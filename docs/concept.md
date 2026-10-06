@@ -1,6 +1,6 @@
 # Game Concept
 
-This document is the single reference for the game concept agreed with the user. It replaces the original notes (`.local/concept.md`, local only and not committed).
+This document is the single reference for the game concept agreed with the user.
 
 ## Contents
 - Status tags
