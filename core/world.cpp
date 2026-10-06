@@ -42,6 +42,33 @@ static_assert(strides_fit_a_cell(), "a tier's stride must not exceed a cell");
 static_assert(TIERS.back().reach == std::numeric_limits<std::int64_t>::max(),
               "the far tier must reach every body");
 
+// The most uses one strike can make: one per tick of the longest step.
+constexpr std::uint64_t longest_interval() {
+  std::uint64_t longest = 0;
+  for (const Tier& tier : TIERS) {
+    longest = std::max(longest, tier.interval);
+  }
+  return longest;
+}
+constexpr std::uint64_t MAX_USES = longest_interval();
+constexpr std::uint64_t UINT64_LIMIT =
+    std::numeric_limits<std::uint64_t>::max();
+
+// The damage a body takes in one tick is at most every agent striking, each
+// with every use, at every agent of the body struck.
+static_assert(MAX_BODY_DAMAGE <=
+                  UINT64_LIMIT / MAX_AGENTS / MAX_USES / MAX_AGENTS,
+              "the damage a body takes in a tick must fit 64 bits");
+static_assert(std::numeric_limits<std::uint32_t>::max() <=
+                  UINT64_LIMIT / MAX_AGENTS / MAX_USES,
+              "the damage a structure takes in a strike must fit 64 bits");
+// wound() multiplies count by strength and adds strength to round up.
+static_assert(MAX_STRENGTH <= (UINT64_LIMIT - MAX_STRENGTH) / MAX_AGENTS,
+              "a body's count times its strength must fit 64 bits");
+// A cooldown leaves half the range to the tick count it is added to.
+static_assert(MAX_COOLDOWN <= UINT64_LIMIT / 2 / MAX_USES,
+              "a step's cooldowns must fit beside the tick count");
+
 std::uint64_t mix(std::uint64_t value) {
   value = (value ^ (value >> MIX_SHIFT_1)) * MIX_MULTIPLIER_1;
   value = (value ^ (value >> MIX_SHIFT_2)) * MIX_MULTIPLIER_2;
@@ -181,27 +208,34 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     return row.size() != factions;
   };
   const auto invalid_skill = [](const Skill& skill) {
-    return !reachable(skill.range) || !reachable(skill.radius);
+    return !reachable(skill.range) || !reachable(skill.radius) ||
+           skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN;
   };
   const auto invalid_army = [this, factions,
                              invalid_skill](const ArmySpec& army) {
     return army.count == 0 || army.strength < army.count ||
-           army.skills.empty() || army.faction >= factions ||
-           !map_.passable(army.start) || !map_.passable(army.objective) ||
+           army.strength > MAX_STRENGTH || army.skills.empty() ||
+           army.faction >= factions || !map_.passable(army.start) ||
+           !map_.passable(army.objective) ||
            std::any_of(army.skills.begin(), army.skills.end(), invalid_skill);
   };
   const auto invalid_structure = [this](const Structure& structure) {
     return !map_.passable(structure.cell);
   };
-  if (!reachable(rules_.separation) ||
+  std::uint64_t agents = 0;
+  for (const ArmySpec& army : armies) {
+    agents += army.count;
+  }
+  if (!reachable(rules_.separation) || agents > MAX_AGENTS ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       std::any_of(armies.begin(), armies.end(), invalid_army) ||
       std::any_of(structures_.begin(), structures_.end(), invalid_structure)) {
     throw std::invalid_argument(
         "separation, range and radius must lie in [0, MAX_REACH], hostility "
-        "must be square, and every army must hold agents, strength and skills "
-        "of a known faction and stand, like every structure, on passable "
-        "cells");
+        "must be square, armies must hold at most MAX_AGENTS agents together, "
+        "and every army must hold agents, strength up to MAX_STRENGTH and "
+        "skills within MAX_BODY_DAMAGE and MAX_COOLDOWN of a known faction "
+        "and stand, like every structure, on passable cells");
   }
   for (ArmySpec& army : armies) {
     armies_.push_back(
