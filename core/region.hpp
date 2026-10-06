@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,13 +22,15 @@ struct TerrainKind {
   std::int32_t weight;
 };
 
-/// A faction: its name, the factions, by index, whose bodies it attacks, and
+/// A faction: its name, the factions, by index, whose bodies it attacks,
 /// the skills its armies use, which decide, among other things, whether they
-/// rebuild what is broken.
+/// rebuild what is broken, and how its leadership passes.
 struct Faction {
   std::string name;
   std::vector<std::size_t> hostile_to;
   std::vector<Skill> skills;
+  /// How its leadership passes; none keeps its leader.
+  std::optional<Duel> succession;
 };
 
 /// A structure a village template places, its cell an offset from the area's
@@ -82,6 +85,9 @@ struct Region {
   std::vector<std::size_t> terrain;
   std::vector<std::size_t> territory;
   std::vector<Village> villages;
+  /// Each faction's leadership: the first resident of its first village, if
+  /// it has one, and its succession.
+  std::vector<Leadership> leadership;
 };
 
 /// Returns the game's terrain kinds, factions and village templates.
