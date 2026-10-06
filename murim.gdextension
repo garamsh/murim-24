@@ -1,0 +1,11 @@
+; Loads the GDExtension adapter that `make build` writes to build/extension/.
+
+[configuration]
+
+entry_symbol = "murim_init"
+compatibility_minimum = "4.7"
+
+[libraries]
+
+macos.debug.arm64 = "res://build/extension/libmurim.macos.template_debug.arm64.dylib"
+linux.debug.x86_64 = "res://build/extension/libmurim.linux.template_debug.x86_64.so"
