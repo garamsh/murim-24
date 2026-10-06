@@ -158,7 +158,7 @@ The village house covers 3 x 3 cells, in four stages that follow the core's stru
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI.
 - The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the rumour that last reached the player, the technique bar with cooldowns, and the current target.
-- UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The mockup's 5-pixel capital font draws English and numerals only; Korean text needs a bitmap font that carries Hangul, which is not chosen yet. Every panel is laid out for the longer of the two strings.
+- UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
 ## Do and don't
 
