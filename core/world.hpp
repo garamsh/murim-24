@@ -29,8 +29,8 @@ struct Body {
 
 /// An ability as data. A body uses it on the nearest living hostile body
 /// within `range`; every hostile body within `radius` of that target, and
-/// every structure whose cell centre lies there, takes the damage. The user
-/// waits `cooldown` ticks between uses.
+/// every structure whose footprint that disc reaches, takes the damage. The
+/// user waits `cooldown` ticks between uses.
 struct Skill {
   std::int32_t range;
   std::int32_t radius;
@@ -59,11 +59,17 @@ struct Order {
   std::vector<std::size_t> skills;
 };
 
-/// A breakable object standing on a map cell.
+/// A breakable object covering `footprint` from `cell`, its top-left cell.
+/// Its cells block movement for as long as the world runs, whatever its
+/// stage.
 struct Structure {
   Cell cell;
   std::uint32_t durability;
+  Footprint footprint{1, 1};
 };
+
+/// The most cells a structure's footprint may span along either side.
+constexpr std::int32_t MAX_FOOTPRINT = 256;
 
 /// How broken a structure is, from durability by the floors in Rules.
 enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
@@ -128,10 +134,14 @@ class World {
   /// is empty, has less strength than agents or more than MAX_STRENGTH, no
   /// skills or a faction outside `hostile`, the armies together hold more
   /// than MAX_AGENTS agents, a skill does more than MAX_BODY_DAMAGE to a body
-  /// or waits longer than MAX_COOLDOWN, or an army or a structure stands on a
-  /// cell that is not passable. Within these limits no damage, count,
-  /// strength, durability or cooldown arithmetic exceeds its type; damage to
-  /// structures and durability need no limit below their 32-bit types.
+  /// or waits longer than MAX_COOLDOWN, a structure's footprint is not 1 to
+  /// MAX_FOOTPRINT cells along each side or covers a cell that is not
+  /// passable or that another structure covers, or an army stands on a cell
+  /// that is not passable or that a structure covers, or from which its
+  /// objective cannot be reached. Within these limits no
+  /// damage, count, strength, durability or cooldown arithmetic exceeds its
+  /// type; damage to structures and durability need no limit below their 32-bit
+  /// types.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules);
 
@@ -140,7 +150,8 @@ class World {
 
   /// Gives army `army` an order, which it follows from the next tick on.
   /// Throws std::invalid_argument when there is no such army, the objective
-  /// is not passable, or the skills are empty or name one the army lacks.
+  /// is not passable or not reachable from the army's lead body, or the
+  /// skills are empty or name one the army lacks.
   void order(std::size_t army, Order order);
 
   /// Advances the world by one step.
@@ -190,6 +201,9 @@ class World {
   std::vector<Army> armies_;
   std::vector<Structure> structures_;
   SpatialHash structure_index_;
+  // The widest footprint's side, in sub-cell units: a structure's centre lies
+  // within it of every point of its footprint.
+  std::int32_t structure_extent_ = 0;
 };
 
 }  // namespace murim

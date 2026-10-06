@@ -31,9 +31,11 @@ const ARMIES: Array[Dictionary] = [
 	{"start": Vector2i(14, 7), "objective": Vector2i(1, 1), "count": 10, "strength": 1010,
 		"faction": 1, "skills": [STRIKE]},
 ]
+# Beside the wall's only gap, at (8, 8), and clear of the cells leading into it, since a structure
+# blocks its cell.
 const STRUCTURES: Array[Dictionary] = [
-	{"cell": Vector2i(8, 8), "durability": 100},
-	{"cell": Vector2i(7, 8), "durability": 60},
+	{"cell": Vector2i(7, 7), "durability": 100},
+	{"cell": Vector2i(9, 7), "durability": 60},
 ]
 const RULES := {"separation": 72, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 # One agent at home and ten hostile agents holding their camp, which strike nothing back.

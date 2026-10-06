@@ -85,13 +85,57 @@ std::int64_t distance_squared(Position origin, Position point) {
 // The range a separation, range or radius must lie in.
 bool reachable(std::int32_t units) { return units >= 0 && units <= MAX_REACH; }
 
+// The centre of each structure's footprint.
 std::vector<Position> centres_of(const std::vector<Structure>& structures) {
   std::vector<Position> centres;
   centres.reserve(structures.size());
   for (const Structure& structure : structures) {
-    centres.push_back(centre_of(structure.cell));
+    centres.push_back(
+        Position{(structure.cell.x * CELL_SIZE) +
+                     (structure.footprint.width * CELL_SIZE / 2),
+                 (structure.cell.y * CELL_SIZE) +
+                     (structure.footprint.height * CELL_SIZE / 2)});
   }
   return centres;
+}
+
+// Blocks every structure's footprint on `map`. Returns false at the first
+// footprint of a size outside [1, MAX_FOOTPRINT] or covering a cell that is
+// not passable, which includes one an earlier structure covers.
+bool block_footprints(Map& map, const std::vector<Structure>& structures) {
+  const auto spans = [](std::int32_t side) {
+    return side >= 1 && side <= MAX_FOOTPRINT;
+  };
+  for (const Structure& structure : structures) {
+    if (!spans(structure.footprint.width) ||
+        !spans(structure.footprint.height)) {
+      return false;
+    }
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      if (!map.passable(cell)) {
+        return false;
+      }
+      map.block(cell);
+    }
+  }
+  return true;
+}
+
+// Whether the disc of `radius` around `centre` reaches a sub-cell unit of the
+// structure's footprint: the footprint's nearest point lies within it.
+bool reaches(const Structure& structure, Position centre, std::int32_t radius) {
+  const auto gap = [](std::int64_t point, std::int32_t first,
+                      std::int32_t cells) {
+    const std::int64_t low = std::int64_t{first} * CELL_SIZE;
+    const std::int64_t high = ((std::int64_t{first} + cells) * CELL_SIZE) - 1;
+    return std::max({low - point, std::int64_t{0}, point - high});
+  };
+  const std::int64_t gap_x =
+      gap(centre.x, structure.cell.x, structure.footprint.width);
+  const std::int64_t gap_y =
+      gap(centre.y, structure.cell.y, structure.footprint.height);
+  return (gap_x * gap_x) + (gap_y * gap_y) <=
+         std::int64_t{radius} * std::int64_t{radius};
 }
 
 std::int32_t sign(std::int64_t value) {
@@ -220,23 +264,28 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
            !map_.passable(army.objective) ||
            std::any_of(army.skills.begin(), army.skills.end(), invalid_skill);
   };
-  const auto invalid_structure = [this](const Structure& structure) {
-    return !map_.passable(structure.cell);
-  };
+  // Footprints block their cells before any army is checked against them.
+  const bool placed = block_footprints(map_, structures_);
   std::uint64_t agents = 0;
   for (const ArmySpec& army : armies) {
     agents += army.count;
   }
   if (!reachable(rules_.separation) || agents > MAX_AGENTS ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
-      std::any_of(armies.begin(), armies.end(), invalid_army) ||
-      std::any_of(structures_.begin(), structures_.end(), invalid_structure)) {
+      !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
         "separation, range and radius must lie in [0, MAX_REACH], hostility "
         "must be square, armies must hold at most MAX_AGENTS agents together, "
         "and every army must hold agents, strength up to MAX_STRENGTH and "
         "skills within MAX_BODY_DAMAGE and MAX_COOLDOWN of a known faction "
-        "and stand, like every structure, on passable cells");
+        "and stand on passable cells, and every structure must cover 1 to "
+        "MAX_FOOTPRINT cells along each side, all passable and covered by no "
+        "other structure");
+  }
+  for (const Structure& structure : structures_) {
+    structure_extent_ =
+        std::max({structure_extent_, structure.footprint.width * CELL_SIZE,
+                  structure.footprint.height * CELL_SIZE});
   }
   for (ArmySpec& army : armies) {
     std::vector<std::size_t> every_skill(army.skills.size());
@@ -248,6 +297,10 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              Order{army.objective, std::move(every_skill)},
              FlowField{map_, army.objective},
              {Body{centre_of(army.start), army.count, army.strength, 0}}});
+    if (armies_.back().field.distance(army.start) == FlowField::UNREACHABLE) {
+      throw std::invalid_argument(
+          "every army's objective must be reachable from its start");
+    }
   }
 }
 
@@ -265,7 +318,13 @@ void World::order(std::size_t army, Order order) {
         "of the army's skills");
   }
   Army& ordered = armies_.at(army);
-  ordered.field = FlowField{map_, order.objective};
+  FlowField field{map_, order.objective};
+  if (field.distance(cell_of(ordered.bodies.front().position)) ==
+      FlowField::UNREACHABLE) {
+    throw std::invalid_argument(
+        "an order's objective must be reachable from where the army stands");
+  }
+  ordered.field = std::move(field);
   ordered.order = std::move(order);
 }
 
@@ -343,6 +402,8 @@ StateHash World::hash() const {
   for (const Structure& structure : structures_) {
     fold(structure.cell.x);
     fold(structure.cell.y);
+    fold(structure.footprint.width);
+    fold(structure.footprint.height);
     fold(structure.durability);
   }
   for (const Army& army : armies_) {
@@ -448,11 +509,14 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
     }
   });
   const std::uint64_t broken = std::uint64_t{skill.structure_damage} * force;
-  structure_index_.visit_within(centre, skill.radius, [&](std::size_t index) {
-    Structure& structure = structures_.at(index);
-    structure.durability -= static_cast<std::uint32_t>(
-        std::min<std::uint64_t>(broken, structure.durability));
-  });
+  structure_index_.visit_within(
+      centre, skill.radius + structure_extent_, [&](std::size_t index) {
+        Structure& structure = structures_.at(index);
+        if (reaches(structure, centre, skill.radius)) {
+          structure.durability -= static_cast<std::uint32_t>(
+              std::min<std::uint64_t>(broken, structure.durability));
+        }
+      });
 }
 
 }  // namespace murim

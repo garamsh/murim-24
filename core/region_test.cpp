@@ -29,19 +29,17 @@ std::size_t index_of(Cell cell) {
 }
 
 std::vector<Cell> area_of(const Village& village) {
-  std::vector<Cell> cells;
-  for (std::int32_t row = 0; row < village.side; ++row) {
-    for (std::int32_t column = 0; column < village.side; ++column) {
-      cells.push_back(Cell{village.corner.x + column, village.corner.y + row});
-    }
-  }
-  return cells;
+  return cells_of(village.corner, village.area);
 }
 
 bool inside(const Village& village, Cell cell) {
   return cell.x >= village.corner.x && cell.y >= village.corner.y &&
-         cell.x < village.corner.x + village.side &&
-         cell.y < village.corner.y + village.side;
+         cell.x < village.corner.x + village.area.width &&
+         cell.y < village.corner.y + village.area.height;
+}
+
+bool same(Cell left, Cell right) {
+  return left.x == right.x && left.y == right.y;
 }
 
 // Every field of a region, as integers, so two regions compare equal exactly
@@ -82,6 +80,8 @@ std::vector<std::int64_t> flatten(const Region& region) {
     add(structure.cell.x);
     add(structure.cell.y);
     add(structure.durability);
+    add(structure.footprint.width);
+    add(structure.footprint.height);
   }
   add(region.rules.separation);
   for (const std::vector<bool>& row : region.rules.hostile) {
@@ -103,7 +103,8 @@ std::vector<std::int64_t> flatten(const Region& region) {
     add(village.faction);
     add(village.corner.x);
     add(village.corner.y);
-    add(village.side);
+    add(village.area.width);
+    add(village.area.height);
     for (const std::size_t structure : village.structures) {
       add(structure);
     }
@@ -117,6 +118,17 @@ World world_of(const Region& region) {
                region.structures, region.rules};
 }
 
+// Whether the region is a world's valid input, footprints and armies
+// included.
+bool builds_a_world(const Region& region) {
+  try {
+    static_cast<void>(world_of(region));
+    return true;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
 StateHash hash_after_ticks(const Region& region) {
   World world = world_of(region);
   for (int tick = 0; tick < TICKS; ++tick) {
@@ -125,22 +137,24 @@ StateHash hash_after_ticks(const Region& region) {
   return world.hash();
 }
 
-// Whether every cell of each village's square is passable, and its structures
-// and resident army stand inside that square.
+// Whether every cell of each village's area is passable, every cell of its
+// structures' footprints lies inside that area, and its resident army stands
+// inside it on a cell no structure covers.
 bool villages_on_passable_cells(const Region& region) {
   const Map map{region.map_rows};
   for (const Village& village : region.villages) {
+    const Cell home = region.armies.at(village.army).start;
+    bool fits = inside(village, home);
     for (const Cell cell : area_of(village)) {
-      if (!map.passable(cell)) {
-        return false;
+      fits = fits && map.passable(cell);
+    }
+    for (const std::size_t index : village.structures) {
+      const Structure& structure = region.structures.at(index);
+      for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+        fits = fits && inside(village, cell) && !same(cell, home);
       }
     }
-    for (const std::size_t structure : village.structures) {
-      if (!inside(village, region.structures.at(structure).cell)) {
-        return false;
-      }
-    }
-    if (!inside(village, region.armies.at(village.army).start)) {
+    if (!fits) {
       return false;
     }
   }
@@ -235,6 +249,7 @@ TEST(Region, VillagesStandOnPassableCells) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
     const Region region = generate_region(Seed{seed}, region_data());
     EXPECT_TRUE(villages_on_passable_cells(region)) << "seed " << seed;
+    EXPECT_TRUE(builds_a_world(region)) << "seed " << seed;
 
     // Control: blocking the cell a resident army stands on breaks it.
     Region blocked = region;
@@ -306,9 +321,22 @@ TEST(Region, RejectsInconsistentData) {
                std::invalid_argument);
 
   RegionData outside = region_data();
-  VillageTemplate& village = outside.villages.at(0);
-  village.structures.push_back(Cell{village.side, 0});
+  VillageTemplate& beyond = outside.villages.at(0);
+  beyond.structures.push_back(Structure{{beyond.area.width - 1, 0}, 1, {2, 1}});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, outside)),
+               std::invalid_argument);
+
+  RegionData overlapping = region_data();
+  VillageTemplate& doubled = overlapping.villages.at(0);
+  doubled.structures.push_back(doubled.structures.front());
+  EXPECT_THROW(static_cast<void>(generate_region(SEED, overlapping)),
+               std::invalid_argument);
+
+  RegionData over_centre = region_data();
+  VillageTemplate& central = over_centre.villages.at(0);
+  central.structures.push_back(
+      Structure{{central.area.width / 2, central.area.height / 2}, 1, {1, 1}});
+  EXPECT_THROW(static_cast<void>(generate_region(SEED, over_centre)),
                std::invalid_argument);
 }
 
@@ -322,7 +350,7 @@ TEST(Region, ABodyBornIntoAVillageIsOneAgentOfItsFactionInsideIt) {
   EXPECT_EQ(born.faction, village.faction);
   EXPECT_EQ(born.strength, residents.strength / residents.count);
   EXPECT_TRUE(inside(village, born.start));
-  EXPECT_TRUE(inside(village, born.objective));
+  EXPECT_TRUE(same(born.objective, born.start));
   region.armies.push_back(born);
   EXPECT_NO_THROW(world_of(region));
   // Control: a village the region lacks has no one born into it.
