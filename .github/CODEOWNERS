@@ -1,0 +1,5 @@
+# The rules are owned; changes to these paths require review from their owner.
+/AGENTS.md @sauce-git
+/docs/convention/ @sauce-git
+/docs/architecture/ @sauce-git
+/.github/ @sauce-git
