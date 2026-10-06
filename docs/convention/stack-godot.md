@@ -21,7 +21,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 
 - The repository root is the Godot project: `project.godot` and `murim.gdextension` sit there.
 - `murim.gdextension` names, per platform, the library `make build` writes to `build/extension/`.
-- A scene keeps the scripts and resources only it uses in its own folder; a resource two scenes share sits in the nearest folder both are under.
+- A scene is `<name>/<name>.tscn` in a folder at the repository root named for it, with its script `<name>.gd` beside it, such as `world_view/world_view.tscn`. The scene keeps the scripts and resources only it uses in that folder; a resource two scenes share sits in the nearest folder both are under.
 - Every `.uid` file Godot writes beside a script or resource is committed with it.
 - A folder Godot must not import holds an empty `.gdignore`. `make build` writes `build/.gdignore`.
 
@@ -43,6 +43,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 |---|---|
 | `make build` | After the C++ builds, writes `build/.gdignore`, and `.godot/extension_list.cfg` naming every committed `*.gdextension`. |
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
+| `make bench` | After the tick benchmark, `godot --path . --script res://world_view/frame_bench.gd` renders `world_view/world_view.tscn` in a window with vsync off. It checks the scenario first, then prints p50, p99 and max frame time over its timed frames, and PASS or FAIL against a 16.7 ms p99. It needs a display, so it runs on a developer's machine only, and says so. `make bench` exits non-zero when either benchmark fails. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
 
