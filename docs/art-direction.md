@@ -24,13 +24,15 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 
 | Asset | Frame | Tags |
 |---|---|---|
-| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four variants each |
+| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each |
+| `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14 |
+| `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3` |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` (four frames) |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, and a scene assembled from them on the grid; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, and a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
 
 ## Screen and grid
 
@@ -94,19 +96,26 @@ Faction accents, chosen to stay apart at one cell and against every terrain kind
 
 One tile set covers the terrain kinds the region generator defines (`core/region.cpp`, `region_data()`): plain, forest, hills, water and mountain.
 
-| Kind | Passable | Look |
-|---|---|---|
-| Plain | yes | Grass in three tones with tufts and a rare flower |
-| Forest | yes | Separate tree crowns from above, lit from the upper left with a dark rim, the dark understorey and the odd trunk showing between them |
-| Hills | yes | Rough grass with one or two low mounds, lit from the upper left, a contour on the lower side and a short shadow |
-| Water | no | Deep and shallow blue with short light ripples; no grass anywhere |
-| Mountain | no | One or two crags on dark scree: a lit west face, a shaded east face with a gully, a pale summit, a shadowed foot |
+| Kind | Passable | Full tile | Where it meets the plain | Landforms |
+|---|---|---|---|---|
+| Plain | yes | Grass in three tones with tufts and a rare flower | (the ground under every other kind) | none |
+| Forest | yes | Separate tree crowns from above, lit from the upper left with a dark rim, the understorey and the odd trunk between them | A dark canopy edge and a shadow on the grass | none |
+| Hills | yes | Upland grass a step lighter than the plain, with a faint contour arc | A contour, dark on the lower-right side and lit on the upper-left | Clusters of low mounds, 2 x 1 to 3 x 3 cells |
+| Water | no | Blue with a little deep-water grain and short light ripples | Foam, then a bank of wet earth | none |
+| Mountain | no | Fractured stone and scree | A lit lip above, a dark cliff foot below, a shadow on the grass | Massifs of sharp peaks, 2 x 2 to 4 x 3 cells |
 
 - A tile carries no outline, so tiles of one kind join into one surface.
-- Every variant of a kind meets every other without a seam. Near the tile's edge every variant has the same fine ground texture, repeating every 16 pixels; the variants differ only in the middle.
-- Features (crowns, mounds, crags) stay inside their tile, and the variants place them differently. No line runs from one tile edge to the next, so a stretch of one kind does not tile into bands. The contact sheet shows each kind tiled over 12 x 6 cells, with each cell's variant picked by a seeded hash.
+- Full tiles carry no feature larger than a tuft, a crown or a ripple, and near their edge all four variants are the same grain, so a stretch of one kind shows neither seams nor a feature per cell.
+- Features larger than a cell are landforms: mountain massifs and hill clusters, each over a footprint of several cells, standing on a stretch of their kind and drawn with everything standing, by the bottom edge of the footprint. A landform's frame is 64 x 64 with the footprint at its bottom-left; what rises above the footprint is drawn above it in the frame.
 - Water and mountain, the two impassable kinds, carry no green, so passability reads from colour family alone.
-- Where two kinds meet, the cell edge shows. Transition tiles are not drawn yet; the mockup's ragged river bank is the look they are to give.
+
+Transitions:
+
+- Every kind but the plain is laid over the plain on a dual grid, half a cell up and left of the cells, so each tile's four corners sit on four cells' centres.
+- A tile's corner mask adds top-left 1, top-right 2, bottom-left 4 and bottom-right 8 for each of those four cells that is of the kind. Masks 1 to 14 are the transition tiles, frame mask of the kind's tag in `art/terrain/transitions`; mask 15 is one of the kind's full tiles; mask 0 is empty. The 16 tiles are the set Godot's Match Corners terrain mode describes.
+- Within a transition tile, the kind's area is its corners blended across the tile with noise that repeats every 16 pixels, so neighbouring tiles agree all along their shared edge. The rest is transparent, so the plain shows.
+- Where two kinds other than the plain meet, each meets the plain, and a strip of plain shows between them, read as a bank or a clearing.
+- How Godot lays them is in `docs/convention/stack-godot.md` §Terrain layers.
 
 ## Bodies and markers
 
