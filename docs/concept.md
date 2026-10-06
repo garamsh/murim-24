@@ -111,4 +111,4 @@ The items below are not yet decided.
 - What happens after immortality is reached (for example, an ending in which ascension (deungseon) ends the cycle of reincarnation, versus remaining in the world).
 - Whether to include factors that shorten lifespan (side effects of demonic martial arts, qi deviation, poison, and so on).
 - Whether to include the martial clan and government factions.
-- Separating simulation from presentation, and distance-based simulation LOD: awaiting the user's approval as an architectural direction.
+- Distance-based simulation LOD: to be decided in an ADR together with the simulation core.
