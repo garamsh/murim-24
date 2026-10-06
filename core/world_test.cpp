@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -370,6 +371,81 @@ TEST(World, AreaSkillHitsExactlyTheBodiesInsideItsShape) {
   EXPECT_EQ(std::find(narrower.begin(), narrower.end(), edge), narrower.end());
 }
 
+void run_ticks(World& world, std::uint64_t ticks) {
+  for (std::uint64_t i = 0; i < ticks; ++i) {
+    world.tick();
+  }
+}
+
+// Two armies on neighbouring cells, far from the focus: one agent with
+// `user_skill`, and the rest of MAX_AGENTS as its target with MAX_STRENGTH.
+std::vector<ArmySpec> at_the_limits(const Skill& user_skill) {
+  constexpr std::uint32_t TARGETS = MAX_AGENTS - 1;
+  const std::vector<ArmySpec> armies{
+      {{3, 3}, {3, 3}, 1, MAX_STRENGTH, 0, {user_skill}},
+      {{4, 3}, {4, 3}, TARGETS, MAX_STRENGTH, 1, {IDLE}},
+  };
+  return armies;
+}
+
+// The separation of at_the_limits(): one sub-cell unit per agent, so a
+// small disc covers every target agent.
+constexpr std::int32_t PACKED = 1;
+
+// The skill of at_the_limits(): the most damage, a disc whose area,
+// 355 * 600^2 / 113 = 1130973 squares, covers all 2^20 - 1 target agents,
+// and a cooldown of 1 so a far step holds 16 uses.
+constexpr Skill LIMIT_SKILL{2 * CELL_SIZE, 600, MAX_BODY_DAMAGE, 0, 1};
+
+TEST(World, StrikeAtTheLargestAcceptedValuesKeepsTotalsExact) {
+  const std::vector<ArmySpec> armies = at_the_limits(LIMIT_SKILL);
+  World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(PACKED)};
+  world.set_focus(Position{FAR_AWAY, FAR_AWAY});
+  run_ticks(world, TIERS.back().interval);
+
+  // 2^19 damage, times 16 uses, times 2^20 - 1 agents struck, is
+  // 2^43 - 2^23: the target keeps 2^23 strength, and its count falls in
+  // proportion to one agent.
+  const std::uint64_t dealt =
+      MAX_BODY_DAMAGE * TIERS.back().interval * armies.at(1).count;
+  const Totals kept = totals(world.bodies(1));
+  EXPECT_EQ(kept.strength, MAX_STRENGTH - dealt);
+  EXPECT_EQ(kept.count, 1U);
+  EXPECT_TRUE(totals(world.bodies(0)) ==
+              (Totals{armies.at(0).count, armies.at(0).strength}));
+}
+
+// Whether the constructor refuses `armies` with std::invalid_argument.
+bool refused(const std::vector<ArmySpec>& armies) {
+  try {
+    const World world{
+        Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(PACKED)};
+  } catch (const std::invalid_argument&) {
+    return true;
+  }
+  return false;
+}
+
+TEST(World, InputJustPastALimitIsRefused) {
+  std::vector<ArmySpec> agents = at_the_limits(LIMIT_SKILL);
+  ++agents.at(1).count;
+  std::vector<ArmySpec> strength = at_the_limits(LIMIT_SKILL);
+  ++strength.at(1).strength;
+  Skill damage = LIMIT_SKILL;
+  ++damage.body_damage;
+  Skill cooldown = LIMIT_SKILL;
+  cooldown.cooldown = MAX_COOLDOWN + 1;
+  Skill longest = LIMIT_SKILL;
+  longest.cooldown = MAX_COOLDOWN;
+
+  // Control: the values at every limit are accepted.
+  EXPECT_FALSE(refused(at_the_limits(longest)));
+  EXPECT_TRUE(refused(agents));
+  EXPECT_TRUE(refused(strength));
+  EXPECT_TRUE(refused(at_the_limits(damage)));
+  EXPECT_TRUE(refused(at_the_limits(cooldown)));
+}
+
 TEST(World, AreaSkillWalksAStructureThroughEveryStage) {
   constexpr std::uint32_t DURABILITY = 100;
   const ArmySpec user{{0, 0}, {0, 0}, 1, 1, 0, {{2 * CELL_SIZE, 0, 0, 30, 1}}};
@@ -540,12 +616,6 @@ TEST(World, QuickSkillBeatsSlowSkillNearAndFarAlike) {
   // than the far tier's 16-tick step.
   const Skill heave{2 * CELL_SIZE, 0, 24, 0, 20};
   expect_same_outcome(JAB, heave, 0);
-}
-
-void run_ticks(World& world, std::uint64_t ticks) {
-  for (std::uint64_t i = 0; i < ticks; ++i) {
-    world.tick();
-  }
 }
 
 // Both armies' totals, compared as a whole.

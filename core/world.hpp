@@ -63,6 +63,18 @@ enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
 /// units; it keeps the products of their squares within 64 bits.
 constexpr std::int32_t MAX_REACH = std::int32_t{1} << 26;
 
+/// The most agents all of a world's armies may hold together.
+constexpr std::uint64_t MAX_AGENTS = std::uint64_t{1} << 20;
+
+/// The most strength one army may hold.
+constexpr std::uint64_t MAX_STRENGTH = std::uint64_t{1} << 43;
+
+/// The most damage a skill may do to a body.
+constexpr std::uint64_t MAX_BODY_DAMAGE = std::uint64_t{1} << 19;
+
+/// The longest cooldown a skill may have, in ticks.
+constexpr std::uint64_t MAX_COOLDOWN = std::uint64_t{1} << 32;
+
 /// The data a world's rules read.
 struct Rules {
   /// Sub-cell units moving bodies keep apart; 0 lets them overlap. It is
@@ -101,9 +113,13 @@ class World {
  public:
   /// Throws std::invalid_argument when the separation, or a skill's range or
   /// radius, lies outside [0, MAX_REACH], `hostile` is not square, an army
-  /// is empty, has less strength than agents, no skills or a faction outside
-  /// `hostile`, or an army or a structure stands on a cell that is not
-  /// passable.
+  /// is empty, has less strength than agents or more than MAX_STRENGTH, no
+  /// skills or a faction outside `hostile`, the armies together hold more
+  /// than MAX_AGENTS agents, a skill does more than MAX_BODY_DAMAGE to a body
+  /// or waits longer than MAX_COOLDOWN, or an army or a structure stands on a
+  /// cell that is not passable. Within these limits no damage, count,
+  /// strength, durability or cooldown arithmetic exceeds its type; damage to
+  /// structures and durability need no limit below their 32-bit types.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules);
 
