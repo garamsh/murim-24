@@ -80,4 +80,11 @@ struct Region {
 /// throws std::runtime_error when a village finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
+/// Returns an army of one agent born into village `village` of `region`: of
+/// the village's faction, standing at its corner with that cell as its
+/// objective, clear of the residents crowding its centre, with their skills
+/// and an agent's share of their strength. Throws std::out_of_range when there
+/// is no such village.
+[[nodiscard]] ArmySpec born_in(const Region& region, std::size_t village);
+
 }  // namespace murim

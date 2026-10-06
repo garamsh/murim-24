@@ -273,4 +273,15 @@ Region generate_region(Seed seed, const RegionData& data) {
   return region;
 }
 
+ArmySpec born_in(const Region& region, std::size_t village) {
+  const Village& home = region.villages.at(village);
+  const ArmySpec& residents = region.armies.at(home.army);
+  return ArmySpec{home.corner,
+                  home.corner,
+                  1,
+                  residents.strength / residents.count,
+                  residents.faction,
+                  residents.skills};
+}
+
 }  // namespace murim

@@ -187,7 +187,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xC4F8BB5BCC33A95ULL);
+            0x704FDE0B4DC99739ULL);
 }
 
 // Keeps the focus `tier.reach` to the side of the army's lead body, so the
@@ -753,6 +753,161 @@ TEST(World, ArmiesKeepCountAndStrengthWhenRegroupedMidBattle) {
   // The battle goes on once the cooldown has passed.
   run_ticks(world, COOLDOWN - BEFORE_COLLAPSE - COLLAPSED_FOR);
   EXPECT_FALSE(same_totals(world, struck));
+}
+
+// An order given before tick `tick` of a run.
+struct LoggedOrder {
+  std::uint64_t tick;
+  std::size_t army;
+  Order order;
+};
+
+// Ticks `world` `ticks` times as a driving adapter does: gives each logged
+// order before its tick, and places the focus on army `steered`'s lead body
+// before every tick. Returns the orders given, as a recording.
+std::vector<LoggedOrder> drive(World& world, std::size_t steered,
+                               const std::vector<LoggedOrder>& log,
+                               std::uint64_t ticks) {
+  std::vector<LoggedOrder> given;
+  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+    for (const LoggedOrder& logged : log) {
+      if (logged.tick == tick) {
+        world.order(logged.army, logged.order);
+        given.push_back(logged);
+      }
+    }
+    world.set_focus(world.bodies(steered).front().position);
+    world.tick();
+  }
+  return given;
+}
+
+constexpr std::size_t STEERED = 0;
+constexpr std::size_t ORDERS_SIDE = 24;
+constexpr std::uint64_t ORDER_TICKS = 1'500;
+constexpr Cell STEERED_HOME{2, 2};
+constexpr Cell HOSTILE_HOME{12, 12};
+constexpr Cell BESIDE_HOSTILE{12, 10};
+constexpr Seed ORDERS_SEED{7};
+constexpr std::uint64_t HOSTILE_STRENGTH = 6'000;
+constexpr std::uint32_t DURABILITY = 100;
+
+// One agent at STEERED_HOME with a skill that spares structures and one that
+// breaks them, bound for `objective`; six hostile agents holding
+// HOSTILE_HOME, with a structure under them.
+World orders_world(Cell objective) {
+  const Skill strike{3 * CELL_SIZE, 0, 50, 0, 10};
+  const Skill smash{3 * CELL_SIZE, CELL_SIZE, 50, 40, 10};
+  const Skill guard{3 * CELL_SIZE, 0, 1, 0, 10};
+  const std::vector<ArmySpec> armies{
+      {STEERED_HOME, objective, 1, 100'000, 0, {strike, smash}},
+      {HOSTILE_HOME, HOSTILE_HOME, 6, HOSTILE_STRENGTH, 1, {guard}},
+  };
+  return World{ORDERS_SEED,
+               Map{open_map(ORDERS_SIDE)},
+               armies,
+               {{HOSTILE_HOME, DURABILITY}},
+               at_war(SEPARATION)};
+}
+
+TEST(World, OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData) {
+  World npc = orders_world(BESIDE_HOSTILE);
+  drive(npc, STEERED, {}, ORDER_TICKS);
+  World ordered = orders_world(STEERED_HOME);
+  drive(ordered, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0, 1}}}},
+        ORDER_TICKS);
+
+  // Setup: the body left home and the hostile army took damage, so the run
+  // covered moving and striking.
+  EXPECT_FALSE(in(STEERED_HOME, ordered.bodies(STEERED).front().position));
+  EXPECT_LT(totals(ordered.bodies(1)).strength, HOSTILE_STRENGTH);
+  EXPECT_EQ(npc.hash(), ordered.hash());
+  // Control: the same order with one skill fewer is another run.
+  World narrower = orders_world(STEERED_HOME);
+  drive(narrower, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
+  EXPECT_NE(npc.hash(), narrower.hash());
+}
+
+TEST(World, OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse) {
+  World smashing = orders_world(STEERED_HOME);
+  drive(smashing, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {1}}}}, ORDER_TICKS);
+  EXPECT_LT(smashing.structure(0).durability, DURABILITY);
+
+  // Control: ordered to the skill that spares structures, the body still
+  // strikes, and the structure stands untouched.
+  World striking = orders_world(STEERED_HOME);
+  drive(striking, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
+  EXPECT_LT(totals(striking.bodies(1)).strength, HOSTILE_STRENGTH);
+  EXPECT_EQ(striking.structure(0).durability, DURABILITY);
+}
+
+TEST(World, TiersExpandAndCollapseAroundTheSteeredBody) {
+  constexpr std::size_t SIDE = 64;
+  constexpr std::uint64_t LEG_TICKS = 1'200;
+  const Cell home{2, 4};
+  const ArmySpec steered{home, home, 1, 100, 0, {IDLE}};
+  const ArmySpec camp{{56, 4}, {56, 4}, 20, 2'000, 0, {IDLE}};
+  const auto run = [&](bool follow) {
+    World world{Seed{3},
+                Map{open_map(SIDE)},
+                {steered, camp},
+                {},
+                peaceful(SEPARATION)};
+    world.set_focus(centre_of(home));
+    std::vector<std::size_t> sizes;
+    for (const Cell objective : {Cell{54, 4}, home}) {
+      world.order(STEERED, {objective, {0}});
+      for (std::uint64_t tick = 0; tick < LEG_TICKS; ++tick) {
+        world.set_focus(follow ? world.bodies(STEERED).front().position
+                               : centre_of(home));
+        world.tick();
+        sizes.push_back(world.bodies(1).size());
+      }
+    }
+    return sizes;
+  };
+
+  const std::vector<std::size_t> following = run(true);
+  EXPECT_EQ(following.front(), 1U);
+  EXPECT_GT(*std::max_element(following.begin(), following.end()), 1U);
+  EXPECT_EQ(following.back(), 1U);
+  // Control: with the focus left at home the camp never expands.
+  const std::vector<std::size_t> staying = run(false);
+  EXPECT_EQ(*std::max_element(staying.begin(), staying.end()), 1U);
+}
+
+TEST(World, ReplayingARecordedOrderLogGivesTheSameHash) {
+  const std::vector<LoggedOrder> issued{
+      {0, STEERED, {BESIDE_HOSTILE, {0, 1}}},
+      {400, STEERED, {Cell{6, 14}, {1}}},
+      {900, STEERED, {BESIDE_HOSTILE, {0}}},
+  };
+  World live = orders_world(STEERED_HOME);
+  const std::vector<LoggedOrder> recorded =
+      drive(live, STEERED, issued, ORDER_TICKS);
+  ASSERT_EQ(recorded.size(), issued.size());
+  World replayed = orders_world(STEERED_HOME);
+  drive(replayed, STEERED, recorded, ORDER_TICKS);
+  EXPECT_EQ(live.hash(), replayed.hash());
+
+  // Control: the same log with one order a tick later is another run.
+  std::vector<LoggedOrder> late = recorded;
+  late.at(1).tick += 1;
+  World shifted = orders_world(STEERED_HOME);
+  drive(shifted, STEERED, late, ORDER_TICKS);
+  EXPECT_NE(live.hash(), shifted.hash());
+}
+
+TEST(World, OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused) {
+  World world = orders_world(STEERED_HOME);
+  EXPECT_NO_THROW(world.order(STEERED, {BESIDE_HOSTILE, {1}}));
+
+  EXPECT_THROW(world.order(2, {BESIDE_HOSTILE, {0}}), std::invalid_argument);
+  EXPECT_THROW(world.order(STEERED, {Cell{-1, 0}, {0}}), std::invalid_argument);
+  EXPECT_THROW(world.order(STEERED, {BESIDE_HOSTILE, {}}),
+               std::invalid_argument);
+  EXPECT_THROW(world.order(STEERED, {BESIDE_HOSTILE, {2}}),
+               std::invalid_argument);
 }
 
 }  // namespace

@@ -10,6 +10,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
 - A faction is a name and the factions it attacks; the rules' hostility matrix is built from those lists.
 - A village template is a name, the side of the square it occupies, and the cells of its structures within that square. A village has a name, an owner, its square, its structures and a resident army at its centre, of a fixed number of agents for each structure.
 - Terrain and territory each partition the grid by nearest site: terrain around sites at random cells, each of a kind drawn by weight; territory around one capital per faction, each the farthest from those already placed among a fixed number of random cells.
+- `born_in` makes an army of one agent born into a village: of the village's faction, at its corner, clear of the residents crowding its centre, with their skills and one agent's share of their strength. The player's body is born this way.
 - Six to eight villages are owned in turn by each faction. Each takes a template drawn by the seed and a corner drawn among every corner where its square lies on free passable cells of its owner's territory; no corner left is a failure the generator reports.
 - Generation uses integers only, and the seed is its only source of randomness, so the same seed and tables give the same region. The draws come from the same generator as the M1 scenario's (`core/random.cpp`).
 - Tests over 200 seeds show every village on passable cells in its owner's territory, no two overlapping, and a fourth faction added to the table alone generated with territory and villages.
@@ -17,6 +18,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
 ## Rationale
 
 - Content as data tables, nearest-site partitions, capitals spread by best candidate, and villages placed among every corner that fits: ADR 0009 (`adr/0009-generate-a-region-from-data-tables-by-nearest-site-partitions.md`).
+- A body born into a village as a one-agent army, the shape the player's body takes: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
 - Integers only, with the seed as the only randomness, for determinism across builds: ADR 0005 (`adr/0005-simulate-armies-at-three-levels-of-detail-in-fixed-point.md`).
 
 ## Open questions
