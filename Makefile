@@ -3,6 +3,7 @@
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
 BENCH_DIR := $(BUILD_DIR)/bench
+LINT_DIR := $(BUILD_DIR)/lint
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -30,15 +31,25 @@ build:
 	@echo "imported $$($(IMPORT_SCOPE) | wc -l | tr -d ' ') resources into .godot/, selected by: $(IMPORT_SCOPE)"
 	@echo "built every target in core/CMakeLists.txt into $(BUILD_DIR)/, and every default target in extension/CMakeLists.txt into $(EXTENSION_BUILD_DIR)/; registered $$($(GDEXTENSION_SCOPE) | wc -l | tr -d ' ') GDExtension, selected by: $(GDEXTENSION_SCOPE)"
 
+# Lint parses on every host as on an Ubuntu 24.04 x86_64 host, against the pinned headers lint-sysroot.sh unpacks (ADR 0016):
+# clang-tidy's findings depend on the standard library it parses. The configures only write compile_commands.json;
+# clang++ is the platform's, and CMake asks it to compile and never to link, so it needs no target linker or libraries.
+# CMake cannot detect the pointer size without linking, so x86_64's is given; godot-cpp needs it.
+LINT_TARGET := -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=$(CURDIR)/$(LINT_DIR)/sysroot \
+	-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
 lint: build
 	./check-contents-list.sh
+	./lint-sysroot.sh $(LINT_DIR)/sysroot
+	$(TOOLS)/cmake -S core -B $(LINT_DIR)/core -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja $(LINT_TARGET)
+	$(TOOLS)/cmake -S extension -B $(LINT_DIR)/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 $(LINT_TARGET)
+	$(TOOLS)/ninja -C $(LINT_DIR)/extension _deps/godot-cpp-build/generate_bindings
 	@files=$$($(CXX_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no C++ source was read" >&2; exit 1; }; \
-	$(TOOLS)/clang-tidy --quiet -p $(BUILD_DIR) $$files && \
+	$(TOOLS)/clang-tidy --quiet -p $(LINT_DIR)/core $$files && \
 	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ headers they include, selected by: $(CXX_SOURCE_SCOPE)"
 	@files=$$($(EXTENSION_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no extension/ C++ source was read" >&2; exit 1; }; \
-	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/extension/[^/]+\.hpp$$' -p $(EXTENSION_BUILD_DIR) $$files && \
+	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/extension/[^/]+\.hpp$$' -p $(LINT_DIR)/extension $$files && \
 	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') extension/ C++ sources and the extension/ headers they include, with core/.clang-tidy, selected by: $(EXTENSION_SOURCE_SCOPE)"
 
 format:
