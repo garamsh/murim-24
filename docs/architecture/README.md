@@ -34,3 +34,4 @@ Current architecture of the system and the decisions behind it. This file is the
 - `adr/0007-move-each-army-at-its-own-phase-within-its-tier.md` — each army moves at a phase set by its index within its tier's interval, spreading a tier's movement over its ticks, while strikes stay on the tier's common tick
 - `adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md` — an orthogonal top-down view with one cell to one tile, real-time combat on the core's tick, and pixel art on a 16-pixel tile grid from Aseprite
 - `adr/0009-generate-a-region-from-data-tables-by-nearest-site-partitions.md` — terrain, faction and village data as tables, terrain and territory partitioned by nearest site, capitals spread by best candidate, villages owned in turn and placed among every corner that fits
+- `adr/0010-keep-the-cores-inside-undivided.md` — the application's inside stays undivided, with no rings and no folder per subject area, its files flat in `core/`
