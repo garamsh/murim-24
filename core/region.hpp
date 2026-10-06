@@ -27,13 +27,22 @@ struct Faction {
   std::vector<std::size_t> hostile_to;
 };
 
-/// A kind of village: the `area` it occupies, and its `structures`, each cell
-/// an offset from the area's corner. Its resident army stands at the area's
-/// centre, with a fixed number of agents for each structure.
+/// A structure a village template places, its cell an offset from the area's
+/// corner; the `kind` of building it is, which names its art; and how many
+/// `residents` it houses.
+struct Building {
+  Structure structure;
+  std::string kind;
+  std::uint32_t residents;
+};
+
+/// A kind of village: the `area` it occupies, and its `buildings`. Its
+/// resident army stands at the area's centre, as many agents as its buildings
+/// house.
 struct VillageTemplate {
   std::string name;
   Footprint area;
-  std::vector<Structure> structures;
+  std::vector<Building> buildings;
 };
 
 /// The tables a region is generated from.
@@ -48,6 +57,8 @@ struct RegionData {
 /// lists.
 struct Village {
   std::string name;
+  /// The name of the template it was laid out from.
+  std::string kind;
   std::size_t faction;
   Cell corner;
   Footprint area;
@@ -62,6 +73,8 @@ struct Region {
   std::vector<std::string> map_rows;
   std::vector<ArmySpec> armies;
   std::vector<Structure> structures;
+  /// The kind of each structure, in the order of `structures`.
+  std::vector<std::string> structure_kinds;
   Rules rules;
   std::vector<std::size_t> terrain;
   std::vector<std::size_t> territory;
@@ -75,9 +88,10 @@ struct Region {
 /// to eight villages owned in turn by each faction, each on passable cells in
 /// its owner's territory and overlapping no other. The same seed and data give
 /// the same region. Throws std::invalid_argument when a table is empty, the
-/// terrain weights are not positive, a village template has no structures,
-/// one outside its area, two that overlap, or one over the area's centre, or a
-/// faction is hostile to one that does not exist; throws std::runtime_error
+/// terrain weights are not positive, a village template has no buildings,
+/// houses no residents, has one outside its area, two that overlap, or one
+/// over the area's centre, or a faction is hostile to one that does not
+/// exist; throws std::runtime_error
 /// when a village finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
