@@ -1,8 +1,8 @@
 # C++ stack
 
-The concrete C++ form of naming, file layout, tests, comments and the check entry points, for the code under `core/`.
+The concrete C++ form of naming, file layout, tests, comments and the check entry points, for the code under `core/` and `extension/`.
 
-Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1.8 (clang-format, clang-tidy) and GoogleTest 1.18.0.
+Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1.8 (clang-format, clang-tidy), GoogleTest 1.18.0 and godot-cpp 10.0.0.
 
 ## Naming
 
@@ -16,14 +16,17 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | File | `snake_case`, header `.hpp`, source `.cpp`, both named for the unit | `world.hpp`, `world.cpp` |
 
 - `readability-identifier-naming` in `core/.clang-tidy` enforces the identifier forms, so `make lint` fails on a name in the wrong form.
-- Code under `core/` lives in the `murim` namespace; a helper used by one source file goes in an unnamed namespace inside it.
+- Code under `core/` lives in the `murim` namespace, and code under `extension/` in `murim_godot`; a helper used by one source file goes in an unnamed namespace inside it.
+- A class registered with Godot is named as GDScript sees it, since godot-cpp's `GDCLASS` registers the C++ name.
+- `_bind_methods` keeps the name godot-cpp requires.
 
 ## File layout
 
-- `core/CMakeLists.txt` is the one CMake project; it declares the library, its tests and their dependencies.
+- `core/CMakeLists.txt` declares the core library, its tests and their dependencies.
+- `extension/CMakeLists.txt` declares the GDExtension library and `world_hash`; it adds `core/` as a subdirectory, and CMake fetches godot-cpp at configure time from the release archive pinned by hash there.
 - A header opens with `#pragma once`.
 - A source file includes its own header first, then a blank line, then every other include; clang-format orders each block.
-- `core/.clang-format` and `core/.clang-tidy` are the formatter and linter configuration.
+- `core/.clang-format` and `core/.clang-tidy` are the formatter and linter configuration for both directories.
 - Build output goes to `build/` at the repository root, which `.gitignore` excludes.
 
 ## Tests
@@ -37,14 +40,15 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 
 - Doc comment: `///` on the lines above the declaration in the header.
 - Every other comment: `//`. No `/* */` blocks.
+- `// NOLINTNEXTLINE(<checks>)` goes only above a line where a godot-cpp macro, such as `GDCLASS`, expands into code the checks reject, and names each check.
 
 ## Entry points
 
 | Name | What it runs |
 |---|---|
-| `make build` | CMake configures `core/` into `build/` with the Ninja generator, then builds every target, the tests included. |
-| `make lint` | `check-contents-list.sh` over every Markdown file, then `clang-tidy -p build` over every `core/*.cpp` with warnings as errors. Runs `make build` first for `compile_commands.json`. |
-| `make format` | `clang-format --dry-run --Werror` over every `core/*.cpp` and `core/*.hpp`. `clang-format -i <file>` applies the style. |
+| `make build` | CMake configures `core/` into `build/` with the Ninja generator, then builds every target, the tests included; then configures `extension/` into `build/extension/` the same way, with `SDKROOT` set to the macOS SDK, and builds its default targets. |
+| `make lint` | `check-contents-list.sh` over every Markdown file, then `clang-tidy -p build` over every `core/*.cpp`, then `clang-tidy -p build/extension` over every `extension/*.cpp` with `core/.clang-tidy` and the `extension/` headers, each with warnings as errors. Runs `make build` first for `compile_commands.json`. |
+| `make format` | `clang-format --style=file:core/.clang-format --dry-run --Werror` over every `.cpp` and `.hpp` in `core/` and `extension/`. `clang-format --style=file:core/.clang-format -i <file>` applies the style. |
 | `make test` | `ctest --no-tests=error` in `build/`. Runs `make build` first. |
 | `make ci` | `lint`, `format`, `test` and `build`, in that order. |
 

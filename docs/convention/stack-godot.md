@@ -1,8 +1,8 @@
 # Godot stack
 
-The concrete Godot form of naming, file layout, tests, comments, the check entry points and asset export, for the Godot project at the repository root and the GDExtension C++ under `extension/`.
+The concrete Godot form of naming, file layout, tests, comments, the check entry points and asset export, for the Godot project at the repository root and its GDScript.
 
-Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en/4.7`), godot-cpp 10.0.0 and Aseprite 1.3.18.6.
+Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en/4.7`) and Aseprite 1.3.18.6.
 
 ## Naming
 
@@ -17,17 +17,10 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 | Constant, enum member | `CONSTANT_CASE` | `TICKS` |
 | Node in a scene | `PascalCase` | `Player` |
 
-GDExtension C++ under `extension/`:
-
-- Code lives in the `murim_godot` namespace.
-- A class registered with Godot is named as GDScript sees it, since `GDCLASS` registers the C++ name.
-- `_bind_methods` keeps the name godot-cpp requires.
-
 ## File layout
 
 - The repository root is the Godot project: `project.godot` and `murim.gdextension` sit there.
 - `murim.gdextension` names, per platform, the library `make build` writes to `build/extension/`.
-- `extension/CMakeLists.txt` is the CMake project for the GDExtension library; it adds `core/` as a subdirectory, and CMake fetches godot-cpp at configure time from the release archive pinned by hash there.
 - A scene keeps the scripts and resources only it uses in its own folder; a resource two scenes share sits in the nearest folder both are under.
 - Every `.uid` file Godot writes beside a script or resource is committed with it.
 - A folder Godot must not import holds an empty `.gdignore`. `make build` writes `build/.gdignore`.
@@ -48,12 +41,10 @@ GDExtension C++ under `extension/`:
 
 | Name | What it runs |
 |---|---|
-| `make build` | After `core/`, CMake configures `extension/` into `build/extension/` with the Ninja generator, then builds the GDExtension library and `world_hash`; then writes `build/.gdignore`, and `.godot/extension_list.cfg` naming every committed `*.gdextension`. |
-| `make format` | `clang-format --dry-run --Werror` over every `extension/*.cpp` and `extension/*.hpp` as well, with `core/.clang-format` as the style. |
-| `make lint` | clang-tidy reads no file under `extension/`: `GDCLASS` expands into code `core/.clang-tidy` rejects. |
+| `make build` | After the C++ builds, writes `build/.gdignore`, and `.godot/extension_list.cfg` naming every committed `*.gdextension`. |
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 
-`make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive pinned by SHA-512 in `.github/workflows/ci.yml`.
+`make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
 
 ## Asset export
 

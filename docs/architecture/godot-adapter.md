@@ -18,5 +18,4 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 
 ## Open questions
 
-- **Whether the adapter's C++ is linted.** clang-tidy reads none of it, because godot-cpp's class macro fails the core's checks; a configuration for `extension/` is undecided.
 - **Which platforms the library is built for.** It is built for the host only, macOS arm64 and Linux x86_64 so far; Android and iOS exports are not built.
