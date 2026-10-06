@@ -1,4 +1,4 @@
--- Shared by the mockup scripts: the body template and its faction palettes, the village
+-- Shared by the art scripts: the body template and its faction palettes, the village
 -- building in its four damage stages, terrain objects, effects and the aggregate-army marker.
 -- Each function draws onto a canvas from pixel.lua.
 
@@ -118,6 +118,21 @@ return function(px)
     local cv = px.canvas(16, 18)
     local map = scheme(spec.faction, spec.over)
     local b = bodies[spec.body or "robe"]
+    -- A step lifts one foot into the row above: "left" or "right".
+    if spec.step then
+      b = { table.unpack(b) }
+      local feet, above = b[#b], b[#b - 1]
+      local mid = #feet // 2
+      local new_feet, new_above = {}, {}
+      for k = 1, #feet do
+        local ch = feet:sub(k, k)
+        local lifted = (spec.step == "left") == (k > mid)
+        new_feet[k] = (lifted and ch == "F") and "." or ch
+        new_above[k] = (lifted and ch == "F") and "F" or above:sub(k, k)
+      end
+      b[#b] = table.concat(new_feet)
+      b[#b - 1] = table.concat(new_above)
+    end
     local bw = #b[1]
     local bx = 8 - bw // 2
     local by = 17 - #b

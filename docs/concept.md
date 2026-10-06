@@ -35,8 +35,9 @@ Each section carries one of the following statuses.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on).
 - **Genre and engine**: 2D RPG, Godot 4.7.
-- **Perspective and combat**: an orthogonal top-down view, with combat in real time (`docs/architecture/adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md`).
-- **Art direction**: pixel art on a 16-pixel tile grid.
+- **Perspective and combat**: a three-quarter top-down view, with combat in real time (`docs/architecture/adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`).
+- **Art direction**: pixel art on a 16-pixel tile grid (`docs/art-direction.md`).
+- **Language**: UI text in Korean first, with English supported.
 - **Title**: "Murim24" is a working title for development. The 24 has no meaning, and the official title is decided after the MVP.
 
 ## Factions and the rules for gaining power [agreed]
