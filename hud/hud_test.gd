@@ -1,5 +1,7 @@
 # Checks that hud.tscn shows its words from the translations, Korean first, that switching the
-# locale changes them to English, and that the faction shown is the steered army's.
+# locale changes them to English, that the faction shown is the steered army's, that health shows
+# its current and starting strength and inner energy a dash, and that the technique bar shows one
+# slot per skill with the icon of its shape.
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
@@ -21,9 +23,29 @@ func run() -> bool:
 	var expected_faction: String = "FACTION_" + world.faction_names()[world.army_faction(steered)].to_upper()
 	# Setup: the label holds the key, so a translated text differing from it came from a file.
 	var keyed := hp.text == "HUD_HP" and faction.text == expected_faction
+	hud.refresh(world, steered, PackedInt64Array([0]))
+	var strength := 0
+	for body_strength in world.body_strengths(steered):
+		strength += body_strength
+	var hp_value: String = hud.labels.hp_value.text
+	var qi_value: String = hud.labels.qi_value.text
+	var values_right := hp_value == "%d/%d" % [strength, world.army_strength(steered)] and qi_value == "—"
+	# One slot per skill, each with the icon of its shape; control: the slots past them are hidden.
+	var skills := world.skills(steered)
+	var icons_right := skills.size() > 0
+	for slot in hud.slot_icons.size():
+		var icon: TextureRect = hud.slot_icons[slot]
+		var visible: bool = icon.get_parent().visible
+		if slot < skills.size():
+			var burst := int(skills[slot].radius) > 0
+			var region := (icon.texture as AtlasTexture).region
+			icons_right = icons_right and visible and region.position.x == (16 if burst else 0)
+		else:
+			icons_right = icons_right and not visible
 	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
-			and english == ["en", "HP", "Orthodox"] and back == "ko"
-	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s: %s" % [
-		hp.text, faction.text, korean, switched, english, back, "pass" if passed else "FAIL"])
+			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right
+	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, inner energy %s; %d skills shown with their icons %s: %s" % [
+		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, skills.size(),
+		icons_right, "pass" if passed else "FAIL"])
 	hud.free()
 	return passed

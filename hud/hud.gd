@@ -1,6 +1,7 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
-## HUD: the player's portrait, faction, health and inner energy; a map of the region around the
-## player with the season and year; a rumour log; and the technique bar. Every word comes from
+## HUD: the player's portrait, faction, health and inner energy with their values; a map of the
+## region around the player with the season and year; a rumour log; and the technique bar, an
+## icon and its number key for each of the player's skills. Every word comes from
 ## hud.csv through Godot's translations, Korean first; F2 switches between Korean and English.
 ## It reads the world and holds no game rule.
 extends CanvasLayer
@@ -29,8 +30,10 @@ const KIND_COLOURS := {
 }
 const MAP_SIZE := Vector2i(76, 44)
 
-## Labels that show a translated key, by what they show, so a test can read them.
+## Labels that show a translated key or a value, by what they show, so a test can read them.
 var labels := {}
+## The icon in each technique slot, in key order.
+var slot_icons: Array[TextureRect] = []
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
@@ -40,6 +43,7 @@ var _map := TextureRect.new()
 var _map_texture: ImageTexture
 var _dot := ColorRect.new()
 var _slots: Array[Panel] = []
+var _icons := {}
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
 
@@ -80,6 +84,10 @@ func switch_locale() -> String:
 ## Shows `world`'s region on the map and army `steered`'s faction on the portrait.
 func show_player(world: WorldAdapter, steered: int) -> void:
 	_set_up()
+	var icons: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "icons/skill_icons.json"))
+	_icons = {"texture": load(ART + "icons/skill_icons.png"), "tags": {}}
+	for tag: Dictionary in icons.meta.frameTags:
+		_icons.tags[tag.name] = int(tag.from)
 	var names := world.faction_names()
 	var faction := world.army_faction(steered)
 	var sprite: String = names[faction].to_lower() if faction < names.size() else FACTIONS[faction % FACTIONS.size()]
@@ -93,9 +101,17 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 	var view := AtlasTexture.new()
 	view.atlas = _map_texture
 	_map.texture = view
-	var shown := mini(world.skill_count(steered), MAX_SLOTS)
+	var skills := world.skills(steered)
+	var shown := mini(skills.size(), MAX_SLOTS)
 	for slot in _slots.size():
 		_slots[slot].visible = slot < shown
+		if slot < shown:
+			# A skill whose radius reaches past its target bursts; any other strikes one body.
+			var icon := AtlasTexture.new()
+			icon.atlas = _icons.texture
+			var tag: String = "burst" if int(skills[slot].radius) > 0 else "strike"
+			icon.region = Rect2(_icons.tags[tag] * 16, 0, 16, 16)
+			slot_icons[slot].texture = icon
 	_skill_bar.size.x = shown * 22 + 6
 	_skill_bar.position.x = 240 - _skill_bar.size.x / 2.0
 
@@ -108,6 +124,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		strength += body_strength
 	var full := maxi(world.army_strength(steered), 1)
 	_hp.value = 100.0 * strength / full
+	labels.hp_value.text = "%d/%d" % [strength, full]
 	var lead := world.body_positions(steered)[0] / WorldAdapter.CELL_SIZE
 	var corner := (Vector2i(lead) - MAP_SIZE / 2).clamp(Vector2i.ZERO,
 			(_world_size - MAP_SIZE).max(Vector2i.ZERO))
@@ -119,7 +136,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 
 
 func _build() -> void:
-	var player := _panel(Rect2(4, 4, 160, 48))
+	var player := _panel(Rect2(4, 4, 160, 50))
 	_portrait.position = Vector2(4, 8)
 	_portrait.size = Vector2(32, 32)
 	_portrait.stretch_mode = TextureRect.STRETCH_SCALE
@@ -131,12 +148,16 @@ func _build() -> void:
 	player.add_child(title)
 	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, PAPER)
 	labels.faction = _label(title, "", Vector2.ZERO, STONE)
-	labels.hp = _label(player, "HUD_HP", Vector2(42, 16), HP)
+	# Each value on its label's line, right-aligned, and its bar under the line.
+	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), HP)
+	labels.hp_value = _value(player, Vector2(42, 14), 112)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
-	_bar(player, _hp, Vector2(70, 21), HP)
-	_bar(player, _qi, Vector2(70, 35), QI)
-	# Inner energy is not in the core yet, so its bar stands full.
+	labels.qi_value = _value(player, Vector2(42, 30), 112)
+	_bar(player, _hp, Vector2(42, 26), HP)
+	_bar(player, _qi, Vector2(42, 42), QI)
+	# Inner energy is not in the core yet: its bar stands full and its value is a dash.
 	_qi.value = 100.0
+	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(392, 4, 84, 62))
 	_map.position = Vector2(4, 4)
@@ -164,11 +185,19 @@ func _build() -> void:
 		cell.position = Vector2(4 + slot * 22, 3)
 		cell.size = Vector2(20, 20)
 		bar.add_child(cell)
+		var icon := TextureRect.new()
+		icon.position = Vector2(2, 2)
+		icon.size = Vector2(16, 16)
+		cell.add_child(icon)
+		slot_icons.append(icon)
+		# The number key, in the slot's top-left corner over the icon.
 		var number := Label.new()
 		number.text = str(slot + 1)
 		number.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		number.position = Vector2(7, 3)
+		number.position = Vector2(1, -3)
 		number.add_theme_color_override("font_color", GOLD_LIGHT)
+		number.add_theme_color_override("font_outline_color", INK_DARK)
+		number.add_theme_constant_override("outline_size", 2)
 		cell.add_child(number)
 		_slots.append(cell)
 
@@ -200,6 +229,19 @@ func _label(parent: Node, key: String, at: Vector2, colour: Color) -> Label:
 	return label
 
 
+# A value label `width` pixels wide from `at`, its text against the right edge.
+func _value(parent: Control, at: Vector2, width: float) -> Label:
+	var label := Label.new()
+	label.theme = _theme
+	label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	label.position = at
+	label.size = Vector2(width, 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_color_override("font_color", PAPER)
+	parent.add_child(label)
+	return label
+
+
 func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void:
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = colour
@@ -209,7 +251,7 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 	bar.add_theme_stylebox_override("background", back)
 	bar.show_percentage = false
 	bar.position = at
-	bar.size = Vector2(64, 5)
+	bar.size = Vector2(112, 4)
 	parent.add_child(bar)
 
 
