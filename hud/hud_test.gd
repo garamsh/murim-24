@@ -1,7 +1,7 @@
 # Checks that hud.tscn shows its words from the translations, Korean first, that switching the
 # locale changes them to English, that the faction shown is the steered army's, that health shows
-# its current and starting strength and inner energy a dash, and that the technique bar shows one
-# slot per skill with the icon of its shape.
+# its strength as a percentage of its starting strength and inner energy a dash over an empty
+# bar, and that the technique bar shows one slot per skill with the icon of its shape.
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
@@ -29,7 +29,9 @@ func run() -> bool:
 		strength += body_strength
 	var hp_value: String = hud.labels.hp_value.text
 	var qi_value: String = hud.labels.qi_value.text
-	var values_right := hp_value == "%d/%d" % [strength, world.army_strength(steered)] and qi_value == "—"
+	var percent := floori(100.0 * strength / world.army_strength(steered))
+	var values_right: bool = hp_value == "%d%%" % percent and qi_value == "—" \
+			and hud.qi_bar.value == 0.0 and hud.hp_bar.value == 100.0 * strength / world.army_strength(steered)
 	# One slot per skill, each with the icon of its shape; control: the slots past them are hidden.
 	var skills := world.skills(steered)
 	var icons_right := skills.size() > 0
@@ -44,8 +46,8 @@ func run() -> bool:
 			icons_right = icons_right and not visible
 	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
 			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right
-	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, inner energy %s; %d skills shown with their icons %s: %s" % [
-		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, skills.size(),
+	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, inner energy %s, its bar %d; %d skills shown with their icons %s: %s" % [
+		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
 		icons_right, "pass" if passed else "FAIL"])
 	hud.free()
 	return passed

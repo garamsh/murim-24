@@ -37,8 +37,9 @@ var slot_icons: Array[TextureRect] = []
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
-var _hp := ProgressBar.new()
-var _qi := ProgressBar.new()
+## The health and inner-energy bars, so a test can read them.
+var hp_bar := ProgressBar.new()
+var qi_bar := ProgressBar.new()
 var _map := TextureRect.new()
 var _map_texture: ImageTexture
 var _dot := ColorRect.new()
@@ -123,8 +124,9 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	for body_strength in world.body_strengths(steered):
 		strength += body_strength
 	var full := maxi(world.army_strength(steered), 1)
-	_hp.value = 100.0 * strength / full
-	labels.hp_value.text = "%d/%d" % [strength, full]
+	hp_bar.value = 100.0 * strength / full
+	# A percentage of the starting strength: strength itself runs to units no player reads.
+	labels.hp_value.text = "%d%%" % floori(hp_bar.value)
 	var lead := world.body_positions(steered)[0] / WorldAdapter.CELL_SIZE
 	var corner := (Vector2i(lead) - MAP_SIZE / 2).clamp(Vector2i.ZERO,
 			(_world_size - MAP_SIZE).max(Vector2i.ZERO))
@@ -153,10 +155,10 @@ func _build() -> void:
 	labels.hp_value = _value(player, Vector2(42, 14), 112)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
 	labels.qi_value = _value(player, Vector2(42, 30), 112)
-	_bar(player, _hp, Vector2(42, 26), HP)
-	_bar(player, _qi, Vector2(42, 42), QI)
-	# Inner energy is not in the core yet: its bar stands full and its value is a dash.
-	_qi.value = 100.0
+	_bar(player, hp_bar, Vector2(42, 26), HP)
+	_bar(player, qi_bar, Vector2(42, 42), QI)
+	# Inner energy is not in the core yet: its bar stands empty and its value is a dash.
+	qi_bar.value = 0.0
 	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(392, 4, 84, 62))
