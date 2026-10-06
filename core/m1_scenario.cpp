@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "random.hpp"
 #include "world.hpp"
 
 namespace murim {
@@ -59,24 +60,6 @@ constexpr std::array<Band, 2> BANDS{{
     {MIDDLE_ARMIES, MIDDLE_COUNT, 12, 30},
     {FAR_ARMIES, FAR_COUNT, 36, MAP_SIDE},
 }};
-
-// Knuth's MMIX linear congruential generator; the high bits are the output.
-class Random {
- public:
-  explicit Random(std::uint64_t seed) : state_(seed) {}
-
-  std::int32_t below(std::int32_t bound) {
-    constexpr std::uint64_t MULTIPLIER = 6364136223846793005ULL;
-    constexpr std::uint64_t INCREMENT = 1442695040888963407ULL;
-    constexpr unsigned SHIFT = 33U;
-    state_ = (state_ * MULTIPLIER) + INCREMENT;
-    return static_cast<std::int32_t>((state_ >> SHIFT) %
-                                     static_cast<std::uint64_t>(bound));
-  }
-
- private:
-  std::uint64_t state_;
-};
 
 std::int32_t from_focus(Cell cell) {
   return std::max(std::abs(cell.x - FOCUS.x), std::abs(cell.y - FOCUS.y));

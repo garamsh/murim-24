@@ -24,6 +24,7 @@ Current architecture of the system and the decisions behind it. This file is the
 - `structure.md` — the shape the system is partitioned into and the rules it imposes
 - `simulation.md` — the simulation core: what exists of it and the decisions it rests on
 - `godot-adapter.md` — the GDExtension adapter through which Godot drives the core
+- `world-generation.md` — how the core generates a region from a seed and data tables
 - `adr/0001-partition-the-system-hexagonally.md` — the simulation is the application; every technology is an adapter
 - `adr/0002-build-on-godot-with-a-cpp-simulation-core.md` — Godot as the presentation adapter, C++ as the core's language
 - `adr/0003-build-the-core-with-cmake-googletest-and-llvm-tools.md` — CMake, C++17, GoogleTest and LLVM 22 tools for the core, installed from pinned PyPI wheels in CI
@@ -32,3 +33,4 @@ Current architecture of the system and the decisions behind it. This file is the
 - `adr/0006-resolve-every-skill-through-one-rule-scaled-by-count.md` — skills as data resolved by one rule for every body, scaled by the agents its user stands for, structures with durability and stages, and damage folded into count and strength
 - `adr/0007-move-each-army-at-its-own-phase-within-its-tier.md` — each army moves at a phase set by its index within its tier's interval, spreading a tier's movement over its ticks, while strikes stay on the tier's common tick
 - `adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md` — an orthogonal top-down view with one cell to one tile, real-time combat on the core's tick, and pixel art on a 16-pixel tile grid from Aseprite
+- `adr/0009-generate-a-region-from-data-tables-by-nearest-site-partitions.md` — terrain, faction and village data as tables, terrain and territory partitioned by nearest site, capitals spread by best candidate, villages owned in turn and placed among every corner that fits
