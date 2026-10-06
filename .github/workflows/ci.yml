@@ -16,4 +16,5 @@ jobs:
         with:
           python-version: '3.14'
       - run: python -m venv .venv && .venv/bin/pip install --require-hashes -r core/requirements.txt
+      - run: .github/scripts/install-godot.sh "$RUNNER_TEMP/godot" && echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
       - run: make ci
