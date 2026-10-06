@@ -5,7 +5,7 @@
 # season and year are the core's. It also checks that the leader and duel panels name people by
 # the adapter's person_name, Korean first and romanised in English, and that every word the HUD
 # shows from hud.csv, and every name the world's data can make, fits the room its panel gives it, in
-# each locale.
+# each locale, measured in the font and size each label draws with.
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
@@ -83,9 +83,10 @@ func run() -> bool:
 	print("hud_test: date %s shown as \"%s\"; year 3, season 1 as \"%s\": %s" % [
 		date, season, later, "pass" if dated else "FAIL"])
 	hud.free()
+	var measure_passed := _measure_pass()
 	var names_passed := _names_pass()
 	var fit_passed := _fit_pass()
-	return passed and names_passed and fit_passed
+	return passed and measure_passed and names_passed and fit_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -107,9 +108,7 @@ func _names_pass() -> bool:
 			and world.order(steered, seat, PackedInt64Array([0]), faction)
 	hud.refresh(world, steered, PackedInt64Array([0]))
 	var shown_labels: Array[Label] = [hud.labels.leader_value, hud.labels.duel_leader, hud.labels.duel_challenger]
-	var font: Font = hud.labels.leader_value.get_theme_font("font")
-	var given_width := font.get_string_size(name.get("given_en", ""), HORIZONTAL_ALIGNMENT_LEFT, -1,
-			hud.FONT_SIZE).x
+	var given_width := _width(hud.labels.leader_value, name.get("given_en", ""))
 	# Setup: the leader is someone else, named wider than the labels, and a duel with them is fought.
 	var set_up: bool = leader >= 0 and not world.roster(steered).has(leader) and not name.is_empty() \
 			and given_width > hud.labels.leader_value.size.x and given_width > hud.labels.duel_leader.size.x \
@@ -118,11 +117,9 @@ func _names_pass() -> bool:
 	hud.switch_locale()
 	hud.refresh(world, steered, PackedInt64Array([0]))
 	var english := shown_labels.map(func(label: Label) -> String: return label.text)
-	# Within its label: the label asks for no more than its width, and the leader's clears the
-	# words on either side of it.
-	var within := shown_labels.all(func(label: Label) -> bool: return label.get_minimum_size().x <= label.size.x)
-	var leader_word := font.get_string_size(hud.labels.leader.atr(hud.labels.leader.text),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, hud.FONT_SIZE).x
+	# Within its label, and the leader's clear of the words on either side of it.
+	var within := shown_labels.all(func(label: Label) -> bool: return _within(label, label.text))
+	var leader_word := _width(hud.labels.leader, hud.labels.leader.atr(hud.labels.leader.text))
 	var clear: bool = hud.labels.leader.position.x + leader_word <= hud.labels.leader_value.position.x \
 			and hud.labels.leader_value.position.x + hud.labels.leader_value.size.x <= hud.labels.challenge_key.position.x
 	hud.switch_locale()
@@ -159,7 +156,6 @@ func _fit_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(SCENE).instantiate()
 	hud.show_player(world, world.army_count() - 1)
-	var font: Font = hud.labels.hp.get_theme_font("font")
 	var locales: Array = hud.LOCALES
 	var measured := {}
 	var overruns: Array[String] = []
@@ -177,8 +173,7 @@ func _fit_pass() -> bool:
 			texts[label] = shown
 			widest[label] = 0.0
 			for text: String in shown:
-				widest[label] = maxf(widest[label], font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1,
-						hud.FONT_SIZE).x)
+				widest[label] = maxf(widest[label], _width(label, text))
 		# Each label's span on its line, by the panel it sits in and the line's height.
 		var lines := {}
 		for label: Label in widest:
@@ -215,14 +210,11 @@ func _fit_pass() -> bool:
 					overruns.append("%s %s ends at %d past %d" % [locale, line_spans[i][2], line_spans[i][1], limit])
 		for name in _every_name(world):
 			var text := PersonName.shown(name, true)
-			var whole := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, hud.FONT_SIZE).x
 			names += 1
 			for key: String in ["leader_value", "duel_challenger", "duel_leader"]:
 				var label: Label = hud.labels[key]
-				# Out of the tree a label measures in the fallback font, so the width is the HUD font's,
-				# and a label that trims with an ellipsis keeps any name within it.
-				var trims := label.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS
-				if (whole > label.size.x and not trims) or (locale == "ko" and whole > label.size.x):
+				var whole := _width(label, text)
+				if not _within(label, text) or (locale == "ko" and whole > label.size.x):
 					overruns.append("%s %s is %d px in the %d px %s" % [locale, text, whole, label.size.x, key])
 	TranslationServer.set_locale(locales[0])
 	hud.free()
@@ -269,3 +261,48 @@ func _every_name(world: WorldAdapter) -> Array[Dictionary]:
 			names.append({"surname": surname.korean, "given": given.korean,
 					"surname_en": surname.romanised, "given_en": given.romanised})
 	return names
+
+
+# The width `text` takes in the font and size `label` draws with. Out of the scene tree, as these
+# tests run, get_theme_font answers with the engine's fallback font, so the label's own override,
+# or else its own theme, is read, as the tree reads them first.
+func _width(label: Label, text: String) -> float:
+	var font: Font = label.get_theme_font("font") if label.has_theme_font_override("font") \
+			else label.theme.get_font("font", "Label")
+	var size: int = label.get_theme_font_size("font_size") if label.has_theme_font_size_override("font_size") \
+			else label.theme.get_font_size("font_size", "Label")
+	return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+
+
+# Whether `label` shows `text` within its width: whole, or cut short with an ellipsis.
+func _within(label: Label, text: String) -> bool:
+	return _width(label, text) <= label.size.x or label.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS
+
+
+# The checks measure in the HUD's font, Galmuri9 at FONT_SIZE: an untrimmed name label one pixel
+# narrower than a Korean name, as Galmuri9 draws it, fails it, and the same label exactly as wide
+# passes it. The engine's fallback font draws that name narrower at that size and wider at its own,
+# so measuring in it reverses one of the two.
+func _measure_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, world.army_count() - 1)
+	var probe: Label = hud.labels.leader_value.duplicate()
+	probe.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	var text := "남궁설화"
+	var galmuri: Font = load(hud.FONT)
+	var drawn := galmuri.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, hud.FONT_SIZE).x
+	probe.size.x = drawn - 1
+	var narrow_refused := not _within(probe, text)
+	probe.size.x = drawn
+	var exact_accepted := _within(probe, text)
+	# Setup: the probe draws untrimmed, in its own theme's Galmuri9 at FONT_SIZE.
+	var set_up: bool = probe.text_overrun_behavior == TextServer.OVERRUN_NO_TRIMMING \
+			and probe.theme.get_font("font", "Label").resource_path == hud.FONT \
+			and probe.theme.get_font_size("font_size", "Label") == hud.FONT_SIZE and drawn > 0.0
+	probe.free()
+	hud.free()
+	var passed := set_up and narrow_refused and exact_accepted
+	print("hud_test: \"%s\" is %d px in Galmuri9; refused in a %d px untrimmed label %s, accepted in a %d px one %s (setup %s): %s" % [
+		text, drawn, drawn - 1, narrow_refused, drawn, exact_accepted, set_up, "pass" if passed else "FAIL"])
+	return passed
