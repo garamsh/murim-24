@@ -370,6 +370,25 @@ TEST(World, OnlyHostileBodiesWithinRangeUseTheirSkills) {
   EXPECT_EQ(strength_lost(user, ally, at_war(0)), 0U);
 }
 
+TEST(World, EquallyNearTargetsGoToTheLowestIndex) {
+  const ArmySpec user{{4, 4}, {4, 4}, 1,
+                      1,      0,      {{3 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN}}};
+  // The lower index stands east, where a query visits it last.
+  const ArmySpec east{{6, 4}, {6, 4}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  const ArmySpec west{{2, 4}, {2, 4}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  // The two targets must stand equally near, or there is no tie to break.
+  ASSERT_EQ(distance_squared(centre_of(user.start), centre_of(east.start)),
+            distance_squared(centre_of(user.start), centre_of(west.start)));
+  World world{
+      Seed{1}, Map{open_map(OPEN_SIDE)}, {user, east, west}, {}, at_war(0)};
+  world.set_focus(centre_of(user.start));
+  world.tick();
+
+  EXPECT_EQ(totals(world.bodies(1)).strength, TARGET_STRENGTH - 1);
+  // Control: the other target, as near, is untouched.
+  EXPECT_EQ(totals(world.bodies(2)).strength, TARGET_STRENGTH);
+}
+
 // The cells (2..6, 0..6), each holding a single-agent hostile army in
 // damaged_cells().
 std::vector<Cell> target_grid() {
