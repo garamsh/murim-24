@@ -139,6 +139,31 @@ struct Duel {
   bool allies_turn_hostile = true;
 };
 
+/// Why an army's lead may not challenge a faction's leader, the first that
+/// holds in this order; `NONE` when it may.
+enum class ChallengeRefusal : std::uint8_t {
+  NONE,
+  /// The faction does not pass its lead by duel.
+  NO_SUCCESSION,
+  /// The faction has no leader.
+  NO_LEADER,
+  /// The army has no living member to challenge.
+  NO_CHALLENGER,
+  /// The duel takes members only, and the army is of another faction.
+  NOT_A_MEMBER,
+  /// The army's lead is the leader.
+  IS_LEADER,
+  /// A duel for the faction's lead is being fought.
+  DUEL_IN_PROGRESS,
+};
+
+/// A duel being fought for a faction's lead: the challenger and the leader,
+/// as person indices.
+struct Duellists {
+  std::size_t challenger;
+  std::size_t leader;
+};
+
 /// A faction's leadership as a world is created with: the person leading
 /// it, if anyone does, and how the lead passes, if it passes at all.
 struct Leadership {
@@ -243,6 +268,16 @@ class World {
   /// Returns the person leading faction `faction`, if it has a leader.
   [[nodiscard]] std::optional<std::size_t> leader(std::size_t faction) const;
 
+  /// Returns why army `army`'s lead may not challenge faction `faction`'s
+  /// leader, which is why order() would refuse that challenge, or
+  /// ChallengeRefusal::NONE when it may. Throws std::invalid_argument when
+  /// there is no such army.
+  [[nodiscard]] ChallengeRefusal challenge_refusal(std::size_t army,
+                                                   std::size_t faction) const;
+
+  /// Returns the duel being fought for faction `faction`'s lead, if one is.
+  [[nodiscard]] std::optional<Duellists> duel(std::size_t faction) const;
+
   /// Returns whether people of faction `from` attack those of `target`.
   [[nodiscard]] bool hostile(std::size_t from, std::size_t target) const;
 
@@ -287,7 +322,9 @@ class World {
   void strike(std::size_t user, const Crowd& crowd,
               std::vector<std::uint64_t>& damage);
   [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
-  void start_duel(const Army& army, std::size_t faction);
+  void start_duel(std::size_t army, std::size_t faction);
+  [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
+                                         std::size_t faction) const;
   void settle_duels();
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
