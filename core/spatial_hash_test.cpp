@@ -43,24 +43,26 @@ std::vector<std::size_t> brute_force(const std::vector<Position>& positions,
         std::int64_t{positions.at(other).x} - centre.x;
     const std::int64_t offset_y =
         std::int64_t{positions.at(other).y} - centre.y;
-    if (other != index && (offset_x * offset_x) + (offset_y * offset_y) <=
-                              std::int64_t{RADIUS} * RADIUS) {
+    if ((offset_x * offset_x) + (offset_y * offset_y) <=
+        std::int64_t{RADIUS} * RADIUS) {
       found.push_back(other);
     }
   }
   return found;
 }
 
-TEST(SpatialHash, NeighboursMatchABruteForceScan) {
+TEST(SpatialHash, WithinMatchesABruteForceScan) {
   const std::vector<Position> positions = random_population(7);
-  const SpatialHash hash{positions, RADIUS};
+  const SpatialHash hash{positions};
 
   std::size_t with_neighbours = 0;
   std::size_t without_neighbours = 0;
   for (std::size_t index = 0; index < POPULATION; ++index) {
     const std::vector<std::size_t> expected = brute_force(positions, index);
-    EXPECT_EQ(hash.neighbours(index), expected) << "agent " << index;
-    ++(expected.empty() ? without_neighbours : with_neighbours);
+    EXPECT_EQ(hash.within(positions.at(index), RADIUS), expected)
+        << "agent " << index;
+    // Every position lies within the radius of itself.
+    ++(expected.size() == 1 ? without_neighbours : with_neighbours);
   }
   // The population must hold both cases, or one of them went untested.
   EXPECT_GT(with_neighbours, 0U);

@@ -30,9 +30,8 @@ std::size_t slot_count_for(std::size_t entries) {
 
 }  // namespace
 
-SpatialHash::SpatialHash(std::vector<Position> positions, std::int32_t radius)
+SpatialHash::SpatialHash(std::vector<Position> positions)
     : positions_(std::move(positions)),
-      radius_(radius),
       slot_mask_(slot_count_for(positions_.size()) - 1),
       slot_starts_(slot_mask_ + 2, 0),
       entries_(positions_.size()) {
@@ -48,11 +47,11 @@ SpatialHash::SpatialHash(std::vector<Position> positions, std::int32_t radius)
   }
 }
 
-std::vector<std::size_t> SpatialHash::neighbours(std::size_t index) const {
-  const Position centre = positions_.at(index);
-  const Cell low = cell_of(Position{centre.x - radius_, centre.y - radius_});
-  const Cell high = cell_of(Position{centre.x + radius_, centre.y + radius_});
-  const std::int64_t radius_squared = std::int64_t{radius_} * radius_;
+std::vector<std::size_t> SpatialHash::within(Position centre,
+                                             std::int32_t radius) const {
+  const Cell low = cell_of(Position{centre.x - radius, centre.y - radius});
+  const Cell high = cell_of(Position{centre.x + radius, centre.y + radius});
+  const std::int64_t radius_squared = std::int64_t{radius} * radius;
   std::vector<std::size_t> found;
   for (Cell cell{low.x, low.y}; cell.y <= high.y; ++cell.y) {
     for (cell.x = low.x; cell.x <= high.x; ++cell.x) {
@@ -66,7 +65,7 @@ std::vector<std::size_t> SpatialHash::neighbours(std::size_t index) const {
         // also bounds the offsets squared below.
         const std::int64_t offset_x = std::int64_t{position.x} - centre.x;
         const std::int64_t offset_y = std::int64_t{position.y} - centre.y;
-        if (other != index && own.x == cell.x && own.y == cell.y &&
+        if (own.x == cell.x && own.y == cell.y &&
             (offset_x * offset_x) + (offset_y * offset_y) <= radius_squared) {
           found.push_back(other);
         }

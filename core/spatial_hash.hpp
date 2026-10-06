@@ -8,17 +8,16 @@
 
 namespace murim {
 
-/// An index over positions, bucketed by the cell holding each, that finds a
-/// position's neighbours by visiting only the cells its radius overlaps.
+/// An index over positions, bucketed by the cell holding each, that answers a
+/// query by visiting only the cells its radius overlaps.
 class SpatialHash {
  public:
-  /// Indexes `positions` for queries within `radius` sub-cell units,
-  /// Euclidean distance inclusive.
-  SpatialHash(std::vector<Position> positions, std::int32_t radius);
+  explicit SpatialHash(std::vector<Position> positions);
 
-  /// Returns the indices of the other positions within the radius of
-  /// position `index`, in ascending order.
-  [[nodiscard]] std::vector<std::size_t> neighbours(std::size_t index) const;
+  /// Returns the indices of the positions within `radius` sub-cell units of
+  /// `centre`, Euclidean distance inclusive, in ascending order.
+  [[nodiscard]] std::vector<std::size_t> within(Position centre,
+                                                std::int32_t radius) const;
 
   /// Returns the indexed position `index`.
   [[nodiscard]] Position position(std::size_t index) const;
@@ -27,7 +26,6 @@ class SpatialHash {
   [[nodiscard]] std::size_t slot_of(Cell cell) const;
 
   std::vector<Position> positions_;
-  std::int32_t radius_;
   std::size_t slot_mask_;
   std::vector<std::size_t> slot_starts_;
   std::vector<std::size_t> entries_;
