@@ -37,7 +37,11 @@ Selection is not once. A change that alters the project's stack carries the sele
 
 ## Stack-specific
 
-These apply only when the project uses that stack. None does yet: no stack file covers this project's stack.
+These apply only when the project uses that stack.
+
+| File | Extends | Governs |
+|---|---|---|
+| `stack-cpp.md` | none | C++ under `core/`: naming, file layout, tests, comments, and the commands behind each entry point |
 
 A stack file states the concrete form of what a stack-neutral file governs: the test client and file placement behind `testing.md`, the comment syntax behind `code-comments.md`, the commands behind an entry-point name in `ci.md`. It states the same of a structural rule (`docs/architecture/README.md` §Rules, "Structural rules live in `structure.md`"): the package and file names the unit takes in its language. It also states a structural case its framework decides (§Rules, "Structural rules yield only to what a framework imposes"). It never restates the rule itself. These two tables and those rules are where the split is recorded — the files do not point at each other.
 

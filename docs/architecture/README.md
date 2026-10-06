@@ -22,5 +22,7 @@ Current architecture of the system and the decisions behind it. This file is the
 ## Index
 
 - `structure.md` — the shape the system is partitioned into and the rules it imposes
+- `simulation.md` — the simulation core: what exists of it and the decisions it rests on
 - `adr/0001-partition-the-system-hexagonally.md` — the simulation is the application; every technology is an adapter
 - `adr/0002-build-on-godot-with-a-cpp-simulation-core.md` — Godot as the presentation adapter, C++ as the core's language
+- `adr/0003-build-the-core-with-cmake-googletest-and-llvm-tools.md` — CMake, C++17, GoogleTest and LLVM 22 tools for the core, installed from pinned PyPI wheels in CI
