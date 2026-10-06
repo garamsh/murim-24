@@ -19,6 +19,7 @@ The approved target, which the production set is taken from:
 
 - `art/mockup/target_screen.png` — one finished-game screen at native size; `target_screen_4x.png` at 4x.
 - `art/mockup/lineup_sheet.png` — the bodies of each faction, villagers and the player, the village house in its four stages and the aggregate-army marker; `lineup_sheet_4x.png` at 4x.
+- `art/mockup/genealogy_panel.png` — the genealogy panel open over the target screen: a three-generation tree of cards (parents, the steered person and their spouse, their children) joined by gold lines of kin, and a column of the centred person's details, in Korean; `genealogy_panel_4x.png` at 4x. Its Hangul is Galmuri9, drawn from `hud/fonts/Galmuri9.bdf` by `art/mockup/bdf.lua`.
 
 The production set. Each `.aseprite` file is drawn by the `.lua` script beside it and exported beside it as a `.png` sheet with a `.json` of its frames and tags, by the command in `docs/convention/stack-godot.md` §Asset export. `art/build.sh` redraws and exports all of it.
 
