@@ -3,8 +3,8 @@
 -- Run: aseprite --batch --script art/mockup/lineup_sheet.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/pixel.lua")
-local S = dofile(here .. "/sprites.lua")(px)
+local px = dofile(here .. "/../pixel.lua")
+local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 
 local W, H = 320, 232
