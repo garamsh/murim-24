@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 #include <utility>
 #include <vector>
@@ -32,11 +33,18 @@ std::size_t slot_count_for(std::size_t entries) {
 
 SpatialHash::SpatialHash(std::vector<Position> positions)
     : positions_(std::move(positions)),
+      first_{std::numeric_limits<std::int32_t>::max(),
+             std::numeric_limits<std::int32_t>::max()},
+      last_{std::numeric_limits<std::int32_t>::min(),
+            std::numeric_limits<std::int32_t>::min()},
       slot_mask_(slot_count_for(positions_.size()) - 1),
       slot_starts_(slot_mask_ + 2, 0),
       entries_(positions_.size()) {
   for (const Position position : positions_) {
-    ++slot_starts_.at(slot_of(cell_of(position)) + 1);
+    const Cell cell = cell_of(position);
+    first_ = Cell{std::min(first_.x, cell.x), std::min(first_.y, cell.y)};
+    last_ = Cell{std::max(last_.x, cell.x), std::max(last_.y, cell.y)};
+    ++slot_starts_.at(slot_of(cell) + 1);
   }
   std::partial_sum(slot_starts_.begin(), slot_starts_.end(),
                    slot_starts_.begin());
@@ -49,8 +57,7 @@ SpatialHash::SpatialHash(std::vector<Position> positions)
 
 std::vector<std::size_t> SpatialHash::within(Position centre,
                                              std::int32_t radius) const {
-  const Cell low = cell_of(Position{centre.x - radius, centre.y - radius});
-  const Cell high = cell_of(Position{centre.x + radius, centre.y + radius});
+  const auto [low, high] = walk(centre, radius);
   const std::int64_t radius_squared = std::int64_t{radius} * radius;
   std::vector<std::size_t> found;
   for (Cell cell{low.x, low.y}; cell.y <= high.y; ++cell.y) {
@@ -74,6 +81,14 @@ std::vector<std::size_t> SpatialHash::within(Position centre,
   }
   std::sort(found.begin(), found.end());
   return found;
+}
+
+std::pair<Cell, Cell> SpatialHash::walk(Position centre,
+                                        std::int32_t radius) const {
+  const Cell low = cell_of(Position{centre.x - radius, centre.y - radius});
+  const Cell high = cell_of(Position{centre.x + radius, centre.y + radius});
+  return {Cell{std::max(low.x, first_.x), std::max(low.y, first_.y)},
+          Cell{std::min(high.x, last_.x), std::min(high.y, last_.y)}};
 }
 
 Position SpatialHash::position(std::size_t index) const {
