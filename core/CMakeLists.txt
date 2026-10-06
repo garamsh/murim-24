@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(murim_core flow_field.cpp m1_scenario.cpp map.cpp spatial_hash.cpp world.cpp)
+add_library(murim_core flow_field.cpp m1_scenario.cpp map.cpp random.cpp spatial_hash.cpp world.cpp)
 target_include_directories(murim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(murim_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
