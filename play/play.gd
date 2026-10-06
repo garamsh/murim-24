@@ -31,6 +31,12 @@ func _ready() -> void:
 	_camera.position = _to_pixels(lead()).floor()
 	_art.show_world(world, steered)
 	_hud.show_player(world, steered)
+	# The camera stops at the region's edge rather than showing past it.
+	var rows := world.map_rows()
+	_camera.limit_left = 0
+	_camera.limit_top = 0
+	_camera.limit_right = int(rows[0].length() * PIXELS_PER_CELL)
+	_camera.limit_bottom = int(rows.size() * PIXELS_PER_CELL)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -45,7 +51,7 @@ func _process(delta: float) -> void:
 		_since_tick -= step_seconds
 	_camera.position = _to_pixels(lead()).floor()
 	var screen := get_viewport_rect().size / _camera.zoom
-	_art.refresh(Rect2(_camera.position - screen / 2.0, screen))
+	_art.refresh(Rect2(_camera.get_screen_center_position() - screen / 2.0, screen))
 	_hud.refresh(world, steered, _skills)
 
 

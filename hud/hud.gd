@@ -119,13 +119,18 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 
 
 func _build() -> void:
-	var player := _panel(Rect2(4, 4, 140, 48))
+	var player := _panel(Rect2(4, 4, 160, 48))
 	_portrait.position = Vector2(4, 8)
 	_portrait.size = Vector2(32, 32)
 	_portrait.stretch_mode = TextureRect.STRETCH_SCALE
 	player.add_child(_portrait)
-	labels.player = _label(player, "HUD_PLAYER", Vector2(42, 3), PAPER)
-	labels.faction = _label(player, "", Vector2(76, 3), STONE)
+	# The faction follows the title, whichever language makes the title longer.
+	var title := HBoxContainer.new()
+	title.position = Vector2(42, 3)
+	title.add_theme_constant_override("separation", 6)
+	player.add_child(title)
+	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, PAPER)
+	labels.faction = _label(title, "", Vector2.ZERO, STONE)
 	labels.hp = _label(player, "HUD_HP", Vector2(42, 16), HP)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
 	_bar(player, _hp, Vector2(70, 21), HP)
@@ -237,6 +242,6 @@ func _map_image(world: WorldAdapter) -> Image:
 			image.set_pixel(x, y, colour)
 	for village: Dictionary in world.villages():
 		var corner: Vector2i = village.corner
-		var side: int = village.side
-		image.fill_rect(Rect2i(corner, Vector2i(side, side)), ACCENTS[sprites[village.faction]].lightened(0.3))
+		var area: Vector2i = village.area
+		image.fill_rect(Rect2i(corner, area), ACCENTS[sprites[village.faction]].lightened(0.3))
 	return image
