@@ -120,11 +120,12 @@ std::vector<ArmySpec> crossing_armies() {
   return armies;
 }
 
-// Structures standing on and beside both gaps of crossing_map().
+// Structures diagonal to both gaps of crossing_map(), clear of the cells
+// leading into them.
 std::vector<Structure> crossing_structures() {
   const std::vector<Structure> structures{
-      {{23, 10}, 100}, {{24, 10}, 100}, {{25, 10}, 100},
-      {{23, 37}, 100}, {{24, 37}, 100}, {{25, 37}, 100},
+      {{23, 9}, 100},  {{23, 11}, 100}, {{25, 11}, 100},
+      {{23, 36}, 100}, {{25, 36}, 100}, {{25, 38}, 100},
   };
   return structures;
 }
@@ -187,7 +188,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x704FDE0B4DC99739ULL);
+            0x4C50A33638415407ULL);
 }
 
 // Keeps the focus `tier.reach` to the side of the army's lead body, so the
@@ -546,12 +547,14 @@ TEST(World, InputJustPastALimitIsRefused) {
 
 TEST(World, AreaSkillWalksAStructureThroughEveryStage) {
   constexpr std::uint32_t DURABILITY = 100;
-  const ArmySpec user{{0, 0}, {0, 0}, 1, 1, 0, {{2 * CELL_SIZE, 0, 0, 30, 1}}};
+  // The disc around the target reaches just into the structure beside it.
+  const ArmySpec user{
+      {0, 0}, {0, 0}, 1, 1, 0, {{2 * CELL_SIZE, CELL_SIZE / 2, 0, 30, 1}}};
   const ArmySpec target{{2, 0}, {2, 0}, 1, TARGET_STRENGTH, 1, {IDLE}};
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
               {user, target},
-              {{{2, 0}, DURABILITY}},
+              {{{3, 0}, DURABILITY}},
               at_war(0)};
   world.set_focus(centre_of(user.start));
 
@@ -806,7 +809,7 @@ World orders_world(Cell objective) {
   return World{ORDERS_SEED,
                Map{open_map(ORDERS_SIDE)},
                armies,
-               {{HOSTILE_HOME, DURABILITY}},
+               {{{HOSTILE_HOME.x, HOSTILE_HOME.y + 1}, DURABILITY}},
                at_war(SEPARATION)};
 }
 
@@ -908,6 +911,110 @@ TEST(World, OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused) {
                std::invalid_argument);
   EXPECT_THROW(world.order(STEERED, {BESIDE_HOSTILE, {2}}),
                std::invalid_argument);
+}
+
+constexpr Footprint HOUSE{3, 3};
+
+// The durability left on a 3 by 3 house after a user strikes a target beside
+// its west edge with a disc of `radius` around the target for ARRIVAL_TICKS.
+std::uint32_t house_after_strikes(std::int32_t radius) {
+  constexpr std::uint32_t DURABILITY = 1'000;
+  const ArmySpec user{{0, 5}, {0, 5}, 1,
+                      1,      0,      {{3 * CELL_SIZE, radius, 0, 1, 1}}};
+  const ArmySpec target{{2, 5}, {2, 5}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {user, target},
+              {{{4, 4}, DURABILITY, HOUSE}},
+              at_war(0)};
+  world.set_focus(centre_of(user.start));
+  run_ticks(world, ARRIVAL_TICKS);
+  return world.structure(0).durability;
+}
+
+TEST(World, AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint) {
+  // From the target's centre to the house's west edge, the middle cell of
+  // that edge being the nearest: two and a half cells less half a cell.
+  constexpr std::int32_t TO_EDGE = (3 * CELL_SIZE) / 2;
+  EXPECT_LT(house_after_strikes(TO_EDGE), 1'000U);
+  // Control: one unit less radius stops just outside the footprint.
+  EXPECT_EQ(house_after_strikes(TO_EDGE - 1), 1'000U);
+}
+
+// The cells an agent marching from (1, 5) to (12, 5) passes through, with
+// `structures` standing on the map.
+std::vector<Cell> march_cells(const std::vector<Structure>& structures) {
+  const ArmySpec walker{{1, 5}, {12, 5}, 1, 1, 0, {IDLE}};
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {walker},
+              structures,
+              peaceful(SEPARATION)};
+  world.set_focus(centre_of(walker.start));
+  std::vector<Cell> cells;
+  for (int i = 0; i < ARRIVAL_TICKS; ++i) {
+    world.tick();
+    cells.push_back(cell_of(world.bodies(0).front().position));
+  }
+  return cells;
+}
+
+bool covers(const Structure& structure, Cell cell) {
+  return cell.x >= structure.cell.x && cell.y >= structure.cell.y &&
+         cell.x < structure.cell.x + structure.footprint.width &&
+         cell.y < structure.cell.y + structure.footprint.height;
+}
+
+TEST(World, BodiesWalkAroundAStructuresFootprint) {
+  const Structure house{{5, 4}, 1, HOUSE};
+  const auto inside_house = [&house](Cell cell) { return covers(house, cell); };
+  const std::vector<Cell> around = march_cells({house});
+  EXPECT_TRUE(in(Cell{12, 5}, centre_of(around.back())));
+  EXPECT_TRUE(std::none_of(around.begin(), around.end(), inside_house));
+
+  // Control: with no house the straight path crosses its footprint.
+  const std::vector<Cell> straight = march_cells({});
+  EXPECT_TRUE(std::any_of(straight.begin(), straight.end(), inside_house));
+}
+
+bool refused_on_walled_map(const std::vector<ArmySpec>& armies,
+                           const std::vector<Structure>& structures) {
+  try {
+    const World world{Seed{1}, Map{walled_map()}, armies, structures,
+                      peaceful(0)};
+    return false;
+  } catch (const std::invalid_argument&) {
+    return true;
+  }
+}
+
+TEST(World, FootprintsOverWallsArmiesOrEachOtherAreRefused) {
+  const ArmySpec army{{0, 0}, {0, 0}, 1, 1, 0, {IDLE}};
+  const Structure house{{1, 1}, 1, HOUSE};
+  EXPECT_FALSE(refused_on_walled_map({army}, {house}));
+
+  // Over the wall down column 8, over the army, over another structure,
+  // and of no width.
+  EXPECT_TRUE(refused_on_walled_map({army}, {{{6, 1}, 1, HOUSE}}));
+  EXPECT_TRUE(refused_on_walled_map({army}, {{{0, 0}, 1, HOUSE}}));
+  EXPECT_TRUE(refused_on_walled_map({army}, {house, {{3, 3}, 1, {1, 1}}}));
+  EXPECT_TRUE(refused_on_walled_map({army}, {{{1, 1}, 1, {0, 3}}}));
+}
+
+TEST(World, ObjectiveTheArmyCannotReachIsRefused) {
+  // A row of three cells sealing the wall's only gap, in the bottom row of
+  // walled_map().
+  const Structure seal{{7, 8}, 1, {3, 1}};
+  const ArmySpec west{{1, 1}, {1, 1}, 1, 1, 0, {IDLE}};
+  World world{Seed{1}, Map{walled_map()}, {west}, {seal}, peaceful(0)};
+  EXPECT_NO_THROW(world.order(0, {Cell{3, 3}, {0}}));
+  EXPECT_THROW(world.order(0, {Cell{13, 1}, {0}}), std::invalid_argument);
+
+  // Control: created bound for the far side, the same army is refused, and
+  // accepted with the gap open.
+  const ArmySpec bound{{1, 1}, {13, 1}, 1, 1, 0, {IDLE}};
+  EXPECT_TRUE(refused_on_walled_map({bound}, {seal}));
+  EXPECT_FALSE(refused_on_walled_map({bound}, {}));
 }
 
 }  // namespace

@@ -23,6 +23,16 @@ struct Position {
   std::int32_t y;
 };
 
+/// A rectangle of cells, `width` columns by `height` rows.
+struct Footprint {
+  std::int32_t width;
+  std::int32_t height;
+};
+
+/// Returns the cells of `footprint` from `corner`, its top-left cell, row by
+/// row.
+[[nodiscard]] std::vector<Cell> cells_of(Cell corner, Footprint footprint);
+
 /// Returns the cell holding a position.
 [[nodiscard]] Cell cell_of(Position position);
 
@@ -42,6 +52,9 @@ class Map {
 
   /// Returns whether the cell lies inside the map and is not blocked.
   [[nodiscard]] bool passable(Cell cell) const;
+
+  /// Blocks a cell that lies inside the map.
+  void block(Cell cell);
 
  private:
   [[nodiscard]] std::size_t index(Cell cell) const;

@@ -18,6 +18,16 @@ std::int32_t cells_in(std::int32_t units) {
 
 }  // namespace
 
+std::vector<Cell> cells_of(Cell corner, Footprint footprint) {
+  std::vector<Cell> cells;
+  for (std::int32_t row = 0; row < footprint.height; ++row) {
+    for (std::int32_t column = 0; column < footprint.width; ++column) {
+      cells.push_back(Cell{corner.x + column, corner.y + row});
+    }
+  }
+  return cells;
+}
+
 Cell cell_of(Position position) {
   return Cell{cells_in(position.x), cells_in(position.y)};
 }
@@ -51,6 +61,8 @@ bool Map::passable(Cell cell) const {
   return cell.x >= 0 && cell.y >= 0 && cell.x < width_ && cell.y < height_ &&
          !blocked_.at(index(cell));
 }
+
+void Map::block(Cell cell) { blocked_.at(index(cell)) = true; }
 
 std::size_t Map::index(Cell cell) const {
   return (static_cast<std::size_t>(cell.y) * static_cast<std::size_t>(width_)) +

@@ -7,6 +7,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -16,6 +17,7 @@
 namespace murim {
 namespace {
 
+constexpr Footprint REGION{REGION_SIDE, REGION_SIDE};
 constexpr std::size_t CELLS = static_cast<std::size_t>(REGION_SIDE) *
                               static_cast<std::size_t>(REGION_SIDE);
 
@@ -40,6 +42,9 @@ struct Site {
   std::size_t value;
 };
 
+// The middle cell of an area, as offsets from its corner.
+Cell middle_of(Footprint area) { return Cell{area.width / 2, area.height / 2}; }
+
 std::size_t index_of(Cell cell) {
   return (static_cast<std::size_t>(cell.y) *
           static_cast<std::size_t>(REGION_SIDE)) +
@@ -48,17 +53,6 @@ std::size_t index_of(Cell cell) {
 
 Cell random_cell(Random& random) {
   return Cell{random.below(REGION_SIDE), random.below(REGION_SIDE)};
-}
-
-// The cells of the square of `side` cells from `corner`, row by row.
-std::vector<Cell> square(Cell corner, std::int32_t side) {
-  std::vector<Cell> cells;
-  for (std::int32_t row = corner.y; row < corner.y + side; ++row) {
-    for (std::int32_t column = corner.x; column < corner.x + side; ++column) {
-      cells.push_back(Cell{column, row});
-    }
-  }
-  return cells;
 }
 
 std::int64_t distance_squared(Cell from, Cell other) {
@@ -71,7 +65,7 @@ std::int64_t distance_squared(Cell from, Cell other) {
 // equals.
 std::vector<std::size_t> partition(const std::vector<Site>& sites) {
   std::vector<std::size_t> values(CELLS);
-  for (const Cell cell : square(Cell{0, 0}, REGION_SIDE)) {
+  for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     const auto nearer = [cell](const Site& left, const Site& right) {
       return distance_squared(cell, left.cell) <
              distance_squared(cell, right.cell);
@@ -142,6 +136,40 @@ std::vector<std::vector<bool>> hostility(const std::vector<Faction>& factions) {
   return hostile;
 }
 
+// The corners from which `area` lies on cells `room` gives to `owner`. A
+// summed-area table of those cells counts the ones under any rectangle in
+// four reads.
+std::vector<Cell> corners_for(const std::vector<std::size_t>& room,
+                              std::size_t owner, Footprint area) {
+  constexpr auto STRIDE = static_cast<std::size_t>(REGION_SIDE) + 1;
+  std::vector<std::int32_t> sums(STRIDE * STRIDE, 0);
+  const auto slot = [](std::int32_t column, std::int32_t row) {
+    return (static_cast<std::size_t>(row) * STRIDE) +
+           static_cast<std::size_t>(column);
+  };
+  for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
+    sums.at(slot(cell.x + 1, cell.y + 1)) =
+        static_cast<std::int32_t>(room.at(index_of(cell)) == owner) +
+        sums.at(slot(cell.x, cell.y + 1)) + sums.at(slot(cell.x + 1, cell.y)) -
+        sums.at(slot(cell.x, cell.y));
+  }
+  const auto fits = [&sums, &slot, area](Cell corner) {
+    const std::int32_t right = corner.x + area.width;
+    const std::int32_t bottom = corner.y + area.height;
+    return sums.at(slot(right, bottom)) - sums.at(slot(corner.x, bottom)) -
+               sums.at(slot(right, corner.y)) +
+               sums.at(slot(corner.x, corner.y)) ==
+           area.width * area.height;
+  };
+  std::vector<Cell> corners = cells_of(
+      Cell{0, 0},
+      Footprint{REGION_SIDE - area.width + 1, REGION_SIDE - area.height + 1});
+  corners.erase(std::remove_if(corners.begin(), corners.end(),
+                               [&fits](Cell corner) { return !fits(corner); }),
+                corners.end());
+  return corners;
+}
+
 void validate(const RegionData& data) {
   const auto weightless = [](const TerrainKind& kind) {
     return kind.weight <= 0;
@@ -151,14 +179,37 @@ void validate(const RegionData& data) {
         faction.hostile_to.begin(), faction.hostile_to.end(),
         [&data](std::size_t enemy) { return enemy >= data.factions.size(); });
   };
+  // Lays the structures out on the area, failing on a structure that covers
+  // no cell, or a cell outside the area or already covered; the centre is
+  // covered last, so a structure over it fails too.
   const auto malformed = [](const VillageTemplate& village) {
-    const auto outside = [&village](Cell offset) {
-      return offset.x < 0 || offset.y < 0 || offset.x >= village.side ||
-             offset.y >= village.side;
+    std::vector<bool> covered(static_cast<std::size_t>(village.area.width) *
+                                  static_cast<std::size_t>(village.area.height),
+                              false);
+    const auto cover = [&village, &covered](Cell cell) {
+      const bool inside = cell.x >= 0 && cell.y >= 0 &&
+                          cell.x < village.area.width &&
+                          cell.y < village.area.height;
+      const std::size_t slot =
+          inside ? (static_cast<std::size_t>(cell.y) *
+                    static_cast<std::size_t>(village.area.width)) +
+                       static_cast<std::size_t>(cell.x)
+                 : 0;
+      const bool free = inside && !covered.at(slot);
+      if (free) {
+        covered.at(slot) = true;
+      }
+      return free;
+    };
+    const auto placed = [&cover](const Structure& structure) {
+      const std::vector<Cell> cells =
+          cells_of(structure.cell, structure.footprint);
+      return !cells.empty() && std::all_of(cells.begin(), cells.end(), cover);
     };
     return village.structures.empty() ||
-           std::any_of(village.structures.begin(), village.structures.end(),
-                       outside);
+           !std::all_of(village.structures.begin(), village.structures.end(),
+                        placed) ||
+           !cover(middle_of(village.area));
   };
   if (data.terrain.empty() || data.factions.empty() || data.villages.empty() ||
       std::any_of(data.terrain.begin(), data.terrain.end(), weightless) ||
@@ -171,7 +222,15 @@ void validate(const RegionData& data) {
 }  // namespace
 
 RegionData region_data() {
-  constexpr std::int32_t TOWN_SIDE = 5;
+  constexpr Footprint HOUSE{3, 3};
+  constexpr Footprint HALL{5, 3};
+  constexpr std::int32_t HAMLET_WIDTH = 7;
+  constexpr std::int32_t VILLAGE_WIDTH = 17;
+  constexpr std::int32_t VILLAGE_HEIGHT = 9;
+  constexpr std::int32_t SOUTH_ROW = 6;
+  constexpr std::int32_t HALL_EAST = 10;
+  constexpr std::int32_t FAR_EAST = 14;
+  constexpr std::int32_t SOUTH_EAST = 11;
   return RegionData{
       {
           {"plain", true, 4},
@@ -185,12 +244,23 @@ RegionData region_data() {
           {"Demonic", {0, 2}},
           {"Unorthodox", {1}},
       },
+      // The approved target mockup's village: houses of 3 by 3 cells and a
+      // hall of 5 by 3 north of the road through its centre, more houses
+      // south of it. The hamlet keeps its west end.
       {
-          {"hamlet", 3, {{0, 0}, {2, 0}, {0, 2}, {2, 2}}},
-          {"village", 4, {{0, 0}, {3, 0}, {0, 3}, {3, 3}, {1, 0}, {0, 2}}},
-          {"town",
-           TOWN_SIDE,
-           {{0, 0}, {2, 0}, {4, 0}, {0, 2}, {4, 2}, {0, 4}, {2, 4}, {4, 4}}},
+          {"hamlet",
+           {HAMLET_WIDTH, VILLAGE_HEIGHT},
+           {{{0, 0}, DURABILITY, HOUSE},
+            {{4, 0}, DURABILITY, HOUSE},
+            {{2, SOUTH_ROW}, DURABILITY, HOUSE}}},
+          {"village",
+           {VILLAGE_WIDTH, VILLAGE_HEIGHT},
+           {{{0, 0}, DURABILITY, HOUSE},
+            {{4, 0}, DURABILITY, HALL},
+            {{HALL_EAST, 0}, DURABILITY, HOUSE},
+            {{FAR_EAST, 0}, DURABILITY, HOUSE},
+            {{1, SOUTH_ROW}, DURABILITY, HOUSE},
+            {{SOUTH_EAST, SOUTH_ROW}, DURABILITY, HOUSE}}},
       },
   };
 }
@@ -214,7 +284,7 @@ Region generate_region(Seed seed, const RegionData& data) {
   // owned by no faction, so no village fits on it.
   const std::size_t nobody = data.factions.size();
   std::vector<std::size_t> room(CELLS);
-  for (const Cell cell : square(Cell{0, 0}, REGION_SIDE)) {
+  for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     const std::size_t place = index_of(cell);
     const bool passable = data.terrain.at(region.terrain.at(place)).passable;
     region.map_rows.at(static_cast<std::size_t>(cell.y))
@@ -226,40 +296,45 @@ Region generate_region(Seed seed, const RegionData& data) {
   for (std::int32_t number = 0; number < villages; ++number) {
     const std::size_t owner =
         static_cast<std::size_t>(number) % data.factions.size();
-    const VillageTemplate& kind = data.villages.at(static_cast<std::size_t>(
-        random.below(static_cast<std::int32_t>(data.villages.size()))));
-    const auto fits = [&room, &kind, owner](Cell corner) {
-      const std::vector<Cell> cells = square(corner, kind.side);
-      return std::all_of(cells.begin(), cells.end(), [&room, owner](Cell cell) {
-        return room.at(index_of(cell)) == owner;
-      });
-    };
-    std::vector<Cell> corners = square(Cell{0, 0}, REGION_SIDE - kind.side + 1);
-    corners.erase(
-        std::remove_if(corners.begin(), corners.end(),
-                       [&fits](Cell corner) { return !fits(corner); }),
-        corners.end());
-    if (corners.empty()) {
+    // The templates with room in the owner's territory, each with the
+    // corners where it fits.
+    std::vector<std::size_t> roomy;
+    std::vector<std::vector<Cell>> fitting;
+    for (std::size_t kind = 0; kind < data.villages.size(); ++kind) {
+      std::vector<Cell> corners =
+          corners_for(room, owner, data.villages.at(kind).area);
+      if (!corners.empty()) {
+        roomy.push_back(kind);
+        fitting.push_back(std::move(corners));
+      }
+    }
+    if (roomy.empty()) {
       throw std::runtime_error("no room for a village");
     }
+    const auto drawn = static_cast<std::size_t>(
+        random.below(static_cast<std::int32_t>(roomy.size())));
+    const VillageTemplate& kind = data.villages.at(roomy.at(drawn));
+    const std::vector<Cell>& corners = fitting.at(drawn);
     const Cell corner = corners.at(static_cast<std::size_t>(
         random.below(static_cast<std::int32_t>(corners.size()))));
-    for (const Cell cell : square(corner, kind.side)) {
+    for (const Cell cell : cells_of(corner, kind.area)) {
       room.at(index_of(cell)) = nobody;
     }
 
     Village village{kind.name + " " + std::to_string(number + 1),
                     owner,
                     corner,
-                    kind.side,
+                    kind.area,
                     {},
                     region.armies.size()};
-    for (const Cell offset : kind.structures) {
+    for (const Structure& structure : kind.structures) {
       village.structures.push_back(region.structures.size());
       region.structures.push_back(Structure{
-          Cell{corner.x + offset.x, corner.y + offset.y}, DURABILITY});
+          Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
+          structure.durability, structure.footprint});
     }
-    const Cell centre{corner.x + (kind.side / 2), corner.y + (kind.side / 2)};
+    const Cell middle = middle_of(kind.area);
+    const Cell centre{corner.x + middle.x, corner.y + middle.y};
     const auto residents = static_cast<std::uint32_t>(kind.structures.size() *
                                                       RESIDENTS_PER_STRUCTURE);
     region.armies.push_back(ArmySpec{centre,
@@ -276,8 +351,26 @@ Region generate_region(Seed seed, const RegionData& data) {
 ArmySpec born_in(const Region& region, std::size_t village) {
   const Village& home = region.villages.at(village);
   const ArmySpec& residents = region.armies.at(home.army);
-  return ArmySpec{home.corner,
-                  home.corner,
+  const auto taken = [&region, &home, &residents](Cell cell) {
+    const auto covers = [&region, cell](std::size_t index) {
+      const Structure& structure = region.structures.at(index);
+      const std::vector<Cell> cells =
+          cells_of(structure.cell, structure.footprint);
+      return std::any_of(cells.begin(), cells.end(), [cell](Cell covered) {
+        return covered.x == cell.x && covered.y == cell.y;
+      });
+    };
+    return (cell.x == residents.start.x && cell.y == residents.start.y) ||
+           std::any_of(home.structures.begin(), home.structures.end(), covers);
+  };
+  const std::vector<Cell> cells = cells_of(home.corner, home.area);
+  const auto free = std::find_if_not(cells.begin(), cells.end(), taken);
+  if (free == cells.end()) {
+    throw std::out_of_range("the village has no free cell to be born on");
+  }
+  const Cell birthplace = *free;
+  return ArmySpec{birthplace,
+                  birthplace,
                   1,
                   residents.strength / residents.count,
                   residents.faction,
