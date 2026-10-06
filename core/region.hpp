@@ -21,10 +21,13 @@ struct TerrainKind {
   std::int32_t weight;
 };
 
-/// A faction: its name and the factions, by index, whose bodies it attacks.
+/// A faction: its name, the factions, by index, whose bodies it attacks, and
+/// the skills its armies use, which decide, among other things, whether they
+/// rebuild what is broken.
 struct Faction {
   std::string name;
   std::vector<std::size_t> hostile_to;
+  std::vector<Skill> skills;
 };
 
 /// A structure a village template places, its cell an offset from the area's
@@ -88,12 +91,16 @@ struct Region {
 /// to eight villages owned in turn by each faction, each on passable cells in
 /// its owner's territory and overlapping no other. The same seed and data give
 /// the same region. Throws std::invalid_argument when a table is empty, the
-/// terrain weights are not positive, a village template has no buildings,
-/// houses no residents, has one outside its area, two that overlap, or one
-/// over the area's centre, or a faction is hostile to one that does not
-/// exist; throws std::runtime_error
-/// when a village finds no room.
+/// terrain weights are not positive, a faction has no skills, a village
+/// template has no buildings, houses no residents, has one outside its area,
+/// two that overlap, or one over the area's centre, or a faction is hostile to
+/// one that does not exist; throws std::runtime_error when a village finds no
+/// room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
+
+/// Returns the villages of `region` as a World is created with them: each
+/// village's structures and resident army.
+[[nodiscard]] std::vector<VillageSpec> village_specs(const Region& region);
 
 /// Returns an army of one agent born into village `village` of `region`: of
 /// the village's faction, with their skills and an agent's share of their

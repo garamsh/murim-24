@@ -32,8 +32,6 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 constexpr std::int32_t SEPARATION = 72;
 constexpr std::uint32_t DURABILITY = 3'000;
 constexpr std::uint64_t STRENGTH_PER_AGENT = 100'000;
-constexpr std::uint64_t GUARD_COOLDOWN = 15;
-constexpr Skill GUARD{3 * CELL_SIZE, 0, 1, 0, GUARD_COOLDOWN};
 
 // A point a partition is made around, and the value its cells take.
 struct Site {
@@ -219,6 +217,9 @@ void validate(const RegionData& data) {
   if (data.terrain.empty() || data.factions.empty() || data.villages.empty() ||
       std::any_of(data.terrain.begin(), data.terrain.end(), weightless) ||
       std::any_of(data.factions.begin(), data.factions.end(), unknown_enemy) ||
+      std::any_of(
+          data.factions.begin(), data.factions.end(),
+          [](const Faction& faction) { return faction.skills.empty(); }) ||
       std::any_of(data.villages.begin(), data.villages.end(), malformed)) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
@@ -227,6 +228,19 @@ void validate(const RegionData& data) {
 }  // namespace
 
 RegionData region_data() {
+  // A guard's strike; a mend that restores the structures within ten cells
+  // of where it is used, a village's from its centre; and a torch that burns
+  // them, where they belong to a faction its user is hostile to.
+  constexpr std::uint64_t GUARD_COOLDOWN = 15;
+  constexpr Skill GUARD{3 * CELL_SIZE, 0, 1, 0, GUARD_COOLDOWN};
+  constexpr std::int32_t MEND_REACH = 10;
+  constexpr std::int32_t MEND_REPAIR = -5;
+  constexpr std::uint64_t MEND_COOLDOWN = 30;
+  constexpr Skill MEND{0, MEND_REACH * CELL_SIZE, 0, MEND_REPAIR,
+                       MEND_COOLDOWN};
+  constexpr std::int32_t TORCH_DAMAGE = 10;
+  constexpr Skill TORCH{0, MEND_REACH * CELL_SIZE, 0, TORCH_DAMAGE,
+                        MEND_COOLDOWN};
   constexpr Footprint HOUSE{3, 3};
   constexpr Footprint HALL{5, 3};
   constexpr Footprint WELL{2, 2};
@@ -258,9 +272,11 @@ RegionData region_data() {
           {"mountain", false, 1},
       },
       {
-          {"Orthodox", {1}},
-          {"Demonic", {0, 2}},
-          {"Unorthodox", {1}},
+          // The Orthodox and Unorthodox mend villages; the Demonic Cult burns
+          // them and rebuilds nothing.
+          {"Orthodox", {1}, {GUARD, MEND}},
+          {"Demonic", {0, 2}, {GUARD, TORCH}},
+          {"Unorthodox", {1}, {GUARD, MEND}},
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
       // hall of 5 by 3 north of the road through its centre, more houses
@@ -367,12 +383,9 @@ Region generate_region(Seed seed, const RegionData& data) {
     }
     const Cell middle = middle_of(kind.area);
     const Cell centre{corner.x + middle.x, corner.y + middle.y};
-    region.armies.push_back(ArmySpec{centre,
-                                     centre,
-                                     residents,
-                                     residents * STRENGTH_PER_AGENT,
-                                     owner,
-                                     {GUARD}});
+    region.armies.push_back(ArmySpec{centre, centre, residents,
+                                     residents * STRENGTH_PER_AGENT, owner,
+                                     data.factions.at(owner).skills});
     region.villages.push_back(village);
   }
   return region;
@@ -405,6 +418,15 @@ ArmySpec born_in(const Region& region, std::size_t village) {
                   residents.strength / residents.count,
                   residents.faction,
                   residents.skills};
+}
+
+std::vector<VillageSpec> village_specs(const Region& region) {
+  std::vector<VillageSpec> specs;
+  specs.reserve(region.villages.size());
+  for (const Village& village : region.villages) {
+    specs.push_back(VillageSpec{village.structures, village.army});
+  }
+  return specs;
 }
 
 }  // namespace murim

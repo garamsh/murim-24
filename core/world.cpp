@@ -60,9 +60,11 @@ constexpr std::uint64_t UINT64_LIMIT =
 static_assert(MAX_BODY_DAMAGE <=
                   UINT64_LIMIT / MAX_AGENTS / MAX_USES / MAX_AGENTS,
               "the damage a body takes in a tick must fit 64 bits");
-static_assert(std::numeric_limits<std::uint32_t>::max() <=
-                  UINT64_LIMIT / MAX_AGENTS / MAX_USES,
-              "the damage a structure takes in a strike must fit 64 bits");
+static_assert(
+    std::uint64_t{std::numeric_limits<std::int32_t>::max()} + 1 <=
+        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) /
+            MAX_AGENTS / MAX_USES,
+    "the damage a structure takes in a strike must fit 64 bits");
 // wound() multiplies count by strength and adds strength to round up.
 static_assert(MAX_STRENGTH <= (UINT64_LIMIT - MAX_STRENGTH) / MAX_AGENTS,
               "a body's count times its strength must fit 64 bits");
@@ -242,7 +244,8 @@ void regroup(std::vector<Body>& bodies, std::uint32_t max_bodies) {
 }  // namespace
 
 World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
-             std::vector<Structure> structures, Rules rules)
+             std::vector<Structure> structures, Rules rules,
+             std::vector<VillageSpec> villages)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       map_(std::move(map)),
       rules_(std::move(rules)),
@@ -281,6 +284,23 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
         "and stand on passable cells, and every structure must cover 1 to "
         "MAX_FOOTPRINT cells along each side, all passable and covered by no "
         "other structure");
+  }
+  village_of_.resize(structures_.size());
+  for (VillageSpec& spec : villages) {
+    const auto claimed = [this](std::size_t structure) {
+      return structure >= village_of_.size() ||
+             village_of_.at(structure).has_value();
+    };
+    if (spec.residents >= armies.size() ||
+        std::any_of(spec.structures.begin(), spec.structures.end(), claimed)) {
+      throw std::invalid_argument(
+          "a village must name existing structures no other village names, "
+          "and an existing army as its residents");
+    }
+    for (const std::size_t structure : spec.structures) {
+      village_of_.at(structure) = villages_.size();
+    }
+    villages_.push_back(Village{std::move(spec), std::nullopt});
   }
   for (const Structure& structure : structures_) {
     structure_extent_ =
@@ -430,6 +450,12 @@ StateHash World::hash() const {
       fold(body.ready_at);
     }
   }
+  for (const Village& village : villages_) {
+    fold(village.spec.residents);
+    fold(village.destroyer.has_value());
+    fold(village.destroyer ? village.destroyer->army : 0);
+    fold(village.destroyer ? village.destroyer->faction : 0);
+  }
   return StateHash{digest};
 }
 
@@ -439,6 +465,56 @@ const std::vector<Body>& World::bodies(std::size_t army) const {
 
 const Structure& World::structure(std::size_t structure) const {
   return structures_.at(structure);
+}
+
+VillageState World::village_state(std::size_t village) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  const auto all_in = [this, &spec](Stage wanted) {
+    return std::all_of(
+        spec.structures.begin(), spec.structures.end(),
+        [this, wanted](std::size_t index) { return stage(index) == wanted; });
+  };
+  if (all_in(Stage::RUBBLE)) {
+    return VillageState::RUINS;
+  }
+  const std::size_t owned_by = owner(village);
+  const auto threatens = [this, &spec, owned_by](const Army& army) {
+    return rules_.hostile.at(army.faction).at(owned_by) &&
+           std::any_of(army.skills.begin(), army.skills.end(),
+                       [this, &spec, &army](const Skill& skill) {
+                         return skill.structure_damage > 0 &&
+                                within_reach(army, spec,
+                                             skill.range + skill.radius);
+                       });
+  };
+  if (std::any_of(armies_.begin(), armies_.end(), threatens)) {
+    return VillageState::RAIDED;
+  }
+  return all_in(Stage::INTACT) ? VillageState::PROSPEROUS
+                               : VillageState::REBUILDING;
+}
+
+// Whether a living body of `army` stands within `reach` of a structure of
+// the village.
+bool World::within_reach(const Army& army, const VillageSpec& spec,
+                         std::int32_t reach) const {
+  return std::any_of(
+      army.bodies.begin(), army.bodies.end(), [&](const Body& body) {
+        return body.count > 0 &&
+               std::any_of(spec.structures.begin(), spec.structures.end(),
+                           [&](std::size_t index) {
+                             return reaches(structures_.at(index),
+                                            body.position, reach);
+                           });
+      });
+}
+
+std::size_t World::owner(std::size_t village) const {
+  return armies_.at(villages_.at(village).spec.residents).faction;
+}
+
+std::optional<Destroyer> World::destroyer(std::size_t village) const {
+  return villages_.at(village).destroyer;
 }
 
 Stage World::stage(std::size_t structure) const {
@@ -468,21 +544,30 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
   };
   // The nearest living hostile body, the lowest index among equals, so the
   // order the query visits bodies in does not decide the target.
-  std::optional<std::size_t> target;
-  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-  crowd.hash.visit_within(user.position, skill.range, [&](std::size_t other) {
-    const std::int64_t distance =
-        distance_squared(user.position, crowd.hash.position(other));
-    const bool closer = distance < nearest ||
-                        (distance == nearest && target && other < *target);
-    if (crowd.counts.at(other) > 0 && hostile(other) && closer) {
-      nearest = distance;
-      target = other;
-    }
-  });
-  if (!target) {
+  const auto nearest_hostile = [&]() -> std::optional<Position> {
+    std::optional<std::size_t> target;
+    std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+    crowd.hash.visit_within(user.position, skill.range, [&](std::size_t other) {
+      const std::int64_t distance =
+          distance_squared(user.position, crowd.hash.position(other));
+      const bool closer = distance < nearest ||
+                          (distance == nearest && target && other < *target);
+      if (crowd.counts.at(other) > 0 && hostile(other) && closer) {
+        nearest = distance;
+        target = other;
+      }
+    });
+    return target ? std::optional<Position>{crowd.hash.position(*target)}
+                  : std::nullopt;
+  };
+  // A skill of range 0 reaches only its user, so it lands where it stands.
+  const std::optional<Position> aim =
+      skill.range == 0 ? std::optional<Position>{user.position}
+                       : nearest_hostile();
+  if (!aim) {
     return;
   }
+  const Position centre = *aim;
   // Uses the step holds: one per cooldown since the later of the user's
   // readiness and the start of its tier's step, so a body acting every 16
   // ticks uses a skill as often as one acting every tick.
@@ -500,7 +585,6 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
   const auto reach = static_cast<std::uint64_t>(skill.radius);
   const std::uint64_t covered =
       1 + ((PI_NUMERATOR * reach * reach) / (PI_DENOMINATOR * side * side));
-  const Position centre = crowd.hash.position(*target);
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (hostile(other)) {
       damage.at(other) +=
@@ -508,15 +592,60 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
           std::min<std::uint64_t>(crowd.counts.at(other), covered);
     }
   });
-  const std::uint64_t broken = std::uint64_t{skill.structure_damage} * force;
+  const std::int64_t effect =
+      std::int64_t{skill.structure_damage} * static_cast<std::int64_t>(force);
   structure_index_.visit_within(
       centre, skill.radius + structure_extent_, [&](std::size_t index) {
-        Structure& structure = structures_.at(index);
-        if (reaches(structure, centre, skill.radius)) {
-          structure.durability -= static_cast<std::uint32_t>(
-              std::min<std::uint64_t>(broken, structure.durability));
+        if (reaches(structures_.at(index), centre, skill.radius)) {
+          shift(index, Destroyer{army, own.faction}, effect);
         }
       });
+}
+
+// Lowers a structure's durability by `effect`, or raises it by a negative
+// one up to the intact floor, never lowering one above that floor by a
+// repair. In a village with living residents an army damages only if it is
+// hostile to the owner and repairs only if it is not; an empty village, or a
+// structure in none, takes either. A village notes the army whose strike left
+// its last standing structure in rubble, and takes as its residents the army
+// that restores a structure while its residents have no living agent.
+void World::shift(std::size_t structure, Destroyer striker,
+                  std::int64_t effect) {
+  const std::optional<std::size_t>& home = village_of_.at(structure);
+  const bool held = home && living(villages_.at(*home).spec.residents) > 0;
+  if (held &&
+      (effect > 0) != rules_.hostile.at(striker.faction).at(owner(*home))) {
+    return;
+  }
+  Structure& shifted = structures_.at(structure);
+  const std::int64_t before = shifted.durability;
+  const bool stood = stage(structure) != Stage::RUBBLE;
+  const std::int64_t ceiling =
+      std::max<std::int64_t>(before, rules_.stage_floors.front());
+  shifted.durability = static_cast<std::uint32_t>(
+      std::clamp(before - effect, std::int64_t{0}, ceiling));
+  if (!home) {
+    return;
+  }
+  Village& village = villages_.at(*home);
+  const std::vector<std::size_t>& own = village.spec.structures;
+  const bool ruined = std::all_of(
+      own.begin(), own.end(),
+      [this](std::size_t index) { return stage(index) == Stage::RUBBLE; });
+  if (stood && ruined) {
+    village.destroyer = striker;
+  }
+  if (shifted.durability > before && living(village.spec.residents) == 0) {
+    village.spec.residents = striker.army;
+  }
+}
+
+std::uint64_t World::living(std::size_t army) const {
+  std::uint64_t agents = 0;
+  for (const Body& body : armies_.at(army).bodies) {
+    agents += body.count;
+  }
+  return agents;
 }
 
 }  // namespace murim

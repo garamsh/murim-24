@@ -88,7 +88,7 @@ murim::Skill skill(const godot::Dictionary& fields) {
   return murim::Skill{integer<std::int32_t>(fields, "range"),
                       integer<std::int32_t>(fields, "radius"),
                       integer<std::uint64_t>(fields, "body_damage"),
-                      integer<std::uint32_t>(fields, "structure_damage"),
+                      integer<std::int32_t>(fields, "structure_damage"),
                       integer<std::uint64_t>(fields, "cooldown")};
 }
 

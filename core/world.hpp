@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 #include "flow_field.hpp"
@@ -28,14 +29,18 @@ struct Body {
 };
 
 /// An ability as data. A body uses it on the nearest living hostile body
-/// within `range`; every hostile body within `radius` of that target, and
-/// every structure whose footprint that disc reaches, takes the damage. The
-/// user waits `cooldown` ticks between uses.
+/// within `range`, or on its own position when `range` is 0; every hostile
+/// body within `radius` of that point takes `body_damage`, and every
+/// structure whose footprint that disc reaches loses `structure_damage` of
+/// durability. A negative `structure_damage` restores durability instead, up
+/// to the intact stage's floor. A village with living residents takes damage
+/// only from factions hostile to its owner, and repair only from the others.
+/// The user waits `cooldown` ticks between uses.
 struct Skill {
   std::int32_t range;
   std::int32_t radius;
   std::uint64_t body_damage;
-  std::uint32_t structure_damage;
+  std::int32_t structure_damage;
   std::uint64_t cooldown;
 };
 
@@ -66,6 +71,29 @@ struct Structure {
   Cell cell{};
   std::uint32_t durability = 0;
   Footprint footprint{1, 1};
+};
+
+/// A village as a world is created with: its structures by index, and the
+/// army living in it.
+struct VillageSpec {
+  std::vector<std::size_t> structures;
+  std::size_t residents;
+};
+
+/// Where a village stands in its life cycle, derived from its structures,
+/// its residents and the bodies standing in it.
+enum class VillageState : std::uint8_t {
+  PROSPEROUS,
+  RAIDED,
+  RUINS,
+  REBUILDING
+};
+
+/// The army whose strike brought a village's last standing structure to
+/// rubble, and its faction.
+struct Destroyer {
+  std::size_t army;
+  std::size_t faction;
 };
 
 /// The most cells a structure's footprint may span along either side.
@@ -138,12 +166,15 @@ class World {
   /// MAX_FOOTPRINT cells along each side or covers a cell that is not
   /// passable or that another structure covers, or an army stands on a cell
   /// that is not passable or that a structure covers, or from which its
-  /// objective cannot be reached. Within these limits no
+  /// objective cannot be reached, or a village names a structure or an army
+  /// that does not exist, or a structure that another village names. Within
+  /// these limits no
   /// damage, count, strength, durability or cooldown arithmetic exceeds its
   /// type; damage to structures and durability need no limit below their 32-bit
   /// types.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
-        std::vector<Structure> structures, Rules rules);
+        std::vector<Structure> structures, Rules rules,
+        std::vector<VillageSpec> villages = {});
 
   /// Places the point the tiers are measured from.
   void set_focus(Position focus);
@@ -170,7 +201,28 @@ class World {
   /// Returns the stage structure `structure` is in.
   [[nodiscard]] Stage stage(std::size_t structure) const;
 
+  /// Returns the state of village `village`: ruins while every structure is
+  /// rubble; otherwise raided while a living body of a faction hostile to its
+  /// owner could damage one of its structures from where it stands, a
+  /// skill's range and radius away; otherwise prosperous while every
+  /// structure is intact, and rebuilding while one is not.
+  [[nodiscard]] VillageState village_state(std::size_t village) const;
+
+  /// Returns the faction owning village `village`: its residents' faction.
+  /// The first army to restore one of its structures while its residents
+  /// have no living agent becomes its residents.
+  [[nodiscard]] std::size_t owner(std::size_t village) const;
+
+  /// Returns who last brought village `village` to ruins, if anyone has; it
+  /// is kept when the village is rebuilt.
+  [[nodiscard]] std::optional<Destroyer> destroyer(std::size_t village) const;
+
  private:
+  struct Village {
+    VillageSpec spec;
+    std::optional<Destroyer> destroyer;
+  };
+
   struct Army {
     std::uint64_t phase;
     std::size_t faction;
@@ -190,6 +242,10 @@ class World {
   };
 
   [[nodiscard]] std::uint64_t next_random();
+  [[nodiscard]] std::uint64_t living(std::size_t army) const;
+  [[nodiscard]] bool within_reach(const Army& army, const VillageSpec& spec,
+                                  std::int32_t reach) const;
+  void shift(std::size_t structure, Destroyer striker, std::int64_t effect);
   void strike(Body& user, std::size_t army, const Crowd& crowd,
               std::vector<std::uint64_t>& damage);
 
@@ -204,6 +260,9 @@ class World {
   // The widest footprint's side, in sub-cell units: a structure's centre lies
   // within it of every point of its footprint.
   std::int32_t structure_extent_ = 0;
+  std::vector<Village> villages_;
+  // The village each structure belongs to, if any.
+  std::vector<std::optional<std::size_t>> village_of_;
 };
 
 }  // namespace murim
