@@ -58,6 +58,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - The world ticks 30 times a second, so a rate given per second, such as skills, becomes work per tick.
 - The tick budget is a p99 tick time of at most 4 ms on the development Mac (Apple Silicon), on the M1 benchmark scenario in `core/m1_scenario.cpp`, the worst case: MAX_PEOPLE people, every one in one battle of two lines with a barricade between them, and two caster armies breaking it. On 2026-10-07 it measured a tick p99 of 0.551 ms. `make bench` measures it. Timing depends on the machine, so `make ci` does not run it.
 - The core is built, tested, linted and formatted with the toolchain ADR 0003 chose. Lint parses it on every host against one pinned Ubuntu 24.04 sysroot, unpacked by `lint-sysroot.sh`, so local and CI lint read the same standard library.
+- `age_in_years` reads a person's age in whole years of the calendar, and `faction_of` the faction of the army a person serves in, none once dead. Both read what the world holds and change nothing.
 
 ## Rationale
 
