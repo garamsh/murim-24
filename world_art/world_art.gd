@@ -116,24 +116,32 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_chevron_frames.append(_region(player, "chevron", 1))
 	_ring.visible = steered >= 0
 	_chevron.visible = steered >= 0
-	for army in world.army_count():
-		_tick_positions.append(world.body_positions(army))
-		_last_positions.append(_tick_positions[army])
-		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
+	_add_armies()
 
 
 ## Records the bodies' positions as a tick leaves them, so a body that moved since the last
 ## tick is drawn walking, facing the way it went.
 func note_tick() -> void:
-	for army in world.army_count():
+	for army in _tick_positions.size():
 		_last_positions[army] = _tick_positions[army]
 		_tick_positions[army] = world.body_positions(army)
+	_add_armies()
+
+
+# Reads the armies the world formed since they were last read, settlers and raiding parties
+# among them: their positions and their sprite set.
+func _add_armies() -> void:
+	for army in range(_tick_positions.size(), world.army_count()):
+		_tick_positions.append(world.body_positions(army))
+		_last_positions.append(_tick_positions[army])
+		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
 
 
 ## Updates buildings and bodies within `view`, the part of the world on screen, in pixels.
 func refresh(view: Rect2) -> void:
 	var now := Time.get_ticks_msec()
 	_tile_fields()
+	_lay_structures()
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
@@ -306,10 +314,12 @@ func _fits(x: int, y: int, size: Vector2i, kind: String, taken: PackedByteArray)
 
 
 # One sprite per structure whose kind has art, the bottom edge of its footprint as its
-# position. A structure with no kind, as from WorldAdapter.create(), is not drawn.
+# position, for each structure laid since they were last laid, those the world's growth lays
+# among them. A structure with no kind, as from WorldAdapter.create(), is not drawn.
 func _lay_structures() -> void:
+	var laid := structure_sprites.size()
 	structure_sprites.resize(world.structure_count())
-	for structure in world.structure_count():
+	for structure in range(laid, world.structure_count()):
 		var corner := world.structure_cell(structure)
 		var footprint := world.structure_footprint(structure)
 		var kind := world.structure_kind(structure)

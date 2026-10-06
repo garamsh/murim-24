@@ -150,7 +150,8 @@ class WorldAdapter : public godot::RefCounted {
   /// one.
   [[nodiscard]] godot::PackedStringArray map_rows() const;
 
-  /// Returns how many armies the world was created with.
+  /// Returns how many armies the world holds, those its villages' growth
+  /// formed included.
   [[nodiscard]] std::int64_t army_count() const;
 
   /// Returns the world's date: `year` and `day` counted from 1, `season`
@@ -166,7 +167,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::PackedVector2Array body_positions(
       std::int64_t army) const;
 
-  /// Returns how many structures the world was created with.
+  /// Returns how many structures the world holds, those its villages' growth
+  /// laid included.
   [[nodiscard]] std::int64_t structure_count() const;
 
   /// Returns the cell structure `structure` stands on.
@@ -177,8 +179,9 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::Vector2i structure_footprint(
       std::int64_t structure) const;
 
-  /// Returns the kind of building structure `structure` is, such as `house`;
-  /// empty for a world made by create(), whose structures carry no kind.
+  /// Returns the kind of building structure `structure` is, such as `house`,
+  /// a structure growth laid taking its plan's; empty for a world made by
+  /// create(), whose structures carry no kind.
   [[nodiscard]] godot::String structure_kind(std::int64_t structure) const;
 
   /// Returns army `army`'s skills, each a Dictionary keyed as create() takes
@@ -195,11 +198,11 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] std::int64_t structure_field_state(
       std::int64_t structure) const;
 
-  /// Returns how many people village `village` of the region can hold, as
-  /// the core derives it.
+  /// Returns how many people village `village` can hold, as the core derives
+  /// it; villages founded as the world runs follow the region's.
   [[nodiscard]] std::int64_t village_cap(std::int64_t village) const;
 
-  /// Returns the food village `village` of the region holds.
+  /// Returns the food village `village` holds.
   [[nodiscard]] std::int64_t village_stock(std::int64_t village) const;
 
   /// Returns how many living people make village `village` their home.
@@ -209,7 +212,8 @@ class WorldAdapter : public godot::RefCounted {
   /// takes its new family's.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
 
-  /// Returns the health army `army`'s members were created with, together.
+  /// Returns the health army `army`'s members were created with, together; 0
+  /// for an army the world formed as it ran.
   [[nodiscard]] std::int64_t army_strength(std::int64_t army) const;
 
   /// Returns the health of each of army `army`'s living members, in the
@@ -236,7 +240,8 @@ class WorldAdapter : public godot::RefCounted {
   /// name), `faction` (int),
   /// `corner` (Vector2i) and `area` (Vector2i, its width and height in
   /// cells); empty unless the world was made
-  /// by create_region().
+  /// by create_region(). It lists the region's villages, not those founded
+  /// as the world runs.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
 
  protected:
@@ -247,10 +252,8 @@ class WorldAdapter : public godot::RefCounted {
   // registered abstract.
   std::optional<murim::World> world_;
   std::vector<std::string> map_rows_;
-  std::size_t army_count_ = 0;
   std::vector<std::string> structure_kinds_;
   std::vector<std::uint64_t> strengths_;
-  std::size_t structure_count_ = 0;
   std::size_t faction_count_ = 0;
   // The names the world's rules of life were given.
   murim::Names names_;

@@ -15,7 +15,8 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - `challenge_refusal` gives the core's verdict on a challenge before it is made, one of the `CHALLENGE_*` constants.
   - `hostile`, `roster`, `person_position` and `person_health` read what a duel changes and who fights it.
 - Each person's name and kin are read back as the core holds them: `person_name` gives its surname and given name in Korean and romanised, `names` every surname and female and male given name the world's rules of life were given, in Korean and romanised, empty for a world from `create`, and `person_parents`, `person_children`, `person_spouse` (the last it married) and `person_family` its kin; `person_age` its age in whole years of the core's calendar, and `person_faction` the faction of the army it serves in, or -1 for one serving in none, as the dead do. The genealogy panel and the HUD read them.
-- Each village's cap, stock and population are read back as the core derives them by `village_cap`, `village_stock` and `village_population`, and each field's state by `structure_field_state`, one of the `FIELD_*` constants or -1 for a structure that is no field.
+- Each village's cap, stock and population are read back as the core derives them by `village_cap`, `village_stock` and `village_population`, villages founded as the world runs included, and each field's state by `structure_field_state`, one of the `FIELD_*` constants or -1 for a structure that is no field.
+- `army_count` and `structure_count` count what the world holds now, the armies and structures its villages' growth adds included. A structure growth laid takes its plan's kind in `structure_kind`. `army_strength` gives 0 for an army formed as the world runs. `villages` lists the region's villages only.
 - Positions cross in sub-cell units as `Vector2`s, exact while a coordinate stays within 2^24. The tick rate, the cell size and the structure stages cross as the class's integer constants, so GDScript repeats none of them.
 - `create` takes what the core's constructor takes, as Godot types: a seed, map rows as a `PackedStringArray`, and the armies (with their skills), structures, rules and, optionally, each faction's leadership as `Dictionary`s keyed by the core's field names, with cells as `Vector2i`. Converting them to the core's types, and the hash back to a signed int, is the adapter's work.
 - Input the core refuses, or that is missing, of the wrong type or outside the core's integer types, makes `create` report it with `push_error` and return null. No exception crosses into Godot.
@@ -23,7 +24,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `world_art/world_art.tscn` draws a world in the approved art, and both scenes below use it. It holds no game rule.
   - Terrain is laid as `docs/convention/stack-godot.md` §Terrain layers sets out. A world without a region draws its passable cells as plain and its blocked cells as mountain.
   - Territory borders are a dotted line in each owner's accent. Landforms are `Sprite2D`s.
-  - Each structure is a `Sprite2D` over its footprint, showing its stage's frame of its kind's art: house, hall, well, barrels, fence, granary or storehouse. A structure from `create` has no kind and is not drawn.
+  - Each structure is a `Sprite2D` over its footprint, showing its stage's frame of its kind's art: house, hall, well, barrels, fence, granary or storehouse. A structure from `create` has no kind and is not drawn. A structure growth lays is given its sprite on the next refresh, and an army growth forms is read on the next tick.
   - Each village's decorations come from `world_art/villages.json` by its template's name: paving and road as ground tiles on a layer above the terrain, and a banner in its owner's colours standing with everything else. They never block or break.
   - Each field is tiled from `art/decorations/fields` by the state the core gives it, sown, growing, ripe, fallow or burnt, with its winter tag in winter, re-tiled when its state or the season changes.
   - Bodies are drawn only on screen, through one `MultiMesh` per row of cells, from one texture holding every faction's sprites. Every body is one person, drawn as its faction's sprite, walking and facing the way it moved since the last tick.
@@ -47,6 +48,8 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - The three-quarter top-down view, structure footprints, real-time combat, pixel art on a 16-pixel tile grid and Korean-first UI text, and the alternatives rejected: ADR 0012 (`adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`), which supersedes ADR 0008 (`adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md`).
 
 ## Open questions
+
+- **Founded villages on the map.** Territory borders and village decorations follow the region as generated, so a founded village shows its structures but no banner or paving, and borders do not follow the core's `territory()`.
 
 - **Inner energy.** The core has none. The HUD's inner-energy bar stands empty with a dash for its value until the core holds it.
 - **Rumours.** The HUD's rumour log shows a placeholder line until the core spreads rumours (`docs/concept.md` §Reputation and rumors).
