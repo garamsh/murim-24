@@ -1289,6 +1289,17 @@ TEST(World, AChallengeIsRefusedForEachReasonTheOrderRefusesIt) {
                std::invalid_argument);
 }
 
+TEST(World, APersonsFactionIsItsArmysAndNoneOnceDead) {
+  World lost = cult_world(1);
+  EXPECT_EQ(lost.faction_of(PLAYER), std::optional<std::size_t>{CULT});
+  EXPECT_EQ(lost.faction_of(OUTSIDER), std::optional<std::size_t>{ORTHODOX});
+  ASSERT_EQ(after_challenge(lost, PLAYER), std::optional<std::size_t>{0});
+  // The challenger died in the duel and serves in no army; control: the NPC,
+  // alive in the same faction, still has it.
+  EXPECT_FALSE(lost.faction_of(PLAYER).has_value());
+  EXPECT_EQ(lost.faction_of(NPC), std::optional<std::size_t>{CULT});
+}
+
 TEST(World, ADuelIsReadWhileItIsFoughtAndGoneOnceSettled) {
   World world = cult_world(TARGET_HEALTH);
   EXPECT_FALSE(world.duel(CULT).has_value());
@@ -1510,6 +1521,29 @@ bool everyone_lives(const World& world, std::uint64_t days) {
     }
   }
   return true;
+}
+
+TEST(World, APersonsAgeIsCountedInWholeYearsOfTheCalendar) {
+  constexpr std::uint64_t DAYS_SHORT = 5;
+  Life life = one_discipline(0);
+  life.founding_age =
+      Spread{static_cast<std::uint32_t>((2 * DAYS_PER_YEAR) + DAYS_SHORT), 0};
+  Rules daily = peaceful(0);
+  daily.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+              {},
+              daily,
+              {},
+              {},
+              life};
+  EXPECT_EQ(world.age_in_years(0), 2);
+  // Control: a day short of the third year it is still two; on it, three.
+  run_ticks(world, DAYS_PER_YEAR - DAYS_SHORT - 1);
+  EXPECT_EQ(world.age_in_years(0), 2);
+  run_ticks(world, 1);
+  EXPECT_EQ(world.age_in_years(0), 3);
 }
 
 TEST(World, PeopleAgeOutUnlessAttainmentExtendsTheirLives) {

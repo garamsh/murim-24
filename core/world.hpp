@@ -449,6 +449,13 @@ class World {
   /// Returns the date the world has reached.
   [[nodiscard]] Date date() const;
 
+  /// Returns person `person`'s age in whole years of the calendar.
+  [[nodiscard]] std::int64_t age_in_years(std::size_t person) const;
+
+  /// Returns the faction of the army person `person` serves in, if it
+  /// serves in one; the dead serve in none.
+  [[nodiscard]] std::optional<std::size_t> faction_of(std::size_t person) const;
+
   /// Returns the faction army `army` fights for now.
   [[nodiscard]] std::size_t faction(std::size_t army) const;
 
