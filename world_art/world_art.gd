@@ -12,9 +12,15 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 # The faction accents of docs/art-direction.md §Palette, in the order of FACTIONS.
 const ACCENTS: Array[Color] = [Color("2f63b8"), Color("d63a2f"), Color("e8a830")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
-# The art for each footprint a structure may have, in cells; its frames hold the footprint at
+# The art for each kind of structure; its frames hold the structure's footprint at
 # (FOOTPRINT_INSET, FOOTPRINT_INSET).
-const BUILDINGS := {Vector2i(3, 3): "structures/house", Vector2i(5, 3): "structures/hall"}
+const BUILDINGS := {
+	"house": "structures/house", "hall": "structures/hall", "well": "structures/well",
+	"barrels": "structures/barrels", "fence": "structures/fence",
+}
+# The decorations of each village template, which never block or break: ground tiles over
+# rectangles of cells and banners on cells, as offsets from the village's corner.
+const DECORATIONS := "res://world_art/villages.json"
 const FOOTPRINT_INSET := 8
 # How often a free cell is left without a landform: mountains mostly covered, hills open.
 const LANDFORM_SKIP := {"mountain": 0.05, "hills": 0.3}
@@ -44,6 +50,8 @@ var _tick_positions: Array[PackedVector2Array] = []
 var _last_positions: Array[PackedVector2Array] = []
 var _counts: Array[PackedInt64Array] = []
 var _army_sprites := PackedInt64Array()
+## The layer of the villages' ground decorations: paving, road and fields.
+var built: TileMapLayer
 ## One sprite per structure, in the world's order; null for a structure with no art.
 var structure_sprites: Array[Sprite2D] = []
 # Each building's frames by footprint, one per stage in the order of STAGES.
@@ -84,12 +92,13 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		colours.append(ACCENTS[faction])
 	_territory.show_borders(_borders(), colours)
 	_lay_landforms()
-	for footprint: Vector2i in BUILDINGS:
-		var sheet := _sheet(BUILDINGS[footprint])
+	for kind: String in BUILDINGS:
+		var sheet := _sheet(BUILDINGS[kind])
 		var frames: Array[AtlasTexture] = []
 		for stage: String in STAGES:
 			frames.append(_region(sheet, stage, 0))
-		_stage_frames[footprint] = frames
+		_stage_frames[kind] = frames
+	_lay_decorations()
 	_lay_structures()
 	_build_body_atlas()
 	var player := _sheet("markers/player_marker")
@@ -289,16 +298,17 @@ func _fits(x: int, y: int, size: Vector2i, kind: String, taken: PackedByteArray)
 	return true
 
 
-# One sprite per structure whose footprint has art, the bottom edge of its footprint as its
-# position. A structure of any other footprint has no art and is not drawn.
+# One sprite per structure whose kind has art, the bottom edge of its footprint as its
+# position. A structure with no kind, as from WorldAdapter.create(), is not drawn.
 func _lay_structures() -> void:
 	structure_sprites.resize(world.structure_count())
 	for structure in world.structure_count():
 		var corner := world.structure_cell(structure)
 		var footprint := world.structure_footprint(structure)
-		if not _stage_frames.has(footprint):
+		var kind := world.structure_kind(structure)
+		if not _stage_frames.has(kind):
 			continue
-		var frames: Array[AtlasTexture] = _stage_frames[footprint]
+		var frames: Array[AtlasTexture] = _stage_frames[kind]
 		var sprite := Sprite2D.new()
 		sprite.centered = false
 		sprite.position = Vector2(corner.x * CELL, (corner.y + footprint.y) * CELL)
@@ -306,6 +316,45 @@ func _lay_structures() -> void:
 		sprite.set_meta("frames", frames)
 		_standing.add_child(sprite)
 		structure_sprites[structure] = sprite
+
+
+# Lays each village's decorations from DECORATIONS by its template: ground tiles on a layer
+# above the terrain, a variant per cell by a seeded hash, and banners in the owner's colours,
+# standing with everything else.
+func _lay_decorations() -> void:
+	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DECORATIONS))
+	var ground := _sheet("decorations/ground")
+	var banners := _sheet("decorations/banner")
+	var tiles := TileSet.new()
+	tiles.tile_size = Vector2i(CELL, CELL)
+	var source := TileSetAtlasSource.new()
+	source.texture = ground.texture
+	source.texture_region_size = Vector2i(CELL, CELL)
+	for frame in ground.texture.get_width() / CELL:
+		source.create_tile(Vector2i(frame, 0))
+	tiles.add_source(source)
+	built = TileMapLayer.new()
+	built.tile_set = tiles
+	_ground.add_child(built)
+	for village: Dictionary in world.villages():
+		var corner: Vector2i = village.corner
+		for item: Dictionary in layouts.get(village.kind, []):
+			if item.has("tile"):
+				var tagged: Array = ground.tags[item.tile]
+				var rect: Array = item.rect
+				for y in range(int(rect[1]), int(rect[1]) + int(rect[3])):
+					for x in range(int(rect[0]), int(rect[0]) + int(rect[2])):
+						var cell := corner + Vector2i(x, y)
+						var variant: int = tagged[0] + _hash(cell.x, cell.y, 6) % (tagged[1] - tagged[0] + 1)
+						built.set_cell(cell, 0, Vector2i(variant, 0))
+			elif item.has("banner"):
+				var cell := corner + Vector2i(int(item.banner[0]), int(item.banner[1]))
+				var sprite := Sprite2D.new()
+				sprite.texture = _region(banners, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
+				sprite.centered = false
+				sprite.position = Vector2(cell.x * CELL, (cell.y + 1) * CELL)
+				sprite.offset = Vector2(0, -banners.frame.y)
+				_standing.add_child(sprite)
 
 
 # Puts the bodies' and the aggregate markers' frames in one texture, so every band draws from

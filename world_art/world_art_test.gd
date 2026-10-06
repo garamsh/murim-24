@@ -1,7 +1,8 @@
 # Checks that world_art.tscn lays a world as docs/convention/stack-godot.md §Terrain layers sets
 # out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
-# cells around it; that it draws every body on screen and none off it; and that a building is
-# drawn over its footprint with its stage's frame of the art for that footprint.
+# cells around it; that it draws every body on screen and none off it; that a structure is drawn
+# over its footprint with its stage's frame of its kind's art; and that each village's ground
+# decorations cover the cells its template's data names.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -77,35 +78,65 @@ func run() -> bool:
 		TICKS, bodies, on_screen, off_screen]
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
-	# Buildings: a region's structures have footprints with art, each drawn with its footprint's
-	# bottom-left on the sprite's position, showing its stage's frame of the art for its width.
-	# Control: the structures above, one cell each, have no art and get no sprite.
+	# Buildings: each region structure is drawn as its kind's art, its footprint's bottom-left on
+	# the sprite's position, showing its stage's frame. Control: the structures above, made by
+	# create() with no kind, get no sprite.
 	var region := WorldAdapter.create_region(SEED)
 	var region_art: Node2D = load(SCENE).instantiate()
 	region_art.show_world(region, region.army_count() - 1)
 	region_art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
-	var sheets := {3: _tags("res://art/structures/house.json"), 5: _tags("res://art/structures/hall.json")}
-	var widths := {3: 64, 5: 96}
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var placed := 0
+	var kinds := {}
 	for structure in region.structure_count():
 		var sprite: Sprite2D = region_art.structure_sprites[structure]
 		var footprint := region.structure_footprint(structure)
 		var corner := region.structure_cell(structure)
-		if sprite == null or not sheets.has(footprint.x):
+		var kind := region.structure_kind(structure)
+		var sheet := _sheet("res://art/structures/%s.json" % kind)
+		if sprite == null or sheet.is_empty():
 			continue
 		var frame := (sprite.texture as AtlasTexture).region
 		var stage: String = stages[region.structure_stage(structure)]
 		if sprite.position == Vector2(corner.x, corner.y + footprint.y) * 16 \
-				and frame.position.x == sheets[footprint.x][stage][0] * widths[footprint.x] \
-				and frame.size.x == widths[footprint.x]:
+				and frame.position.x == sheet.tags[stage][0] * sheet.width \
+				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
 			placed += 1
-	var one_cell_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
-	var buildings_right := placed == region.structure_count() and placed > 0 and one_cell_skipped
-	print("world_art_test: %d of %d region structures drawn over their footprints with their stage's frame; one-cell structures left undrawn %s: %s" % [
-		placed, region.structure_count(), one_cell_skipped, "pass" if buildings_right else "FAIL"])
+			kinds[kind] = true
+	var unkinded_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
+	var buildings_right := placed == region.structure_count() and kinds.size() == 5 and unkinded_skipped
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame; structures without a kind left undrawn %s: %s" % [
+		placed, region.structure_count(), kinds.keys(), unkinded_skipped, "pass" if buildings_right else "FAIL"])
+
+	# Decorations: each village's ground tiles cover the cells its template's data names, with a
+	# frame of the tag named; control: the cell west of the village has none.
+	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
+	var ground_tiles := _sheet("res://art/decorations/ground.json")
+	var tiled := 0
+	var expected := 0
+	var outside_bare := true
+	for village: Dictionary in region.villages():
+		var corner: Vector2i = village.corner
+		outside_bare = outside_bare and region_art.built.get_cell_source_id(corner + Vector2i(-1, 4)) == -1
+		for item: Dictionary in layouts[village.kind]:
+			if not item.has("tile"):
+				continue
+			var rect: Array = item.rect
+			for y in range(int(rect[1]), int(rect[1]) + int(rect[3])):
+				for x in range(int(rect[0]), int(rect[0]) + int(rect[2])):
+					var cell := corner + Vector2i(x, y)
+					var at: int = region_art.built.get_cell_atlas_coords(cell).x
+					# Paving laid after the road over the same cell is the one that shows.
+					var last := _last_tile(layouts[village.kind], Vector2i(x, y))
+					expected += 1
+					if at >= ground_tiles.tags[last][0] and at <= ground_tiles.tags[last][1]:
+						tiled += 1
+	var decorations_right := expected > 0 and tiled == expected and outside_bare
+	print("world_art_test: %d of %d decorated cells carry their template's tile; cells beside the villages bare %s: %s" % [
+		tiled, expected, outside_bare, "pass" if decorations_right else "FAIL"])
 	region_art.free()
-	var passed := plain_full and masks_right and bodies_right and buildings_right
+	var passed := plain_full and masks_right and bodies_right and buildings_right \
+			and decorations_right
 	art.free()
 	return passed
 
@@ -116,6 +147,24 @@ func _layer_with_tiles(ground: Array[Node]) -> TileMapLayer:
 		if not layer.get_used_cells().is_empty():
 			return layer
 	return null
+
+
+# The last tile a layout lays on `cell`, which is the one left showing.
+func _last_tile(layout: Array, cell: Vector2i) -> String:
+	var last := ""
+	for item: Dictionary in layout:
+		if item.has("tile") and Rect2i(int(item.rect[0]), int(item.rect[1]), int(item.rect[2]),
+				int(item.rect[3])).has_point(cell):
+			last = item.tile
+	return last
+
+
+# An exported sheet's tags and frame width, or empty when there is no such sheet.
+func _sheet(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return {"tags": _tags(path), "width": int(data.frames[0].frame.w)}
 
 
 func _tags(path: String) -> Dictionary:
