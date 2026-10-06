@@ -1376,6 +1376,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               std::nullopt,
               std::nullopt,
               {},
+              std::nullopt,
               std::nullopt};
 }
 
@@ -1807,6 +1808,348 @@ TEST(World, TheHungryWithNowhereToGoDie) {
                             holding(1, STORED, STORED), 1);
   run_ticks(fed, DAYS);
   EXPECT_EQ(fed.living(), 5U);
+}
+
+// The growth tests' villages: A, of faction 0, with residents around
+// GROWING_SEAT, and B, of faction 1, with residents around NEIGHBOUR_SEAT, on
+// a 32-cell open map. Days last a tick and growth is checked every day.
+constexpr std::size_t GROWTH_SIDE = 32;
+constexpr Cell GROWING_SEAT{6, 4};
+constexpr Cell NEIGHBOUR_SEAT{24, 24};
+constexpr std::size_t VILLAGE_A = 0;
+constexpr std::size_t VILLAGE_B = 1;
+constexpr std::uint32_t TEN_YEARS_FOOD = 10 * DAYS_PER_YEAR;
+constexpr std::uint32_t HOUSE_FOR_FOUR = 4;
+// A mend that restores 10 durability within 6 cells, and a guard's strike
+// of 10 within 3 cells, each every tick.
+constexpr std::int32_t MEND_RADIUS = 6 * CELL_SIZE;
+constexpr Skill MEND{0, MEND_RADIUS, 0, -10, 1};
+constexpr Skill GUARD{3 * CELL_SIZE, 0, 10, 0, 1};
+constexpr std::uint64_t SETTLING_TICKS = 400;
+// Each village's three structures, a house, a granary and a field; the
+// settlement's side.
+constexpr std::size_t STRUCTURES_AT_START = 6;
+constexpr std::int32_t SETTLEMENT_SIDE = 5;
+
+// What the growth tests vary: A's stance, the pressure, the reach, the plans
+// A builds, whether B's faction is hostile to A's, and B's residents'
+// health.
+struct Growing {
+  std::vector<Expansion> stance;
+  std::uint32_t pressure = PER_MILLE;
+  std::int32_t reach = 24;
+  std::vector<std::size_t> builds{0, 1};
+  bool hostile = true;
+  std::uint64_t neighbour_health = 1;
+  std::size_t founders = FOUNDERS;
+};
+
+// Growth of three plans, a granary, a house for four and a field, a 5 x 5
+// settlement of one of each, two settlers and two raiders.
+Growth growth_of(const Growing& growing) {
+  Growth growth;
+  growth.interval = 1;
+  growth.pressure = growing.pressure;
+  growth.reach = growing.reach;
+  growth.vicinity = 4;
+  growth.spacing = 1;
+  growth.claim = 4;
+  growth.plans = {Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}},
+                  Plan{"house", {2, 2}, true, Holding{HOUSE_FOR_FOUR, 0, 0}},
+                  Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}}};
+  growth.builds = growing.builds;
+  growth.settlement = {SETTLEMENT_SIDE, SETTLEMENT_SIDE};
+  growth.layout = {Placement{1, {0, 0}}, Placement{0, {3, 0}},
+                   Placement{2, {0, 3}}};
+  growth.settlers = 2;
+  growth.raiders = 2;
+  growth.stances = {growing.stance, {}};
+  return growth;
+}
+
+// Village A of four residents housed for four, with ten years' food stored
+// and harvested, so housing is its scarcest holding, and village B of four.
+World growth_world(const Growing& growing) {
+  const auto row = [](Cell from) {
+    return std::vector<Structure>{
+        Structure{from, INTACT, {1, 1}, true},
+        Structure{{from.x + 1, from.y}, INTACT, {1, 1}, true},
+        Structure{{from.x + 2, from.y}, INTACT, {1, 1}, false}};
+  };
+  constexpr Cell NEIGHBOUR_ROW{20, 20};
+  std::vector<Structure> structures = row({1, 1});
+  for (const Structure& structure : row(NEIGHBOUR_ROW)) {
+    structures.push_back(structure);
+  }
+  const std::vector<Holding> holdings{Holding{HOUSE_FOR_FOUR, 0, 0},
+                                      Holding{0, TEN_YEARS_FOOD, 0},
+                                      Holding{0, 0, TEN_YEARS_FOOD}};
+  Rules daily =
+      growing.hostile
+          ? at_war(SEPARATION)
+          : Rules{SEPARATION, {{false, false}, {false, false}}, STAGE_FLOORS};
+  daily.ticks_per_day = 1;
+  Life life = one_discipline(0);
+  life.husbandry = FED;
+  life.growth = growth_of(growing);
+  const std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  return World{Seed{3},
+               Map{rows},
+               {army(rows, GROWING_SEAT, GROWING_SEAT, growing.founders, 1, 0,
+                     {MEND, GUARD}),
+                army(rows, NEIGHBOUR_SEAT, NEIGHBOUR_SEAT, FOUNDERS,
+                     growing.neighbour_health, 1, {IDLE})},
+               structures,
+               daily,
+               {VillageSpec{{0, 1, 2}, 0, holdings},
+                VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings}},
+               {},
+               life};
+}
+
+// Whether `cell` lies within four cells of `centre` along each axis.
+bool within_four(Cell cell, Cell centre) {
+  constexpr std::int32_t NEAR = 4;
+  return std::abs(cell.x - centre.x) <= NEAR &&
+         std::abs(cell.y - centre.y) <= NEAR;
+}
+
+// How many armies `growing`'s growth world holds after its first check.
+std::size_t grown_armies(const Growing& growing) {
+  World world = growth_world(growing);
+  run_ticks(world, 1);
+  return world.army_count();
+}
+
+TEST(World, APressedVillageBuildsWhatItLacksAndRaisesItByRepair) {
+  World world = growth_world(Growing{{Expansion::BUILD}});
+  ASSERT_EQ(world.cap(VILLAGE_A), FOUNDERS);
+  run_ticks(world, 1);
+  // Housing is scarcest, so of the granary and the house it lays the house,
+  // as rubble, beside its centre.
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  constexpr std::size_t BUILT = STRUCTURES_AT_START;
+  EXPECT_EQ(world.plan_of(BUILT), std::optional<std::size_t>{1});
+  EXPECT_EQ(world.stage(BUILT), Stage::RUBBLE);
+  EXPECT_TRUE(within_four(world.structure(BUILT).cell, GROWING_SEAT));
+  EXPECT_EQ(world.cap(VILLAGE_A), FOUNDERS);
+  // The residents' mend raises it by the repair rule, and the housing grows.
+  constexpr std::uint64_t RAISING_TICKS = 50;
+  run_ticks(world, RAISING_TICKS);
+  EXPECT_EQ(world.stage(BUILT), Stage::INTACT);
+  EXPECT_EQ(world.cap(VILLAGE_A), 2 * FOUNDERS);
+  // Control: no longer pressed, it built nothing more.
+  EXPECT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  // Control: three people under a cap of four do not press it, and nothing
+  // is built.
+  Growing short_of_cap{{Expansion::BUILD}};
+  short_of_cap.founders = FOUNDERS - 1;
+  World unpressed = growth_world(short_of_cap);
+  run_ticks(unpressed, 1);
+  EXPECT_EQ(unpressed.structure_count(), STRUCTURES_AT_START);
+  // Control: residents ordered to strike only with their guard, the second
+  // of their skills, leave what they lay in rubble.
+  World unraised = growth_world(Growing{{Expansion::BUILD}});
+  const std::size_t residents_a = 0;
+  unraised.order(residents_a, Order{GROWING_SEAT, {1}});
+  run_ticks(unraised, RAISING_TICKS + 1);
+  ASSERT_EQ(unraised.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(unraised.stage(BUILT), Stage::RUBBLE);
+  EXPECT_EQ(unraised.cap(VILLAGE_A), FOUNDERS);
+}
+
+// Whether `person` is a man.
+bool male(const World& world, std::size_t person) {
+  return world.person(person).sex == Sex::MALE;
+}
+
+// Village A's world after its first check under a stance to found, with the
+// seed's draw checked to have given A a man to found the village.
+World founded() {
+  World world = growth_world(Growing{{Expansion::FOUND}});
+  const std::vector<std::size_t>& before = world.roster(VILLAGE_A);
+  const bool founder =
+      std::any_of(before.begin(), before.end(),
+                  [&world](std::size_t person) { return male(world, person); });
+  EXPECT_TRUE(founder);
+  run_ticks(world, 1);
+  return world;
+}
+
+constexpr std::size_t FOUNDED = 2;
+
+TEST(World, APressedVillageFoundsAVillageOnFreeLand) {
+  const std::vector<std::optional<std::size_t>> unclaimed =
+      growth_world(Growing{{Expansion::FOUND}}).territory();
+  const World world = founded();
+  ASSERT_EQ(world.village_count(), 3U);
+  const std::size_t settlers = world.army_count() - 1;
+  ASSERT_EQ(world.roster(settlers).size(), 2U);
+  EXPECT_EQ(world.roster(VILLAGE_A).size(), FOUNDERS - 2);
+  EXPECT_EQ(world.owner(FOUNDED), 0U);
+  // The founder heads a new family, held by no one who stayed.
+  const std::size_t founder = world.roster(settlers).front();
+  const std::size_t family = world.person(founder).family;
+  EXPECT_TRUE(male(world, founder));
+  EXPECT_GE(family, 2U);
+  const std::vector<std::size_t>& stayed = world.roster(VILLAGE_A);
+  EXPECT_TRUE(std::none_of(stayed.begin(), stayed.end(),
+                           [&world, family](std::size_t person) {
+                             return world.person(person).family == family;
+                           }));
+  // Its faction's territory grew where it was founded.
+  EXPECT_NE(world.territory(), unclaimed);
+  // Control: with no free land within its reach, it founds nothing.
+  Growing hemmed{{Expansion::FOUND}};
+  hemmed.reach = 0;
+  World nowhere = growth_world(hemmed);
+  run_ticks(nowhere, 1);
+  EXPECT_EQ(nowhere.village_count(), 2U);
+  EXPECT_EQ(nowhere.roster(VILLAGE_A).size(), FOUNDERS);
+}
+
+TEST(World, SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem) {
+  World world = founded();
+  ASSERT_EQ(world.village_count(), 3U);
+  // Until then the settlers keep their home, and the new village holds
+  // nothing.
+  EXPECT_EQ(world.residents_of(FOUNDED), 0U);
+  EXPECT_EQ(world.residents_of(VILLAGE_A), FOUNDERS);
+  EXPECT_EQ(world.cap(FOUNDED), 0U);
+  // They raise it; a harvest then finds it holding them, makes it their
+  // home, and it feeds them as any village does.
+  run_ticks(world, SETTLING_TICKS);
+  EXPECT_EQ(world.residents_of(FOUNDED), 2U);
+  EXPECT_EQ(world.residents_of(VILLAGE_A), FOUNDERS - 2);
+  EXPECT_GE(world.cap(FOUNDED), 2U);
+  EXPECT_GT(world.stock(FOUNDED), 0U);
+}
+
+// Ticks `world` until village B's residents are struck down, for at most
+// 2,000 ticks. Returns the cell where party `party`'s lead last stood while
+// one of them lived.
+Cell raid_out(World& world, std::size_t party) {
+  constexpr std::uint64_t MARCH_LIMIT = 2'000;
+  Cell reached = GROWING_SEAT;
+  for (std::uint64_t tick = 0;
+       tick < MARCH_LIMIT && !world.roster(VILLAGE_B).empty(); ++tick) {
+    reached = cell_of(lead(world, party));
+    world.tick();
+  }
+  return reached;
+}
+
+TEST(World, APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome) {
+  Growing raiding{{Expansion::RAID}};
+  raiding.neighbour_health = GUARD.body_damage;
+  World world = growth_world(raiding);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.army_count(), 3U);
+  constexpr std::size_t PARTY = 2;
+  EXPECT_EQ(world.roster(PARTY).size(), 2U);
+  EXPECT_EQ(world.faction(PARTY), 0U);
+  // The party marches on village B and strikes its residents down.
+  const Cell reached = raid_out(world, PARTY);
+  ASSERT_TRUE(world.roster(VILLAGE_B).empty());
+  EXPECT_TRUE(within_four(reached, NEIGHBOUR_SEAT));
+  // The raid is over, so at that check the party went home to its village's
+  // residents.
+  EXPECT_TRUE(world.roster(PARTY).empty());
+  EXPECT_EQ(world.roster(VILLAGE_A).size(), FOUNDERS);
+}
+
+TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
+  // The same village raids a hostile neighbour within its reach (above).
+  ASSERT_EQ(grown_armies(Growing{{Expansion::RAID}}), 3U);
+  Growing peace{{Expansion::RAID}};
+  peace.hostile = false;
+  EXPECT_EQ(grown_armies(peace), 2U);
+  Growing far{{Expansion::RAID}};
+  far.reach = NEIGHBOUR_SEAT.x - GROWING_SEAT.x - 1;
+  EXPECT_EQ(grown_armies(far), 2U);
+}
+
+// What a check of `growing`'s growth world did: laid a structure, founded a
+// village, or sent a party.
+struct Grown {
+  bool built;
+  bool founded;
+  bool raided;
+};
+
+Grown grown(const Growing& growing) {
+  World world = growth_world(growing);
+  run_ticks(world, 1);
+  return Grown{world.structure_count() > STRUCTURES_AT_START &&
+                   world.village_count() == 2,
+               world.village_count() > 2,
+               world.army_count() > 2 && world.village_count() == 2};
+}
+
+TEST(World, TheStanceOrdersTheChoicesAndTheCapAndNeighboursDecideThem) {
+  // Each choice is open to the same village; its stance picks the first.
+  const Grown builds = grown(Growing{{Expansion::BUILD, Expansion::RAID}});
+  EXPECT_TRUE(builds.built && !builds.founded && !builds.raided);
+  const Grown raids = grown(Growing{{Expansion::RAID, Expansion::BUILD}});
+  EXPECT_TRUE(!raids.built && !raids.founded && raids.raided);
+  const Grown founds = grown(Growing{{Expansion::FOUND, Expansion::BUILD}});
+  EXPECT_TRUE(!founds.built && founds.founded && !founds.raided);
+  // With only a granary to build while housing is scarcest, building raises
+  // nothing it lacks, and it raids instead.
+  Growing granary_only{{Expansion::BUILD, Expansion::RAID}};
+  granary_only.builds = {0};
+  const Grown lacking = grown(granary_only);
+  EXPECT_TRUE(!lacking.built && lacking.raided);
+  // With no hostile neighbour, it neither raids nor grows otherwise.
+  Growing peaceful_only{{Expansion::RAID}};
+  peaceful_only.hostile = false;
+  const Grown idle = grown(peaceful_only);
+  EXPECT_TRUE(!idle.built && !idle.founded && !idle.raided);
+  // Control: a faction with no stance grows no village.
+  const Grown still = grown(Growing{{}});
+  EXPECT_TRUE(!still.built && !still.founded && !still.raided);
+}
+
+// Whether a world whose life grows by `growth` is accepted.
+bool grows_by(const Growth& growth) {
+  try {
+    Life life = one_discipline(0);
+    life.growth = growth;
+    static_cast<void>(World{
+        Seed{1}, Map{open_map(OPEN_SIDE)}, {}, {}, at_war(0), {}, {}, life});
+    return true;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
+TEST(World, GrowthPastItsLimitsIsRefused) {
+  const Growth valid = growth_of(Growing{});
+  EXPECT_TRUE(grows_by(valid));
+  Growth never = valid;
+  never.interval = 0;
+  EXPECT_FALSE(grows_by(never));
+  Growth overpressed = valid;
+  overpressed.pressure = PER_MILLE + 1;
+  EXPECT_FALSE(grows_by(overpressed));
+  Growth beyond = valid;
+  beyond.reach = MAX_REACH + 1;
+  EXPECT_FALSE(grows_by(beyond));
+  Growth unknown = valid;
+  unknown.builds = {valid.plans.size()};
+  EXPECT_FALSE(grows_by(unknown));
+  Growth overlapping = valid;
+  overlapping.layout.push_back(Placement{0, {1, 1}});
+  EXPECT_FALSE(grows_by(overlapping));
+  Growth outside = valid;
+  outside.layout.push_back(Placement{0, {SETTLEMENT_SIDE, 0}});
+  EXPECT_FALSE(grows_by(outside));
+  Growth over_centre = valid;
+  over_centre.layout.push_back(Placement{0, {2, 2}});
+  EXPECT_FALSE(grows_by(over_centre));
+  Growth too_many = valid;
+  too_many.stances = {{}, {}, {}};
+  EXPECT_FALSE(grows_by(too_many));
 }
 
 }  // namespace

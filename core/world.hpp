@@ -38,7 +38,9 @@ enum class Sex : std::uint8_t { FEMALE, MALE };
 /// tick `born`, before the world began for the people it starts with, into
 /// `family`, of `parents` if it had any, of sex `sex` with given name `given`
 /// among its sex's names, with `talent` and `attainment` per discipline, and
-/// lives `lifespan` days, extended by its attainment, if it ages at all.
+/// lives `lifespan` days, extended by its attainment, if it ages at all. A
+/// founder of a village, and the children settling with it, take the new
+/// family it heads.
 /// `spouses` are the people it married, in order, and `children` the people
 /// born to it. It has gone `hunger` days unfed. A person carrying soul `soul`
 /// is born again when it dies.
@@ -134,9 +136,75 @@ struct Husbandry {
   std::int32_t migration_reach = 0;
 };
 
+/// The most a chance per mille may be.
+constexpr std::uint32_t PER_MILLE = 1'000;
+
 /// What a field shows: sown in spring, growing in summer, ripe in autumn,
 /// fallow in winter, and burnt whenever it is below its intact stage.
 enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
+
+/// What a structure gives its village: the people it houses, the food it
+/// stores, and the food it yields each harvest, which makes it a field.
+struct Holding {
+  std::uint32_t housing = 0;
+  std::uint32_t storage = 0;
+  std::uint32_t harvest = 0;
+};
+
+/// What a village pressing against its cap may do: raise a structure, found
+/// a village on free land, or raid a hostile neighbour.
+enum class Expansion : std::uint8_t { BUILD, FOUND, RAID };
+
+/// A structure growth may lay: the `kind` of building it is, which names its
+/// art, its footprint, whether it blocks movement and what it holds.
+struct Plan {
+  std::string kind;
+  Footprint footprint{1, 1};
+  bool blocks = true;
+  Holding holding;
+};
+
+/// Plan `plan` laid at `offset` from a new village's corner.
+struct Placement {
+  std::size_t plan = 0;
+  Cell offset{};
+};
+
+/// How villages grow, as data, checked every `interval` days. A village with
+/// living residents presses against its cap once the people whose home it is
+/// reach `pressure` per mille of it; it then takes the first expansion of its
+/// owner's stance, `stances` by faction, that it can:
+/// - build: while every structure of its own is intact, it lays the plan of
+///   `builds` that most raises its scarcest holding, in people, as rubble
+///   on free cells within `vicinity` cells of its centre, nearest it, for
+///   its residents to raise by the repair rule
+/// - found: with more residents than `settlers` and none of its people still
+///   settling, it lays `layout` as rubble on a `settlement` area of free
+///   land, drawn by the seed among those whose centre lies within `reach`
+///   cells of its own, `spacing` cells clear of any structure and held by no
+///   other faction; `settlers` of its residents, a founder's household first,
+///   march there as the new village's residents, and the founder heads a new
+///   family
+/// - raid: with more residents than `raiders` and no party out, it sends
+///   `raiders` of them against the nearest village of a faction it is hostile
+///   to, with living residents and its centre within `reach` cells
+/// A cell lies in the territory of the owner of the nearest village with
+/// living residents whose centre lies within `claim` cells of it.
+struct Growth {
+  std::uint32_t interval = 1;
+  std::uint32_t pressure = PER_MILLE;
+  std::int32_t reach = 0;
+  std::int32_t vicinity = 0;
+  std::int32_t spacing = 0;
+  std::int32_t claim = 0;
+  std::vector<Plan> plans;
+  std::vector<std::size_t> builds;
+  Footprint settlement{1, 1};
+  std::vector<Placement> layout;
+  std::uint32_t settlers = 0;
+  std::uint32_t raiders = 0;
+  std::vector<std::vector<Expansion>> stances;
+};
 
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
@@ -149,7 +217,8 @@ enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
 /// born, with `newborn_health`. The people a world starts with are
 /// `founding_age` days old, or newborn without one. People marry and have
 /// children by `kinship`, if given, and bear `names`. Villages feed their
-/// people by `husbandry`, if given, which caps how many a village holds.
+/// people by `husbandry`, if given, which caps how many a village holds, and
+/// grow by `growth`, if given, as they press against their caps.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -161,6 +230,7 @@ struct Life {
   std::optional<Kinship> kinship;
   Names names;
   std::optional<Husbandry> husbandry;
+  std::optional<Growth> growth;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -192,9 +262,6 @@ constexpr std::uint64_t DAYS_PER_YEAR =
 
 /// A minute of play to a day.
 constexpr std::uint64_t TICKS_PER_DAY = 1'800;
-
-/// The most a chance per mille may be.
-constexpr std::uint32_t PER_MILLE = 1'000;
 
 /// A day of the calendar, each part counted from 1 but `season`, from 0.
 struct Date {
@@ -253,14 +320,6 @@ struct Structure {
   Footprint footprint{1, 1};
   /// Whether its footprint blocks movement; a field does not.
   bool blocks = true;
-};
-
-/// What a structure gives its village: the people it houses, the food it
-/// stores, and the food it yields each harvest, which makes it a field.
-struct Holding {
-  std::uint32_t housing = 0;
-  std::uint32_t storage = 0;
-  std::uint32_t harvest = 0;
 };
 
 /// A village as a world is created with: its structures by index, and the
@@ -398,7 +457,12 @@ class World {
   /// or `life` could draw a talent above MAX_TALENT or a lifespan or founding
   /// age above MAX_LIFESPAN_DAYS, gives a newborn no health or more than
   /// MAX_HEALTH, or gives kinship an age range running downward, a chance
-  /// above PER_MILLE or a neighbourhood outside [0, MAX_REACH]. Within these
+  /// above PER_MILLE or a neighbourhood outside [0, MAX_REACH], or gives
+  /// growth no interval, a pressure above PER_MILLE, a reach, vicinity,
+  /// spacing or claim outside [0, MAX_REACH], a plan or settlement of a side
+  /// outside [1, MAX_FOOTPRINT], a build or placement naming no plan, a
+  /// layout with a structure outside its settlement, over another or over
+  /// its centre, or stances for more factions than `hostile`. Within these
   /// limits no damage, health, durability or cooldown arithmetic exceeds its
   /// type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
@@ -487,6 +551,27 @@ class World {
   [[nodiscard]] std::optional<FieldState> field_state(
       std::size_t structure) const;
 
+  /// Returns how many armies the world holds, those growth formed included.
+  [[nodiscard]] std::size_t army_count() const;
+
+  /// Returns how many structures the world holds, those growth laid
+  /// included, numbered in the order they were laid.
+  [[nodiscard]] std::size_t structure_count() const;
+
+  /// Returns how many villages the world holds, those founded included.
+  [[nodiscard]] std::size_t village_count() const;
+
+  /// Returns the index, among the growth's plans, of the plan structure
+  /// `structure` was laid from, or nothing for one the world was created
+  /// with.
+  [[nodiscard]] std::optional<std::size_t> plan_of(std::size_t structure) const;
+
+  /// Returns the faction whose territory each cell of the map lies in, row by
+  /// row: the owner of the nearest village with living residents whose
+  /// centre lies within the growth's claim, the lowest village among equals,
+  /// or nothing beyond every such village and without growth.
+  [[nodiscard]] std::vector<std::optional<std::size_t>> territory() const;
+
   /// Gives living person `person` a new soul with no history, so that it is
   /// born again when it dies. Returns the soul. Throws std::invalid_argument
   /// when the person is dead or does not exist.
@@ -544,6 +629,10 @@ class World {
     VillageSpec spec;
     std::optional<Destroyer> destroyer;
     std::uint64_t stock = 0;
+    /// The army its raids are fought by, once it has raided, and the village
+    /// its party is out against.
+    std::optional<std::size_t> party;
+    std::optional<std::size_t> raiding;
   };
 
   struct Army {
@@ -604,6 +693,37 @@ class World {
     std::size_t army;
   };
   void rebirth(Passing passing);
+  void grow(const Growth& growth);
+  void recall(std::size_t village);
+  void settle();
+  [[nodiscard]] bool expand(std::size_t village, Expansion expansion,
+                            const Growth& growth);
+  [[nodiscard]] bool lay_building(std::size_t village, const Growth& growth);
+  [[nodiscard]] bool found_village(std::size_t village, const Growth& growth);
+  [[nodiscard]] bool send_raid(std::size_t village, const Growth& growth);
+  [[nodiscard]] bool settling(std::size_t village) const;
+  [[nodiscard]] std::vector<std::size_t> levy(std::size_t village) const;
+  [[nodiscard]] std::vector<std::size_t> households(std::size_t village) const;
+  /// A plan laid from a corner cell.
+  struct Laid {
+    std::size_t plan;
+    Cell cell;
+  };
+  [[nodiscard]] std::optional<std::vector<std::size_t>> lay(
+      const std::vector<Laid>& laid, const Growth& growth,
+      const std::vector<std::size_t>& movers, Cell destination);
+  void attach(std::size_t village, const std::vector<std::size_t>& structures,
+              const Growth& growth);
+  std::size_t form(std::size_t village, const std::vector<std::size_t>& members,
+                   Cell objective, std::optional<std::size_t> into);
+  /// Cells of the map, row by row: those a structure covers, those that are
+  /// not passable, and those an objective or a living person takes.
+  struct Ground {
+    std::vector<bool> covered;
+    std::vector<bool> rough;
+    std::vector<bool> taken;
+  };
+  [[nodiscard]] Ground ground() const;
   [[nodiscard]] std::vector<Passing> passings() const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
@@ -631,6 +751,8 @@ class World {
   std::vector<std::size_t> surnames_;
   // The village each structure belongs to, if any.
   std::vector<std::optional<std::size_t>> village_of_;
+  // The growth plan each structure was laid from, if any.
+  std::vector<std::optional<std::size_t>> plans_;
 };
 
 }  // namespace murim

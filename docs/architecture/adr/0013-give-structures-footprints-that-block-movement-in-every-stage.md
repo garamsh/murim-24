@@ -1,6 +1,6 @@
 # ADR 0013: Give structures footprints that block movement in every stage
 
-> Status: accepted; its rule that every footprint blocks superseded by ADR-0022, which makes blocking per-kind data
+> Status: accepted; its rule that every footprint blocks superseded by ADR-0022, which makes blocking per-kind data; its rule that footprints block only from the world's creation superseded by ADR-0023
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

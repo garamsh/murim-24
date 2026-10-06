@@ -1,9 +1,11 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -226,6 +228,149 @@ void fold_soul(const Fold& fold, const Soul& soul) {
   }
 }
 
+// Whether a footprint spans 1 to MAX_FOOTPRINT cells along each side.
+bool spans(Footprint footprint) {
+  const auto side = [](std::int32_t cells) {
+    return cells >= 1 && cells <= MAX_FOOTPRINT;
+  };
+  return side(footprint.width) && side(footprint.height);
+}
+
+// Whether `layout` places only known plans, inside `area`, over no other
+// placement and off the area's centre.
+bool lays_out(const Growth& growth) {
+  const Footprint area = growth.settlement;
+  std::vector<bool> covered(static_cast<std::size_t>(area.width) *
+                                static_cast<std::size_t>(area.height),
+                            false);
+  const auto cover = [&area, &covered](Cell cell) {
+    const bool inside = cell.x >= 0 && cell.y >= 0 && cell.x < area.width &&
+                        cell.y < area.height;
+    if (!inside) {
+      return false;
+    }
+    const std::size_t slot = (static_cast<std::size_t>(cell.y) *
+                              static_cast<std::size_t>(area.width)) +
+                             static_cast<std::size_t>(cell.x);
+    const bool free = !covered.at(slot);
+    covered.at(slot) = true;
+    return free;
+  };
+  const auto placed = [&growth, &cover](const Placement& placement) {
+    if (placement.plan >= growth.plans.size()) {
+      return false;
+    }
+    const std::vector<Cell> cells =
+        cells_of(placement.offset, growth.plans.at(placement.plan).footprint);
+    return std::all_of(cells.begin(), cells.end(), cover);
+  };
+  return std::all_of(growth.layout.begin(), growth.layout.end(), placed) &&
+         cover(Cell{area.width / 2, area.height / 2});
+}
+
+// Throws std::invalid_argument when `growth` checks at no interval, presses
+// above PER_MILLE, reaches outside [0, MAX_REACH], or lays a footprint or
+// placement it cannot.
+void check_growth(const Growth& growth) {
+  const auto unknown = [&growth](std::size_t plan) {
+    return plan >= growth.plans.size();
+  };
+  const bool reaches_out =
+      !reachable(growth.reach) || !reachable(growth.vicinity) ||
+      !reachable(growth.spacing) || !reachable(growth.claim);
+  const bool misshapen =
+      !spans(growth.settlement) ||
+      std::any_of(growth.plans.begin(), growth.plans.end(),
+                  [](const Plan& plan) { return !spans(plan.footprint); });
+  if (growth.interval == 0 || growth.pressure > PER_MILLE || reaches_out ||
+      misshapen ||
+      std::any_of(growth.builds.begin(), growth.builds.end(), unknown) ||
+      !lays_out(growth)) {
+    throw std::invalid_argument(
+        "growth must check at an interval, press within a thousand per "
+        "mille, reach within MAX_REACH, and lay footprints of 1 to "
+        "MAX_FOOTPRINT cells from known plans inside its settlement, apart "
+        "and off its centre");
+  }
+}
+
+// How many marked cells of a grid lie under a rectangle, read from a
+// summed-area table in four lookups.
+class Tally {
+ public:
+  Tally(const std::vector<bool>& marked, std::int32_t width,
+        std::int32_t height)
+      : width_(width),
+        height_(height),
+        sums_((static_cast<std::size_t>(width) + 1) *
+                  (static_cast<std::size_t>(height) + 1),
+              0) {
+    for (Cell cell{0, 0}; cell.y < height; ++cell.y) {
+      for (cell.x = 0; cell.x < width; ++cell.x) {
+        const std::size_t index = (static_cast<std::size_t>(cell.y) *
+                                   static_cast<std::size_t>(width)) +
+                                  static_cast<std::size_t>(cell.x);
+        sums_.at(slot(cell.x + 1, cell.y + 1)) =
+            static_cast<std::int32_t>(marked.at(index)) +
+            sums_.at(slot(cell.x, cell.y + 1)) +
+            sums_.at(slot(cell.x + 1, cell.y)) - sums_.at(slot(cell.x, cell.y));
+      }
+    }
+  }
+
+  // Whether `area` from `corner` lies on the grid with no cell marked.
+  [[nodiscard]] bool clear(Cell corner, Footprint area) const {
+    return corner.x >= 0 && corner.y >= 0 && corner.x + area.width <= width_ &&
+           corner.y + area.height <= height_ &&
+           count(corner.x, corner.y, corner.x + area.width,
+                 corner.y + area.height) == 0;
+  }
+
+  // Whether no cell within `margin` of `area` from `corner`, on the grid, is
+  // marked.
+  [[nodiscard]] bool clear_around(Cell corner, Footprint area,
+                                  std::int32_t margin) const {
+    return count(std::max(corner.x - margin, 0), std::max(corner.y - margin, 0),
+                 std::min(corner.x + area.width + margin, width_),
+                 std::min(corner.y + area.height + margin, height_)) == 0;
+  }
+
+ private:
+  [[nodiscard]] std::size_t slot(std::int32_t column, std::int32_t row) const {
+    return (static_cast<std::size_t>(row) *
+            (static_cast<std::size_t>(width_) + 1)) +
+           static_cast<std::size_t>(column);
+  }
+
+  // The marked cells in columns [left, right) of rows [top, bottom).
+  [[nodiscard]] std::int32_t count(std::int32_t left, std::int32_t top,
+                                   std::int32_t right,
+                                   std::int32_t bottom) const {
+    return sums_.at(slot(right, bottom)) - sums_.at(slot(left, bottom)) -
+           sums_.at(slot(right, top)) + sums_.at(slot(left, top));
+  }
+
+  std::int32_t width_;
+  std::int32_t height_;
+  std::vector<std::int32_t> sums_;
+};
+
+// Twice the squared distance between the centre of `area` from `corner` and
+// the centre of cell `seat`, in half cells, so it stays an integer.
+std::int64_t remoteness(Cell corner, Footprint area, Cell seat) {
+  const std::int64_t offset_x = (2 * std::int64_t{corner.x}) + area.width -
+                                (2 * std::int64_t{seat.x}) - 1;
+  const std::int64_t offset_y = (2 * std::int64_t{corner.y}) + area.height -
+                                (2 * std::int64_t{seat.y}) - 1;
+  return (offset_x * offset_x) + (offset_y * offset_y);
+}
+
+// Whether `there` lies within `reach` cells of `here` along each axis.
+bool within(Cell here, Cell there, std::int32_t reach) {
+  return std::abs(there.x - here.x) <= reach &&
+         std::abs(there.y - here.y) <= reach;
+}
+
 // Throws std::invalid_argument when `life` could draw a talent above
 // MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives a newborn no
 // health or more than MAX_HEALTH.
@@ -264,6 +409,9 @@ void check_life(const Life& life) {
         "ages run upward, its chances within a thousand per mille and its "
         "neighbourhood within reach");
   }
+  if (life.growth) {
+    check_growth(*life.growth);
+  }
 }
 
 // The range a spread draws over.
@@ -280,6 +428,10 @@ void fold_village(const Fold& fold, const Village& village) {
   fold(village.destroyer ? village.destroyer->army : 0);
   fold(village.destroyer ? village.destroyer->faction : 0);
   fold(village.stock);
+  fold(village.party.has_value());
+  fold(village.party.value_or(0));
+  fold(village.raiding.has_value());
+  fold(village.raiding.value_or(0));
   for (const Holding& holding : village.spec.holdings) {
     fold(holding.housing);
     fold(holding.storage);
@@ -372,6 +524,11 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     surnames_.push_back(next_random() % life_.names.surnames.size());
   }
   village_of_.resize(structures_.size());
+  plans_.resize(structures_.size());
+  if (life_.growth && life_.growth->stances.size() > rules_.hostile.size()) {
+    throw std::invalid_argument(
+        "growth must give stances for no more factions than hostility names");
+  }
   for (VillageSpec& spec : villages) {
     add_village(std::move(spec));
   }
@@ -417,7 +574,8 @@ void World::add_village(VillageSpec spec) {
   for (const std::size_t member : armies_.at(spec.residents).roster) {
     people_.at(member).home = villages_.size();
   }
-  villages_.push_back(Village{std::move(spec), std::nullopt, 0});
+  villages_.push_back(
+      Village{std::move(spec), std::nullopt, 0, std::nullopt, std::nullopt});
   // A village starts with its storage full.
   villages_.back().stock = held(villages_.size() - 1, Stage::DAMAGED).storage;
 }
@@ -611,6 +769,11 @@ void World::tick() {
   // The newborn first act on the next tick.
   for (const Passing& passing : reborn) {
     rebirth(passing);
+  }
+  const std::uint64_t day = tick_count_ / rules_.ticks_per_day;
+  if (life_.growth && tick_count_ % rules_.ticks_per_day == 0 &&
+      day % life_.growth->interval == 0) {
+    grow(*life_.growth);
   }
   if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
     kin(*life_.kinship);
@@ -1401,6 +1564,9 @@ void World::husband(const Husbandry& husbandry) {
   const std::uint64_t day =
       (tick_count_ / rules_.ticks_per_day) % DAYS_PER_YEAR;
   const bool harvest = day == CALENDAR.days_per_season * 3;
+  if (harvest) {
+    settle();
+  }
   std::vector<std::size_t> population = homes();
   std::vector<bool> fed(villages_.size(), false);
   for (std::size_t village = 0; village < villages_.size(); ++village) {
@@ -1430,6 +1596,29 @@ void World::husband(const Husbandry& husbandry) {
             [](Unfed left, Unfed right) { return left.person < right.person; });
   for (const Unfed& each : unfed) {
     migrate_or_starve(each, husbandry.migration_reach, population);
+  }
+}
+
+// Makes each village the home of its residents who make another their home,
+// the settlers of a village founded from it, once a harvest finds its cap
+// holding all its living residents.
+void World::settle() {
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const std::vector<std::size_t>& residents =
+        armies_.at(villages_.at(village).spec.residents).roster;
+    const auto living = static_cast<std::size_t>(std::count_if(
+        residents.begin(), residents.end(),
+        [this](std::size_t member) { return people_.at(member).health > 0; }));
+    const auto elsewhere = [this, village](std::size_t member) {
+      return people_.at(member).home != village;
+    };
+    if (std::none_of(residents.begin(), residents.end(), elsewhere) ||
+        cap(village) < living) {
+      continue;
+    }
+    for (const std::size_t member : residents) {
+      people_.at(member).home = village;
+    }
   }
 }
 
@@ -1465,6 +1654,558 @@ void World::migrate_or_starve(Unfed unfed, std::int32_t reach,
   hungry.hunger = 0;
   --population.at(home);
   ++population.at(refuge);
+}
+
+std::size_t World::army_count() const { return armies_.size(); }
+
+std::size_t World::structure_count() const { return structures_.size(); }
+
+std::size_t World::village_count() const { return villages_.size(); }
+
+std::optional<std::size_t> World::plan_of(std::size_t structure) const {
+  return plans_.at(structure);
+}
+
+std::vector<std::optional<std::size_t>> World::territory() const {
+  const std::int32_t width = map_.width();
+  std::vector<std::optional<std::size_t>> held(
+      static_cast<std::size_t>(width) *
+      static_cast<std::size_t>(map_.height()));
+  if (!life_.growth) {
+    return held;
+  }
+  const std::int32_t claim = life_.growth->claim;
+  std::vector<std::int64_t> nearest(held.size(),
+                                    std::numeric_limits<std::int64_t>::max());
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    if (armies_.at(villages_.at(village).spec.residents).roster.empty()) {
+      continue;
+    }
+    const Cell centre = seat(village);
+    for (Cell cell{0, std::max(centre.y - claim, 0)};
+         cell.y <= std::min(centre.y + claim, map_.height() - 1); ++cell.y) {
+      for (cell.x = std::max(centre.x - claim, 0);
+           cell.x <= std::min(centre.x + claim, width - 1); ++cell.x) {
+        const std::size_t slot = (static_cast<std::size_t>(cell.y) *
+                                  static_cast<std::size_t>(width)) +
+                                 static_cast<std::size_t>(cell.x);
+        const std::int64_t offset_x = cell.x - centre.x;
+        const std::int64_t offset_y = cell.y - centre.y;
+        const std::int64_t distance =
+            (offset_x * offset_x) + (offset_y * offset_y);
+        if (distance < nearest.at(slot)) {
+          nearest.at(slot) = distance;
+          held.at(slot) = owner(village);
+        }
+      }
+    }
+  }
+  return held;
+}
+
+// Every growth check: each village recalls a raid that is over, then, while
+// it presses against its cap, takes the first expansion of its owner's stance
+// it can, in order of village; a village founded in the check waits for the
+// next.
+void World::grow(const Growth& growth) {
+  const std::vector<std::size_t> population = homes();
+  const std::size_t villages = villages_.size();
+  for (std::size_t village = 0; village < villages; ++village) {
+    recall(village);
+    const std::size_t owned_by = owner(village);
+    const std::uint64_t people = population.at(village);
+    const bool pressed =
+        people > 0 &&
+        !armies_.at(villages_.at(village).spec.residents).roster.empty() &&
+        people * PER_MILLE >= std::uint64_t{cap(village)} * growth.pressure;
+    if (!pressed || owned_by >= growth.stances.size()) {
+      continue;
+    }
+    for (const Expansion expansion : growth.stances.at(owned_by)) {
+      if (expand(village, expansion, growth)) {
+        break;
+      }
+    }
+  }
+}
+
+bool World::expand(std::size_t village, Expansion expansion,
+                   const Growth& growth) {
+  switch (expansion) {
+    case Expansion::BUILD:
+      return lay_building(village, growth);
+    case Expansion::FOUND:
+      return found_village(village, growth);
+    case Expansion::RAID:
+      return send_raid(village, growth);
+  }
+  return false;
+}
+
+// Ends village `village`'s raid once its party has no living member, its
+// target's residents have none, or its target's owner is no longer one the
+// party is hostile to: every member whose home's residents can reach it goes
+// back to them. A party that became another village's residents is no
+// longer the village's.
+void World::recall(std::size_t village) {
+  Village& raiding = villages_.at(village);
+  if (!raiding.party) {
+    return;
+  }
+  const std::size_t party = *raiding.party;
+  const auto housed = [party](const Village& other) {
+    return other.spec.residents == party;
+  };
+  if (std::any_of(villages_.begin(), villages_.end(), housed)) {
+    raiding.party.reset();
+    raiding.raiding.reset();
+    return;
+  }
+  if (!raiding.raiding) {
+    return;
+  }
+  const std::size_t target = *raiding.raiding;
+  Army& out = armies_.at(party);
+  const bool over =
+      out.roster.empty() ||
+      armies_.at(villages_.at(target).spec.residents).roster.empty() ||
+      !rules_.hostile.at(out.faction).at(owner(target));
+  if (!over) {
+    return;
+  }
+  raiding.raiding.reset();
+  const std::vector<std::size_t> members = out.roster;
+  for (const std::size_t member : members) {
+    const std::optional<std::size_t> home = people_.at(member).home;
+    if (!home) {
+      continue;
+    }
+    Army& residents = armies_.at(villages_.at(*home).spec.residents);
+    if (residents.field.distance(cell_of(people_.at(member).position)) ==
+        FlowField::UNREACHABLE) {
+      continue;
+    }
+    out.roster.erase(std::find(out.roster.begin(), out.roster.end(), member));
+    residents.roster.push_back(member);
+  }
+}
+
+// Cells of the map: those a structure covers, those not passable, and those
+// an army's objective or a living person takes.
+World::Ground World::ground() const {
+  const auto width = static_cast<std::size_t>(map_.width());
+  const std::size_t cells = width * static_cast<std::size_t>(map_.height());
+  Ground marked{std::vector<bool>(cells, false),
+                std::vector<bool>(cells, false),
+                std::vector<bool>(cells, false)};
+  const auto slot = [width](Cell cell) {
+    return (static_cast<std::size_t>(cell.y) * width) +
+           static_cast<std::size_t>(cell.x);
+  };
+  for (const Structure& structure : structures_) {
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      marked.covered.at(slot(cell)) = true;
+    }
+  }
+  for (Cell cell{0, 0}; cell.y < map_.height(); ++cell.y) {
+    for (cell.x = 0; cell.x < map_.width(); ++cell.x) {
+      marked.rough.at(slot(cell)) = !map_.passable(cell);
+    }
+  }
+  for (const Army& army : armies_) {
+    marked.taken.at(slot(army.order.objective)) = true;
+    for (const std::size_t member : army.roster) {
+      marked.taken.at(slot(cell_of(people_.at(member).position))) = true;
+    }
+  }
+  return marked;
+}
+
+// Lays the plan of the growth's builds that most raises village `village`'s
+// scarcest holding, in people, while every structure of its own is intact:
+// as rubble, on the free cells within the vicinity of its centre nearest it,
+// a cell clear of any structure or impassable cell. Returns whether it laid
+// one.
+bool World::lay_building(std::size_t village, const Growth& growth) {
+  const VillageSpec& spec = villages_.at(village).spec;
+  const auto unfinished = [this](std::size_t structure) {
+    return stage(structure) != Stage::INTACT;
+  };
+  if (std::any_of(spec.structures.begin(), spec.structures.end(), unfinished)) {
+    return false;
+  }
+  const std::uint64_t yearly = std::max<std::uint64_t>(
+      std::uint64_t{life_.husbandry ? life_.husbandry->consumption : 1} *
+          DAYS_PER_YEAR,
+      1);
+  // Housing, food and storage, each in the people it holds.
+  const auto in_people = [yearly](const Holding& holding) {
+    return std::array<std::uint64_t, 3>{
+        holding.housing, holding.harvest / yearly, holding.storage / yearly};
+  };
+  const std::array<std::uint64_t, 3> holds =
+      in_people(held(village, Stage::DAMAGED));
+  const auto scarcest = static_cast<std::size_t>(
+      std::min_element(holds.begin(), holds.end()) - holds.begin());
+  std::optional<std::size_t> chosen;
+  std::uint64_t most = 0;
+  for (const std::size_t plan : growth.builds) {
+    const std::uint64_t gain =
+        in_people(growth.plans.at(plan).holding).at(scarcest);
+    if (gain > most) {
+      most = gain;
+      chosen = plan;
+    }
+  }
+  if (!chosen) {
+    return false;
+  }
+  const Footprint footprint = growth.plans.at(*chosen).footprint;
+  const Ground marked = ground();
+  std::vector<bool> open = marked.covered;
+  for (std::size_t cell = 0; cell < open.size(); ++cell) {
+    open.at(cell) = open.at(cell) || marked.rough.at(cell);
+  }
+  const Tally blocked{open, map_.width(), map_.height()};
+  const Tally taken{marked.taken, map_.width(), map_.height()};
+  const Cell centre = seat(village);
+  const std::int32_t vicinity = growth.vicinity;
+  std::optional<Cell> best;
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (Cell corner{0, centre.y - vicinity};
+       corner.y + footprint.height - 1 <= centre.y + vicinity; ++corner.y) {
+    for (corner.x = centre.x - vicinity;
+         corner.x + footprint.width - 1 <= centre.x + vicinity; ++corner.x) {
+      const std::int64_t distance = remoteness(corner, footprint, centre);
+      if (distance < nearest && blocked.clear(corner, footprint) &&
+          blocked.clear_around(corner, footprint, 1) &&
+          taken.clear(corner, footprint)) {
+        nearest = distance;
+        best = corner;
+      }
+    }
+  }
+  if (!best) {
+    return false;
+  }
+  const std::optional<std::vector<std::size_t>> laid =
+      lay({Laid{*chosen, *best}}, growth, {}, centre);
+  if (!laid) {
+    return false;
+  }
+  attach(village, *laid, growth);
+  return true;
+}
+
+// Lays the growth's settlement as rubble on free land drawn by the seed, its
+// centre within reach of village `village`'s, `spacing` cells clear of any
+// structure and held by no other faction, and sends the settlers there as the
+// new village's residents; their homes stay until it can hold them. The
+// founder heads a new family, a branch bearing its family's surname, and so
+// do its children among the settlers. Returns whether it founded one.
+bool World::found_village(std::size_t village, const Growth& growth) {
+  const std::vector<std::size_t>& residents =
+      armies_.at(villages_.at(village).spec.residents).roster;
+  if (residents.size() <= growth.settlers || settling(village)) {
+    return false;
+  }
+  std::vector<std::size_t> settlers = households(village);
+  settlers.resize(std::min<std::size_t>(settlers.size(), growth.settlers));
+  if (settlers.empty()) {
+    return false;
+  }
+  const Footprint area = growth.settlement;
+  const Cell middle{area.width / 2, area.height / 2};
+  const Cell home = seat(village);
+  const std::size_t faction = owner(village);
+  const FlowField paths{map_, home};
+  const Ground marked = ground();
+  std::vector<bool> open = marked.covered;
+  for (std::size_t cell = 0; cell < open.size(); ++cell) {
+    open.at(cell) =
+        open.at(cell) || marked.rough.at(cell) || marked.taken.at(cell);
+  }
+  const Tally blocked{open, map_.width(), map_.height()};
+  const Tally covered{marked.covered, map_.width(), map_.height()};
+  const std::vector<std::optional<std::size_t>> held = territory();
+  const auto claimed = [this, &held, faction](Cell cell) {
+    const std::optional<std::size_t> holder =
+        held.at((static_cast<std::size_t>(cell.y) *
+                 static_cast<std::size_t>(map_.width())) +
+                static_cast<std::size_t>(cell.x));
+    return holder && *holder != faction;
+  };
+  std::vector<Cell> free;
+  for (Cell corner{0, home.y - growth.reach - middle.y};
+       corner.y <= home.y + growth.reach - middle.y; ++corner.y) {
+    for (corner.x = home.x - growth.reach - middle.x;
+         corner.x <= home.x + growth.reach - middle.x; ++corner.x) {
+      const Cell centre{corner.x + middle.x, corner.y + middle.y};
+      if (!blocked.clear(corner, area) ||
+          !covered.clear_around(corner, area, growth.spacing) ||
+          paths.distance(centre) == FlowField::UNREACHABLE) {
+        continue;
+      }
+      const std::vector<Cell> cells = cells_of(corner, area);
+      if (std::none_of(cells.begin(), cells.end(), claimed)) {
+        free.push_back(corner);
+      }
+    }
+  }
+  if (free.empty()) {
+    return false;
+  }
+  const Cell corner = free.at(next_random() % free.size());
+  const Cell centre{corner.x + middle.x, corner.y + middle.y};
+  std::vector<Laid> layout;
+  layout.reserve(growth.layout.size());
+  for (const Placement& placement : growth.layout) {
+    layout.push_back(Laid{placement.plan, Cell{corner.x + placement.offset.x,
+                                               corner.y + placement.offset.y}});
+  }
+  const std::optional<std::vector<std::size_t>> laid =
+      lay(layout, growth, settlers, centre);
+  if (!laid) {
+    return false;
+  }
+  // The founder's family branches: a new family under its surname.
+  std::size_t families = surnames_.size();
+  for (const Person& person : people_) {
+    families = std::max(families, person.family + 1);
+  }
+  const std::size_t founder = settlers.front();
+  if (!surnames_.empty()) {
+    surnames_.push_back(surnames_.at(people_.at(founder).family));
+  }
+  for (const std::size_t settler : settlers) {
+    const std::vector<std::size_t>& parents = people_.at(settler).parents;
+    if (settler == founder ||
+        std::find(parents.begin(), parents.end(), founder) != parents.end()) {
+      people_.at(settler).family = families;
+    }
+  }
+  const std::size_t army = form(village, settlers, centre, std::nullopt);
+  villages_.push_back(Village{VillageSpec{{}, army, {}}, std::nullopt, 0,
+                              std::nullopt, std::nullopt});
+  attach(villages_.size() - 1, *laid, growth);
+  return true;
+}
+
+// Sends the growth's raiders from village `village`'s residents, while no
+// party of its is out, against the nearest village of a faction its owner is
+// hostile to, with living residents and its centre within reach, the lowest
+// among equals. Returns whether it sent them.
+bool World::send_raid(std::size_t village, const Growth& growth) {
+  const Village& raiding = villages_.at(village);
+  const std::vector<std::size_t>& residents =
+      armies_.at(raiding.spec.residents).roster;
+  if (raiding.raiding || residents.size() <= growth.raiders) {
+    return false;
+  }
+  const Cell home = seat(village);
+  const std::size_t faction = owner(village);
+  std::optional<std::size_t> target;
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (std::size_t other = 0; other < villages_.size(); ++other) {
+    const Cell there = seat(other);
+    const std::int64_t offset_x = there.x - home.x;
+    const std::int64_t offset_y = there.y - home.y;
+    const std::int64_t distance = (offset_x * offset_x) + (offset_y * offset_y);
+    if (other != village && rules_.hostile.at(faction).at(owner(other)) &&
+        !armies_.at(villages_.at(other).spec.residents).roster.empty() &&
+        within(home, there, growth.reach) && distance < nearest) {
+      nearest = distance;
+      target = other;
+    }
+  }
+  if (!target) {
+    return false;
+  }
+  std::vector<std::size_t> raiders = levy(village);
+  raiders.resize(std::min<std::size_t>(raiders.size(), growth.raiders));
+  const FlowField field{map_, seat(*target)};
+  const auto cut_off = [this, &field](std::size_t member) {
+    return field.distance(cell_of(people_.at(member).position)) ==
+           FlowField::UNREACHABLE;
+  };
+  if (raiders.empty() || std::any_of(raiders.begin(), raiders.end(), cut_off)) {
+    return false;
+  }
+  const std::size_t party =
+      form(village, raiders, seat(*target), raiding.party);
+  villages_.at(village).party = party;
+  villages_.at(village).raiding = target;
+  return true;
+}
+
+// Whether people whose home is village `village` serve as another village's
+// residents: settlers of a village founded from it.
+bool World::settling(std::size_t village) const {
+  for (std::size_t other = 0; other < villages_.size(); ++other) {
+    const std::vector<std::size_t>& residents =
+        armies_.at(villages_.at(other).spec.residents).roster;
+    const auto homed_here = [this, village](std::size_t member) {
+      return people_.at(member).home == village;
+    };
+    if (other != village &&
+        std::any_of(residents.begin(), residents.end(), homed_here)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The living residents of village `village`, in roster order, who lead no
+// faction: those it may send away.
+std::vector<std::size_t> World::levy(std::size_t village) const {
+  std::vector<std::size_t> levied;
+  for (const std::size_t member :
+       armies_.at(villages_.at(village).spec.residents).roster) {
+    const auto leads = [member](const Leadership& faction) {
+      return faction.leader == member;
+    };
+    if (people_.at(member).health > 0 &&
+        std::none_of(leadership_.begin(), leadership_.end(), leads)) {
+      levied.push_back(member);
+    }
+  }
+  return levied;
+}
+
+// Village `village`'s residents who lead no faction, in the order they would
+// settle: a founder, the first of the sex the lineage follows, then its living
+// spouse and unmarried children among them, then the others in roster order.
+// Empty when there is no founder.
+std::vector<std::size_t> World::households(std::size_t village) const {
+  const std::vector<std::size_t> free = levy(village);
+  const Sex lineage =
+      !life_.kinship || life_.kinship->fathers_family ? Sex::MALE : Sex::FEMALE;
+  const auto heads = [this, lineage](std::size_t member) {
+    return people_.at(member).sex == lineage;
+  };
+  const auto founder = std::find_if(free.begin(), free.end(), heads);
+  if (founder == free.end()) {
+    return {};
+  }
+  const Person& head = people_.at(*founder);
+  std::vector<std::size_t> settlers{*founder};
+  const auto unwed = [this](std::size_t member) {
+    const std::vector<std::size_t>& spouses = people_.at(member).spouses;
+    return spouses.empty() || people_.at(spouses.back()).health == 0;
+  };
+  const auto kin = [&](std::size_t member) {
+    const bool spouse = !head.spouses.empty() && head.spouses.back() == member;
+    const bool child = std::find(head.children.begin(), head.children.end(),
+                                 member) != head.children.end() &&
+                       unwed(member);
+    return member != *founder && (spouse || child);
+  };
+  std::copy_if(free.begin(), free.end(), std::back_inserter(settlers), kin);
+  for (const std::size_t member : free) {
+    if (std::find(settlers.begin(), settlers.end(), member) == settlers.end()) {
+      settlers.push_back(member);
+    }
+  }
+  return settlers;
+}
+
+// Lays each of `laid` as rubble, blocking the cells of those that block,
+// unless that would leave an army's member unable to reach its objective or a
+// mover unable to reach `destination`. Every army's flow field follows the new
+// map. Returns the new structures, or nothing when it laid none.
+std::optional<std::vector<std::size_t>> World::lay(
+    const std::vector<Laid>& laid, const Growth& growth,
+    const std::vector<std::size_t>& movers, Cell destination) {
+  Map built = map_;
+  for (const Laid& each : laid) {
+    const Plan& plan = growth.plans.at(each.plan);
+    for (const Cell cell : cells_of(each.cell, plan.footprint)) {
+      if (plan.blocks) {
+        built.block(cell);
+      }
+    }
+  }
+  const auto reaches = [this](const FlowField& field,
+                              const std::vector<std::size_t>& members) {
+    return std::all_of(
+        members.begin(), members.end(), [this, &field](std::size_t member) {
+          return field.distance(cell_of(people_.at(member).position)) !=
+                 FlowField::UNREACHABLE;
+        });
+  };
+  std::vector<FlowField> fields;
+  fields.reserve(armies_.size());
+  for (const Army& army : armies_) {
+    fields.emplace_back(built, army.order.objective);
+    if (!reaches(fields.back(), army.roster)) {
+      return std::nullopt;
+    }
+  }
+  if (!movers.empty() && !reaches(FlowField{built, destination}, movers)) {
+    return std::nullopt;
+  }
+  map_ = std::move(built);
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    armies_.at(army).field = std::move(fields.at(army));
+  }
+  std::vector<std::size_t> made;
+  for (const Laid& each : laid) {
+    const Plan& plan = growth.plans.at(each.plan);
+    made.push_back(structures_.size());
+    structures_.push_back(Structure{each.cell, 0, plan.footprint, plan.blocks});
+    village_of_.emplace_back();
+    plans_.emplace_back(each.plan);
+    structure_extent_ =
+        std::max({structure_extent_, plan.footprint.width * CELL_SIZE,
+                  plan.footprint.height * CELL_SIZE});
+  }
+  structure_index_ = SpatialHash{centres_of(structures_)};
+  return made;
+}
+
+// Makes `structures`, laid from the growth's plans, village `village`'s, each
+// holding what its plan holds.
+void World::attach(std::size_t village,
+                   const std::vector<std::size_t>& structures,
+                   const Growth& growth) {
+  VillageSpec& spec = villages_.at(village).spec;
+  spec.holdings.resize(spec.structures.size());
+  for (const std::size_t structure : structures) {
+    village_of_.at(structure) = village;
+    spec.structures.push_back(structure);
+    spec.holdings.push_back(
+        growth.plans.at(plans_.at(structure).value_or(0)).holding);
+  }
+}
+
+// Moves `members` off village `village`'s residents into army `into`, or a
+// new army when none is given, of the residents' faction and skills, bound
+// for `objective` with all of them. Returns the army.
+std::size_t World::form(std::size_t village,
+                        const std::vector<std::size_t>& members, Cell objective,
+                        std::optional<std::size_t> into) {
+  const std::size_t from = villages_.at(village).spec.residents;
+  std::vector<std::size_t>& roster = armies_.at(from).roster;
+  for (const std::size_t member : members) {
+    roster.erase(std::find(roster.begin(), roster.end(), member));
+  }
+  std::vector<std::size_t> every_skill(armies_.at(from).skills.size());
+  std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
+  Army formed{armies_.at(from).faction,
+              armies_.at(from).skills,
+              Order{objective, std::move(every_skill)},
+              FlowField{map_, objective},
+              {}};
+  if (into) {
+    formed.roster = std::move(armies_.at(*into).roster);
+  }
+  formed.roster.insert(formed.roster.end(), members.begin(), members.end());
+  if (into) {
+    armies_.at(*into) = std::move(formed);
+    return *into;
+  }
+  armies_.push_back(std::move(formed));
+  return armies_.size() - 1;
 }
 
 }  // namespace murim

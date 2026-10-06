@@ -67,6 +67,15 @@ constexpr std::uint32_t HALL_HOUSING = 12;
 constexpr std::uint32_t GRANARY_STORAGE = 2'400;
 constexpr std::uint32_t STOREHOUSE_STORAGE = 3'600;
 constexpr std::uint32_t FIELD_YIELD = 600;
+// Growth in region_data(), distances in cells.
+constexpr std::uint32_t GROWTH_INTERVAL_DAYS = 30;
+constexpr std::uint32_t GROWTH_PRESSURE = 800;
+constexpr std::int32_t GROWTH_REACH = 40;
+constexpr std::int32_t BUILD_VICINITY = 8;
+constexpr std::int32_t SETTLEMENT_SPACING = 3;
+constexpr std::int32_t TERRITORY_CLAIM = 16;
+constexpr std::uint32_t SETTLERS = 10;
+constexpr std::uint32_t RAIDERS = 10;
 
 // Surnames of the murim's clans, common and of the old houses, and given
 // names for women and men, in Korean with their romanised forms.
@@ -251,6 +260,59 @@ std::optional<StructureKind> kind_named(const RegionData& data,
                                    : std::optional<StructureKind>{*found};
 }
 
+// The plan of `building`, from what its kind holds: the yield of a field is
+// per cell of its footprint.
+Plan plan_of(const RegionData& data, const Building& building) {
+  const StructureKind kind =
+      kind_named(data, building.kind).value_or(StructureKind{});
+  const Footprint footprint = building.structure.footprint;
+  const auto cells =
+      static_cast<std::uint32_t>(footprint.width * footprint.height);
+  return Plan{building.kind, footprint, kind.blocks,
+              Holding{kind.housing, kind.storage, kind.yield * cells}};
+}
+
+// Growth that builds `builds` and lays out `settlement`'s buildings for a
+// new village, each a plan from what its kind holds: the builds' plans
+// first, then the settlement's, in order.
+Growth growth_of(const RegionData& data, const std::vector<Building>& builds,
+                 const VillageTemplate& settlement) {
+  Growth growth{GROWTH_INTERVAL_DAYS,
+                GROWTH_PRESSURE,
+                GROWTH_REACH,
+                BUILD_VICINITY,
+                SETTLEMENT_SPACING,
+                TERRITORY_CLAIM,
+                {},
+                {},
+                settlement.area,
+                {},
+                SETTLERS,
+                RAIDERS,
+                {}};
+  for (const Building& building : builds) {
+    growth.builds.push_back(growth.plans.size());
+    growth.plans.push_back(plan_of(data, building));
+  }
+  for (const Building& building : settlement.buildings) {
+    growth.layout.push_back(
+        Placement{growth.plans.size(), building.structure.cell});
+    growth.plans.push_back(plan_of(data, building));
+  }
+  return growth;
+}
+
+// The data's rules of life, its growth taking each faction's stance.
+Life life_of(const RegionData& data) {
+  Life life = data.life;
+  if (life.growth) {
+    for (const Faction& faction : data.factions) {
+      life.growth->stances.push_back(faction.stance);
+    }
+  }
+  return life;
+}
+
 void validate(const RegionData& data) {
   const auto weightless = [](const TerrainKind& kind) {
     return kind.weight <= 0;
@@ -364,7 +426,7 @@ RegionData region_data() {
                            std::uint32_t residents) {
     return Building{Structure{cell, DURABILITY, footprint}, kind, residents};
   };
-  return RegionData{
+  RegionData data{
       {
           {"plain", true, 4},
           {"forest", true, 3},
@@ -377,9 +439,24 @@ RegionData region_data() {
           // them and rebuilds nothing.
           // The Demonic Cult changes leader by duel, to the death, and the
           // old leader's allies turn on the winner.
-          {"Orthodox", {1}, {GUARD, MEND}, std::nullopt},
-          {"Demonic", {0, 2}, {GUARD, TORCH}, Duel{true, 0, true}},
-          {"Unorthodox", {1}, {GUARD, MEND}, std::nullopt},
+          // As their villages press against their caps, the Orthodox build
+          // first, then found and raid; the Unorthodox found first; the
+          // Demonic Cult, which raises nothing, raids.
+          {"Orthodox",
+           {1},
+           {GUARD, MEND},
+           std::nullopt,
+           {Expansion::BUILD, Expansion::FOUND, Expansion::RAID}},
+          {"Demonic",
+           {0, 2},
+           {GUARD, TORCH},
+           Duel{true, 0, true},
+           {Expansion::RAID}},
+          {"Unorthodox",
+           {1},
+           {GUARD, MEND},
+           std::nullopt,
+           {Expansion::FOUND, Expansion::RAID, Expansion::BUILD}},
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
       // hall of 5 by 3 north of the road through its centre, more houses
@@ -448,7 +525,8 @@ RegionData region_data() {
            // Each person eats a measure of food a day. Unfed for ten days,
            // a person moves to a village within 64 cells with room and food,
            // or dies.
-           Husbandry{1, HUNGER_DAYS, MIGRATION_REACH}},
+           Husbandry{1, HUNGER_DAYS, MIGRATION_REACH},
+           std::nullopt},
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village
@@ -462,6 +540,17 @@ RegionData region_data() {
        {"storehouse", 0, STOREHOUSE_STORAGE, 0, true},
        {"field", 0, 0, FIELD_YIELD, false}},
   };
+  // Villages pressing against four fifths of their caps grow, checked every
+  // 30 days. They build a house, a field of rice or a granary within 8 cells
+  // of their centre, or send 10 settlers to lay out a hamlet within 40
+  // cells, 3 cells clear of any structure, or 10 raiders against a hostile
+  // village within 40 cells. A village holds the land within 16 cells.
+  data.life.growth = growth_of(
+      data,
+      {building({0, 0}, HOUSE, "house", 0), building({0, 0}, RICE, "field", 0),
+       building({0, 0}, GRANARY, "granary", 0)},
+      data.villages.front());
+  return data;
 }
 
 Region generate_region(Seed seed, const RegionData& data) {
@@ -482,7 +571,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 generate_territory(random, data.factions.size()),
                 {},
                 {},
-                data.life,
+                life_of(data),
                 {}};
   // The owner of each free passable cell; a blocked or built-on cell is
   // owned by no faction, so no village fits on it.

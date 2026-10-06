@@ -249,7 +249,6 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     std::vector<murim::Leadership> leadership, murim::Life life) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
-  adapter->army_count_ = armies.size();
   for (const murim::ArmySpec& army : armies) {
     std::uint64_t health = 0;
     for (const murim::Recruit& member : army.members) {
@@ -257,7 +256,6 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     }
     adapter->strengths_.push_back(health);
   }
-  adapter->structure_count_ = structures.size();
   adapter->faction_count_ = rules.hostile.size();
   adapter->names_ = life.names;
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
@@ -279,8 +277,9 @@ const murim::World& WorldAdapter::world() const {
 }
 
 std::size_t WorldAdapter::army_index(std::int64_t army) const {
-  CRASH_COND_MSG(army < 0 || static_cast<std::uint64_t>(army) >= army_count_,
-                 "army index out of range");
+  CRASH_COND_MSG(
+      army < 0 || static_cast<std::uint64_t>(army) >= world().army_count(),
+      "army index out of range");
   return static_cast<std::size_t>(army);
 }
 
@@ -299,8 +298,8 @@ std::size_t WorldAdapter::person_index(std::int64_t person) const {
 }
 
 std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
-  CRASH_COND_MSG(structure < 0 ||
-                     static_cast<std::uint64_t>(structure) >= structure_count_,
+  CRASH_COND_MSG(structure < 0 || static_cast<std::uint64_t>(structure) >=
+                                      world().structure_count(),
                  "structure index out of range");
   return static_cast<std::size_t>(structure);
 }
@@ -347,7 +346,7 @@ godot::PackedStringArray WorldAdapter::map_rows() const {
 }
 
 std::int64_t WorldAdapter::army_count() const {
-  return static_cast<std::int64_t>(army_count_);
+  return static_cast<std::int64_t>(world().army_count());
 }
 
 std::int64_t WorldAdapter::skill_count(std::int64_t army) const {
@@ -375,7 +374,7 @@ godot::PackedVector2Array WorldAdapter::body_positions(
 }
 
 std::int64_t WorldAdapter::structure_count() const {
-  return static_cast<std::int64_t>(structure_count_);
+  return static_cast<std::int64_t>(world().structure_count());
 }
 
 godot::Vector2i WorldAdapter::structure_cell(std::int64_t structure) const {
@@ -392,9 +391,14 @@ godot::Vector2i WorldAdapter::structure_footprint(
 
 godot::String WorldAdapter::structure_kind(std::int64_t structure) const {
   const std::size_t index = structure_index(structure);
-  return index < structure_kinds_.size()
-             ? godot::String(structure_kinds_.at(index).c_str())
-             : godot::String();
+  if (index < structure_kinds_.size()) {
+    return {structure_kinds_.at(index).c_str()};
+  }
+  // A structure growth laid takes its plan's kind.
+  const std::optional<std::size_t> plan = world().plan_of(index);
+  const std::optional<murim::Growth>& growth = region_data_.life.growth;
+  return plan && growth ? godot::String(growth->plans.at(*plan).kind.c_str())
+                        : godot::String();
 }
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
@@ -419,9 +423,9 @@ std::int64_t WorldAdapter::structure_field_state(std::int64_t structure) const {
 }
 
 std::size_t WorldAdapter::village_index(std::int64_t village) const {
-  CRASH_COND_MSG(
-      village < 0 || static_cast<std::uint64_t>(village) >= villages_.size(),
-      "village index out of range");
+  CRASH_COND_MSG(village < 0 || static_cast<std::uint64_t>(village) >=
+                                    world().village_count(),
+                 "village index out of range");
   return static_cast<std::size_t>(village);
 }
 
@@ -447,7 +451,10 @@ std::int64_t WorldAdapter::army_faction(std::int64_t army) const {
 }
 
 std::int64_t WorldAdapter::army_strength(std::int64_t army) const {
-  return static_cast<std::int64_t>(strengths_.at(army_index(army)));
+  const std::size_t index = army_index(army);
+  return index < strengths_.size()
+             ? static_cast<std::int64_t>(strengths_.at(index))
+             : 0;
 }
 
 godot::PackedInt64Array WorldAdapter::body_strengths(std::int64_t army) const {

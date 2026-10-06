@@ -24,13 +24,16 @@ struct TerrainKind {
 
 /// A faction: its name, the factions, by index, whose bodies it attacks,
 /// the skills its armies use, which decide, among other things, whether they
-/// rebuild what is broken, and how its leadership passes.
+/// rebuild what is broken, how its leadership passes, and its stance.
 struct Faction {
   std::string name;
   std::vector<std::size_t> hostile_to;
   std::vector<Skill> skills;
   /// How its leadership passes; none keeps its leader.
   std::optional<Duel> succession;
+  /// What its villages do as they press against their caps, in order of
+  /// preference; none grows no village.
+  std::vector<Expansion> stance;
 };
 
 /// A kind of structure, by `name`: the people it houses, the food it stores,

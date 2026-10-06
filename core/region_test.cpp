@@ -311,8 +311,8 @@ TEST(Region, VillagesDoNotOverlap) {
 
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = region_data();
-  data.factions.push_back(
-      Faction{"Martial clans", {1}, data.factions.at(0).skills, std::nullopt});
+  data.factions.push_back(Faction{
+      "Martial clans", {1}, data.factions.at(0).skills, std::nullopt, {}});
   data.factions.at(1).hostile_to.push_back(3);
 
   const Region region = generate_region(SEED, data);
@@ -988,8 +988,10 @@ std::pair<std::int64_t, std::size_t> crowding(const RegionData& data,
 }
 
 TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
-  // Everyone free marries and every wife may bear a child each day.
+  // Everyone free marries and every wife may bear a child each day. Growth,
+  // which raises the caps measured against, is left out.
   RegionData fertile = region_data();
+  fertile.life.growth.reset();
   ASSERT_TRUE(fertile.life.kinship.has_value());
   Kinship kinship = fertile.life.kinship.value_or(Kinship{});
   kinship.marriage_chance = PER_MILLE;
@@ -1011,6 +1013,85 @@ TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
   RegionData unfed = fertile;
   unfed.life.husbandry.reset();
   EXPECT_GT(crowding(unfed, fertile).first, 0);
+}
+
+// How a region grew over GROWTH_YEARS years: its villages and territory at
+// the start and the end, its armies at the end, the most living at once,
+// whether a founded village came to house its settlers and a building was
+// raised, and the hash.
+struct Grew {
+  std::size_t villages_before;
+  std::size_t villages_after;
+  std::size_t armies_after;
+  std::vector<std::optional<std::size_t>> territory_before;
+  std::vector<std::optional<std::size_t>> territory_after;
+  std::size_t peak;
+  bool founded_village_housed;
+  bool building_raised;
+  StateHash hash;
+};
+
+constexpr std::uint64_t GROWTH_YEARS = 50;
+// Days of five ticks: marching, fighting and raising run far faster against
+// the calendar than in play, so fifty years see many growth checks resolve.
+constexpr std::uint64_t GROWTH_TICKS_PER_DAY = 5;
+
+Grew grew(const RegionData& data, Seed seed) {
+  Region region = generate_region(seed, data);
+  region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
+  World world = world_of(region);
+  Grew result{world.village_count(), 0,     0,     world.territory(), {},
+              world.living(),        false, false, StateHash{}};
+  for (std::uint64_t tick = 0;
+       tick < GROWTH_YEARS * DAYS_PER_YEAR * GROWTH_TICKS_PER_DAY; ++tick) {
+    world.tick();
+    result.peak = std::max(result.peak, world.living());
+  }
+  result.villages_after = world.village_count();
+  result.armies_after = world.army_count();
+  result.territory_after = world.territory();
+  for (std::size_t village = result.villages_before;
+       village < result.villages_after; ++village) {
+    result.founded_village_housed =
+        result.founded_village_housed || world.residents_of(village) > 0;
+  }
+  const std::size_t builds = data.life.growth.value_or(Growth{}).builds.size();
+  for (std::size_t structure = region.structures.size();
+       structure < world.structure_count(); ++structure) {
+    result.building_raised =
+        result.building_raised ||
+        (world.plan_of(structure).value_or(builds) < builds &&
+         world.stage(structure) == Stage::INTACT);
+  }
+  result.hash = world.hash();
+  return result;
+}
+
+TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
+  const Grew region = grew(region_data(), SEED);
+  // Villages were founded, and one came to house its settlers; a building
+  // was raised; a raiding party, an army housing no village, was sent; the
+  // factions' territories changed; the living stayed within the bound.
+  EXPECT_GT(region.villages_after, region.villages_before);
+  EXPECT_GT(region.armies_after, region.villages_after);
+  EXPECT_TRUE(region.founded_village_housed);
+  EXPECT_TRUE(region.building_raised);
+  EXPECT_NE(region.territory_after, region.territory_before);
+  EXPECT_LE(region.peak, MAX_PEOPLE);
+  // The same seed grows the same way; control: another seed does not.
+  EXPECT_EQ(static_cast<std::uint64_t>(grew(region_data(), SEED).hash),
+            static_cast<std::uint64_t>(region.hash));
+  EXPECT_NE(static_cast<std::uint64_t>(grew(region_data(), OTHER_SEED).hash),
+            static_cast<std::uint64_t>(region.hash));
+  // Control: with no faction taking a stance, no village is founded.
+  RegionData still = region_data();
+  for (Faction& faction : still.factions) {
+    faction.stance.clear();
+  }
+  const Grew unchanged = grew(still, SEED);
+  EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
+  EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
+  EXPECT_FALSE(unchanged.building_raised);
 }
 
 }  // namespace
