@@ -1,0 +1,88 @@
+## Measures frame time with world_view.tscn rendering and the simulation ticking together, vsync off
+## so a frame takes as long as its work, and prints p50, p99 and max against the frame budget.
+## `make bench` runs it; it needs a display, so it runs on a developer's machine and not in CI.
+extends SceneTree
+
+const SCENE := "res://world_view/world_view.tscn"
+const WARM_UP_FRAMES := 120
+const TIMED_FRAMES := 1200
+const BUDGET_MS := 16.7
+const EXPECTED_AGENTS := 20000
+
+var _view: Node
+var _frame := 0
+var _last_usec := 0
+var _ticks_before := 0
+var _times := PackedFloat64Array()
+
+
+func _initialize() -> void:
+	if DisplayServer.get_name() == "headless":
+		_fail("rendering needs a display; run make bench on a machine with one")
+		return
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	_view = load(SCENE).instantiate()
+	root.add_child(_view)
+
+
+func _process(_delta: float) -> bool:
+	var now := Time.get_ticks_usec()
+	_frame += 1
+	if _frame == WARM_UP_FRAMES:
+		_check_setup()
+		_ticks_before = _view.ticks
+	elif _frame > WARM_UP_FRAMES:
+		_times.append((now - _last_usec) / 1000.0)
+	_last_usec = now
+	if _times.size() == TIMED_FRAMES:
+		_report()
+	return false
+
+
+# Fails before timing when the scene is not running the scenario it claims to.
+func _check_setup() -> void:
+	var world: WorldAdapter = _view.world
+	var agents := 0
+	for army in world.army_count():
+		for count in world.body_counts(army):
+			agents += count
+	if agents != EXPECTED_AGENTS:
+		_fail("the world must hold %d agents, not %d" % [EXPECTED_AGENTS, agents])
+	elif _view.bodies_drawn <= world.army_count():
+		_fail("the focus must expand armies into agents; %d bodies for %d armies" % [
+			_view.bodies_drawn, world.army_count()])
+	elif _view.ticks == 0:
+		_fail("the world must tick during the warm-up")
+
+
+func _report() -> void:
+	var world: WorldAdapter = _view.world
+	var broken := 0
+	for structure in world.structure_count():
+		if world.structure_stage(structure) != WorldAdapter.STAGE_INTACT:
+			broken += 1
+	var sorted := _times.duplicate()
+	sorted.sort()
+	var p50 := sorted[sorted.size() / 2]
+	var p99 := sorted[ceili(sorted.size() * 0.99) - 1]
+	var seconds := 0.0
+	for time in _times:
+		seconds += time / 1000.0
+	var passed := p99 <= BUDGET_MS
+	print("frame scene: %s, M1 scenario (core/m1_scenario.cpp), window %s, vsync off, %s, Godot %s" % [
+		SCENE, DisplayServer.window_get_size(), RenderingServer.get_video_adapter_name(),
+		Engine.get_version_info().string])
+	print("frames: %d warm-up, then %d timed; %d ticks in %.1f s timed (%d per second set)" % [
+		WARM_UP_FRAMES, TIMED_FRAMES, _view.ticks - _ticks_before, seconds,
+		WorldAdapter.TICKS_PER_SECOND])
+	print("bodies drawn: %d through one MultiMesh; structures broken: %d of %d" % [
+		_view.bodies_drawn, broken, world.structure_count()])
+	print("frame time: p50 %.3f ms, p99 %.3f ms, max %.3f ms" % [p50, p99, sorted[-1]])
+	print("%s: p99 %.3f ms against a %.1f ms budget" % ["PASS" if passed else "FAIL", p99, BUDGET_MS])
+	print("frame time is measured on this machine only: CI has no display and does not run make bench")
+	quit(0 if passed else 1)
+
+
+func _fail(message: String) -> void:
+	printerr("frame bench: setup check failed: ", message)
+	quit(2)
