@@ -6,7 +6,7 @@ set -eu
 aseprite=${1:-aseprite}
 cd "$(dirname "$0")"
 
-for name in target_screen lineup_sheet; do
+for name in target_screen lineup_sheet genealogy_panel; do
 	"$aseprite" --batch --script "$name.lua"
 	"$aseprite" --batch "$name.aseprite" --save-as "$name.png"
 	"$aseprite" --batch "$name.aseprite" --scale 4 --save-as "${name}_4x.png"
