@@ -1,7 +1,8 @@
-.PHONY: lint format test build ci
+.PHONY: lint format test build ci bench
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
+BENCH_DIR := build-bench
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -48,3 +49,9 @@ test: build
 	@echo "run_tests.gd ran the GDScript tests selected by: $(GDSCRIPT_TEST_SCOPE)"
 
 ci: lint format test build
+
+# Not part of ci: tick times depend on the machine, so they gate nothing.
+bench:
+	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
+	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_bench
+	$(BENCH_DIR)/murim_core_bench

@@ -51,6 +51,7 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | `make format` | `clang-format --style=file:core/.clang-format --dry-run --Werror` over every `.cpp` and `.hpp` in `core/` and `extension/`. `clang-format --style=file:core/.clang-format -i <file>` applies the style. |
 | `make test` | `ctest --no-tests=error` in `build/`. Runs `make build` first. |
 | `make ci` | `lint`, `format`, `test` and `build`, in that order. |
+| `make bench` | CMake configures `core/` into `build-bench/` as a Release build, builds `murim_core_bench`, and runs it. It prints the scenario it ran and the tick times against the budget, and exits non-zero on a failed setup check or a missed budget. Not part of `make ci`. |
 
 The C++ compiler is the platform's default. CMake, Ninja, clang-format and clang-tidy come only from `core/requirements.txt`, installed into `.venv/` at the repository root, and every entry point runs them from `.venv/bin/`:
 

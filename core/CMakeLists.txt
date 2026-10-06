@@ -10,6 +10,10 @@ add_library(murim_core flow_field.cpp map.cpp spatial_hash.cpp world.cpp)
 target_include_directories(murim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(murim_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
+add_executable(murim_core_bench bench.cpp)
+target_link_libraries(murim_core_bench PRIVATE murim_core)
+target_compile_options(murim_core_bench PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
