@@ -19,7 +19,7 @@ GDSCRIPT_TEST_SCOPE := git ls-files --cached --others --exclude-standard -- '*_t
 build:
 	$(TOOLS)/cmake -S core -B $(BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx
 	$(TOOLS)/cmake --build $(BUILD_DIR)
-	SDKROOT=$$(xcrun --show-sdk-path 2>/dev/null) $(TOOLS)/cmake -S extension -B $(EXTENSION_BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3
+	SDKROOT=$$(xcrun --show-sdk-path 2>/dev/null) $(TOOLS)/cmake -S extension -B $(EXTENSION_BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3
 	$(TOOLS)/cmake --build $(EXTENSION_BUILD_DIR)
 	touch $(BUILD_DIR)/.gdignore
 	mkdir -p .godot && $(GDEXTENSION_SCOPE) | sed 's|^|res://|' > .godot/extension_list.cfg
@@ -50,8 +50,12 @@ test: build
 
 ci: lint format test build
 
-# Not part of ci: tick times depend on the machine, so they gate nothing.
-bench:
+# Not part of ci: tick and frame times depend on the machine, so they gate nothing.
+# Both measurements run and report before either result decides the exit status.
+bench: build
 	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
 	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_bench
-	$(BENCH_DIR)/murim_core_bench
+	@$(BENCH_DIR)/murim_core_bench; tick=$$?; \
+	$(GODOT) --path . --script res://world_view/frame_bench.gd; frame=$$?; \
+	echo "make bench ran the tick benchmark (exit $$tick) and the frame benchmark (exit $$frame)"; \
+	test $$tick -eq 0 && test $$frame -eq 0
