@@ -1,9 +1,12 @@
-.PHONY: lint format test build ci bench
+.PHONY: lint format test build ci bench android
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
 BENCH_DIR := $(BUILD_DIR)/bench
 LINT_DIR := $(BUILD_DIR)/lint
+ANDROID_BUILD_DIR := $(BUILD_DIR)/android
+ANDROID_HOME ?= $(HOME)/Library/Android/sdk
+ANDROID_NDK := $(ANDROID_HOME)/ndk/28.1.13356709
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -75,3 +78,11 @@ bench: build
 	$(GODOT) --path . --script res://world_view/frame_bench.gd; frame=$$?; \
 	echo "make bench ran the tick benchmark (exit $$tick) and the frame benchmark (exit $$frame)"; \
 	test $$tick -eq 0 && test $$frame -eq 0
+
+# Not part of ci: CI installs no Android SDK. The NDK's toolchain file selects the target; extension/CMakeLists.txt is the same for every platform.
+# The export runs frame_bench.gd at launch through the preset's command_line/extra_args, and murim_core_bench is pushed to the device separately.
+android: build
+	$(TOOLS)/cmake -S extension -B $(ANDROID_BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
+	$(TOOLS)/cmake --build $(ANDROID_BUILD_DIR) --target murim_extension murim_core_bench
+	$(GODOT) --headless --path . --export-debug Android $(ANDROID_BUILD_DIR)/murim.apk
+	@echo "built $(ANDROID_BUILD_DIR)/libmurim.android.template_debug.arm64.so and $(ANDROID_BUILD_DIR)/core/murim_core_bench for Android arm64, and exported $(ANDROID_BUILD_DIR)/murim.apk with the Android preset in export_presets.cfg"

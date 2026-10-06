@@ -5,6 +5,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 ## Current decisions
 
 - The adapter is a GDExtension library built from `extension/`, linking `core/` unchanged. `murim.gdextension` at the repository root loads it into the Godot project there.
+- `make build` builds the library for the host. `make android` builds it for Android arm64 through the NDK's CMake toolchain file, with the same `extension/CMakeLists.txt`, and exports a debug APK whose launch runs `world_view/frame_bench.gd`.
 - It registers one class, `WorldAdapter`, which creates a core world, ticks it, and reads back its hash, each army's faction and its members' health when created, together, the positions and health of its living members, one person each, each army's skills, and each structure's cell, footprint, kind and stage. GDScript cannot construct it; `WorldAdapter.create`, `WorldAdapter.create_m1` and `WorldAdapter.create_region` are the only ways to get one.
 - `create_m1` builds the core's M1 benchmark scenario (`core/m1_scenario.cpp`), the same one the tick benchmark runs; `m1_centre` gives the point its battle is fought around.
 - `create_region` builds the region the core generates from a seed, with one person born into its first village as the last army. It keeps what the view draws of the region: each cell's terrain kind and owning faction, the kinds' and factions' names, and the villages, read back by `terrain`, `terrain_names`, `territory`, `faction_names` and `villages`, each village with the name of its template. Its structures carry their kinds, and so do the M1 scenario's, which are barrels. A world from `create` or `create_m1` has no region, and these return empty.
@@ -40,4 +41,4 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Inner energy and the calendar.** The core has neither. The HUD's inner-energy bar stands empty with a dash for its value, and its season and year are a fixed placeholder, until the core holds them.
 - **Rumours.** The HUD's rumour log shows a placeholder line until the core spreads rumours (`docs/concept.md` §Reputation and rumors).
 
-- **Which platforms the library is built for.** It is built for the host only, macOS arm64 and Linux x86_64 so far; Android and iOS exports are not built.
+- **Which platforms the library is built for.** It is built for the host, macOS arm64 and Linux x86_64 so far, and for Android arm64; iOS exports are not built.
