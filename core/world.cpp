@@ -98,8 +98,8 @@ void march(std::vector<Body>& bodies, std::int32_t stride,
   }
 }
 
-// Lowers strength by `damage`, and count in proportion, rounded up so a body
-// keeps one agent per unit of strength at least and none once it has none.
+// Lowers strength by `damage`, and count in proportion, rounded up: a body
+// with strength left keeps an agent, and none once its strength is gone.
 void wound(Body& body, std::uint64_t damage) {
   const std::uint64_t before = std::max<std::uint64_t>(body.strength, 1);
   body.strength -= std::min(damage, body.strength);
