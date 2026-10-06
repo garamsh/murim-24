@@ -20,6 +20,10 @@ const RIGHT := 188.0
 const CHILD_STEP := 78.0
 # The details column is wider than the mockup's so that English, the longer, fits beside the portrait.
 const DETAILS := Rect2(310, 38, 142, 196)
+# Where a card's text starts, and where the details column's name, family and sect start.
+const CARD_TEXT_X := 23
+const DETAILS_TEXT_X := 50
+const ELLIPSIS := "…"
 # docs/art-direction.md §Palette.
 const INK := Color("2a2433")
 const INK_DARK := Color("14101a")
@@ -314,8 +318,10 @@ func _draw_card(index: int) -> void:
 	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 16)), GRASS)
 	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 1)), GRASS_LIGHT)
 	_portrait(card.person, Rect2(rect.position + Vector2(4, 12), Vector2(16, 24)), card.dead)
-	_text(rect.position + Vector2(23, 6), card.short, STONE if card.dead else PAPER)
-	_text(rect.position + Vector2(23, 21), card.line, STONE_DARK if card.dead else STONE)
+	# A card's name stays within its 2-pixel frame.
+	var room := CARD.x - CARD_TEXT_X - 2
+	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(card.short, room), STONE if card.dead else PAPER)
+	_text(rect.position + Vector2(CARD_TEXT_X, 21), card.line, STONE_DARK if card.dead else STONE)
 	if own_card:
 		var tag := tr("GENEALOGY_SELF")
 		var w := _width(tag) + 6
@@ -329,9 +335,11 @@ func _draw_details() -> void:
 	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 44)), GRASS)
 	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 1)), GRASS_LIGHT)
 	_portrait(centre, Rect2(at + Vector2(10, 4), Vector2(32, 48)), _world.person_health(centre) == 0)
-	_text(at + Vector2(50, 10), details.name, PAPER, true)
-	_text(at + Vector2(50, 24), details.family, GOLD_LIGHT)
-	_text(at + Vector2(50, 38), details.sect, AZURE_LIGHT)
+	# Each line keeps the 8 pixels from the column's right edge that the rows keep.
+	var room := DETAILS.size.x - DETAILS_TEXT_X - 8
+	_text(at + Vector2(DETAILS_TEXT_X, 10), fit(details.name, room), PAPER, true)
+	_text(at + Vector2(DETAILS_TEXT_X, 24), fit(details.family, room), GOLD_LIGHT)
+	_text(at + Vector2(DETAILS_TEXT_X, 38), fit(details.sect, room), AZURE_LIGHT)
 	var rows := [
 		["GENEALOGY_AGE_LABEL", details.age], ["GENEALOGY_TALENT", details.talent],
 		["GENEALOGY_LIFESPAN", details.lifespan], ["GENEALOGY_SPOUSE", details.spouse],
@@ -340,9 +348,12 @@ func _draw_details() -> void:
 	for n in rows.size():
 		var y := at.y + 62 + n * 20
 		draw_rect(Rect2(at.x + 6, y - 4, DETAILS.size.x - 12, 1), INK_LIGHT)
-		_text(Vector2(at.x + 8, y), tr(rows[n][0]), GOLD)
+		var label := tr(rows[n][0])
+		_text(Vector2(at.x + 8, y), label, GOLD)
 		var value: String = rows[n][1]
 		var unknown := value == tr("GENEALOGY_UNKNOWN")
+		# The value, such as a spouse's name, keeps 4 pixels from its label.
+		value = fit(value, DETAILS.size.x - 16 - _width(label) - 4)
 		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, STONE_DARK if unknown else PAPER)
 
 
@@ -400,3 +411,14 @@ func _scrim_texture() -> ImageTexture:
 ## Uses `font` for every word the panel draws.
 func use_font(font: Font) -> void:
 	_font = font
+
+
+## Returns `text` as the panel draws it in `room` pixels: whole where it fits, and otherwise cut
+## short with an ellipsis.
+func fit(text: String, room: float) -> String:
+	if _width(text) <= room:
+		return text
+	var kept := text
+	while not kept.is_empty() and _width(kept + ELLIPSIS) > room:
+		kept = kept.left(-1)
+	return kept.strip_edges(false, true) + ELLIPSIS
