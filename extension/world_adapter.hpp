@@ -23,14 +23,23 @@ class WorldAdapter : public godot::RefCounted {
 
  public:
   /// Returns an adapter over a world created from `seed`, a map of
-  /// `map_rows`, `armies` and `separation`, as the core's constructor takes
-  /// them. An army is a Dictionary with `start` and `objective` (Vector2i
-  /// cells), `count` and `strength` (int). Returns null, after push_error,
-  /// when the core or the conversion to its types refuses the input.
+  /// `map_rows`, `armies`, `structures` and `rules`, as the core's
+  /// constructor takes them, each struct as a Dictionary keyed by its field
+  /// names:
+  /// - army: `start` and `objective` (Vector2i cells), `count`, `strength`,
+  ///   `faction` (int) and `skills` (Array of skills);
+  /// - skill: `range`, `radius`, `body_damage`, `structure_damage`,
+  ///   `cooldown` (int);
+  /// - structure: `cell` (Vector2i) and `durability` (int);
+  /// - rules: `separation` (int), `hostile` (Array of Arrays of bool) and
+  ///   `stage_floors` (Array of three ints).
+  /// Returns null, after push_error, when the core or the conversion to its
+  /// types refuses the input.
   static godot::Ref<WorldAdapter> create(
       std::int64_t seed, const godot::PackedStringArray& map_rows,
       const godot::TypedArray<godot::Dictionary>& armies,
-      std::int64_t separation);
+      const godot::TypedArray<godot::Dictionary>& structures,
+      const godot::Dictionary& rules);
 
   /// Advances the world by one step.
   void tick();
