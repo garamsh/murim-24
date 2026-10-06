@@ -1,6 +1,6 @@
 # ADR 0008: Present the world in an orthogonal top-down view, in real time, as pixel art on a 16-pixel tile grid
 
-> Status: accepted
+> Status: superseded by ADR-0012
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

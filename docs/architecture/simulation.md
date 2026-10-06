@@ -38,4 +38,6 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 ## Open questions
 
+- **Structure footprints.** ADR 0012 has a structure occupy a footprint of width x height cells, set by data, and the village house is drawn over 3 x 3. A structure here is still one cell; giving it a footprint changes how an area skill finds it, whether its cells block movement while it stands, and how village templates lay structures out.
+
 - **Whether destroyed structures change passability.** A structure's stage does not affect movement yet. Making rubble or intact walls block or free cells would mean rebuilding the flow fields that cross them.
