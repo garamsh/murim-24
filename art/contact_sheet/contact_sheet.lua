@@ -1,6 +1,7 @@
 -- Draws contact_sheet.aseprite: every frame of the production set, read back from the
--- .aseprite sources, and a small scene built from them on the 16-pixel grid with shadows
--- drawn the way the view is to draw them. It is a review image; the game does not load it.
+-- .aseprite sources, a small scene built from them on the 16-pixel grid with shadows drawn
+-- the way the view is to draw them, and a mixed-terrain patch laid as the view is
+-- to lay it. It is a review image; the game does not load it.
 -- Run: aseprite --batch --script art/contact_sheet/contact_sheet.lua (after the asset scripts)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -9,7 +10,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 584
+local W, H = 608, 760
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -135,17 +136,138 @@ sheet:stamp(ground, 0, 0)
 table.sort(standing, function(a, b) if a[1] == b[1] then return a[2] < b[2] end return a[1] < b[1] end)
 for _, s in ipairs(standing) do s[3]() end
 
--- Each terrain kind tiled over 12 x 6 cells, every cell's variant picked by a seeded hash,
--- to show how a stretch of one kind reads.
-label(8, 352, "TERRAIN TILED 12 X 6 CELLS, VARIANT PER CELL BY SEEDED HASH", c("paper", 3))
-for k, kind in ipairs(KINDS) do
-  local x, y = 8 + ((k - 1) % 3) * 200, 368 + ((k - 1) // 3) * 112
-  label(x, y - 8, kind:upper(), c("paper", 2))
-  for row = 0, 5 do
-    for col = 0, 11 do
-      sheet:stamp(frame(terrain, kind, 1 + math.floor(px.hash(col, row, 100 + k) * 4)), x + col * 16, y + row * 16)
+-- Transition tiles: each kind's corner tiles over the plain, by corner mask 1 to 14 (mask 0
+-- is empty).
+local transitions = load("terrain/transitions.aseprite")
+local landforms = load("terrain/landforms.aseprite")
+local EDGED = { "forest", "hills", "water", "mountain" }
+label(8, 352, "TRANSITIONS, CORNER MASK 1-14 (TL 1, TR 2, BL 4, BR 8)", c("paper", 3))
+for k, kind in ipairs(EDGED) do
+  local y = 362 + (k - 1) * 18
+  label(8, y + 6, kind:upper(), c("paper", 2))
+  for m = 1, 14 do
+    local x = 48 + (m - 1) * 17
+    sheet:stamp(frame(terrain, "plain", 1 + m % 4), x, y)
+    sheet:stamp(frame(transitions, kind, m + 1), x, y)
+  end
+end
+
+-- Landforms: each frame on the full tiles of its kind, its footprint outlined in the frame.
+label(312, 352, "LANDFORMS, FOOTPRINT AT BOTTOM LEFT", c("paper", 3))
+local forms = {}
+for name, range in pairs(landforms.tags) do forms[#forms + 1] = { range[1], name } end
+table.sort(forms, function(a, b) return a[1] < b[1] end)
+for n, f in ipairs(forms) do
+  local x, y = 312 + ((n - 1) % 4) * 72, 362 + ((n - 1) // 4) * 84
+  local kind, w, h = f[2]:match("^(%a+)_(%d+)x(%d+)$")
+  w, h = tonumber(w), tonumber(h)
+  for row = 0, h - 1 do
+    for col = 0, w - 1 do sheet:stamp(frame(terrain, kind, 1 + (row + col) % 4), x + col * 16, y + 64 - (h - row) * 16) end
+  end
+  sheet:stamp(landforms.frames[f[1]], x, y)
+  label(x, y + 68, f[2]:upper(), c("paper", 2))
+end
+
+-- A mixed patch of 24 x 12 cells. Terrain is partitioned by nearest site, as the region
+-- generator does, with kinds drawn by its weights. The plain is laid on every cell. Each other
+-- kind is laid on the dual grid, half a cell up and left: the tile whose corners sit on four
+-- cells' centres takes its mask from which of those cells are the kind, mask 15 being a full
+-- tile. Landforms then stand on stretches of the kind, placed greedily in a seeded order.
+local PW, PH = 24, 12
+local PX, PY = 8, 556
+label(8, PY - 12, "MIXED TERRAIN, 24 X 12 CELLS, SEEDED", c("paper", 3))
+local weights = { plain = 4, forest = 3, hills = 2, water = 1, mountain = 1 }
+local rng = px.rng(4601)
+local sites = {}
+for n = 1, 11 do
+  local kind
+  if n <= #KINDS then
+    kind = KINDS[n]
+  else
+    local roll, acc = rng.int(1, 11), 0
+    for _, kk in ipairs(KINDS) do
+      acc = acc + weights[kk]
+      if roll <= acc then kind = kk; break end
     end
   end
+  sites[n] = { rng.int(0, PW - 1), rng.int(0, PH - 1), kind }
+end
+local cells = {}
+local function kind_at(col, row)
+  col = math.max(0, math.min(PW - 1, col)); row = math.max(0, math.min(PH - 1, row))
+  return cells[row * PW + col]
+end
+for row = 0, PH - 1 do
+  for col = 0, PW - 1 do
+    local best, bd = nil, math.huge
+    for _, s in ipairs(sites) do
+      local d = (s[1] - col) ^ 2 + (s[2] - row) ^ 2
+      if d < bd then bd, best = d, s[3] end
+    end
+    cells[row * PW + col] = best
+  end
+end
+local patch = px.canvas(W, H)
+for row = 0, PH - 1 do
+  for col = 0, PW - 1 do
+    patch:stamp(frame(terrain, "plain", 1 + math.floor(px.hash(col, row, 46) * 4)), PX + col * 16, PY + row * 16)
+  end
+end
+-- Dual-grid tile (dx, dy) has its corners on cells (dx - 1, dy - 1), (dx, dy - 1),
+-- (dx - 1, dy) and (dx, dy), and is drawn half a cell up and left of cell (dx, dy).
+for _, kind in ipairs(EDGED) do
+  for dy = 0, PH do
+    for dx = 0, PW do
+      local function is(col, row) return kind_at(col, row) == kind and 1 or 0 end
+      local mask = is(dx - 1, dy - 1) + 2 * is(dx, dy - 1) + 4 * is(dx - 1, dy) + 8 * is(dx, dy)
+      local x, y = PX + dx * 16 - 8, PY + dy * 16 - 8
+      if mask == 15 then
+        patch:stamp(frame(terrain, kind, 1 + math.floor(px.hash(dx, dy, 47) * 4)), x, y)
+      elseif mask > 0 then
+        patch:stamp(frame(transitions, kind, mask + 1), x, y)
+      end
+    end
+  end
+end
+local sizes = { mountain = { { 4, 3 }, { 3, 3 }, { 3, 2 }, { 2, 2 } }, hills = { { 3, 3 }, { 3, 2 }, { 2, 2 }, { 2, 1 } } }
+-- How often a free cell is left bare: mountains mostly covered, hills left open between.
+local skip = { mountain = 0.05, hills = 0.3 }
+local taken, placed = {}, {}
+local order = {}
+for i = 0, PW * PH - 1 do order[#order + 1] = i end
+table.sort(order, function(a, b) return px.hash(a, 0, 461) < px.hash(b, 0, 461) end)
+for _, i in ipairs(order) do
+  local col, row = i % PW, i // PW
+  local kind = cells[i]
+  if sizes[kind] and not taken[i] and px.hash(col, row, 462) > skip[kind] then
+    local start = 1 + math.floor(px.hash(col, row, 463) * #sizes[kind])
+    for t = 0, #sizes[kind] - 1 do
+      local s = sizes[kind][(start + t - 1) % #sizes[kind] + 1]
+      local fits = col + s[1] <= PW and row + s[2] <= PH
+      for r = row, row + s[2] - 1 do
+        for q = col, col + s[1] - 1 do
+          if not fits then break end
+          local j = r * PW + q
+          if cells[j] ~= kind or taken[j] then fits = false end
+        end
+      end
+      if fits then
+        for r = row, row + s[2] - 1 do for q = col, col + s[1] - 1 do taken[r * PW + q] = true end end
+        placed[#placed + 1] = { col, row, s[1], s[2], kind }
+        break
+      end
+    end
+  end
+end
+table.sort(placed, function(a, b) return a[2] + a[4] < b[2] + b[4] end)
+for _, p in ipairs(placed) do
+  local name = p[5] .. "_" .. p[3] .. "x" .. p[4]
+  patch:stamp(landforms.frames[landforms.tags[name][1]], PX + p[1] * 16, PY + (p[2] + p[4]) * 16 - 64)
+end
+-- The patch is clipped to its 24 x 12 cells: the dual grid's outer half cells and the
+-- landforms' rise past the top are cut.
+for y = PY, PY + PH * 16 - 1 do
+  for x = PX, PX + PW * 16 - 1 do sheet:set(x, y, patch:get(x, y)) end
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")

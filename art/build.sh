@@ -9,12 +9,13 @@ aseprite=${1:-aseprite}
 cd "$(dirname "$0")"
 
 "$aseprite" --batch --script terrain/terrain.lua
+"$aseprite" --batch --script terrain/landforms.lua
 "$aseprite" --batch --script bodies/bodies.lua
 "$aseprite" --batch --script structures/house.lua
 "$aseprite" --batch --script markers/markers.lua
 
-for name in terrain/terrain bodies/orthodox bodies/demonic bodies/unorthodox structures/house \
-	markers/army_marker markers/player_marker; do
+for name in terrain/terrain terrain/transitions terrain/landforms bodies/orthodox bodies/demonic \
+	bodies/unorthodox structures/house markers/army_marker markers/player_marker; do
 	"$aseprite" --batch "$name.aseprite" --sheet "$name.png" --data "$name.json" --format json-array --list-tags
 done
 

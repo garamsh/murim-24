@@ -57,3 +57,13 @@ aseprite --batch <name>.aseprite --sheet <name>.png --data <name>.json --format 
 ```
 
 The `.png` and `.json` are committed with it, because CI has no Aseprite.
+
+## Terrain layers
+
+The ground is laid from `art/terrain/` on `TileMapLayer`s with 16-pixel tiles:
+
+- The plain is one layer on the cell grid, a full tile on every cell.
+- Every other kind has a layer of its own above it, offset by half a cell up and left. Its tile at (x, y) has its corners on cells (x - 1, y - 1), (x, y - 1), (x - 1, y) and (x, y), and its corner mask adds 1, 2, 4 and 8 for each of those cells that is of the kind.
+- Mask 0 places no tile. Masks 1 to 14 place frame `from + mask` of the kind's tag in `transitions.json`, as atlas coordinates (`from + mask`, 0) of `transitions.png`. Mask 15 places one of the kind's four frames in `terrain.json`, picked by a seeded hash of the tile's coordinates.
+- Tiles are placed with `set_cell`. `set_cells_terrain_connect` is not used: in `TERRAIN_MODE_MATCH_CORNERS` it gives a painted cell's corner the terrain only when all four cells sharing it are painted, which leaves a lone tile at every convex step of a border.
+- A landform from `landforms.json` is drawn with everything standing, sorted by the bottom edge of its footprint, with its frame's bottom-left corner on its footprint's bottom-left. Its tag names its kind and footprint in cells, `<kind>_<width>x<height>`. It stands only on cells of its kind, and no two landforms share a cell.
