@@ -23,7 +23,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 - `murim.gdextension` names, per platform, the library `make build` writes to `build/extension/`.
 - A scene is `<name>/<name>.tscn` in a folder at the repository root named for it, with its script `<name>.gd` beside it, such as `world_view/world_view.tscn`. The scene keeps the scripts and resources only it uses in that folder; a resource two scenes share sits in the nearest folder both are under.
 - Every `.uid` file Godot writes beside a script or resource is committed with it.
-- A folder Godot must not import holds an empty `.gdignore`. `make build` writes `build/.gdignore`.
+- A folder Godot must not import holds an empty `.gdignore`. Every build tree sits under `build/`, and `make build` writes `build/.gdignore`.
 
 ## Tests
 
