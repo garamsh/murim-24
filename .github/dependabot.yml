@@ -8,3 +8,12 @@ updates:
     directory: "/core"
     schedule:
       interval: "weekly"
+    groups:
+      llvm:
+        patterns:
+          - "clang-format"
+          - "clang-tidy"
+    ignore:
+      - dependency-name: "clang-*"
+        update-types:
+          - "version-update:semver-major"
