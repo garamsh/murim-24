@@ -2,8 +2,9 @@
 # and people's positions and health for the same scenario and tick count,
 # the core's coming from the world_hash reference program; that the adapter
 # refuses what the core, or the conversion to the core's types, refuses; that
-# a body given orders through the adapter moves and strikes; and that a
-# region's villages keep their residents' own skills off their structures.
+# a body given orders through the adapter moves and strikes; that a region's
+# villages keep their residents' own skills off their structures; and that a
+# region's people are read back with their names and kin.
 extends RefCounted
 
 const SEED := 42
@@ -96,8 +97,31 @@ func run() -> bool:
 	var orders_pass := _orders_pass()
 	var reads_pass := _reads_pass()
 	var villages_pass := _villages_pass()
+	var kin_pass := _kin_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass
+			and reads_pass and villages_pass and kin_pass
+
+
+# The player's body in a region has a surname and a given name in Korean and romanised, the family
+# of its own army, and, as the world begins, no parents, spouse or children. Control: a world made
+# by create() names no one.
+func _kin_pass() -> bool:
+	var region := WorldAdapter.create_region(REGION_SEED)
+	var army := region.army_count() - 1
+	var body: int = region.roster(army)[0]
+	var name := region.person_name(body)
+	var named := true
+	for key in ["surname", "given", "surname_en", "given_en"]:
+		named = named and name.has(key) and not String(name[key]).is_empty()
+	var kin := region.person_family(body) == army and region.person_spouse(body) == -1 \
+			and region.person_parents(body).is_empty() and region.person_children(body).is_empty()
+	var unnamed := _create(SEED, _armies, RULES).person_name(0).is_empty()
+	var passed: bool = named and kin and unnamed
+	print("world_adapter_test: the player's body is %s %s (%s %s) of family %d, spouse %d, %d parents, %d children; a created world names no one %s: %s" % [
+		name.get("surname", ""), name.get("given", ""), name.get("surname_en", ""), name.get("given_en", ""),
+		region.person_family(body), region.person_spouse(body), region.person_parents(body).size(),
+		region.person_children(body).size(), unnamed, "pass" if passed else "FAIL"])
+	return passed
 
 
 # The region create_region() makes, the player born into the first Cult village, keeps every

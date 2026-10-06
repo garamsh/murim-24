@@ -27,23 +27,33 @@ struct Aptitude {
   std::uint32_t limit = 0;
 };
 
+/// A person's sex, drawn at birth.
+enum class Sex : std::uint8_t { FEMALE, MALE };
+
 /// A person of the world. A person keeps its identity, its index among the
 /// world's people, for as long as the world runs, through every army it
 /// serves in and after it dies; a dead person has no health and stands in no
 /// army. It may use a skill again from tick `ready_at`, and returns to
 /// village `home`, if it has one, when its army disbands. It was born on
-/// tick `born` into `family`, of `parents` if it had any, with `talent` and
-/// `attainment` per discipline, and lives `lifespan` days, extended by its
-/// attainment, if it ages at all. A person carrying soul `soul` is born
-/// again when it dies.
+/// tick `born`, before the world began for the people it starts with, into
+/// `family`, of `parents` if it had any, of sex `sex` with given name `given`
+/// among its sex's names, with `talent` and `attainment` per discipline, and
+/// lives `lifespan` days, extended by its attainment, if it ages at all.
+/// `spouses` are the people it married, in order, and `children` the people
+/// born to it. A person carrying soul `soul` is
+/// born again when it dies.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
   std::uint64_t ready_at = 0;
   std::optional<std::size_t> home;
-  std::uint64_t born = 0;
+  std::int64_t born = 0;
   std::size_t family = 0;
   std::vector<std::size_t> parents;
+  Sex sex = Sex::FEMALE;
+  std::size_t given = 0;
+  std::vector<std::size_t> spouses;
+  std::vector<std::size_t> children;
   std::vector<Aptitude> talent;
   std::vector<std::uint32_t> attainment;
   std::optional<std::uint64_t> lifespan;
@@ -63,6 +73,53 @@ struct DisciplineDraw {
   Spread limit;
 };
 
+/// The lowest and highest value a draw can give, or a span of ages.
+struct Range {
+  std::uint32_t low = 0;
+  std::uint32_t high = 0;
+};
+
+/// A name as it is shown: in Korean, and romanised for English.
+struct NameEntry {
+  std::string korean;
+  std::string romanised;
+};
+
+/// The names people bear: a surname for each family, drawn by the seed when
+/// the world begins, and given names for each sex, drawn at birth.
+struct Names {
+  std::vector<NameEntry> surnames;
+  std::vector<NameEntry> female;
+  std::vector<NameEntry> male;
+};
+
+/// A person's full name: its family's surname and its given name.
+struct Name {
+  NameEntry surname;
+  NameEntry given;
+};
+
+/// How people marry and have children, as data, checked once a day. A
+/// living person of `marrying_age`, in days, with a home and no living
+/// spouse marries with a chance of `marriage_chance` per mille a year: a
+/// partner of the other sex and another family, as free to marry, whose
+/// home is the same village or one whose centre lies within `neighbourhood`
+/// cells of its own, drawn by the seed. A wife of `bearing_age` whose husband
+/// lives bears a child with a chance of `birth_chance` per mille a year, no
+/// sooner than `birth_spacing` days after her last, while the world holds
+/// fewer than MAX_PEOPLE living. The child is born by the one birth rule
+/// into its father's family, or its mother's unless `fathers_family`, and
+/// at that parent's side, home and army.
+struct Kinship {
+  Range marrying_age;
+  std::int32_t neighbourhood = 0;
+  std::uint32_t marriage_chance = 0;
+  Range bearing_age;
+  std::uint32_t birth_chance = 0;
+  std::uint32_t birth_spacing = 0;
+  bool fathers_family = true;
+};
+
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
 /// age passes its lifespan plus `days_per_attainment` days for every point of
@@ -70,8 +127,10 @@ struct DisciplineDraw {
 /// discipline it practised draws its limit `discipline_widening` further
 /// down and up, and every discipline `upper_widening` further up, each
 /// divided by the lives it has lived, so the widening shrinks as lives
-/// repeat. Without a lifespan no one ages. A soul is born again with
-/// `newborn_health`.
+/// repeat. Without a lifespan no one ages. A soul is born again, and a child
+/// born, with `newborn_health`. The people a world starts with are
+/// `founding_age` days old, or newborn without one. People marry and have
+/// children by `kinship`, if given, and bear `names`.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -79,6 +138,9 @@ struct Life {
   std::uint32_t days_per_attainment = 0;
   std::uint32_t discipline_widening = 0;
   std::uint32_t upper_widening = 0;
+  std::optional<Spread> founding_age;
+  std::optional<Kinship> kinship;
+  Names names;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -88,27 +150,31 @@ struct Soul {
   std::vector<bool> practised;
 };
 
-/// The lowest and highest value a draw can give.
-struct Range {
-  std::uint32_t low = 0;
-  std::uint32_t high = 0;
-};
-
 /// Returns the range a soul with `soul` history draws discipline
 /// `discipline`'s talent limit from under `life`; an empty history draws
 /// from the discipline's own spread.
 [[nodiscard]] Range limit_range(const Life& life, const Soul& soul,
                                 std::size_t discipline);
 
-/// The world's calendar: ticks in a day, days in a season, seasons in a year.
+/// The world's calendar: days in a season, seasons in a year. How many ticks
+/// make a day is the world's data (Rules).
 struct Calendar {
-  std::uint64_t ticks_per_day;
   std::uint64_t days_per_season;
   std::uint64_t seasons_per_year;
 };
 
-/// A minute of play to a day, thirty days to a season, four seasons a year.
-constexpr Calendar CALENDAR{1'800, 30, 4};
+/// Thirty days to a season, four seasons a year.
+constexpr Calendar CALENDAR{30, 4};
+
+/// Days in a year.
+constexpr std::uint64_t DAYS_PER_YEAR =
+    CALENDAR.days_per_season * CALENDAR.seasons_per_year;
+
+/// A minute of play to a day.
+constexpr std::uint64_t TICKS_PER_DAY = 1'800;
+
+/// The most a chance per mille may be.
+constexpr std::uint32_t PER_MILLE = 1'000;
 
 /// A day of the calendar, each part counted from 1 but `season`, from 0.
 struct Date {
@@ -273,6 +339,8 @@ struct Rules {
   /// The lowest durability of the intact, damaged and destroyed stages; a
   /// structure below all three is rubble.
   std::array<std::uint32_t, 3> stage_floors;
+  /// Ticks in a day of the calendar.
+  std::uint64_t ticks_per_day = TICKS_PER_DAY;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -294,10 +362,13 @@ class World {
   /// army that does not exist, a structure that another village names, or an
   /// army that is another village's residents, a faction's leader is no
   /// person the world creates, or `leadership` names more factions than
-  /// `hostile`; a faction it leaves out has no leader; or `life` could draw a
-  /// talent above MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives
-  /// a newborn no health or more than MAX_HEALTH. Within these limits no
-  /// damage, health, durability or cooldown arithmetic exceeds its type.
+  /// `hostile`; a faction it leaves out has no leader; a day lasts no tick;
+  /// or `life` could draw a talent above MAX_TALENT or a lifespan or founding
+  /// age above MAX_LIFESPAN_DAYS, gives a newborn no health or more than
+  /// MAX_HEALTH, or gives kinship an age range running downward, a chance
+  /// above PER_MILLE or a neighbourhood outside [0, MAX_REACH]. Within these
+  /// limits no damage, health, durability or cooldown arithmetic exceeds its
+  /// type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules,
         std::vector<VillageSpec> villages = {},
@@ -337,6 +408,13 @@ class World {
 
   /// Returns person `person`.
   [[nodiscard]] const Person& person(std::size_t person) const;
+
+  /// Returns how many people live.
+  [[nodiscard]] std::size_t living() const;
+
+  /// Returns person `person`'s name, or nothing when the world's life names
+  /// no surnames or no given names for its sex.
+  [[nodiscard]] std::optional<Name> name(std::size_t person) const;
 
   /// Returns the living members of army `army`, as person indices, in the
   /// order they joined it; the first is its lead.
@@ -439,7 +517,18 @@ class World {
                                          std::size_t faction) const;
   void settle_duels();
   void bear(Person& person, const Soul& soul);
+  [[nodiscard]] std::uint32_t draw(Range range);
+  [[nodiscard]] std::int64_t age_in_days(const Person& person) const;
   void age();
+  void found(Person& person);
+  void kin(const Kinship& kinship);
+  [[nodiscard]] bool free_to_marry(std::size_t person,
+                                   const Kinship& kinship) const;
+  [[nodiscard]] Cell seat(std::size_t village) const;
+  void marry(std::size_t person, const std::vector<std::size_t>& living,
+             const Kinship& kinship);
+  void bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
+                  const Kinship& kinship);
   /// A person who died carrying a soul, and the army it served in.
   struct Passing {
     std::size_t dead;
@@ -468,6 +557,8 @@ class World {
   std::vector<Fight> duels_;
   Life life_;
   std::vector<Soul> souls_;
+  /// Each family's surname, by index among the life's surnames.
+  std::vector<std::size_t> surnames_;
   // The village each structure belongs to, if any.
   std::vector<std::optional<std::size_t>> village_of_;
 };

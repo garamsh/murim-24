@@ -47,6 +47,57 @@ constexpr std::uint32_t LIFESPAN_DAYS = 60 * 120;
 constexpr std::uint32_t LIFESPAN_SPREAD_DAYS = 15 * 120;
 constexpr std::uint32_t DISCIPLINE_WIDENING = 200;
 constexpr std::uint32_t UPPER_WIDENING = 100;
+// Kinship in region_data(), ages in days.
+constexpr std::uint32_t YEAR = 120;
+constexpr std::uint32_t FOUNDING_AGE = 28 * YEAR;
+constexpr std::uint32_t FOUNDING_SPREAD = 12 * YEAR;
+constexpr std::uint32_t MARRYING_FROM = 16 * YEAR;
+constexpr std::uint32_t MARRYING_TO = 40 * YEAR;
+constexpr std::int32_t NEIGHBOURHOOD = 48;
+constexpr std::uint32_t MARRIAGE_CHANCE = 500;
+constexpr std::uint32_t BEARING_FROM = 18 * YEAR;
+constexpr std::uint32_t BEARING_TO = 40 * YEAR;
+constexpr std::uint32_t BIRTH_CHANCE = 400;
+constexpr std::uint32_t BIRTH_SPACING = 2 * YEAR;
+
+// Surnames of the murim's clans, common and of the old houses, and given
+// names for women and men, in Korean with their romanised forms.
+Names names() {
+  return Names{
+      {{"김", "Kim"},       {"이", "Lee"},     {"박", "Park"},
+       {"최", "Choi"},      {"정", "Jeong"},   {"강", "Kang"},
+       {"조", "Jo"},        {"윤", "Yun"},     {"장", "Jang"},
+       {"임", "Im"},        {"한", "Han"},     {"오", "O"},
+       {"서", "Seo"},       {"신", "Sin"},     {"권", "Gwon"},
+       {"황", "Hwang"},     {"송", "Song"},    {"백", "Baek"},
+       {"남궁", "Namgung"}, {"제갈", "Jegal"}, {"독고", "Dokgo"},
+       {"모용", "Moyong"},  {"사마", "Sama"},  {"황보", "Hwangbo"}},
+      {{"설화", "Seolhwa"},
+       {"연화", "Yeonhwa"},
+       {"소연", "Soyeon"},
+       {"하린", "Harin"},
+       {"은비", "Eunbi"},
+       {"매화", "Maehwa"},
+       {"수련", "Suryeon"},
+       {"서희", "Seohui"},
+       {"지아", "Jia"},
+       {"채원", "Chaewon"},
+       {"월향", "Wolhyang"},
+       {"예린", "Yerin"}},
+      {{"무진", "Mujin"},
+       {"태산", "Taesan"},
+       {"청운", "Cheongun"},
+       {"현", "Hyeon"},
+       {"도윤", "Doyun"},
+       {"진혁", "Jinhyeok"},
+       {"소운", "Soun"},
+       {"천명", "Cheonmyeong"},
+       {"강호", "Gangho"},
+       {"백랑", "Baengnang"},
+       {"일검", "Ilgeom"},
+       {"우진", "Ujin"}},
+  };
+}
 
 // A point a partition is made around, and the value its cells take.
 struct Site {
@@ -336,7 +387,21 @@ RegionData region_data() {
            Spread{LIFESPAN_DAYS, LIFESPAN_SPREAD_DAYS},
            1,
            DISCIPLINE_WIDENING,
-           UPPER_WIDENING},
+           UPPER_WIDENING,
+           // The people the region starts with are 16 to 40 years old. A
+           // person of 16 to 40 marries, at even odds a year, someone of
+           // another family from a village whose centre lies within 48
+           // cells; a wife of 18 to 40 bears a child at 2 in 5 a year, two
+           // years apart at least, into her husband's family.
+           Spread{FOUNDING_AGE, FOUNDING_SPREAD},
+           Kinship{{MARRYING_FROM, MARRYING_TO},
+                   NEIGHBOURHOOD,
+                   MARRIAGE_CHANCE,
+                   {BEARING_FROM, BEARING_TO},
+                   BIRTH_CHANCE,
+                   BIRTH_SPACING,
+                   true},
+           names()},
   };
 }
 
@@ -352,7 +417,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                 {},
                 Rules{SEPARATION,
                       hostility(data.factions),
-                      {DURABILITY, DURABILITY / 2, 1}},
+                      {DURABILITY, DURABILITY / 2, 1},
+                      TICKS_PER_DAY},
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
                 {},

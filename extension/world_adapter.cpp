@@ -160,6 +160,15 @@ murim::Leadership leadership(const godot::Dictionary& fields) {
   return led;
 }
 
+// Person indices as GDScript reads them.
+godot::PackedInt64Array indices(const std::vector<std::size_t>& people) {
+  godot::PackedInt64Array result;
+  for (const std::size_t person : people) {
+    result.push_back(static_cast<std::int64_t>(person));
+  }
+  return result;
+}
+
 }  // namespace
 
 godot::Ref<WorldAdapter> WorldAdapter::create(
@@ -523,6 +532,38 @@ std::int64_t WorldAdapter::person_health(std::int64_t person) const {
   return static_cast<std::int64_t>(world().person(person_index(person)).health);
 }
 
+godot::Dictionary WorldAdapter::person_name(std::int64_t person) const {
+  godot::Dictionary fields;
+  const std::optional<murim::Name> name = world().name(person_index(person));
+  if (name) {
+    fields.set("surname", godot::String::utf8(name->surname.korean.c_str()));
+    fields.set("given", godot::String::utf8(name->given.korean.c_str()));
+    fields.set("surname_en", godot::String(name->surname.romanised.c_str()));
+    fields.set("given_en", godot::String(name->given.romanised.c_str()));
+  }
+  return fields;
+}
+
+godot::PackedInt64Array WorldAdapter::person_parents(
+    std::int64_t person) const {
+  return indices(world().person(person_index(person)).parents);
+}
+
+godot::PackedInt64Array WorldAdapter::person_children(
+    std::int64_t person) const {
+  return indices(world().person(person_index(person)).children);
+}
+
+std::int64_t WorldAdapter::person_spouse(std::int64_t person) const {
+  const std::vector<std::size_t>& spouses =
+      world().person(person_index(person)).spouses;
+  return spouses.empty() ? -1 : static_cast<std::int64_t>(spouses.back());
+}
+
+std::int64_t WorldAdapter::person_family(std::int64_t person) const {
+  return static_cast<std::int64_t>(world().person(person_index(person)).family);
+}
+
 void WorldAdapter::_bind_methods() {
   const godot::StringName& name = WorldAdapter::get_class_static();
   godot::ClassDB::bind_static_method(
@@ -557,6 +598,16 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_position);
   godot::ClassDB::bind_method(godot::D_METHOD("person_health", "person"),
                               &WorldAdapter::person_health);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_name", "person"),
+                              &WorldAdapter::person_name);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_parents", "person"),
+                              &WorldAdapter::person_parents);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_children", "person"),
+                              &WorldAdapter::person_children);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_spouse", "person"),
+                              &WorldAdapter::person_spouse);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_family", "person"),
+                              &WorldAdapter::person_family);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);
