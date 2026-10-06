@@ -1,6 +1,9 @@
 # Checks that play.tscn turns input into orders for the person it steers: a left click on a passable
 # cell moves the person toward it, and a click on a blocked cell is refused; key 1 orders the
-# person's first skill, and key 9, a skill it lacks, is refused.
+# person's first skill, and key 9, a skill it lacks, is refused. Key C challenges the person's
+# faction's leader: born into an Orthodox village, the core refuses it for having no duel and the
+# HUD says so; born into a Cult village, it starts a duel the HUD shows, and a second C while it is
+# fought is refused for that.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -36,7 +39,43 @@ func run() -> bool:
 		aimed, wall_refused, target, target_accepted, before, after, key_one, key_nine_refused,
 		"pass" if passed else "FAIL"])
 	scene.free()
+	return passed and _challenge_pass()
+
+
+# Key C from an Orthodox village (the region's first, owned by faction 0) and from a Cult one (its
+# second, owned by faction 1). Control: the Orthodox refusal shows its reason, so the Cult's
+# acceptance is the duel rule's and not the key's.
+func _challenge_pass() -> bool:
+	var orthodox := _scene(0)
+	var refused: bool = not orthodox.command(_key(KEY_C))
+	orthodox.get_node("Hud").refresh(orthodox.world, orthodox.steered, PackedInt64Array([0]))
+	var reason: String = orthodox.get_node("Hud").labels.notice.text
+	orthodox.free()
+
+	var cult := _scene(1)
+	var world: WorldAdapter = cult.world
+	var faction := world.army_faction(cult.steered)
+	var leader_before := world.leader(faction)
+	var accepted: bool = cult.command(_key(KEY_C))
+	var hud: CanvasLayer = cult.get_node("Hud")
+	hud.refresh(world, cult.steered, PackedInt64Array([0]))
+	var shown: bool = hud.duel_panel.visible and not world.duel(faction).is_empty()
+	cult.step()
+	var again: bool = not cult.command(_key(KEY_C))
+	var again_reason: String = hud.labels.notice.text
+	var passed := refused and reason == "CHALLENGE_NO_SUCCESSION" and accepted and shown and again \
+			and again_reason == "CHALLENGE_DUEL_IN_PROGRESS" and world.leader(faction) == leader_before
+	print("play_test: key C from an Orthodox village refused %s, the HUD saying %s; from a Cult village accepted %s, the duel shown %s; again refused %s, the HUD saying %s: %s" % [
+		refused, reason, accepted, shown, again, again_reason, "pass" if passed else "FAIL"])
+	cult.free()
 	return passed
+
+
+func _scene(village: int) -> Node2D:
+	var scene: Node2D = load(SCENE).instantiate()
+	scene.birth_village = village
+	scene.notification(Node.NOTIFICATION_READY)
+	return scene
 
 
 # The nearest cell to `home` within SEARCH cells, at least two away, whose tile is `tile`.

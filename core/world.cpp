@@ -313,32 +313,71 @@ void World::order(std::size_t army, Order order,
   FlowField field{map_, order.objective};
   reachable_from(field, ordered.roster);
   if (challenge) {
-    start_duel(ordered, *challenge);
+    start_duel(army, *challenge);
   }
   ordered.field = std::move(field);
   ordered.order = std::move(order);
 }
 
-// Starts a duel between `army`'s lead and faction `faction`'s leader, or
+// Starts a duel between army `army`'s lead and faction `faction`'s leader, or
 // throws when the faction's succession refuses the challenge.
-void World::start_duel(const Army& army, std::size_t faction) {
-  const auto fought = [faction](const Fight& fight) {
-    return fight.faction == faction;
-  };
+void World::start_duel(std::size_t army, std::size_t faction) {
+  const ChallengeRefusal refused = challenge_refusal(army, faction);
   const Leadership none{};
   const Leadership& led =
       faction < leadership_.size() ? leadership_.at(faction) : none;
-  const std::optional<Duel>& rule = led.succession;
-  const std::optional<std::size_t>& leader = led.leader;
-  if (!rule || !leader || army.roster.empty() ||
-      (rule->members_only && army.faction != faction) ||
-      army.roster.front() == *leader ||
-      std::any_of(duels_.begin(), duels_.end(), fought)) {
+  if (refused != ChallengeRefusal::NONE || !led.leader || !led.succession) {
     throw std::invalid_argument(
         "a challenge must name a faction that passes its lead by duel and has "
         "a leader, from an army whose lead may challenge it, outside a duel");
   }
-  duels_.push_back(Fight{faction, army.roster.front(), *leader, *rule});
+  duels_.push_back(Fight{faction, armies_.at(army).roster.front(), *led.leader,
+                         *led.succession});
+}
+
+ChallengeRefusal World::challenge_refusal(std::size_t army,
+                                          std::size_t faction) const {
+  if (army >= armies_.size()) {
+    throw std::invalid_argument("a challenge must come from an army");
+  }
+  return refusal(armies_.at(army), faction);
+}
+
+ChallengeRefusal World::refusal(const Army& challenging,
+                                std::size_t faction) const {
+  const Leadership none{};
+  const Leadership& led =
+      faction < leadership_.size() ? leadership_.at(faction) : none;
+  if (!led.succession) {
+    return ChallengeRefusal::NO_SUCCESSION;
+  }
+  if (!led.leader) {
+    return ChallengeRefusal::NO_LEADER;
+  }
+  if (challenging.roster.empty()) {
+    return ChallengeRefusal::NO_CHALLENGER;
+  }
+  if (led.succession->members_only && challenging.faction != faction) {
+    return ChallengeRefusal::NOT_A_MEMBER;
+  }
+  if (challenging.roster.front() == *led.leader) {
+    return ChallengeRefusal::IS_LEADER;
+  }
+  if (duel(faction)) {
+    return ChallengeRefusal::DUEL_IN_PROGRESS;
+  }
+  return ChallengeRefusal::NONE;
+}
+
+std::optional<Duellists> World::duel(std::size_t faction) const {
+  const auto fought = [faction](const Fight& fight) {
+    return fight.faction == faction;
+  };
+  const auto found = std::find_if(duels_.begin(), duels_.end(), fought);
+  if (found == duels_.end()) {
+    return std::nullopt;
+  }
+  return Duellists{found->challenger, found->leader};
 }
 
 void World::conscript(std::size_t person, std::size_t army) {

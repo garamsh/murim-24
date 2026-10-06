@@ -1175,7 +1175,8 @@ constexpr std::size_t OUTSIDER = 3;
 constexpr Cell CULT_SEAT{10, 10};
 constexpr std::uint64_t DUEL_TICKS = 2'000;
 
-World cult_world(std::uint64_t challenger_health) {
+World cult_world(std::uint64_t challenger_health,
+                 std::optional<std::size_t> cult_leader = 0) {
   constexpr Seed CULT_SEED{9};
   const Skill strike{2 * CELL_SIZE, 0, 50, 0, 10};
   const std::vector<std::string> rows = open_map(ORDERS_SIDE);
@@ -1196,7 +1197,7 @@ World cult_world(std::uint64_t challenger_health) {
                {},
                rules,
                {},
-               {{}, {0, Duel{true, 0, true}}, {}}};
+               {{}, {cult_leader, Duel{true, 0, true}}, {}}};
 }
 
 // Has army `army` challenge the Cult's leader at its seat and runs the duel
@@ -1245,6 +1246,62 @@ TEST(World, ThePlayerAndAnNpcChallengeThroughTheSameOrder) {
   run_ticks(quiet, DUEL_TICKS);
   EXPECT_EQ(quiet.leader(CULT), std::optional<std::size_t>{0});
   EXPECT_EQ(quiet.person(0).health, HOSTILE_HEALTH);
+}
+
+// Whether order() refuses army `army`'s challenge to faction `faction`
+// exactly when challenge_refusal() names a reason, and that reason is
+// `expected`.
+bool refused_for(World& world, std::size_t army, std::size_t faction,
+                 ChallengeRefusal expected) {
+  bool thrown = false;
+  if (world.challenge_refusal(army, faction) != expected) {
+    return false;
+  }
+  try {
+    world.order(army, Order{CULT_SEAT, {0}}, faction);
+  } catch (const std::invalid_argument&) {
+    thrown = true;
+  }
+  return thrown == (expected != ChallengeRefusal::NONE);
+}
+
+TEST(World, AChallengeIsRefusedForEachReasonTheOrderRefusesIt) {
+  World world = cult_world(TARGET_HEALTH);
+  EXPECT_TRUE(
+      refused_for(world, PLAYER, ORTHODOX, ChallengeRefusal::NO_SUCCESSION));
+  EXPECT_TRUE(
+      refused_for(world, OUTSIDER, CULT, ChallengeRefusal::NOT_A_MEMBER));
+  EXPECT_TRUE(refused_for(world, 0, CULT, ChallengeRefusal::IS_LEADER));
+  // Control: a member may challenge, and the order starts the duel.
+  EXPECT_TRUE(refused_for(world, PLAYER, CULT, ChallengeRefusal::NONE));
+  EXPECT_TRUE(
+      refused_for(world, NPC, CULT, ChallengeRefusal::DUEL_IN_PROGRESS));
+
+  World leaderless = cult_world(TARGET_HEALTH, std::nullopt);
+  EXPECT_TRUE(
+      refused_for(leaderless, PLAYER, CULT, ChallengeRefusal::NO_LEADER));
+
+  // A challenger who lost the duel died, and its army has no one left.
+  World lost = cult_world(1);
+  ASSERT_EQ(after_challenge(lost, PLAYER), std::optional<std::size_t>{0});
+  EXPECT_TRUE(refused_for(lost, PLAYER, CULT, ChallengeRefusal::NO_CHALLENGER));
+  EXPECT_THROW(static_cast<void>(lost.challenge_refusal(99, CULT)),
+               std::invalid_argument);
+}
+
+TEST(World, ADuelIsReadWhileItIsFoughtAndGoneOnceSettled) {
+  World world = cult_world(TARGET_HEALTH);
+  EXPECT_FALSE(world.duel(CULT).has_value());
+  world.order(PLAYER, Order{CULT_SEAT, {0}}, CULT);
+  const std::optional<Duellists> fought = world.duel(CULT);
+  ASSERT_TRUE(fought.has_value());
+  const Duellists both = fought.value_or(Duellists{NPC, NPC});
+  EXPECT_EQ(both.challenger, PLAYER);
+  EXPECT_EQ(both.leader, 0U);
+  // Control: no duel is fought for a faction nobody challenged.
+  EXPECT_FALSE(world.duel(ALLY).has_value());
+  run_ticks(world, DUEL_TICKS);
+  EXPECT_FALSE(world.duel(CULT).has_value());
 }
 
 }  // namespace

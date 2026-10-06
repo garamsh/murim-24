@@ -15,6 +15,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - The challenger is the ordered army's lead. A duel taking members only refuses a challenger from an army of another faction, and a faction with no duel or no leader refuses every challenge.
   - The challenger and the leader become hostile to each other alone and fight by the one skill rule until one has no more than the duel's yield health left. The leader keeps the lead if both fall together.
   - A challenger who wins leads the faction. If the duel says so, every faction at peace with it turns hostile to it, a change to the hostility the world holds.
+  - `challenge_refusal` returns why an army's lead may not challenge a faction's leader, a `ChallengeRefusal`, or `NONE` when it may. `order` refuses a challenge exactly when it names a reason, so the rule is written once. `duel` reads the duel being fought for a faction's lead: the challenger and the leader.
 - Every person moves and strikes on every tick; there are no levels of detail. At 500 people the whole world costs less than the tick budget (below).
 - People move toward their order's objective along their army's flow field, rebuilt when an order changes the objective. A step enters any cell the flow field reaches and never a blocked one. An objective must be reachable from where each member stands, when the army is created and when it is given an order.
 - People keep the separation, about a cell, from neighbours found through a spatial hash rebuilt each tick:
