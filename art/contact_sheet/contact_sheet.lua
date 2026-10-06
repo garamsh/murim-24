@@ -9,7 +9,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 464, 346
+local W, H = 608, 584
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -34,14 +34,12 @@ local KINDS = { "plain", "forest", "hills", "water", "mountain" }
 label(8, 6, "MURIM24  PRODUCTION SET", c("paper", 3))
 label(120, 6, "ONE CELL = 16 PX, SHOWN AT NATIVE SIZE")
 
--- Terrain: the four variants of each kind, then a strip of them in a seeded order.
+-- Terrain: the four variants of each kind; the tiled patches are further down.
 label(8, 20, "TERRAIN  VARIANTS 1-4", c("paper", 3))
-label(120, 20, "TILED")
 for k, kind in ipairs(KINDS) do
   local y = 30 + (k - 1) * 20
   label(8, y + 6, kind:upper(), c("paper", 2))
   for v = 1, 4 do sheet:stamp(frame(terrain, kind, v), 48 + (v - 1) * 17, y) end
-  for t = 0, 7 do sheet:stamp(frame(terrain, kind, 1 + math.floor(px.hash(t, k, 5) * 4)), 120 + t * 16, y) end
 end
 
 -- Bodies: idle, then the four walk frames, each standing on a plain cell.
@@ -136,5 +134,18 @@ end
 sheet:stamp(ground, 0, 0)
 table.sort(standing, function(a, b) if a[1] == b[1] then return a[2] < b[2] end return a[1] < b[1] end)
 for _, s in ipairs(standing) do s[3]() end
+
+-- Each terrain kind tiled over 12 x 6 cells, every cell's variant picked by a seeded hash,
+-- to show how a stretch of one kind reads.
+label(8, 352, "TERRAIN TILED 12 X 6 CELLS, VARIANT PER CELL BY SEEDED HASH", c("paper", 3))
+for k, kind in ipairs(KINDS) do
+  local x, y = 8 + ((k - 1) % 3) * 200, 368 + ((k - 1) // 3) * 112
+  label(x, y - 8, kind:upper(), c("paper", 2))
+  for row = 0, 5 do
+    for col = 0, 11 do
+      sheet:stamp(frame(terrain, kind, 1 + math.floor(px.hash(col, row, 100 + k) * 4)), x + col * 16, y + row * 16)
+    end
+  end
+end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")

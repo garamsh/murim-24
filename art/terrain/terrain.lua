@@ -1,7 +1,8 @@
 -- Draws terrain.aseprite: four 16x16 variants of each terrain kind the region generator
--- defines (core/region.cpp, region_data()), one tag per kind. Every variant's edge is drawn
--- from noise that repeats every 16 pixels, so any variant meets any other of its kind
--- without a seam.
+-- defines (core/region.cpp, region_data()), one tag per kind. Every variant's ground is drawn
+-- from noise that repeats every 16 pixels and is the same in every variant near the tile's
+-- edge, and the features on it (crowns, mounds, crags) stay inside the tile, so any variant
+-- meets any other of its kind without a seam or a band.
 -- Run: aseprite --batch --script art/terrain/terrain.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -11,11 +12,21 @@ local c = px.c
 local T = 16
 local VARIANTS = 4
 
+-- Ground noise: a fine texture shared by every variant of a kind, plus the variant's own
+-- coarse noise faded out over the four pixels nearest the tile's edge. Two variants then
+-- meet on the same fine texture, without a seam, and differ in the middle.
+local function ground(x, y, scale, seed, v)
+  local edge = math.min(x, y, T - 1 - x, T - 1 - y)
+  local window = math.min(1, (edge + 0.5) / 4)
+  return 0.5 + (px.tile_noise(x, y, 2, T, seed) - 0.5) * 0.5
+    + (px.tile_noise(x, y, scale, T, seed + 100 * v) - 0.5) * 1.1 * window
+end
+
 local function plain(cv, v)
   local r = px.rng(100 + v)
   for y = 0, T - 1 do
     for x = 0, T - 1 do
-      local n = px.tile_noise(x, y, 8, T, 10 + v) + (px.tile_noise(x, y, 4, T, 20 + v) - 0.5) * 0.4
+      local n = ground(x, y, 8, 10, v)
       local col = c("grass", 4)
       if n > 0.66 + px.bayer(x, y) * 0.1 then col = c("grass", 5)
       elseif n < 0.28 + px.bayer(x, y) * 0.1 then col = c("grass", 3) end
@@ -34,54 +45,87 @@ local function plain(cv, v)
 end
 
 local function forest(cv, v)
-  -- Canopy seen from above: lumps lit from the upper left over a dark understorey.
+  -- Separate crowns seen from above, each lit from the upper left with a dark rim, over a
+  -- dark understorey that shows between them; a trunk shows below a crown where there is
+  -- room. Every crown stays inside its tile, so tiles meet on understorey alone.
   for y = 0, T - 1 do
-    for x = 0, T - 1 do cv:set(x, y, px.tile_noise(x, y, 4, T, 30 + v) > 0.5 and c("leaf", 2) or c("leaf", 1)) end
-  end
-  local r = px.rng(200 + v)
-  local lumps = { { 4, 4, 4 }, { 12, 5, 4 }, { 7, 11, 5 }, { 15, 13, 3 }, { 0, 12, 3 } }
-  for _, l in ipairs(lumps) do
-    local cx, cy, rad = l[1] + r.int(-1, 1), l[2] + r.int(-1, 1), l[3]
-    for dy = -rad, rad do
-      for dx = -rad, rad do
-        local d = math.sqrt(dx * dx + dy * dy) / rad
-        if d <= 1 then
-          local x, y = (cx + dx) % T, (cy + dy) % T
-          local light = (-dx - dy) / rad + (px.tile_noise(x, y, 2, T, 40 + v) - 0.5) * 0.8
-          local col = c("leaf", 3)
-          if light > 0.7 then col = c("leaf", 5) elseif light > 0.2 then col = c("leaf", 4)
-          elseif light < -0.6 then col = c("leaf", 2) end
-          cv:set(x, y, col)
-        end
-      end
+    for x = 0, T - 1 do
+      local n = ground(x, y, 4, 30, v)
+      cv:set(x, y, n > 0.6 and c("grass", 2) or (n > 0.3 and c("leaf", 2) or c("leaf", 1)))
     end
+  end
+  local crowns = ({
+    { { 5, 5, 4.5 }, { 11, 10, 4.5 } },
+    { { 8, 6, 5.5 }, { 3, 13, 2.5 } },
+    { { 4, 9, 4 }, { 11, 4, 4 }, { 12, 12, 3 } },
+    { { 6, 6, 5 }, { 12, 12, 3.5 } },
+  })[v]
+  for _, k in ipairs(crowns) do
+    local cx, cy, rad = k[1], k[2], k[3]
+    -- Shadow on the floor to the lower right, then the trunk where the crown leaves room.
+    cv:each_ellipse(cx + 1.5, cy + 1.5, rad, rad * 0.9, function(x, y)
+      if x >= 0 and x < T and y >= 0 and y < T then cv:set(x, y, c("leaf", 1)) end
+    end)
+    if cy + rad + 2 <= T - 1 then
+      cv:vline(cx, math.floor(cy + rad) - 1, 3, c("wood", 2)); cv:set(cx - 1, math.floor(cy + rad) + 1, c("wood", 3))
+    end
+  end
+  for _, k in ipairs(crowns) do
+    local cx, cy, rad = k[1], k[2], k[3]
+    cv:each_ellipse(cx, cy, rad, rad * 0.9, function(x, y, d)
+      if x < 0 or x >= T or y < 0 or y >= T then return end
+      local dx, dy = (x - cx) / rad, (y - cy) / rad
+      local n = px.tile_noise(x, y, 2, T, 40 + v)
+      local light = -dx * 0.7 - dy * 0.9 + (n - 0.5) * 0.7
+      local col = c("leaf", 3)
+      if light > 0.75 then col = c("leaf", 5) elseif light > 0.2 then col = c("leaf", 4)
+      elseif light < -0.55 then col = c("leaf", 2) end
+      if d > 0.82 and dx + dy > 0.2 then col = c("leaf", 1) end
+      cv:set(x, y, col)
+    end)
   end
 end
 
 local function hills(cv, v)
-  -- Terraced slopes: wavy contour ridges two to a tile, each lit on its upper edge and
-  -- shaded below. Every variant's wave is zero at the tile's edge, so ridges run on across
-  -- tiles whichever variants meet; variants differ in the wave between the edges.
-  local sign = v <= 2 and 1 or -1
+  -- Rough grass with one or two low mounds inside the tile, each lit from the upper left,
+  -- rimmed with a contour on its lower side and casting a short shadow. Variants differ in
+  -- how many mounds, where and how large; nothing crosses the tile's edge, so tiled hills
+  -- read as hummocky ground rather than lines.
   for y = 0, T - 1 do
     for x = 0, T - 1 do
-      local wave = sign * 2.2 * math.sin(x / T * 2 * math.pi) + (v % 2) * 1.2 * math.sin(x / T * 4 * math.pi)
-      local t = (y + wave) % 8
-      local n = px.tile_noise(x, y, 4, T, 50 + v)
-      local col = c("grass", 4)
-      if t < 1 then col = c("grass", 6)
-      elseif t < 3 then col = n > 0.4 and c("grass", 5) or c("grass", 4)
-      elseif t >= 7 then col = c("grass", 2)
-      elseif t >= 5.5 then col = c("grass", 3) end
-      cv:set(x, y, col)
+      local n = ground(x, y, 4, 50, v)
+      cv:set(x, y, n < 0.42 + px.bayer(x, y) * 0.1 and c("grass", 3) or c("grass", 4))
     end
+  end
+  local mounds = ({
+    { { 8, 8, 6, 4.5 } },
+    { { 5, 5, 4, 3 }, { 11, 11, 4, 3 } },
+    { { 9, 6, 5.5, 4 }, { 4, 12, 3, 2.2 } },
+    { { 7, 9, 6.5, 4.5 } },
+  })[v]
+  for _, m in ipairs(mounds) do
+    local cx, cy, rx, ry = m[1], m[2], m[3], m[4]
+    cv:each_ellipse(cx + 1, cy + 1.2, rx, ry, function(x, y)
+      if x >= 0 and x < T and y >= 0 and y < T then cv:set(x, y, c("grass", 2)) end
+    end)
+    cv:each_ellipse(cx, cy, rx, ry, function(x, y, d)
+      if x < 0 or x >= T or y < 0 or y >= T then return end
+      local dx, dy = (x - cx) / rx, (y - cy) / ry
+      local n = px.tile_noise(x, y, 2, T, 55 + v)
+      local light = -dx * 0.6 - dy * 0.8 + (n - 0.5) * 0.4
+      local col = c("grass", 4)
+      if light > 0.55 then col = c("grass", 6) elseif light > 0.1 then col = c("grass", 5)
+      elseif light < -0.5 then col = c("grass", 3) end
+      if d > 0.85 and dy > 0.1 then col = c("grass", 2) end
+      cv:set(x, y, col)
+    end)
   end
 end
 
 local function water(cv, v)
   for y = 0, T - 1 do
     for x = 0, T - 1 do
-      local n = px.tile_noise(x, y, 4, T, 60 + v)
+      local n = ground(x, y, 4, 60, v)
       cv:set(x, y, n < 0.3 + px.bayer(x, y) * 0.12 and c("water", 2) or c("water", 3))
     end
   end
@@ -94,30 +138,47 @@ local function water(cv, v)
 end
 
 local function mountain(cv, v)
-  -- Bare rock as a ridge crossing the tile: the lit slope above the crest, the shaded face
-  -- below it creased by gullies, scree at the foot. The crest repeats every 16 pixels, so
-  -- ridges run on across tiles and stacked tiles read as ridge behind ridge. The crest is the
-  -- same in every variant; the gullies and scree differ.
-  local peak = T // 2
+  -- Bare rock: one or two crags standing inside the tile on dark scree, each with a lit
+  -- west face, a shaded east face, a pale summit and a shadowed foot. Variants differ in
+  -- the number, place and height of the crags; no crag crosses the tile's edge, so tiled
+  -- mountains read as a field of peaks rather than a band.
   for y = 0, T - 1 do
     for x = 0, T - 1 do
-      local d = math.abs(((x - peak + T / 2) % T) - T / 2)
-      local crest = 3 + math.floor(d * 0.6 + 0.5)
-      local n = px.tile_noise(x, y, 2, T, 70 + v)
-      local col
-      if y < crest then
-        col = (y < crest - 2) and c("stone", 4) or c("stone", 5)
-        if x < peak and y >= crest - 1 then col = c("stone", 6) end
-      elseif y == crest then
-        col = c("stone", 1)
-      elseif y < 13 then
-        col = ((x + v) % 5 == 0 or n > 0.8) and c("stone", 2) or c("stone", 3)
-        if y > crest + 1 and n < 0.2 then col = c("stone", 4) end
-      else
-        col = (px.bayer(x, y) + n * 0.5 > 0.7) and c("stone", 3) or c("stone", 2)
-      end
+      local n = ground(x, y, 4, 70, v)
+      local col = n > 0.55 and c("stone", 3) or c("stone", 2)
+      if ground(x, y, 2, 75, v) > 0.82 then col = c("stone", 1) end
       cv:set(x, y, col)
     end
+  end
+  local crags = ({
+    { { 8, 2, 14, 6.5 } },
+    { { 5, 3, 12, 4.5 }, { 11, 6, 15, 4 } },
+    { { 10, 2, 13, 5 }, { 4, 8, 15, 3.5 } },
+    { { 7, 5, 15, 6.5 } },
+  })[v]
+  for _, k in ipairs(crags) do
+    local peak, top, base, hw = k[1], k[2], k[3], k[4]
+    for y = top, base do
+      local t = (y - top) / (base - top)
+      local half = t * hw + (px.tile_noise(peak, y, 2, T, 80 + v) - 0.5) * 1.5 * t
+      for x = math.ceil(peak - half), math.floor(peak + half) do
+        if x >= 0 and x < T then
+          local col
+          if x < peak then
+            col = (x < peak - half * 0.55) and c("stone", 4) or c("stone", 5)
+          elseif x == peak then
+            col = c("stone", 4)
+          else
+            col = (x > peak + half * 0.5) and c("stone", 2) or c("stone", 3)
+          end
+          if y - top < 2 then col = c("stone", 6) end
+          if y == base then col = c("ink", 3) end
+          cv:set(x, y, col)
+        end
+      end
+    end
+    -- A gully down the shaded face.
+    cv:line(peak + 1, top + 3, peak + math.floor(hw / 2), base - 1, c("stone", 1))
   end
 end
 
