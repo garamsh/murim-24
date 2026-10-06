@@ -59,6 +59,14 @@ constexpr std::uint32_t BEARING_FROM = 18 * YEAR;
 constexpr std::uint32_t BEARING_TO = 40 * YEAR;
 constexpr std::uint32_t BIRTH_CHANCE = 400;
 constexpr std::uint32_t BIRTH_SPACING = 2 * YEAR;
+// Husbandry and the structure kinds in region_data().
+constexpr std::uint32_t HUNGER_DAYS = 10;
+constexpr std::int32_t MIGRATION_REACH = 64;
+constexpr std::uint32_t HOUSE_HOUSING = 8;
+constexpr std::uint32_t HALL_HOUSING = 12;
+constexpr std::uint32_t GRANARY_STORAGE = 2'400;
+constexpr std::uint32_t STOREHOUSE_STORAGE = 3'600;
+constexpr std::uint32_t FIELD_YIELD = 600;
 
 // Surnames of the murim's clans, common and of the old houses, and given
 // names for women and men, in Korean with their romanised forms.
@@ -233,6 +241,16 @@ std::vector<Cell> corners_for(const std::vector<std::size_t>& room,
   return corners;
 }
 
+// The kind named `name` among the data's kinds, if any.
+std::optional<StructureKind> kind_named(const RegionData& data,
+                                        const std::string& name) {
+  const auto found = std::find_if(
+      data.kinds.begin(), data.kinds.end(),
+      [&name](const StructureKind& kind) { return kind.name == name; });
+  return found == data.kinds.end() ? std::nullopt
+                                   : std::optional<StructureKind>{*found};
+}
+
 void validate(const RegionData& data) {
   const auto weightless = [](const TerrainKind& kind) {
     return kind.weight <= 0;
@@ -286,7 +304,15 @@ void validate(const RegionData& data) {
       std::any_of(
           data.factions.begin(), data.factions.end(),
           [](const Faction& faction) { return faction.skills.empty(); }) ||
-      std::any_of(data.villages.begin(), data.villages.end(), malformed)) {
+      std::any_of(data.villages.begin(), data.villages.end(), malformed) ||
+      std::any_of(data.villages.begin(), data.villages.end(),
+                  [&data](const VillageTemplate& village) {
+                    return std::any_of(
+                        village.buildings.begin(), village.buildings.end(),
+                        [&data](const Building& building) {
+                          return !kind_named(data, building.kind);
+                        });
+                  })) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
 }
@@ -313,6 +339,14 @@ RegionData region_data() {
   constexpr Footprint WELL{2, 2};
   constexpr Footprint BARRELS{1, 1};
   constexpr Footprint FENCE{5, 1};
+  constexpr Footprint MILLET{2, 2};
+  constexpr Footprint RICE{3, 2};
+  constexpr Footprint GRANARY{2, 2};
+  constexpr Footprint STOREHOUSE{3, 2};
+  constexpr std::int32_t MILLET_EAST = 5;
+  constexpr std::int32_t RICE_EAST = 7;
+  constexpr std::int32_t GRANARY_EAST = 12;
+  constexpr std::int32_t GRANARY_ROW = 4;
   constexpr std::uint32_t HOUSE_RESIDENTS = 4;
   constexpr std::uint32_t HALL_RESIDENTS = 6;
   constexpr std::int32_t HAMLET_WIDTH = 7;
@@ -352,14 +386,19 @@ RegionData region_data() {
       // south of it, a well in the square before the hall, barrels at the
       // road's ends and a fence along the field between the southern houses.
       // The hamlet keeps its west end. Wells, barrels and fences block and
-      // break like any structure, and house no one.
+      // break like any structure, and house no one. Fields of millet and rice
+      // lie where the mockup sows them, a granary stands east of the square
+      // and a storehouse in the south-east corner; the hamlet keeps its
+      // millet and a granary in its south-west corner.
       {
           {"hamlet",
            {HAMLET_WIDTH, VILLAGE_HEIGHT},
            {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
             building({4, 0}, HOUSE, "house", HOUSE_RESIDENTS),
             building({2, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0)}},
+            building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
+            building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
+            building({0, SOUTH_ROW}, GRANARY, "granary", 0)}},
           {"village",
            {VILLAGE_WIDTH, VILLAGE_HEIGHT},
            {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
@@ -371,7 +410,11 @@ RegionData region_data() {
             building({WELL_EAST, ROAD_ROW}, WELL, "well", 0),
             building({0, ROAD_ROW}, BARRELS, "barrels", 0),
             building({VILLAGE_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
-            building({FENCE_EAST, FENCE_ROW}, FENCE, "fence", 0)}},
+            building({FENCE_EAST, FENCE_ROW}, FENCE, "fence", 0),
+            building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
+            building({RICE_EAST, SOUTH_ROW}, RICE, "field", 0),
+            building({GRANARY_EAST, GRANARY_ROW}, GRANARY, "granary", 0),
+            building({FAR_EAST, SOUTH_ROW}, STOREHOUSE, "storehouse", 0)}},
       },
       // Five disciplines, each drawn the same way: growth of 5 to 15 a use,
       // a limit of 300 to 700. People live 45 to 75 years of 120 days, a
@@ -401,7 +444,23 @@ RegionData region_data() {
                    BIRTH_CHANCE,
                    BIRTH_SPACING,
                    true},
-           names()},
+           names(),
+           // Each person eats a measure of food a day. Unfed for ten days,
+           // a person moves to a village within 64 cells with room and food,
+           // or dies.
+           Husbandry{1, HUNGER_DAYS, MIGRATION_REACH}},
+      // What each kind of structure holds: a house shelters 8 and a hall 12,
+      // a granary stores 2,400 measures and a storehouse 3,600, and each
+      // cell of a field yields 600 a harvest. A field never blocks. A village
+      // of 26 founders is capped at 50 people, a hamlet of 12 at 20.
+      {{"house", HOUSE_HOUSING, 0, 0, true},
+       {"hall", HALL_HOUSING, 0, 0, true},
+       {"well", 0, 0, 0, true},
+       {"barrels", 0, 0, 0, true},
+       {"fence", 0, 0, 0, true},
+       {"granary", 0, GRANARY_STORAGE, 0, true},
+       {"storehouse", 0, STOREHOUSE_STORAGE, 0, true},
+       {"field", 0, 0, FIELD_YIELD, false}},
   };
 }
 
@@ -423,7 +482,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                 generate_territory(random, data.factions.size()),
                 {},
                 {},
-                data.life};
+                data.life,
+                {}};
   // The owner of each free passable cell; a blocked or built-on cell is
   // owned by no faction, so no village fits on it.
   const std::size_t nobody = data.factions.size();
@@ -476,10 +536,16 @@ Region generate_region(Seed seed, const RegionData& data) {
     for (const Building& building : kind.buildings) {
       const Structure& structure = building.structure;
       village.structures.push_back(region.structures.size());
+      const StructureKind made =
+          kind_named(data, building.kind).value_or(StructureKind{});
       region.structures.push_back(Structure{
           Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
-          structure.durability, structure.footprint});
+          structure.durability, structure.footprint, made.blocks});
       region.structure_kinds.push_back(building.kind);
+      const auto cells = static_cast<std::uint32_t>(structure.footprint.width *
+                                                    structure.footprint.height);
+      region.holdings.push_back(
+          Holding{made.housing, made.storage, made.yield * cells});
       residents += building.residents;
     }
     const Cell middle = middle_of(kind.area);
@@ -564,7 +630,13 @@ std::vector<VillageSpec> village_specs(const Region& region) {
   std::vector<VillageSpec> specs;
   specs.reserve(region.villages.size());
   for (const Village& village : region.villages) {
-    specs.push_back(VillageSpec{village.structures, village.army});
+    std::vector<Holding> holdings;
+    holdings.reserve(village.structures.size());
+    for (const std::size_t structure : village.structures) {
+      holdings.push_back(region.holdings.at(structure));
+    }
+    specs.push_back(
+        VillageSpec{village.structures, village.army, std::move(holdings)});
   }
   return specs;
 }

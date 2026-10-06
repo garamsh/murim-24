@@ -1,8 +1,9 @@
 # Checks that world_art.tscn lays a world as docs/convention/stack-godot.md §Terrain layers sets
 # out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
 # cells around it; that it draws every body on screen and none off it; that a structure is drawn
-# over its footprint with its stage's frame of its kind's art; and that each village's ground
-# decorations cover the cells its template's data names.
+# over its footprint with its stage's frame of its kind's art; that each field is tiled with its
+# state's tag; and that each village's ground decorations cover the cells its template's data
+# names.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -86,12 +87,16 @@ func run() -> bool:
 	region_art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var placed := 0
+	var fields := 0
 	var kinds := {}
 	for structure in region.structure_count():
 		var sprite: Sprite2D = region_art.structure_sprites[structure]
 		var footprint := region.structure_footprint(structure)
 		var corner := region.structure_cell(structure)
 		var kind := region.structure_kind(structure)
+		if kind == "field":
+			fields += 1
+			continue
 		var sheet := _sheet("res://art/structures/%s.json" % kind)
 		if sprite == null or sheet.is_empty():
 			continue
@@ -103,9 +108,28 @@ func run() -> bool:
 			placed += 1
 			kinds[kind] = true
 	var unkinded_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
-	var buildings_right := placed == region.structure_count() and kinds.size() == 5 and unkinded_skipped
-	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame; structures without a kind left undrawn %s: %s" % [
-		placed, region.structure_count(), kinds.keys(), unkinded_skipped, "pass" if buildings_right else "FAIL"])
+	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 7 \
+			and unkinded_skipped
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, %d fields tiled; structures without a kind left undrawn %s: %s" % [
+		placed, region.structure_count(), kinds.keys(), fields, unkinded_skipped, "pass" if buildings_right else "FAIL"])
+
+	# Fields: every cell of each field carries a frame of its state's tag, sown in spring as the
+	# world begins. Control: the same cells carry no frame of the burnt tag, so the check tells
+	# the states apart.
+	var field_tiles := _sheet("res://art/decorations/fields.json")
+	var tiled_right := fields > 0
+	var burnt_apart := true
+	for structure in region.structure_count():
+		var state := region.structure_field_state(structure)
+		if state < 0:
+			continue
+		tiled_right = tiled_right and state == WorldAdapter.FIELD_SOWN \
+				and _field_tagged(region_art.fields, region, structure, field_tiles.tags["sown"])
+		burnt_apart = burnt_apart \
+				and not _field_tagged(region_art.fields, region, structure, field_tiles.tags["burnt"])
+	var fields_right := tiled_right and burnt_apart
+	print("world_art_test: %d fields tiled with the sown frames %s, none with the burnt %s: %s" % [
+		fields, tiled_right, burnt_apart, "pass" if fields_right else "FAIL"])
 
 	# Decorations: each village's ground tiles cover the cells its template's data names, with a
 	# frame of the tag named; control: the cell west of the village has none.
@@ -135,7 +159,7 @@ func run() -> bool:
 		tiled, expected, outside_bare, "pass" if decorations_right else "FAIL"])
 	region_art.free()
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
-			and decorations_right
+			and decorations_right and fields_right
 	art.free()
 	return passed
 
@@ -146,6 +170,18 @@ func _layer_with_tiles(ground: Array[Node]) -> TileMapLayer:
 		if not layer.get_used_cells().is_empty():
 			return layer
 	return null
+
+
+# Whether every cell of field `structure` of `world` carries a frame within `tag` on `layer`.
+func _field_tagged(layer: TileMapLayer, world: WorldAdapter, structure: int, tag: Array) -> bool:
+	var corner := world.structure_cell(structure)
+	var footprint := world.structure_footprint(structure)
+	for y in footprint.y:
+		for x in footprint.x:
+			var at := layer.get_cell_atlas_coords(corner + Vector2i(x, y)).x
+			if at < tag[0] or at > tag[1]:
+				return false
+	return true
 
 
 # The last tile a layout lays on `cell`, which is the one left showing.

@@ -240,7 +240,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xFB2B052AD0BD236FULL);
+            0xB40A2479B312866EULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -645,7 +645,7 @@ World conscription_world() {
                armies,
                {{{2, 2}, HOME_DURABILITY}},
                at_war(SEPARATION),
-               {{{0}, HOME_ARMY}}};
+               {{{0}, HOME_ARMY, {}}}};
 }
 
 TEST(World, APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding) {
@@ -954,7 +954,7 @@ constexpr std::int64_t TORCH_REACH = std::int64_t{3} * CELL_SIZE;
 // Health of each resident a raid can kill.
 constexpr std::uint64_t RESIDENT_HEALTH = 100;
 
-VillageSpec small_village() { return VillageSpec{{0, 1}, RESIDENTS}; }
+VillageSpec small_village() { return VillageSpec{{0, 1}, RESIDENTS, {}}; }
 
 World village_world(std::uint64_t health) {
   const Skill guard{3 * CELL_SIZE, 0, 1, 0, 15};
@@ -1132,12 +1132,12 @@ TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
       return true;
     }
   };
-  EXPECT_FALSE(refused({{{0, 1}, 0}}));
+  EXPECT_FALSE(refused({{{0, 1}, 0, {}}}));
 
   // A structure the world lacks, one two villages name, an army it lacks.
-  EXPECT_TRUE(refused({{{0, 2}, 0}}));
-  EXPECT_TRUE(refused({{{0}, 0}, {{1}, 0}, {{0}, 0}}));
-  EXPECT_TRUE(refused({{{0, 1}, 1}}));
+  EXPECT_TRUE(refused({{{0, 2}, 0, {}}}));
+  EXPECT_TRUE(refused({{{0}, 0, {}}, {{1}, 0, {}}, {{0}, 0, {}}}));
+  EXPECT_TRUE(refused({{{0, 1}, 1, {}}}));
 }
 
 // The durability left on a village's house after a torch-bearer of
@@ -1150,7 +1150,7 @@ std::uint32_t house_after_torch(std::size_t faction) {
   };
   World world{Seed{1},   Map{open_map(OPEN_SIDE)},
               armies,    {{{4, 4}, HOUSE_DURABILITY}},
-              at_war(0), {{{0}, 0}}};
+              at_war(0), {{{0}, 0, {}}}};
   run_ticks(world, ARRIVAL_TICKS);
   return world.structure(0).durability;
 }
@@ -1375,7 +1375,8 @@ Life one_discipline(std::uint32_t limit_spread) {
               0,
               std::nullopt,
               std::nullopt,
-              {}};
+              {},
+              std::nullopt};
 }
 
 // The mean and variance of the limits drawn for 400 people born with
@@ -1656,6 +1657,156 @@ TEST(World, PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife) {
   const Range other = limit_range(life, Soul{1, {true, false}}, 1);
   EXPECT_EQ((std::pair{other.low, other.high}),
             (std::pair<std::uint32_t, std::uint32_t>{300, 800}));
+}
+
+// Husbandry for the economy tests: a measure of food a day each, ten days'
+// hunger, and a migration reach across the open map.
+constexpr Husbandry FED{1, 10, 16};
+constexpr std::uint32_t INTACT = 100;
+// Where the first economy test village's four residents stand.
+constexpr Cell SQUARE{6, 2};
+constexpr std::size_t FOUNDERS = 4;
+// Housing for ten and for twenty.
+constexpr std::uint32_t FOR_TEN = 10;
+constexpr std::uint32_t FOR_TWENTY = 20;
+constexpr std::uint32_t BURNT = 50;
+
+// What one economy test village holds: its house, its granary, and its
+// field, and how much durability the field has.
+struct Holdings {
+  Holding house;
+  Holding granary;
+  Holding field;
+  std::uint32_t field_durability = INTACT;
+};
+
+// Two villages on the open map, each of a house, a granary and a field, in a
+// row: the first along row 1 with FOUNDERS residents around SQUARE, the
+// second along row 10 with `others` residents around the cell nine below. Days
+// last a tick, so a test runs a year in DAYS_PER_YEAR ticks.
+World economy_world(const Holdings& first, const Holdings& second,
+                    std::size_t others,
+                    std::optional<Husbandry> husbandry = FED) {
+  constexpr std::int32_t SECOND_ROW = 10;
+  const auto row = [](std::int32_t row, const Holdings& holds) {
+    return std::vector<Structure>{
+        Structure{{1, row}, INTACT, {1, 1}, true},
+        Structure{{2, row}, INTACT, {1, 1}, true},
+        Structure{{3, row}, holds.field_durability, {1, 1}, false}};
+  };
+  std::vector<Structure> structures = row(1, first);
+  for (const Structure& structure : row(SECOND_ROW, second)) {
+    structures.push_back(structure);
+  }
+  Rules daily = peaceful(0);
+  daily.ticks_per_day = 1;
+  Life life = one_discipline(0);
+  life.husbandry = husbandry;
+  const Cell second_square{SQUARE.x, SECOND_ROW + 1};
+  const std::vector<std::size_t> first_structures{0, 1, 2};
+  const std::vector<std::size_t> second_structures{3, 4, 5};
+  return World{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(SQUARE, SQUARE, FOUNDERS, 1, 0, {IDLE}),
+       army(second_square, second_square, others, 1, 0, {IDLE})},
+      structures,
+      daily,
+      {VillageSpec{
+           first_structures, 0, {first.house, first.granary, first.field}},
+       VillageSpec{
+           second_structures, 1, {second.house, second.granary, second.field}}},
+      {},
+      life};
+}
+
+// A village of `housing`, `storage` and a field of `harvest`.
+Holdings holding(std::uint32_t housing, std::uint32_t storage,
+                 std::uint32_t harvest) {
+  return Holdings{Holding{housing, 0, 0}, Holding{0, storage, 0},
+                  Holding{0, 0, harvest}};
+}
+
+TEST(World, AVillagesCapIsTheLeastOfItsHousingFoodAndStorage) {
+  // A year's food for one person is DAYS_PER_YEAR measures.
+  constexpr std::uint32_t TEN_YEARS = 10 * DAYS_PER_YEAR;
+  constexpr std::uint32_t FIVE_YEARS = 5 * DAYS_PER_YEAR;
+  constexpr std::uint32_t FOUR_YEARS = 4 * DAYS_PER_YEAR;
+  const Holdings other = holding(1, TEN_YEARS, TEN_YEARS);
+  const auto cap_of = [&other](const Holdings& first) {
+    return economy_world(first, other, 1).cap(0);
+  };
+  EXPECT_EQ(cap_of(holding(3, TEN_YEARS, TEN_YEARS)), 3U);
+  EXPECT_EQ(cap_of(holding(FOR_TWENTY, TEN_YEARS, FIVE_YEARS)), 5U);
+  EXPECT_EQ(cap_of(holding(FOR_TWENTY, FOUR_YEARS, TEN_YEARS)), 4U);
+  // Derived on read: a burnt field feeds no one.
+  Holdings burnt = holding(FOR_TWENTY, TEN_YEARS, FIVE_YEARS);
+  burnt.field_durability = BURNT;
+  EXPECT_EQ(cap_of(burnt), 0U);
+  // Control: without husbandry no village is capped below the bound.
+  EXPECT_EQ(
+      economy_world(holding(3, TEN_YEARS, TEN_YEARS), other, 1, std::nullopt)
+          .cap(0),
+      MAX_PEOPLE);
+}
+
+TEST(World, AFieldBlocksNoOneAndATorchBurnsIt) {
+  const Holdings fields = holding(1, DAYS_PER_YEAR, DAYS_PER_YEAR);
+  World world = economy_world(fields, fields, 1);
+  // The field, at (3, 1), is no obstacle: an order onto it is accepted.
+  EXPECT_NO_THROW(world.order(0, {{3, 1}, {0}}));
+  EXPECT_EQ(world.field_state(2), std::optional<FieldState>{FieldState::SOWN});
+  // Control: the house beside it, which blocks, refuses the same order.
+  EXPECT_THROW(world.order(0, {{1, 1}, {0}}), std::invalid_argument);
+  EXPECT_FALSE(world.field_state(0).has_value());
+  // A torch of a hostile faction, used beside the field, burns it.
+  const Skill torch{0, 2 * CELL_SIZE, 0, BURNT, 1};
+  World raided{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(SQUARE, SQUARE, 1, 1, 0, {IDLE}),
+                army({4, 1}, {4, 1}, 1, 1, 1, {torch})},
+               {Structure{{3, 1}, INTACT, {1, 1}, false}},
+               at_war(0),
+               {VillageSpec{{0}, 0, {Holding{0, 0, DAYS_PER_YEAR}}}}};
+  run_ticks(raided, 2);
+  EXPECT_EQ(raided.field_state(0),
+            std::optional<FieldState>{FieldState::BURNT});
+}
+
+TEST(World, AVillageWithoutAHarvestRunsOutOfFoodAndItsPeopleMove) {
+  // Four people eat 600 measures in 150 days; the harvest comes on day 91.
+  constexpr std::uint32_t STORED = 600;
+  constexpr std::uint64_t DAYS = 200;
+  Holdings starving = holding(FOR_TEN, STORED, STORED);
+  starving.field_durability = BURNT;
+  const Holdings refuge = holding(FOR_TEN, 2 * STORED, STORED);
+  World world = economy_world(starving, refuge, 1);
+  run_ticks(world, DAYS);
+  EXPECT_EQ(world.residents_of(0), 0U);
+  EXPECT_EQ(world.residents_of(1), 5U);
+  EXPECT_EQ(world.living(), 5U);
+  // Control: with its field intact, the harvest feeds the village through.
+  World harvested = economy_world(holding(FOR_TEN, STORED, STORED), refuge, 1);
+  run_ticks(harvested, DAYS);
+  EXPECT_EQ(harvested.residents_of(0), 4U);
+}
+
+TEST(World, TheHungryWithNowhereToGoDie) {
+  constexpr std::uint32_t STORED = 600;
+  constexpr std::uint64_t DAYS = 200;
+  Holdings starving = holding(FOR_TEN, STORED, STORED);
+  starving.field_durability = BURNT;
+  // The only other village houses one, and one lives there.
+  World world = economy_world(starving, holding(1, STORED, STORED), 1);
+  run_ticks(world, DAYS);
+  EXPECT_EQ(world.residents_of(0), 0U);
+  EXPECT_EQ(world.living(), 1U);
+  // Control: with room there, they moved instead (the test above), and here
+  // the same village fed lives on.
+  World fed = economy_world(holding(FOR_TEN, STORED, STORED),
+                            holding(1, STORED, STORED), 1);
+  run_ticks(fed, DAYS);
+  EXPECT_EQ(fed.living(), 5U);
 }
 
 }  // namespace

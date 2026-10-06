@@ -17,7 +17,13 @@ const STAGES := ["intact", "damaged", "destroyed", "rubble"]
 const BUILDINGS := {
 	"house": "structures/house", "hall": "structures/hall", "well": "structures/well",
 	"barrels": "structures/barrels", "fence": "structures/fence",
+	"granary": "structures/granary", "storehouse": "structures/storehouse",
 }
+# The fields' tile for each FIELD_* state the core gives, in their order; in winter each takes
+# its tag with WINTER after it.
+const FIELD_TAGS := ["sown", "growing", "ripe", "fallow", "burnt"]
+const WINTER := "_winter"
+const WINTER_SEASON := 3
 # The decorations of each village template, which never block or break: ground tiles over
 # rectangles of cells and banners on cells, as offsets from the village's corner.
 const DECORATIONS := "res://world_art/villages.json"
@@ -47,12 +53,17 @@ var _bands: Array[MultiMeshInstance2D] = []
 var _tick_positions: Array[PackedVector2Array] = []
 var _last_positions: Array[PackedVector2Array] = []
 var _army_sprites := PackedInt64Array()
-## The layer of the villages' ground decorations: paving, road and fields.
+## The layer of the villages' ground decorations: paving and road.
 var built: TileMapLayer
+## The layer of the fields, each cell tiled by its field's state and the season.
+var fields: TileMapLayer
 ## One sprite per structure, in the world's order; null for a structure with no art.
 var structure_sprites: Array[Sprite2D] = []
 # Each building's frames by footprint, one per stage in the order of STAGES.
 var _stage_frames := {}
+var _field_sheet := {}
+# The tag each field's cells were last tiled with, by structure.
+var _field_tags := {}
 var _chevron_frames: Array[AtlasTexture] = []
 var _material: ShaderMaterial
 
@@ -96,6 +107,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 			frames.append(_region(sheet, stage, 0))
 		_stage_frames[kind] = frames
 	_lay_decorations()
+	_lay_fields()
 	_lay_structures()
 	_build_body_atlas()
 	var player := _sheet("markers/player_marker")
@@ -121,6 +133,7 @@ func note_tick() -> void:
 ## Updates buildings and bodies within `view`, the part of the world on screen, in pixels.
 func refresh(view: Rect2) -> void:
 	var now := Time.get_ticks_msec()
+	_tile_fields()
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
@@ -310,6 +323,47 @@ func _lay_structures() -> void:
 		sprite.set_meta("frames", frames)
 		_standing.add_child(sprite)
 		structure_sprites[structure] = sprite
+
+
+# Lays the layer the fields are tiled on, one tile of fields.png per cell, under the standing
+# sprites and over the decorations.
+func _lay_fields() -> void:
+	_field_sheet = _sheet("decorations/fields")
+	var tiles := TileSet.new()
+	tiles.tile_size = Vector2i(CELL, CELL)
+	var source := TileSetAtlasSource.new()
+	source.texture = _field_sheet.texture
+	source.texture_region_size = Vector2i(CELL, CELL)
+	for frame in _field_sheet.texture.get_width() / CELL:
+		source.create_tile(Vector2i(frame, 0))
+	tiles.add_source(source)
+	fields = TileMapLayer.new()
+	fields.tile_set = tiles
+	_ground.add_child(fields)
+	_field_tags.clear()
+	_tile_fields()
+
+
+# Tiles every field whose state or season changed since it was last tiled: each cell of its
+# footprint with a variant of its tag by a seeded hash.
+func _tile_fields() -> void:
+	var winter: bool = world.date().season == WINTER_SEASON
+	for structure in world.structure_count():
+		var state := world.structure_field_state(structure)
+		if state < 0:
+			continue
+		var tag: String = FIELD_TAGS[state] + (WINTER if winter else "")
+		if _field_tags.get(structure, "") == tag:
+			continue
+		_field_tags[structure] = tag
+		var tagged: Array = _field_sheet.tags[tag]
+		var corner := world.structure_cell(structure)
+		var footprint := world.structure_footprint(structure)
+		for y in footprint.y:
+			for x in footprint.x:
+				var cell := corner + Vector2i(x, y)
+				var variant: int = tagged[0] + _hash(cell.x, cell.y, 7) % (tagged[1] - tagged[0] + 1)
+				fields.set_cell(cell, 0, Vector2i(variant, 0))
 
 
 # Lays each village's decorations from DECORATIONS by its template: ground tiles on a layer

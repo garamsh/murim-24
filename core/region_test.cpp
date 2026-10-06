@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -903,8 +904,10 @@ TEST(Region, FamiliesReachAThirdGenerationWithinThirtyYears) {
 }
 
 TEST(Region, BirthsStopOnceMaxPeopleLive) {
-  // Everyone free marries and every wife bears a child each day she may.
+  // Everyone free marries and every wife bears a child each day she may,
+  // with no village's economy to cap them.
   RegionData fertile = region_data();
+  fertile.life.husbandry.reset();
   ASSERT_TRUE(fertile.life.kinship.has_value());
   Kinship kinship = fertile.life.kinship.value_or(Kinship{});
   kinship.marriage_chance = PER_MILLE;
@@ -956,6 +959,58 @@ TEST(Region, EveryPersonBearsTheirFamilySurnameAndAGivenName) {
             spelled(lived(region_data(), SEED, 0)));
   EXPECT_NE(spelled(lived(region_data(), SEED, 0)),
             spelled(lived(region_data(), OTHER_SEED, 0)));
+}
+
+// The most people above its cap any village of the region `data` generates
+// from SEED ever held, measured against `capping`'s caps, and the most people
+// its villages together held, over GENERATIONS_YEARS years of one-tick days.
+std::pair<std::int64_t, std::size_t> crowding(const RegionData& data,
+                                              const RegionData& capping) {
+  Region region = generate_region(SEED, data);
+  region.rules.ticks_per_day = 1;
+  World world = world_of(region);
+  const Region capped_region = generate_region(SEED, capping);
+  const World capped = world_of(capped_region);
+  std::int64_t over = std::numeric_limits<std::int64_t>::min();
+  std::size_t most = 0;
+  for (std::uint64_t day = 0; day < GENERATIONS_YEARS * DAYS_PER_YEAR; ++day) {
+    world.tick();
+    std::size_t together = 0;
+    for (std::size_t village = 0; village < region.villages.size(); ++village) {
+      const std::size_t held = world.residents_of(village);
+      together += held;
+      over = std::max(over, static_cast<std::int64_t>(held) -
+                                static_cast<std::int64_t>(capped.cap(village)));
+    }
+    most = std::max(most, together);
+  }
+  return {over, most};
+}
+
+TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
+  // Everyone free marries and every wife may bear a child each day.
+  RegionData fertile = region_data();
+  ASSERT_TRUE(fertile.life.kinship.has_value());
+  Kinship kinship = fertile.life.kinship.value_or(Kinship{});
+  kinship.marriage_chance = PER_MILLE;
+  kinship.birth_chance = PER_MILLE;
+  kinship.birth_spacing = 0;
+  fertile.life.kinship = kinship;
+  const Region region = generate_region(SEED, fertile);
+  const World start = world_of(region);
+  std::size_t caps = 0;
+  for (std::size_t village = 0; village < region.villages.size(); ++village) {
+    caps += start.cap(village);
+  }
+  const auto [over, most] = crowding(fertile, fertile);
+  // No village ever passes its cap, and together they come within a tenth
+  // of their caps.
+  EXPECT_LE(over, 0);
+  EXPECT_GE(most * 10, caps * 9);
+  // Control: without the economy the same villages pass those caps.
+  RegionData unfed = fertile;
+  unfed.life.husbandry.reset();
+  EXPECT_GT(crowding(unfed, fertile).first, 0);
 }
 
 }  // namespace

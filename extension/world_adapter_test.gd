@@ -4,7 +4,8 @@
 # refuses what the core, or the conversion to the core's types, refuses; that
 # a body given orders through the adapter moves and strikes; that a region's
 # villages keep their residents' own skills off their structures; and that a
-# region's people are read back with their names and kin.
+# region's people are read back with their names and kin; and that a region's
+# villages are read back with the cap, stock and population the core derives.
 extends RefCounted
 
 const SEED := 42
@@ -45,6 +46,8 @@ const ORDER_TICKS := 800
 const REGION_SEED := 2026
 const CULT_VILLAGE := 1
 const VILLAGE_TICKS := 600
+# Ticks in a day of the region's calendar.
+const TICKS_PER_DAY := 1800
 const HOME := Vector2i(1, 1)
 const CAMP := Vector2i(12, 7)
 const BESIDE_CAMP := Vector2i(12, 5)
@@ -98,8 +101,33 @@ func run() -> bool:
 	var reads_pass := _reads_pass()
 	var villages_pass := _villages_pass()
 	var kin_pass := _kin_pass()
+	var economy_pass := _economy_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass
+			and reads_pass and villages_pass and kin_pass and economy_pass
+
+
+# Each village of a region starts with people, under its cap, and food in store; a day later its stock has fed every one of them a measure. Control: the stock read
+# changes by exactly the population, so it is not a constant.
+func _economy_pass() -> bool:
+	var region := WorldAdapter.create_region(REGION_SEED)
+	var villages := region.villages()
+	var starts: Array = []
+	var right := villages.size() > 0
+	for village in villages.size():
+		var population := region.village_population(village)
+		right = right and population > 0 and population < region.village_cap(village) \
+				and region.village_stock(village) > 0
+		starts.append([region.village_stock(village), population])
+	for i in TICKS_PER_DAY:
+		region.tick()
+	var fed := true
+	for village in villages.size():
+		fed = fed and region.village_stock(village) == starts[village][0] - starts[village][1]
+	var passed: bool = right and fed
+	print("world_adapter_test: %d villages, first with %d people under a cap of %d and %d food, %d a day later: %s" % [
+		villages.size(), region.village_population(0), region.village_cap(0), starts[0][0],
+		region.village_stock(0), "pass" if passed else "FAIL"])
+	return passed
 
 
 # The player's body in a region has a surname and a given name in Korean and romanised, the family

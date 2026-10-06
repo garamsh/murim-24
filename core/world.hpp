@@ -40,8 +40,8 @@ enum class Sex : std::uint8_t { FEMALE, MALE };
 /// among its sex's names, with `talent` and `attainment` per discipline, and
 /// lives `lifespan` days, extended by its attainment, if it ages at all.
 /// `spouses` are the people it married, in order, and `children` the people
-/// born to it. A person carrying soul `soul` is
-/// born again when it dies.
+/// born to it. It has gone `hunger` days unfed. A person carrying soul `soul`
+/// is born again when it dies.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -54,6 +54,7 @@ struct Person {
   std::size_t given = 0;
   std::vector<std::size_t> spouses;
   std::vector<std::size_t> children;
+  std::uint32_t hunger = 0;
   std::vector<Aptitude> talent;
   std::vector<std::uint32_t> attainment;
   std::optional<std::uint64_t> lifespan;
@@ -120,6 +121,23 @@ struct Kinship {
   bool fathers_family = true;
 };
 
+/// How a village feeds its people, as data, checked once a day. Each person
+/// whose home it is eats `consumption` food a day from its stock; while the
+/// stock cannot feed them all, none eats, and a person unfed for
+/// `hunger_days` days moves, by the seed, to a village within
+/// `migration_reach` cells with room and food, or dies. On the first day of
+/// winter its intact fields add their harvest to its stock, which never
+/// holds more than its storage.
+struct Husbandry {
+  std::uint32_t consumption = 0;
+  std::uint32_t hunger_days = 0;
+  std::int32_t migration_reach = 0;
+};
+
+/// What a field shows: sown in spring, growing in summer, ripe in autumn,
+/// fallow in winter, and burnt whenever it is below its intact stage.
+enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
+
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
 /// age passes its lifespan plus `days_per_attainment` days for every point of
@@ -130,7 +148,8 @@ struct Kinship {
 /// repeat. Without a lifespan no one ages. A soul is born again, and a child
 /// born, with `newborn_health`. The people a world starts with are
 /// `founding_age` days old, or newborn without one. People marry and have
-/// children by `kinship`, if given, and bear `names`.
+/// children by `kinship`, if given, and bear `names`. Villages feed their
+/// people by `husbandry`, if given, which caps how many a village holds.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -141,6 +160,7 @@ struct Life {
   std::optional<Spread> founding_age;
   std::optional<Kinship> kinship;
   Names names;
+  std::optional<Husbandry> husbandry;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -231,6 +251,16 @@ struct Structure {
   Cell cell{};
   std::uint32_t durability = 0;
   Footprint footprint{1, 1};
+  /// Whether its footprint blocks movement; a field does not.
+  bool blocks = true;
+};
+
+/// What a structure gives its village: the people it houses, the food it
+/// stores, and the food it yields each harvest, which makes it a field.
+struct Holding {
+  std::uint32_t housing = 0;
+  std::uint32_t storage = 0;
+  std::uint32_t harvest = 0;
 };
 
 /// A village as a world is created with: its structures by index, and the
@@ -238,6 +268,8 @@ struct Structure {
 struct VillageSpec {
   std::vector<std::size_t> structures;
   std::size_t residents;
+  /// What each of `structures` holds, in their order; none holds nothing.
+  std::vector<Holding> holdings;
 };
 
 /// Where a village stands in its life cycle, derived from its structures,
@@ -438,6 +470,23 @@ class World {
   /// have no living member becomes its residents, and its home.
   [[nodiscard]] std::size_t owner(std::size_t village) const;
 
+  /// Returns how many people village `village` can hold: the least of the
+  /// housing of its structures still standing, the people its intact fields'
+  /// harvests feed for a year, and the people a year's food its standing
+  /// structures store feeds. Without husbandry it is MAX_PEOPLE.
+  [[nodiscard]] std::size_t cap(std::size_t village) const;
+
+  /// Returns the food village `village` holds.
+  [[nodiscard]] std::uint64_t stock(std::size_t village) const;
+
+  /// Returns how many living people make village `village` their home.
+  [[nodiscard]] std::size_t residents_of(std::size_t village) const;
+
+  /// Returns what structure `structure` shows as a field, or nothing when it
+  /// yields no harvest.
+  [[nodiscard]] std::optional<FieldState> field_state(
+      std::size_t structure) const;
+
   /// Gives living person `person` a new soul with no history, so that it is
   /// born again when it dies. Returns the soul. Throws std::invalid_argument
   /// when the person is dead or does not exist.
@@ -494,6 +543,7 @@ class World {
   struct Village {
     VillageSpec spec;
     std::optional<Destroyer> destroyer;
+    std::uint64_t stock = 0;
   };
 
   struct Army {
@@ -522,6 +572,7 @@ class World {
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
                                          std::size_t faction) const;
+  void add_village(VillageSpec spec);
   void settle_duels();
   void bear(Person& person, const Soul& soul);
   [[nodiscard]] std::uint32_t draw(Range range);
@@ -529,6 +580,17 @@ class World {
   void age();
   void found(Person& person);
   void kin(const Kinship& kinship);
+  void husband(const Husbandry& husbandry);
+  [[nodiscard]] Holding held(std::size_t village, Stage worst) const;
+  [[nodiscard]] std::vector<std::size_t> homes() const;
+  /// A person unfed too long, and the army it serves in.
+  struct Unfed {
+    std::size_t person;
+    std::size_t army;
+  };
+  void migrate_or_starve(Unfed unfed, std::int32_t reach,
+                         std::vector<std::size_t>& population);
+  [[nodiscard]] bool may_bear(std::size_t mother, const Kinship& kinship) const;
   [[nodiscard]] bool free_to_marry(std::size_t person,
                                    const Kinship& kinship) const;
   [[nodiscard]] Cell seat(std::size_t village) const;
@@ -542,6 +604,7 @@ class World {
     std::size_t army;
   };
   void rebirth(Passing passing);
+  [[nodiscard]] std::vector<Passing> passings() const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
              const std::vector<Step>& pulls, const std::vector<bool>& standing);
