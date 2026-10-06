@@ -205,8 +205,9 @@ func _villages_pass() -> bool:
 
 # What the view reads: each army's faction and health, its people's health, each structure's
 # footprint, and for a region its terrain, territory and villages, which agree with the map's
-# blocked cells, the person born into the first village and the structures inside the villages. A
-# world made by create() has no region to read, and its structures are one cell.
+# blocked cells, the person born into the first village and the structures inside the villages. The
+# territory is the core's: each village's centre lies in its owner's, and a cell no village claims
+# lies in none. A world made by create() has no region to read, and its structures are one cell.
 func _reads_pass() -> bool:
 	var world := _create(SEED, _armies, RULES)
 	var strength := 0
@@ -228,8 +229,12 @@ func _reads_pass() -> bool:
 	for i in terrain.size() if agrees else 0:
 		var blocked := rows[i / rows[0].length()][i % rows[0].length()] == "#"
 		agrees = agrees and blocked == (names[terrain[i]] in ["water", "mountain"]) \
-				and territory[i] < region.faction_names().size()
+				and territory[i] >= -1 and territory[i] < region.faction_names().size()
 	var villages := region.villages()
+	var claimed := territory.has(-1)
+	for village: Dictionary in villages:
+		var centre: Vector2i = village.corner + village.area / 2
+		claimed = claimed and territory[centre.y * rows[0].length() + centre.x] == village.faction
 	var born_faction := region.army_faction(region.army_count() - 1)
 	var villages_read := villages.size() >= 6 and villages.size() <= 8 \
 			and born_faction == int(villages[0].faction)
@@ -256,11 +261,11 @@ func _reads_pass() -> bool:
 	# Skills come back as create() took them; control: the second army's differ.
 	var skills_read: bool = world.skills(0) == _armies[0].skills and world.skills(1) == _armies[1].skills \
 			and world.skills(0) != world.skills(1)
-	var passed: bool = armies_read and no_region and agrees and villages_read and footprints_read \
-			and kinds_read and skills_read
-	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, %d villages, person's faction %d, first village's %d; created footprint %s, region footprints %s, %d of %d structures inside a village: %s" % [
+	var passed: bool = armies_read and no_region and agrees and claimed and villages_read \
+			and footprints_read and kinds_read and skills_read
+	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, each village's centre in its owner's territory and some cell in none %s, %d villages, person's faction %d, first village's %d; created footprint %s, region footprints %s, %d of %d structures inside a village: %s" % [
 		world.army_faction(0), world.army_faction(1), world.army_strength(0), world.army_strength(1),
-		strength, no_region, cells, names, agrees, villages.size(), born_faction,
+		strength, no_region, cells, names, agrees, claimed, villages.size(), born_faction,
 		int(villages[0].faction) if villages.size() > 0 else -1, world.structure_footprint(0),
 		footprints.keys(), inside, region.structure_count(), "pass" if passed else "FAIL"])
 	print("world_adapter_test: structure kinds: created %s, M1 %s, region %s, first village %s; skills read back %s: %s" % [

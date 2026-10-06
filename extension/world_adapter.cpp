@@ -169,6 +169,34 @@ godot::PackedInt64Array indices(const std::vector<std::size_t>& people) {
   return result;
 }
 
+// Returns the name of the template among `data`'s villages that the growth
+// lays out for a founded village: its area the settlement's, and each of its
+// buildings a placement's offset and plan's kind, in order. Empty when none
+// is, or without growth.
+std::string settlement_of(const murim::RegionData& data) {
+  const std::optional<murim::Growth>& growth = data.life.growth;
+  if (!growth) {
+    return {};
+  }
+  const auto laid_out = [&growth](const murim::VillageTemplate& village) {
+    const std::vector<murim::Building>& buildings = village.buildings;
+    return village.area.width == growth->settlement.width &&
+           village.area.height == growth->settlement.height &&
+           std::equal(
+               buildings.begin(), buildings.end(), growth->layout.begin(),
+               growth->layout.end(),
+               [&growth](const murim::Building& building,
+                         const murim::Placement& placement) {
+                 return building.structure.cell.x == placement.offset.x &&
+                        building.structure.cell.y == placement.offset.y &&
+                        building.kind == growth->plans.at(placement.plan).kind;
+               });
+  };
+  const auto found =
+      std::find_if(data.villages.begin(), data.villages.end(), laid_out);
+  return found == data.villages.end() ? std::string() : found->name;
+}
+
 }  // namespace
 
 godot::Ref<WorldAdapter> WorldAdapter::create(
@@ -230,8 +258,8 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
   adapter->world().ensoul(adapter->world().population() - 1);
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
+  adapter->settlement_ = settlement_of(adapter->region_data_);
   adapter->terrain_ = std::move(region.terrain);
-  adapter->territory_ = std::move(region.territory);
   adapter->villages_ = std::move(region.villages);
   return adapter;
 }
@@ -496,23 +524,47 @@ godot::PackedStringArray WorldAdapter::faction_names() const {
 
 godot::PackedInt64Array WorldAdapter::territory() const {
   godot::PackedInt64Array owners;
-  for (const std::size_t owner : territory_) {
-    owners.push_back(static_cast<std::int64_t>(owner));
+  if (!terrain_.empty()) {
+    for (const std::optional<std::size_t> owner : world().territory()) {
+      owners.push_back(owner ? static_cast<std::int64_t>(*owner) : -1);
+    }
   }
   return owners;
 }
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   godot::TypedArray<godot::Dictionary> villages;
-  for (const murim::Village& village : villages_) {
+  const auto add = [this, &villages](
+                       const std::string& name, const std::string& kind,
+                       murim::Cell corner, murim::Footprint area) {
+    const auto index = static_cast<std::size_t>(villages.size());
     godot::Dictionary fields;
-    fields.set("name", godot::String(village.name.c_str()));
-    fields.set("kind", godot::String(village.kind.c_str()));
-    fields.set("faction", static_cast<std::int64_t>(village.faction));
-    fields.set("corner", godot::Vector2i{village.corner.x, village.corner.y});
-    fields.set("area",
-               godot::Vector2i{village.area.width, village.area.height});
+    fields.set("name", godot::String(name.c_str()));
+    fields.set("kind", godot::String(kind.c_str()));
+    fields.set("faction", static_cast<std::int64_t>(world().owner(index)));
+    fields.set("corner", godot::Vector2i{corner.x, corner.y});
+    fields.set("area", godot::Vector2i{area.width, area.height});
     villages.push_back(fields);
+  };
+  for (const murim::Village& village : villages_) {
+    add(village.name, village.kind, village.corner, village.area);
+  }
+  // Those founded since, in the order they were founded, each at the corner
+  // its first placement's structure gives and named as the region numbers
+  // its own.
+  const std::optional<murim::Growth>& growth = region_data_.life.growth;
+  if (!growth || growth->layout.empty() || settlement_.empty()) {
+    return villages;
+  }
+  const murim::Placement& first = growth->layout.front();
+  for (std::size_t structure = 0; structure < world().structure_count();
+       ++structure) {
+    if (world().plan_of(structure) == first.plan) {
+      const murim::Cell cell = world().structure(structure).cell;
+      add(settlement_ + " " + std::to_string(villages.size() + 1), settlement_,
+          murim::Cell{cell.x - first.offset.x, cell.y - first.offset.y},
+          growth->settlement);
+    }
   }
   return villages;
 }

@@ -232,16 +232,16 @@ class WorldAdapter : public godot::RefCounted {
   /// made by create_region().
   [[nodiscard]] godot::PackedStringArray faction_names() const;
 
-  /// Returns the faction owning each cell, row by row; empty unless the
-  /// world was made by create_region().
+  /// Returns the faction whose territory each cell lies in, row by row, as
+  /// the core derives it now, or -1 for a cell no village holds; empty unless
+  /// the world was made by create_region().
   [[nodiscard]] godot::PackedInt64Array territory() const;
 
   /// Returns each village as a Dictionary of `name`, `kind` (its template's
-  /// name), `faction` (int),
-  /// `corner` (Vector2i) and `area` (Vector2i, its width and height in
-  /// cells); empty unless the world was made
-  /// by create_region(). It lists the region's villages, not those founded
-  /// as the world runs.
+  /// name), `faction` (int, its owner now), `corner` (Vector2i) and `area`
+  /// (Vector2i, its width and height in cells): the region's, then those
+  /// founded as the world runs, laid out from the template the growth's
+  /// settlement follows; empty unless the world was made by create_region().
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
 
  protected:
@@ -260,8 +260,9 @@ class WorldAdapter : public godot::RefCounted {
   // What create_region() keeps of the region for display; empty otherwise.
   murim::RegionData region_data_;
   std::vector<std::size_t> terrain_;
-  std::vector<std::size_t> territory_;
   std::vector<murim::Village> villages_;
+  // The template a founded village is laid out from, by name.
+  std::string settlement_;
 
   // Returns an adapter over a world created from these arguments, as the
   // core's constructor takes them.
