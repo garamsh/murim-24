@@ -14,11 +14,12 @@ namespace murim {
 /// Cells along each side of a generated region.
 constexpr std::int32_t REGION_SIDE = 128;
 
-/// A kind of ground: its name, whether bodies may stand on it, and how often
-/// generation picks it relative to the other kinds.
+/// A kind of ground: its name, what it bears, buildings and bodies, bodies
+/// only or neither, and how often generation picks it relative to the other
+/// kinds.
 struct TerrainKind {
   std::string name;
-  bool passable;
+  Footing footing;
   std::int32_t weight;
 };
 
@@ -116,7 +117,7 @@ struct Region {
 [[nodiscard]] RegionData region_data();
 
 /// Generates a region from `seed` and `data`: terrain and territories, and six
-/// to eight villages owned in turn by each faction, each on passable cells in
+/// to eight villages owned in turn by each faction, each on buildable cells in
 /// its owner's territory and overlapping no other. The same seed and data give
 /// the same region. Throws std::invalid_argument when a table is empty, the
 /// terrain weights are not positive, a faction has no skills, a village
