@@ -18,6 +18,7 @@
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -137,13 +138,36 @@ murim::Rules rules(const godot::Dictionary& fields) {
       stage_floors(array(fields, "stage_floors"))};
 }
 
+bool boolean(const godot::Dictionary& fields, const char* key) {
+  return field(fields, key, godot::Variant::BOOL);
+}
+
+// A faction's leadership: `leader` (int) and `duel` (Dictionary of
+// `members_only`, `yield_health` and `allies_turn_hostile`), each left out
+// when the faction has none.
+murim::Leadership leadership(const godot::Dictionary& fields) {
+  murim::Leadership led;
+  if (fields.has("leader")) {
+    led.leader = integer<std::size_t>(fields, "leader");
+  }
+  if (fields.has("duel")) {
+    const godot::Dictionary duel =
+        field(fields, "duel", godot::Variant::DICTIONARY);
+    led.succession = murim::Duel{boolean(duel, "members_only"),
+                                 integer<std::uint64_t>(duel, "yield_health"),
+                                 boolean(duel, "allies_turn_hostile")};
+  }
+  return led;
+}
+
 }  // namespace
 
 godot::Ref<WorldAdapter> WorldAdapter::create(
     std::int64_t seed, const godot::PackedStringArray& map_rows,
     const godot::TypedArray<godot::Dictionary>& armies,
     const godot::TypedArray<godot::Dictionary>& structures,
-    const godot::Dictionary& rules) {
+    const godot::Dictionary& rules,
+    const godot::TypedArray<godot::Dictionary>& leaderships) {
   // The one handler for the core's refusal: it must not cross into Godot.
   try {
     std::vector<std::string> rows;
@@ -152,7 +176,7 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
     }
     return over(murim::Seed{static_cast<std::uint64_t>(seed)}, std::move(rows),
                 each(armies, army_spec), each(structures, structure),
-                murim_godot::rules(rules));
+                murim_godot::rules(rules), each(leaderships, leadership));
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.create: ", error.what());
     return {};
@@ -168,14 +192,29 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   return adapter;
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
-  murim::Region region = murim::generate_region(
-      murim::Seed{static_cast<std::uint64_t>(seed)}, murim::region_data());
-  region.armies.push_back(murim::born_in(region, 0));
+godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed,
+                                                     std::int64_t village) {
+  // The one handler for a village the region lacks: it must not cross into
+  // Godot.
+  try {
+    return born_into(murim::Seed{static_cast<std::uint64_t>(seed)},
+                     narrow<std::size_t>(village, "village"));
+  } catch (const std::logic_error& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
+                                        error.what());
+    return {};
+  }
+}
+
+godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
+                                                 std::size_t village) {
+  murim::Region region = murim::generate_region(seed, murim::region_data());
+  region.armies.push_back(murim::born_in(region, village));
   std::vector<std::string> kinds = std::move(region.structure_kinds);
   godot::Ref<WorldAdapter> adapter =
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
-           std::move(region.structures), std::move(region.rules));
+           std::move(region.structures), std::move(region.rules),
+           std::move(region.leadership));
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
   adapter->terrain_ = std::move(region.terrain);
@@ -192,7 +231,8 @@ godot::Vector2i WorldAdapter::m1_centre() {
 godot::Ref<WorldAdapter> WorldAdapter::over(
     murim::Seed seed, std::vector<std::string> map_rows,
     std::vector<murim::ArmySpec> armies,
-    std::vector<murim::Structure> structures, murim::Rules rules) {
+    std::vector<murim::Structure> structures, murim::Rules rules,
+    std::vector<murim::Leadership> leadership) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
   for (const murim::ArmySpec& army : armies) {
@@ -206,8 +246,11 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     adapter->strengths_.push_back(health);
   }
   adapter->structure_count_ = structures.size();
+  adapter->faction_count_ = rules.hostile.size();
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
-                          std::move(structures), std::move(rules));
+                          std::move(structures), std::move(rules),
+                          std::vector<murim::VillageSpec>{},
+                          std::move(leadership));
   adapter->map_rows_ = std::move(map_rows);
   return adapter;
 }
@@ -229,6 +272,20 @@ std::size_t WorldAdapter::army_index(std::int64_t army) const {
   return static_cast<std::size_t>(army);
 }
 
+std::size_t WorldAdapter::faction_index(std::int64_t faction) const {
+  CRASH_COND_MSG(
+      faction < 0 || static_cast<std::uint64_t>(faction) >= faction_count_,
+      "faction index out of range");
+  return static_cast<std::size_t>(faction);
+}
+
+std::size_t WorldAdapter::person_index(std::int64_t person) const {
+  CRASH_COND_MSG(
+      person < 0 || static_cast<std::uint64_t>(person) >= world().population(),
+      "person index out of range");
+  return static_cast<std::size_t>(person);
+}
+
 std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
   CRASH_COND_MSG(structure < 0 ||
                      static_cast<std::uint64_t>(structure) >= structure_count_,
@@ -237,7 +294,8 @@ std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
 }
 
 bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
-                         const godot::PackedInt64Array& skills) {
+                         const godot::PackedInt64Array& skills,
+                         std::int64_t challenge) {
   // The one handler for the core's refusal: it must not cross into Godot.
   try {
     const godot::Variant cell = objective;
@@ -245,11 +303,16 @@ bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
     for (const std::int64_t skill : skills) {
       chosen.push_back(narrow<std::size_t>(skill, "skill"));
     }
+    std::optional<std::size_t> challenged;
+    if (challenge >= 0) {
+      challenged = narrow<std::size_t>(challenge, "challenge");
+    }
     world().order(
         narrow<std::size_t>(army, "army"),
         murim::Order{murim::Cell{narrow<std::int32_t>(cell.get("x"), "x"),
                                  narrow<std::int32_t>(cell.get("y"), "y")},
-                     std::move(chosen)});
+                     std::move(chosen)},
+        challenged);
     return true;
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.order: ", error.what());
@@ -400,23 +463,89 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   return villages;
 }
 
+std::int64_t WorldAdapter::faction_count() const {
+  return static_cast<std::int64_t>(faction_count_);
+}
+
+std::int64_t WorldAdapter::leader(std::int64_t faction) const {
+  const std::optional<std::size_t> person =
+      world().leader(faction_index(faction));
+  return person ? static_cast<std::int64_t>(*person) : -1;
+}
+
+std::int64_t WorldAdapter::challenge_refusal(std::int64_t army,
+                                             std::int64_t faction) const {
+  return static_cast<std::int64_t>(
+      world().challenge_refusal(army_index(army), faction_index(faction)));
+}
+
+godot::Dictionary WorldAdapter::duel(std::int64_t faction) const {
+  godot::Dictionary fields;
+  const std::optional<murim::Duellists> fought =
+      world().duel(faction_index(faction));
+  if (fought) {
+    fields.set("challenger", static_cast<std::int64_t>(fought->challenger));
+    fields.set("leader", static_cast<std::int64_t>(fought->leader));
+  }
+  return fields;
+}
+
+bool WorldAdapter::hostile(std::int64_t from, std::int64_t target) const {
+  return world().hostile(faction_index(from), faction_index(target));
+}
+
+godot::PackedInt64Array WorldAdapter::roster(std::int64_t army) const {
+  godot::PackedInt64Array members;
+  for (const std::size_t member : world().roster(army_index(army))) {
+    members.push_back(static_cast<std::int64_t>(member));
+  }
+  return members;
+}
+
+godot::Vector2 WorldAdapter::person_position(std::int64_t person) const {
+  const murim::Position position =
+      world().person(person_index(person)).position;
+  return {static_cast<float>(position.x), static_cast<float>(position.y)};
+}
+
+std::int64_t WorldAdapter::person_health(std::int64_t person) const {
+  return static_cast<std::int64_t>(world().person(person_index(person)).health);
+}
+
 void WorldAdapter::_bind_methods() {
   const godot::StringName& name = WorldAdapter::get_class_static();
   godot::ClassDB::bind_static_method(
       name,
       godot::D_METHOD("create", "seed", "map_rows", "armies", "structures",
-                      "rules"),
-      &WorldAdapter::create);
+                      "rules", "leadership"),
+      &WorldAdapter::create, DEFVAL(godot::TypedArray<godot::Dictionary>()));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
-  godot::ClassDB::bind_static_method(name,
-                                     godot::D_METHOD("create_region", "seed"),
-                                     &WorldAdapter::create_region);
+  godot::ClassDB::bind_static_method(
+      name, godot::D_METHOD("create_region", "seed", "village"),
+      &WorldAdapter::create_region, DEFVAL(0));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
   godot::ClassDB::bind_method(
-      godot::D_METHOD("order", "army", "objective", "skills"),
-      &WorldAdapter::order);
+      godot::D_METHOD("order", "army", "objective", "skills", "challenge"),
+      &WorldAdapter::order, DEFVAL(-1));
+  godot::ClassDB::bind_method(godot::D_METHOD("faction_count"),
+                              &WorldAdapter::faction_count);
+  godot::ClassDB::bind_method(godot::D_METHOD("leader", "faction"),
+                              &WorldAdapter::leader);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("challenge_refusal", "army", "faction"),
+      &WorldAdapter::challenge_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("duel", "faction"),
+                              &WorldAdapter::duel);
+  godot::ClassDB::bind_method(godot::D_METHOD("hostile", "from", "target"),
+                              &WorldAdapter::hostile);
+  godot::ClassDB::bind_method(godot::D_METHOD("roster", "army"),
+                              &WorldAdapter::roster);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_position", "person"),
+                              &WorldAdapter::person_position);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_health", "person"),
+                              &WorldAdapter::person_health);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);
@@ -468,6 +597,21 @@ void WorldAdapter::_bind_methods() {
       name, "", "STAGE_DESTROYED", static_cast<int>(murim::Stage::DESTROYED));
   godot::ClassDB::bind_integer_constant(name, "", "STAGE_RUBBLE",
                                         static_cast<int>(murim::Stage::RUBBLE));
+  const std::array<std::pair<const char*, murim::ChallengeRefusal>, 7> refusals{
+      {
+          {"CHALLENGE_NONE", murim::ChallengeRefusal::NONE},
+          {"CHALLENGE_NO_SUCCESSION", murim::ChallengeRefusal::NO_SUCCESSION},
+          {"CHALLENGE_NO_LEADER", murim::ChallengeRefusal::NO_LEADER},
+          {"CHALLENGE_NO_CHALLENGER", murim::ChallengeRefusal::NO_CHALLENGER},
+          {"CHALLENGE_NOT_A_MEMBER", murim::ChallengeRefusal::NOT_A_MEMBER},
+          {"CHALLENGE_IS_LEADER", murim::ChallengeRefusal::IS_LEADER},
+          {"CHALLENGE_DUEL_IN_PROGRESS",
+           murim::ChallengeRefusal::DUEL_IN_PROGRESS},
+      }};
+  for (const auto& [constant, refusal] : refusals) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
 }
 
 }  // namespace murim_godot
