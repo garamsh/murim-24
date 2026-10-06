@@ -1,114 +1,114 @@
-# 게임 컨셉
+# Game Concept
 
-이 문서는 사용자와 합의한 게임 컨셉의 단일 기준 문서다. 원본 메모(`.local/concept.md`, 로컬 전용·미커밋)를 대체한다.
+This document is the single reference for the game concept agreed with the user. It replaces the original notes (`.local/concept.md`, local only and not committed).
 
 ## Contents
-- 상태 표기
-- 정체성 [합의]
-- 세력과 권력 획득 규칙 [합의]
-- 명성과 소문 [합의]
-- 마을 생애 주기 [합의]
-- 재능 [확정]
-- 윤회 [확정]
-- 수명 [확정]
-- 무공 [초안]
-- MVP 범위 [제안]
-- 미결 사항 [미결]
+- Status tags
+- Identity [agreed]
+- Factions and the rules for gaining power [agreed]
+- Reputation and rumors [agreed]
+- Village life cycle [agreed]
+- Talent [settled]
+- Reincarnation [settled]
+- Lifespan [settled]
+- Martial arts [draft]
+- MVP scope [proposed]
+- Open questions [open]
 
-## 상태 표기
+## Status tags
 
-각 항목에는 다음 상태 중 하나가 붙는다.
+Each section carries one of the following statuses.
 
-- **[확정]** 합의되어 확정된 내용.
-- **[합의]** 방향은 합의되었으나 세부는 바뀔 수 있는 내용.
-- **[초안]** 초안 단계의 내용.
-- **[제안]** 제안 단계이며 아직 확정되지 않은 내용.
-- **[후보]** 포함 여부가 미확정인 후보.
-- **[미결]** 아직 결정하지 않은 사항. 이 문서에서 결정하지 않는다.
+- **[settled]** Agreed and final.
+- **[agreed]** The direction is agreed, but the details may change.
+- **[draft]** At the draft stage.
+- **[proposed]** At the proposal stage and not yet final.
+- **[candidate]** A candidate whose inclusion is not yet decided.
+- **[open]** Not yet decided. This document does not decide it.
 
-## 정체성 [합의]
+## Identity [agreed]
 
-- **한 줄 소개**: "살아 움직이는 강호에 떨어진 한 생명. 죽으면 같은 세계의 다른 누군가로 다시 태어난다."
-- **세 기둥**
-  1. **살아있는 강호**: 플레이어 없이도 세력·마을이 변하는 시뮬레이션.
-  2. **한 생의 무협 서사**: 출신에 따라 시작점과 길이 다르다.
-  3. **윤회**: 세계는 리셋되지 않는다.
-- **원칙: 플레이어도 세계의 NPC 중 하나.** 플레이어 전용 규칙을 두지 않고, NPC와 같은 규칙(재능·수명 등)을 적용한다.
-- **장르·엔진**: 2D RPG, Godot 4.7.
-- **제목**: "Murim24"는 개발용 가칭이다. 24에는 의미가 없으며, 정식 제목은 MVP 이후 결정한다.
+- **One-line pitch**: "A single life dropped into a living gangho (the martial world of wuxia fiction). When it dies, it is reborn as someone else in the same world."
+- **Three pillars**
+  1. **A living gangho**: a simulation in which factions and villages change even without the player.
+  2. **A wuxia story of one life**: the starting point and the path differ by origin.
+  3. **Reincarnation**: the world is never reset.
+- **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on).
+- **Genre and engine**: 2D RPG, Godot 4.7.
+- **Title**: "Murim24" is a working title for development. The 24 has no meaning, and the official title is decided after the MVP.
 
-## 세력과 권력 획득 규칙 [합의]
+## Factions and the rules for gaining power [agreed]
 
-| 세력 | 가치관 | 수장이 되는 방법 | 가입 조건 |
+| Faction | Values | How to become its leader | Joining requirement |
 |---|---|---|---|
-| 마교 | 약육강식 | 교주에게 도전해 결투로 승리. 교주의 우호 세력은 적이 됨 | 마교도 신분이어야 도전 가능 |
-| 정파(무림맹) | 명분·협의 | 문파 장로 우호도를 모아 선거로 선출. 힘으로 차지 불가 | 문파 입문, 악명 일정 이하 |
-| 사파 | 이익 | 금전·매수·암살·뒷거래 | 돈이나 쓸모 증명 |
+| Demonic Cult (Magyo) | The strong prey on the weak | Challenge the Cult Leader and win the duel. The Cult Leader's allied factions become enemies | Only a member of the Cult may challenge |
+| Orthodox faction (Jeongpa; the Murim Alliance, Murimmaeng) | Righteousness and chivalry | Win an election by gathering the favor of sect elders. Cannot be taken by force | Enter a sect; infamy below a set threshold |
+| Unorthodox faction (Sapa) | Profit | Money, bribery, assassination, and backroom deals | Money, or proof of usefulness |
 
-- **[후보]** 세가(혈통·혼인 계승)와 관부는 후보로만 기재한다. MVP에 포함하지 않으며 미확정이다.
+- **[candidate]** The martial clans (Sega; succession by bloodline and marriage) and the government (Gwanbu) are listed as candidates only. They are not in the MVP and are not decided.
 
-## 명성과 소문 [합의]
+## Reputation and rumors [agreed]
 
-- 호감도는 2층으로 구성된다.
-  - 마을·NPC 개인 호감도
-  - 세력 명성
-- 행동은 소문이 되어 시간차를 두고 전파된다.
-- 행적에 따라 별호가 자동 생성된다.
+- Favor has two layers.
+  - Personal favor with a village or an individual NPC
+  - Reputation with a faction
+- Actions become rumors and spread with a time delay.
+- An epithet (byeolho) is generated automatically from one's deeds.
 
-## 마을 생애 주기 [합의]
+## Village life cycle [agreed]
 
-번영 → 피습 → 폐허 → (생존자 귀환 / 타 세력 이주) → 재건 → 번영
+Prosperity → Raided → Ruins → (survivors return / another faction moves in) → Rebuilt → Prosperity
 
-- 재건 주체에 따라 소속 세력이 바뀔 수 있다.
-- 파괴자에 대한 기억은 재건 후에도 남는다.
+- The faction a village belongs to can change depending on who rebuilds it.
+- The memory of who destroyed it remains after it is rebuilt.
 
-## 재능 [확정]
+## Talent [settled]
 
-- 모든 생명은 출생 시 재능을 무작위로 받는다.
-- 재능은 현재 능력치가 아니라 **잠재력**(성장 속도·한계)이다.
-- 축 예시: 근골, 오성, 내공 친화, 계열 적성(검·도·권·암기·의술 등), 희귀 특이체질.
-- **재능은 숨겨져 있다.** 수련 체감, 관상·진맥 같은 능력, 고수의 평가로 드러난다.
-- 재능은 출신 환경(집안·세력의 자원)과 곱해져 의미를 가진다.
+- Every living being receives talent at random at birth.
+- Talent is not current ability but **potential** (growth rate and limit).
+- Example axes: physique, comprehension, inner energy affinity, aptitude for a discipline (sword, saber, fist, hidden weapons, medicine, and so on), rare special constitutions.
+- **Talent is hidden.** It is revealed through how training feels, through abilities such as reading faces and taking the pulse, and through the assessment of masters.
+- Talent takes on meaning multiplied by the circumstances of one's origin (the resources of one's family and faction).
 
-## 윤회 [확정]
+## Reincarnation [settled]
 
-- 사망 시 같은 세계에서 무작위 세력·집안으로 환생한다.
-- 전생의 행적은 세계에 남는다(전설·악명·숨겨둔 비급 등).
-- **메타 성장 = 재능 분포의 확장.** 확정 강화가 아니다. 최초 플레이어도 운이 좋으면 천재로 태어날 수 있다.
-- 확장 방식
-  - **계열 확장 중심**: 전생에 익힌 계열의 적성이 다음 생에 잘 나온다.
-  - **상한 확장 소량**: 윤회를 거듭해야 열리는 희귀 영역.
-  - 하한 상승은 쓰지 않거나 최소화한다.
-- 파워 크립 대응
-  - 세계도 함께 흐른다.
-  - 확장 폭은 윤회가 거듭될수록 줄어든다.
+- On death, one is reborn in the same world into a random faction and family.
+- The deeds of a past life remain in the world (legends, infamy, hidden secret manuals, and so on).
+- **Meta progression = widening the talent distribution.** It is not a guaranteed power-up. Even a first-time player can be born a genius with luck.
+- How it widens
+  - **Mainly by discipline**: aptitude for the disciplines learned in a past life comes up more readily in the next life.
+  - **A small widening of the upper bound**: rare ranges that open only after repeated reincarnation.
+  - Raising the lower bound is not used, or is kept to a minimum.
+- Countering power creep
+  - The world moves on as well.
+  - The amount of widening shrinks as reincarnations repeat.
 
-## 수명 [확정]
+## Lifespan [settled]
 
-- 수명 제한이 있다.
-- **수명은 캐릭터마다 다르다.** 재능처럼 출생 시 결정된다.
-- 무공 경지에 따라 수명이 늘어나며, 극한에 이르면 **영생도 가능**하다.
-- NPC도 같은 규칙을 따른다. 오래 산 노고수가 세계에 존재할 수 있다.
+- Lifespan is limited.
+- **Lifespan differs from character to character.** Like talent, it is decided at birth.
+- Lifespan grows with one's level of martial attainment, and at the extreme **immortality is possible**.
+- NPCs follow the same rules. Old masters who have lived a long time can exist in the world.
 
-## 무공 [초안]
+## Martial arts [draft]
 
-- **내공**: 자원.
-- **초식**: 스킬.
-- **경공**: 이동.
-- **깨달음**: 레벨업을 대체한다.
-- 비급은 세계에 실재하는 아이템이며, 문파 멸문 시 흩어지거나 소실된다.
+- **Inner energy (naegong)**: a resource.
+- **Techniques (choesik)**: skills.
+- **Lightness skill (gyeonggong)**: movement.
+- **Enlightenment**: replaces leveling up.
+- Secret manuals are items that actually exist in the world, and they are scattered or lost when a sect is wiped out.
 
-## MVP 범위 [제안]
+## MVP scope [proposed]
 
-- **규모**: 1개 지역, 정·마·사 3세력, 마을 6~8개.
-- **흐름**: 세계 생성 → 이동·전투 → 마을 파괴·재건 루프 1회 → 마교 결투 계승 → 사망·환생.
+- **Scale**: one region, three factions (Orthodox, Demonic, Unorthodox), six to eight villages.
+- **Flow**: world generation → travel and combat → one loop of a village being destroyed and rebuilt → succession by duel in the Demonic Cult → death and rebirth.
 
-## 미결 사항 [미결]
+## Open questions [open]
 
-아래 항목은 아직 결정하지 않았다.
+The items below are not yet decided.
 
-- 시점·전투 방식(추천: 탑다운 실시간), 아트 방향(픽셀아트 여부).
-- 영생 달성 이후의 처리(예: 등선으로 윤회를 끝내는 엔딩 vs 세계 잔류).
-- 수명 단축 요인(마공 부작용·주화입마·독 등) 포함 여부.
-- 세가·관부 세력 포함 여부.
-- 시뮬레이션/표현 분리, 거리 기반 시뮬레이션 LOD: 아키텍처 방향으로 사용자 승인 대기.
+- Camera perspective and combat style (recommended: top-down real-time), art direction (whether to use pixel art).
+- What happens after immortality is reached (for example, an ending in which ascension (deungseon) ends the cycle of reincarnation, versus remaining in the world).
+- Whether to include factors that shorten lifespan (side effects of demonic martial arts, qi deviation, poison, and so on).
+- Whether to include the martial clan and government factions.
+- Separating simulation from presentation, and distance-based simulation LOD: awaiting the user's approval as an architectural direction.
