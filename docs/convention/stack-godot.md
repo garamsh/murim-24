@@ -82,4 +82,5 @@ What Godot 4.7's "Exporting for Android" (`tutorials/export/exporting_for_androi
 - Install the SDK packages with `sdkmanager --sdk_root=<android_sdk_path>` and the package names above, after accepting their licences with `sdkmanager --licenses`.
 - In Editor Settings, `export/android/java_sdk_path` is the JDK and `export/android/android_sdk_path` the SDK. `make android` reads the SDK from `ANDROID_HOME`, by default `~/Library/Android/sdk`, and builds with the NDK at `ndk/28.1.13356709` under it.
 - The `Android` preset exports arm64-v8a only, from the prebuilt template without Gradle, signed with the editor's debug keystore. Its `command_line/extra_args` runs `world_view/frame_bench.gd` at launch.
+- `project.godot` sets `rendering/textures/vram_compression/import_etc2_astc`, without which Godot refuses an Android export.
 - A release export needs a release keystore, which is never committed.
