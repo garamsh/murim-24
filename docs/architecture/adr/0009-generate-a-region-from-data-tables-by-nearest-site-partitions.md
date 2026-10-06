@@ -1,6 +1,6 @@
 # ADR 0009: Generate a region from data tables by nearest-site partitions
 
-> Status: accepted
+> Status: accepted; its villages on free passable cells superseded by ADR-0024, which places them on free buildable cells
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
