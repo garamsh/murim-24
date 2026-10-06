@@ -57,6 +57,15 @@ std::int64_t distance_squared(Position origin, Position point) {
 // The range a separation, range or radius must lie in.
 bool reachable(std::int32_t units) { return units >= 0 && units <= MAX_REACH; }
 
+std::vector<Position> centres_of(const std::vector<Structure>& structures) {
+  std::vector<Position> centres;
+  centres.reserve(structures.size());
+  for (const Structure& structure : structures) {
+    centres.push_back(centre_of(structure.cell));
+  }
+  return centres;
+}
+
 std::int32_t sign(std::int64_t value) {
   return static_cast<std::int32_t>(value > 0) -
          static_cast<std::int32_t>(value < 0);
@@ -165,7 +174,8 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     : rng_state_(static_cast<std::uint64_t>(seed)),
       map_(std::move(map)),
       rules_(std::move(rules)),
-      structures_(std::move(structures)) {
+      structures_(std::move(structures)),
+      structure_index_(centres_of(structures_)) {
   const std::size_t factions = rules_.hostile.size();
   const auto ragged = [factions](const std::vector<bool>& row) {
     return row.size() != factions;
@@ -373,12 +383,11 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
     }
   }
   const std::uint64_t broken = std::uint64_t{skill.structure_damage} * force;
-  const std::int64_t radius_squared = std::int64_t{skill.radius} * skill.radius;
-  for (Structure& structure : structures_) {
-    if (distance_squared(centre, centre_of(structure.cell)) <= radius_squared) {
-      structure.durability -= static_cast<std::uint32_t>(
-          std::min<std::uint64_t>(broken, structure.durability));
-    }
+  for (const std::size_t index :
+       structure_index_.within(centre, skill.radius)) {
+    Structure& structure = structures_.at(index);
+    structure.durability -= static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(broken, structure.durability));
   }
 }
 

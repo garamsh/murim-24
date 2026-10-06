@@ -20,7 +20,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - a body struck takes it once for each of its agents the disc covers, at one agent per separation square, so a battle has the same winner near the focus and far from it
   - damage lands after every body has struck
 - Damage folds into count and strength, which is all of an agent's state that a collapse keeps. Strength falls by the damage and count in proportion; a cooldown merges to the latest. Dead bodies leave when the army regroups.
-- A structure is a cell and a durability. Its stage — intact, damaged, destroyed or rubble — follows from durability by the floors in the rules.
+- A structure is a cell and a durability, found by area through a spatial hash of its own. Its stage — intact, damaged, destroyed or rubble — follows from durability by the floors in the rules.
 - All simulation state is integers: positions are fixed-point at 1/256 of a cell.
 - A world exposes a hash of its whole state. Determinism is tested by comparing hashes: the same seed gives the same hash after 10,000 ticks with armies moving, crossing tiers, fighting and breaking structures. A test pins that hash, so it must be the same on every compiler and platform.
 - The core is built, tested, linted and formatted with the toolchain ADR 0003 chose.

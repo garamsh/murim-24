@@ -155,6 +155,7 @@ class World {
   Position focus_{0, 0};
   std::vector<Army> armies_;
   std::vector<Structure> structures_;
+  SpatialHash structure_index_;
 };
 
 }  // namespace murim
