@@ -97,13 +97,14 @@ One tile set covers the terrain kinds the region generator defines (`core/region
 | Kind | Passable | Look |
 |---|---|---|
 | Plain | yes | Grass in three tones with tufts and a rare flower |
-| Forest | yes | Canopy from above: leaf lumps lit from the upper left over a dark understorey |
-| Hills | yes | Wavy terraced ridges, two to a tile, lit on the upper edge and shaded below |
+| Forest | yes | Separate tree crowns from above, lit from the upper left with a dark rim, the dark understorey and the odd trunk showing between them |
+| Hills | yes | Rough grass with one or two low mounds, lit from the upper left, a contour on the lower side and a short shadow |
 | Water | no | Deep and shallow blue with short light ripples; no grass anywhere |
-| Mountain | no | Bare rock: a lit crest, a creased shaded face, scree at the foot |
+| Mountain | no | One or two crags on dark scree: a lit west face, a shaded east face with a gully, a pale summit, a shadowed foot |
 
 - A tile carries no outline, so tiles of one kind join into one surface.
-- Every variant of a kind meets every other without a seam: each is drawn from noise and shapes that repeat every 16 pixels, and hills and mountain ridges cross the tile edge at the same height in every variant.
+- Every variant of a kind meets every other without a seam. Near the tile's edge every variant has the same fine ground texture, repeating every 16 pixels; the variants differ only in the middle.
+- Features (crowns, mounds, crags) stay inside their tile, and the variants place them differently. No line runs from one tile edge to the next, so a stretch of one kind does not tile into bands. The contact sheet shows each kind tiled over 12 x 6 cells, with each cell's variant picked by a seeded hash.
 - Water and mountain, the two impassable kinds, carry no green, so passability reads from colour family alone.
 - Where two kinds meet, the cell edge shows. Transition tiles are not drawn yet; the mockup's ragged river bank is the look they are to give.
 
