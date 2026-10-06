@@ -564,6 +564,16 @@ std::int64_t WorldAdapter::person_family(std::int64_t person) const {
   return static_cast<std::int64_t>(world().person(person_index(person)).family);
 }
 
+std::int64_t WorldAdapter::person_age(std::int64_t person) const {
+  return world().age_in_years(person_index(person));
+}
+
+std::int64_t WorldAdapter::person_faction(std::int64_t person) const {
+  const std::optional<std::size_t> faction =
+      world().faction_of(person_index(person));
+  return faction ? static_cast<std::int64_t>(*faction) : -1;
+}
+
 void WorldAdapter::_bind_methods() {
   const godot::StringName& name = WorldAdapter::get_class_static();
   godot::ClassDB::bind_static_method(
@@ -608,6 +618,10 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_spouse);
   godot::ClassDB::bind_method(godot::D_METHOD("person_family", "person"),
                               &WorldAdapter::person_family);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_age", "person"),
+                              &WorldAdapter::person_age);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_faction", "person"),
+                              &WorldAdapter::person_faction);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);

@@ -127,6 +127,13 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns person `person`'s family.
   [[nodiscard]] std::int64_t person_family(std::int64_t person) const;
 
+  /// Returns person `person`'s age in whole years of the core's calendar.
+  [[nodiscard]] std::int64_t person_age(std::int64_t person) const;
+
+  /// Returns the faction of the army person `person` serves in, or -1 when
+  /// it serves in none, as the dead do.
+  [[nodiscard]] std::int64_t person_faction(std::int64_t person) const;
+
   /// Advances the world by one step.
   void tick();
 
