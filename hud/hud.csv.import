@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://byl6y0n3i0hnq"
+
+[deps]
+
+files=["res://hud/hud.ko.translation", "res://hud/hud.en.translation"]
+
+source_file="res://hud/hud.csv"
+dest_files=["res://hud/hud.ko.translation", "res://hud/hud.en.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true
