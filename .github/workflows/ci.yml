@@ -7,6 +7,11 @@ on:
 
 permissions: read-all
 
+# A newer push to a pull request cancels its run in progress; runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -15,6 +20,31 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.14'
+          cache: pip
+          cache-dependency-path: core/requirements.txt
       - run: python -m venv .venv && .venv/bin/pip install --require-hashes -r core/requirements.txt
-      - run: .github/scripts/install-godot.sh "$RUNNER_TEMP/godot" && echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
+      # The Godot binary, keyed on the script that pins its version and SHA-512.
+      - id: godot
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/godot
+          key: godot-${{ runner.os }}-${{ hashFiles('.github/scripts/install-godot.sh') }}
+      - if: steps.godot.outputs.cache-hit != 'true'
+        run: .github/scripts/install-godot.sh "$RUNNER_TEMP/godot"
+      - run: echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
+      # The runner image's version, which fixes its compilers, read from the environment the image sets.
+      - id: image
+        run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      # build/ holds the fetched and built dependencies: godot-cpp, GoogleTest and the lint sysroot. The key
+      # names the runner image (its compilers), the tool pins and the files pinning each dependency. A
+      # restore-key match restores another pin's tree, which is safe: CMake re-verifies a changed archive hash
+      # and refetches, lint-sysroot.sh refetches when its package list differs, and Ninja rebuilds what a
+      # changed command or a source newer than its output asks for. Checkout gives every tracked source a
+      # newer time than any restored output, so the project's own files are always rebuilt.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build
+          key: build-${{ steps.image.outputs.version }}-${{ hashFiles('core/requirements.txt', 'Makefile') }}-${{ hashFiles('core/CMakeLists.txt', 'extension/CMakeLists.txt', 'lint-sysroot.sh') }}
+          restore-keys: |
+            build-${{ steps.image.outputs.version }}-${{ hashFiles('core/requirements.txt', 'Makefile') }}-
       - run: make ci
