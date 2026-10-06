@@ -13,12 +13,14 @@ The application is the simulation core: C++ with no engine dependency. Adapters 
 - **An adapter's only counterpart is its port.** One adapter calling another carries application work outside, where no port names it and no substitute stands in for it.
 - **A new port is earned** by a conversation whose technology can be replaced without the application changing, and which the application can name without naming that technology. A port carries two or more adapters — the real technology, and one for the test harness — so a port with a single adapter that nothing substitutes is indirection.
 - **GDScript holds no game rule.** It lives only in adapters; a rule written there exists outside the application.
+- **The inside is undivided.** The application has no concentric rings and no folder per subject area: the core's files sit flat in `core/`, whichever subject area they serve, as in Cockburn's statement of the pattern (*Hexagonal architecture*, 2005).
 
 ## Rationale
 
 - Hexagonal partitioning keeps the simulation's rules runnable and testable with no engine attached: ADR 0001 (`adr/0001-partition-the-system-hexagonally.md`).
 - Godot is the presentation adapter and C++ the core's language, for PC and mobile: ADR 0002 (`adr/0002-build-on-godot-with-a-cpp-simulation-core.md`).
+- The inside stays undivided, rather than split into rings (Palermo's Onion Architecture, 2008; Martin's *Clean Architecture*, 2017) or folders, while its subject areas depend one way and fit one folder: ADR 0010 (`adr/0010-keep-the-cores-inside-undivided.md`).
 
 ## Open questions
 
-- **Whether the inside is itself partitioned.** Cockburn's statement of the pattern (*Hexagonal architecture*, 2005) leaves it undivided; Palermo's Onion Architecture (2008) and Martin's *Clean Architecture* (2017) divide it into concentric rings with every reference pointing inward. The project takes a side, in an ADR, when the core holds more than one subject area.
+None.
