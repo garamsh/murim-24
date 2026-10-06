@@ -1,4 +1,4 @@
--- Shared by the mockup scripts: the master palette, an indexed canvas, a seeded random source,
+-- Shared by the art scripts: the master palette, an indexed canvas, a seeded random source,
 -- value noise and a small pixel font. Every pixel a canvas holds is a palette index, so every
 -- image drawn with it stays inside the master palette.
 
@@ -95,6 +95,20 @@ function M.noise(x, y, scale, seed)
   local b = M.hash(x0 + 1, y0, seed)
   local c = M.hash(x0, y0 + 1, seed)
   local d = M.hash(x0 + 1, y0 + 1, seed)
+  return (a + (b - a) * tx) + ((c + (d - c) * tx) - (a + (b - a) * tx)) * ty
+end
+
+-- Value noise that repeats every `period` pixels in x and y, so a 16-pixel tile drawn with a
+-- period of 16 meets its neighbours without a seam.
+function M.tile_noise(x, y, scale, period, seed)
+  local cells = period // scale
+  local fx, fy = (x % period) / scale, (y % period) / scale
+  local x0, y0 = math.floor(fx), math.floor(fy)
+  local tx, ty = fx - x0, fy - y0
+  tx = tx * tx * (3 - 2 * tx)
+  ty = ty * ty * (3 - 2 * ty)
+  local function h(a, b) return M.hash(a % cells, b % cells, seed) end
+  local a, b, c, d = h(x0, y0), h(x0 + 1, y0), h(x0, y0 + 1), h(x0 + 1, y0 + 1)
   return (a + (b - a) * tx) + ((c + (d - c) * tx) - (a + (b - a) * tx)) * ty
 end
 
@@ -314,6 +328,56 @@ function M.save(w, h, layers, path)
   end
   spr:saveAs(path)
   spr:close()
+end
+
+-- Saves one layer of frames as a sprite: frames is a list of canvases, tags a list of
+-- { name, first frame, last frame, duration in ms }.
+function M.save_frames(w, h, frames, tags, path)
+  local spr = Sprite(w, h, ColorMode.RGB)
+  local pal = Palette(#M.colours)
+  for i, hex in ipairs(M.colours) do
+    pal:setColor(i - 1, Color { r = tonumber(hex:sub(1, 2), 16), g = tonumber(hex:sub(3, 4), 16),
+      b = tonumber(hex:sub(5, 6), 16), a = 255 })
+  end
+  spr:setPalette(pal)
+  local layer = spr.layers[1]
+  for n, cv in ipairs(frames) do
+    if n > 1 then spr:newEmptyFrame() end
+    if n == 1 then spr:deleteCel(layer, 1) end
+    spr:newCel(layer, n, cv:to_image(), Point(0, 0))
+  end
+  for _, t in ipairs(tags) do
+    local tag = spr:newTag(t[2], t[3])
+    tag.name = t[1]
+    for f = t[2], t[3] do spr.frames[f].duration = t[4] / 1000 end
+  end
+  spr:saveAs(path)
+  spr:close()
+end
+
+-- Reads every frame of an Aseprite file back into canvases, with its tags as
+-- { name = { first, last } }. Pixels outside the master palette are an error.
+function M.load_frames(path)
+  local by_rgb = {}
+  for i, hex in ipairs(M.colours) do by_rgb[tonumber(hex, 16)] = i end
+  local spr = app.open(path)
+  local frames, tags = {}, {}
+  for n = 1, #spr.frames do
+    local img = Image(spr.width, spr.height, ColorMode.RGB)
+    img:drawSprite(spr, n)
+    local cv = M.canvas(spr.width, spr.height)
+    for it in img:pixels() do
+      local v = it()
+      if app.pixelColor.rgbaA(v) > 0 then
+        local rgb = app.pixelColor.rgbaR(v) * 65536 + app.pixelColor.rgbaG(v) * 256 + app.pixelColor.rgbaB(v)
+        cv:set(it.x, it.y, assert(by_rgb[rgb], path .. ": colour outside the palette"))
+      end
+    end
+    frames[n] = cv
+  end
+  for _, t in ipairs(spr.tags) do tags[t.name] = { t.fromFrame.frameNumber, t.toFrame.frameNumber } end
+  spr:close()
+  return frames, tags
 end
 
 -- The directory holding the script that called this, so outputs land beside the scripts.
