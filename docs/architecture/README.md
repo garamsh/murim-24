@@ -26,3 +26,4 @@ Current architecture of the system and the decisions behind it. This file is the
 - `adr/0001-partition-the-system-hexagonally.md` — the simulation is the application; every technology is an adapter
 - `adr/0002-build-on-godot-with-a-cpp-simulation-core.md` — Godot as the presentation adapter, C++ as the core's language
 - `adr/0003-build-the-core-with-cmake-googletest-and-llvm-tools.md` — CMake, C++17, GoogleTest and LLVM 22 tools for the core, installed from pinned PyPI wheels in CI
+- `adr/0005-simulate-armies-at-three-levels-of-detail-in-fixed-point.md` — near, middle and far tiers that differ in data, armies that expand and collapse with exact totals, flow fields, a spatial hash, and fixed-point integers for determinism across builds
