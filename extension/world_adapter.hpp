@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "region.hpp"
 #include "world.hpp"
 
 namespace murim_godot {
@@ -105,6 +106,37 @@ class WorldAdapter : public godot::RefCounted {
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
 
+  /// Returns the faction army `army` was created with.
+  [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
+
+  /// Returns the strength army `army` was created with.
+  [[nodiscard]] std::int64_t army_strength(std::int64_t army) const;
+
+  /// Returns the strength of each of army `army`'s bodies, in the order of
+  /// body_positions().
+  [[nodiscard]] godot::PackedInt64Array body_strengths(std::int64_t army) const;
+
+  /// Returns the names of the terrain kinds, by index; empty unless the
+  /// world was made by create_region().
+  [[nodiscard]] godot::PackedStringArray terrain_names() const;
+
+  /// Returns the terrain kind of each cell, row by row; empty unless the
+  /// world was made by create_region().
+  [[nodiscard]] godot::PackedInt64Array terrain() const;
+
+  /// Returns the names of the factions, by index; empty unless the world was
+  /// made by create_region().
+  [[nodiscard]] godot::PackedStringArray faction_names() const;
+
+  /// Returns the faction owning each cell, row by row; empty unless the
+  /// world was made by create_region().
+  [[nodiscard]] godot::PackedInt64Array territory() const;
+
+  /// Returns each village as a Dictionary of `name`, `faction` (int),
+  /// `corner` (Vector2i) and `side` (int); empty unless the world was made
+  /// by create_region().
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
+
  protected:
   static void _bind_methods();
 
@@ -114,7 +146,14 @@ class WorldAdapter : public godot::RefCounted {
   std::optional<murim::World> world_;
   std::vector<std::string> map_rows_;
   std::vector<std::size_t> skill_counts_;
+  std::vector<std::size_t> factions_;
+  std::vector<std::uint64_t> strengths_;
   std::size_t structure_count_ = 0;
+  // What create_region() keeps of the region for display; empty otherwise.
+  murim::RegionData region_data_;
+  std::vector<std::size_t> terrain_;
+  std::vector<std::size_t> territory_;
+  std::vector<murim::Village> villages_;
 
   // Returns an adapter over a world created from these arguments, as the
   // core's constructor takes them.

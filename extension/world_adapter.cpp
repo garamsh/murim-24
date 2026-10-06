@@ -174,6 +174,10 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
            std::move(region.structures), std::move(region.rules));
   adapter->world().set_focus(murim::centre_of(birthplace));
+  adapter->region_data_ = murim::region_data();
+  adapter->terrain_ = std::move(region.terrain);
+  adapter->territory_ = std::move(region.territory);
+  adapter->villages_ = std::move(region.villages);
   return adapter;
 }
 
@@ -190,6 +194,8 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   adapter.instantiate();
   for (const murim::ArmySpec& army : armies) {
     adapter->skill_counts_.push_back(army.skills.size());
+    adapter->factions_.push_back(army.faction);
+    adapter->strengths_.push_back(army.strength);
   }
   adapter->structure_count_ = structures.size();
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
@@ -302,6 +308,71 @@ std::int64_t WorldAdapter::structure_stage(std::int64_t structure) const {
   return static_cast<std::int64_t>(world().stage(structure_index(structure)));
 }
 
+std::int64_t WorldAdapter::army_faction(std::int64_t army) const {
+  return static_cast<std::int64_t>(factions_.at(army_index(army)));
+}
+
+std::int64_t WorldAdapter::army_strength(std::int64_t army) const {
+  return static_cast<std::int64_t>(strengths_.at(army_index(army)));
+}
+
+godot::PackedInt64Array WorldAdapter::body_strengths(std::int64_t army) const {
+  godot::PackedInt64Array strengths;
+  for (const murim::Body& body : world().bodies(army_index(army))) {
+    strengths.push_back(static_cast<std::int64_t>(body.strength));
+  }
+  return strengths;
+}
+
+godot::PackedStringArray WorldAdapter::terrain_names() const {
+  godot::PackedStringArray names;
+  if (!terrain_.empty()) {
+    for (const murim::TerrainKind& kind : region_data_.terrain) {
+      names.push_back(godot::String(kind.name.c_str()));
+    }
+  }
+  return names;
+}
+
+godot::PackedInt64Array WorldAdapter::terrain() const {
+  godot::PackedInt64Array kinds;
+  for (const std::size_t kind : terrain_) {
+    kinds.push_back(static_cast<std::int64_t>(kind));
+  }
+  return kinds;
+}
+
+godot::PackedStringArray WorldAdapter::faction_names() const {
+  godot::PackedStringArray names;
+  if (!terrain_.empty()) {
+    for (const murim::Faction& faction : region_data_.factions) {
+      names.push_back(godot::String(faction.name.c_str()));
+    }
+  }
+  return names;
+}
+
+godot::PackedInt64Array WorldAdapter::territory() const {
+  godot::PackedInt64Array owners;
+  for (const std::size_t owner : territory_) {
+    owners.push_back(static_cast<std::int64_t>(owner));
+  }
+  return owners;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
+  godot::TypedArray<godot::Dictionary> villages;
+  for (const murim::Village& village : villages_) {
+    godot::Dictionary fields;
+    fields.set("name", godot::String(village.name.c_str()));
+    fields.set("faction", static_cast<std::int64_t>(village.faction));
+    fields.set("corner", godot::Vector2i{village.corner.x, village.corner.y});
+    fields.set("side", village.side);
+    villages.push_back(fields);
+  }
+  return villages;
+}
+
 void WorldAdapter::_bind_methods() {
   const godot::StringName& name = WorldAdapter::get_class_static();
   godot::ClassDB::bind_static_method(
@@ -339,6 +410,22 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::structure_cell);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
+  godot::ClassDB::bind_method(godot::D_METHOD("army_faction", "army"),
+                              &WorldAdapter::army_faction);
+  godot::ClassDB::bind_method(godot::D_METHOD("army_strength", "army"),
+                              &WorldAdapter::army_strength);
+  godot::ClassDB::bind_method(godot::D_METHOD("body_strengths", "army"),
+                              &WorldAdapter::body_strengths);
+  godot::ClassDB::bind_method(godot::D_METHOD("terrain_names"),
+                              &WorldAdapter::terrain_names);
+  godot::ClassDB::bind_method(godot::D_METHOD("terrain"),
+                              &WorldAdapter::terrain);
+  godot::ClassDB::bind_method(godot::D_METHOD("faction_names"),
+                              &WorldAdapter::faction_names);
+  godot::ClassDB::bind_method(godot::D_METHOD("territory"),
+                              &WorldAdapter::territory);
+  godot::ClassDB::bind_method(godot::D_METHOD("villages"),
+                              &WorldAdapter::villages);
   godot::ClassDB::bind_integer_constant(name, "", "TICKS_PER_SECOND",
                                         murim::TICKS_PER_SECOND);
   godot::ClassDB::bind_integer_constant(name, "", "CELL_SIZE",

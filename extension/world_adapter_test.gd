@@ -91,7 +91,46 @@ func run() -> bool:
 	print("world_adapter_test: valid scenario accepted %s; %d of %d invalid scenarios refused: %s" % [
 		accepted, refused, invalid.size(), "pass" if accepted and refused == invalid.size() else "FAIL"])
 	var orders_pass := _orders_pass()
-	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass
+	var reads_pass := _reads_pass()
+	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
+			and reads_pass
+
+
+# What the view reads: each army's faction and strength, its bodies' strengths, and for a region
+# its terrain, territory and villages, which agree with the map's blocked cells and the agent born
+# into the first village. A world made by create() has no region to read.
+func _reads_pass() -> bool:
+	var world := _create(SEED, ARMIES, RULES)
+	var strength := 0
+	for body_strength in world.body_strengths(0):
+		strength += body_strength
+	var armies_read := world.army_faction(0) == 0 and world.army_faction(1) == 1 \
+			and world.army_strength(0) == 1200 and world.army_strength(1) == 1010 and strength == 1200
+	var no_region := world.terrain().is_empty() and world.territory().is_empty() \
+			and world.villages().is_empty() and world.terrain_names().is_empty() \
+			and world.faction_names().is_empty()
+	var region := WorldAdapter.create_region(SEED)
+	var rows := region.map_rows()
+	var names := region.terrain_names()
+	var terrain := region.terrain()
+	var territory := region.territory()
+	var cells := rows.size() * rows[0].length()
+	# Blocked cells are exactly the cells of the kinds bodies cannot pass.
+	var agrees := terrain.size() == cells and territory.size() == cells
+	for i in terrain.size() if agrees else 0:
+		var blocked := rows[i / rows[0].length()][i % rows[0].length()] == "#"
+		agrees = agrees and blocked == (names[terrain[i]] in ["water", "mountain"]) \
+				and territory[i] < region.faction_names().size()
+	var villages := region.villages()
+	var born_faction := region.army_faction(region.army_count() - 1)
+	var villages_read := villages.size() >= 6 and villages.size() <= 8 \
+			and born_faction == int(villages[0].faction)
+	var passed := armies_read and no_region and agrees and villages_read
+	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, %d villages, agent's faction %d, first village's %d: %s" % [
+		world.army_faction(0), world.army_faction(1), world.army_strength(0), world.army_strength(1),
+		strength, no_region, cells, names, agrees, villages.size(), born_faction,
+		int(villages[0].faction) if villages.size() > 0 else -1, "pass" if passed else "FAIL"])
+	return passed
 
 
 # An agent ordered beside the camp leaves home and strikes the camp's agents down. Control: left
