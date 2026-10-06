@@ -8,6 +8,7 @@ This document is the single reference for the game concept agreed with the user.
 - Factions and the rules for gaining power [agreed]
 - Reputation and rumors [agreed]
 - Village life cycle [agreed]
+- Growing civilization [agreed]
 - Talent [settled]
 - Reincarnation [settled]
 - Lifespan [settled]
@@ -65,6 +66,20 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - The faction a village belongs to can change depending on who rebuilds it.
 - The memory of who destroyed it remains after it is rebuilt.
 
+## Growing civilization [agreed]
+
+- **The world starts with few people.** NPCs meet and have children, and a civilization grows from them.
+- **Genealogy and families.** Every NPC has parents and belongs to a family (clan), and the genealogy is kept in the world.
+- **Every NPC is an individual person**, with a name, parents, a family, talent and a lifespan.
+- **An army is a roster** of the NPCs conscripted into it, never a count of soldiers.
+- **Population caps.** Each faction's population is capped by its housing, food and storage.
+- **A hard upper bound.** A world's population never exceeds about 500 NPCs. That bound is a ceiling, not a target: the caps below it set the actual population.
+- **[proposed]** The cap formula:
+  - A faction's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, each given as data.
+  - Growth slows as the population nears the cap.
+  - A shortage brings starvation or migration.
+  - Expansion (building, new villages, territory, raids) is the motive for war.
+
 ## Talent [settled]
 
 - Every living being receives talent at random at birth.
@@ -75,7 +90,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 ## Reincarnation [settled]
 
-- On death, one is reborn in the same world into a random faction and family.
+- On death, one is reborn in the same world into a random faction and into a family of its genealogy (§Growing civilization).
 - The deeds of a past life remain in the world (legends, infamy, hidden secret manuals, and so on).
 - **Meta progression = widening the talent distribution.** It is not a guaranteed power-up. Even a first-time player can be born a genius with luck.
 - How it widens
