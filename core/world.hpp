@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "flow_field.hpp"
@@ -19,16 +20,101 @@ enum class Seed : std::uint64_t {};
 /// Digest of a world's whole state; equal states give equal hashes.
 enum class StateHash : std::uint64_t {};
 
+/// Talent for one discipline: how much each practice adds to attainment,
+/// and the most attainment it can reach. Hidden from the player.
+struct Aptitude {
+  std::uint32_t growth = 0;
+  std::uint32_t limit = 0;
+};
+
 /// A person of the world. A person keeps its identity, its index among the
 /// world's people, for as long as the world runs, through every army it
 /// serves in and after it dies; a dead person has no health and stands in no
 /// army. It may use a skill again from tick `ready_at`, and returns to
-/// village `home`, if it has one, when its army disbands.
+/// village `home`, if it has one, when its army disbands. It was born on
+/// tick `born` into `family`, of `parents` if it had any, with `talent` and
+/// `attainment` per discipline, and lives `lifespan` days, extended by its
+/// attainment, if it ages at all. A person carrying soul `soul` is born
+/// again when it dies.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
   std::uint64_t ready_at = 0;
   std::optional<std::size_t> home;
+  std::uint64_t born = 0;
+  std::size_t family = 0;
+  std::vector<std::size_t> parents;
+  std::vector<Aptitude> talent;
+  std::vector<std::uint32_t> attainment;
+  std::optional<std::uint64_t> lifespan;
+  std::optional<std::size_t> soul;
+};
+
+/// A uniform draw over [mean - spread, mean + spread].
+struct Spread {
+  std::uint32_t mean = 0;
+  std::uint32_t spread = 0;
+};
+
+/// How one discipline's talent is drawn at birth.
+struct DisciplineDraw {
+  std::string name;
+  Spread growth;
+  Spread limit;
+};
+
+/// How people are born, age and are born again, as data. Each birth draws a
+/// talent per discipline and a lifespan in days. A person ages out when its
+/// age passes its lifespan plus `days_per_attainment` days for every point of
+/// attainment it holds. A soul's past lives widen its next talent draw: a
+/// discipline it practised draws its limit `discipline_widening` further
+/// down and up, and every discipline `upper_widening` further up, each
+/// divided by the lives it has lived, so the widening shrinks as lives
+/// repeat. Without a lifespan no one ages. A soul is born again with
+/// `newborn_health`.
+struct Life {
+  std::vector<DisciplineDraw> disciplines;
+  std::uint64_t newborn_health = 1;
+  std::optional<Spread> lifespan;
+  std::uint32_t days_per_attainment = 0;
+  std::uint32_t discipline_widening = 0;
+  std::uint32_t upper_widening = 0;
+};
+
+/// What a soul carries between bodies: the lives it has lived, and whether
+/// each discipline was practised in one of them.
+struct Soul {
+  std::uint32_t lives = 0;
+  std::vector<bool> practised;
+};
+
+/// The lowest and highest value a draw can give.
+struct Range {
+  std::uint32_t low = 0;
+  std::uint32_t high = 0;
+};
+
+/// Returns the range a soul with `soul` history draws discipline
+/// `discipline`'s talent limit from under `life`; an empty history draws
+/// from the discipline's own spread.
+[[nodiscard]] Range limit_range(const Life& life, const Soul& soul,
+                                std::size_t discipline);
+
+/// The world's calendar: ticks in a day, days in a season, seasons in a year.
+struct Calendar {
+  std::uint64_t ticks_per_day;
+  std::uint64_t days_per_season;
+  std::uint64_t seasons_per_year;
+};
+
+/// A minute of play to a day, thirty days to a season, four seasons a year.
+constexpr Calendar CALENDAR{1'800, 30, 4};
+
+/// A day of the calendar, each part counted from 1 but `season`, from 0.
+struct Date {
+  std::uint64_t year;
+  std::uint64_t season;
+  std::uint64_t day;
 };
 
 /// A person as a world is created with: standing at `cell`, with `health`.
@@ -126,6 +212,13 @@ constexpr std::uint64_t MAX_BODY_DAMAGE = std::uint64_t{1} << 19;
 /// The longest cooldown a skill may have, in ticks.
 constexpr std::uint64_t MAX_COOLDOWN = std::uint64_t{1} << 32;
 
+/// The most a talent's growth or limit may be drawn as, its widenings
+/// included.
+constexpr std::uint32_t MAX_TALENT = std::uint32_t{1} << 20;
+
+/// The longest lifespan a birth may draw, in days.
+constexpr std::uint32_t MAX_LIFESPAN_DAYS = std::uint32_t{1} << 20;
+
 /// How a faction's leadership passes by duel. A person may challenge the
 /// leader, if `members_only` holds, only from an army of the faction; the two
 /// then fight by the one skill rule, hostile to each other alone, until one
@@ -201,12 +294,14 @@ class World {
   /// army that does not exist, a structure that another village names, or an
   /// army that is another village's residents, a faction's leader is no
   /// person the world creates, or `leadership` names more factions than
-  /// `hostile`; a faction it leaves out has no leader. Within these limits no
+  /// `hostile`; a faction it leaves out has no leader; or `life` could draw a
+  /// talent above MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives
+  /// a newborn no health or more than MAX_HEALTH. Within these limits no
   /// damage, health, durability or cooldown arithmetic exceeds its type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules,
         std::vector<VillageSpec> villages = {},
-        std::vector<Leadership> leadership = {});
+        std::vector<Leadership> leadership = {}, Life life = {});
 
   /// Gives army `army` an order, which it follows from the next tick on.
   /// With `challenge`, the army's lead also challenges that faction's
@@ -265,6 +360,23 @@ class World {
   /// have no living member becomes its residents, and its home.
   [[nodiscard]] std::size_t owner(std::size_t village) const;
 
+  /// Gives living person `person` a new soul with no history, so that it is
+  /// born again when it dies. Returns the soul. Throws std::invalid_argument
+  /// when the person is dead or does not exist.
+  std::size_t ensoul(std::size_t person);
+
+  /// Returns soul `soul`'s history.
+  [[nodiscard]] const Soul& soul(std::size_t soul) const;
+
+  /// Returns the date the world has reached.
+  [[nodiscard]] Date date() const;
+
+  /// Returns the faction army `army` fights for now.
+  [[nodiscard]] std::size_t faction(std::size_t army) const;
+
+  /// Returns the skills army `army` has now.
+  [[nodiscard]] const std::vector<Skill>& skills(std::size_t army) const;
+
   /// Returns the person leading faction `faction`, if it has a leader.
   [[nodiscard]] std::optional<std::size_t> leader(std::size_t faction) const;
 
@@ -318,7 +430,7 @@ class World {
   [[nodiscard]] std::uint64_t next_random();
   [[nodiscard]] bool within_reach(const Army& army, const VillageSpec& spec,
                                   std::int32_t reach) const;
-  void shift(std::size_t structure, Destroyer striker, std::int64_t effect);
+  bool shift(std::size_t structure, Destroyer striker, std::int64_t effect);
   void strike(std::size_t user, const Crowd& crowd,
               std::vector<std::uint64_t>& damage);
   [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
@@ -326,6 +438,14 @@ class World {
   [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
                                          std::size_t faction) const;
   void settle_duels();
+  void bear(Person& person, const Soul& soul);
+  void age();
+  /// A person who died carrying a soul, and the army it served in.
+  struct Passing {
+    std::size_t dead;
+    std::size_t army;
+  };
+  void rebirth(Passing passing);
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
              const std::vector<Step>& pulls, const std::vector<bool>& standing);
@@ -346,6 +466,8 @@ class World {
   std::vector<Village> villages_;
   std::vector<Leadership> leadership_;
   std::vector<Fight> duels_;
+  Life life_;
+  std::vector<Soul> souls_;
   // The village each structure belongs to, if any.
   std::vector<std::optional<std::size_t>> village_of_;
 };

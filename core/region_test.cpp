@@ -124,7 +124,7 @@ std::vector<std::int64_t> flatten(const Region& region) {
 World world_of(const Region& region) {
   return World{region.seed,       Map{region.map_rows}, region.armies,
                region.structures, region.rules,         village_specs(region),
-               region.leadership};
+               region.leadership, region.life};
 }
 
 // Whether the region is a world's valid input, footprints and armies

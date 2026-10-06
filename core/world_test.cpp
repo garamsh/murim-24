@@ -240,7 +240,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xF4BB49BB6403ECEEULL);
+            0xFB21CF84CE823C4ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -1302,6 +1302,237 @@ TEST(World, ADuelIsReadWhileItIsFoughtAndGoneOnceSettled) {
   EXPECT_FALSE(world.duel(ALLY).has_value());
   run_ticks(world, DUEL_TICKS);
   EXPECT_FALSE(world.duel(CULT).has_value());
+}
+
+constexpr std::uint64_t TICKS_PER_DAY = CALENDAR.ticks_per_day;
+constexpr std::uint64_t TICKS_PER_SEASON =
+    CALENDAR.ticks_per_day * CALENDAR.days_per_season;
+
+TEST(World, TheCalendarFollowsTheTicks) {
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+              {},
+              peaceful(0)};
+  const auto when = [&world]() {
+    const Date date = world.date();
+    return std::array<std::uint64_t, 3>{date.year, date.season, date.day};
+  };
+  EXPECT_EQ(when(), (std::array<std::uint64_t, 3>{1, 0, 1}));
+  run_ticks(world, TICKS_PER_DAY);
+  EXPECT_EQ(when(), (std::array<std::uint64_t, 3>{1, 0, 2}));
+  run_ticks(world, TICKS_PER_SEASON - TICKS_PER_DAY);
+  EXPECT_EQ(when(), (std::array<std::uint64_t, 3>{1, 1, 1}));
+  run_ticks(world, TICKS_PER_SEASON * (CALENDAR.seasons_per_year - 1));
+  EXPECT_EQ(when(), (std::array<std::uint64_t, 3>{2, 0, 1}));
+}
+
+// One discipline whose limit is drawn over [500 - spread, 500 + spread].
+Life one_discipline(std::uint32_t limit_spread) {
+  constexpr Spread GROWTH{10, 5};
+  constexpr std::uint32_t LIMIT = 500;
+  return Life{
+      {{"sword", GROWTH, {LIMIT, limit_spread}}}, 1, std::nullopt, 0, 0, 0};
+}
+
+// The mean and variance of the limits drawn for 400 people born with
+// `life`, times 1, as integers.
+std::pair<std::int64_t, std::int64_t> limit_moments(const Life& life) {
+  constexpr std::size_t BORN = 400;
+  const std::vector<std::string> rows = open_map(OPEN_SIDE * 2);
+  const World world{Seed{3},
+                    Map{rows},
+                    {army(rows, {16, 16}, {16, 16}, BORN, 1, 0, {IDLE})},
+                    {},
+                    peaceful(0),
+                    {},
+                    {},
+                    life};
+  std::int64_t sum = 0;
+  std::int64_t squares = 0;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const std::int64_t limit = world.person(person).talent.front().limit;
+    sum += limit;
+    squares += limit * limit;
+  }
+  EXPECT_EQ(world.population(), BORN);
+  const auto count = static_cast<std::int64_t>(BORN);
+  const std::int64_t mean = sum / count;
+  return {mean, (squares / count) - (mean * mean)};
+}
+
+TEST(World, TalentIsDrawnAtBirthFromItsDistribution) {
+  constexpr std::int64_t SPREAD = 200;
+  // A uniform draw over 2 * SPREAD + 1 values: mean 500, variance
+  // ((2 * SPREAD + 1)^2 - 1) / 12 = 13,400.
+  constexpr std::int64_t VALUES = (2 * SPREAD) + 1;
+  constexpr std::int64_t VARIANCE = ((VALUES * VALUES) - 1) / 12;
+  const auto [mean, variance] = limit_moments(one_discipline(SPREAD));
+  EXPECT_NEAR(static_cast<double>(mean), 500.0, 20.0);
+  EXPECT_NEAR(static_cast<double>(variance), static_cast<double>(VARIANCE),
+              static_cast<double>(VARIANCE) / 5);
+  // Control: with no spread every person draws the mean.
+  EXPECT_EQ(limit_moments(one_discipline(0)),
+            (std::pair<std::int64_t, std::int64_t>{500, 0}));
+}
+
+// Whether a world of one person born with `life` is created.
+bool lives_by(const Life& life) {
+  try {
+    const World world{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      peaceful(0),
+                      {},
+                      {},
+                      life};
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+  return true;
+}
+
+TEST(World, LifeDrawingPastItsLimitsIsRefused) {
+  Life limit = one_discipline(0);
+  limit.disciplines.front().limit = Spread{MAX_TALENT - 2, 0};
+  limit.discipline_widening = 1;
+  limit.upper_widening = 1;
+  limit.lifespan = Spread{MAX_LIFESPAN_DAYS - 1, 1};
+  limit.newborn_health = MAX_HEALTH;
+  Life talent = limit;
+  ++talent.upper_widening;
+  Life lifespan = limit;
+  ++lifespan.lifespan->spread;
+  Life healthless = limit;
+  healthless.newborn_health = 0;
+  // Control: life at every limit is accepted.
+  EXPECT_TRUE(lives_by(limit));
+  EXPECT_FALSE(lives_by(talent));
+  EXPECT_FALSE(lives_by(lifespan));
+  EXPECT_FALSE(lives_by(healthless));
+}
+
+// Whether every person of `world` was born to live `days` days.
+bool everyone_lives(const World& world, std::uint64_t days) {
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    if (world.person(person).lifespan != std::optional<std::uint64_t>{days}) {
+      return false;
+    }
+  }
+  return true;
+}
+
+TEST(World, PeopleAgeOutUnlessAttainmentExtendsTheirLives) {
+  // Everyone lives one day, and a day more for each point of attainment.
+  Life life = one_discipline(0);
+  life.lifespan = Spread{1, 0};
+  life.days_per_attainment = 1;
+  const Skill practice{2 * CELL_SIZE, 0, 1, 0, 10};
+  const std::vector<ArmySpec> armies{
+      army({1, 1}, {1, 1}, 1, 1, 0, {IDLE}),
+      army({8, 8}, {8, 8}, 1, 1, 0, {practice}),
+      army({9, 8}, {9, 8}, 1, TARGET_HEALTH, 1, {IDLE}),
+  };
+  World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(0), {}, {},
+              life};
+  // Setup: everyone was born to live one day.
+  ASSERT_TRUE(everyone_lives(world, 1));
+  run_ticks(world, TICKS_PER_DAY + 1);
+
+  // The idle person aged out on its first day.
+  EXPECT_EQ(world.person(0).health, 0U);
+  EXPECT_TRUE(world.roster(0).empty());
+  // The one who practised has attainment, up to its limit, and lives on.
+  EXPECT_GT(world.person(1).attainment.front(), 0U);
+  EXPECT_LE(world.person(1).attainment.front(),
+            world.person(1).talent.front().limit);
+  EXPECT_GT(world.person(1).health, 0U);
+}
+
+TEST(World, PeopleTheWorldStartsWithBelongToTheFamilyOfTheirArmy) {
+  const World world = conscription_world();
+  for (std::size_t army = 0; army < 3; ++army) {
+    for (const std::size_t member : world.roster(army)) {
+      EXPECT_EQ(world.person(member).family, army);
+      EXPECT_TRUE(world.person(member).parents.empty());
+    }
+  }
+}
+
+// conscription_world() with a soul: its post, of faction 1, has the soul and
+// marches on the village, where the residents kill it.
+World soul_world() {
+  World world = conscription_world();
+  world.ensoul(world.roster(POST).front());
+  world.order(POST, {HOME, {0}});
+  return world;
+}
+
+TEST(World, ASoulIsBornAgainIntoAFamilyOfTheSameWorld) {
+  World world = soul_world();
+  const std::size_t post = world.roster(POST).front();
+  const std::size_t before = world.population();
+  run_ticks(world, ARRIVAL_TICKS);
+
+  // The post died, and its soul lives on in a new person, the world's last.
+  ASSERT_EQ(world.person(post).health, 0U);
+  ASSERT_EQ(world.population(), before + 1);
+  const std::size_t reborn = before;
+  const Person& person = world.person(reborn);
+  EXPECT_EQ(person.soul, world.person(post).soul);
+  ASSERT_TRUE(person.soul.has_value());
+  EXPECT_EQ(world.soul(person.soul.value_or(0)).lives, 1U);
+  EXPECT_EQ(world.roster(POST), std::vector<std::size_t>{reborn});
+  // Born to residents of the village, its home, into their family.
+  ASSERT_EQ(person.parents.size(), 2U);
+  EXPECT_EQ(person.home, std::optional<std::size_t>{0});
+  EXPECT_EQ(person.family, world.person(person.parents.front()).family);
+  // Control: not the family of the body that died.
+  EXPECT_NE(person.family, world.person(post).family);
+  EXPECT_GT(person.born, 0U);
+}
+
+TEST(World, ARebirthContinuesTheWorldInsteadOfResettingIt) {
+  World world = soul_world();
+  World twin = soul_world();
+  run_ticks(world, ARRIVAL_TICKS);
+  run_ticks(twin, ARRIVAL_TICKS);
+  const World fresh = soul_world();
+
+  // Setup: the soul was born again in both runs.
+  ASSERT_EQ(world.population(), fresh.population() + 1);
+  EXPECT_EQ(world.hash(), twin.hash());
+  // Control: the world as created, before any of it happened, differs.
+  EXPECT_NE(world.hash(), fresh.hash());
+  EXPECT_GT(world.date().day, fresh.date().day);
+}
+
+TEST(World, PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife) {
+  constexpr std::uint32_t SPREAD = 200;
+  constexpr std::uint32_t WIDENING = 200;
+  constexpr std::uint32_t HIGHER = 100;
+  Life life = one_discipline(SPREAD);
+  life.disciplines.push_back(life.disciplines.front());
+  life.discipline_widening = WIDENING;
+  life.upper_widening = HIGHER;
+  const auto range = [&life](std::uint32_t lives, bool practised) {
+    const Range drawn = limit_range(life, Soul{lives, {practised, false}}, 0);
+    return std::pair{drawn.low, drawn.high};
+  };
+  // No history: the discipline's own spread.
+  EXPECT_EQ(range(0, false),
+            (std::pair<std::uint32_t, std::uint32_t>{300, 700}));
+  // One life practising it: 200 wider each way, and 100 higher.
+  EXPECT_EQ(range(1, true),
+            (std::pair<std::uint32_t, std::uint32_t>{100, 1'000}));
+  // Two lives: each widening halves.
+  EXPECT_EQ(range(2, true),
+            (std::pair<std::uint32_t, std::uint32_t>{200, 850}));
+  // Control: a discipline not practised gains only the higher top.
+  const Range other = limit_range(life, Soul{1, {true, false}}, 1);
+  EXPECT_EQ((std::pair{other.low, other.high}),
+            (std::pair<std::uint32_t, std::uint32_t>{300, 800}));
 }
 
 }  // namespace

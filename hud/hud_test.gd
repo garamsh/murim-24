@@ -1,7 +1,8 @@
 # Checks that hud.tscn shows its words from the translations, Korean first, that switching the
 # locale changes them to English, that the faction shown is the steered army's, that health shows
 # its strength as a percentage of its starting strength and inner energy a dash over an empty
-# bar, and that the technique bar shows one slot per skill with the icon of its shape.
+# bar, that the technique bar shows one slot per skill with the icon of its shape, and that the
+# season and year are the core's.
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
@@ -44,10 +45,20 @@ func run() -> bool:
 			icons_right = icons_right and visible and region.position.x == (16 if burst else 0)
 		else:
 			icons_right = icons_right and not visible
+	# The season and year the core gives, spring of the first year at the start; control: a later
+	# date reads differently, so the label is not fixed text.
+	var season: String = hud.labels.season.text
+	var date := world.date()
+	var later: String = hud.season_text({"year": 3, "season": 1, "day": 1})
+	var dated: bool = date.year == 1 and date.season == 0 and season == "봄 · 1년" \
+			and later == "여름 · 3년"
 	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
-			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right
+			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right \
+			and dated
 	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, inner energy %s, its bar %d; %d skills shown with their icons %s: %s" % [
 		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
 		icons_right, "pass" if passed else "FAIL"])
+	print("hud_test: date %s shown as \"%s\"; year 3, season 1 as \"%s\": %s" % [
+		date, season, later, "pass" if dated else "FAIL"])
 	hud.free()
 	return passed

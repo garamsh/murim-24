@@ -34,6 +34,15 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 constexpr std::int32_t SEPARATION = CELL_SIZE;
 constexpr std::uint32_t DURABILITY = 3'000;
 constexpr std::uint64_t HEALTH = 100'000;
+// The rules of life in region_data().
+constexpr std::uint32_t GROWTH = 10;
+constexpr std::uint32_t GROWTH_SPREAD = 5;
+constexpr std::uint32_t LIMIT = 500;
+constexpr std::uint32_t LIMIT_SPREAD = 200;
+constexpr std::uint32_t LIFESPAN_DAYS = 60 * 120;
+constexpr std::uint32_t LIFESPAN_SPREAD_DAYS = 15 * 120;
+constexpr std::uint32_t DISCIPLINE_WIDENING = 200;
+constexpr std::uint32_t UPPER_WIDENING = 100;
 
 // A point a partition is made around, and the value its cells take.
 struct Site {
@@ -308,6 +317,21 @@ RegionData region_data() {
             building({VILLAGE_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
             building({FENCE_EAST, FENCE_ROW}, FENCE, "fence", 0)}},
       },
+      // Five disciplines, each drawn the same way: growth of 5 to 15 a use,
+      // a limit of 300 to 700. People live 45 to 75 years of 120 days, a
+      // day longer for each point of attainment; a soul's past lives widen a
+      // practised discipline's limit by 200, and every limit's top by 100,
+      // each over the lives lived.
+      Life{{{"sword", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
+            {"saber", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
+            {"fist", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
+            {"hidden weapons", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
+            {"medicine", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}}},
+           HEALTH,
+           Spread{LIFESPAN_DAYS, LIFESPAN_SPREAD_DAYS},
+           1,
+           DISCIPLINE_WIDENING,
+           UPPER_WIDENING},
   };
 }
 
@@ -327,7 +351,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
                 {},
-                {}};
+                {},
+                data.life};
   // The owner of each free passable cell; a blocked or built-on cell is
   // owned by no faction, so no village fits on it.
   const std::size_t nobody = data.factions.size();

@@ -5,8 +5,8 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ## Current decisions
 
 - The simulation core is a C++ library in `core/`, with no engine dependency.
-- A world is created from a seed, a map of passable and blocked cells, armies, structures, rules, villages and each faction's leadership. The rules are data: the separation people keep, the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
-- Every NPC is a person: a position, health, a cooldown and a home village or none. A person's identity is its index among the world's people, kept for as long as the world runs, through every army it serves in and after it dies. A world holds at most `MAX_PEOPLE`, 500, living people. That is a hard upper bound, not a target.
+- A world is created from a seed, a map of passable and blocked cells, armies, structures, rules, villages, each faction's leadership and its rules of life. The rules are data: the separation people keep, the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
+- Every NPC is a person: a position, health, a cooldown and a home village or none, and what its birth gave it: the tick it was born, its family, its parents, its talent and attainment per discipline, a lifespan, and a soul or none. A person's identity is its index among the world's people, kept for as long as the world runs, through every army it serves in and after it dies. A world holds at most `MAX_PEOPLE`, 500, living people. That is a hard upper bound, not a target.
 - An army is a roster of the living people serving in it, never a count, with an objective, a faction and skills. Every living person stands on exactly one roster. A person who dies leaves its roster but keeps its record, so the dead cost no work on a tick and stay out of the spatial index.
 - `conscript()` moves one living person from its roster to another army's. `disband()` returns every member with a home to that village's residents; members without one stay. Neither creates nor removes a person, so the people on rosters are conserved.
 - Every army follows an order: an objective cell, and the skills, by index among its own, it strikes with. An army created from data follows its objective with all its skills. `order()` gives an army another order, which it follows from the next tick. That is the port through which a driver steers a body, whether the driver is Godot input or a test, and the same type and resolution serve an NPC and the player alike. Nothing records who steers an army.
@@ -16,6 +16,15 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - The challenger and the leader become hostile to each other alone and fight by the one skill rule until one has no more than the duel's yield health left. The leader keeps the lead if both fall together.
   - A challenger who wins leads the faction. If the duel says so, every faction at peace with it turns hostile to it, a change to the hostility the world holds.
   - `challenge_refusal` returns why an army's lead may not challenge a faction's leader, a `ChallengeRefusal`, or `NONE` when it may. `order` refuses a challenge exactly when it names a reason, so the rule is written once. `duel` reads the duel being fought for a faction's lead: the challenger and the leader.
+- Life is data, `Life`, given with the world. One function bears every person, the player's body and every NPC alike, at creation and on rebirth:
+  - talent is a growth and a limit per discipline, each drawn uniformly over a mean plus or minus a spread; a lifespan in days is drawn the same way. A world given no `Life` draws no talent and ages no one
+  - a strike that hits anyone or anything practises the striker's best discipline, its highest limit: its attainment there grows by its growth, up to its limit
+  - a person dies, as a wound kills, once its age in days passes its lifespan plus `days_per_attainment` days for each point of attainment
+- Everyone the world starts with belongs to the family of the army it was created in, and has no parents.
+- A soul is the history a person may carry from body to body: the lives it has lived and the disciplines it practised. `ensoul()` gives a living person one. The birth rule reads only that history, empty for a person without a soul:
+  - a discipline practised in a past life draws its limit `discipline_widening / lives` further down and up, and every discipline `upper_widening / lives` further up, so the widening shrinks as lives repeat
+  - a person carrying a soul who dies is born again on the next tick, in a village drawn by the seed among those with a living resident: into its first resident's family, with its first two residents as parents and that village as home, with a newborn's health. It serves in the army its body served in, which takes the residents' faction and skills and is bound for the birthplace. With no such village the soul is not born again
+- The calendar is the core's: a day is 1,800 ticks, a season 30 days and a year 4 seasons. `date()` derives the year, the season and the day from the tick count.
 - Every person moves and strikes on every tick; there are no levels of detail. At 500 people the whole world costs less than the tick budget (below).
 - People move toward their order's objective along their army's flow field, rebuilt when an order changes the objective. A step enters any cell the flow field reaches and never a blocked one. An objective must be reachable from where each member stands, when the army is created and when it is given an order.
 - People keep the separation, about a cell, from neighbours found through a spatial hash rebuilt each tick:
@@ -39,9 +48,9 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - A village records who ruined it: the army, and its faction, whose strike brought its last standing structure to rubble. The record outlives rebuilding and is part of the hash.
 - A structure's footprint blocks movement for as long as the world runs, rubble included, so the flow fields never change under an army. Footprints must lie on passable cells, cover no other structure, and leave every person's start uncovered.
 - All simulation state is integers: positions are fixed-point at 1/256 of a cell.
-- A world exposes a hash of its whole state. Determinism is tested by comparing hashes: the same seed gives the same hash after 10,000 ticks with armies moving, fighting, losing people and breaking structures. A test pins that hash, so it must be the same on every compiler and platform. The hash covers every person, living or dead, each army's roster and order, and the villages, and a log of orders, each with the tick it was given before, replays to the same hash.
+- A world exposes a hash of its whole state. Determinism is tested by comparing hashes: the same seed gives the same hash after 10,000 ticks with armies moving, fighting, losing people and breaking structures. A test pins that hash, so it must be the same on every compiler and platform. The hash covers every person, living or dead, with what its birth gave it, the souls, each army's roster and order, and the villages, and a log of orders, each with the tick it was given before, replays to the same hash.
 - The world ticks 30 times a second, so a rate given per second, such as skills, becomes work per tick.
-- The tick budget is a p99 tick time of at most 4 ms on the development Mac (Apple Silicon), on the M1 benchmark scenario in `core/m1_scenario.cpp`, the worst case: MAX_PEOPLE people, every one in one battle of two lines with a barricade between them, and two caster armies breaking it. On 2026-10-07 it measured a tick p99 of 0.487 ms. `make bench` measures it. Timing depends on the machine, so `make ci` does not run it.
+- The tick budget is a p99 tick time of at most 4 ms on the development Mac (Apple Silicon), on the M1 benchmark scenario in `core/m1_scenario.cpp`, the worst case: MAX_PEOPLE people, every one in one battle of two lines with a barricade between them, and two caster armies breaking it. On 2026-10-07 it measured a tick p99 of 0.555 ms. `make bench` measures it. Timing depends on the machine, so `make ci` does not run it.
 - The core is built, tested, linted and formatted with the toolchain ADR 0003 chose. Lint parses it on every host against one pinned Ubuntu 24.04 sysroot, unpacked by `lint-sysroot.sh`, so local and CI lint read the same standard library.
 
 ## Rationale
@@ -55,9 +64,13 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - Villages, their derived state, repair as a signed structure effect, owners following residents, and the recorded destroyer: ADR 0015 (`adr/0015-run-the-village-life-cycle-from-structures-and-residents.md`).
 - Footprints, the hit rule they share, footprints that block in every stage, and objectives that must be reachable: ADR 0013 (`adr/0013-give-structures-footprints-that-block-movement-in-every-stage.md`).
 - Leaders as people, the duel as faction data fought by the one skill rule, and challenges through the order port: ADR 0018 (`adr/0018-change-a-factions-leader-by-duel-as-faction-data.md`).
+- Talent and lifespan drawn at birth by one rule, ageing, souls born again into a family of the same world with a widened draw, and the calendar: ADR 0019 (`adr/0019-draw-talent-and-lifespan-at-birth-and-bear-a-soul-again.md`).
 - Orders as the one shape of every army's intent, and the player's body as an army of one: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
 
 ## Open questions
+
+- **Which discipline a strike practises.** Skills carry no discipline, so a strike practises the striker's best one. Martial arts (`docs/concept.md` §Martial arts) are to give each technique its discipline.
+- **Where a soul goes with no village to be born in.** A soul whose body dies while no village has a living resident is not born again.
 
 - **Whether rubble should free its cells.** Rubble blocks as an intact structure does. Freeing it would mean rebuilding the flow fields that cross it when a structure falls, on the tick it falls.
 - **Whether two people on the move can block each other.** A person on the move gives way to another on the move as to anyone, so two marching head-on into each other may hold each other up. No test or scenario covers it yet.

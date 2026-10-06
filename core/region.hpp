@@ -56,6 +56,8 @@ struct RegionData {
   std::vector<TerrainKind> terrain;
   std::vector<Faction> factions;
   std::vector<VillageTemplate> villages;
+  /// How its people are born, age and are born again.
+  Life life;
 };
 
 /// A village as generated: the `area` from `corner` it occupies, its owner,
@@ -88,9 +90,11 @@ struct Region {
   /// Each faction's leadership: the first resident of its first village, if
   /// it has one, and its succession.
   std::vector<Leadership> leadership;
+  /// The tables' rules of life, as the world is created with them.
+  Life life;
 };
 
-/// Returns the game's terrain kinds, factions and village templates.
+/// Returns the game's terrain kinds, factions, village templates and life.
 [[nodiscard]] RegionData region_data();
 
 /// Generates a region from `seed` and `data`: terrain and territories, and six
