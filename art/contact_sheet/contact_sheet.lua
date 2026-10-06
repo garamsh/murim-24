@@ -10,7 +10,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 1024
+local W, H = 608, 1424
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -317,6 +317,77 @@ end
 for k, tag in ipairs({ "strike", "burst" }) do
   sheet:rect(gx + 70 + (k - 1) * 22, 994, 20, 20, c("ink", 1))
   sheet:stamp(frame(icons, tag), gx + 72 + (k - 1) * 22, 996)
+end
+
+-- The economy: the granary and the storehouse in their stages; fields in each state, in summer
+-- and under snow; the economy icons; then all of it assembled in a village.
+local granary = load("structures/granary.aseprite")
+local storehouse = load("structures/storehouse.aseprite")
+local fields = load("decorations/fields.aseprite")
+local economy_icons = load("icons/economy_icons.aseprite")
+label(8, 1030, "ECONOMY", c("paper", 3))
+stages(granary, "GRANARY, 2 X 2", 2, 2, 8, 1050, 56)
+stages(storehouse, "STOREHOUSE, 3 X 2", 3, 2, 240, 1050, 72)
+local states = { "sown", "growing", "ripe", "fallow", "burnt" }
+-- A plot of 3 x 2 tiles of `tag`, its variants alternating, at (x, y).
+local function plot(canvas, tag, x, y, cols, rows)
+  for r = 0, rows - 1 do
+    for q = 0, cols - 1 do
+      canvas:stamp(frame(fields, tag, 1 + (q + r) % 2), x + q * 16, y + r * 16)
+    end
+  end
+end
+for k, state in ipairs(states) do
+  local x = 8 + (k - 1) * 56
+  plot(sheet, state, x, 1120, 3, 2)
+  label(x, 1154, state:upper(), c("paper", 2))
+  plot(sheet, state .. "_winter", x, 1166, 3, 2)
+end
+label(8, 1110, "FIELDS, SUMMER", c("paper", 3))
+label(8, 1200, "UNDER SNOW", c("paper", 2))
+label(300, 1110, "ECONOMY ICONS", c("paper", 3))
+for k, tag in ipairs({ "food", "stock", "housing" }) do
+  local x = 300 + (k - 1) * 48
+  sheet:rect(x, 1120, 20, 20, c("ink", 1))
+  sheet:stamp(frame(economy_icons, tag), x + 2, 1122)
+  label(x, 1144, tag:upper(), c("paper", 2))
+end
+
+-- A village of 30 x 10 cells: houses, the granary and the storehouse north of the road, a well
+-- and barrels by it, and fields in each state south of it. Everything standing is drawn in order
+-- of the bottom edge of its footprint.
+local VX, VY = 8, 1224
+label(8, VY - 12, "ASSEMBLED IN A VILLAGE", c("paper", 3))
+local village = px.canvas(W, H)
+for row = 0, 9 do
+  for col = 0, 29 do
+    village:stamp(frame(terrain, "plain", 1 + math.floor(px.hash(col, row, 77) * 4)), VX + col * 16, VY + row * 16)
+  end
+end
+local ground_tiles = load("decorations/ground.aseprite")
+for col = 0, 29 do
+  village:stamp(ground_tiles.frames[ground_tiles.tags.road[1] + col % 4], VX + col * 16, VY + 5 * 16)
+end
+for k, state in ipairs(states) do plot(village, state, VX + (2 + (k - 1) * 4) * 16, VY + 6 * 16, 3, 3) end
+local standing_village = {}
+local function stand_at(set, tag, col, row, rows)
+  standing_village[#standing_village + 1] = { row + rows, #standing_village, function()
+    village:stamp(frame(set, tag), VX + col * 16 - 8, VY + row * 16 - 8)
+  end }
+end
+stand_at(house, "intact", 1, 1, 3)
+stand_at(granary, "intact", 5, 2, 2)
+stand_at(storehouse, "intact", 8, 2, 2)
+stand_at(granary, "damaged", 12, 2, 2)
+stand_at(house, "intact", 15, 1, 3)
+stand_at(storehouse, "destroyed", 19, 2, 2)
+stand_at(well, "intact", 23, 3, 2)
+stand_at(barrels, "intact", 26, 4, 1)
+stand_at(house, "rubble", 26, 6, 3)
+table.sort(standing_village, function(a, b) if a[1] == b[1] then return a[2] < b[2] end return a[1] < b[1] end)
+for _, s in ipairs(standing_village) do s[3]() end
+for y = VY, VY + 159 do
+  for x = VX, VX + 479 do sheet:set(x, y, village:get(x, y)) end
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")
