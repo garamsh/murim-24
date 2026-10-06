@@ -24,7 +24,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - All simulation state is integers: positions are fixed-point at 1/256 of a cell.
 - A world exposes a hash of its whole state. Determinism is tested by comparing hashes: the same seed gives the same hash after 10,000 ticks with armies moving, crossing tiers, fighting and breaking structures. A test pins that hash, so it must be the same on every compiler and platform.
 - The world ticks 30 times a second, so a rate given per second, such as skills, becomes work per tick.
-- The tick budget is a p99 tick time of at most 4 ms on the development Mac (Apple Silicon), on the M1 benchmark scenario in `core/bench.cpp`: 20,000 agents across every tier, 500 of them fighting in the near tier, and about 50 area strikes a second breaking structures. `make bench` measures it. Timing depends on the machine, so `make ci` does not run it.
+- The tick budget is a p99 tick time of at most 4 ms on the development Mac (Apple Silicon), on the M1 benchmark scenario in `core/m1_scenario.cpp`: 20,000 agents across every tier, 500 of them fighting in the near tier, and about 50 area strikes a second breaking structures. `make bench` measures it. Timing depends on the machine, so `make ci` does not run it.
 - The core is built, tested, linted and formatted with the toolchain ADR 0003 chose.
 
 ## Rationale
