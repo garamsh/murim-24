@@ -46,11 +46,13 @@ var own := -1
 ## The cards shown, each a Dictionary of `role` (parent, centre, spouse or child), `person`,
 ## `name`, `short` (the name as the card shows it), `line` (the age, or that they died) and `dead`.
 var cards: Array[Dictionary] = []
-## The centred person's details, by what they are: `name`, `family`, `sect`, `age`, `talent`,
-## `lifespan`, `spouse` and `children`.
+## The centred person's details, by what they are: `name`, `family`, `sect`, `age`,
+## `generation` (as the header shows it), `talent`, `lifespan`, `spouse` and `children`.
 var details := {}
 
 var _world: WorldAdapter
+# Generations counted so far, by person; parents never change once a person is born.
+var _generations := {}
 var _font: Font
 var _bodies := {}
 var _scrim: ImageTexture
@@ -70,6 +72,8 @@ func _notification(what: int) -> void:
 
 ## Opens the panel on `person`, with `steered` the person the player plays.
 func show_person(world: WorldAdapter, person: int, steered: int) -> void:
+	if world != _world:
+		_generations.clear()
 	_world = world
 	own = steered
 	centre = person
@@ -91,6 +95,7 @@ func show_person(world: WorldAdapter, person: int, steered: int) -> void:
 		"family": tr("GENEALOGY_FAMILY") % _surname(name),
 		"sect": _sect(person),
 		"age": str(world.person_age(person)),
+		"generation": tr("GENEALOGY_GENERATION") % generation_of(person),
 		"talent": tr("GENEALOGY_UNKNOWN"),
 		"lifespan": tr("GENEALOGY_UNKNOWN"),
 		"spouse": _name_of(spouse) if spouse >= 0 else tr("GENEALOGY_NONE"),
@@ -98,6 +103,19 @@ func show_person(world: WorldAdapter, person: int, steered: int) -> void:
 	}
 	visible = true
 	queue_redraw()
+
+
+## Returns `person`'s generation: 1 for someone with no parents, as the people a world begins
+## with have none, and otherwise one more than their parents' deepest. It reads the parents the
+## core holds and counts them, deciding nothing.
+func generation_of(person: int) -> int:
+	if _generations.has(person):
+		return _generations[person]
+	var deepest := 0
+	for parent in _world.person_parents(person):
+		deepest = maxi(deepest, generation_of(parent))
+	_generations[person] = deepest + 1
+	return deepest + 1
 
 
 ## Moves the selection to the nearest card in `direction`: up to the parents, down to the
@@ -230,7 +248,7 @@ func _draw() -> void:
 	var family_x := 8 + _width(title) + 10
 	_text(PANEL.position + Vector2(8, 4), title, PAPER, true)
 	_text(PANEL.position + Vector2(family_x, 4), details.family, GOLD_LIGHT, true)
-	_text(PANEL.position + Vector2(family_x + _width(details.family) + 14, 4), tr("GENEALOGY_GENERATIONS"), STONE)
+	_text(PANEL.position + Vector2(family_x + _width(details.family) + 14, 4), details.generation, STONE)
 	var close_text := tr("GENEALOGY_CLOSE")
 	_text(Vector2(PANEL.end.x - 8 - _width(close_text), PANEL.position.y + 4), close_text, STONE)
 	# Generation labels.
