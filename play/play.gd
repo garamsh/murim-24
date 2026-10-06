@@ -1,6 +1,7 @@
 ## Lets the player steer one person born into the generated region, through the same orders every
 ## army follows: a left click orders it toward the cell clicked, keys 1 to 9 to strike with that
-## skill, and 0 with all its skills. The camera follows it. It ticks at the core's tick rate, draws
+## skill, and 0 with all its skills; C challenges its faction's leader to a duel, with the same
+## order, when the core allows it. The camera follows it. It ticks at the core's tick rate, draws
 ## the world through world_art.tscn and the HUD through hud.tscn, and holds no game rule.
 extends Node2D
 
@@ -9,6 +10,8 @@ const PIXELS_PER_CELL := 16.0
 # Ticks one frame may run to catch up; beyond it the simulation falls behind instead of stalling.
 const MAX_TICKS_PER_FRAME := 4
 
+## The village the player is born into, set before the scene is ready.
+var birth_village := 0
 var world: WorldAdapter
 var steered := 0
 var ticks := 0
@@ -16,6 +19,8 @@ var ticks := 0
 var _objective := Vector2i.ZERO
 var _skills := PackedInt64Array()
 var _since_tick := 0.0
+# Where the steered person last stood, kept for the camera once it has died.
+var _last_lead := Vector2.ZERO
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -23,7 +28,7 @@ var _since_tick := 0.0
 
 
 func _ready() -> void:
-	world = WorldAdapter.create_region(SEED)
+	world = WorldAdapter.create_region(SEED, birth_village)
 	steered = world.army_count() - 1
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
@@ -64,6 +69,8 @@ func command(event: InputEvent) -> bool:
 	var key := event as InputEventKey
 	if mouse != null and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
 		objective = Vector2i((mouse.position / PIXELS_PER_CELL).floor())
+	elif key != null and key.pressed and key.keycode == KEY_C:
+		return challenge() == WorldAdapter.CHALLENGE_NONE
 	elif key != null and key.pressed and key.keycode >= KEY_0 and key.keycode <= KEY_9:
 		var number := key.keycode - KEY_0
 		skills = _all_skills() if number == 0 else PackedInt64Array([number - 1])
@@ -76,6 +83,20 @@ func command(event: InputEvent) -> bool:
 	return true
 
 
+## Has the steered person challenge its faction's leader, marching on the leader with its current
+## skills, and shows the outcome on the HUD. Returns the core's verdict, one of the
+## WorldAdapter.CHALLENGE_* constants; CHALLENGE_NONE means the duel began.
+func challenge() -> int:
+	var faction := world.army_faction(steered)
+	var refusal := world.challenge_refusal(steered, faction)
+	if refusal == WorldAdapter.CHALLENGE_NONE:
+		var seat := Vector2i((world.person_position(world.leader(faction)) / WorldAdapter.CELL_SIZE).floor())
+		if world.order(steered, seat, _skills, faction):
+			_objective = seat
+	_hud.show_challenge(refusal)
+	return refusal
+
+
 ## Advances the world one tick.
 func step() -> void:
 	world.tick()
@@ -83,9 +104,12 @@ func step() -> void:
 	ticks += 1
 
 
-## Returns the steered person's lead body position, in sub-cell units.
+## Returns the steered person's position, in sub-cell units, or where it last stood once dead.
 func lead() -> Vector2:
-	return world.body_positions(steered)[0]
+	var positions := world.body_positions(steered)
+	if not positions.is_empty():
+		_last_lead = positions[0]
+	return _last_lead
 
 
 func _all_skills() -> PackedInt64Array:

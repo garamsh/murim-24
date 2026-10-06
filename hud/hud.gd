@@ -1,5 +1,6 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
-## HUD: the player's portrait, faction, health and inner energy with their values; a map of the
+## HUD: the player's portrait, faction, health and inner energy with their values; its faction's
+## leader, a duel for the lead while one is fought, and the verdict on a challenge; a map of the
 ## region around the player with the season and year; a rumour log; and the technique bar, an
 ## icon and its number key for each of the player's skills. Every word comes from
 ## hud.csv through Godot's translations, Korean first; F2 switches between Korean and English.
@@ -29,9 +30,25 @@ const KIND_COLOURS := {
 	"water": Color("2b5770"), "mountain": Color("8a94a0"),
 }
 const MAP_SIZE := Vector2i(76, 44)
+# How long a notice about a challenge stays on screen.
+const NOTICE_MS := 3000
+# The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
+const CHALLENGE_KEYS := {
+	WorldAdapter.CHALLENGE_NONE: "CHALLENGE_NONE",
+	WorldAdapter.CHALLENGE_NO_SUCCESSION: "CHALLENGE_NO_SUCCESSION",
+	WorldAdapter.CHALLENGE_NO_LEADER: "CHALLENGE_NO_LEADER",
+	WorldAdapter.CHALLENGE_NO_CHALLENGER: "CHALLENGE_NO_CHALLENGER",
+	WorldAdapter.CHALLENGE_NOT_A_MEMBER: "CHALLENGE_NOT_A_MEMBER",
+	WorldAdapter.CHALLENGE_IS_LEADER: "CHALLENGE_IS_LEADER",
+	WorldAdapter.CHALLENGE_DUEL_IN_PROGRESS: "CHALLENGE_DUEL_IN_PROGRESS",
+}
 
 ## Labels that show a translated key or a value, by what they show, so a test can read them.
 var labels := {}
+## The panel shown while a duel for the player's faction's lead is fought, and its two bars:
+## `challenger` and `leader`.
+var duel_panel: Panel
+var duel_bars := {}
 ## The icon in each technique slot, in key order.
 var slot_icons: Array[TextureRect] = []
 
@@ -45,6 +62,9 @@ var _map_texture: ImageTexture
 var _dot := ColorRect.new()
 var _slots: Array[Panel] = []
 var _icons := {}
+# The duel being shown: its challenger and each duellist's health when it began.
+var _duel := {}
+var _notice_until := 0
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
 
@@ -127,14 +147,67 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	hp_bar.value = 100.0 * strength / full
 	# A percentage of the starting strength: strength itself runs to units no player reads.
 	labels.hp_value.text = "%d%%" % floori(hp_bar.value)
-	var lead := world.body_positions(steered)[0] / WorldAdapter.CELL_SIZE
-	var corner := (Vector2i(lead) - MAP_SIZE / 2).clamp(Vector2i.ZERO,
-			(_world_size - MAP_SIZE).max(Vector2i.ZERO))
-	(_map.texture as AtlasTexture).region = Rect2(corner, MAP_SIZE)
-	_dot.position = _map.position + (lead - Vector2(corner)).floor() - Vector2.ONE
+	var positions := world.body_positions(steered)
+	_dot.visible = not positions.is_empty()
+	if not positions.is_empty():
+		var lead := positions[0] / WorldAdapter.CELL_SIZE
+		var corner := (Vector2i(lead) - MAP_SIZE / 2).clamp(Vector2i.ZERO,
+				(_world_size - MAP_SIZE).max(Vector2i.ZERO))
+		(_map.texture as AtlasTexture).region = Rect2(corner, MAP_SIZE)
+		_dot.position = _map.position + (lead - Vector2(corner)).floor() - Vector2.ONE
+	_refresh_leadership(world, steered)
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = JADE if skills.has(slot) else INK
+
+
+## Shows the core's verdict on the player's challenge, one of the WorldAdapter.CHALLENGE_*
+## constants, for NOTICE_MS: that the duel began, or why it was refused.
+func show_challenge(refusal: int) -> void:
+	_set_up()
+	_notice(CHALLENGE_KEYS.get(refusal, "CHALLENGE_NONE"))
+
+
+# Shows the player's faction's leader, and while a duel for its lead is fought, both duellists'
+# health against what each had when it began; when it ends, whether the lead changed hands.
+func _refresh_leadership(world: WorldAdapter, steered: int) -> void:
+	var faction := world.army_faction(steered)
+	var leader := world.leader(faction)
+	var own := world.roster(steered)
+	labels.leader_value.text = _who(leader, own) if leader >= 0 else tr("HUD_LEADER_NONE")
+	var fought := world.duel(faction)
+	duel_panel.visible = not fought.is_empty()
+	if fought.is_empty():
+		if not _duel.is_empty():
+			_notice("HUD_DUEL_NEW_LEADER" if leader == _duel.challenger else "HUD_DUEL_LEADER_HELD")
+			_duel = {}
+		return
+	if _duel.is_empty() or _duel.challenger != fought.challenger:
+		_duel = {
+			"challenger": fought.challenger,
+			"from": maxi(world.person_health(fought.challenger), 1),
+			"leader_from": maxi(world.person_health(fought.leader), 1),
+		}
+	labels.duel_challenger.text = _who(fought.challenger, own)
+	labels.duel_leader.text = _who(fought.leader, own)
+	duel_bars.challenger.value = 100.0 * world.person_health(fought.challenger) / _duel.from
+	duel_bars.leader.value = 100.0 * world.person_health(fought.leader) / _duel.leader_from
+
+
+# The player, if `person` is the player's own, or the person by number.
+func _who(person: int, own: PackedInt64Array) -> String:
+	return tr("HUD_LEADER_YOU") if own.has(person) else tr("HUD_PERSON") % person
+
+
+func _notice(key: String) -> void:
+	labels.notice.text = key
+	labels.notice.visible = true
+	_notice_until = Time.get_ticks_msec() + NOTICE_MS
+
+
+func _process(_delta: float) -> void:
+	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
+		labels.notice.visible = false
 
 
 func _build() -> void:
@@ -204,6 +277,33 @@ func _build() -> void:
 		_slots.append(cell)
 
 	labels.locale = _label(self, "HUD_LOCALE", Vector2(400, 68), STONE)
+
+	var leadership := _panel(Rect2(4, 58, 160, 18))
+	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
+	labels.leader_value = _value(leadership, Vector2(36, 2), 60)
+	labels.leader_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
+
+	duel_panel = _panel(Rect2(176, 4, 128, 44))
+	duel_panel.visible = false
+	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), HP)
+	labels.duel_challenger = _value(duel_panel, Vector2(5, 15), 52)
+	labels.duel_challenger.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	labels.duel_leader = _value(duel_panel, Vector2(5, 28), 52)
+	labels.duel_leader.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	duel_bars.challenger = ProgressBar.new()
+	duel_bars.leader = ProgressBar.new()
+	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), HP)
+	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), HP)
+	duel_bars.challenger.size.x = 62
+	duel_bars.leader.size.x = 62
+
+	labels.notice = _label(self, "", Vector2(90, 80), PAPER)
+	labels.notice.size = Vector2(300, 12)
+	labels.notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
+	labels.notice.add_theme_constant_override("outline_size", 3)
+	labels.notice.visible = false
 
 
 func _panel(rect: Rect2) -> Panel:

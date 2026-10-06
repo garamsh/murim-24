@@ -153,7 +153,11 @@ func refresh(view: Rect2) -> void:
 					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0)
 			drawn += 1
 	_fill_bands(buffers, first_row)
-	if steered >= 0:
+	# The markers follow the steered person while it lives.
+	var alive := steered >= 0 and not _tick_positions[steered].is_empty()
+	_ring.visible = alive
+	_chevron.visible = alive
+	if alive:
 		var lead := _tick_positions[steered][0] * CELL / WorldAdapter.CELL_SIZE
 		_ring.position = lead.floor()
 		_chevron.position = lead.floor()
