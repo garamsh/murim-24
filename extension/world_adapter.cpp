@@ -162,6 +162,7 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
       scenario.seed, std::move(scenario.map_rows), std::move(scenario.armies),
       std::move(scenario.structures), std::move(scenario.rules));
   adapter->world().set_focus(murim::centre_of(scenario.focus));
+  adapter->structure_kinds_ = std::move(scenario.structure_kinds);
   return adapter;
 }
 
@@ -169,11 +170,13 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
   murim::Region region = murim::generate_region(
       murim::Seed{static_cast<std::uint64_t>(seed)}, murim::region_data());
   region.armies.push_back(murim::born_in(region, 0));
+  std::vector<std::string> kinds = std::move(region.structure_kinds);
   const murim::Cell birthplace = region.armies.back().start;
   godot::Ref<WorldAdapter> adapter =
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
            std::move(region.structures), std::move(region.rules));
   adapter->world().set_focus(murim::centre_of(birthplace));
+  adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
   adapter->terrain_ = std::move(region.terrain);
   adapter->territory_ = std::move(region.territory);
@@ -194,6 +197,7 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   adapter.instantiate();
   for (const murim::ArmySpec& army : armies) {
     adapter->skill_counts_.push_back(army.skills.size());
+    adapter->skills_.push_back(army.skills);
     adapter->factions_.push_back(army.faction);
     adapter->strengths_.push_back(army.strength);
   }
@@ -311,6 +315,28 @@ godot::Vector2i WorldAdapter::structure_footprint(
   return godot::Vector2i{footprint.width, footprint.height};
 }
 
+godot::String WorldAdapter::structure_kind(std::int64_t structure) const {
+  const std::size_t index = structure_index(structure);
+  return index < structure_kinds_.size()
+             ? godot::String(structure_kinds_.at(index).c_str())
+             : godot::String();
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
+    std::int64_t army) const {
+  godot::TypedArray<godot::Dictionary> skills;
+  for (const murim::Skill& skill : skills_.at(army_index(army))) {
+    godot::Dictionary fields;
+    fields.set("range", skill.range);
+    fields.set("radius", skill.radius);
+    fields.set("body_damage", static_cast<std::int64_t>(skill.body_damage));
+    fields.set("structure_damage", skill.structure_damage);
+    fields.set("cooldown", static_cast<std::int64_t>(skill.cooldown));
+    skills.push_back(fields);
+  }
+  return skills;
+}
+
 std::int64_t WorldAdapter::structure_stage(std::int64_t structure) const {
   return static_cast<std::int64_t>(world().stage(structure_index(structure)));
 }
@@ -372,6 +398,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   for (const murim::Village& village : villages_) {
     godot::Dictionary fields;
     fields.set("name", godot::String(village.name.c_str()));
+    fields.set("kind", godot::String(village.kind.c_str()));
     fields.set("faction", static_cast<std::int64_t>(village.faction));
     fields.set("corner", godot::Vector2i{village.corner.x, village.corner.y});
     fields.set("area",
@@ -419,6 +446,10 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_method(
       godot::D_METHOD("structure_footprint", "structure"),
       &WorldAdapter::structure_footprint);
+  godot::ClassDB::bind_method(godot::D_METHOD("structure_kind", "structure"),
+                              &WorldAdapter::structure_kind);
+  godot::ClassDB::bind_method(godot::D_METHOD("skills", "army"),
+                              &WorldAdapter::skills);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
   godot::ClassDB::bind_method(godot::D_METHOD("army_faction", "army"),
