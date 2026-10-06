@@ -1,8 +1,9 @@
 # Checks that the genealogy panel shows what the adapter reads: after the region has lived long
 # enough for families to form, the panel on a parent shows that person's name, spouse and
 # children, their family name, age and sect, and talent and lifespan as unknown; moving down and
-# pressing Enter centres it on a child, whose parents then include that parent. Control: a
-# person the world began with has no parents, and the panel shows none.
+# pressing Enter centres it on a child, whose parents then include that parent, and whose
+# generation in the header is one more than its parents'. Control: a person the world began with
+# has no parents, the panel shows none, and its header reads the first generation.
 extends RefCounted
 
 const SEED := 2026
@@ -49,6 +50,7 @@ func run() -> bool:
 	var moved: bool = panel.move(Vector2i.DOWN)
 	var child: int = panel.selected
 	panel.centre_selected()
+	var child_generation: String = panel.details.generation
 	var recentred: bool = moved and children.has(child) and panel.centre == child \
 			and panel.cards.any(func(card: Dictionary) -> bool: return card.role == "parent" and card.person == parent)
 
@@ -57,9 +59,19 @@ func run() -> bool:
 	panel.show_person(world, founder, founder)
 	var founder_parents: int = panel.cards.filter(func(card: Dictionary) -> bool: return card.role == "parent").size()
 	var control := world.person_parents(founder).is_empty() and founder_parents == 0
-	var passed := kin_right and details_right and recentred and control
-	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s; the founder %d shows %d parents: %s" % [
+	# The header's generation: the founder's first, the child's one more than its parents'.
+	var founder_generation: String = panel.details.generation
+	# Setup: fifty days in, the child's parents are people the world began with, so it is the
+	# second generation.
+	var parents_founders := world.person_parents(child).size() > 0
+	for p in world.person_parents(child):
+		parents_founders = parents_founders and world.person_parents(p).is_empty()
+	var generations_right: bool = founder_generation == "1대" and parents_founders \
+			and child_generation == "2대"
+	var passed := kin_right and details_right and recentred and control and generations_right
+	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s; the founder %d shows %d parents; generations: founder %s, child %s: %s" % [
 		DAYS, parent, name.surname, name.given, spouse, children, shown, panel.details if not details_right else "match",
-		child, recentred, founder, founder_parents, "pass" if passed else "FAIL"])
+		child, recentred, founder, founder_parents, founder_generation, child_generation,
+		"pass" if passed else "FAIL"])
 	panel.free()
 	return passed

@@ -30,7 +30,7 @@ CHALLENGE_IS_LEADER,이미 수장이다.,You already lead.
 CHALLENGE_DUEL_IN_PROGRESS,이미 결투가 벌어지고 있다.,A duel is already being fought.
 GENEALOGY_TITLE,족보,Genealogy
 GENEALOGY_FAMILY,%s씨 가문,House of %s
-GENEALOGY_GENERATIONS,3대,Three generations
+GENEALOGY_GENERATION,%d대,Generation %d
 GENEALOGY_CLOSE,G 닫기,G Close
 GENEALOGY_PARENTS,부모,Parents
 GENEALOGY_SELF,본인,You
