@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -275,9 +276,11 @@ RegionData region_data() {
       {
           // The Orthodox and Unorthodox mend villages; the Demonic Cult burns
           // them and rebuilds nothing.
-          {"Orthodox", {1}, {GUARD, MEND}},
-          {"Demonic", {0, 2}, {GUARD, TORCH}},
-          {"Unorthodox", {1}, {GUARD, MEND}},
+          // The Demonic Cult changes leader by duel, to the death, and the
+          // old leader's allies turn on the winner.
+          {"Orthodox", {1}, {GUARD, MEND}, std::nullopt},
+          {"Demonic", {0, 2}, {GUARD, TORCH}, Duel{true, 0, true}},
+          {"Unorthodox", {1}, {GUARD, MEND}, std::nullopt},
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
       // hall of 5 by 3 north of the road through its centre, more houses
@@ -323,6 +326,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                       {DURABILITY, DURABILITY / 2, 1}},
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
+                {},
                 {}};
   // The owner of each free passable cell; a blocked or built-on cell is
   // owned by no faction, so no village fits on it.
@@ -397,6 +401,29 @@ Region generate_region(Seed seed, const RegionData& data) {
     region.armies.push_back(ArmySpec{centre, std::move(members), owner,
                                      data.factions.at(owner).skills});
     region.villages.push_back(village);
+  }
+  // A faction is led by the first resident of its first village; people are
+  // numbered in army order, so that resident's index counts every member of
+  // the armies before it.
+  region.leadership.resize(data.factions.size());
+  for (std::size_t faction = 0; faction < data.factions.size(); ++faction) {
+    region.leadership.at(faction).succession =
+        data.factions.at(faction).succession;
+  }
+  std::size_t counted = 0;
+  for (std::size_t army = 0; army < region.armies.size(); ++army) {
+    const auto housed = [army](const Village& village) {
+      return village.army == army;
+    };
+    const auto home =
+        std::find_if(region.villages.begin(), region.villages.end(), housed);
+    std::optional<std::size_t>& leader =
+        region.leadership.at(region.armies.at(army).faction).leader;
+    if (home != region.villages.end() && !leader &&
+        !region.armies.at(army).members.empty()) {
+      leader = counted;
+    }
+    counted += region.armies.at(army).members.size();
   }
   return region;
 }

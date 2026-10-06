@@ -240,7 +240,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xE4A2CD2A8FEFE169ULL);
+            0xF4BB49BB6403ECEEULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -1159,6 +1159,92 @@ TEST(World, VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction) {
   EXPECT_EQ(house_after_torch(0), HOUSE_DURABILITY);
   // Control: the same torch in hostile hands burns the house.
   EXPECT_LT(house_after_torch(1), HOUSE_DURABILITY);
+}
+
+// A Cult of faction 1 led by person 0 at CULT_SEAT, with two members of its
+// own, each an army of one: the player's body (person 1) and an NPC
+// (person 2). Faction 0 is at war with the Cult; faction 2 is at peace with
+// it, its ally. Person 3, of faction 0, and person 4, of faction 2, stand far
+// off.
+constexpr std::size_t ORTHODOX = 0;
+constexpr std::size_t CULT = 1;
+constexpr std::size_t ALLY = 2;
+constexpr std::size_t PLAYER = 1;
+constexpr std::size_t NPC = 2;
+constexpr std::size_t OUTSIDER = 3;
+constexpr Cell CULT_SEAT{10, 10};
+constexpr std::uint64_t DUEL_TICKS = 2'000;
+
+World cult_world(std::uint64_t challenger_health) {
+  constexpr Seed CULT_SEED{9};
+  const Skill strike{2 * CELL_SIZE, 0, 50, 0, 10};
+  const std::vector<std::string> rows = open_map(ORDERS_SIDE);
+  const std::vector<ArmySpec> armies{
+      ArmySpec{CULT_SEAT, {Recruit{CULT_SEAT, HOSTILE_HEALTH}}, CULT, {strike}},
+      ArmySpec{{4, 10}, {Recruit{{4, 10}, challenger_health}}, CULT, {strike}},
+      ArmySpec{{4, 12}, {Recruit{{4, 12}, challenger_health}}, CULT, {strike}},
+      ArmySpec{{1, 22}, {Recruit{{1, 22}, 1}}, ORTHODOX, {IDLE}},
+      ArmySpec{{22, 22}, {Recruit{{22, 22}, 1}}, ALLY, {IDLE}},
+  };
+  const Rules rules{
+      SEPARATION,
+      {{false, true, false}, {true, false, false}, {false, false, false}},
+      STAGE_FLOORS};
+  return World{CULT_SEED,
+               Map{rows},
+               armies,
+               {},
+               rules,
+               {},
+               {{}, {0, Duel{true, 0, true}}, {}}};
+}
+
+// Has army `army` challenge the Cult's leader at its seat and runs the duel
+// out, then returns the Cult's leader.
+std::optional<std::size_t> after_challenge(World& world, std::size_t army) {
+  world.order(army, Order{CULT_SEAT, {0}}, CULT);
+  run_ticks(world, DUEL_TICKS);
+  return world.leader(CULT);
+}
+
+TEST(World, OnlyAMemberMayChallengeTheCultsLeader) {
+  World world = cult_world(TARGET_HEALTH);
+  EXPECT_THROW(world.order(OUTSIDER, Order{CULT_SEAT, {0}}, CULT),
+               std::invalid_argument);
+  // Nor does a faction without a duel take a challenge.
+  EXPECT_THROW(world.order(PLAYER, Order{CULT_SEAT, {0}}, ORTHODOX),
+               std::invalid_argument);
+  // Control: a member's challenge is taken.
+  EXPECT_NO_THROW(world.order(PLAYER, Order{CULT_SEAT, {0}}, CULT));
+}
+
+TEST(World, AChallengerWhoWinsLeadsAndTheLeadersAlliesTurnOnThem) {
+  World won = cult_world(TARGET_HEALTH);
+  ASSERT_FALSE(won.hostile(ALLY, CULT));
+  EXPECT_EQ(after_challenge(won, PLAYER), std::optional<std::size_t>{1});
+  // The duel was fought by the one skill rule: the old leader fell.
+  EXPECT_EQ(won.person(0).health, 0U);
+  EXPECT_TRUE(won.hostile(ALLY, CULT));
+  EXPECT_TRUE(won.hostile(ORTHODOX, CULT));
+
+  // Control: a challenger who loses dies, and nothing changes.
+  World lost = cult_world(1);
+  EXPECT_EQ(after_challenge(lost, PLAYER), std::optional<std::size_t>{0});
+  EXPECT_EQ(lost.person(1).health, 0U);
+  EXPECT_FALSE(lost.hostile(ALLY, CULT));
+}
+
+TEST(World, ThePlayerAndAnNpcChallengeThroughTheSameOrder) {
+  World by_player = cult_world(TARGET_HEALTH);
+  World by_npc = cult_world(TARGET_HEALTH);
+  EXPECT_EQ(after_challenge(by_player, PLAYER), std::optional<std::size_t>{1});
+  EXPECT_EQ(after_challenge(by_npc, NPC), std::optional<std::size_t>{2});
+  // Control: without a challenge, members of one faction never fight.
+  World quiet = cult_world(TARGET_HEALTH);
+  quiet.order(PLAYER, Order{CULT_SEAT, {0}});
+  run_ticks(quiet, DUEL_TICKS);
+  EXPECT_EQ(quiet.leader(CULT), std::optional<std::size_t>{0});
+  EXPECT_EQ(quiet.person(0).health, HOSTILE_HEALTH);
 }
 
 }  // namespace

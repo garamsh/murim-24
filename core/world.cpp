@@ -184,7 +184,8 @@ Position stepped(const FlowField& field, Position from, Step direction) {
 
 World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              std::vector<Structure> structures, Rules rules,
-             std::vector<VillageSpec> villages)
+             std::vector<VillageSpec> villages,
+             std::vector<Leadership> leadership)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       map_(std::move(map)),
       rules_(std::move(rules)),
@@ -270,6 +271,17 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     }
     villages_.push_back(Village{std::move(spec), std::nullopt});
   }
+  const auto unknown = [this](const Leadership& faction) {
+    return faction.leader && *faction.leader >= people_.size();
+  };
+  if (leadership.size() > rules_.hostile.size() ||
+      std::any_of(leadership.begin(), leadership.end(), unknown)) {
+    throw std::invalid_argument(
+        "leaders must be people the world creates, of no more factions than "
+        "hostility names");
+  }
+  leadership_ = std::move(leadership);
+  leadership_.resize(rules_.hostile.size());
 }
 
 // Throws when one of `members` stands where `field` cannot reach.
@@ -285,7 +297,8 @@ void World::reachable_from(const FlowField& field,
   }
 }
 
-void World::order(std::size_t army, Order order) {
+void World::order(std::size_t army, Order order,
+                  std::optional<std::size_t> challenge) {
   const auto lacking = [this, army](std::size_t skill) {
     return skill >= armies_.at(army).skills.size();
   };
@@ -299,8 +312,33 @@ void World::order(std::size_t army, Order order) {
   Army& ordered = armies_.at(army);
   FlowField field{map_, order.objective};
   reachable_from(field, ordered.roster);
+  if (challenge) {
+    start_duel(ordered, *challenge);
+  }
   ordered.field = std::move(field);
   ordered.order = std::move(order);
+}
+
+// Starts a duel between `army`'s lead and faction `faction`'s leader, or
+// throws when the faction's succession refuses the challenge.
+void World::start_duel(const Army& army, std::size_t faction) {
+  const auto fought = [faction](const Fight& fight) {
+    return fight.faction == faction;
+  };
+  const Leadership none{};
+  const Leadership& led =
+      faction < leadership_.size() ? leadership_.at(faction) : none;
+  const std::optional<Duel>& rule = led.succession;
+  const std::optional<std::size_t>& leader = led.leader;
+  if (!rule || !leader || army.roster.empty() ||
+      (rule->members_only && army.faction != faction) ||
+      army.roster.front() == *leader ||
+      std::any_of(duels_.begin(), duels_.end(), fought)) {
+    throw std::invalid_argument(
+        "a challenge must name a faction that passes its lead by duel and has "
+        "a leader, from an army whose lead may challenge it, outside a duel");
+  }
+  duels_.push_back(Fight{faction, army.roster.front(), *leader, *rule});
 }
 
 void World::conscript(std::size_t person, std::size_t army) {
@@ -350,8 +388,7 @@ void World::tick() {
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     if (people_.at(crowd.people.at(index)).ready_at <= tick_count_) {
-      strike(people_.at(crowd.people.at(index)), crowd.armies.at(index), crowd,
-             damage);
+      strike(index, crowd, damage);
     }
   }
   // Damage lands after everyone has struck, so the order people strike in
@@ -360,6 +397,7 @@ void World::tick() {
     Person& struck = people_.at(crowd.people.at(index));
     struck.health -= std::min(damage.at(index), struck.health);
   }
+  settle_duels();
   for (Army& army : armies_) {
     army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
                                      [this](std::size_t member) {
@@ -481,6 +519,20 @@ StateHash World::hash() const {
       fold(member);
     }
   }
+  for (const Leadership& faction : leadership_) {
+    fold(faction.leader.has_value());
+    fold(faction.leader.value_or(0));
+    const Duel rule = faction.succession.value_or(Duel{false, 0, false});
+    fold(faction.succession.has_value());
+    fold(rule.members_only);
+    fold(rule.yield_health);
+    fold(rule.allies_turn_hostile);
+  }
+  for (const Fight& fight : duels_) {
+    fold(fight.faction);
+    fold(fight.challenger);
+    fold(fight.leader);
+  }
   for (const Village& village : villages_) {
     fold(village.spec.residents);
     fold(village.destroyer.has_value());
@@ -545,6 +597,55 @@ bool World::within_reach(const Army& army, const VillageSpec& spec,
       });
 }
 
+bool World::duelling(std::size_t one, std::size_t other) const {
+  return std::any_of(
+      duels_.begin(), duels_.end(), [one, other](const Fight& fight) {
+        return (fight.challenger == one && fight.leader == other) ||
+               (fight.challenger == other && fight.leader == one);
+      });
+}
+
+// Ends every duel in which a duellist has no more than its faction's yield
+// health left: the leader keeps the lead unless only the challenger stands,
+// who then leads, and the factions at peace with it turn hostile to it if
+// the duel says so.
+void World::settle_duels() {
+  const auto down = [this](const Fight& fight, std::size_t duellist) {
+    return people_.at(duellist).health <= fight.rule.yield_health;
+  };
+  const auto fallen = [&down](const Fight& fight) {
+    return down(fight, fight.challenger) || down(fight, fight.leader);
+  };
+  for (const Fight& fight : duels_) {
+    const Duel& rule = fight.rule;
+    const bool won =
+        down(fight, fight.leader) && !down(fight, fight.challenger);
+    if (!won) {
+      continue;
+    }
+    leadership_.at(fight.faction).leader = fight.challenger;
+    std::vector<std::vector<bool>>& hostility = rules_.hostile;
+    for (std::size_t other = 0; other < hostility.size(); ++other) {
+      const bool ally = other != fight.faction &&
+                        !hostility.at(other).at(fight.faction) &&
+                        !hostility.at(fight.faction).at(other);
+      hostility.at(other).at(fight.faction) =
+          hostility.at(other).at(fight.faction) ||
+          (ally && rule.allies_turn_hostile);
+    }
+  }
+  duels_.erase(std::remove_if(duels_.begin(), duels_.end(), fallen),
+               duels_.end());
+}
+
+std::optional<std::size_t> World::leader(std::size_t faction) const {
+  return leadership_.at(faction).leader;
+}
+
+bool World::hostile(std::size_t from, std::size_t target) const {
+  return rules_.hostile.at(from).at(target);
+}
+
 std::size_t World::owner(std::size_t village) const {
   return armies_.at(villages_.at(village).spec.residents).faction;
 }
@@ -568,14 +669,19 @@ std::uint64_t World::next_random() {
 // The one rule every skill resolves through, whoever uses it: each use hits
 // every hostile person in its disc once, and every structure its disc
 // reaches.
-void World::strike(Person& striker, std::size_t army, const Crowd& crowd,
+void World::strike(std::size_t user, const Crowd& crowd,
                    std::vector<std::uint64_t>& damage) {
+  const std::size_t army = crowd.armies.at(user);
+  const std::size_t self = crowd.people.at(user);
+  Person& striker = people_.at(self);
   const Army& own = armies_.at(army);
   const std::vector<std::size_t>& choice = own.order.skills;
   const Skill& skill = own.skills.at(choice.at(next_random() % choice.size()));
-  const auto hostile = [this, &own, &crowd](std::size_t other) {
+  // Duellists are hostile to each other whatever their factions.
+  const auto hostile = [this, &own, &crowd, self](std::size_t other) {
     return rules_.hostile.at(own.faction)
-        .at(armies_.at(crowd.armies.at(other)).faction);
+               .at(armies_.at(crowd.armies.at(other)).faction) ||
+           duelling(self, crowd.people.at(other));
   };
   // The nearest hostile person, the lowest index among equals, so the order
   // the query visits people in does not decide the target.

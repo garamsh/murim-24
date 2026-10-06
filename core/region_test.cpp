@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -122,7 +123,8 @@ std::vector<std::int64_t> flatten(const Region& region) {
 
 World world_of(const Region& region) {
   return World{region.seed,       Map{region.map_rows}, region.armies,
-               region.structures, region.rules,         village_specs(region)};
+               region.structures, region.rules,         village_specs(region),
+               region.leadership};
 }
 
 // Whether the region is a world's valid input, footprints and armies
@@ -307,7 +309,7 @@ TEST(Region, VillagesDoNotOverlap) {
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = region_data();
   data.factions.push_back(
-      Faction{"Martial clans", {1}, data.factions.at(0).skills});
+      Faction{"Martial clans", {1}, data.factions.at(0).skills, std::nullopt});
   data.factions.at(1).hostile_to.push_back(3);
 
   const Region region = generate_region(SEED, data);
@@ -544,6 +546,22 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   const Destroyer none{region.armies.size(), data.factions.size()};
   const Destroyer who = world.destroyer(target).value_or(none);
   EXPECT_EQ((std::pair{who.army, who.faction}), (std::pair{raider, DEMONIC}));
+}
+
+TEST(Region, EachFactionIsLedByTheFirstResidentOfItsFirstVillage) {
+  const Region region = generate_region(SEED, region_data());
+  const World world = world_of(region);
+  for (std::size_t faction = 0; faction < region.leadership.size(); ++faction) {
+    const std::size_t first = first_of(region, faction);
+    EXPECT_EQ(world.leader(faction),
+              std::optional<std::size_t>{
+                  world.roster(region.villages.at(first).army).front()})
+        << "faction " << faction;
+  }
+  // Only the Demonic Cult passes its lead by duel.
+  EXPECT_FALSE(region.leadership.at(0).succession.has_value());
+  EXPECT_TRUE(region.leadership.at(1).succession.has_value());
+  EXPECT_FALSE(region.leadership.at(2).succession.has_value());
 }
 
 }  // namespace

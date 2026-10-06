@@ -5,12 +5,16 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ## Current decisions
 
 - The simulation core is a C++ library in `core/`, with no engine dependency.
-- A world is created from a seed, a map of passable and blocked cells, armies, structures, rules and villages. The rules are data: the separation people keep, the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
+- A world is created from a seed, a map of passable and blocked cells, armies, structures, rules, villages and each faction's leadership. The rules are data: the separation people keep, the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
 - Every NPC is a person: a position, health, a cooldown and a home village or none. A person's identity is its index among the world's people, kept for as long as the world runs, through every army it serves in and after it dies. A world holds at most `MAX_PEOPLE`, 500, living people. That is a hard upper bound, not a target.
 - An army is a roster of the living people serving in it, never a count, with an objective, a faction and skills. Every living person stands on exactly one roster. A person who dies leaves its roster but keeps its record, so the dead cost no work on a tick and stay out of the spatial index.
 - `conscript()` moves one living person from its roster to another army's. `disband()` returns every member with a home to that village's residents; members without one stay. Neither creates nor removes a person, so the people on rosters are conserved.
 - Every army follows an order: an objective cell, and the skills, by index among its own, it strikes with. An army created from data follows its objective with all its skills. `order()` gives an army another order, which it follows from the next tick. That is the port through which a driver steers a body, whether the driver is Godot input or a test, and the same type and resolution serve an NPC and the player alike. Nothing records who steers an army.
 - The player's body is an army of one person, born into a village (`world-generation.md`).
+- A faction may have a leader, a person, and a succession rule, as data. The only rule is the duel; a faction without one keeps its leader. An order may name a faction to challenge, the same order for the player's body as for an NPC:
+  - The challenger is the ordered army's lead. A duel taking members only refuses a challenger from an army of another faction, and a faction with no duel or no leader refuses every challenge.
+  - The challenger and the leader become hostile to each other alone and fight by the one skill rule until one has no more than the duel's yield health left. The leader keeps the lead if both fall together.
+  - A challenger who wins leads the faction. If the duel says so, every faction at peace with it turns hostile to it, a change to the hostility the world holds.
 - Every person moves and strikes on every tick; there are no levels of detail. At 500 people the whole world costs less than the tick budget (below).
 - People move toward their order's objective along their army's flow field, rebuilt when an order changes the objective. A step enters any cell the flow field reaches and never a blocked one. An objective must be reachable from where each member stands, when the army is created and when it is given an order.
 - People keep the separation, about a cell, from neighbours found through a spatial hash rebuilt each tick:
@@ -49,6 +53,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - Skills as data, the single rule that resolves them, and structures and their stages: ADR 0006 (`adr/0006-resolve-every-skill-through-one-rule-scaled-by-count.md`), whose scaling by count ADR 0017 removes.
 - Villages, their derived state, repair as a signed structure effect, owners following residents, and the recorded destroyer: ADR 0015 (`adr/0015-run-the-village-life-cycle-from-structures-and-residents.md`).
 - Footprints, the hit rule they share, footprints that block in every stage, and objectives that must be reachable: ADR 0013 (`adr/0013-give-structures-footprints-that-block-movement-in-every-stage.md`).
+- Leaders as people, the duel as faction data fought by the one skill rule, and challenges through the order port: ADR 0018 (`adr/0018-change-a-factions-leader-by-duel-as-faction-data.md`).
 - Orders as the one shape of every army's intent, and the player's body as an army of one: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
 
 ## Open questions
