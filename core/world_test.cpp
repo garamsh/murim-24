@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "spatial_hash.hpp"
 
 namespace murim {
 namespace {
@@ -323,6 +324,22 @@ std::vector<Cell> target_grid() {
 }
 
 using Cells = std::vector<std::pair<std::int32_t, std::int32_t>>;
+
+TEST(World, StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap) {
+  const ArmySpec user{
+      {3, 3}, {3, 3}, 1, 1, 0, {{2 * CELL_SIZE, MAX_REACH, 1, 0, NEVER_AGAIN}}};
+  const ArmySpec target{{4, 3}, {4, 3}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  // The walk of the strike's area query over the bodies the world indexes,
+  // which stand at their start cells' centres.
+  const SpatialHash crowd{{centre_of(user.start), centre_of(target.start)}};
+  const auto [first, last] = crowd.walk(centre_of(target.start), MAX_REACH);
+  const std::int64_t cells = (std::int64_t{last.x} - first.x + 1) *
+                             (std::int64_t{last.y} - first.y + 1);
+  // Fatal, so an unbounded walk fails here rather than stalling the strike.
+  ASSERT_LE(cells, std::int64_t{OPEN_SIDE * OPEN_SIDE});
+
+  EXPECT_EQ(strength_lost(user, target, at_war(0)), 1U);
+}
 
 // Fires one skill of `radius` from (0, 3) at target_grid() and returns the
 // cells of the armies it damaged.
