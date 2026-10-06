@@ -222,7 +222,7 @@ func season_text(date: Dictionary) -> String:
 
 
 func _build() -> void:
-	var player := _panel(Rect2(4, 4, 160, 50))
+	var player := _panel(Rect2(4, 4, 168, 50))
 	_portrait.position = Vector2(4, 8)
 	_portrait.size = Vector2(32, 32)
 	_portrait.stretch_mode = TextureRect.STRETCH_SCALE
@@ -236,9 +236,9 @@ func _build() -> void:
 	labels.faction = _label(title, "", Vector2.ZERO, STONE)
 	# Each value on its label's line, right-aligned, and its bar under the line.
 	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), HP)
-	labels.hp_value = _value(player, Vector2(42, 14), 112)
+	labels.hp_value = _value(player, Vector2(42, 14), 120)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
-	labels.qi_value = _value(player, Vector2(42, 30), 112)
+	labels.qi_value = _value(player, Vector2(42, 30), 120)
 	_bar(player, hp_bar, Vector2(42, 26), HP)
 	_bar(player, qi_bar, Vector2(42, 42), QI)
 	# Inner energy is not in the core yet: its bar stands empty and its value is a dash.
@@ -253,7 +253,7 @@ func _build() -> void:
 	_dot.color = JADE
 	_dot.size = Vector2(2, 2)
 	map.add_child(_dot)
-	labels.season = _label(map, "HUD_SEASON_YEAR", Vector2(5, 48), PAPER)
+	labels.season = _trimmed(map, Vector2(5, 48), 74)
 
 	var rumour := _panel(Rect2(4, 230, 164, 36))
 	labels.rumour = _label(rumour, "HUD_RUMOR", Vector2(5, 2), GOLD_LIGHT)
@@ -295,16 +295,16 @@ func _build() -> void:
 	genealogy.use_font(_theme.default_font)
 	genealogy.visible = false
 
-	var leadership := _panel(Rect2(4, 58, 160, 18))
+	var leadership := _panel(Rect2(4, 58, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
-	labels.leader_value = _name(leadership, Vector2(42, 2), 56)
+	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
 	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
 
 	duel_panel = _panel(Rect2(176, 4, 128, 44))
 	duel_panel.visible = false
 	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), HP)
-	labels.duel_challenger = _name(duel_panel, Vector2(5, 15), 52)
-	labels.duel_leader = _name(duel_panel, Vector2(5, 28), 52)
+	labels.duel_challenger = _trimmed(duel_panel, Vector2(5, 15), 52)
+	labels.duel_leader = _trimmed(duel_panel, Vector2(5, 28), 52)
 	duel_bars.challenger = ProgressBar.new()
 	duel_bars.leader = ProgressBar.new()
 	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), HP)
@@ -358,9 +358,9 @@ func _value(parent: Control, at: Vector2, width: float) -> Label:
 	return label
 
 
-# A label for a person's name `width` pixels wide from `at`, its text from the left edge and cut
-# short with an ellipsis past the right.
-func _name(parent: Control, at: Vector2, width: float) -> Label:
+# A label `width` pixels wide from `at`, its text from the left edge and cut short with an
+# ellipsis past the right: a person's name, or a date in a year too late for the map panel.
+func _trimmed(parent: Control, at: Vector2, width: float) -> Label:
 	var label := _value(parent, at, width)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -376,7 +376,7 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 	bar.add_theme_stylebox_override("background", back)
 	bar.show_percentage = false
 	bar.position = at
-	bar.size = Vector2(112, 4)
+	bar.size = Vector2(120, 4)
 	parent.add_child(bar)
 
 
