@@ -12,12 +12,14 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - Input the core refuses, or that is missing, of the wrong type or outside the core's integer types, makes `create` report it with `push_error` and return null. No exception crosses into Godot.
 - It holds no game rule: every call is passed to the core, which decides what is valid.
 - `world_view/world_view.tscn`, the project's main scene, shows the M1 scenario. It draws every body through one `MultiMesh`, with no node per agent, sets the camera's centre as the focus before each tick, and ticks at the core's tick rate whatever the frame rate. Colours and sizes are presentation only.
+- The world is presented in an orthogonal top-down view, one core cell to one 16-pixel tile, with combat in real time on the core's tick. Art is pixel art on that 16-pixel grid, from Aseprite sources.
 - A headless Godot test shows that a world of two hostile armies with skills, and structures, driven through the adapter, gives the core's hash, body positions and counts for the same scenario, focus and tick count, against `world_hash`, a program that runs the core with no Godot; and that invalid scenarios return null while a valid one does not.
 
 ## Rationale
 
 - Godot is the presentation adapter and the core reaches it through GDExtension: ADR 0002 (`adr/0002-build-on-godot-with-a-cpp-simulation-core.md`).
 - The binding release, its pin, the build path, the scenario format, how refusals reach GDScript, the test runner and how CI installs Godot: ADR 0004 (`adr/0004-bind-the-core-to-godot-with-godot-cpp-through-cmake.md`).
+- The top-down view, real-time combat and pixel art on a 16-pixel tile grid, and the perspectives, combat styles and art rejected: ADR 0008 (`adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md`).
 
 ## Open questions
 
