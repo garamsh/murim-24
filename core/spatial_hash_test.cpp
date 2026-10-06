@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -51,7 +52,7 @@ std::vector<std::size_t> brute_force(const std::vector<Position>& positions,
   return found;
 }
 
-TEST(SpatialHash, WithinMatchesABruteForceScan) {
+TEST(SpatialHash, VisitWithinMatchesABruteForceScan) {
   const std::vector<Position> positions = random_population(7);
   const SpatialHash hash{positions};
 
@@ -59,8 +60,11 @@ TEST(SpatialHash, WithinMatchesABruteForceScan) {
   std::size_t without_neighbours = 0;
   for (std::size_t index = 0; index < POPULATION; ++index) {
     const std::vector<std::size_t> expected = brute_force(positions, index);
-    EXPECT_EQ(hash.within(positions.at(index), RADIUS), expected)
-        << "agent " << index;
+    std::vector<std::size_t> found;
+    hash.visit_within(positions.at(index), RADIUS,
+                      [&found](std::size_t other) { found.push_back(other); });
+    std::sort(found.begin(), found.end());
+    EXPECT_EQ(found, expected) << "agent " << index;
     // Every position lies within the radius of itself.
     ++(expected.size() == 1 ? without_neighbours : with_neighbours);
   }

@@ -127,10 +127,10 @@ void march(std::vector<Body>& bodies, std::int32_t stride,
   for (Body& body : bodies) {
     std::int64_t away_x = 0;
     std::int64_t away_y = 0;
-    for (const std::size_t other : crowd.within(body.position, separation)) {
+    crowd.visit_within(body.position, separation, [&](std::size_t other) {
       away_x += body.position.x - crowd.position(other).x;
       away_y += body.position.y - crowd.position(other).y;
-    }
+    });
     // A body crowded by neighbours steps away from them; any other follows
     // the flow field.
     const Step direction = away_x != 0 || away_y != 0
@@ -239,7 +239,8 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   for (ArmySpec& army : armies) {
     armies_.push_back(
-        Army{army.objective,
+        Army{armies_.size(),
+             army.objective,
              army.faction,
              std::move(army.skills),
              FlowField{map_, army.objective},
@@ -287,8 +288,11 @@ void World::tick() {
     }
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
+    // Each army marches at its own phase within the interval, so a tier's
+    // movement spreads over its ticks; strikes keep the tier's common tick,
+    // where every army's step lands at once.
     const std::uint64_t interval = crowd.intervals.at(army);
-    if (tick_count_ % interval == 0) {
+    if ((tick_count_ + armies_.at(army).phase) % interval == 0) {
       march(armies_.at(army).bodies,
             SPEED * static_cast<std::int32_t>(interval), armies_.at(army).field,
             crowd.hash, rules_.separation);
@@ -323,6 +327,7 @@ StateHash World::hash() const {
     fold(structure.durability);
   }
   for (const Army& army : armies_) {
+    fold(army.phase);
     fold(army.objective.x);
     fold(army.objective.y);
     fold(army.faction);
@@ -377,17 +382,20 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
     return rules_.hostile.at(own.faction)
         .at(armies_.at(crowd.armies.at(other)).faction);
   };
+  // The nearest living hostile body, the lowest index among equals, so the
+  // order the query visits bodies in does not decide the target.
   std::optional<std::size_t> target;
   std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-  for (const std::size_t other :
-       crowd.hash.within(user.position, skill.range)) {
+  crowd.hash.visit_within(user.position, skill.range, [&](std::size_t other) {
     const std::int64_t distance =
         distance_squared(user.position, crowd.hash.position(other));
-    if (crowd.counts.at(other) > 0 && hostile(other) && distance < nearest) {
+    const bool closer = distance < nearest ||
+                        (distance == nearest && target && other < *target);
+    if (crowd.counts.at(other) > 0 && hostile(other) && closer) {
       nearest = distance;
       target = other;
     }
-  }
+  });
   if (!target) {
     return;
   }
@@ -409,20 +417,19 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
   const std::uint64_t covered =
       1 + ((PI_NUMERATOR * reach * reach) / (PI_DENOMINATOR * side * side));
   const Position centre = crowd.hash.position(*target);
-  for (const std::size_t other : crowd.hash.within(centre, skill.radius)) {
+  crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (hostile(other)) {
       damage.at(other) +=
           skill.body_damage * force *
           std::min<std::uint64_t>(crowd.counts.at(other), covered);
     }
-  }
+  });
   const std::uint64_t broken = std::uint64_t{skill.structure_damage} * force;
-  for (const std::size_t index :
-       structure_index_.within(centre, skill.radius)) {
+  structure_index_.visit_within(centre, skill.radius, [&](std::size_t index) {
     Structure& structure = structures_.at(index);
     structure.durability -= static_cast<std::uint32_t>(
         std::min<std::uint64_t>(broken, structure.durability));
-  }
+  });
 }
 
 }  // namespace murim

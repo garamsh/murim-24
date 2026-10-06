@@ -88,8 +88,11 @@ struct Rules {
 };
 
 /// A level of detail. An army whose lead body lies within `reach` sub-cell
-/// units of the focus (Chebyshev distance) moves every `interval` ticks, as
-/// at most `max_bodies` bodies.
+/// units of the focus (Chebyshev distance) moves and strikes every
+/// `interval` ticks, as at most `max_bodies` bodies. It strikes on the ticks
+/// the interval divides, with every army of its tier, and moves at its own
+/// phase within the interval, set by its index, so a tier's armies do not
+/// all move on one tick.
 struct Tier {
   std::int64_t reach;
   std::uint64_t interval;
@@ -144,6 +147,7 @@ class World {
 
  private:
   struct Army {
+    std::uint64_t phase;
     Cell objective;
     std::size_t faction;
     std::vector<Skill> skills;
