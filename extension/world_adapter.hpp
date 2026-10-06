@@ -102,6 +102,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the cell structure `structure` stands on.
   [[nodiscard]] godot::Vector2i structure_cell(std::int64_t structure) const;
 
+  /// Returns the footprint of structure `structure`, its width and height in
+  /// cells, from structure_cell() as its top-left cell.
+  [[nodiscard]] godot::Vector2i structure_footprint(
+      std::int64_t structure) const;
+
   /// Returns the stage structure `structure` is in, one of the STAGE_*
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
@@ -133,7 +138,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::PackedInt64Array territory() const;
 
   /// Returns each village as a Dictionary of `name`, `faction` (int),
-  /// `corner` (Vector2i) and `side` (int); empty unless the world was made
+  /// `corner` (Vector2i) and `area` (Vector2i, its width and height in
+  /// cells); empty unless the world was made
   /// by create_region().
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
 

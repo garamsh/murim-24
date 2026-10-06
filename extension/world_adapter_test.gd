@@ -96,9 +96,10 @@ func run() -> bool:
 			and reads_pass
 
 
-# What the view reads: each army's faction and strength, its bodies' strengths, and for a region
-# its terrain, territory and villages, which agree with the map's blocked cells and the agent born
-# into the first village. A world made by create() has no region to read.
+# What the view reads: each army's faction and strength, its bodies' strengths, each structure's
+# footprint, and for a region its terrain, territory and villages, which agree with the map's
+# blocked cells, the agent born into the first village and the structures inside the villages. A
+# world made by create() has no region to read, and its structures are one cell.
 func _reads_pass() -> bool:
 	var world := _create(SEED, ARMIES, RULES)
 	var strength := 0
@@ -125,11 +126,24 @@ func _reads_pass() -> bool:
 	var born_faction := region.army_faction(region.army_count() - 1)
 	var villages_read := villages.size() >= 6 and villages.size() <= 8 \
 			and born_faction == int(villages[0].faction)
-	var passed := armies_read and no_region and agrees and villages_read
-	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, %d villages, agent's faction %d, first village's %d: %s" % [
+	# Every region structure lies inside a village's area, and some span several cells.
+	var footprints := {}
+	var inside := 0
+	for structure in region.structure_count():
+		var rect := Rect2i(region.structure_cell(structure), region.structure_footprint(structure))
+		footprints[rect.size] = true
+		for village: Dictionary in villages:
+			if Rect2i(village.corner, village.area).encloses(rect):
+				inside += 1
+				break
+	var footprints_read := world.structure_footprint(0) == Vector2i.ONE \
+			and inside == region.structure_count() and footprints.has(Vector2i(3, 3))
+	var passed := armies_read and no_region and agrees and villages_read and footprints_read
+	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, %d villages, agent's faction %d, first village's %d; created footprint %s, region footprints %s, %d of %d structures inside a village: %s" % [
 		world.army_faction(0), world.army_faction(1), world.army_strength(0), world.army_strength(1),
 		strength, no_region, cells, names, agrees, villages.size(), born_faction,
-		int(villages[0].faction) if villages.size() > 0 else -1, "pass" if passed else "FAIL"])
+		int(villages[0].faction) if villages.size() > 0 else -1, world.structure_footprint(0),
+		footprints.keys(), inside, region.structure_count(), "pass" if passed else "FAIL"])
 	return passed
 
 

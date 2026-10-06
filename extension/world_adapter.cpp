@@ -304,6 +304,13 @@ godot::Vector2i WorldAdapter::structure_cell(std::int64_t structure) const {
   return godot::Vector2i{cell.x, cell.y};
 }
 
+godot::Vector2i WorldAdapter::structure_footprint(
+    std::int64_t structure) const {
+  const murim::Footprint footprint =
+      world().structure(structure_index(structure)).footprint;
+  return godot::Vector2i{footprint.width, footprint.height};
+}
+
 std::int64_t WorldAdapter::structure_stage(std::int64_t structure) const {
   return static_cast<std::int64_t>(world().stage(structure_index(structure)));
 }
@@ -367,7 +374,8 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
     fields.set("name", godot::String(village.name.c_str()));
     fields.set("faction", static_cast<std::int64_t>(village.faction));
     fields.set("corner", godot::Vector2i{village.corner.x, village.corner.y});
-    fields.set("side", village.side);
+    fields.set("area",
+               godot::Vector2i{village.area.width, village.area.height});
     villages.push_back(fields);
   }
   return villages;
@@ -408,6 +416,9 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::structure_count);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_cell", "structure"),
                               &WorldAdapter::structure_cell);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("structure_footprint", "structure"),
+      &WorldAdapter::structure_footprint);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
   godot::ClassDB::bind_method(godot::D_METHOD("army_faction", "army"),
