@@ -1,8 +1,7 @@
-## Lets the player steer one agent born into the generated region, through the same orders every
+## Lets the player steer one person born into the generated region, through the same orders every
 ## army follows: a left click orders it toward the cell clicked, keys 1 to 9 to strike with that
-## skill, and 0 with all its skills. Before each tick the focus is set on the agent's lead body, and
-## the camera follows it. It ticks at the core's tick rate, draws the world through world_art.tscn
-## and the HUD through hud.tscn, and holds no game rule.
+## skill, and 0 with all its skills. The camera follows it. It ticks at the core's tick rate, draws
+## the world through world_art.tscn and the HUD through hud.tscn, and holds no game rule.
 extends Node2D
 
 const SEED := 2026
@@ -55,7 +54,7 @@ func _process(delta: float) -> void:
 	_hud.refresh(world, steered, _skills)
 
 
-## Turns `event`, its position in this node's pixels, into an order for the steered agent, keeping
+## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
 ## the part of its last order the event does not change. Returns whether it gave an order and the
 ## core accepted it.
 func command(event: InputEvent) -> bool:
@@ -77,15 +76,14 @@ func command(event: InputEvent) -> bool:
 	return true
 
 
-## Advances the world one tick, with the focus on the steered agent's lead body.
+## Advances the world one tick.
 func step() -> void:
-	world.set_focus(Vector2i(lead()))
 	world.tick()
 	_art.note_tick()
 	ticks += 1
 
 
-## Returns the steered agent's lead body position, in sub-cell units.
+## Returns the steered person's lead body position, in sub-cell units.
 func lead() -> Vector2:
 	return world.body_positions(steered)[0]
 

@@ -1,6 +1,6 @@
 ## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid
 ## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
-## buildings by stage, bodies by faction and the steered agent's markers. Bodies are batched:
+## buildings by stage, bodies by faction and the steered person's markers. Bodies are batched:
 ## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
 ## edge of what they stand on. It reads the world and holds no game rule.
 extends Node2D
@@ -30,8 +30,6 @@ const CHEVRON_FRAME_MS := 400
 const MARGIN := 64.0
 # Frame positions in the body atlas built at startup, in pixels.
 const BODY_FRAME := Vector2i(16, 24)
-const MARKER_FRAME := Vector2i(64, 48)
-const MARKER_ROW := 24
 
 var world: WorldAdapter
 var steered := -1
@@ -45,10 +43,9 @@ var _sprite_of_faction := PackedInt64Array()
 var _atlas: ImageTexture
 var _bands: Array[MultiMeshInstance2D] = []
 # Bodies change only on a tick, so they are read once per tick: positions now and a tick ago,
-# counts now, and each army's sprite set.
+# and each army's sprite set. Every body is one person.
 var _tick_positions: Array[PackedVector2Array] = []
 var _last_positions: Array[PackedVector2Array] = []
-var _counts: Array[PackedInt64Array] = []
 var _army_sprites := PackedInt64Array()
 ## The layer of the villages' ground decorations: paving, road and fields.
 var built: TileMapLayer
@@ -110,7 +107,6 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	for army in world.army_count():
 		_tick_positions.append(world.body_positions(army))
 		_last_positions.append(_tick_positions[army])
-		_counts.append(world.body_counts(army))
 		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
 
 
@@ -120,7 +116,6 @@ func note_tick() -> void:
 	for army in world.army_count():
 		_last_positions[army] = _tick_positions[army]
 		_tick_positions[army] = world.body_positions(army)
-		_counts[army] = world.body_counts(army)
 
 
 ## Updates buildings and bodies within `view`, the part of the world on screen, in pixels.
@@ -139,7 +134,6 @@ func refresh(view: Rect2) -> void:
 	drawn = 0
 	for army in _tick_positions.size():
 		var positions := _tick_positions[army]
-		var counts := _counts[army]
 		var before := _last_positions[army]
 		var sprite := _army_sprites[army]
 		for body in positions.size():
@@ -154,13 +148,9 @@ func refresh(view: Rect2) -> void:
 				heading = positions[body].x - before[body].x
 				if heading == 0.0 and positions[body].y == before[body].y:
 					heading = NAN
-			if counts[body] == 1:
-				var frame := 0 if is_nan(heading) else 1 + walk
-				_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
-						BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0)
-			else:
-				_append(buffers, row - first_row, row, Rect2(Vector2(sprite * MARKER_FRAME.x, MARKER_ROW),
-						MARKER_FRAME), Vector2(at.x, at.y + CELL / 2.0 - MARKER_FRAME.y / 2.0), false)
+			var frame := 0 if is_nan(heading) else 1 + walk
+			_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
+					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0)
 			drawn += 1
 	_fill_bands(buffers, first_row)
 	if steered >= 0:
@@ -357,18 +347,15 @@ func _lay_decorations() -> void:
 				_standing.add_child(sprite)
 
 
-# Puts the bodies' and the aggregate markers' frames in one texture, so every band draws from
-# it: the three factions' body sheets side by side on the first row, the army markers below.
+# Puts the bodies' frames in one texture, so every band draws from it: the three factions' body
+# sheets side by side.
 func _build_body_atlas() -> void:
-	var image := Image.create_empty(256, MARKER_ROW + MARKER_FRAME.y, false, Image.FORMAT_RGBA8)
+	var image := Image.create_empty(256, BODY_FRAME.y, false, Image.FORMAT_RGBA8)
 	for faction in FACTIONS.size():
 		var sheet := _sheet("bodies/" + FACTIONS[faction])
 		var source: Image = sheet.texture.get_image()
 		source.convert(Image.FORMAT_RGBA8)
 		image.blit_rect(source, Rect2i(Vector2i.ZERO, source.get_size()), Vector2i(faction * 80, 0))
-	var markers: Image = _sheet("markers/army_marker").texture.get_image()
-	markers.convert(Image.FORMAT_RGBA8)
-	image.blit_rect(markers, Rect2i(Vector2i.ZERO, markers.get_size()), Vector2i(0, MARKER_ROW))
 	_atlas = ImageTexture.create_from_image(image)
 
 

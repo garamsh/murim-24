@@ -1,11 +1,9 @@
 // Prints the core's hash after running a scenario, its bits read as a signed
-// int as GDScript reads them, then one line `army x y count` per body: the
-// reference extension/world_adapter_test.gd checks the adapter against. The
-// scenario is one argument of whitespace-separated fields in the order the
-// core's types declare them, each list preceded by its length, and the focus
-// in sub-cell units last:
+// int as GDScript reads them, then one line `army x y health` per living
+// person: the reference extension/world_adapter_test.gd checks the adapter
+// against. The scenario is one argument of whitespace-separated fields in the
+// order the core's types declare them, each list preceded by its length:
 // seed ticks rows... armies... structures... separation hostile... floors...
-// focus_x focus_y
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -52,11 +50,16 @@ murim::Skill read_skill(std::istream& scenario) {
   return skill;
 }
 
+murim::Recruit read_member(std::istream& scenario) {
+  const murim::Cell cell = read_cell(scenario);
+  return murim::Recruit{cell, read<std::uint64_t>(scenario)};
+}
+
 murim::ArmySpec read_army(std::istream& scenario) {
   murim::ArmySpec army{};
-  army.start = read_cell(scenario);
   army.objective = read_cell(scenario);
-  scenario >> army.count >> army.strength >> army.faction;
+  army.members = read_list(scenario, read_member);
+  scenario >> army.faction;
   army.skills = read_list(scenario, read_skill);
   return army;
 }
@@ -101,8 +104,6 @@ int main(int argc, char** argv) {
     const std::size_t army_total = armies.size();
     murim::World world{murim::Seed{seed}, murim::Map{rows}, std::move(armies),
                        std::move(structures), read_rules(scenario)};
-    const auto focus_x = read<std::int32_t>(scenario);
-    world.set_focus(murim::Position{focus_x, read<std::int32_t>(scenario)});
     for (std::uint64_t i = 0; i < ticks; ++i) {
       world.tick();
     }
@@ -110,9 +111,10 @@ int main(int argc, char** argv) {
                      static_cast<std::uint64_t>(world.hash()))
               << '\n';
     for (std::size_t army = 0; army < army_total; ++army) {
-      for (const murim::Body& body : world.bodies(army)) {
-        std::cout << army << ' ' << body.position.x << ' ' << body.position.y
-                  << ' ' << body.count << '\n';
+      for (const std::size_t member : world.roster(army)) {
+        const murim::Person& person = world.person(member);
+        std::cout << army << ' ' << person.position.x << ' '
+                  << person.position.y << ' ' << person.health << '\n';
       }
     }
     return 0;

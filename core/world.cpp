@@ -26,51 +26,20 @@ constexpr std::uint64_t MIX_MULTIPLIER_2 = 0x94D049BB133111EBULL;
 constexpr unsigned MIX_SHIFT_1 = 30U;
 constexpr unsigned MIX_SHIFT_2 = 27U;
 constexpr unsigned MIX_SHIFT_3 = 31U;
-// Pi as 355/113 (Zu Chongzhi), within 3e-7 of it, for areas in integers.
-constexpr std::uint64_t PI_NUMERATOR = 355;
-constexpr std::uint64_t PI_DENOMINATOR = 113;
+// Cells beyond its arrival ring a person may be jostled and still count as
+// standing still.
+constexpr std::uint32_t STANDING_SLACK = 2;
 
-// A move crosses at most one cell border per axis, so the flow field vets
-// every cell a body enters.
-constexpr bool strides_fit_a_cell() {
-  bool fit = true;
-  for (const Tier& tier : TIERS) {
-    fit = fit && SPEED * tier.interval <= CELL_SIZE;
-  }
-  return fit;
-}
-static_assert(strides_fit_a_cell(), "a tier's stride must not exceed a cell");
-static_assert(TIERS.back().reach == std::numeric_limits<std::int64_t>::max(),
-              "the far tier must reach every body");
-
-// The most uses one strike can make: one per tick of the longest step.
-constexpr std::uint64_t longest_interval() {
-  std::uint64_t longest = 0;
-  for (const Tier& tier : TIERS) {
-    longest = std::max(longest, tier.interval);
-  }
-  return longest;
-}
-constexpr std::uint64_t MAX_USES = longest_interval();
 constexpr std::uint64_t UINT64_LIMIT =
     std::numeric_limits<std::uint64_t>::max();
 
-// The damage a body takes in one tick is at most every agent striking, each
-// with every use, at every agent of the body struck.
-static_assert(MAX_BODY_DAMAGE <=
-                  UINT64_LIMIT / MAX_AGENTS / MAX_USES / MAX_AGENTS,
-              "the damage a body takes in a tick must fit 64 bits");
-static_assert(
-    std::uint64_t{std::numeric_limits<std::int32_t>::max()} + 1 <=
-        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) /
-            MAX_AGENTS / MAX_USES,
-    "the damage a structure takes in a strike must fit 64 bits");
-// wound() multiplies count by strength and adds strength to round up.
-static_assert(MAX_STRENGTH <= (UINT64_LIMIT - MAX_STRENGTH) / MAX_AGENTS,
-              "a body's count times its strength must fit 64 bits");
+// The damage a person takes in one tick is at most every other living
+// person's strike.
+static_assert(MAX_BODY_DAMAGE <= UINT64_LIMIT / MAX_PEOPLE,
+              "the damage a person takes in a tick must fit 64 bits");
 // A cooldown leaves half the range to the tick count it is added to.
-static_assert(MAX_COOLDOWN <= UINT64_LIMIT / 2 / MAX_USES,
-              "a step's cooldowns must fit beside the tick count");
+static_assert(MAX_COOLDOWN <= UINT64_LIMIT / 2,
+              "a cooldown must fit beside the tick count");
 
 std::uint64_t mix(std::uint64_t value) {
   value = (value ^ (value >> MIX_SHIFT_1)) * MIX_MULTIPLIER_1;
@@ -145,100 +114,70 @@ std::int32_t sign(std::int64_t value) {
          static_cast<std::int32_t>(value < 0);
 }
 
-const Tier& tier_at(Position focus, Position lead) {
+// A push on a person, in sub-cell units along each axis.
+struct Push {
+  std::int64_t x;
+  std::int64_t y;
+};
+
+// The integer square root, rounded down.
+std::int64_t root(std::int64_t value) {
+  std::int64_t low = 0;
+  constexpr std::int64_t ABOVE_ANY_ROOT = std::int64_t{1} << 32;
+  std::int64_t high = std::min<std::int64_t>(value, ABOVE_ANY_ROOT);
+  while (low < high) {
+    const std::int64_t middle = (low + high + 1) / 2;
+    if (middle <= value / middle) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return low;
+}
+
+// The push a person at `from` takes from one at `there`, closer than the
+// separation: away along the line between them, the harder the closer. Two on
+// one point part along `lean`.
+Push repulsion(Position from, Position there, std::int64_t separation,
+               Step lean) {
+  const std::int64_t offset_x = std::int64_t{from.x} - there.x;
+  const std::int64_t offset_y = std::int64_t{from.y} - there.y;
   const std::int64_t distance =
-      std::max(std::abs(std::int64_t{lead.x} - focus.x),
-               std::abs(std::int64_t{lead.y} - focus.y));
-  return *std::find_if(
-      TIERS.begin(), TIERS.end(),
-      [distance](const Tier& tier) { return distance <= tier.reach; });
+      root((offset_x * offset_x) + (offset_y * offset_y));
+  if (distance == 0) {
+    return Push{lean.x * separation, lean.y * separation};
+  }
+  const std::int64_t give = separation - distance;
+  return Push{offset_x * give / distance, offset_y * give / distance};
 }
 
-// Moves one axis at a time, and only where the move does not lengthen the
-// path to the objective, so no body enters a blocked cell or backs away.
-Position advance(const FlowField& field, Position from, Step direction,
-                 std::int32_t stride) {
-  const std::uint32_t limit = field.distance(cell_of(from));
-  const Position along_x{from.x + (direction.x * stride), from.y};
-  const Position moved_x =
-      field.distance(cell_of(along_x)) <= limit ? along_x : from;
-  const Position along_y{moved_x.x, moved_x.y + (direction.y * stride)};
-  return field.distance(cell_of(along_y)) <= limit ? along_y : moved_x;
+// The push a person standing still at `from` takes from one at `there` on
+// the move along `way`: it steps aside, across that way, to its own side of
+// it, or, exactly in it, to `side`.
+Push aside(Position from, Position there, std::int64_t separation, Step way,
+           std::int64_t side) {
+  const std::int64_t offset_x = std::int64_t{from.x} - there.x;
+  const std::int64_t offset_y = std::int64_t{from.y} - there.y;
+  const std::int64_t give =
+      separation - root((offset_x * offset_x) + (offset_y * offset_y));
+  const auto across = [side](std::int64_t offset) {
+    return offset != 0 ? sign(offset) : side;
+  };
+  return Push{way.y != 0 ? across(offset_x) * give : 0,
+              way.x != 0 ? across(offset_y) * give : 0};
 }
 
-// Reads every neighbour from `crowd`, the positions as the tick began, so the
-// order bodies move in does not change where they go.
-void march(std::vector<Body>& bodies, std::int32_t stride,
-           const FlowField& field, const SpatialHash& crowd,
-           std::int32_t separation) {
-  for (Body& body : bodies) {
-    std::int64_t away_x = 0;
-    std::int64_t away_y = 0;
-    crowd.visit_within(body.position, separation, [&](std::size_t other) {
-      away_x += body.position.x - crowd.position(other).x;
-      away_y += body.position.y - crowd.position(other).y;
-    });
-    // A body crowded by neighbours steps away from them; any other follows
-    // the flow field.
-    const Step direction = away_x != 0 || away_y != 0
-                               ? Step{sign(away_x), sign(away_y)}
-                               : field.step(cell_of(body.position));
-    body.position = advance(field, body.position, direction, stride);
-  }
-}
-
-// Lowers strength by `damage`, and count in proportion, rounded up: a body
-// with strength left keeps an agent, and none once its strength is gone.
-void wound(Body& body, std::uint64_t damage) {
-  const std::uint64_t before = std::max<std::uint64_t>(body.strength, 1);
-  body.strength -= std::min(damage, body.strength);
-  body.count = static_cast<std::uint32_t>(
-      ((std::uint64_t{body.count} * body.strength) + before - 1) / before);
-}
-
-// Drops dead bodies, keeping one so an army always has a lead, and moves
-// living ones to the front. Then, unless the living bodies already number
-// what the tier allows, merges them into their totals and splits those into
-// at most `max_bodies` bodies on a lattice across the lead body's cell. Count
-// and strength are divided with the remainder spread one unit at a time, so
-// the totals carry over exactly; every new body waits for the latest
-// cooldown among the old ones.
-void regroup(std::vector<Body>& bodies, std::uint32_t max_bodies) {
-  const auto living =
-      std::stable_partition(bodies.begin(), bodies.end(),
-                            [](const Body& body) { return body.count > 0; });
-  bodies.erase(std::max(living, bodies.begin() + 1), bodies.end());
-  std::uint32_t count = 0;
-  std::uint64_t strength = 0;
-  std::uint64_t ready_at = 0;
-  for (const Body& body : bodies) {
-    count += body.count;
-    strength += body.strength;
-    ready_at = std::max(ready_at, body.ready_at);
-  }
-  const std::uint32_t pieces = std::max(1U, std::min(count, max_bodies));
-  if (pieces == bodies.size()) {
-    return;
-  }
-  std::uint32_t side = 1;
-  while (std::uint64_t{side} * side < pieces) {
-    ++side;
-  }
-  const std::int32_t spacing = CELL_SIZE / static_cast<std::int32_t>(side);
-  const Cell cell = cell_of(bodies.front().position);
-  const Position corner{cell.x * CELL_SIZE, cell.y * CELL_SIZE};
-  bodies.clear();
-  for (std::uint32_t piece = 0; piece < pieces; ++piece) {
-    const auto column = static_cast<std::int32_t>(piece % side);
-    const auto row = static_cast<std::int32_t>(piece / side);
-    bodies.push_back(Body{
-        Position{corner.x + (column * spacing) + (spacing / 2),
-                 corner.y + (row * spacing) + (spacing / 2)},
-        (count / pieces) + static_cast<std::uint32_t>(piece < count % pieces),
-        (strength / pieces) +
-            static_cast<std::uint64_t>(piece < strength % pieces),
-        ready_at});
-  }
+// Moves from `from` one step along `direction`, one axis at a time, into
+// cells the flow field reaches only.
+Position stepped(const FlowField& field, Position from, Step direction) {
+  const auto reached = [&field](Position position) {
+    return field.distance(cell_of(position)) != FlowField::UNREACHABLE;
+  };
+  const Position along_x{from.x + (direction.x * SPEED), from.y};
+  const Position moved_x = reached(along_x) ? along_x : from;
+  const Position along_y{moved_x.x, moved_x.y + (direction.y * SPEED)};
+  return reached(along_y) ? along_y : moved_x;
 }
 
 }  // namespace
@@ -259,48 +198,33 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     return !reachable(skill.range) || !reachable(skill.radius) ||
            skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN;
   };
-  const auto invalid_army = [this, factions,
-                             invalid_skill](const ArmySpec& army) {
-    return army.count == 0 || army.strength < army.count ||
-           army.strength > MAX_STRENGTH || army.skills.empty() ||
-           army.faction >= factions || !map_.passable(army.start) ||
-           !map_.passable(army.objective) ||
-           std::any_of(army.skills.begin(), army.skills.end(), invalid_skill);
+  const auto invalid_recruit = [this](const Recruit& recruit) {
+    return recruit.health == 0 || recruit.health > MAX_HEALTH ||
+           !map_.passable(recruit.cell);
   };
-  // Footprints block their cells before any army is checked against them.
+  const auto invalid_army = [&](const ArmySpec& army) {
+    return army.skills.empty() || army.faction >= factions ||
+           !map_.passable(army.objective) ||
+           std::any_of(army.skills.begin(), army.skills.end(), invalid_skill) ||
+           std::any_of(army.members.begin(), army.members.end(),
+                       invalid_recruit);
+  };
+  // Footprints block their cells before any recruit is checked against them.
   const bool placed = block_footprints(map_, structures_);
-  std::uint64_t agents = 0;
+  std::size_t recruits = 0;
   for (const ArmySpec& army : armies) {
-    agents += army.count;
+    recruits += army.members.size();
   }
-  if (!reachable(rules_.separation) || agents > MAX_AGENTS ||
+  if (!reachable(rules_.separation) || recruits > MAX_PEOPLE ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
         "separation, range and radius must lie in [0, MAX_REACH], hostility "
-        "must be square, armies must hold at most MAX_AGENTS agents together, "
-        "and every army must hold agents, strength up to MAX_STRENGTH and "
-        "skills within MAX_BODY_DAMAGE and MAX_COOLDOWN of a known faction "
-        "and stand on passable cells, and every structure must cover 1 to "
-        "MAX_FOOTPRINT cells along each side, all passable and covered by no "
-        "other structure");
-  }
-  village_of_.resize(structures_.size());
-  for (VillageSpec& spec : villages) {
-    const auto claimed = [this](std::size_t structure) {
-      return structure >= village_of_.size() ||
-             village_of_.at(structure).has_value();
-    };
-    if (spec.residents >= armies.size() ||
-        std::any_of(spec.structures.begin(), spec.structures.end(), claimed)) {
-      throw std::invalid_argument(
-          "a village must name existing structures no other village names, "
-          "and an existing army as its residents");
-    }
-    for (const std::size_t structure : spec.structures) {
-      village_of_.at(structure) = villages_.size();
-    }
-    villages_.push_back(Village{std::move(spec), std::nullopt});
+        "must be square, the world must hold at most MAX_PEOPLE people, each "
+        "with health up to MAX_HEALTH on a passable cell, every army must "
+        "have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known "
+        "faction, and every structure must cover 1 to MAX_FOOTPRINT cells "
+        "along each side, all passable and covered by no other structure");
   }
   for (const Structure& structure : structures_) {
     structure_extent_ =
@@ -310,21 +234,56 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   for (ArmySpec& army : armies) {
     std::vector<std::size_t> every_skill(army.skills.size());
     std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
-    armies_.push_back(
-        Army{armies_.size(),
-             army.faction,
-             std::move(army.skills),
-             Order{army.objective, std::move(every_skill)},
-             FlowField{map_, army.objective},
-             {Body{centre_of(army.start), army.count, army.strength, 0}}});
-    if (armies_.back().field.distance(army.start) == FlowField::UNREACHABLE) {
-      throw std::invalid_argument(
-          "every army's objective must be reachable from its start");
+    std::vector<std::size_t> roster;
+    for (const Recruit& recruit : army.members) {
+      roster.push_back(people_.size());
+      people_.push_back(
+          Person{centre_of(recruit.cell), recruit.health, 0, std::nullopt});
     }
+    FlowField field{map_, army.objective};
+    reachable_from(field, roster);
+    armies_.push_back(Army{army.faction, std::move(army.skills),
+                           Order{army.objective, std::move(every_skill)},
+                           std::move(field), std::move(roster)});
+  }
+  village_of_.resize(structures_.size());
+  for (VillageSpec& spec : villages) {
+    const auto claimed = [this](std::size_t structure) {
+      return structure >= village_of_.size() ||
+             village_of_.at(structure).has_value();
+    };
+    const auto housed = [&spec](const Village& village) {
+      return village.spec.residents == spec.residents;
+    };
+    if (spec.residents >= armies_.size() ||
+        std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
+        std::any_of(villages_.begin(), villages_.end(), housed)) {
+      throw std::invalid_argument(
+          "a village must name existing structures no other village names, "
+          "and an existing army no other village houses as its residents");
+    }
+    for (const std::size_t structure : spec.structures) {
+      village_of_.at(structure) = villages_.size();
+    }
+    for (const std::size_t member : armies_.at(spec.residents).roster) {
+      people_.at(member).home = villages_.size();
+    }
+    villages_.push_back(Village{std::move(spec), std::nullopt});
   }
 }
 
-void World::set_focus(Position focus) { focus_ = focus; }
+// Throws when one of `members` stands where `field` cannot reach.
+void World::reachable_from(const FlowField& field,
+                           const std::vector<std::size_t>& members) const {
+  const auto cut_off = [this, &field](std::size_t member) {
+    return field.distance(cell_of(people_.at(member).position)) ==
+           FlowField::UNREACHABLE;
+  };
+  if (std::any_of(members.begin(), members.end(), cut_off)) {
+    throw std::invalid_argument(
+        "an army's objective must be reachable from where each member stands");
+  }
+}
 
 void World::order(std::size_t army, Order order) {
   const auto lacking = [this, army](std::size_t skill) {
@@ -339,62 +298,133 @@ void World::order(std::size_t army, Order order) {
   }
   Army& ordered = armies_.at(army);
   FlowField field{map_, order.objective};
-  if (field.distance(cell_of(ordered.bodies.front().position)) ==
-      FlowField::UNREACHABLE) {
-    throw std::invalid_argument(
-        "an order's objective must be reachable from where the army stands");
-  }
+  reachable_from(field, ordered.roster);
   ordered.field = std::move(field);
   ordered.order = std::move(order);
+}
+
+void World::conscript(std::size_t person, std::size_t army) {
+  const auto serving = [person](const Army& candidate) {
+    return std::find(candidate.roster.begin(), candidate.roster.end(),
+                     person) != candidate.roster.end();
+  };
+  const auto from = std::find_if(armies_.begin(), armies_.end(), serving);
+  if (army >= armies_.size() || from == armies_.end()) {
+    throw std::invalid_argument(
+        "only a living person can be conscripted, into an existing army");
+  }
+  reachable_from(armies_.at(army).field, {person});
+  from->roster.erase(
+      std::find(from->roster.begin(), from->roster.end(), person));
+  armies_.at(army).roster.push_back(person);
+}
+
+void World::disband(std::size_t army) {
+  const std::vector<std::size_t> members = armies_.at(army).roster;
+  for (const std::size_t member : members) {
+    const std::optional<std::size_t>& home = people_.at(member).home;
+    if (home) {
+      conscript(member, villages_.at(*home).spec.residents);
+    }
+  }
 }
 
 void World::tick() {
   rng_state_ += SPLITMIX_INCREMENT;
   ++tick_count_;
-  std::vector<std::uint64_t> intervals;
   std::vector<Position> positions;
+  std::vector<std::size_t> people;
   std::vector<std::size_t> owners;
-  std::vector<std::uint32_t> counts;
+  // Each living person's index in the crowd.
+  std::vector<std::size_t> slot(people_.size());
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    std::vector<Body>& bodies = armies_.at(army).bodies;
-    const Tier& tier = tier_at(focus_, bodies.front().position);
-    regroup(bodies, tier.max_bodies);
-    intervals.push_back(tier.interval);
-    for (const Body& body : bodies) {
-      positions.push_back(body.position);
+    for (const std::size_t member : armies_.at(army).roster) {
+      slot.at(member) = people.size();
+      positions.push_back(people_.at(member).position);
+      people.push_back(member);
       owners.push_back(army);
-      counts.push_back(body.count);
     }
   }
-  const Crowd crowd{SpatialHash{std::move(positions)}, std::move(owners),
-                    std::move(counts), std::move(intervals)};
-  std::vector<std::uint64_t> damage(crowd.armies.size(), 0);
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    for (Body& body : armies_.at(army).bodies) {
-      if (tick_count_ % crowd.intervals.at(army) == 0 &&
-          body.ready_at <= tick_count_) {
-        strike(body, army, crowd, damage);
-      }
+  const Crowd crowd{SpatialHash{std::move(positions)}, std::move(people),
+                    std::move(owners)};
+  std::vector<std::uint64_t> damage(crowd.people.size(), 0);
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    if (people_.at(crowd.people.at(index)).ready_at <= tick_count_) {
+      strike(people_.at(crowd.people.at(index)), crowd.armies.at(index), crowd,
+             damage);
     }
   }
-  // Damage lands after every body has struck, so the order bodies strike in
-  // does not decide who strikes.
-  std::size_t index = 0;
+  // Damage lands after everyone has struck, so the order people strike in
+  // does not decide who strikes. The dead leave their army's roster.
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    Person& struck = people_.at(crowd.people.at(index));
+    struck.health -= std::min(damage.at(index), struck.health);
+  }
   for (Army& army : armies_) {
-    for (Body& body : army.bodies) {
-      wound(body, damage.at(index++));
+    army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
+                                     [this](std::size_t member) {
+                                       return people_.at(member).health == 0;
+                                     }),
+                      army.roster.end());
+  }
+  // Each person's pull toward its objective, from where it stood: none
+  // within its arrival ring, as many cells from the objective as the square
+  // root of its rank in its army. A person within two cells of its ring
+  // counts as standing still, so a crowd jostled a little stays standing.
+  std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
+  std::vector<bool> standing(crowd.people.size(), true);
+  for (const Army& army : armies_) {
+    for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
+      const std::size_t index = slot.at(army.roster.at(rank));
+      const Cell cell = cell_of(crowd.hash.position(index));
+      const auto ring =
+          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
+      const std::uint32_t distance = army.field.distance(cell);
+      pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
+      standing.at(index) = distance <= ring + STANDING_SLACK;
     }
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    // Each army marches at its own phase within the interval, so a tier's
-    // movement spreads over its ticks; strikes keep the tier's common tick,
-    // where every army's step lands at once.
-    const std::uint64_t interval = crowd.intervals.at(army);
-    if ((tick_count_ + armies_.at(army).phase) % interval == 0) {
-      march(armies_.at(army).bodies,
-            SPEED * static_cast<std::int32_t>(interval), armies_.at(army).field,
-            crowd.hash, rules_.separation);
-    }
+    march(army, crowd, slot, pulls, standing);
+  }
+}
+
+// Each member steps away from the people closer to it than the separation,
+// the harder the closer each is, and otherwise along its pull. A person on the
+// move does not give way to people standing still, who give way to it, so a
+// standing crowd parts for a person walking out of it. A step enters any cell
+// the flow field reaches. Positions are read from `crowd`, as the tick began,
+// so the order people move in decides nothing.
+void World::march(std::size_t army, const Crowd& crowd,
+                  const std::vector<std::size_t>& slot,
+                  const std::vector<Step>& pulls,
+                  const std::vector<bool>& standing) {
+  const Army& marching = armies_.at(army);
+  const std::int64_t separation = rules_.separation;
+  for (const std::size_t member : marching.roster) {
+    const std::size_t self = slot.at(member);
+    const Position from = crowd.hash.position(self);
+    // Two people on one point part along x, the lower index westward, and a
+    // person exactly in a mover's way steps aside to the side its index
+    // fixes.
+    const std::int64_t side = (member % 2 == 0) ? 1 : -1;
+    Push push{0, 0};
+    crowd.hash.visit_within(from, rules_.separation, [&](std::size_t other) {
+      const bool ignored =
+          other == self || (!standing.at(self) && standing.at(other));
+      const bool yields = standing.at(self) && !standing.at(other);
+      const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
+      const Position there = crowd.hash.position(other);
+      const Push felt =
+          yields ? aside(from, there, separation, pulls.at(other), side)
+                 : repulsion(from, there, separation, lean);
+      push.x += ignored ? 0 : felt.x;
+      push.y += ignored ? 0 : felt.y;
+    });
+    const Step pull = pulls.at(self);
+    const Step direction{sign((push.x * 2) + pull.x),
+                         sign((push.y * 2) + pull.y)};
+    people_.at(member).position = stepped(marching.field, from, direction);
   }
 }
 
@@ -412,8 +442,6 @@ StateHash World::hash() const {
   for (const std::uint32_t floor : rules_.stage_floors) {
     fold(floor);
   }
-  fold(focus_.x);
-  fold(focus_.y);
   for (Cell cell{0, 0}; cell.y < map_.height(); ++cell.y) {
     for (cell.x = 0; cell.x < map_.width(); ++cell.x) {
       fold(map_.passable(cell));
@@ -426,8 +454,15 @@ StateHash World::hash() const {
     fold(structure.footprint.height);
     fold(structure.durability);
   }
+  for (const Person& person : people_) {
+    fold(person.position.x);
+    fold(person.position.y);
+    fold(person.health);
+    fold(person.ready_at);
+    fold(person.home.has_value());
+    fold(person.home.value_or(0));
+  }
   for (const Army& army : armies_) {
-    fold(army.phase);
     fold(army.order.objective.x);
     fold(army.order.objective.y);
     for (const std::size_t skill : army.order.skills) {
@@ -441,13 +476,9 @@ StateHash World::hash() const {
       fold(skill.structure_damage);
       fold(skill.cooldown);
     }
-    fold(army.bodies.size());
-    for (const Body& body : army.bodies) {
-      fold(body.position.x);
-      fold(body.position.y);
-      fold(body.count);
-      fold(body.strength);
-      fold(body.ready_at);
+    fold(army.roster.size());
+    for (const std::size_t member : army.roster) {
+      fold(member);
     }
   }
   for (const Village& village : villages_) {
@@ -459,8 +490,14 @@ StateHash World::hash() const {
   return StateHash{digest};
 }
 
-const std::vector<Body>& World::bodies(std::size_t army) const {
-  return armies_.at(army).bodies;
+std::size_t World::population() const { return people_.size(); }
+
+const Person& World::person(std::size_t person) const {
+  return people_.at(person);
+}
+
+const std::vector<std::size_t>& World::roster(std::size_t army) const {
+  return armies_.at(army).roster;
 }
 
 const Structure& World::structure(std::size_t structure) const {
@@ -494,17 +531,16 @@ VillageState World::village_state(std::size_t village) const {
                                : VillageState::REBUILDING;
 }
 
-// Whether a living body of `army` stands within `reach` of a structure of
+// Whether a living member of `army` stands within `reach` of a structure of
 // the village.
 bool World::within_reach(const Army& army, const VillageSpec& spec,
                          std::int32_t reach) const {
   return std::any_of(
-      army.bodies.begin(), army.bodies.end(), [&](const Body& body) {
-        return body.count > 0 &&
-               std::any_of(spec.structures.begin(), spec.structures.end(),
+      army.roster.begin(), army.roster.end(), [&](std::size_t member) {
+        return std::any_of(spec.structures.begin(), spec.structures.end(),
                            [&](std::size_t index) {
                              return reaches(structures_.at(index),
-                                            body.position, reach);
+                                            people_.at(member).position, reach);
                            });
       });
 }
@@ -529,11 +565,10 @@ std::uint64_t World::next_random() {
   return mix(rng_state_);
 }
 
-// The one rule every skill resolves through, whoever uses it. An agent, an
-// aggregate and the player's body differ only in how many agents they stand
-// for, and every tier in how many uses fall in one of its steps, so a battle
-// comes out the same wherever the focus is.
-void World::strike(Body& user, std::size_t army, const Crowd& crowd,
+// The one rule every skill resolves through, whoever uses it: each use hits
+// every hostile person in its disc once, and every structure its disc
+// reaches.
+void World::strike(Person& striker, std::size_t army, const Crowd& crowd,
                    std::vector<std::uint64_t>& damage) {
   const Army& own = armies_.at(army);
   const std::vector<std::size_t>& choice = own.order.skills;
@@ -542,62 +577,43 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
     return rules_.hostile.at(own.faction)
         .at(armies_.at(crowd.armies.at(other)).faction);
   };
-  // The nearest living hostile body, the lowest index among equals, so the
-  // order the query visits bodies in does not decide the target.
+  // The nearest hostile person, the lowest index among equals, so the order
+  // the query visits people in does not decide the target.
   const auto nearest_hostile = [&]() -> std::optional<Position> {
     std::optional<std::size_t> target;
     std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-    crowd.hash.visit_within(user.position, skill.range, [&](std::size_t other) {
-      const std::int64_t distance =
-          distance_squared(user.position, crowd.hash.position(other));
-      const bool closer = distance < nearest ||
-                          (distance == nearest && target && other < *target);
-      if (crowd.counts.at(other) > 0 && hostile(other) && closer) {
-        nearest = distance;
-        target = other;
-      }
-    });
+    crowd.hash.visit_within(
+        striker.position, skill.range, [&](std::size_t other) {
+          const std::int64_t distance =
+              distance_squared(striker.position, crowd.hash.position(other));
+          const bool closer = distance < nearest || (distance == nearest &&
+                                                     target && other < *target);
+          if (hostile(other) && closer) {
+            nearest = distance;
+            target = other;
+          }
+        });
     return target ? std::optional<Position>{crowd.hash.position(*target)}
                   : std::nullopt;
   };
   // A skill of range 0 reaches only its user, so it lands where it stands.
   const std::optional<Position> aim =
-      skill.range == 0 ? std::optional<Position>{user.position}
+      skill.range == 0 ? std::optional<Position>{striker.position}
                        : nearest_hostile();
   if (!aim) {
     return;
   }
   const Position centre = *aim;
-  // Uses the step holds: one per cooldown since the later of the user's
-  // readiness and the start of its tier's step, so a body acting every 16
-  // ticks uses a skill as often as one acting every tick.
-  const std::uint64_t cooldown = std::max<std::uint64_t>(skill.cooldown, 1);
-  const std::uint64_t interval = crowd.intervals.at(army);
-  const std::uint64_t since =
-      std::max(user.ready_at, tick_count_ + 1 - interval);
-  const std::uint64_t uses = ((tick_count_ - since) / cooldown) + 1;
-  user.ready_at = since + (uses * cooldown);
-  const std::uint64_t force = std::uint64_t{user.count} * uses;
-  // Agents the disc covers, with one agent on every separation square: its
-  // area over a square's, pi taken as 355/113. A body takes the damage once
-  // for each of its agents the disc covers, so an agent takes it once.
-  const auto side = static_cast<std::uint64_t>(std::max(rules_.separation, 1));
-  const auto reach = static_cast<std::uint64_t>(skill.radius);
-  const std::uint64_t covered =
-      1 + ((PI_NUMERATOR * reach * reach) / (PI_DENOMINATOR * side * side));
+  striker.ready_at = tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (hostile(other)) {
-      damage.at(other) +=
-          skill.body_damage * force *
-          std::min<std::uint64_t>(crowd.counts.at(other), covered);
+      damage.at(other) += skill.body_damage;
     }
   });
-  const std::int64_t effect =
-      std::int64_t{skill.structure_damage} * static_cast<std::int64_t>(force);
   structure_index_.visit_within(
       centre, skill.radius + structure_extent_, [&](std::size_t index) {
         if (reaches(structures_.at(index), centre, skill.radius)) {
-          shift(index, Destroyer{army, own.faction}, effect);
+          shift(index, Destroyer{army, own.faction}, skill.structure_damage);
         }
       });
 }
@@ -608,11 +624,13 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
 // hostile to the owner and repairs only if it is not; an empty village, or a
 // structure in none, takes either. A village notes the army whose strike left
 // its last standing structure in rubble, and takes as its residents the army
-// that restores a structure while its residents have no living agent.
+// that restores a structure while its residents have no living member; that
+// army's members make it their home.
 void World::shift(std::size_t structure, Destroyer striker,
                   std::int64_t effect) {
   const std::optional<std::size_t>& home = village_of_.at(structure);
-  const bool held = home && living(villages_.at(*home).spec.residents) > 0;
+  const bool held =
+      home && !armies_.at(villages_.at(*home).spec.residents).roster.empty();
   if (held &&
       (effect > 0) != rules_.hostile.at(striker.faction).at(owner(*home))) {
     return;
@@ -635,17 +653,13 @@ void World::shift(std::size_t structure, Destroyer striker,
   if (stood && ruined) {
     village.destroyer = striker;
   }
-  if (shifted.durability > before && living(village.spec.residents) == 0) {
+  if (shifted.durability > before &&
+      armies_.at(village.spec.residents).roster.empty()) {
     village.spec.residents = striker.army;
+    for (const std::size_t member : armies_.at(striker.army).roster) {
+      people_.at(member).home = home;
+    }
   }
-}
-
-std::uint64_t World::living(std::size_t army) const {
-  std::uint64_t agents = 0;
-  for (const Body& body : armies_.at(army).bodies) {
-    agents += body.count;
-  }
-  return agents;
 }
 
 }  // namespace murim

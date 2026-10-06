@@ -62,13 +62,14 @@ std::vector<std::int64_t> flatten(const Region& region) {
     add_text(row);
   }
   for (const ArmySpec& army : region.armies) {
-    for (const auto value :
-         {std::int64_t{army.start.x}, std::int64_t{army.start.y},
-          std::int64_t{army.objective.x}, std::int64_t{army.objective.y}}) {
-      add(value);
+    add(army.objective.x);
+    add(army.objective.y);
+    add(army.members.size());
+    for (const Recruit& member : army.members) {
+      add(member.cell.x);
+      add(member.cell.y);
+      add(member.health);
     }
-    add(army.count);
-    add(army.strength);
     add(army.faction);
     for (const Skill& skill : army.skills) {
       add(skill.range);
@@ -144,20 +145,29 @@ StateHash hash_after_ticks(const Region& region) {
 }
 
 // Whether every cell of each village's area is passable, every cell of its
-// structures' footprints lies inside that area, and its resident army stands
-// inside it on a cell no structure covers.
+// structures' footprints lies inside that area, and each of its residents
+// stands inside it on a cell no structure covers.
 bool villages_on_passable_cells(const Region& region) {
   const Map map{region.map_rows};
   for (const Village& village : region.villages) {
-    const Cell home = region.armies.at(village.army).start;
-    bool fits = inside(village, home);
+    const std::vector<Recruit>& residents =
+        region.armies.at(village.army).members;
+    bool fits = true;
     for (const Cell cell : area_of(village)) {
       fits = fits && map.passable(cell);
+    }
+    for (const Recruit& resident : residents) {
+      fits =
+          fits && inside(village, resident.cell) && map.passable(resident.cell);
     }
     for (const std::size_t index : village.structures) {
       const Structure& structure = region.structures.at(index);
       for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
-        fits = fits && inside(village, cell) && !same(cell, home);
+        fits = fits && inside(village, cell) &&
+               std::none_of(residents.begin(), residents.end(),
+                            [cell](const Recruit& resident) {
+                              return same(cell, resident.cell);
+                            });
       }
     }
     if (!fits) {
@@ -259,7 +269,8 @@ TEST(Region, VillagesStandOnPassableCells) {
 
     // Control: blocking the cell a resident army stands on breaks it.
     Region blocked = region;
-    const Cell home = blocked.armies.at(blocked.villages.at(0).army).start;
+    const Cell home =
+        blocked.armies.at(blocked.villages.at(0).army).members.front().cell;
     blocked.map_rows.at(static_cast<std::size_t>(home.y))
         .at(static_cast<std::size_t>(home.x)) = '#';
     ASSERT_FALSE(Map{blocked.map_rows}.passable(home));
@@ -400,7 +411,8 @@ bool follows_its_template(const RegionData& data, const Region& region,
                           const Village& village) {
   const VillageTemplate* made_from = template_of(data, village);
   return made_from != nullptr && kinds_follow(region, village, *made_from) &&
-         region.armies.at(village.army).count == housed_by(*made_from) &&
+         region.armies.at(village.army).members.size() ==
+             housed_by(*made_from) &&
          housed_by(*made_from) != 4 * village.structures.size();
 }
 
@@ -413,22 +425,47 @@ TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheResidents) {
   }
 }
 
-TEST(Region, ABodyBornIntoAVillageIsOneAgentOfItsFactionInsideIt) {
+TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
   Region region = generate_region(SEED, region_data());
   const Village& village = region.villages.at(1);
   const ArmySpec& residents = region.armies.at(village.army);
   const ArmySpec born = born_in(region, 1);
 
-  EXPECT_EQ(born.count, 1U);
+  ASSERT_EQ(born.members.size(), 1U);
+  const Recruit& person = born.members.front();
   EXPECT_EQ(born.faction, village.faction);
-  EXPECT_EQ(born.strength, residents.strength / residents.count);
-  EXPECT_TRUE(inside(village, born.start));
-  EXPECT_TRUE(same(born.objective, born.start));
+  EXPECT_EQ(person.health, residents.members.front().health);
+  EXPECT_TRUE(inside(village, person.cell));
+  EXPECT_TRUE(same(born.objective, person.cell));
+  EXPECT_TRUE(std::none_of(residents.members.begin(), residents.members.end(),
+                           [&person](const Recruit& resident) {
+                             return same(resident.cell, person.cell);
+                           }));
   region.armies.push_back(born);
   EXPECT_NO_THROW(world_of(region));
   // Control: a village the region lacks has no one born into it.
   EXPECT_THROW(static_cast<void>(born_in(region, region.villages.size())),
                std::out_of_range);
+}
+
+// Health of each person gathered().
+constexpr std::uint64_t GATHERED_HEALTH = 100'000;
+
+// `people` people of GATHERED_HEALTH on the open cells of village `home`
+// that none of its residents stands on, row by row.
+std::vector<Recruit> gathered(const Region& region, const Village& home,
+                              std::size_t people) {
+  const std::vector<Recruit>& residents = region.armies.at(home.army).members;
+  std::vector<Recruit> members;
+  for (const Cell cell : open_cells(region, home)) {
+    const bool taken = std::any_of(
+        residents.begin(), residents.end(),
+        [cell](const Recruit& resident) { return same(resident.cell, cell); });
+    if (!taken && members.size() < people) {
+      members.push_back(Recruit{cell, GATHERED_HEALTH});
+    }
+  }
+  return members;
 }
 
 // The first village owned by `faction`.
@@ -445,27 +482,29 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   constexpr std::size_t DEMONIC = 1;
   constexpr std::size_t UNORTHODOX = 2;
   constexpr std::uint64_t LIMIT = 20'000;
-  constexpr std::uint32_t RAIDERS = 40;
-  constexpr std::uint32_t REBUILDERS = 20;
-  constexpr std::uint64_t PER_AGENT = 100'000;
+  constexpr std::size_t RAIDERS = 12;
+  constexpr std::size_t REBUILDERS = 12;
   Region region = generate_region(SEED, region_data());
   const RegionData data = region_data();
   const std::size_t target = first_of(region, ORTHODOX);
-  const Cell centre = region.armies.at(region.villages.at(target).army).start;
+  const Cell centre =
+      region.armies.at(region.villages.at(target).army).objective;
 
   // Raiders from a Demonic village, with a killing strike beside their
   // faction's skills; rebuilders from an Unorthodox one, with their
   // faction's skills alone.
   const Skill kill{3 * CELL_SIZE, CELL_SIZE, 20'000, 0, 15};
   ArmySpec raiders = born_in(region, first_of(region, DEMONIC));
-  raiders.count = RAIDERS;
-  raiders.strength = RAIDERS * PER_AGENT;
+  raiders.members =
+      gathered(region, region.villages.at(first_of(region, DEMONIC)), RAIDERS);
+  raiders.objective = raiders.members.front().cell;
   raiders.skills = data.factions.at(DEMONIC).skills;
   raiders.skills.push_back(kill);
-  const Cell raiders_home = raiders.start;
+  const Cell raiders_home = raiders.objective;
   ArmySpec rebuilders = born_in(region, first_of(region, UNORTHODOX));
-  rebuilders.count = REBUILDERS;
-  rebuilders.strength = REBUILDERS * PER_AGENT;
+  rebuilders.members = gathered(
+      region, region.villages.at(first_of(region, UNORTHODOX)), REBUILDERS);
+  rebuilders.objective = rebuilders.members.front().cell;
   const std::size_t raider = region.armies.size();
   const std::size_t rebuilder = raider + 1;
   region.armies.push_back(raiders);
@@ -476,7 +515,6 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   std::vector<std::size_t> owners{world.owner(target)};
   const auto run_until = [&](const auto& done) {
     for (std::uint64_t tick = 0; tick < LIMIT && !done(); ++tick) {
-      world.set_focus(centre_of(centre));
       world.tick();
       if (world.village_state(target) != states.back()) {
         states.push_back(world.village_state(target));
@@ -491,7 +529,8 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   run_until([&] { return world.village_state(target) == VillageState::RUINS; });
   world.order(raider, {raiders_home, {0, 1, 2}});
   run_until([&] {
-    return same(cell_of(world.bodies(raider).front().position), raiders_home);
+    return same(cell_of(world.person(world.roster(raider).front()).position),
+                raiders_home);
   });
   world.order(rebuilder, {centre, {0, 1}});
   run_until(

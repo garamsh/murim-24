@@ -1,6 +1,6 @@
-## Shows the core's M1 benchmark scenario in the approved art, through world_art.tscn, with the
-## camera's centre set as the world's focus each tick. It ticks the world at the core's tick rate
-## whatever the frame rate, and holds no game rule.
+## Shows the core's M1 benchmark scenario in the approved art, through world_art.tscn, with a
+## camera the arrow keys move. It ticks the world at the core's tick rate whatever the frame rate,
+## and holds no game rule.
 extends Node2D
 
 const PIXELS_PER_CELL := 16.0
@@ -23,7 +23,7 @@ var _since_tick := 0.0
 
 func _ready() -> void:
 	world = WorldAdapter.create_m1()
-	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_focus()))
+	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_centre()))
 	_art.show_world(world, -1)
 
 
@@ -33,7 +33,6 @@ func _process(delta: float) -> void:
 	var step := 1.0 / WorldAdapter.TICKS_PER_SECOND
 	_since_tick = minf(_since_tick + delta, step * MAX_TICKS_PER_FRAME)
 	while _since_tick >= step:
-		world.set_focus(Vector2i(_camera.position * WorldAdapter.CELL_SIZE / PIXELS_PER_CELL))
 		world.tick()
 		_art.note_tick()
 		ticks += 1
@@ -43,7 +42,7 @@ func _process(delta: float) -> void:
 	bodies_drawn = _art.drawn
 	bodies = 0
 	for army in world.army_count():
-		bodies += world.body_counts(army).size()
+		bodies += world.body_positions(army).size()
 
 
 func _to_pixels(sub_cells: Vector2) -> Vector2:

@@ -2,7 +2,6 @@
 // budget. `make bench` builds it optimised and runs it; it is not a test.
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -24,45 +23,27 @@ namespace {
 constexpr int WARM_UP_TICKS = 2 * TICKS_PER_SECOND;
 constexpr int TIMED_TICKS = 20 * TICKS_PER_SECOND;
 constexpr double BUDGET_MS = 4.0;
-constexpr std::uint64_t EXPECTED_AGENTS = 20'000;
-constexpr std::uint64_t EXPECTED_NEAR_AGENTS = 500;
 
-// Agents of every army, by the tier its lead body stands in.
-std::array<std::uint64_t, 3> agents_per_tier(const World& world,
-                                             std::size_t armies,
-                                             Cell focus_cell) {
-  std::array<std::uint64_t, 3> agents{0, 0, 0};
-  const Position focus = centre_of(focus_cell);
-  for (std::size_t army = 0; army < armies; ++army) {
-    const std::vector<Body>& bodies = world.bodies(army);
-    const Position lead = bodies.front().position;
-    const std::int64_t distance =
-        std::max(std::abs(std::int64_t{lead.x} - focus.x),
-                 std::abs(std::int64_t{lead.y} - focus.y));
-    std::size_t tier = 0;
-    while (distance > TIERS.at(tier).reach) {
-      ++tier;
-    }
-    for (const Body& body : bodies) {
-      agents.at(tier) += body.count;
-    }
-  }
-  return agents;
-}
-
-// The cooldowns of the near armies' bodies; a body whose cooldown moved
+// The cooldown of every person in the world; a person whose cooldown moved
 // between two ticks struck in the second.
-std::vector<std::vector<std::uint64_t>> cooldowns(const World& world,
-                                                  std::size_t near_armies) {
-  std::vector<std::vector<std::uint64_t>> ready;
-  for (std::size_t army = 0; army < near_armies; ++army) {
-    std::vector<std::uint64_t> bodies;
-    for (const Body& body : world.bodies(army)) {
-      bodies.push_back(body.ready_at);
-    }
-    ready.push_back(bodies);
+std::vector<std::uint64_t> cooldowns(const World& world) {
+  std::vector<std::uint64_t> ready;
+  ready.reserve(world.population());
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    ready.push_back(world.person(person).ready_at);
   }
   return ready;
+}
+
+// Whether each person serves in one of the two caster armies.
+std::vector<bool> casters(const World& world, std::size_t casters_first) {
+  std::vector<bool> caster(world.population(), false);
+  for (const std::size_t army : {casters_first, casters_first + 1}) {
+    for (const std::size_t member : world.roster(army)) {
+      caster.at(member) = true;
+    }
+  }
+  return caster;
 }
 
 struct Strikes {
@@ -70,20 +51,14 @@ struct Strikes {
   std::uint64_t area;
 };
 
-Strikes strikes_between(const std::vector<std::vector<std::uint64_t>>& before,
-                        const std::vector<std::vector<std::uint64_t>>& after,
-                        std::size_t casters_first) {
+Strikes strikes_between(const std::vector<std::uint64_t>& before,
+                        const std::vector<std::uint64_t>& after,
+                        const std::vector<bool>& caster) {
   Strikes strikes{0, 0};
-  for (std::size_t army = 0; army < before.size(); ++army) {
-    const std::vector<std::uint64_t>& earlier = before.at(army);
-    const std::vector<std::uint64_t>& later = after.at(army);
-    const bool caster = army == casters_first || army == casters_first + 1;
-    for (std::size_t body = 0; body < std::min(earlier.size(), later.size());
-         ++body) {
-      const bool struck = later.at(body) != earlier.at(body);
-      strikes.all += static_cast<std::uint64_t>(struck);
-      strikes.area += static_cast<std::uint64_t>(struck && caster);
-    }
+  for (std::size_t person = 0; person < before.size(); ++person) {
+    const bool struck = after.at(person) != before.at(person);
+    strikes.all += static_cast<std::uint64_t>(struck);
+    strikes.area += static_cast<std::uint64_t>(struck && caster.at(person));
   }
   return strikes;
 }
@@ -109,45 +84,44 @@ double milliseconds(std::chrono::steady_clock::duration duration) {
   return std::chrono::duration<double, std::milli>(duration).count();
 }
 
+// The people still alive in the world's armies.
+std::size_t living(const World& world, std::size_t armies) {
+  std::size_t people = 0;
+  for (std::size_t army = 0; army < armies; ++army) {
+    people += world.roster(army).size();
+  }
+  return people;
+}
+
 int run() {
   const M1Scenario scenario = m1_scenario();
   const std::size_t armies = scenario.armies.size();
   World world{scenario.seed, Map{scenario.map_rows}, scenario.armies,
               scenario.structures, scenario.rules};
-  world.set_focus(centre_of(scenario.focus));
+  const std::size_t people = living(world, armies);
+  const std::vector<bool> caster = casters(world, scenario.casters_first);
 
-  std::uint64_t agents = 0;
-  for (const ArmySpec& army : scenario.armies) {
-    agents += army.count;
-  }
   Strikes warm_up{0, 0};
   for (int tick = 0; tick < WARM_UP_TICKS; ++tick) {
-    const auto before = cooldowns(world, scenario.near_armies);
+    const auto before = cooldowns(world);
     world.tick();
-    const Strikes strikes = strikes_between(
-        before, cooldowns(world, scenario.near_armies), scenario.casters_first);
+    const Strikes strikes = strikes_between(before, cooldowns(world), caster);
     warm_up.all += strikes.all;
     warm_up.area += strikes.area;
   }
-  const std::array<std::uint64_t, 3> tiers =
-      agents_per_tier(world, armies, scenario.focus);
-  require(agents == EXPECTED_AGENTS, "the world must hold 20000 agents");
-  require(tiers.at(0) == EXPECTED_NEAR_AGENTS,
-          "the near tier must hold the 500 agents of the battle");
-  require(tiers.at(1) > 0 && tiers.at(2) > 0,
-          "the middle and far tiers must hold armies");
-  require(warm_up.all > 0, "the near armies must strike during the warm-up");
+  require(people == MAX_PEOPLE,
+          "the world must hold MAX_PEOPLE people, the most it may");
+  require(warm_up.all > 0, "the armies must strike during the warm-up");
   require(warm_up.area > 0, "area strikes must happen during the warm-up");
 
   std::vector<std::chrono::steady_clock::duration> durations;
   Strikes timed{0, 0};
   for (int tick = 0; tick < TIMED_TICKS; ++tick) {
-    const auto before = cooldowns(world, scenario.near_armies);
+    const auto before = cooldowns(world);
     const auto start = std::chrono::steady_clock::now();
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
-    const Strikes strikes = strikes_between(
-        before, cooldowns(world, scenario.near_armies), scenario.casters_first);
+    const Strikes strikes = strikes_between(before, cooldowns(world), caster);
     timed.all += strikes.all;
     timed.area += strikes.area;
   }
@@ -157,6 +131,8 @@ int run() {
       milliseconds(durations.at((((durations.size() * 99) + 99) / 100) - 1));
   const double max = milliseconds(durations.back());
   const bool pass = p99 <= BUDGET_MS;
+  require(living(world, armies) > people / 2,
+          "most of the battle must still be fighting when timing ends");
 
   std::cout << std::fixed << std::setprecision(3)
             << "scenario: M1 (core/m1_scenario.cpp), seed "
@@ -166,9 +142,9 @@ int run() {
             << " structures\n"
             << "ticks: " << WARM_UP_TICKS << " warm-up, then " << TIMED_TICKS
             << " timed, at " << TICKS_PER_SECOND << " ticks per second\n"
-            << "agents: " << agents << " (near " << tiers.at(0) << ", middle "
-            << tiers.at(1) << ", far " << tiers.at(2) << " after warm-up)\n"
-            << "strikes per tick (near armies): "
+            << "people: " << people << ", all in one battle; "
+            << living(world, armies) << " alive when timing ended\n"
+            << "strikes per tick: "
             << static_cast<double>(timed.all) / TIMED_TICKS
             << ", of which area "
             << static_cast<double>(timed.area) / TIMED_TICKS << " ("

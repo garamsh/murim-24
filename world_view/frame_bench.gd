@@ -7,7 +7,7 @@ const SCENE := "res://world_view/world_view.tscn"
 const WARM_UP_FRAMES := 120
 const TIMED_FRAMES := 1200
 const BUDGET_MS := 16.7
-const EXPECTED_AGENTS := 20000
+const EXPECTED_PEOPLE := 500
 
 var _view: Node
 var _frame := 0
@@ -42,15 +42,11 @@ func _process(_delta: float) -> bool:
 # Fails before timing when the scene is not running the scenario it claims to.
 func _check_setup() -> void:
 	var world: WorldAdapter = _view.world
-	var agents := 0
+	var people := 0
 	for army in world.army_count():
-		for count in world.body_counts(army):
-			agents += count
-	if agents != EXPECTED_AGENTS:
-		_fail("the world must hold %d agents, not %d" % [EXPECTED_AGENTS, agents])
-	elif _view.bodies <= world.army_count():
-		_fail("the focus must expand armies into agents; %d bodies for %d armies" % [
-			_view.bodies, world.army_count()])
+		people += world.body_positions(army).size()
+	if people != EXPECTED_PEOPLE:
+		_fail("the world must hold %d people, not %d" % [EXPECTED_PEOPLE, people])
 	elif _view.bodies_drawn == 0:
 		_fail("the camera must have bodies on screen to draw")
 	elif _view.ticks == 0:
