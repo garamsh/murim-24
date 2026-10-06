@@ -2,8 +2,9 @@
 # out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
 # cells around it; that it draws every body on screen and none off it; that a structure is drawn
 # over its footprint with its stage's frame of its kind's art; that each field is tiled with its
-# state's tag; and that each village's ground decorations cover the cells its template's data
-# names.
+# state's tag; that each village's ground decorations cover the cells its template's data
+# names; and that after the view jumps across the region, every body a band holds lies inside the
+# bounds the renderer culls that band by.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -34,6 +35,7 @@ const STRUCTURES: Array[Dictionary] = [
 	{"cell": Vector2i(9, 7), "durability": 60},
 ]
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
+const VIEW := Vector2(480, 270)
 
 
 func run() -> bool:
@@ -161,7 +163,78 @@ func run() -> bool:
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
 			and decorations_right and fields_right
 	art.free()
+	return _bands_pass() and passed
+
+
+# A band's bodies lie inside the bounds the renderer culls it by after the view jumps from the
+# player's village to the village farthest from it, so the renderer draws them. Godot 4.7.2 takes a
+# MultiMeshInstance2D's bounds from its MultiMesh's AABB when the band is first drawn, and keeps
+# them when the buffer is refilled: the bounds are the band's custom_aabb where it has one, and
+# otherwise what the band held when first filled. Control: refreshed again over the same view, the
+# bands' bodies lie inside the same bounds. Setup: both views draw bodies, a screen's width apart.
+func _bands_pass() -> bool:
+	var region := WorldAdapter.create_region(SEED)
+	var art: Node2D = load(SCENE).instantiate()
+	var steered := region.army_count() - 1
+	art.show_world(region, steered)
+	var home := region.body_positions(steered)[0] * 16 / WorldAdapter.CELL_SIZE
+	var far := home
+	for village: Dictionary in region.villages():
+		var corner := Vector2(village.corner) * 16
+		if corner.distance_to(home) > far.distance_to(home):
+			far = corner
+	art.refresh(Rect2(home - VIEW / 2, VIEW))
+	var home_drawn: int = art.drawn
+	var first := {}
+	for band in _bands(art):
+		first[band] = _extent(band)
+	art.refresh(Rect2(home - VIEW / 2, VIEW))
+	var unmoved := _outside(art, first)
+	art.refresh(Rect2(far - VIEW / 2, VIEW))
+	var far_drawn: int = art.drawn
+	var jumped := _outside(art, first)
+	art.free()
+	var set_up := home_drawn > 0 and far_drawn > 0 and absf(far.x - home.x) >= VIEW.x
+	var passed := set_up and unmoved.is_empty() and jumped.is_empty()
+	print("world_art_test: %d bodies drawn at the player's village %s, %d at the village at %s; bodies outside their band's bounds: %d refreshed in place, %d after the jump %s: %s" % [
+		home_drawn, home, far_drawn, far, unmoved.size(), jumped.size(), jumped.slice(0, 3), "pass" if passed else "FAIL"])
 	return passed
+
+
+func _bands(art: Node2D) -> Array[MultiMeshInstance2D]:
+	var bands: Array[MultiMeshInstance2D] = []
+	for child in art.get_node("Standing").get_children():
+		if child is MultiMeshInstance2D:
+			bands.append(child)
+	return bands
+
+
+# The rectangle the bodies band `band` holds now cover, in its own coordinates; an empty Rect2 for
+# none. Each instance is a unit quad scaled by its transform's diagonal and centred on its origin.
+func _extent(band: MultiMeshInstance2D) -> Rect2:
+	var buffer := band.multimesh.buffer
+	var extent := Rect2()
+	for i in band.multimesh.visible_instance_count:
+		var size := Vector2(absf(buffer[i * 12]), absf(buffer[i * 12 + 5]))
+		var quad := Rect2(Vector2(buffer[i * 12 + 3], buffer[i * 12 + 7]) - size / 2, size)
+		extent = quad if i == 0 else extent.merge(quad)
+	return extent
+
+
+# Each band whose bodies reach past the bounds the renderer culls it by: its custom_aabb, or
+# else its extent in `first`, when it was first filled; a band first filled now is drawn now.
+func _outside(art: Node2D, first: Dictionary) -> Array[String]:
+	var outside: Array[String] = []
+	for band in _bands(art):
+		var extent := _extent(band)
+		if band.multimesh.visible_instance_count == 0:
+			continue
+		var aabb := band.multimesh.custom_aabb
+		var bounds: Rect2 = Rect2(aabb.position.x, aabb.position.y, aabb.size.x, aabb.size.y) \
+				if aabb.size.x > 0.0 and aabb.size.y > 0.0 else first.get(band, extent)
+		if not bounds.encloses(extent):
+			outside.append("%s outside %s" % [extent, bounds])
+	return outside
 
 
 # The first kind layer with any tile: here, the only kind beside the plain is mountain.

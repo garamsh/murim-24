@@ -449,6 +449,11 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 		var quad := QuadMesh.new()
 		quad.size = Vector2.ONE
 		band.multimesh.mesh = quad
+		# The renderer keeps a band's bounds from its MultiMesh's AABB when the band is first drawn,
+		# and culls a band refilled elsewhere by them; bounds over every body the band's row can
+		# hold, across the whole region, stay right wherever the view goes.
+		band.multimesh.custom_aabb = AABB(Vector3(-BODY_FRAME.x, -CELL - BODY_FRAME.y, 0),
+				Vector3(_width * CELL + 2 * BODY_FRAME.x, 2 * (CELL + BODY_FRAME.y), 0))
 		band.texture = _atlas
 		band.material = _band_material()
 		_standing.add_child(band)
