@@ -39,7 +39,25 @@ func run() -> bool:
 		aimed, wall_refused, target, target_accepted, before, after, key_one, key_nine_refused,
 		"pass" if passed else "FAIL"])
 	scene.free()
-	return passed and _challenge_pass()
+	return passed and _challenge_pass() and _genealogy_pass()
+
+
+# G opens the genealogy panel on the steered person and takes the keys while it is open, so a
+# digit gives no order; G again closes it. Control: with it closed, the same digit orders.
+func _genealogy_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var panel: Control = scene.get_node("Hud").genealogy
+	var opened: bool = scene.command(_key(KEY_G)) and panel.visible \
+			and panel.centre == world.roster(scene.steered)[0]
+	var digit_taken: bool = not scene.command(_key(KEY_1))
+	var closed: bool = scene.command(_key(KEY_G)) and not panel.visible
+	var digit_orders: bool = scene.command(_key(KEY_1))
+	var passed := opened and digit_taken and closed and digit_orders
+	print("play_test: G opens the genealogy on the steered person %s, a digit gives no order while open %s, G closes it %s, then the digit orders %s: %s" % [
+		opened, digit_taken, closed, digit_orders, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
 
 
 # Key C from an Orthodox village (the region's first, owned by faction 0) and from a Cult one (its

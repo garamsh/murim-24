@@ -28,3 +28,22 @@ CHALLENGE_NO_CHALLENGER,도전할 사람이 남지 않았다.,No one is left to 
 CHALLENGE_NOT_A_MEMBER,문파의 일원만 도전할 수 있다.,Only a member may challenge.
 CHALLENGE_IS_LEADER,이미 수장이다.,You already lead.
 CHALLENGE_DUEL_IN_PROGRESS,이미 결투가 벌어지고 있다.,A duel is already being fought.
+GENEALOGY_TITLE,족보,Genealogy
+GENEALOGY_FAMILY,%s씨 가문,House of %s
+GENEALOGY_GENERATIONS,3대,Three generations
+GENEALOGY_CLOSE,G 닫기,G Close
+GENEALOGY_PARENTS,부모,Parents
+GENEALOGY_SELF,본인,You
+GENEALOGY_ROW_SELF,본인,Self
+GENEALOGY_CHILDREN,자녀,Children
+GENEALOGY_DEAD,고인,Deceased
+GENEALOGY_AGE,%d세,Age %d
+GENEALOGY_AGE_LABEL,나이,Age
+GENEALOGY_TALENT,천부,Talent
+GENEALOGY_LIFESPAN,수명,Lifespan
+GENEALOGY_UNKNOWN,알 수 없음,Unknown
+GENEALOGY_SPOUSE,배우자,Spouse
+GENEALOGY_NONE,없음,None
+GENEALOGY_COUNT,%d명,%d
+GENEALOGY_UNNAMED,무명,Unnamed
+GENEALOGY_KEYS,방향키 이동 · Enter 중심으로 · G 닫기,Arrows move · Enter centre · G close
