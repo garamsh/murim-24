@@ -14,12 +14,13 @@ ADR 0002 loads the C++ core into Godot 4.7 through GDExtension, and ADR 0003 bui
 - **Build path.** `extension/CMakeLists.txt` is its own CMake project, configured into `build/extension/`: it adds `core/` as a subdirectory, excluded from its default targets, and turns on position-independent code so the core's static library links into the shared one. Rejected: one tree with the extension as the top project, which would move the core's tests into another project's build; godot-cpp's SCons build, rejected for the core in ADR 0003.
 - **Reference hash.** `world_hash`, a program in `extension/` linking only the core, prints the core's hash for a seed and tick count; the Godot test compares the adapter with it. Rejected: a hash value copied into the test, which goes stale whenever the core's state changes.
 - **GDScript test framework.** None: `run_tests.gd` loads each `*_test.gd`, calls its `run()`, and exits non-zero unless all loaded and passed. Godot 4.7.2 exits 0 from `--script` when the script fails to parse, so a test naming a class from an extension that did not load would pass if run directly; the runner counts that load as a failure. Rejected: GUT 9.7.1 and gdUnit4 v6.2.1, each an editor plugin vendored under `addons/` for a suite of one test.
+- **Registering the extension.** `make build` writes `.godot/extension_list.cfg`, the list of extensions Godot loads at startup, naming every committed `*.gdextension`. Rejected: `godot --headless --import`, which registers it by discovery: on Godot 4.7.2, with no `.godot/extension_list.cfg`, it crashed on exit with signal 11 in three of three runs on macOS arm64 and in CI on Linux x86_64, and exited 0 once the list existed; godotengine/godot#111645 tracks a headless import crash with GDExtensions. Shipping a class reference through godot-cpp's `target_doc_sources`, the workaround reported there, still crashed.
 - **Godot in CI.** The Linux x86_64 archive of Godot 4.7.2, checked against the SHA-512 in that release's `SHA512-SUMS.txt`. Rejected: chickensoft-games/setup-godot v2.4.3, which downloads by version from the release URL and checks no hash, while the godotengine/godot `4.7.2-stable` release is not marked immutable.
 - **Lint.** clang-format checks `extension/` with the core's style. clang-tidy does not read it: `GDCLASS` expands into code that `core/.clang-tidy` rejects (`cppcoreguidelines-special-member-functions`, `misc-const-correctness`, `modernize-use-auto`), and passing would take suppressions.
 
 ## Decision
 
-The GDExtension library is built from `extension/` with godot-cpp 10.0.0 targeting the Godot 4.7 API, fetched by CMake from its release archive pinned by SHA-256, and it links the core as a CMake subdirectory. GDScript tests run under Godot 4.7.2 headless through `run_tests.gd`, with no test framework, and CI installs that Godot from its release archive pinned by SHA-512. The godot-cpp and Godot pins are moved by hand, together, in a pull request that also moves the versions `docs/convention/stack-godot.md` is checked against.
+The GDExtension library is built from `extension/` with godot-cpp 10.0.0 targeting the Godot 4.7 API, fetched by CMake from its release archive pinned by SHA-256, and it links the core as a CMake subdirectory. `make build` registers it in `.godot/extension_list.cfg`. GDScript tests run under Godot 4.7.2 headless through `run_tests.gd`, with no test framework, and CI installs that Godot from its release archive pinned by SHA-512. The godot-cpp and Godot pins are moved by hand, together, in a pull request that also moves the versions `docs/convention/stack-godot.md` is checked against.
 
 ## Consequences
 
@@ -27,6 +28,7 @@ The GDExtension library is built from `extension/` with godot-cpp 10.0.0 targeti
 - No bot proposes godot-cpp or Godot bumps; a new Godot release stays unadopted until someone moves the pins.
 - A GDScript test is plain GDScript with a pass result, and a test that needs fixtures or doubles has none to reach for.
 - The GDExtension C++ is formatted but not linted.
+- The build writes into `.godot/`, Godot's own cache, a file whose format Godot does not document.
 - Android and iOS builds go through godot-cpp's `cmake/android.cmake` and `cmake/ios.cmake`, which are not built here.
 
 ## Signs the decision was wrong
@@ -36,3 +38,4 @@ The GDExtension library is built from `extension/` with godot-cpp 10.0.0 targeti
 - Godot moves past 4.7 while the pins stay, or a godot-cpp bump breaks the build and is left open.
 - A defect clang-tidy would have caught reaches `extension/`.
 - The second core build dominates `make ci`'s time.
+- A Godot release stops reading `.godot/extension_list.cfg` at startup, or changes its format, and the GDScript tests fail on a clean checkout.

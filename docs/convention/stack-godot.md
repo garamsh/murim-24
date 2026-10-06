@@ -48,10 +48,10 @@ GDExtension C++ under `extension/`:
 
 | Name | What it runs |
 |---|---|
-| `make build` | After `core/`, CMake configures `extension/` into `build/extension/` with the Ninja generator, then builds the GDExtension library and `world_hash`; then writes `build/.gdignore`. |
+| `make build` | After `core/`, CMake configures `extension/` into `build/extension/` with the Ninja generator, then builds the GDExtension library and `world_hash`; then writes `build/.gdignore`, and `.godot/extension_list.cfg` naming every committed `*.gdextension`. |
 | `make format` | `clang-format --dry-run --Werror` over every `extension/*.cpp` and `extension/*.hpp` as well, with `core/.clang-format` as the style. |
 | `make lint` | clang-tidy reads no file under `extension/`: `GDCLASS` expands into code `core/.clang-tidy` rejects. |
-| `make test` | After `ctest`, `godot --headless --path . --import` registers `murim.gdextension`, then `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
+| `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive pinned by SHA-512 in `.github/workflows/ci.yml`.
 
