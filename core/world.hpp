@@ -63,8 +63,8 @@ struct Order {
 /// Its cells block movement for as long as the world runs, whatever its
 /// stage.
 struct Structure {
-  Cell cell{};
-  std::uint32_t durability = 0;
+  Cell cell;
+  std::uint32_t durability;
   Footprint footprint{1, 1};
 };
 
