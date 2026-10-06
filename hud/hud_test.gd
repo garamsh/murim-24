@@ -4,10 +4,12 @@
 # bar, that the technique bar shows one slot per skill with the icon of its shape, and that the
 # season and year are the core's. It also checks that the leader and duel panels name people by
 # the adapter's person_name, Korean first and romanised in English, and that every word the HUD
-# shows from hud.csv fits the room its panel gives it, in each locale.
+# shows from hud.csv, and every name the world's data can make, fits the room its panel gives it, in
+# each locale.
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
+const PersonName := preload("res://hud/person_name.gd")
 const SEED := 2026
 # A seed whose first Cult village's leader has the widest given name, Cheonmyeong.
 const LONG_NAME_SEED := 11
@@ -82,7 +84,8 @@ func run() -> bool:
 		date, season, later, "pass" if dated else "FAIL"])
 	hud.free()
 	var names_passed := _names_pass()
-	return passed and names_passed and _fit_pass()
+	var fit_passed := _fit_pass()
+	return passed and names_passed and fit_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -148,8 +151,10 @@ func _names_pass() -> bool:
 
 # In each locale, every text a label can show, measured in the HUD's font, fits the room its panel
 # gives it: within the label where the label has a width of its own, clear of the label after it
-# on its line, and clear of its panel's right edge. Setup: every key in hud.csv outside the
-# genealogy panel's is measured, and the widths are not zero.
+# on its line, and clear of its panel's right edge. Every surname crossed with every given name in
+# names(), as the leader and duel panels show it, fits each of their name labels or is cut short
+# with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the genealogy panel's is measured, and
+# the widths are not zero.
 func _fit_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(SCENE).instantiate()
@@ -159,6 +164,7 @@ func _fit_pass() -> bool:
 	var measured := {}
 	var overruns: Array[String] = []
 	var spans := 0
+	var names := 0
 	for locale: String in locales:
 		TranslationServer.set_locale(locale)
 		var widest := {}
@@ -207,6 +213,17 @@ func _fit_pass() -> bool:
 				var limit: float = line_spans[i + 1][0] if i + 1 < line_spans.size() else edge
 				if line_spans[i][1] > limit or line_spans[i][1] <= line_spans[i][0]:
 					overruns.append("%s %s ends at %d past %d" % [locale, line_spans[i][2], line_spans[i][1], limit])
+		for name in _every_name(world):
+			var text := PersonName.shown(name, true)
+			var whole := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, hud.FONT_SIZE).x
+			names += 1
+			for key: String in ["leader_value", "duel_challenger", "duel_leader"]:
+				var label: Label = hud.labels[key]
+				# Out of the tree a label measures in the fallback font, so the width is the HUD font's,
+				# and a label that trims with an ellipsis keeps any name within it.
+				var trims := label.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS
+				if (whole > label.size.x and not trims) or (locale == "ko" and whole > label.size.x):
+					overruns.append("%s %s is %d px in the %d px %s" % [locale, text, whole, label.size.x, key])
 	TranslationServer.set_locale(locales[0])
 	hud.free()
 	var unmeasured: Array[String] = []
@@ -216,9 +233,9 @@ func _fit_pass() -> bool:
 		var key := csv.get_csv_line()[0]
 		if key != "" and not key.begins_with("GENEALOGY_") and not measured.has(key):
 			unmeasured.append(key)
-	var passed := unmeasured.is_empty() and overruns.is_empty()
-	print("hud_test: %d keys measured on %d label spans across %s; unmeasured %s; overruns %s: %s" % [
-		measured.size(), spans, locales, unmeasured, overruns, "pass" if passed else "FAIL"])
+	var passed := unmeasured.is_empty() and overruns.is_empty() and names > 0
+	print("hud_test: %d keys measured on %d label spans and %d names across %s; unmeasured %s; overruns %s: %s" % [
+		measured.size(), spans, names, locales, unmeasured, overruns, "pass" if passed else "FAIL"])
 	return passed
 
 
@@ -241,3 +258,14 @@ func _texts(hud: CanvasLayer, name: String, label: Label, measured: Dictionary) 
 	for key: String in keys:
 		measured[key] = true
 	return keys.map(func(key: String) -> String: return hud.tr(key))
+
+
+# Every surname in `world`'s names() crossed with every given name, as person_name gives a name.
+func _every_name(world: WorldAdapter) -> Array[Dictionary]:
+	var table := world.names()
+	var names: Array[Dictionary] = []
+	for surname: Dictionary in table.surnames:
+		for given: Dictionary in table.female + table.male:
+			names.append({"surname": surname.korean, "given": given.korean,
+					"surname_en": surname.romanised, "given_en": given.romanised})
+	return names

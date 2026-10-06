@@ -4,7 +4,8 @@
 # pressing Enter centres it on a child, whose parents then include that parent, and whose
 # generation in the header is one more than its parents'. Control: a person the world began with
 # has no parents, the panel shows none, and its header reads the first generation. Every word the
-# panel draws from hud.csv fits the room the panel gives it, in each locale.
+# panel draws from hud.csv, and every name the world's data can make, fits the room the panel gives
+# it, in each locale.
 extends RefCounted
 
 const SEED := 2026
@@ -14,8 +15,7 @@ const DAYS := 70
 const TICKS_PER_DAY := 1800
 const Genealogy := preload("res://hud/genealogy.gd")
 const Hud := preload("res://hud/hud.gd")
-# The widest surname the name data makes, by locale.
-const WIDEST_SURNAME := {"ko": "남궁", "en": "Namgung"}
+const PersonName := preload("res://hud/person_name.gd")
 # Ages, generations and counts are measured at two digits: people live 45 to 75 years.
 const WIDEST_NUMBER := 99
 
@@ -89,10 +89,21 @@ func run() -> bool:
 # In each locale, every word the panel draws, in the HUD's font at the panel's size, fits where
 # _draw places it: the header clear of the close key, the row labels clear of the cards, a card's
 # line and the steered person's tag within the card, the details within their column, each detail
-# row's label clear of its value, and the keys along the foot within the panel. Setup: every
-# GENEALOGY_ key in hud.csv is measured, and the widths are not zero.
+# row's label clear of its value, and the keys along the foot within the panel. Every surname
+# crossed with every given name in names() is measured as a card, the details column and a spouse
+# show it, as the panel fits it: cut short with an ellipsis where it would overrun, and in Korean
+# drawn whole. Setup: every GENEALOGY_ key in hud.csv is measured, and the widths are not zero.
 func _fit_pass() -> bool:
 	var font: Font = load(Hud.FONT)
+	var table := WorldAdapter.create_region(SEED, 0).names()
+	var names: Array[Dictionary] = []
+	for surname: Dictionary in table.surnames:
+		for given: Dictionary in table.female + table.male:
+			names.append({"surname": surname.korean, "given": given.korean,
+					"surname_en": surname.romanised, "given_en": given.romanised})
+	var panel: Control = Genealogy.new()
+	panel.use_font(font)
+	var cut := {}
 	var measured := {}
 	var overruns: Array[String] = []
 	var checks := 0
@@ -103,9 +114,9 @@ func _fit_pass() -> bool:
 		var say := func(key: String) -> String:
 			measured[key] = true
 			return tr(key)
-		var families: Array[String] = []
-		for surname: String in [WIDEST_SURNAME[locale], say.call("GENEALOGY_UNNAMED")]:
-			families.append(say.call("GENEALOGY_FAMILY") % surname)
+		var families: Array[String] = [say.call("GENEALOGY_FAMILY") % say.call("GENEALOGY_UNNAMED")]
+		for surname: Dictionary in table.surnames:
+			families.append(say.call("GENEALOGY_FAMILY") % (surname.korean if locale == "ko" else surname.romanised))
 		var sects: Array[String] = [say.call("GENEALOGY_NONE")]
 		for faction: String in Hud.FACTIONS:
 			sects.append(say.call("FACTION_" + faction.to_upper()))
@@ -120,11 +131,11 @@ func _fit_pass() -> bool:
 			fits.append([key, Genealogy.PANEL.position.x + 10 + width.call(say.call(key)), Genealogy.LEFT])
 		for line: String in [say.call("GENEALOGY_DEAD"), say.call("GENEALOGY_AGE") % WIDEST_NUMBER]:
 			# Within the card's 2-pixel frame.
-			fits.append([line, 23 + width.call(line), Genealogy.CARD.x - 2])
+			fits.append([line, Genealogy.CARD_TEXT_X + width.call(line), Genealogy.CARD.x - 2])
 		var tag: String = say.call("GENEALOGY_SELF")
 		fits.append([tag, width.call(tag) + 6 + 3, Genealogy.CARD.x])
 		for text in families + sects:
-			fits.append([text, 50 + width.call(text), Genealogy.DETAILS.size.x - 8])
+			fits.append([text, Genealogy.DETAILS_TEXT_X + width.call(text), Genealogy.DETAILS.size.x - 8])
 		var unknown: String = say.call("GENEALOGY_UNKNOWN")
 		var rows := [
 			["GENEALOGY_AGE_LABEL", str(WIDEST_NUMBER)], ["GENEALOGY_TALENT", unknown],
@@ -134,6 +145,19 @@ func _fit_pass() -> bool:
 		for row: Array in rows:
 			# The label and its value 4 pixels apart at least.
 			fits.append([row, 8 + width.call(say.call(row[0])) + 4 + width.call(row[1]), Genealogy.DETAILS.size.x - 8])
+		var spouse_word: float = width.call(say.call("GENEALOGY_SPOUSE"))
+		for name in names:
+			var card_room: float = Genealogy.CARD.x - 2 - Genealogy.CARD_TEXT_X
+			var detail_room: float = Genealogy.DETAILS.size.x - 8 - Genealogy.DETAILS_TEXT_X
+			var spouse_room: float = Genealogy.DETAILS.size.x - 8 - 8 - spouse_word - 4
+			for place: Array in [[PersonName.shown(name, true), card_room], [PersonName.shown(name), detail_room],
+					[PersonName.shown(name), spouse_room]]:
+				var drawn: String = panel.fit(place[0], place[1])
+				fits.append([drawn, width.call(drawn), place[1]])
+				if drawn != place[0]:
+					cut[locale] = cut.get(locale, 0) + 1
+					if locale == "ko":
+						overruns.append("ko %s drawn as %s" % [place[0], drawn])
 		var keys: String = say.call("GENEALOGY_KEYS")
 		fits.append([keys, 8 + width.call(keys), Genealogy.PANEL.size.x - 8])
 		for fit: Array in fits:
@@ -141,6 +165,7 @@ func _fit_pass() -> bool:
 			if fit[1] > fit[2] or width.call(str(fit[0])) <= 0.0:
 				overruns.append("%s %s reaches %d past %d" % [locale, fit[0], fit[1], fit[2]])
 	TranslationServer.set_locale(Hud.LOCALES[0])
+	panel.free()
 	var unmeasured: Array[String] = []
 	var csv := FileAccess.open("res://hud/hud.csv", FileAccess.READ)
 	csv.get_csv_line()
@@ -148,7 +173,8 @@ func _fit_pass() -> bool:
 		var key := csv.get_csv_line()[0]
 		if key.begins_with("GENEALOGY_") and not measured.has(key):
 			unmeasured.append(key)
-	var passed := unmeasured.is_empty() and overruns.is_empty()
-	print("genealogy_test: %d keys measured in %d checks across %s; unmeasured %s; overruns %s: %s" % [
-		measured.size(), checks, Hud.LOCALES, unmeasured, overruns, "pass" if passed else "FAIL"])
+	var passed := unmeasured.is_empty() and overruns.is_empty() and names.size() > 0
+	print("genealogy_test: %d keys and %d names measured in %d checks across %s, names cut short %s; unmeasured %s; %d overruns, the first %s: %s" % [
+		measured.size(), names.size(), checks, Hud.LOCALES, cut, unmeasured, overruns.size(), overruns.slice(0, 6),
+		"pass" if passed else "FAIL"])
 	return passed
