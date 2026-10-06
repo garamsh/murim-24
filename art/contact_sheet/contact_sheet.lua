@@ -10,7 +10,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 848
+local W, H = 608, 1024
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -26,6 +26,12 @@ local bodies = {
 }
 local house = load("structures/house.aseprite")
 local hall = load("structures/hall.aseprite")
+local well = load("structures/well.aseprite")
+local barrels = load("structures/barrels.aseprite")
+local fence = load("structures/fence.aseprite")
+local ground_tiles = load("decorations/ground.aseprite")
+local banner = load("decorations/banner.aseprite")
+local icons = load("icons/skill_icons.aseprite")
 local army = load("markers/army_marker.aseprite")
 local player = load("markers/player_marker.aseprite")
 
@@ -278,6 +284,39 @@ for k, stage in ipairs({ "intact", "damaged", "destroyed", "rubble" }) do
   for cy = 0, 2 do for cx = 0, 4 do sheet:stamp(frame(terrain, "plain", 1 + (cx + cy) % 4), x + 8 + cx * 16, y + 8 + cy * 16) end end
   sheet:stamp(frame(hall, stage), x, y)
   label(x + 8, y + 62, stage:upper(), c("paper", 2))
+end
+
+-- The village props that are structures, each stage on its footprint of plain ground; then
+-- the decorations, ground tiles and banners, and the technique icons.
+local function stages(set, name, fw, fh, x0, y0, step)
+  label(x0, y0 - 10, name, c("paper", 3))
+  for k, stage in ipairs({ "intact", "damaged", "destroyed", "rubble" }) do
+    local x = x0 + (k - 1) * step
+    for cy = 0, fh - 1 do
+      for cx = 0, fw - 1 do sheet:stamp(frame(terrain, "plain", 1 + (cx + cy) % 4), x + 8 + cx * 16, y0 + 8 + cy * 16) end
+    end
+    sheet:stamp(frame(set, stage), x, y0)
+  end
+end
+stages(well, "WELL, 2 X 2", 2, 2, 8, 868, 56)
+stages(barrels, "BARRELS, 1 X 1", 1, 1, 240, 868, 40)
+stages(fence, "FENCE, 5 X 1", 5, 1, 8, 932, 104)
+label(8, 982, "DECORATION: PAVING, ROAD, MILLET, RICE; BANNERS; TECHNIQUE ICONS", c("paper", 3))
+local gx = 8
+for _, tag in ipairs({ "paving", "road", "millet", "rice" }) do
+  local first, last = ground_tiles.tags[tag][1], ground_tiles.tags[tag][2]
+  for f = first, last do
+    sheet:stamp(ground_tiles.frames[f], gx, 996)
+    gx = gx + 17
+  end
+end
+for k, tag in ipairs({ "orthodox", "demonic", "unorthodox" }) do
+  sheet:stamp(frame(terrain, "plain", k), gx + 8 + (k - 1) * 18, 996)
+  sheet:stamp(frame(banner, tag), gx + 8 + (k - 1) * 18, 988)
+end
+for k, tag in ipairs({ "strike", "burst" }) do
+  sheet:rect(gx + 70 + (k - 1) * 22, 994, 20, 20, c("ink", 1))
+  sheet:stamp(frame(icons, tag), gx + 72 + (k - 1) * 22, 996)
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")

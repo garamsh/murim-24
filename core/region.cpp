@@ -31,7 +31,6 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 
 constexpr std::int32_t SEPARATION = 72;
 constexpr std::uint32_t DURABILITY = 3'000;
-constexpr std::size_t RESIDENTS_PER_STRUCTURE = 4;
 constexpr std::uint64_t STRENGTH_PER_AGENT = 100'000;
 constexpr std::uint64_t GUARD_COOLDOWN = 15;
 constexpr Skill GUARD{3 * CELL_SIZE, 0, 1, 0, GUARD_COOLDOWN};
@@ -179,9 +178,10 @@ void validate(const RegionData& data) {
         faction.hostile_to.begin(), faction.hostile_to.end(),
         [&data](std::size_t enemy) { return enemy >= data.factions.size(); });
   };
-  // Lays the structures out on the area, failing on a structure that covers
-  // no cell, or a cell outside the area or already covered; the centre is
-  // covered last, so a structure over it fails too.
+  // Lays the buildings out on the area, failing on a template that houses no
+  // one, or a building that covers no cell, or a cell outside the area or
+  // already covered; the centre is covered last, so a building over it fails
+  // too.
   const auto malformed = [](const VillageTemplate& village) {
     std::vector<bool> covered(static_cast<std::size_t>(village.area.width) *
                                   static_cast<std::size_t>(village.area.height),
@@ -201,13 +201,18 @@ void validate(const RegionData& data) {
       }
       return free;
     };
-    const auto placed = [&cover](const Structure& structure) {
+    const auto placed = [&cover](const Building& building) {
       const std::vector<Cell> cells =
-          cells_of(structure.cell, structure.footprint);
+          cells_of(building.structure.cell, building.structure.footprint);
       return !cells.empty() && std::all_of(cells.begin(), cells.end(), cover);
     };
-    return village.structures.empty() ||
-           !std::all_of(village.structures.begin(), village.structures.end(),
+    const auto housed = [](const Building& building) {
+      return building.residents > 0;
+    };
+    return village.buildings.empty() ||
+           std::none_of(village.buildings.begin(), village.buildings.end(),
+                        housed) ||
+           !std::all_of(village.buildings.begin(), village.buildings.end(),
                         placed) ||
            !cover(middle_of(village.area));
   };
@@ -224,13 +229,26 @@ void validate(const RegionData& data) {
 RegionData region_data() {
   constexpr Footprint HOUSE{3, 3};
   constexpr Footprint HALL{5, 3};
+  constexpr Footprint WELL{2, 2};
+  constexpr Footprint BARRELS{1, 1};
+  constexpr Footprint FENCE{5, 1};
+  constexpr std::uint32_t HOUSE_RESIDENTS = 4;
+  constexpr std::uint32_t HALL_RESIDENTS = 6;
   constexpr std::int32_t HAMLET_WIDTH = 7;
   constexpr std::int32_t VILLAGE_WIDTH = 17;
   constexpr std::int32_t VILLAGE_HEIGHT = 9;
+  constexpr std::int32_t ROAD_ROW = 3;
   constexpr std::int32_t SOUTH_ROW = 6;
+  constexpr std::int32_t FENCE_ROW = 8;
   constexpr std::int32_t HALL_EAST = 10;
   constexpr std::int32_t FAR_EAST = 14;
   constexpr std::int32_t SOUTH_EAST = 11;
+  constexpr std::int32_t WELL_EAST = 6;
+  constexpr std::int32_t FENCE_EAST = 5;
+  const auto building = [](Cell cell, Footprint footprint, const char* kind,
+                           std::uint32_t residents) {
+    return Building{Structure{cell, DURABILITY, footprint}, kind, residents};
+  };
   return RegionData{
       {
           {"plain", true, 4},
@@ -246,21 +264,29 @@ RegionData region_data() {
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
       // hall of 5 by 3 north of the road through its centre, more houses
-      // south of it. The hamlet keeps its west end.
+      // south of it, a well in the square before the hall, barrels at the
+      // road's ends and a fence along the field between the southern houses.
+      // The hamlet keeps its west end. Wells, barrels and fences block and
+      // break like any structure, and house no one.
       {
           {"hamlet",
            {HAMLET_WIDTH, VILLAGE_HEIGHT},
-           {{{0, 0}, DURABILITY, HOUSE},
-            {{4, 0}, DURABILITY, HOUSE},
-            {{2, SOUTH_ROW}, DURABILITY, HOUSE}}},
+           {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({4, 0}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({2, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0)}},
           {"village",
            {VILLAGE_WIDTH, VILLAGE_HEIGHT},
-           {{{0, 0}, DURABILITY, HOUSE},
-            {{4, 0}, DURABILITY, HALL},
-            {{HALL_EAST, 0}, DURABILITY, HOUSE},
-            {{FAR_EAST, 0}, DURABILITY, HOUSE},
-            {{1, SOUTH_ROW}, DURABILITY, HOUSE},
-            {{SOUTH_EAST, SOUTH_ROW}, DURABILITY, HOUSE}}},
+           {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({4, 0}, HALL, "hall", HALL_RESIDENTS),
+            building({HALL_EAST, 0}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({FAR_EAST, 0}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({1, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({SOUTH_EAST, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
+            building({WELL_EAST, ROAD_ROW}, WELL, "well", 0),
+            building({0, ROAD_ROW}, BARRELS, "barrels", 0),
+            building({VILLAGE_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
+            building({FENCE_EAST, FENCE_ROW}, FENCE, "fence", 0)}},
       },
   };
 }
@@ -272,6 +298,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 std::vector<std::string>(
                     static_cast<std::size_t>(REGION_SIDE),
                     std::string(static_cast<std::size_t>(REGION_SIDE), '.')),
+                {},
                 {},
                 {},
                 Rules{SEPARATION,
@@ -322,21 +349,24 @@ Region generate_region(Seed seed, const RegionData& data) {
     }
 
     Village village{kind.name + " " + std::to_string(number + 1),
+                    kind.name,
                     owner,
                     corner,
                     kind.area,
                     {},
                     region.armies.size()};
-    for (const Structure& structure : kind.structures) {
+    std::uint32_t residents = 0;
+    for (const Building& building : kind.buildings) {
+      const Structure& structure = building.structure;
       village.structures.push_back(region.structures.size());
       region.structures.push_back(Structure{
           Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
           structure.durability, structure.footprint});
+      region.structure_kinds.push_back(building.kind);
+      residents += building.residents;
     }
     const Cell middle = middle_of(kind.area);
     const Cell centre{corner.x + middle.x, corner.y + middle.y};
-    const auto residents = static_cast<std::uint32_t>(kind.structures.size() *
-                                                      RESIDENTS_PER_STRUCTURE);
     region.armies.push_back(ArmySpec{centre,
                                      centre,
                                      residents,

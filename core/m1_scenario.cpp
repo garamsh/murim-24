@@ -91,6 +91,7 @@ M1Scenario m1_scenario() {
       std::vector<std::string>(MAP_SIDE, std::string(MAP_SIDE, '.')),
       {},
       {},
+      {},
       rules(),
       FOCUS,
       NEAR_ARMIES,
@@ -107,6 +108,7 @@ M1Scenario m1_scenario() {
                                        FACTION_EAST, skills});
     scenario.structures.push_back(
         Structure{Cell{FOCUS.x, FIRST_ROW + row}, DURABILITY});
+    scenario.structure_kinds.emplace_back("barrels");
   }
   // The middle pair of the lines are the casters.
   scenario.casters_first = LINE_ROWS;

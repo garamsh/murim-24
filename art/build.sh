@@ -13,10 +13,14 @@ cd "$(dirname "$0")"
 "$aseprite" --batch --script bodies/bodies.lua
 "$aseprite" --batch --script structures/house.lua
 "$aseprite" --batch --script structures/hall.lua
+"$aseprite" --batch --script structures/props.lua
+"$aseprite" --batch --script decorations/decorations.lua
+"$aseprite" --batch --script icons/icons.lua
 "$aseprite" --batch --script markers/markers.lua
 
 for name in terrain/terrain terrain/transitions terrain/landforms bodies/orthodox bodies/demonic \
-	bodies/unorthodox structures/house structures/hall markers/army_marker markers/player_marker; do
+	bodies/unorthodox structures/house structures/hall structures/well structures/barrels structures/fence \
+	decorations/ground decorations/banner icons/skill_icons markers/army_marker markers/player_marker; do
 	"$aseprite" --batch "$name.aseprite" --sheet "$name.png" --data "$name.json" --format json-array --list-tags
 done
 

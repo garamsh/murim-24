@@ -138,12 +138,28 @@ func _reads_pass() -> bool:
 				break
 	var footprints_read := world.structure_footprint(0) == Vector2i.ONE \
 			and inside == region.structure_count() and footprints.has(Vector2i(3, 3))
-	var passed := armies_read and no_region and agrees and villages_read and footprints_read
+	# Kinds: none from create(), the template's for a region, barrels for M1's barricade.
+	var kinds := {}
+	for structure in region.structure_count():
+		kinds[region.structure_kind(structure)] = true
+	var m1 := WorldAdapter.create_m1()
+	var kinds_read: bool = world.structure_kind(0) == "" and m1.structure_kind(0) == "barrels" \
+			and kinds.has("house") and kinds.has("barrels") and not kinds.has("") \
+			and villages[0].kind in ["hamlet", "village"]
+	# Skills come back as create() took them; control: the second army's differ.
+	var skills_read := world.skills(0) == ARMIES[0].skills and world.skills(1) == ARMIES[1].skills \
+			and world.skills(0) != world.skills(1)
+	var passed := armies_read and no_region and agrees and villages_read and footprints_read \
+			and kinds_read and skills_read
 	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, %d villages, agent's faction %d, first village's %d; created footprint %s, region footprints %s, %d of %d structures inside a village: %s" % [
 		world.army_faction(0), world.army_faction(1), world.army_strength(0), world.army_strength(1),
 		strength, no_region, cells, names, agrees, villages.size(), born_faction,
 		int(villages[0].faction) if villages.size() > 0 else -1, world.structure_footprint(0),
 		footprints.keys(), inside, region.structure_count(), "pass" if passed else "FAIL"])
+	print("world_adapter_test: structure kinds: created %s, M1 %s, region %s, first village %s; skills read back %s: %s" % [
+		"\"%s\"" % world.structure_kind(0), m1.structure_kind(0), kinds.keys(),
+		villages[0].kind if villages.size() > 0 else "none", skills_read,
+		"pass" if kinds_read and skills_read else "FAIL"])
 	return passed
 
 

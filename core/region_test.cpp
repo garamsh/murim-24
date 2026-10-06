@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <set>
@@ -98,8 +99,12 @@ std::vector<std::int64_t> flatten(const Region& region) {
   for (const std::size_t faction : region.territory) {
     add(faction);
   }
+  for (const std::string& kind : region.structure_kinds) {
+    add_text(kind);
+  }
   for (const Village& village : region.villages) {
     add_text(village.name);
+    add_text(village.kind);
     add(village.faction);
     add(village.corner.x);
     add(village.corner.y);
@@ -322,22 +327,88 @@ TEST(Region, RejectsInconsistentData) {
 
   RegionData outside = region_data();
   VillageTemplate& beyond = outside.villages.at(0);
-  beyond.structures.push_back(Structure{{beyond.area.width - 1, 0}, 1, {2, 1}});
+  beyond.buildings.push_back(
+      Building{Structure{{beyond.area.width - 1, 0}, 1, {2, 1}}, "house", 1});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, outside)),
                std::invalid_argument);
 
   RegionData overlapping = region_data();
   VillageTemplate& doubled = overlapping.villages.at(0);
-  doubled.structures.push_back(doubled.structures.front());
+  doubled.buildings.push_back(doubled.buildings.front());
   EXPECT_THROW(static_cast<void>(generate_region(SEED, overlapping)),
                std::invalid_argument);
 
   RegionData over_centre = region_data();
   VillageTemplate& central = over_centre.villages.at(0);
-  central.structures.push_back(
-      Structure{{central.area.width / 2, central.area.height / 2}, 1, {1, 1}});
+  central.buildings.push_back(Building{
+      Structure{{central.area.width / 2, central.area.height / 2}, 1, {1, 1}},
+      "barrels", 0});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, over_centre)),
                std::invalid_argument);
+
+  RegionData empty = region_data();
+  for (Building& building : empty.villages.at(0).buildings) {
+    building.residents = 0;
+  }
+  EXPECT_THROW(static_cast<void>(generate_region(SEED, empty)),
+               std::invalid_argument);
+}
+
+// The template `village` was laid out from, or null when `data` has none of its
+// name.
+const VillageTemplate* template_of(const RegionData& data,
+                                   const Village& village) {
+  const auto made_from =
+      std::find_if(data.villages.begin(), data.villages.end(),
+                   [&village](const VillageTemplate& kind) {
+                     return kind.name == village.kind;
+                   });
+  return made_from == data.villages.end() ? nullptr : &*made_from;
+}
+
+// Whether each of the village's structures carries its template building's
+// kind, in order.
+bool kinds_follow(const Region& region, const Village& village,
+                  const VillageTemplate& made_from) {
+  if (village.structures.size() != made_from.buildings.size()) {
+    return false;
+  }
+  for (std::size_t index = 0; index < village.structures.size(); ++index) {
+    if (region.structure_kinds.at(village.structures.at(index)) !=
+        made_from.buildings.at(index).kind) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::uint32_t housed_by(const VillageTemplate& made_from) {
+  std::uint32_t housed = 0;
+  for (const Building& building : made_from.buildings) {
+    housed += building.residents;
+  }
+  return housed;
+}
+
+// Whether `village` was laid out from a template of `data` whose buildings'
+// kinds its structures carry, and whose residents its army counts. A flat count
+// per structure would differ: wells, barrels and the fence house no one, and a
+// hall houses more than a house.
+bool follows_its_template(const RegionData& data, const Region& region,
+                          const Village& village) {
+  const VillageTemplate* made_from = template_of(data, village);
+  return made_from != nullptr && kinds_follow(region, village, *made_from) &&
+         region.armies.at(village.army).count == housed_by(*made_from) &&
+         housed_by(*made_from) != 4 * village.structures.size();
+}
+
+TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheResidents) {
+  const RegionData data = region_data();
+  const Region region = generate_region(SEED, data);
+  EXPECT_EQ(region.structure_kinds.size(), region.structures.size());
+  for (const Village& village : region.villages) {
+    EXPECT_TRUE(follows_its_template(data, region, village)) << village.name;
+  }
 }
 
 TEST(Region, ABodyBornIntoAVillageIsOneAgentOfItsFactionInsideIt) {

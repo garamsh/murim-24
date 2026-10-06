@@ -30,6 +30,12 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` (four frames) |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/barrels` | 32 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/fence` | 96 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/decorations/ground` | 16 x 16 | `paving` and `road` (four each), `millet` and `rice` (two each) |
+| `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
+| `art/icons/skill_icons` | 16 x 16 | `strike`, `burst` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
@@ -153,12 +159,28 @@ The village house covers 3 x 3 cells and the hall 5 x 3, each in four stages tha
 - The plinth stays in every stage, so the footprint stays readable after the building is gone.
 - Fire and smoke over a burning building are effects drawn over the `destroyed` frame, not part of it.
 
+The village is furnished as the approved mockup's is. What blocks movement or breaks is a structure, drawn in the same four stages; what does neither is decoration, which never changes:
+
+| Prop | Kind | Footprint | Look |
+|---|---|---|---|
+| Well | Structure | 2 x 2 | A stone ring round dark water under a small tiled roof on two posts, a bucket on its rope; damaged loses roof tiles and stones, destroyed drops the roof and snaps a post, rubble is a ring of stones |
+| Barrels | Structure | 1 x 1 | Two barrels with one on top; damaged breaks one, destroyed splits them and spills grain, rubble is staves on the ground |
+| Fence | Structure | 5 x 1 | Posts every 8 pixels with two rails; damaged and destroyed lose rails and posts, rubble is posts lying down |
+| Paving | Decoration | the square | Slabs of 8 pixels in offset courses, a light slab here and there |
+| Road | Decoration | a row through the village | Packed earth with two wheel ruts |
+| Fields | Decoration | plots south of the square | Millet in amber rows or rice in green rows over water, an earth border at each plot's edge |
+| Banner | Decoration | one cell | The owner's accent on a pole, with a white mark |
+
+- Every frame holds its footprint at (8, 8), as the house's does.
+- Ground decorations are tiles laid over the terrain and under everything standing; the banner stands and is sorted with bodies and buildings.
+
 ## Effects and HUD
 
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
-- HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI.
+- HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI, each under its label and its value.
 - The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the rumour that last reached the player, the technique bar with cooldowns, and the current target.
+- A technique slot shows its number key in its top-left corner over an icon of the skill's shape: a blade with an arc of sword qi for a strike at one body, an open palm in a ring of force for a burst that reaches the bodies round its target.
 - UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
 ## Do and don't

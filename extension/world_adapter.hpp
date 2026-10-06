@@ -107,6 +107,15 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::Vector2i structure_footprint(
       std::int64_t structure) const;
 
+  /// Returns the kind of building structure `structure` is, such as `house`;
+  /// empty for a world made by create(), whose structures carry no kind.
+  [[nodiscard]] godot::String structure_kind(std::int64_t structure) const;
+
+  /// Returns army `army`'s skills, each a Dictionary keyed as create() takes
+  /// it: `range`, `radius`, `body_damage`, `structure_damage` and `cooldown`.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> skills(
+      std::int64_t army) const;
+
   /// Returns the stage structure `structure` is in, one of the STAGE_*
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
@@ -137,7 +146,8 @@ class WorldAdapter : public godot::RefCounted {
   /// world was made by create_region().
   [[nodiscard]] godot::PackedInt64Array territory() const;
 
-  /// Returns each village as a Dictionary of `name`, `faction` (int),
+  /// Returns each village as a Dictionary of `name`, `kind` (its template's
+  /// name), `faction` (int),
   /// `corner` (Vector2i) and `area` (Vector2i, its width and height in
   /// cells); empty unless the world was made
   /// by create_region().
@@ -152,6 +162,8 @@ class WorldAdapter : public godot::RefCounted {
   std::optional<murim::World> world_;
   std::vector<std::string> map_rows_;
   std::vector<std::size_t> skill_counts_;
+  std::vector<std::vector<murim::Skill>> skills_;
+  std::vector<std::string> structure_kinds_;
   std::vector<std::size_t> factions_;
   std::vector<std::uint64_t> strengths_;
   std::size_t structure_count_ = 0;

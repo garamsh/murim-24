@@ -21,6 +21,9 @@ struct M1Scenario {
   std::vector<std::string> map_rows;
   std::vector<ArmySpec> armies;
   std::vector<Structure> structures;
+  /// The kind of each structure, in the order of `structures`: barrels, a
+  /// barricade between the lines.
+  std::vector<std::string> structure_kinds;
   Rules rules;
   Cell focus;
   /// Armies [0, near_armies) are the near battle.
