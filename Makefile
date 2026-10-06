@@ -2,7 +2,7 @@
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
-BENCH_DIR := build-bench
+BENCH_DIR := $(BUILD_DIR)/bench
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -13,7 +13,7 @@ GDSCRIPT_TEST_SCOPE := git ls-files --cached --others --exclude-standard -- '*_t
 
 # CMAKE_OSX_SYSROOT puts the macOS SDK into compile_commands.json so clang-tidy finds the standard headers; other hosts ignore it.
 # godot-cpp replaces CMAKE_OSX_SYSROOT with $$SDKROOT, so the extension build passes the SDK there instead; xcrun is absent off macOS, leaving it empty.
-# build/.gdignore keeps Godot from importing the build trees, which hold godot-cpp's own test project.
+# build/.gdignore keeps Godot from importing every build tree, all of which sit under build/ and include godot-cpp's own test project.
 # .godot/extension_list.cfg names every committed .gdextension, so Godot loads them at startup: a headless
 # Godot 4.7.2 session that discovers an extension itself crashes on exit (godotengine/godot#111645).
 build:
