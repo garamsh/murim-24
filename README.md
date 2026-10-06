@@ -5,6 +5,7 @@ A 2D martial-arts RPG for PC and mobile, set inside a living world simulation. F
 ## Documents
 
 - `docs/concept.md` — the game concept
+- `docs/art-direction.md` — how the game looks
 - `docs/architecture/README.md` — how the system is shaped and why
 - `AGENTS.md` — how to contribute
 
