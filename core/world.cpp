@@ -202,6 +202,14 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
   }
   fold(person.lifespan.value_or(0));
   fold(person.soul.value_or(absent));
+  fold(person.sex);
+  fold(person.given);
+  for (const std::size_t spouse : person.spouses) {
+    fold(spouse);
+  }
+  for (const std::size_t child : person.children) {
+    fold(child);
+  }
 }
 
 // Folds a soul's history into `fold`.
@@ -234,6 +242,29 @@ void check_life(const Life& life) {
         "life must draw talents and lifespans within their limits, and give "
         "newborns health");
   }
+  const bool too_old =
+      life.founding_age &&
+      std::uint64_t{life.founding_age->mean} + life.founding_age->spread >
+          MAX_LIFESPAN_DAYS;
+  const auto unkind = [](const Kinship& kinship) {
+    const auto inverted = [](Range range) { return range.low > range.high; };
+    return inverted(kinship.marrying_age) || inverted(kinship.bearing_age) ||
+           kinship.marriage_chance > PER_MILLE ||
+           kinship.birth_chance > PER_MILLE || kinship.neighbourhood < 0 ||
+           kinship.neighbourhood > MAX_REACH;
+  };
+  if (too_old || (life.kinship && unkind(*life.kinship))) {
+    throw std::invalid_argument(
+        "a founding age must lie within the longest lifespan, and kinship's "
+        "ages run upward, its chances within a thousand per mille and its "
+        "neighbourhood within reach");
+  }
+}
+
+// The range a spread draws over.
+Range range_of(Spread values) {
+  return Range{values.mean - std::min(values.mean, values.spread),
+               values.mean + values.spread};
 }
 
 }  // namespace
@@ -249,6 +280,9 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       structure_index_(centres_of(structures_)),
       life_(std::move(life)) {
   check_life(life_);
+  if (rules_.ticks_per_day == 0) {
+    throw std::invalid_argument("a day must last at least one tick");
+  }
   const std::size_t factions = rules_.hostile.size();
   const auto ragged = [factions](const std::vector<bool>& row) {
     return row.size() != factions;
@@ -298,11 +332,12 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       roster.push_back(people_.size());
       // Everyone the world starts with is born into the family of the army
       // it is created in, of no parents, by the same rule as any birth.
+      // Founders were born before the world began, by the founding age.
       Person person;
       person.position = centre_of(recruit.cell);
       person.health = recruit.health;
       person.family = armies_.size();
-      bear(person, Soul{});
+      found(person);
       people_.push_back(std::move(person));
     }
     FlowField field{map_, army.objective};
@@ -310,6 +345,11 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     armies_.push_back(Army{army.faction, std::move(army.skills),
                            Order{army.objective, std::move(every_skill)},
                            std::move(field), std::move(roster)});
+  }
+  // Each family, one for every army the world starts with, takes a surname.
+  for (std::size_t family = 0;
+       family < armies_.size() && !life_.names.surnames.empty(); ++family) {
+    surnames_.push_back(next_random() % life_.names.surnames.size());
   }
   village_of_.resize(structures_.size());
   for (VillageSpec& spec : villages) {
@@ -543,6 +583,9 @@ void World::tick() {
   for (const Passing& passing : reborn) {
     rebirth(passing);
   }
+  if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
+    kin(*life_.kinship);
+  }
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -619,6 +662,10 @@ StateHash World::hash() const {
   for (const Soul& soul : souls_) {
     fold_soul(fold, soul);
   }
+  for (const std::size_t surname : surnames_) {
+    fold(surname);
+  }
+  fold(rules_.ticks_per_day);
   for (const Army& army : armies_) {
     fold(army.order.objective.x);
     fold(army.order.objective.y);
@@ -662,6 +709,25 @@ StateHash World::hash() const {
 }
 
 std::size_t World::population() const { return people_.size(); }
+
+std::size_t World::living() const {
+  std::size_t living = 0;
+  for (const Army& army : armies_) {
+    living += army.roster.size();
+  }
+  return living;
+}
+
+std::optional<Name> World::name(std::size_t person) const {
+  const Person& named = people_.at(person);
+  const std::vector<NameEntry>& given =
+      named.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
+  if (named.family >= surnames_.size() || given.empty()) {
+    return std::nullopt;
+  }
+  return Name{life_.names.surnames.at(surnames_.at(named.family)),
+              given.at(named.given)};
+}
 
 const Person& World::person(std::size_t person) const {
   return people_.at(person);
@@ -920,35 +986,52 @@ Range limit_range(const Life& life, const Soul& soul, std::size_t discipline) {
 // Draws `person`'s talent and lifespan, for a soul of `soul` history: the
 // one rule every birth follows.
 void World::bear(Person& person, const Soul& soul) {
-  const auto draw = [this](Range range) {
-    return range.low +
-           static_cast<std::uint32_t>(
-               next_random() % (std::uint64_t{range.high - range.low} + 1));
-  };
-  const auto spread = [](Spread values) {
-    return Range{values.mean - std::min(values.mean, values.spread),
-                 values.mean + values.spread};
-  };
-  person.born = tick_count_;
+  person.born = static_cast<std::int64_t>(tick_count_);
   person.talent.clear();
   for (std::size_t discipline = 0; discipline < life_.disciplines.size();
        ++discipline) {
     const std::uint32_t growth =
-        draw(spread(life_.disciplines.at(discipline).growth));
+        draw(range_of(life_.disciplines.at(discipline).growth));
     const std::uint32_t limit = draw(limit_range(life_, soul, discipline));
     person.talent.push_back(Aptitude{growth, limit});
   }
   person.attainment.assign(person.talent.size(), 0);
   person.lifespan =
       life_.lifespan
-          ? std::optional<std::uint64_t>{draw(spread(*life_.lifespan))}
+          ? std::optional<std::uint64_t>{draw(range_of(*life_.lifespan))}
           : std::nullopt;
+  person.sex = next_random() % 2 == 0 ? Sex::FEMALE : Sex::MALE;
+  const std::vector<NameEntry>& given =
+      person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
+  person.given = given.empty() ? 0 : next_random() % given.size();
+}
+
+// Bears founder `person` by the one birth rule, born the founding age before
+// the world began, if the life gives one.
+void World::found(Person& person) {
+  bear(person, Soul{});
+  if (life_.founding_age) {
+    person.born = -static_cast<std::int64_t>(
+        std::uint64_t{draw(range_of(*life_.founding_age))} *
+        rules_.ticks_per_day);
+  }
+}
+
+// A draw from the seed over `range`.
+std::uint32_t World::draw(Range range) {
+  return range.low +
+         static_cast<std::uint32_t>(
+             next_random() % (std::uint64_t{range.high - range.low} + 1));
+}
+
+std::int64_t World::age_in_days(const Person& person) const {
+  return (static_cast<std::int64_t>(tick_count_) - person.born) /
+         static_cast<std::int64_t>(rules_.ticks_per_day);
 }
 
 // Ends the life of every living person whose age in days has passed its
 // lifespan, extended by its attainment.
 void World::age() {
-  const std::uint64_t today = tick_count_ / CALENDAR.ticks_per_day;
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
       Person& person = people_.at(member);
@@ -956,7 +1039,7 @@ void World::age() {
       for (const std::uint32_t points : person.attainment) {
         attained += points;
       }
-      const std::uint64_t age = today - (person.born / CALENDAR.ticks_per_day);
+      const auto age = static_cast<std::uint64_t>(age_in_days(person));
       const bool spent =
           person.lifespan &&
           age >= *person.lifespan + (attained * life_.days_per_attainment);
@@ -1013,6 +1096,9 @@ void World::rebirth(Passing passing) {
   person.soul = soul_index;
   bear(person, soul);
   const std::size_t born = people_.size();
+  for (const std::size_t parent : person.parents) {
+    people_.at(parent).children.push_back(born);
+  }
   people_.push_back(std::move(person));
   // The soul's army takes its new family's faction and skills.
   Army& serving = armies_.at(army);
@@ -1048,11 +1134,118 @@ std::size_t World::ensoul(std::size_t person) {
 const Soul& World::soul(std::size_t soul) const { return souls_.at(soul); }
 
 Date World::date() const {
-  const std::uint64_t day = tick_count_ / CALENDAR.ticks_per_day;
+  const std::uint64_t day = tick_count_ / rules_.ticks_per_day;
   const std::uint64_t season = day / CALENDAR.days_per_season;
   return Date{(season / CALENDAR.seasons_per_year) + 1,
               season % CALENDAR.seasons_per_year,
               (day % CALENDAR.days_per_season) + 1};
+}
+
+// Once a day: those free to marry marry by the seed, then wives bear
+// children, each in order of person.
+void World::kin(const Kinship& kinship) {
+  std::vector<std::size_t> alive;
+  std::vector<std::size_t> army_of(people_.size());
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    for (const std::size_t member : armies_.at(army).roster) {
+      alive.push_back(member);
+      army_of.at(member) = army;
+    }
+  }
+  std::sort(alive.begin(), alive.end());
+  const auto chance = [this](std::uint32_t per_mille) {
+    return next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
+           per_mille;
+  };
+  for (const std::size_t person : alive) {
+    if (free_to_marry(person, kinship) && chance(kinship.marriage_chance)) {
+      marry(person, alive, kinship);
+    }
+  }
+  for (const std::size_t mother : alive) {
+    const Person& wife = people_.at(mother);
+    const std::int64_t age = age_in_days(wife);
+    const bool wed =
+        !wife.spouses.empty() && people_.at(wife.spouses.back()).health > 0;
+    const bool rested =
+        wife.children.empty() ||
+        static_cast<std::int64_t>(tick_count_) -
+                people_.at(wife.children.back()).born >=
+            static_cast<std::int64_t>(std::uint64_t{kinship.birth_spacing} *
+                                      rules_.ticks_per_day);
+    if (wife.sex == Sex::FEMALE && wed && rested &&
+        age >= kinship.bearing_age.low && age <= kinship.bearing_age.high &&
+        chance(kinship.birth_chance) && living() < MAX_PEOPLE) {
+      bear_child(mother, army_of, kinship);
+    }
+  }
+}
+
+// Whether living person `person` may marry: of marrying age, with a home and
+// no living spouse.
+bool World::free_to_marry(std::size_t person, const Kinship& kinship) const {
+  const Person& single = people_.at(person);
+  const Range ages = kinship.marrying_age;
+  const std::int64_t age = age_in_days(single);
+  return single.health > 0 && single.home.has_value() &&
+         (single.spouses.empty() ||
+          people_.at(single.spouses.back()).health == 0) &&
+         age >= ages.low && age <= ages.high;
+}
+
+// Where village `village` lies: its centre, where its residents are bound.
+Cell World::seat(std::size_t village) const {
+  return armies_.at(villages_.at(village).spec.residents).order.objective;
+}
+
+// Marries `person` to a partner drawn by the seed among the `living` free to
+// marry, of the other sex and another family, whose village is the same or
+// one whose seat lies within the neighbourhood of its own.
+void World::marry(std::size_t person, const std::vector<std::size_t>& living,
+                  const Kinship& kinship) {
+  const Person& self = people_.at(person);
+  if (!self.home) {
+    return;
+  }
+  const Cell here = seat(*self.home);
+  std::vector<std::size_t> partners;
+  for (const std::size_t other : living) {
+    const Person& partner = people_.at(other);
+    if (partner.sex != self.sex && partner.family != self.family &&
+        partner.home && free_to_marry(other, kinship) &&
+        std::abs(seat(*partner.home).x - here.x) <= kinship.neighbourhood &&
+        std::abs(seat(*partner.home).y - here.y) <= kinship.neighbourhood) {
+      partners.push_back(other);
+    }
+  }
+  if (partners.empty()) {
+    return;
+  }
+  const std::size_t chosen = partners.at(next_random() % partners.size());
+  people_.at(person).spouses.push_back(chosen);
+  people_.at(chosen).spouses.push_back(person);
+}
+
+// Bears a child to `mother` and her husband by the one birth rule, into the
+// family, home and army of the parent the lineage follows, at its side.
+void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
+                       const Kinship& kinship) {
+  const std::size_t father = people_.at(mother).spouses.back();
+  const std::size_t lineage = kinship.fathers_family ? father : mother;
+  const Person& parent = people_.at(lineage);
+  Person child;
+  child.position = parent.position;
+  child.health = life_.newborn_health;
+  child.home = parent.home;
+  child.family = parent.family;
+  child.parents = {father, mother};
+  bear(child, Soul{});
+  const std::size_t born = people_.size();
+  people_.at(father).children.push_back(born);
+  people_.at(mother).children.push_back(born);
+  people_.push_back(std::move(child));
+  army_of.push_back(army_of.at(lineage));
+  armies_.at(army_of.at(lineage)).roster.push_back(born);
 }
 
 }  // namespace murim

@@ -825,5 +825,138 @@ TEST(Region, ABandTheWalledVillageOutnumbersStillClosesToStrike) {
       residents);
 }
 
+// Years a generated region lives through in the kinship tests.
+constexpr std::uint64_t GENERATIONS_YEARS = 30;
+
+// How a region lived: the most living at once, and the people it held.
+struct Lived {
+  std::size_t peak;
+  std::vector<Person> people;
+  std::vector<std::optional<Name>> names;
+};
+
+// The region `data` generates from `seed`, lived through `years` years with
+// days of one tick, so that every life rule, counted in days, runs as in
+// play while the test stays short.
+Lived lived(const RegionData& data, Seed seed, std::uint64_t years) {
+  Region region = generate_region(seed, data);
+  region.rules.ticks_per_day = 1;
+  World world = world_of(region);
+  std::size_t peak = world.living();
+  for (std::uint64_t day = 0; day < years * DAYS_PER_YEAR; ++day) {
+    world.tick();
+    peak = std::max(peak, world.living());
+  }
+  Lived result{peak, {}, {}};
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    result.people.push_back(world.person(person));
+    result.names.push_back(world.name(person));
+  }
+  return result;
+}
+
+// Each person's generation: 1 for those the world starts with, and one more
+// than its eldest parent's for everyone born since.
+std::vector<int> generations(const std::vector<Person>& people) {
+  std::vector<int> generation(people.size(), 1);
+  for (std::size_t person = 0; person < people.size(); ++person) {
+    for (const std::size_t parent : people.at(person).parents) {
+      generation.at(person) =
+          std::max(generation.at(person), generation.at(parent) + 1);
+    }
+  }
+  return generation;
+}
+
+// Whether every child was born to a married couple of a man and a woman, in
+// its father's family.
+bool born_in_wedlock(const std::vector<Person>& people) {
+  return std::all_of(people.begin(), people.end(), [&](const Person& child) {
+    if (child.parents.size() != 2 || child.soul) {
+      return child.parents.empty() || child.soul.has_value();
+    }
+    const Person& father = people.at(child.parents.front());
+    const Person& mother = people.at(child.parents.back());
+    return father.sex == Sex::MALE && mother.sex == Sex::FEMALE &&
+           std::count(mother.spouses.begin(), mother.spouses.end(),
+                      child.parents.front()) == 1 &&
+           child.family == father.family && father.family != mother.family;
+  });
+}
+
+TEST(Region, FamiliesReachAThirdGenerationWithinThirtyYears) {
+  const Lived region = lived(region_data(), SEED, GENERATIONS_YEARS);
+  const std::vector<int> generation = generations(region.people);
+  EXPECT_GE(*std::max_element(generation.begin(), generation.end()), 3);
+  EXPECT_LE(region.peak, MAX_PEOPLE);
+  EXPECT_TRUE(born_in_wedlock(region.people));
+  // Control: without kinship no one marries, and the world starts with the
+  // only generation it has.
+  RegionData unwed = region_data();
+  unwed.life.kinship.reset();
+  const Lived control = lived(unwed, SEED, GENERATIONS_YEARS);
+  const std::vector<int> only = generations(control.people);
+  EXPECT_EQ(*std::max_element(only.begin(), only.end()), 1);
+  EXPECT_TRUE(std::none_of(
+      control.people.begin(), control.people.end(),
+      [](const Person& person) { return !person.spouses.empty(); }));
+}
+
+TEST(Region, BirthsStopOnceMaxPeopleLive) {
+  // Everyone free marries and every wife bears a child each day she may.
+  RegionData fertile = region_data();
+  ASSERT_TRUE(fertile.life.kinship.has_value());
+  Kinship kinship = fertile.life.kinship.value_or(Kinship{});
+  kinship.marriage_chance = PER_MILLE;
+  kinship.birth_chance = PER_MILLE;
+  kinship.birth_spacing = 0;
+  fertile.life.kinship = kinship;
+  const Lived crowded = lived(fertile, SEED, GENERATIONS_YEARS);
+  // The bound was met and never passed.
+  EXPECT_EQ(crowded.peak, MAX_PEOPLE);
+  // Control: the game's own odds leave the region below the bound.
+  EXPECT_LT(lived(region_data(), SEED, GENERATIONS_YEARS).peak, MAX_PEOPLE);
+}
+
+// Whether every child born to a couple bears its father's surname.
+bool fathers_surnames(const Lived& region) {
+  for (std::size_t person = 0; person < region.people.size(); ++person) {
+    const std::vector<std::size_t>& parents = region.people.at(person).parents;
+    const bool born_to_couple =
+        parents.size() == 2 && !region.people.at(person).soul;
+    if (born_to_couple &&
+        region.names.at(person).value_or(Name{}).surname.korean !=
+            region.names.at(parents.front()).value_or(Name{}).surname.korean) {
+      return false;
+    }
+  }
+  return true;
+}
+
+TEST(Region, EveryPersonBearsTheirFamilySurnameAndAGivenName) {
+  const Lived region = lived(region_data(), SEED, GENERATIONS_YEARS);
+  const auto named = [](const std::optional<Name>& name) {
+    return name && !name->surname.korean.empty() &&
+           !name->surname.romanised.empty() && !name->given.korean.empty() &&
+           !name->given.romanised.empty();
+  };
+  EXPECT_TRUE(std::all_of(region.names.begin(), region.names.end(), named));
+  // A child bears its father's surname.
+  EXPECT_TRUE(fathers_surnames(region));
+  // The same seed names everyone alike; control: another seed does not.
+  const auto spelled = [](const Lived& from) {
+    std::vector<std::string> spellings;
+    for (const std::optional<Name>& name : from.names) {
+      const Name each = name.value_or(Name{});
+      spellings.push_back(each.surname.romanised + " " + each.given.romanised);
+    }
+    return spellings;
+  };
+  EXPECT_EQ(spelled(lived(region_data(), SEED, 0)),
+            spelled(lived(region_data(), SEED, 0)));
+  EXPECT_NE(spelled(lived(region_data(), SEED, 0)),
+            spelled(lived(region_data(), OTHER_SEED, 0)));
+}
+
 }  // namespace
 }  // namespace murim

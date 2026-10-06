@@ -240,7 +240,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xF354DD24A87FA33BULL);
+            0xFB2B052AD0BD236FULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -1304,9 +1304,8 @@ TEST(World, ADuelIsReadWhileItIsFoughtAndGoneOnceSettled) {
   EXPECT_FALSE(world.duel(CULT).has_value());
 }
 
-constexpr std::uint64_t TICKS_PER_DAY = CALENDAR.ticks_per_day;
 constexpr std::uint64_t TICKS_PER_SEASON =
-    CALENDAR.ticks_per_day * CALENDAR.days_per_season;
+    TICKS_PER_DAY * CALENDAR.days_per_season;
 
 TEST(World, TheCalendarFollowsTheTicks) {
   World world{Seed{1},
@@ -1327,12 +1326,45 @@ TEST(World, TheCalendarFollowsTheTicks) {
   EXPECT_EQ(when(), (std::array<std::uint64_t, 3>{2, 0, 1}));
 }
 
+TEST(World, HowManyTicksMakeADayIsTheWorldsData) {
+  Rules daily = peaceful(0);
+  daily.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+              {},
+              daily};
+  run_ticks(world, CALENDAR.days_per_season);
+  EXPECT_EQ(world.date().season, 1U);
+  // A day of no ticks is refused; control: a day of one tick is accepted.
+  Rules endless = daily;
+  endless.ticks_per_day = 0;
+  EXPECT_THROW((World{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      endless}),
+               std::invalid_argument);
+  EXPECT_NO_THROW((World{Seed{1},
+                         Map{open_map(OPEN_SIDE)},
+                         {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                         {},
+                         daily}));
+}
+
 // One discipline whose limit is drawn over [500 - spread, 500 + spread].
 Life one_discipline(std::uint32_t limit_spread) {
   constexpr Spread GROWTH{10, 5};
   constexpr std::uint32_t LIMIT = 500;
-  return Life{
-      {{"sword", GROWTH, {LIMIT, limit_spread}}}, 1, std::nullopt, 0, 0, 0};
+  return Life{{{"sword", GROWTH, {LIMIT, limit_spread}}},
+              1,
+              std::nullopt,
+              0,
+              0,
+              0,
+              std::nullopt,
+              std::nullopt,
+              {}};
 }
 
 // The mean and variance of the limits drawn for 400 people born with
@@ -1413,6 +1445,63 @@ TEST(World, LifeDrawingPastItsLimitsIsRefused) {
   EXPECT_FALSE(lives_by(healthless));
 }
 
+// Kinship at its limits: ages that run from and to one day, chances of a
+// thousand per mille, and the widest neighbourhood.
+constexpr Kinship KIN_LIMITS{{1, 1},    MAX_REACH, PER_MILLE, {1, 1},
+                             PER_MILLE, 0,         true};
+// A founding age as long as the longest lifespan.
+constexpr Spread FOUNDING_LIMIT{MAX_LIFESPAN_DAYS - 1, 1};
+
+// One discipline with `kinship` and founders `founding` days old.
+Life kin_with(const Kinship& kinship, Spread founding = FOUNDING_LIMIT) {
+  Life life = one_discipline(0);
+  life.founding_age = founding;
+  life.kinship = kinship;
+  return life;
+}
+
+TEST(World, KinshipPastItsLimitsIsRefused) {
+  Kinship downward = KIN_LIMITS;
+  downward.marrying_age = Range{2, 1};
+  Kinship unbearing = KIN_LIMITS;
+  unbearing.bearing_age = Range{2, 1};
+  Kinship eager = KIN_LIMITS;
+  ++eager.marriage_chance;
+  Kinship fertile = KIN_LIMITS;
+  ++fertile.birth_chance;
+  Kinship far = KIN_LIMITS;
+  far.neighbourhood = -1;
+  // Control: kinship at every limit is accepted.
+  EXPECT_TRUE(lives_by(kin_with(KIN_LIMITS)));
+  EXPECT_FALSE(
+      lives_by(kin_with(KIN_LIMITS, Spread{MAX_LIFESPAN_DAYS - 1, 2})));
+  for (const Kinship& refused : {downward, unbearing, eager, fertile, far}) {
+    EXPECT_FALSE(lives_by(kin_with(refused)));
+  }
+}
+
+TEST(World, ThePeopleAWorldStartsWithAreBornBeforeItByTheFoundingAge) {
+  constexpr std::uint32_t AGE = 30;
+  Life life = one_discipline(0);
+  life.founding_age = Spread{AGE, 0};
+  const World founded{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      peaceful(0),
+                      {},
+                      {},
+                      life};
+  EXPECT_EQ(founded.person(0).born,
+            -static_cast<std::int64_t>(AGE * TICKS_PER_DAY));
+  // Control: without a founding age they are born as the world begins.
+  EXPECT_EQ(World(Seed{1}, Map{open_map(OPEN_SIDE)},
+                  {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})}, {}, peaceful(0))
+                .person(0)
+                .born,
+            0);
+}
+
 // Whether every person of `world` was born to live `days` days.
 bool everyone_lives(const World& world, std::uint64_t days) {
   for (std::size_t person = 0; person < world.population(); ++person) {
@@ -1490,7 +1579,7 @@ TEST(World, ASoulIsBornAgainIntoAFamilyOfTheSameWorld) {
   EXPECT_EQ(person.family, world.person(person.parents.front()).family);
   // Control: not the family of the body that died.
   EXPECT_NE(person.family, world.person(post).family);
-  EXPECT_GT(person.born, 0U);
+  EXPECT_GT(person.born, 0);
 }
 
 TEST(World, ARebirthContinuesTheWorldInsteadOfResettingIt) {

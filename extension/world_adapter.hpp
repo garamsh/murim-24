@@ -107,6 +107,26 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns person `person`'s health; 0 once dead.
   [[nodiscard]] std::int64_t person_health(std::int64_t person) const;
 
+  /// Returns person `person`'s name as `surname` and `given` in Korean and
+  /// `surname_en` and `given_en` romanised, or an empty Dictionary when the
+  /// world names no one.
+  [[nodiscard]] godot::Dictionary person_name(std::int64_t person) const;
+
+  /// Returns person `person`'s parents, as person indices.
+  [[nodiscard]] godot::PackedInt64Array person_parents(
+      std::int64_t person) const;
+
+  /// Returns the people born to person `person`, as person indices, in
+  /// order of birth.
+  [[nodiscard]] godot::PackedInt64Array person_children(
+      std::int64_t person) const;
+
+  /// Returns the person `person` last married, or -1 if it never married.
+  [[nodiscard]] std::int64_t person_spouse(std::int64_t person) const;
+
+  /// Returns person `person`'s family.
+  [[nodiscard]] std::int64_t person_family(std::int64_t person) const;
+
   /// Advances the world by one step.
   void tick();
 
