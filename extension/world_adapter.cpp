@@ -259,6 +259,7 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   }
   adapter->structure_count_ = structures.size();
   adapter->faction_count_ = rules.hostile.size();
+  adapter->names_ = life.names;
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
                           std::move(structures), std::move(rules),
                           std::move(villages), std::move(leadership),
@@ -570,6 +571,24 @@ godot::Dictionary WorldAdapter::person_name(std::int64_t person) const {
   return fields;
 }
 
+godot::Dictionary WorldAdapter::names() const {
+  const auto entries = [](const std::vector<murim::NameEntry>& from) {
+    godot::Array entries;
+    for (const murim::NameEntry& entry : from) {
+      godot::Dictionary fields;
+      fields.set("korean", godot::String::utf8(entry.korean.c_str()));
+      fields.set("romanised", godot::String(entry.romanised.c_str()));
+      entries.push_back(fields);
+    }
+    return entries;
+  };
+  godot::Dictionary names;
+  names.set("surnames", entries(names_.surnames));
+  names.set("female", entries(names_.female));
+  names.set("male", entries(names_.male));
+  return names;
+}
+
 godot::PackedInt64Array WorldAdapter::person_parents(
     std::int64_t person) const {
   return indices(world().person(person_index(person)).parents);
@@ -636,6 +655,7 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_health);
   godot::ClassDB::bind_method(godot::D_METHOD("person_name", "person"),
                               &WorldAdapter::person_name);
+  godot::ClassDB::bind_method(godot::D_METHOD("names"), &WorldAdapter::names);
   godot::ClassDB::bind_method(godot::D_METHOD("person_parents", "person"),
                               &WorldAdapter::person_parents);
   godot::ClassDB::bind_method(godot::D_METHOD("person_children", "person"),

@@ -131,8 +131,9 @@ func _economy_pass() -> bool:
 
 
 # The player's body in a region has a surname and a given name in Korean and romanised, the family
-# of its own army, and, as the world begins, no parents, spouse or children. Control: a world made
-# by create() names no one.
+# of its own army, and, as the world begins, no parents, spouse or children. Every person in the
+# region bears a surname and a given name from names(). Control: a world made by create() names no
+# one, and its names() are empty.
 func _kin_pass() -> bool:
 	var region := WorldAdapter.create_region(REGION_SEED)
 	var army := region.army_count() - 1
@@ -143,12 +144,33 @@ func _kin_pass() -> bool:
 		named = named and name.has(key) and not String(name[key]).is_empty()
 	var kin := region.person_family(body) == army and region.person_spouse(body) == -1 \
 			and region.person_parents(body).is_empty() and region.person_children(body).is_empty()
-	var unnamed := _create(SEED, _armies, RULES).person_name(0).is_empty()
-	var passed: bool = named and kin and unnamed
-	print("world_adapter_test: the player's body is %s %s (%s %s) of family %d, spouse %d, %d parents, %d children; a created world names no one %s: %s" % [
+	var created := _create(SEED, _armies, RULES)
+	var unnamed := created.person_name(0).is_empty()
+	var table := region.names()
+	var surnames := {}
+	var givens := {}
+	for entry: Dictionary in table.surnames:
+		surnames[[entry.korean, entry.romanised]] = true
+	for entry: Dictionary in table.female + table.male:
+		givens[[entry.korean, entry.romanised]] = true
+	# Setup: the region has people, and the table has names.
+	var people := 0
+	var from_table := not surnames.is_empty() and not givens.is_empty()
+	for army_index in region.army_count():
+		for person in region.roster(army_index):
+			var person_name := region.person_name(person)
+			people += 1
+			from_table = from_table and surnames.has([person_name.surname, person_name.surname_en]) \
+					and givens.has([person_name.given, person_name.given_en])
+	var empty_table: Dictionary = created.names()
+	var no_names: bool = empty_table.surnames.is_empty() and empty_table.female.is_empty() \
+			and empty_table.male.is_empty()
+	var passed: bool = named and kin and unnamed and people > 0 and from_table and no_names
+	print("world_adapter_test: the player's body is %s %s (%s %s) of family %d, spouse %d, %d parents, %d children; names() holds %d surnames and %d given names, every one of %d people's among them %s; a created world names no one %s, its names() empty %s: %s" % [
 		name.get("surname", ""), name.get("given", ""), name.get("surname_en", ""), name.get("given_en", ""),
 		region.person_family(body), region.person_spouse(body), region.person_parents(body).size(),
-		region.person_children(body).size(), unnamed, "pass" if passed else "FAIL"])
+		region.person_children(body).size(), surnames.size(), givens.size(), people, from_table, unnamed, no_names,
+		"pass" if passed else "FAIL"])
 	return passed
 
 
