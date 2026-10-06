@@ -112,6 +112,12 @@ class WorldAdapter : public godot::RefCounted {
   /// world names no one.
   [[nodiscard]] godot::Dictionary person_name(std::int64_t person) const;
 
+  /// Returns every name the world's people may bear, as its rules of life
+  /// give them: `surnames`, `female` and `male`, each an Array of
+  /// Dictionaries of `korean` and `romanised`; each Array is empty when the
+  /// world names no one.
+  [[nodiscard]] godot::Dictionary names() const;
+
   /// Returns person `person`'s parents, as person indices.
   [[nodiscard]] godot::PackedInt64Array person_parents(
       std::int64_t person) const;
@@ -246,6 +252,8 @@ class WorldAdapter : public godot::RefCounted {
   std::vector<std::uint64_t> strengths_;
   std::size_t structure_count_ = 0;
   std::size_t faction_count_ = 0;
+  // The names the world's rules of life were given.
+  murim::Names names_;
   // What create_region() keeps of the region for display; empty otherwise.
   murim::RegionData region_data_;
   std::vector<std::size_t> terrain_;

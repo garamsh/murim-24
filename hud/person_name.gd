@@ -8,6 +8,11 @@ static func of(world: WorldAdapter, person: int, short := false) -> String:
 	var name := world.person_name(person)
 	if name.is_empty():
 		return TranslationServer.translate("GENEALOGY_UNNAMED")
+	return shown(name, short)
+
+
+## Returns `name`, a Dictionary as WorldAdapter.person_name gives it, as `of` shows it.
+static func shown(name: Dictionary, short := false) -> String:
 	if TranslationServer.get_locale().begins_with("ko"):
 		return name.surname + name.given
 	if short:
