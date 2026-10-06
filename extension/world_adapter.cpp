@@ -1,16 +1,22 @@
 #include "world_adapter.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/error_macros.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
+#include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/variant.hpp>
-#include <godot_cpp/variant/vector2i.hpp>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 #include "map.hpp"
+#include "world.hpp"
 
 namespace murim_godot {
 namespace {
@@ -37,8 +43,9 @@ godot::Variant field(const godot::Dictionary& army, const char* key,
 }
 
 murim::Cell cell(const godot::Dictionary& army, const char* key) {
-  const godot::Vector2i value = field(army, key, godot::Variant::VECTOR2I);
-  return murim::Cell{value.x, value.y};
+  const godot::Variant value = field(army, key, godot::Variant::VECTOR2I);
+  return murim::Cell{narrow<std::int32_t>(value.get("x"), "x"),
+                     narrow<std::int32_t>(value.get("y"), "y")};
 }
 
 murim::ArmySpec army_spec(const godot::Dictionary& army) {
@@ -63,8 +70,9 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
       rows.emplace_back(row.utf8().get_data());
     }
     std::vector<murim::ArmySpec> specs;
-    for (std::int64_t i = 0; i < armies.size(); ++i) {
-      specs.push_back(army_spec(armies[i]));
+    specs.reserve(static_cast<std::size_t>(armies.size()));
+    for (const godot::Variant& army : armies) {
+      specs.push_back(army_spec(army));
     }
     adapter.instantiate();
     adapter->world_.emplace(murim::Seed{static_cast<std::uint64_t>(seed)},
@@ -77,11 +85,14 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
   return adapter;
 }
 
-void WorldAdapter::tick() { world_.value().tick(); }
+void WorldAdapter::tick() {
+  CRASH_COND_MSG(!world_.has_value(), "WorldAdapter was not made by create()");
+  world_->tick();
+}
 
 std::int64_t WorldAdapter::hash() const {
-  return static_cast<std::int64_t>(
-      static_cast<std::uint64_t>(world_.value().hash()));
+  CRASH_COND_MSG(!world_.has_value(), "WorldAdapter was not made by create()");
+  return static_cast<std::int64_t>(static_cast<std::uint64_t>(world_->hash()));
 }
 
 void WorldAdapter::_bind_methods() {

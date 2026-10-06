@@ -14,7 +14,11 @@ namespace murim_godot {
 
 /// A core world exposed to Godot; GDScript gets one from
 /// `WorldAdapter.create()`, the only way to make one.
+// GDCLASS, godot-cpp's code, declares a copy assignment and expands into code
+// these checks reject.
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class WorldAdapter : public godot::RefCounted {
+  // NOLINTNEXTLINE(misc-const-correctness,modernize-use-auto)
   GDCLASS(WorldAdapter, godot::RefCounted)
 
  public:
@@ -38,8 +42,8 @@ class WorldAdapter : public godot::RefCounted {
   static void _bind_methods();
 
  private:
-  // Empty only between construction and the end of create(), since the class
-  // is registered abstract and GDScript cannot construct it.
+  // Set by create(), the only way GDScript gets an adapter, since the class is
+  // registered abstract.
   std::optional<murim::World> world_;
 };
 

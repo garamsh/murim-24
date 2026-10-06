@@ -6,18 +6,19 @@ TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
 CXX_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp'
+EXTENSION_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'
 GDEXTENSION_SCOPE := git ls-files --cached --others --exclude-standard -- '*.gdextension'
 GDSCRIPT_TEST_SCOPE := git ls-files --cached --others --exclude-standard -- '*_test.gd'
 
 # CMAKE_OSX_SYSROOT puts the macOS SDK into compile_commands.json so clang-tidy finds the standard headers; other hosts ignore it.
-# The extension build leaves it unset: godot-cpp sets its own sysroot, and clang-tidy does not read that build.
+# godot-cpp replaces CMAKE_OSX_SYSROOT with $$SDKROOT, so the extension build passes the SDK there instead; xcrun is absent off macOS, leaving it empty.
 # build/.gdignore keeps Godot from importing the build trees, which hold godot-cpp's own test project.
 # .godot/extension_list.cfg names every committed .gdextension, so Godot loads them at startup: a headless
 # Godot 4.7.2 session that discovers an extension itself crashes on exit (godotengine/godot#111645).
 build:
 	$(TOOLS)/cmake -S core -B $(BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx
 	$(TOOLS)/cmake --build $(BUILD_DIR)
-	$(TOOLS)/cmake -S extension -B $(EXTENSION_BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3
+	SDKROOT=$$(xcrun --show-sdk-path 2>/dev/null) $(TOOLS)/cmake -S extension -B $(EXTENSION_BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3
 	$(TOOLS)/cmake --build $(EXTENSION_BUILD_DIR)
 	touch $(BUILD_DIR)/.gdignore
 	mkdir -p .godot && $(GDEXTENSION_SCOPE) | sed 's|^|res://|' > .godot/extension_list.cfg
@@ -29,6 +30,10 @@ lint: build
 	test -n "$$files" || { echo "no C++ source was read" >&2; exit 1; }; \
 	$(TOOLS)/clang-tidy --quiet -p $(BUILD_DIR) $$files && \
 	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ headers they include, selected by: $(CXX_SOURCE_SCOPE)"
+	@files=$$($(EXTENSION_SOURCE_SCOPE)); \
+	test -n "$$files" || { echo "no extension/ C++ source was read" >&2; exit 1; }; \
+	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/extension/[^/]+\.hpp$$' -p $(EXTENSION_BUILD_DIR) $$files && \
+	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') extension/ C++ sources and the extension/ headers they include, with core/.clang-tidy, selected by: $(EXTENSION_SOURCE_SCOPE)"
 
 format:
 	@files=$$($(CXX_SCOPE)); \
