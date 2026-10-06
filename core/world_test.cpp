@@ -185,7 +185,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xEF1ADB54473AC222ULL);
+            0x255B1015DAFB82B3ULL);
 }
 
 // Keeps the focus `tier.reach` to the side of the army's lead body, so the
@@ -467,6 +467,79 @@ TEST(World, BattleNearTheFocusEndsWithConsistentTotals) {
 
 TEST(World, BattleFarFromTheFocusEndsWithConsistentTotals) {
   expect_consistent_battle(Position{FAR_AWAY, FAR_AWAY});
+}
+
+// Strength each matchup army starts with: 12 agents of 100.
+constexpr std::uint32_t MATCHUP_COUNT = 12;
+constexpr std::uint64_t MATCHUP_STRENGTH = 1200;
+
+// Fights an army using `first` against an equal one using `second`, on
+// neighbouring cells with the focus at `focus`, until a side falls or TICKS
+// pass, and returns the strength each side has left.
+std::array<std::uint64_t, 2> fight(const Skill& first, const Skill& second,
+                                   Position focus) {
+  const std::vector<ArmySpec> armies{
+      {{3, 3}, {3, 3}, MATCHUP_COUNT, MATCHUP_STRENGTH, 0, {first}},
+      {{4, 3}, {4, 3}, MATCHUP_COUNT, MATCHUP_STRENGTH, 1, {second}},
+  };
+  World world{
+      Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(SEPARATION)};
+  world.set_focus(focus);
+  for (int i = 0; i < TICKS && totals(world.bodies(0)).count > 0 &&
+                  totals(world.bodies(1)).count > 0;
+       ++i) {
+    world.tick();
+  }
+  return {totals(world.bodies(0)).strength, totals(world.bodies(1)).strength};
+}
+
+// The side with strength left, and how much it kept, as the outcome a
+// matchup must reach in every tier.
+struct Outcome {
+  std::size_t winner;
+  std::uint64_t kept;
+};
+
+Outcome outcome(const std::array<std::uint64_t, 2>& left) {
+  const std::size_t winner = left.at(0) > 0 ? 0 : 1;
+  return Outcome{winner, left.at(winner)};
+}
+
+// Runs one matchup near the focus and far from it, and expects the same side
+// to win with the strength it keeps within a quarter of the start.
+void expect_same_outcome(const Skill& first, const Skill& second,
+                         std::size_t expected_winner) {
+  constexpr std::uint64_t TOLERANCE = MATCHUP_STRENGTH / 4;
+  const auto near = fight(first, second, centre_of({3, 3}));
+  const auto far = fight(first, second, Position{FAR_AWAY, FAR_AWAY});
+  // The battles must have ended, or there is no winner to compare.
+  ASSERT_TRUE(near.at(0) == 0 || near.at(1) == 0);
+  ASSERT_TRUE(far.at(0) == 0 || far.at(1) == 0);
+  const Outcome near_outcome = outcome(near);
+  const Outcome far_outcome = outcome(far);
+  EXPECT_EQ(near_outcome.winner, expected_winner);
+  EXPECT_EQ(far_outcome.winner, expected_winner);
+  EXPECT_LE(std::max(near_outcome.kept, far_outcome.kept) -
+                std::min(near_outcome.kept, far_outcome.kept),
+            TOLERANCE)
+      << "near kept " << near_outcome.kept << ", far kept " << far_outcome.kept;
+}
+
+// A quick single-target skill: 2 damage every tick, 2 per agent per tick.
+constexpr Skill JAB{2 * CELL_SIZE, 0, 2, 0, 1};
+
+TEST(World, AreaSkillBeatsSingleTargetSkillNearAndFarAlike) {
+  // 1 damage every 2 ticks to every agent within a cell's width, which
+  // covers the whole of the other army: up to 6 per agent per tick.
+  const Skill sweep{2 * CELL_SIZE, CELL_SIZE, 1, 0, 2};
+  expect_same_outcome(JAB, sweep, 1);
+}
+
+TEST(World, QuickSkillBeatsSlowSkillNearAndFarAlike) {
+  // 24 damage every 20 ticks, 1.2 per agent per tick; its cooldown is longer
+  // than the far tier's 16-tick step.
+  const Skill heave{2 * CELL_SIZE, 0, 24, 0, 20};
+  expect_same_outcome(JAB, heave, 0);
 }
 
 void run_ticks(World& world, std::uint64_t ticks) {

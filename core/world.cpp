@@ -25,6 +25,9 @@ constexpr std::uint64_t MIX_MULTIPLIER_2 = 0x94D049BB133111EBULL;
 constexpr unsigned MIX_SHIFT_1 = 30U;
 constexpr unsigned MIX_SHIFT_2 = 27U;
 constexpr unsigned MIX_SHIFT_3 = 31U;
+// Pi as 355/113 (Zu Chongzhi), within 3e-7 of it, for areas in integers.
+constexpr std::uint64_t PI_NUMERATOR = 355;
+constexpr std::uint64_t PI_DENOMINATOR = 113;
 
 // A move crosses at most one cell border per axis, so the flow field vets
 // every cell a body enters.
@@ -50,6 +53,9 @@ std::int64_t distance_squared(Position origin, Position point) {
   const std::int64_t offset_y = std::int64_t{point.y} - origin.y;
   return (offset_x * offset_x) + (offset_y * offset_y);
 }
+
+// The range a separation, range or radius must lie in.
+bool reachable(std::int32_t units) { return units >= 0 && units <= MAX_REACH; }
 
 std::int32_t sign(std::int64_t value) {
   return static_cast<std::int32_t>(value > 0) -
@@ -164,22 +170,28 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   const auto ragged = [factions](const std::vector<bool>& row) {
     return row.size() != factions;
   };
-  const auto invalid_army = [this, factions](const ArmySpec& army) {
+  const auto invalid_skill = [](const Skill& skill) {
+    return !reachable(skill.range) || !reachable(skill.radius);
+  };
+  const auto invalid_army = [this, factions,
+                             invalid_skill](const ArmySpec& army) {
     return army.count == 0 || army.strength < army.count ||
            army.skills.empty() || army.faction >= factions ||
-           !map_.passable(army.start) || !map_.passable(army.objective);
+           !map_.passable(army.start) || !map_.passable(army.objective) ||
+           std::any_of(army.skills.begin(), army.skills.end(), invalid_skill);
   };
   const auto invalid_structure = [this](const Structure& structure) {
     return !map_.passable(structure.cell);
   };
-  if (rules_.separation < 0 ||
+  if (!reachable(rules_.separation) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       std::any_of(armies.begin(), armies.end(), invalid_army) ||
       std::any_of(structures_.begin(), structures_.end(), invalid_structure)) {
     throw std::invalid_argument(
-        "the separation must not be negative, hostility must be square, and "
-        "every army must hold agents, strength and skills of a known faction "
-        "and stand, like every structure, on passable cells");
+        "separation, range and radius must lie in [0, MAX_REACH], hostility "
+        "must be square, and every army must hold agents, strength and skills "
+        "of a known faction and stand, like every structure, on passable "
+        "cells");
   }
   for (ArmySpec& army : armies) {
     armies_.push_back(
@@ -199,7 +211,7 @@ void World::tick() {
   std::vector<std::uint64_t> intervals;
   std::vector<Position> positions;
   std::vector<std::size_t> owners;
-  std::vector<bool> alive;
+  std::vector<std::uint32_t> counts;
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     std::vector<Body>& bodies = armies_.at(army).bodies;
     const Tier& tier = tier_at(focus_, bodies.front().position);
@@ -208,15 +220,15 @@ void World::tick() {
     for (const Body& body : bodies) {
       positions.push_back(body.position);
       owners.push_back(army);
-      alive.push_back(body.strength > 0);
+      counts.push_back(body.count);
     }
   }
   const Crowd crowd{SpatialHash{std::move(positions)}, std::move(owners),
-                    std::move(alive)};
+                    std::move(counts), std::move(intervals)};
   std::vector<std::uint64_t> damage(crowd.armies.size(), 0);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     for (Body& body : armies_.at(army).bodies) {
-      if (tick_count_ % intervals.at(army) == 0 &&
+      if (tick_count_ % crowd.intervals.at(army) == 0 &&
           body.ready_at <= tick_count_) {
         strike(body, army, crowd, damage);
       }
@@ -231,7 +243,7 @@ void World::tick() {
     }
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    const std::uint64_t interval = intervals.at(army);
+    const std::uint64_t interval = crowd.intervals.at(army);
     if (tick_count_ % interval == 0) {
       march(armies_.at(army).bodies,
             SPEED * static_cast<std::int32_t>(interval), armies_.at(army).field,
@@ -309,8 +321,10 @@ std::uint64_t World::next_random() {
   return mix(rng_state_);
 }
 
-// The one rule every skill resolves through, whoever uses it: an agent, an
-// aggregate or the player's body differ only in `user.count`.
+// The one rule every skill resolves through, whoever uses it. An agent, an
+// aggregate and the player's body differ only in how many agents they stand
+// for, and every tier in how many uses fall in one of its steps, so a battle
+// comes out the same wherever the focus is.
 void World::strike(Body& user, std::size_t army, const Crowd& crowd,
                    std::vector<std::uint64_t>& damage) {
   const Army& own = armies_.at(army);
@@ -325,7 +339,7 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
        crowd.hash.within(user.position, skill.range)) {
     const std::int64_t distance =
         distance_squared(user.position, crowd.hash.position(other));
-    if (crowd.alive.at(other) && hostile(other) && distance < nearest) {
+    if (crowd.counts.at(other) > 0 && hostile(other) && distance < nearest) {
       nearest = distance;
       target = other;
     }
@@ -333,14 +347,32 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
   if (!target) {
     return;
   }
+  // Uses the step holds: one per cooldown since the later of the user's
+  // readiness and the start of its tier's step, so a body acting every 16
+  // ticks uses a skill as often as one acting every tick.
+  const std::uint64_t cooldown = std::max<std::uint64_t>(skill.cooldown, 1);
+  const std::uint64_t interval = crowd.intervals.at(army);
+  const std::uint64_t since =
+      std::max(user.ready_at, tick_count_ + 1 - interval);
+  const std::uint64_t uses = ((tick_count_ - since) / cooldown) + 1;
+  user.ready_at = since + (uses * cooldown);
+  const std::uint64_t force = std::uint64_t{user.count} * uses;
+  // Agents the disc covers, with one agent on every separation square: its
+  // area over a square's, pi taken as 355/113. A body takes the damage once
+  // for each of its agents the disc covers, so an agent takes it once.
+  const auto side = static_cast<std::uint64_t>(std::max(rules_.separation, 1));
+  const auto reach = static_cast<std::uint64_t>(skill.radius);
+  const std::uint64_t covered =
+      1 + ((PI_NUMERATOR * reach * reach) / (PI_DENOMINATOR * side * side));
   const Position centre = crowd.hash.position(*target);
   for (const std::size_t other : crowd.hash.within(centre, skill.radius)) {
     if (hostile(other)) {
-      damage.at(other) += skill.body_damage * user.count;
+      damage.at(other) +=
+          skill.body_damage * force *
+          std::min<std::uint64_t>(crowd.counts.at(other), covered);
     }
   }
-  const std::uint64_t broken =
-      std::uint64_t{skill.structure_damage} * user.count;
+  const std::uint64_t broken = std::uint64_t{skill.structure_damage} * force;
   const std::int64_t radius_squared = std::int64_t{skill.radius} * skill.radius;
   for (Structure& structure : structures_) {
     if (distance_squared(centre, centre_of(structure.cell)) <= radius_squared) {
@@ -348,7 +380,6 @@ void World::strike(Body& user, std::size_t army, const Crowd& crowd,
           std::min<std::uint64_t>(broken, structure.durability));
     }
   }
-  user.ready_at = tick_count_ + skill.cooldown;
 }
 
 }  // namespace murim

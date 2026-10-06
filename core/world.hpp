@@ -29,8 +29,8 @@ struct Body {
 
 /// An ability as data. A body uses it on the nearest living hostile body
 /// within `range`; every hostile body within `radius` of that target, and
-/// every structure whose cell centre lies there, takes the damage once per
-/// agent the user stands for. The user waits `cooldown` ticks afterwards.
+/// every structure whose cell centre lies there, takes the damage. The user
+/// waits `cooldown` ticks between uses.
 struct Skill {
   std::int32_t range;
   std::int32_t radius;
@@ -59,9 +59,14 @@ struct Structure {
 /// How broken a structure is, from durability by the floors in Rules.
 enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
 
+/// The largest range, radius and separation a world accepts, in sub-cell
+/// units; it keeps the products of their squares within 64 bits.
+constexpr std::int32_t MAX_REACH = std::int32_t{1} << 26;
+
 /// The data a world's rules read.
 struct Rules {
-  /// Sub-cell units moving bodies keep apart; 0 lets them overlap.
+  /// Sub-cell units moving bodies keep apart; 0 lets them overlap. It is
+  /// also the side of the square an agent of an aggregate stands on.
   std::int32_t separation;
   /// `hostile[a][b]`: whether bodies of faction `a` attack those of `b`.
   std::vector<std::vector<bool>> hostile;
@@ -94,10 +99,11 @@ constexpr std::int32_t SPEED = 16;
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
-  /// Throws std::invalid_argument when the separation is negative,
-  /// `hostile` is not square, an army is empty, has less strength than
-  /// agents, no skills or a faction outside `hostile`, or an army or a
-  /// structure stands on a cell that is not passable.
+  /// Throws std::invalid_argument when the separation, or a skill's range or
+  /// radius, lies outside [0, MAX_REACH], `hostile` is not square, an army
+  /// is empty, has less strength than agents, no skills or a faction outside
+  /// `hostile`, or an army or a structure stands on a cell that is not
+  /// passable.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules);
 
@@ -129,11 +135,13 @@ class World {
     std::vector<Body> bodies;
   };
 
-  /// Every body as the tick began, indexed together.
+  /// Every body as the tick began, indexed together, with its army, its
+  /// count, and its army's tier interval.
   struct Crowd {
     SpatialHash hash;
     std::vector<std::size_t> armies;
-    std::vector<bool> alive;
+    std::vector<std::uint32_t> counts;
+    std::vector<std::uint64_t> intervals;
   };
 
   [[nodiscard]] std::uint64_t next_random();

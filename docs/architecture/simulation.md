@@ -5,7 +5,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ## Current decisions
 
 - The simulation core is a C++ library in `core/`, with no engine dependency.
-- A world is created from a seed, a map of passable and blocked cells, armies, structures and rules. The rules are data: the separation distance, the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
+- A world is created from a seed, a map of passable and blocked cells, armies, structures and rules. The rules are data: the separation distance (also an agent's footprint), the hostility between factions, and the floors of the structure stages. It advances one `tick()` at a time.
 - An army has a start, an objective, a count, a strength, a faction and skills. It is a list of bodies: one aggregate, or one body per agent.
 - A focus point sets each army's level of detail:
   - near: agents, moving every tick
@@ -16,7 +16,8 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - A skill is data: range, radius, damage to bodies, damage to structures and cooldown. One rule resolves every skill, from an agent, an aggregate or the player's body alike:
   - a body whose army is due and whose cooldown has passed draws one of its army's skills by the seed
   - it aims at the nearest living hostile body in range
-  - every hostile body and structure in the disc around that target takes the damage, times the agents the user stands for
+  - every hostile body and structure in the disc around that target takes the damage, times the agents the user stands for and the uses its cooldown allows in its tier's step
+  - a body struck takes it once for each of its agents the disc covers, at one agent per separation square, so a battle has the same winner near the focus and far from it
   - damage lands after every body has struck
 - Damage folds into count and strength, which is all of an agent's state that a collapse keeps. Strength falls by the damage and count in proportion; a cooldown merges to the latest. Dead bodies leave when the army regroups.
 - A structure is a cell and a durability. Its stage — intact, damaged, destroyed or rubble — follows from durability by the floors in the rules.
