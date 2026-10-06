@@ -12,6 +12,10 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 # The faction accents of docs/art-direction.md §Palette, in the order of FACTIONS.
 const ACCENTS: Array[Color] = [Color("2f63b8"), Color("d63a2f"), Color("e8a830")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
+# The art for each footprint a structure may have, in cells; its frames hold the footprint at
+# (FOOTPRINT_INSET, FOOTPRINT_INSET).
+const BUILDINGS := {Vector2i(3, 3): "structures/house", Vector2i(5, 3): "structures/hall"}
+const FOOTPRINT_INSET := 8
 # How often a free cell is left without a landform: mountains mostly covered, hills open.
 const LANDFORM_SKIP := {"mountain": 0.05, "hills": 0.3}
 const WALK_FRAME_MS := 150
@@ -40,9 +44,10 @@ var _tick_positions: Array[PackedVector2Array] = []
 var _last_positions: Array[PackedVector2Array] = []
 var _counts: Array[PackedInt64Array] = []
 var _army_sprites := PackedInt64Array()
-## One sprite per structure, in the world's order.
+## One sprite per structure, in the world's order; null for a structure with no art.
 var structure_sprites: Array[Sprite2D] = []
-var _stage_frames: Array[AtlasTexture] = []
+# Each building's frames by footprint, one per stage in the order of STAGES.
+var _stage_frames := {}
 var _chevron_frames: Array[AtlasTexture] = []
 var _material: ShaderMaterial
 
@@ -79,10 +84,13 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		colours.append(ACCENTS[faction])
 	_territory.show_borders(_borders(), colours)
 	_lay_landforms()
-	var house := _sheet("structures/house")
-	for stage: String in STAGES:
-		_stage_frames.append(_region(house, stage, 0))
-	_lay_structures(house)
+	for footprint: Vector2i in BUILDINGS:
+		var sheet := _sheet(BUILDINGS[footprint])
+		var frames: Array[AtlasTexture] = []
+		for stage: String in STAGES:
+			frames.append(_region(sheet, stage, 0))
+		_stage_frames[footprint] = frames
+	_lay_structures()
 	_build_body_atlas()
 	var player := _sheet("markers/player_marker")
 	_ring.texture = _region(player, "ring", 0)
@@ -110,7 +118,9 @@ func note_tick() -> void:
 func refresh(view: Rect2) -> void:
 	var now := Time.get_ticks_msec()
 	for structure in structure_sprites.size():
-		structure_sprites[structure].texture = _stage_frames[world.structure_stage(structure)]
+		var sprite := structure_sprites[structure]
+		if sprite != null:
+			sprite.texture = sprite.get_meta("frames")[world.structure_stage(structure)]
 	var shown := view.grow(MARGIN)
 	var first_row := maxi(int(shown.position.y / CELL), 0)
 	var last_row := mini(int(shown.end.y / CELL) + 2, _height + 2)
@@ -279,21 +289,23 @@ func _fits(x: int, y: int, size: Vector2i, kind: String, taken: PackedByteArray)
 	return true
 
 
-# One sprite per structure, its footprint's bottom edge as its position. The house is drawn
-# over 3 x 3 cells; until the core gives a structure a footprint (#39) it stands on one cell,
-# and the house is centred on it.
-func _lay_structures(house: Dictionary) -> void:
+# One sprite per structure whose footprint has art, the bottom edge of its footprint as its
+# position. A structure of any other footprint has no art and is not drawn.
+func _lay_structures() -> void:
+	structure_sprites.resize(world.structure_count())
 	for structure in world.structure_count():
-		var cell := world.structure_cell(structure)
-		var footprint := Vector2i(3, 3)
-		var corner := cell - footprint / 2
+		var corner := world.structure_cell(structure)
+		var footprint := world.structure_footprint(structure)
+		if not _stage_frames.has(footprint):
+			continue
+		var frames: Array[AtlasTexture] = _stage_frames[footprint]
 		var sprite := Sprite2D.new()
 		sprite.centered = false
 		sprite.position = Vector2(corner.x * CELL, (corner.y + footprint.y) * CELL)
-		# The house's frame holds its footprint at (8, 8), so its bottom-left is (8, 56).
-		sprite.offset = Vector2(-8, -(house.frame.y - 4))
+		sprite.offset = -Vector2(FOOTPRINT_INSET, FOOTPRINT_INSET + footprint.y * CELL)
+		sprite.set_meta("frames", frames)
 		_standing.add_child(sprite)
-		structure_sprites.append(sprite)
+		structure_sprites[structure] = sprite
 
 
 # Puts the bodies' and the aggregate markers' frames in one texture, so every band draws from

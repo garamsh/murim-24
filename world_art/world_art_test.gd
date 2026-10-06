@@ -1,10 +1,11 @@
 # Checks that world_art.tscn lays a world as docs/convention/stack-godot.md §Terrain layers sets
 # out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
-# cells around it; that it draws every body on screen and none off it; and that a building shows
-# the frame of its stage.
+# cells around it; that it draws every body on screen and none off it; and that a building is
+# drawn over its footprint with its stage's frame of the art for that footprint.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
+const SEED := 2026
 const TICKS := 2000
 const FOCUS := Vector2i(4 * 256, 4 * 256)
 # A wall of blocked cells, drawn as mountain, down column 8 from row 0 to row 7.
@@ -27,8 +28,8 @@ const ARMIES: Array[Dictionary] = [
 		"faction": 1, "skills": [BLAST]},
 ]
 const STRUCTURES: Array[Dictionary] = [
-	{"cell": Vector2i(8, 8), "durability": 100},
-	{"cell": Vector2i(7, 8), "durability": 60},
+	{"cell": Vector2i(7, 7), "durability": 100},
+	{"cell": Vector2i(9, 7), "durability": 60},
 ]
 const RULES := {"separation": 72, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 
@@ -72,20 +73,39 @@ func run() -> bool:
 	var off_screen: int = art.drawn
 	var bodies_right := bodies > world.army_count() and on_screen == bodies and off_screen == 0
 
-	var house := _tags("res://art/structures/house.json")
+	var bodies_line := "world_art_test: after %d ticks %d bodies, %d drawn on screen, %d off it" % [
+		TICKS, bodies, on_screen, off_screen]
+	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
+
+	# Buildings: a region's structures have footprints with art, each drawn with its footprint's
+	# bottom-left on the sprite's position, showing its stage's frame of the art for its width.
+	# Control: the structures above, one cell each, have no art and get no sprite.
+	var region := WorldAdapter.create_region(SEED)
+	var region_art: Node2D = load(SCENE).instantiate()
+	region_art.show_world(region, region.army_count() - 1)
+	region_art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
+	var sheets := {3: _tags("res://art/structures/house.json"), 5: _tags("res://art/structures/hall.json")}
+	var widths := {3: 64, 5: 96}
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
-	var broken := 0
-	var frames_right := true
-	for structure in world.structure_count():
-		var stage := world.structure_stage(structure)
-		broken += 1 if stage != WorldAdapter.STAGE_INTACT else 0
-		var sprite: Sprite2D = art.structure_sprites[structure]
-		var region := (sprite.texture as AtlasTexture).region
-		frames_right = frames_right and region.position.x == house[stages[stage]][0] * 64
-	var passed := plain_full and masks_right and bodies_right and broken > 0 and frames_right
-	print("world_art_test: after %d ticks %d bodies, %d drawn on screen, %d off it; %d of %d structures broken, frames match stages %s: %s" % [
-		TICKS, bodies, on_screen, off_screen, broken, world.structure_count(), frames_right,
-		"pass" if passed else "FAIL"])
+	var placed := 0
+	for structure in region.structure_count():
+		var sprite: Sprite2D = region_art.structure_sprites[structure]
+		var footprint := region.structure_footprint(structure)
+		var corner := region.structure_cell(structure)
+		if sprite == null or not sheets.has(footprint.x):
+			continue
+		var frame := (sprite.texture as AtlasTexture).region
+		var stage: String = stages[region.structure_stage(structure)]
+		if sprite.position == Vector2(corner.x, corner.y + footprint.y) * 16 \
+				and frame.position.x == sheets[footprint.x][stage][0] * widths[footprint.x] \
+				and frame.size.x == widths[footprint.x]:
+			placed += 1
+	var one_cell_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
+	var buildings_right := placed == region.structure_count() and placed > 0 and one_cell_skipped
+	print("world_art_test: %d of %d region structures drawn over their footprints with their stage's frame; one-cell structures left undrawn %s: %s" % [
+		placed, region.structure_count(), one_cell_skipped, "pass" if buildings_right else "FAIL"])
+	region_art.free()
+	var passed := plain_full and masks_right and bodies_right and buildings_right
 	art.free()
 	return passed
 
