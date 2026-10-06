@@ -1,8 +1,9 @@
 ## Lets the player steer one person born into the generated region, through the same orders every
 ## army follows: a left click orders it toward the cell clicked, keys 1 to 9 to strike with that
 ## skill, and 0 with all its skills; C challenges its faction's leader to a duel, with the same
-## order, when the core allows it. The camera follows it. It ticks at the core's tick rate, draws
-## the world through world_art.tscn and the HUD through hud.tscn, and holds no game rule.
+## order, when the core allows it; G opens the genealogy panel on the person. The camera follows
+## it. It ticks at the core's tick rate, draws the world through world_art.tscn and the HUD through
+## hud.tscn, and holds no game rule.
 extends Node2D
 
 const SEED := 2026
@@ -69,6 +70,8 @@ func command(event: InputEvent) -> bool:
 	var key := event as InputEventKey
 	if mouse != null and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
 		objective = Vector2i((mouse.position / PIXELS_PER_CELL).floor())
+	elif key != null and key.pressed and (key.keycode == KEY_G or _hud.genealogy.visible):
+		return genealogy(key.keycode)
 	elif key != null and key.pressed and key.keycode == KEY_C:
 		return challenge() == WorldAdapter.CHALLENGE_NONE
 	elif key != null and key.pressed and key.keycode >= KEY_0 and key.keycode <= KEY_9:
@@ -95,6 +98,30 @@ func challenge() -> int:
 			_objective = seat
 	_hud.show_challenge(refusal)
 	return refusal
+
+
+## Works the genealogy panel with `keycode`: G opens it on the steered person or closes it,
+## arrows move the selection, Enter centres the tree on the selected person, Escape closes it.
+## While it is open no key gives an order. Returns whether the key did anything.
+func genealogy(keycode: Key) -> bool:
+	var panel: Control = _hud.genealogy
+	var roster := world.roster(steered)
+	if keycode == KEY_G and not panel.visible:
+		if roster.is_empty():
+			return false
+		panel.show_person(world, roster[0], roster[0])
+		return true
+	if keycode == KEY_G or keycode == KEY_ESCAPE:
+		panel.close()
+		return true
+	var directions := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT,
+			KEY_RIGHT: Vector2i.RIGHT}
+	if directions.has(keycode):
+		return panel.move(directions[keycode])
+	if keycode == KEY_ENTER:
+		panel.centre_selected()
+		return true
+	return false
 
 
 ## Advances the world one tick.

@@ -1133,6 +1133,21 @@ std::size_t World::ensoul(std::size_t person) {
 
 const Soul& World::soul(std::size_t soul) const { return souls_.at(soul); }
 
+std::int64_t World::age_in_years(std::size_t person) const {
+  return age_in_days(people_.at(person)) /
+         static_cast<std::int64_t>(DAYS_PER_YEAR);
+}
+
+std::optional<std::size_t> World::faction_of(std::size_t person) const {
+  for (const Army& army : armies_) {
+    if (std::find(army.roster.begin(), army.roster.end(), person) !=
+        army.roster.end()) {
+      return army.faction;
+    }
+  }
+  return std::nullopt;
+}
+
 Date World::date() const {
   const std::uint64_t day = tick_count_ / rules_.ticks_per_day;
   const std::uint64_t season = day / CALENDAR.days_per_season;
