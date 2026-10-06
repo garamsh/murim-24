@@ -2,13 +2,13 @@ keys,ko,en
 HUD_PLAYER,협객,Wanderer
 HUD_HP,체력,HP
 HUD_QI,내공,QI
-HUD_SEASON_YEAR,%s · %d년,"%s, Year %d"
+HUD_SEASON_YEAR,%s · %d년,"%s, Y%d"
 SEASON_0,봄,Spring
 SEASON_1,여름,Summer
 SEASON_2,가을,Autumn
 SEASON_3,겨울,Winter
 HUD_RUMOR,소문,Rumour
-HUD_RUMOR_NONE,아직 들려온 소문이 없다.,No rumour has reached you yet.
+HUD_RUMOR_NONE,아직 들려온 소문이 없다.,No rumour has come yet.
 HUD_LOCALE,F2 English,F2 한국어
 FACTION_ORTHODOX,정파,Orthodox
 FACTION_DEMONIC,마교,Demonic Cult
@@ -28,14 +28,14 @@ CHALLENGE_NOT_A_MEMBER,문파의 일원만 도전할 수 있다.,Only a member m
 CHALLENGE_IS_LEADER,이미 수장이다.,You already lead.
 CHALLENGE_DUEL_IN_PROGRESS,이미 결투가 벌어지고 있다.,A duel is already being fought.
 GENEALOGY_TITLE,족보,Genealogy
-GENEALOGY_FAMILY,%s씨 가문,House of %s
+GENEALOGY_FAMILY,%s씨 가문,%s family
 GENEALOGY_GENERATION,%d대,Generation %d
 GENEALOGY_CLOSE,G 닫기,G Close
 GENEALOGY_PARENTS,부모,Parents
 GENEALOGY_SELF,본인,You
 GENEALOGY_ROW_SELF,본인,Self
 GENEALOGY_CHILDREN,자녀,Children
-GENEALOGY_DEAD,고인,Deceased
+GENEALOGY_DEAD,고인,Dead
 GENEALOGY_AGE,%d세,Age %d
 GENEALOGY_AGE_LABEL,나이,Age
 GENEALOGY_TALENT,천부,Talent
