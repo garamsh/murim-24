@@ -34,9 +34,13 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/barrels` | 32 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/fence` | 96 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/granary` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/storehouse` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/decorations/fields` | 16 x 16 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 16 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
 | `art/icons/skill_icons` | 16 x 16 | `strike`, `burst` |
+| `art/icons/economy_icons` | 16 x 16 | `food`, `stock`, `housing` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
@@ -171,6 +175,9 @@ The village is furnished as the approved mockup's is. What blocks movement or br
 | Road | Decoration | a row through the village | Packed earth with two wheel ruts |
 | Fields | Decoration | plots south of the square | Millet in amber rows or rice in green rows over water, an earth border at each plot's edge |
 | Banner | Decoration | one cell | The owner's accent on a pole, with a white mark |
+| Granary | Structure | 2 x 2 | A plank store raised on stilts over stone footings, a ladder to its door, under a hipped straw roof with a dark ridge and a ragged fringe; damaged holes the straw and scorches the planks, destroyed burns the roof through to the beams and breaks the walls, rubble is a heap of straw, planks and stone |
+| Storehouse | Structure | 3 x 2 | A long plastered store on a stone plinth, iron-studded double doors and vents, no windows, a crate by the door, under a low slate roof; its stages break it as the house's break the house |
+| Field | Decoration | a plot | Rows of tilled soil four pixels apart, an earth border at the plot's edge, in five states: sown (dark soil with seeds showing), growing (green shoots in rows), ripe (amber grain), fallow (grass and weeds over old rows), burnt (black soil, ash, charred stubble and embers); in winter each lies under snow gathered in its furrows |
 
 - Every frame holds its footprint at (8, 8), as the house's does.
 - Ground decorations are tiles laid over the terrain and under everything standing; the banner stands and is sorted with bodies and buildings.
@@ -181,6 +188,7 @@ The village is furnished as the approved mockup's is. What blocks movement or br
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI, each under its label and its value.
 - The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the rumour that last reached the player, the technique bar with cooldowns, and the current target.
+- The economy icons, at the technique icons' scale: food is a lacquered bowl of rice with chopsticks, stock a tied sack of grain, housing a house under its slate roof.
 - A technique slot shows its number key in its top-left corner over an icon of the skill's shape: a blade with an arc of sword qi for a strike at one body, an open palm in a ring of force for a burst that reaches the bodies round its target.
 - UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
