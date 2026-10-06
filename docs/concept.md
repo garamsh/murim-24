@@ -35,6 +35,8 @@ Each section carries one of the following statuses.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on).
 - **Genre and engine**: 2D RPG, Godot 4.7.
+- **Perspective and combat**: an orthogonal top-down view, with combat in real time (`docs/architecture/adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md`).
+- **Art direction**: pixel art on a 16-pixel tile grid.
 - **Title**: "Murim24" is a working title for development. The 24 has no meaning, and the official title is decided after the MVP.
 
 ## Factions and the rules for gaining power [agreed]
@@ -107,7 +109,6 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 The items below are not yet decided.
 
-- Camera perspective and combat style (recommended: top-down real-time), art direction (whether to use pixel art).
 - What happens after immortality is reached (for example, an ending in which ascension (deungseon) ends the cycle of reincarnation, versus remaining in the world).
 - Whether to include factors that shorten lifespan (side effects of demonic martial arts, qi deviation, poison, and so on).
 - Whether to include the martial clan and government factions.
