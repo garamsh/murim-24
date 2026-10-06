@@ -411,6 +411,32 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
   return skills;
 }
 
+std::int64_t WorldAdapter::structure_field_state(std::int64_t structure) const {
+  const std::optional<murim::FieldState> state =
+      world().field_state(structure_index(structure));
+  return state ? static_cast<std::int64_t>(*state) : -1;
+}
+
+std::size_t WorldAdapter::village_index(std::int64_t village) const {
+  CRASH_COND_MSG(
+      village < 0 || static_cast<std::uint64_t>(village) >= villages_.size(),
+      "village index out of range");
+  return static_cast<std::size_t>(village);
+}
+
+std::int64_t WorldAdapter::village_cap(std::int64_t village) const {
+  return static_cast<std::int64_t>(world().cap(village_index(village)));
+}
+
+std::int64_t WorldAdapter::village_stock(std::int64_t village) const {
+  return static_cast<std::int64_t>(world().stock(village_index(village)));
+}
+
+std::int64_t WorldAdapter::village_population(std::int64_t village) const {
+  return static_cast<std::int64_t>(
+      world().residents_of(village_index(village)));
+}
+
 std::int64_t WorldAdapter::structure_stage(std::int64_t structure) const {
   return static_cast<std::int64_t>(world().stage(structure_index(structure)));
 }
@@ -646,6 +672,15 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::skills);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("structure_field_state", "structure"),
+      &WorldAdapter::structure_field_state);
+  godot::ClassDB::bind_method(godot::D_METHOD("village_cap", "village"),
+                              &WorldAdapter::village_cap);
+  godot::ClassDB::bind_method(godot::D_METHOD("village_stock", "village"),
+                              &WorldAdapter::village_stock);
+  godot::ClassDB::bind_method(godot::D_METHOD("village_population", "village"),
+                              &WorldAdapter::village_population);
   godot::ClassDB::bind_method(godot::D_METHOD("army_faction", "army"),
                               &WorldAdapter::army_faction);
   godot::ClassDB::bind_method(godot::D_METHOD("army_strength", "army"),
@@ -674,6 +709,17 @@ void WorldAdapter::_bind_methods() {
       name, "", "STAGE_DESTROYED", static_cast<int>(murim::Stage::DESTROYED));
   godot::ClassDB::bind_integer_constant(name, "", "STAGE_RUBBLE",
                                         static_cast<int>(murim::Stage::RUBBLE));
+  const std::array<std::pair<const char*, murim::FieldState>, 5> fields{{
+      {"FIELD_SOWN", murim::FieldState::SOWN},
+      {"FIELD_GROWING", murim::FieldState::GROWING},
+      {"FIELD_RIPE", murim::FieldState::RIPE},
+      {"FIELD_FALLOW", murim::FieldState::FALLOW},
+      {"FIELD_BURNT", murim::FieldState::BURNT},
+  }};
+  for (const auto& [constant, state] : fields) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(state));
+  }
   const std::array<std::pair<const char*, murim::ChallengeRefusal>, 7> refusals{
       {
           {"CHALLENGE_NONE", murim::ChallengeRefusal::NONE},

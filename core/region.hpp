@@ -33,9 +33,20 @@ struct Faction {
   std::optional<Duel> succession;
 };
 
+/// A kind of structure, by `name`: the people it houses, the food it stores,
+/// the food each cell of its footprint yields each harvest, which makes it a
+/// field, and whether it blocks movement.
+struct StructureKind {
+  std::string name;
+  std::uint32_t housing;
+  std::uint32_t storage;
+  std::uint32_t yield;
+  bool blocks;
+};
+
 /// A structure a village template places, its cell an offset from the area's
-/// corner; the `kind` of building it is, which names its art; and how many
-/// `residents` it houses.
+/// corner; the `kind` of building it is, which names its art and its data;
+/// and how many `residents` the village starts with in it.
 struct Building {
   Structure structure;
   std::string kind;
@@ -43,8 +54,8 @@ struct Building {
 };
 
 /// A kind of village: the `area` it occupies, and its `buildings`. Its
-/// resident army, as many people as its buildings house, stands on the open
-/// cells nearest the area's centre.
+/// resident army, as many people as its buildings start with, stands on the
+/// open cells nearest the area's centre.
 struct VillageTemplate {
   std::string name;
   Footprint area;
@@ -58,6 +69,8 @@ struct RegionData {
   std::vector<VillageTemplate> villages;
   /// How its people are born, age and are born again.
   Life life;
+  /// The kinds of structure the templates build.
+  std::vector<StructureKind> kinds;
 };
 
 /// A village as generated: the `area` from `corner` it occupies, its owner,
@@ -92,6 +105,8 @@ struct Region {
   std::vector<Leadership> leadership;
   /// The tables' rules of life, as the world is created with them.
   Life life;
+  /// What each structure holds, by its kind, in the order of `structures`.
+  std::vector<Holding> holdings;
 };
 
 /// Returns the game's terrain kinds, factions, village templates and life.
@@ -103,13 +118,13 @@ struct Region {
 /// the same region. Throws std::invalid_argument when a table is empty, the
 /// terrain weights are not positive, a faction has no skills, a village
 /// template has no buildings, houses no residents, has one outside its area,
-/// two that overlap, or one over the area's centre, or a faction is hostile to
-/// one that does not exist; throws std::runtime_error when a village finds no
-/// room.
+/// two that overlap, one over the area's centre, or one of a kind the kinds do
+/// not name, or a faction is hostile to one that does not exist; throws
+/// std::runtime_error when a village finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Returns the villages of `region` as a World is created with them: each
-/// village's structures and resident army.
+/// village's structures, resident army and what its structures hold.
 [[nodiscard]] std::vector<VillageSpec> village_specs(const Region& region);
 
 /// Returns the cells of `village`'s area that none of its structures

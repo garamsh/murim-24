@@ -7,8 +7,9 @@
 extends RefCounted
 
 const SEED := 2026
-# Days for marriages and births to come: the first births come within forty.
-const DAYS := 50
+# Days for marriages and births to come: with births slowed by each village's headroom, the first
+# comes within sixty.
+const DAYS := 70
 const TICKS_PER_DAY := 1800
 
 
@@ -61,7 +62,7 @@ func run() -> bool:
 	var control := world.person_parents(founder).is_empty() and founder_parents == 0
 	# The header's generation: the founder's first, the child's one more than its parents'.
 	var founder_generation: String = panel.details.generation
-	# Setup: fifty days in, the child's parents are people the world began with, so it is the
+	# Setup: seventy days in, the child's parents are people the world began with, so it is the
 	# second generation.
 	var parents_founders := world.person_parents(child).size() > 0
 	for p in world.person_parents(child):

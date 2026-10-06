@@ -70,23 +70,27 @@ std::vector<Position> centres_of(const std::vector<Structure>& structures) {
   return centres;
 }
 
-// Blocks every structure's footprint on `map`. Returns false at the first
-// footprint of a size outside [1, MAX_FOOTPRINT] or covering a cell that is
-// not passable, which includes one an earlier structure covers.
+// Blocks the footprint of every structure that blocks on `map`. Returns false
+// at the first footprint of a size outside [1, MAX_FOOTPRINT] or covering a
+// cell that is not passable or that an earlier structure covers.
 bool block_footprints(Map& map, const std::vector<Structure>& structures) {
   const auto spans = [](std::int32_t side) {
     return side >= 1 && side <= MAX_FOOTPRINT;
   };
+  Map covered = map;
   for (const Structure& structure : structures) {
     if (!spans(structure.footprint.width) ||
         !spans(structure.footprint.height)) {
       return false;
     }
     for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
-      if (!map.passable(cell)) {
+      if (!covered.passable(cell)) {
         return false;
       }
-      map.block(cell);
+      covered.block(cell);
+      if (structure.blocks) {
+        map.block(cell);
+      }
     }
   }
   return true;
@@ -210,6 +214,7 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
   for (const std::size_t child : person.children) {
     fold(child);
   }
+  fold(person.hunger);
 }
 
 // Folds a soul's history into `fold`.
@@ -265,6 +270,21 @@ void check_life(const Life& life) {
 Range range_of(Spread values) {
   return Range{values.mean - std::min(values.mean, values.spread),
                values.mean + values.spread};
+}
+
+// Folds what `village` holds, its residents and who ruined it into `fold`.
+template <typename Fold, typename Village>
+void fold_village(const Fold& fold, const Village& village) {
+  fold(village.spec.residents);
+  fold(village.destroyer.has_value());
+  fold(village.destroyer ? village.destroyer->army : 0);
+  fold(village.destroyer ? village.destroyer->faction : 0);
+  fold(village.stock);
+  for (const Holding& holding : village.spec.holdings) {
+    fold(holding.housing);
+    fold(holding.storage);
+    fold(holding.harvest);
+  }
 }
 
 }  // namespace
@@ -353,27 +373,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   village_of_.resize(structures_.size());
   for (VillageSpec& spec : villages) {
-    const auto claimed = [this](std::size_t structure) {
-      return structure >= village_of_.size() ||
-             village_of_.at(structure).has_value();
-    };
-    const auto housed = [&spec](const Village& village) {
-      return village.spec.residents == spec.residents;
-    };
-    if (spec.residents >= armies_.size() ||
-        std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
-        std::any_of(villages_.begin(), villages_.end(), housed)) {
-      throw std::invalid_argument(
-          "a village must name existing structures no other village names, "
-          "and an existing army no other village houses as its residents");
-    }
-    for (const std::size_t structure : spec.structures) {
-      village_of_.at(structure) = villages_.size();
-    }
-    for (const std::size_t member : armies_.at(spec.residents).roster) {
-      people_.at(member).home = villages_.size();
-    }
-    villages_.push_back(Village{std::move(spec), std::nullopt});
+    add_village(std::move(spec));
   }
   const auto unknown = [this](const Leadership& faction) {
     return faction.leader && *faction.leader >= people_.size();
@@ -386,6 +386,40 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   leadership_ = std::move(leadership);
   leadership_.resize(rules_.hostile.size());
+}
+
+// Adds the village `spec` describes, its storage full, making it its
+// residents' home. Throws std::invalid_argument when it names a structure
+// that does not exist or another village names, an army that does not exist
+// or another village houses, or holdings that are not one for each of its
+// structures.
+void World::add_village(VillageSpec spec) {
+  const auto claimed = [this](std::size_t structure) {
+    return structure >= village_of_.size() ||
+           village_of_.at(structure).has_value();
+  };
+  const auto housed = [&spec](const Village& village) {
+    return village.spec.residents == spec.residents;
+  };
+  const bool unheld =
+      !spec.holdings.empty() && spec.holdings.size() != spec.structures.size();
+  if (spec.residents >= armies_.size() ||
+      std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
+      std::any_of(villages_.begin(), villages_.end(), housed) || unheld) {
+    throw std::invalid_argument(
+        "a village must name existing structures no other village names, "
+        "an existing army no other village houses as its residents, and "
+        "what each of its structures holds, if anything");
+  }
+  for (const std::size_t structure : spec.structures) {
+    village_of_.at(structure) = villages_.size();
+  }
+  for (const std::size_t member : armies_.at(spec.residents).roster) {
+    people_.at(member).home = villages_.size();
+  }
+  villages_.push_back(Village{std::move(spec), std::nullopt, 0});
+  // A village starts with its storage full.
+  villages_.back().stock = held(villages_.size() - 1, Stage::DAMAGED).storage;
 }
 
 // Throws when one of `members` stands where `field` cannot reach.
@@ -542,16 +576,11 @@ void World::tick() {
   }
   settle_duels();
   age();
-  // A soul whose body died this tick is born again, into the army it served.
-  std::vector<Passing> reborn;
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    for (const std::size_t member : armies_.at(army).roster) {
-      const Person& person = people_.at(member);
-      if (person.health == 0 && person.soul) {
-        reborn.push_back(Passing{member, army});
-      }
-    }
+  if (life_.husbandry && tick_count_ % rules_.ticks_per_day == 0) {
+    husband(*life_.husbandry);
   }
+  // A soul whose body died this tick is born again, into the army it served.
+  const std::vector<Passing> reborn = passings();
   for (Army& army : armies_) {
     army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
                                      [this](std::size_t member) {
@@ -586,6 +615,21 @@ void World::tick() {
   if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
     kin(*life_.kinship);
   }
+}
+
+// The people carrying a soul who died this tick, each with the army it
+// served in.
+std::vector<World::Passing> World::passings() const {
+  std::vector<Passing> reborn;
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    for (const std::size_t member : armies_.at(army).roster) {
+      const Person& person = people_.at(member);
+      if (person.health == 0 && person.soul) {
+        reborn.push_back(Passing{member, army});
+      }
+    }
+  }
+  return reborn;
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -655,6 +699,7 @@ StateHash World::hash() const {
     fold(structure.footprint.width);
     fold(structure.footprint.height);
     fold(structure.durability);
+    fold(structure.blocks);
   }
   for (const Person& person : people_) {
     fold_person(fold, person, people_.size());
@@ -700,10 +745,7 @@ StateHash World::hash() const {
     fold(fight.leader);
   }
   for (const Village& village : villages_) {
-    fold(village.spec.residents);
-    fold(village.destroyer.has_value());
-    fold(village.destroyer ? village.destroyer->army : 0);
-    fold(village.destroyer ? village.destroyer->faction : 0);
+    fold_village(fold, village);
   }
   return StateHash{digest};
 }
@@ -1168,7 +1210,8 @@ void World::kin(const Kinship& kinship) {
     }
   }
   std::sort(alive.begin(), alive.end());
-  const auto chance = [this](std::uint32_t per_mille) {
+  std::vector<std::size_t> population = homes();
+  const auto chance = [this](std::uint64_t per_mille) {
     return next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
            per_mille;
   };
@@ -1178,22 +1221,41 @@ void World::kin(const Kinship& kinship) {
     }
   }
   for (const std::size_t mother : alive) {
-    const Person& wife = people_.at(mother);
-    const std::int64_t age = age_in_days(wife);
-    const bool wed =
-        !wife.spouses.empty() && people_.at(wife.spouses.back()).health > 0;
-    const bool rested =
-        wife.children.empty() ||
-        static_cast<std::int64_t>(tick_count_) -
-                people_.at(wife.children.back()).born >=
-            static_cast<std::int64_t>(std::uint64_t{kinship.birth_spacing} *
-                                      rules_.ticks_per_day);
-    if (wife.sex == Sex::FEMALE && wed && rested &&
-        age >= kinship.bearing_age.low && age <= kinship.bearing_age.high &&
-        chance(kinship.birth_chance) && living() < MAX_PEOPLE) {
+    if (!may_bear(mother, kinship) || living() >= MAX_PEOPLE) {
+      continue;
+    }
+    // Births slow as the child's village nears its cap, and stop at it.
+    const std::size_t lineage =
+        kinship.fathers_family ? people_.at(mother).spouses.back() : mother;
+    const std::optional<std::size_t> home = people_.at(lineage).home;
+    const bool capped = life_.husbandry.has_value() && home.has_value();
+    const std::size_t village = home.value_or(0);
+    const std::uint64_t full = capped ? cap(village) : 1;
+    const std::uint64_t room =
+        capped ? full - std::min<std::uint64_t>(full, population.at(village))
+               : 1;
+    if (room > 0 && chance(kinship.birth_chance * room / full)) {
       bear_child(mother, army_of, kinship);
+      population.at(village) += capped ? 1 : 0;
     }
   }
+}
+
+// Whether `mother` may bear a child today: a wife of bearing age, whose
+// husband lives, rested since her last child.
+bool World::may_bear(std::size_t mother, const Kinship& kinship) const {
+  const Person& wife = people_.at(mother);
+  const std::int64_t age = age_in_days(wife);
+  const bool wed =
+      !wife.spouses.empty() && people_.at(wife.spouses.back()).health > 0;
+  const bool rested =
+      wife.children.empty() ||
+      static_cast<std::int64_t>(tick_count_) -
+              people_.at(wife.children.back()).born >=
+          static_cast<std::int64_t>(std::uint64_t{kinship.birth_spacing} *
+                                    rules_.ticks_per_day);
+  return wife.sex == Sex::FEMALE && wed && rested &&
+         age >= kinship.bearing_age.low && age <= kinship.bearing_age.high;
 }
 
 // Whether living person `person` may marry: of marrying age, with a home and
@@ -1261,6 +1323,148 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   people_.push_back(std::move(child));
   army_of.push_back(army_of.at(lineage));
   armies_.at(army_of.at(lineage)).roster.push_back(born);
+}
+
+// What village `village`'s structures no worse than `worst` hold together,
+// and the harvest of its intact fields.
+Holding World::held(std::size_t village, Stage worst) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  Holding total;
+  for (std::size_t index = 0; index < spec.holdings.size(); ++index) {
+    const Holding& holding = spec.holdings.at(index);
+    const Stage now = stage(spec.structures.at(index));
+    if (now <= worst) {
+      total.housing += holding.housing;
+      total.storage += holding.storage;
+    }
+    total.harvest += now == Stage::INTACT ? holding.harvest : 0;
+  }
+  return total;
+}
+
+std::size_t World::cap(std::size_t village) const {
+  if (!life_.husbandry) {
+    return MAX_PEOPLE;
+  }
+  const Holding standing = held(village, Stage::DAMAGED);
+  const std::uint64_t yearly = std::max<std::uint64_t>(
+      std::uint64_t{life_.husbandry->consumption} * DAYS_PER_YEAR, 1);
+  return static_cast<std::size_t>(
+      std::min({std::uint64_t{standing.housing}, standing.harvest / yearly,
+                standing.storage / yearly}));
+}
+
+std::uint64_t World::stock(std::size_t village) const {
+  return villages_.at(village).stock;
+}
+
+std::size_t World::residents_of(std::size_t village) const {
+  return homes().at(village);
+}
+
+std::optional<FieldState> World::field_state(std::size_t structure) const {
+  const std::optional<std::size_t>& village = village_of_.at(structure);
+  if (!village) {
+    return std::nullopt;
+  }
+  const VillageSpec& spec = villages_.at(*village).spec;
+  const auto place = static_cast<std::size_t>(
+      std::find(spec.structures.begin(), spec.structures.end(), structure) -
+      spec.structures.begin());
+  if (place >= spec.holdings.size() || spec.holdings.at(place).harvest == 0) {
+    return std::nullopt;
+  }
+  if (stage(structure) != Stage::INTACT) {
+    return FieldState::BURNT;
+  }
+  return static_cast<FieldState>(date().season);
+}
+
+// How many living people make each village their home.
+std::vector<std::size_t> World::homes() const {
+  std::vector<std::size_t> population(villages_.size(), 0);
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      const Person& person = people_.at(member);
+      if (person.health > 0 && person.home) {
+        ++population.at(*person.home);
+      }
+    }
+  }
+  return population;
+}
+
+// Once a day: the harvest on the first day of winter, then each village
+// feeds its people from its stock, or none of them, and those unfed too long
+// move or die, in order of person.
+void World::husband(const Husbandry& husbandry) {
+  const std::uint64_t day =
+      (tick_count_ / rules_.ticks_per_day) % DAYS_PER_YEAR;
+  const bool harvest = day == CALENDAR.days_per_season * 3;
+  std::vector<std::size_t> population = homes();
+  std::vector<bool> fed(villages_.size(), false);
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const Holding holds = held(village, Stage::DAMAGED);
+    Village& feeding = villages_.at(village);
+    feeding.stock = std::min<std::uint64_t>(
+        feeding.stock + (harvest ? holds.harvest : 0), holds.storage);
+    const std::uint64_t need =
+        std::uint64_t{husbandry.consumption} * population.at(village);
+    fed.at(village) = feeding.stock >= need;
+    feeding.stock -= fed.at(village) ? need : feeding.stock;
+  }
+  std::vector<Unfed> unfed;
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    for (const std::size_t member : armies_.at(army).roster) {
+      Person& person = people_.at(member);
+      if (person.health == 0 || !person.home) {
+        continue;
+      }
+      person.hunger = fed.at(*person.home) ? 0 : person.hunger + 1;
+      if (person.hunger >= husbandry.hunger_days) {
+        unfed.push_back(Unfed{member, army});
+      }
+    }
+  }
+  std::sort(unfed.begin(), unfed.end(),
+            [](Unfed left, Unfed right) { return left.person < right.person; });
+  for (const Unfed& each : unfed) {
+    migrate_or_starve(each, husbandry.migration_reach, population);
+  }
+}
+
+// Moves person `person`, unfed too long, from army `army` to the residents of
+// a village drawn by the seed among those within the migration reach of its
+// home with room under their cap and food in store, or ends its life.
+void World::migrate_or_starve(Unfed unfed, std::int32_t reach,
+                              std::vector<std::size_t>& population) {
+  const std::size_t person = unfed.person;
+  const std::size_t army = unfed.army;
+  Person& hungry = people_.at(person);
+  const std::size_t home = hungry.home.value_or(0);
+  const Cell from = seat(home);
+  std::vector<std::size_t> refuges;
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const Cell there = seat(village);
+    if (village != home && std::abs(there.x - from.x) <= reach &&
+        std::abs(there.y - from.y) <= reach &&
+        population.at(village) < cap(village) &&
+        villages_.at(village).stock > 0) {
+      refuges.push_back(village);
+    }
+  }
+  if (refuges.empty()) {
+    hungry.health = 0;
+    return;
+  }
+  const std::size_t refuge = refuges.at(next_random() % refuges.size());
+  std::vector<std::size_t>& from_roster = armies_.at(army).roster;
+  from_roster.erase(std::find(from_roster.begin(), from_roster.end(), person));
+  armies_.at(villages_.at(refuge).spec.residents).roster.push_back(person);
+  hungry.home = refuge;
+  hungry.hunger = 0;
+  --population.at(home);
+  ++population.at(refuge);
 }
 
 }  // namespace murim

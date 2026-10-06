@@ -184,6 +184,21 @@ class WorldAdapter : public godot::RefCounted {
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
 
+  /// Returns what structure `structure` shows as a field, one of the FIELD_*
+  /// constants, or -1 when it is no field.
+  [[nodiscard]] std::int64_t structure_field_state(
+      std::int64_t structure) const;
+
+  /// Returns how many people village `village` of the region can hold, as
+  /// the core derives it.
+  [[nodiscard]] std::int64_t village_cap(std::int64_t village) const;
+
+  /// Returns the food village `village` of the region holds.
+  [[nodiscard]] std::int64_t village_stock(std::int64_t village) const;
+
+  /// Returns how many living people make village `village` their home.
+  [[nodiscard]] std::int64_t village_population(std::int64_t village) const;
+
   /// Returns the faction army `army` fights for now; a soul born again
   /// takes its new family's.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
@@ -254,6 +269,7 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] const murim::World& world() const;
   [[nodiscard]] std::size_t army_index(std::int64_t army) const;
   [[nodiscard]] std::size_t structure_index(std::int64_t structure) const;
+  [[nodiscard]] std::size_t village_index(std::int64_t village) const;
   [[nodiscard]] std::size_t faction_index(std::int64_t faction) const;
   [[nodiscard]] std::size_t person_index(std::int64_t person) const;
 };
