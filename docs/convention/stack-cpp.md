@@ -48,7 +48,11 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | `make test` | `ctest --no-tests=error` in `build/`. Runs `make build` first. |
 | `make ci` | `lint`, `format`, `test` and `build`, in that order. |
 
-The C++ compiler is the platform's default. The other tools come from one of two sources:
+The C++ compiler is the platform's default. CMake, Ninja, clang-format and clang-tidy come only from `core/requirements.txt`, installed into `.venv/` at the repository root, and every entry point runs them from `.venv/bin/`:
 
-- macOS: `brew install cmake ninja llvm@22`. `llvm@22` is keg-only, so put `$(brew --prefix llvm@22)/bin` on `PATH`, or set `CLANG_FORMAT` and `CLANG_TIDY` to its binaries when calling `make`.
-- CI and any other host: `pip install --require-hashes -r core/requirements.txt`, which pins each tool by version and hash.
+```sh
+python3 -m venv .venv
+.venv/bin/pip install --require-hashes -r core/requirements.txt
+```
+
+Re-run the install after `core/requirements.txt` changes.

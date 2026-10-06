@@ -13,18 +13,19 @@ ADR 0002 makes the simulation core a C++ library with no engine dependency, load
 - **Generator.** Ninja, a CMake generator that runs on macOS, Linux and Windows hosts. Make as the generator was rejected because the root `Makefile` already holds the entry points, and two layers of Make read as one.
 - **C++ standard.** C++17, the standard godot-cpp builds itself with (`CXX_STANDARD 17` in `cmake/godotcpp.cmake` at godot-cpp@507ed9d) and the minimum GoogleTest 1.18.0 requires. C++20 was rejected: nothing in the core needs it yet.
 - **Test framework.** GoogleTest 1.18.0, fetched by CMake from its release archive pinned by SHA-256, with tests registered through the `GoogleTest` module that ships with CMake. Catch2 v3.16.0 and doctest v2.5.3 were rejected: each ships its own registration script with the library, and neither offers the core anything GoogleTest lacks.
-- **Formatter and linter.** clang-format and clang-tidy from LLVM 22.1.8. The newest LLVM in Homebrew is 23.1.2, but the newest clang-tidy wheel on PyPI is 22.1.8, and both tools come from the same release.
-- **How CI installs them.** `actions/setup-python` and a requirements file that pins clang-format, clang-tidy, CMake and Ninja by version and SHA-256, moved by Dependabot's pip ecosystem. Rejected: the runner's preinstalled LLVM, whose version is not the local one; apt.llvm.org, which pins a major version and not a release; Homebrew on the runner, which installs whatever is current.
+- **Formatter and linter.** clang-format and clang-tidy from LLVM 22.1.8: the newest clang-tidy wheel on PyPI is 22.1.8, and both tools come from the same release.
+- **How the tools are installed.** One requirements file pins clang-format, clang-tidy, CMake and Ninja by version and SHA-256, and every host installs it into `.venv/`, CI through `actions/setup-python`. PyPI publishes macOS arm64 and Linux x86_64 wheels for all four, and Dependabot's pip ecosystem moves the pins. Rejected: Homebrew locally, whose releases move independently of any pin CI holds, so local and CI would run different formatters; the runner's preinstalled LLVM, for the same reason; apt.llvm.org, which pins a major version and not a release.
 
 ## Decision
 
-The core is a CMake project at `core/`, generated with Ninja, written in C++17 and tested with GoogleTest 1.18.0. clang-format and clang-tidy from LLVM 22.1.8 check it. Locally they come from Homebrew, and in CI from PyPI wheels pinned by hash.
+The core is a CMake project at `core/`, generated with Ninja, written in C++17 and tested with GoogleTest 1.18.0. clang-format and clang-tidy from LLVM 22.1.8 check it. CMake, Ninja, clang-format and clang-tidy come from PyPI wheels pinned by hash in `core/requirements.txt`, installed into `.venv/` on every host, and the entry points run them from there.
 
 ## Consequences
 
 - The core builds and tests with no engine attached, and the binding can add `core/` to its own CMake build when it lands.
 - Configuring `core/` downloads GoogleTest, so the first build needs network access.
-- Homebrew and PyPI release separately, so local and CI agree on LLVM only while both are at 22.1.8. A Dependabot bump to one LLVM tool needs the other and `llvm@22` checked in the same pull request.
+- Local and CI run the same tool releases, because both install the same pinned file. A contributor whose `.venv/` predates a bump re-runs the install.
+- Dependabot proposes clang-format and clang-tidy bumps separately, and both have to move together, since they come from one LLVM release.
 - A C++20 feature, or a newer LLVM, is a new ADR.
 
 ## Signs the decision was wrong
