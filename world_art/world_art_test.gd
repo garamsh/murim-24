@@ -3,9 +3,9 @@
 # cells around it; that it draws every body on screen and none off it; that a structure is drawn
 # over its footprint with its stage's frame of its kind's art; that each field is tiled with its
 # state's tag; that each village's ground decorations cover the cells its template's data
-# names; that no landform stands on a buildable cell or over a structure; and that after the view
-# jumps across the region, every body a band holds lies inside the bounds the renderer culls that
-# band by.
+# names, a village the world founds as it runs included; that no landform stands on a buildable
+# cell or over a structure; and that after the view jumps across the region, every body a band
+# holds lies inside the bounds the renderer culls that band by.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -37,6 +37,9 @@ const STRUCTURES: Array[Dictionary] = [
 ]
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const VIEW := Vector2(480, 270)
+# Days within which the region SEED makes founds its first village.
+const FOUNDING_DAYS := 500
+const TICKS_PER_DAY := 1800
 
 
 func run() -> bool:
@@ -136,27 +139,15 @@ func run() -> bool:
 
 	# Decorations: each village's ground tiles cover the cells its template's data names, with a
 	# frame of the tag named; control: the cell west of the village has none.
-	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
-	var ground_tiles := _sheet("res://art/decorations/ground.json")
 	var tiled := 0
 	var expected := 0
 	var outside_bare := true
 	for village: Dictionary in region.villages():
-		var corner: Vector2i = village.corner
-		outside_bare = outside_bare and region_art.built.get_cell_source_id(corner + Vector2i(-1, 4)) == -1
-		for item: Dictionary in layouts[village.kind]:
-			if not item.has("tile"):
-				continue
-			var rect: Array = item.rect
-			for y in range(int(rect[1]), int(rect[1]) + int(rect[3])):
-				for x in range(int(rect[0]), int(rect[0]) + int(rect[2])):
-					var cell := corner + Vector2i(x, y)
-					var at: int = region_art.built.get_cell_atlas_coords(cell).x
-					# Paving laid after the road over the same cell is the one that shows.
-					var last := _last_tile(layouts[village.kind], Vector2i(x, y))
-					expected += 1
-					if at >= ground_tiles.tags[last][0] and at <= ground_tiles.tags[last][1]:
-						tiled += 1
+		var counts := _decorated(region_art.built, village)
+		tiled += counts.x
+		expected += counts.y
+		outside_bare = outside_bare \
+				and region_art.built.get_cell_source_id(village.corner + Vector2i(-1, 4)) == -1
 	var decorations_right := expected > 0 and tiled == expected and outside_bare
 	print("world_art_test: %d of %d decorated cells carry their template's tile; cells beside the villages bare %s: %s" % [
 		tiled, expected, outside_bare, "pass" if decorations_right else "FAIL"])
@@ -202,7 +193,84 @@ func run() -> bool:
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
 			and decorations_right and fields_right and landforms_right
 	art.free()
-	return _bands_pass() and passed
+	return _bands_pass() and _founded_pass() and passed
+
+
+# A village the region founds is drawn as its template is: its structures stand at the offsets a
+# generated village of that template has from its corner, and its ground decorations cover the
+# cells the template's data names. Setup: the region founds a village within FOUNDING_DAYS. Control:
+# a corner a cell off matches no structure layout, and the cell west of the village is bare.
+func _founded_pass() -> bool:
+	var region := WorldAdapter.create_region(SEED)
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(region, region.army_count() - 1)
+	var generated := region.villages()
+	var created := region.structure_count()
+	var ticks := 0
+	while region.villages().size() == generated.size() and ticks < FOUNDING_DAYS * TICKS_PER_DAY:
+		region.tick()
+		ticks += 1
+	art.note_tick()
+	var villages := region.villages()
+	var founded: Dictionary = villages[-1] if villages.size() > generated.size() else {}
+	var model := {}
+	for village: Dictionary in generated:
+		if not founded.is_empty() and village.kind == founded.kind:
+			model = village
+			break
+	var set_up := not founded.is_empty() and not model.is_empty()
+	var layout := _layout(region, model, 0, created) if set_up else []
+	var laid := _layout(region, founded, created, region.structure_count()) if set_up else []
+	var off := founded.duplicate()
+	off.corner = founded.get("corner", Vector2i.ZERO) + Vector2i(1, 0)
+	var laid_off := _layout(region, off, created, region.structure_count()) if set_up else []
+	var at_offsets := set_up and layout.all(func(placed: String) -> bool: return laid.has(placed))
+	var off_apart := not layout.all(func(placed: String) -> bool: return laid_off.has(placed))
+	var structures_right := at_offsets and off_apart
+	var counts := _decorated(art.built, founded) if set_up else Vector2i.ZERO
+	var outside_bare: bool = set_up \
+			and art.built.get_cell_source_id(founded.corner + Vector2i(-1, 4)) == -1
+	var passed := structures_right and counts.y > 0 and counts.x == counts.y and outside_bare
+	print("world_art_test: after %d days a village founded %s at %s, laid out as %s at %s: its %d structures at the template's offsets %s, a cell off not %s; %d of %d decorated cells carry their template's tile, the cell beside it bare %s: %s" % [
+		ticks / TICKS_PER_DAY, founded.get("kind", "none"), founded.get("corner", "none"),
+		model.get("name", "none"), model.get("corner", "none"), layout.size(), at_offsets,
+		off_apart, counts.x, counts.y, outside_bare, "pass" if passed else "FAIL"])
+	art.free()
+	return passed
+
+
+# Each structure among `from` to `to` of `world` inside `village`'s area, as its kind and its
+# cell's offset from the village's corner.
+func _layout(world: WorldAdapter, village: Dictionary, from: int, to: int) -> Array[String]:
+	var placed: Array[String] = []
+	var area := Rect2i(village.corner, village.area)
+	for structure in range(from, to):
+		var cell := world.structure_cell(structure)
+		if area.has_point(cell):
+			placed.append("%s at %s" % [world.structure_kind(structure), cell - area.position])
+	return placed
+
+
+# How many of the cells `village`'s template's data names carry a frame of their tile on `built`,
+# and how many it names.
+func _decorated(built: TileMapLayer, village: Dictionary) -> Vector2i:
+	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
+	var ground_tiles := _sheet("res://art/decorations/ground.json")
+	var corner: Vector2i = village.corner
+	var counts := Vector2i.ZERO
+	for item: Dictionary in layouts[village.kind]:
+		if not item.has("tile"):
+			continue
+		var rect: Array = item.rect
+		for y in range(int(rect[1]), int(rect[1]) + int(rect[3])):
+			for x in range(int(rect[0]), int(rect[0]) + int(rect[2])):
+				var at: int = built.get_cell_atlas_coords(corner + Vector2i(x, y)).x
+				# Paving laid after the road over the same cell is the one that shows.
+				var last := _last_tile(layouts[village.kind], Vector2i(x, y))
+				counts.y += 1
+				if at >= ground_tiles.tags[last][0] and at <= ground_tiles.tags[last][1]:
+					counts.x += 1
+	return counts
 
 
 # A band's bodies lie inside the bounds the renderer culls it by after the view jumps from the

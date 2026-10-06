@@ -5,6 +5,9 @@
 ## edge of what they stand on. It reads the world and holds no game rule.
 extends Node2D
 
+## Emitted after a tick changed the territory or the villages, once both are drawn anew.
+signal region_changed
+
 const CELL := 16
 const ART := "res://art/"
 # Sprite sets by faction name; a world without faction names takes them in this order.
@@ -41,6 +44,8 @@ var world: WorldAdapter
 var steered := -1
 ## Bodies drawn in the last refresh, after culling to the screen.
 var drawn := 0
+## The territory the borders were last drawn from, as WorldAdapter.territory() gives it.
+var owners := PackedInt64Array()
 
 var _width := 0
 var _height := 0
@@ -55,6 +60,12 @@ var _last_positions: Array[PackedVector2Array] = []
 var _army_sprites := PackedInt64Array()
 ## The layer of the villages' ground decorations: paving and road.
 var built: TileMapLayer
+# How many villages have their decorations laid, the world's order kept.
+var _decorated := 0
+var _layouts := {}
+var _ground_sheet := {}
+var _banner_sheet := {}
+var _colours: Array[Color] = []
 ## The layer of the fields, each cell tiled by its field's state and the season.
 var fields: TileMapLayer
 ## One sprite per structure, in the world's order; null for a structure with no art.
@@ -95,10 +106,11 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		var name: String = names[faction].to_lower() if faction < names.size() else FACTIONS[faction % FACTIONS.size()]
 		_sprite_of_faction.append(maxi(FACTIONS.find(name), 0))
 	_lay_terrain()
-	var colours: Array[Color] = []
+	_colours.clear()
 	for faction in _sprite_of_faction:
-		colours.append(ACCENTS[faction])
-	_territory.show_borders(_borders(), colours)
+		_colours.append(ACCENTS[faction])
+	owners = world.territory()
+	_territory.show_borders(_borders(), _colours)
 	_lay_landforms()
 	for kind: String in BUILDINGS:
 		var sheet := _sheet(BUILDINGS[kind])
@@ -120,12 +132,21 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 
 
 ## Records the bodies' positions as a tick leaves them, so a body that moved since the last
-## tick is drawn walking, facing the way it went.
+## tick is drawn walking, facing the way it went; and redraws the borders and lays the new
+## villages' decorations when the tick changed the territory or founded a village.
 func note_tick() -> void:
 	for army in _tick_positions.size():
 		_last_positions[army] = _tick_positions[army]
 		_tick_positions[army] = world.body_positions(army)
 	_add_armies()
+	var now := world.territory()
+	var villages := world.villages()
+	if now == owners and villages.size() == _decorated:
+		return
+	owners = now
+	_territory.show_borders(_borders(), _colours)
+	_decorate(villages)
+	region_changed.emit()
 
 
 # Reads the armies the world formed since they were last read, settlers and raiding parties
@@ -244,10 +265,9 @@ func _lay_terrain() -> void:
 					layer.set_cell(Vector2i(x, y), 1, Vector2i(transitions.tags[kind][0] + mask, 0))
 
 
-# Each edge between two cells owned by different factions, as [from, to, faction of the cell
-# on its left or top, faction on its right or bottom].
+# Each edge between two cells in different territories, as [from, to, faction of the cell on
+# its left or top, faction on its right or bottom], -1 for a cell in none.
 func _borders() -> Array:
-	var owners := world.territory()
 	var borders := []
 	if owners.size() != _width * _height:
 		return borders
@@ -376,29 +396,36 @@ func _tile_fields() -> void:
 				fields.set_cell(cell, 0, Vector2i(variant, 0))
 
 
-# Lays each village's decorations from DECORATIONS by its template: ground tiles on a layer
-# above the terrain, a variant per cell by a seeded hash, and banners in the owner's colours,
-# standing with everything else.
+# Lays the layer the villages' ground decorations are tiled on, above the terrain, and each
+# village's decorations.
 func _lay_decorations() -> void:
-	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DECORATIONS))
-	var ground := _sheet("decorations/ground")
-	var banners := _sheet("decorations/banner")
+	_layouts = JSON.parse_string(FileAccess.get_file_as_string(DECORATIONS))
+	_ground_sheet = _sheet("decorations/ground")
+	_banner_sheet = _sheet("decorations/banner")
 	var tiles := TileSet.new()
 	tiles.tile_size = Vector2i(CELL, CELL)
 	var source := TileSetAtlasSource.new()
-	source.texture = ground.texture
+	source.texture = _ground_sheet.texture
 	source.texture_region_size = Vector2i(CELL, CELL)
-	for frame in ground.texture.get_width() / CELL:
+	for frame in _ground_sheet.texture.get_width() / CELL:
 		source.create_tile(Vector2i(frame, 0))
 	tiles.add_source(source)
 	built = TileMapLayer.new()
 	built.tile_set = tiles
 	_ground.add_child(built)
-	for village: Dictionary in world.villages():
+	_decorated = 0
+	_decorate(world.villages())
+
+
+# Lays the decorations from DECORATIONS by its template of each of `villages` laid since they
+# were last laid, those the world's growth founds among them: ground tiles, a variant per cell
+# by a seeded hash, and banners in the owner's colours, standing with everything else.
+func _decorate(villages: Array[Dictionary]) -> void:
+	for village: Dictionary in villages.slice(_decorated):
 		var corner: Vector2i = village.corner
-		for item: Dictionary in layouts.get(village.kind, []):
+		for item: Dictionary in _layouts.get(village.kind, []):
 			if item.has("tile"):
-				var tagged: Array = ground.tags[item.tile]
+				var tagged: Array = _ground_sheet.tags[item.tile]
 				var rect: Array = item.rect
 				for y in range(int(rect[1]), int(rect[1]) + int(rect[3])):
 					for x in range(int(rect[0]), int(rect[0]) + int(rect[2])):
@@ -408,11 +435,12 @@ func _lay_decorations() -> void:
 			elif item.has("banner"):
 				var cell := corner + Vector2i(int(item.banner[0]), int(item.banner[1]))
 				var sprite := Sprite2D.new()
-				sprite.texture = _region(banners, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
+				sprite.texture = _region(_banner_sheet, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
 				sprite.centered = false
 				sprite.position = Vector2(cell.x * CELL, (cell.y + 1) * CELL)
-				sprite.offset = Vector2(0, -banners.frame.y)
+				sprite.offset = Vector2(0, -_banner_sheet.frame.y)
 				_standing.add_child(sprite)
+	_decorated = villages.size()
 
 
 # Puts the bodies' frames in one texture, so every band draws from it: the three factions' body

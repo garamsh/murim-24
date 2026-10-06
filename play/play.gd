@@ -36,6 +36,7 @@ func _ready() -> void:
 	_camera.position = _to_pixels(lead()).floor()
 	_art.show_world(world, steered)
 	_hud.show_player(world, steered)
+	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
 	var rows := world.map_rows()
 	_camera.limit_left = 0
