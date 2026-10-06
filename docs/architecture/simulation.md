@@ -70,6 +70,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ## Open questions
 
 - **Which discipline a strike practises.** Skills carry no discipline, so a strike practises the striker's best one. Martial arts (`docs/concept.md` §Martial arts) are to give each technique its discipline.
+- **Whether raiders can close on a walled village (#70).** A band ordered to the centre of the 26-resident village stops at its arrival ring, about 5 cells from the residents crowding the centre and beyond its strike's 3-cell reach, so neither side strikes and the raid never ends. The hamlet, which a band outnumbers, falls.
 - **Where a soul goes with no village to be born in.** A soul whose body dies while no village has a living resident is not born again.
 
 - **Whether rubble should free its cells.** Rubble blocks as an intact structure does. Freeing it would mean rebuilding the flow fields that cross it when a structure falls, on the tick it falls.

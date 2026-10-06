@@ -32,8 +32,12 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 
 // People stand a cell apart, as wide as a body is drawn.
 constexpr std::int32_t SEPARATION = CELL_SIZE;
-constexpr std::uint32_t DURABILITY = 3'000;
-constexpr std::uint64_t HEALTH = 100'000;
+// Combat is paced by this data at 30 ticks a second: a duel to the death in
+// 10 to 30 seconds, twenty a side in 10 seconds to 2 minutes, and a band of
+// twenty raiders leaving a hamlet in ruins in 1 to 5 minutes. Health is eight
+// to twelve guard strikes; durability sets the raid.
+constexpr std::uint32_t DURABILITY = 10'000;
+constexpr std::uint64_t HEALTH = 120;
 // The rules of life in region_data().
 constexpr std::uint32_t GROWTH = 10;
 constexpr std::uint32_t GROWTH_SPREAD = 5;
@@ -243,7 +247,8 @@ RegionData region_data() {
   // of where it is used, a village's from its centre; and a torch that burns
   // them, where they belong to a faction its user is hostile to.
   constexpr std::uint64_t GUARD_COOLDOWN = 15;
-  constexpr Skill GUARD{3 * CELL_SIZE, 0, 1, 0, GUARD_COOLDOWN};
+  constexpr std::uint64_t GUARD_DAMAGE = 10;
+  constexpr Skill GUARD{3 * CELL_SIZE, 0, GUARD_DAMAGE, 0, GUARD_COOLDOWN};
   constexpr std::int32_t MEND_REACH = 10;
   constexpr std::int32_t MEND_REPAIR = -5;
   constexpr std::uint64_t MEND_COOLDOWN = 30;
