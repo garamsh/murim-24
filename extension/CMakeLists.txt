@@ -18,6 +18,8 @@ FetchContent_Declare(
 )
 set(GODOTCPP_API_VERSION 4.7 CACHE STRING "" FORCE)
 set(GODOTCPP_SYSTEM_HEADERS ON CACHE BOOL "" FORCE)
+# The adapter catches the core's std::invalid_argument, so exceptions stay enabled.
+set(GODOTCPP_DISABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(godot-cpp)
 
 add_library(murim_extension SHARED extension.cpp world_adapter.cpp)
