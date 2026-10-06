@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -238,17 +239,35 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
         "and stand, like every structure, on passable cells");
   }
   for (ArmySpec& army : armies) {
+    std::vector<std::size_t> every_skill(army.skills.size());
+    std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
     armies_.push_back(
         Army{armies_.size(),
-             army.objective,
              army.faction,
              std::move(army.skills),
+             Order{army.objective, std::move(every_skill)},
              FlowField{map_, army.objective},
              {Body{centre_of(army.start), army.count, army.strength, 0}}});
   }
 }
 
 void World::set_focus(Position focus) { focus_ = focus; }
+
+void World::order(std::size_t army, Order order) {
+  const auto lacking = [this, army](std::size_t skill) {
+    return skill >= armies_.at(army).skills.size();
+  };
+  if (army >= armies_.size() || !map_.passable(order.objective) ||
+      order.skills.empty() ||
+      std::any_of(order.skills.begin(), order.skills.end(), lacking)) {
+    throw std::invalid_argument(
+        "an order must name an army, a passable objective and at least one "
+        "of the army's skills");
+  }
+  Army& ordered = armies_.at(army);
+  ordered.field = FlowField{map_, order.objective};
+  ordered.order = std::move(order);
+}
 
 void World::tick() {
   rng_state_ += SPLITMIX_INCREMENT;
@@ -328,8 +347,11 @@ StateHash World::hash() const {
   }
   for (const Army& army : armies_) {
     fold(army.phase);
-    fold(army.objective.x);
-    fold(army.objective.y);
+    fold(army.order.objective.x);
+    fold(army.order.objective.y);
+    for (const std::size_t skill : army.order.skills) {
+      fold(skill);
+    }
     fold(army.faction);
     for (const Skill& skill : army.skills) {
       fold(skill.range);
@@ -377,7 +399,8 @@ std::uint64_t World::next_random() {
 void World::strike(Body& user, std::size_t army, const Crowd& crowd,
                    std::vector<std::uint64_t>& damage) {
   const Army& own = armies_.at(army);
-  const Skill& skill = own.skills.at(next_random() % own.skills.size());
+  const std::vector<std::size_t>& choice = own.order.skills;
+  const Skill& skill = own.skills.at(choice.at(next_random() % choice.size()));
   const auto hostile = [this, &own, &crowd](std::size_t other) {
     return rules_.hostile.at(own.faction)
         .at(armies_.at(crowd.armies.at(other)).faction);

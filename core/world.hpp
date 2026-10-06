@@ -50,6 +50,15 @@ struct ArmySpec {
   std::vector<Skill> skills;
 };
 
+/// What an army does: march toward `objective`, and at each strike use one
+/// of `skills`, indices into the army's own skills, drawn by the seed. An
+/// army created from an ArmySpec follows its objective with all its skills
+/// until it is given another order.
+struct Order {
+  Cell objective;
+  std::vector<std::size_t> skills;
+};
+
 /// A breakable object standing on a map cell.
 struct Structure {
   Cell cell;
@@ -129,6 +138,11 @@ class World {
   /// Places the point the tiers are measured from.
   void set_focus(Position focus);
 
+  /// Gives army `army` an order, which it follows from the next tick on.
+  /// Throws std::invalid_argument when there is no such army, the objective
+  /// is not passable, or the skills are empty or name one the army lacks.
+  void order(std::size_t army, Order order);
+
   /// Advances the world by one step.
   void tick();
 
@@ -148,9 +162,9 @@ class World {
  private:
   struct Army {
     std::uint64_t phase;
-    Cell objective;
     std::size_t faction;
     std::vector<Skill> skills;
+    Order order;
     FlowField field;
     std::vector<Body> bodies;
   };

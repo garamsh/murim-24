@@ -26,6 +26,7 @@
 
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "region.hpp"
 #include "world.hpp"
 
 namespace murim_godot {
@@ -146,7 +147,7 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
     for (const godot::String& row : map_rows) {
       rows.emplace_back(row.utf8().get_data());
     }
-    return over(murim::Seed{static_cast<std::uint64_t>(seed)}, murim::Map{rows},
+    return over(murim::Seed{static_cast<std::uint64_t>(seed)}, std::move(rows),
                 each(armies, army_spec), each(structures, structure),
                 murim_godot::rules(rules));
   } catch (const std::invalid_argument& error) {
@@ -158,9 +159,21 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
 godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   murim::M1Scenario scenario = murim::m1_scenario();
   godot::Ref<WorldAdapter> adapter = over(
-      scenario.seed, murim::Map{scenario.map_rows}, std::move(scenario.armies),
+      scenario.seed, std::move(scenario.map_rows), std::move(scenario.armies),
       std::move(scenario.structures), std::move(scenario.rules));
   adapter->world().set_focus(murim::centre_of(scenario.focus));
+  return adapter;
+}
+
+godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
+  murim::Region region = murim::generate_region(
+      murim::Seed{static_cast<std::uint64_t>(seed)}, murim::region_data());
+  region.armies.push_back(murim::born_in(region, 0));
+  const murim::Cell birthplace = region.armies.back().start;
+  godot::Ref<WorldAdapter> adapter =
+      over(region.seed, std::move(region.map_rows), std::move(region.armies),
+           std::move(region.structures), std::move(region.rules));
+  adapter->world().set_focus(murim::centre_of(birthplace));
   return adapter;
 }
 
@@ -170,14 +183,18 @@ godot::Vector2i WorldAdapter::m1_focus() {
 }
 
 godot::Ref<WorldAdapter> WorldAdapter::over(
-    murim::Seed seed, murim::Map map, std::vector<murim::ArmySpec> armies,
+    murim::Seed seed, std::vector<std::string> map_rows,
+    std::vector<murim::ArmySpec> armies,
     std::vector<murim::Structure> structures, murim::Rules rules) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
-  adapter->army_count_ = armies.size();
+  for (const murim::ArmySpec& army : armies) {
+    adapter->skill_counts_.push_back(army.skills.size());
+  }
   adapter->structure_count_ = structures.size();
-  adapter->world_.emplace(seed, std::move(map), std::move(armies),
+  adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
                           std::move(structures), std::move(rules));
+  adapter->map_rows_ = std::move(map_rows);
   return adapter;
 }
 
@@ -192,8 +209,9 @@ const murim::World& WorldAdapter::world() const {
 }
 
 std::size_t WorldAdapter::army_index(std::int64_t army) const {
-  CRASH_COND_MSG(army < 0 || static_cast<std::uint64_t>(army) >= army_count_,
-                 "army index out of range");
+  CRASH_COND_MSG(
+      army < 0 || static_cast<std::uint64_t>(army) >= skill_counts_.size(),
+      "army index out of range");
   return static_cast<std::size_t>(army);
 }
 
@@ -210,14 +228,47 @@ void WorldAdapter::set_focus(const godot::Vector2i& focus) {
                                     narrow<std::int32_t>(value.get("y"), "y")});
 }
 
+bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
+                         const godot::PackedInt64Array& skills) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    const godot::Variant cell = objective;
+    std::vector<std::size_t> chosen;
+    for (const std::int64_t skill : skills) {
+      chosen.push_back(narrow<std::size_t>(skill, "skill"));
+    }
+    world().order(
+        narrow<std::size_t>(army, "army"),
+        murim::Order{murim::Cell{narrow<std::int32_t>(cell.get("x"), "x"),
+                                 narrow<std::int32_t>(cell.get("y"), "y")},
+                     std::move(chosen)});
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.order: ", error.what());
+    return false;
+  }
+}
+
 void WorldAdapter::tick() { world().tick(); }
 
 std::int64_t WorldAdapter::hash() const {
   return static_cast<std::int64_t>(static_cast<std::uint64_t>(world().hash()));
 }
 
+godot::PackedStringArray WorldAdapter::map_rows() const {
+  godot::PackedStringArray rows;
+  for (const std::string& row : map_rows_) {
+    rows.push_back(godot::String(row.c_str()));
+  }
+  return rows;
+}
+
 std::int64_t WorldAdapter::army_count() const {
-  return static_cast<std::int64_t>(army_count_);
+  return static_cast<std::int64_t>(skill_counts_.size());
+}
+
+std::int64_t WorldAdapter::skill_count(std::int64_t army) const {
+  return static_cast<std::int64_t>(skill_counts_.at(army_index(army)));
 }
 
 godot::PackedVector2Array WorldAdapter::body_positions(
@@ -260,11 +311,21 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::create);
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
+  godot::ClassDB::bind_static_method(name,
+                                     godot::D_METHOD("create_region", "seed"),
+                                     &WorldAdapter::create_region);
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_focus"),
                                      &WorldAdapter::m1_focus);
   godot::ClassDB::bind_method(godot::D_METHOD("set_focus", "focus"),
                               &WorldAdapter::set_focus);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("order", "army", "objective", "skills"),
+      &WorldAdapter::order);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
+  godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
+                              &WorldAdapter::map_rows);
+  godot::ClassDB::bind_method(godot::D_METHOD("skill_count", "army"),
+                              &WorldAdapter::skill_count);
   godot::ClassDB::bind_method(godot::D_METHOD("hash"), &WorldAdapter::hash);
   godot::ClassDB::bind_method(godot::D_METHOD("army_count"),
                               &WorldAdapter::army_count);

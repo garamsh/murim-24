@@ -1,8 +1,8 @@
 # Checks that a world driven through the adapter reaches the core's own hash
 # and body positions and counts for the same scenario, focus and tick count,
-# the core's coming from the world_hash reference program, and that the
-# adapter refuses what the core, or the conversion to the core's types,
-# refuses.
+# the core's coming from the world_hash reference program; that the adapter
+# refuses what the core, or the conversion to the core's types, refuses; and
+# that a body given orders through the adapter moves and strikes.
 extends RefCounted
 
 const SEED := 42
@@ -36,6 +36,17 @@ const STRUCTURES: Array[Dictionary] = [
 	{"cell": Vector2i(7, 8), "durability": 60},
 ]
 const RULES := {"separation": 72, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
+# One agent at home and ten hostile agents holding their camp, which strike nothing back.
+const ORDER_TICKS := 800
+const HOME := Vector2i(1, 1)
+const CAMP := Vector2i(12, 7)
+const BESIDE_CAMP := Vector2i(12, 5)
+const HIT := {"range": 768, "radius": 0, "body_damage": 200, "structure_damage": 0, "cooldown": 10}
+const IDLE := {"range": 0, "radius": 0, "body_damage": 0, "structure_damage": 0, "cooldown": 0}
+const STEERED_ARMIES: Array[Dictionary] = [
+	{"start": HOME, "objective": HOME, "count": 1, "strength": 1000, "faction": 0, "skills": [HIT]},
+	{"start": CAMP, "objective": CAMP, "count": 10, "strength": 1000, "faction": 1, "skills": [IDLE]},
+]
 
 
 func run() -> bool:
@@ -77,7 +88,42 @@ func run() -> bool:
 	var accepted := _create(SEED, ARMIES, RULES) != null
 	print("world_adapter_test: valid scenario accepted %s; %d of %d invalid scenarios refused: %s" % [
 		accepted, refused, invalid.size(), "pass" if accepted and refused == invalid.size() else "FAIL"])
-	return hashes_match and bodies_match and accepted and refused == invalid.size()
+	var orders_pass := _orders_pass()
+	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass
+
+
+# An agent ordered beside the camp leaves home and strikes the camp's agents down. Control: left
+# without an order it stays home and the camp keeps every agent. An order naming a skill the agent
+# lacks is refused, while the valid one was accepted.
+func _orders_pass() -> bool:
+	var ordered := _steered_run(true)
+	var left_alone := _steered_run(false)
+	var refused := not _steered_world().order(0, BESIDE_CAMP, PackedInt64Array([1]))
+	var passed: bool = ordered.accepted and ordered.moved and ordered.camp < 10 \
+			and not left_alone.moved and left_alone.camp == 10 and refused
+	print("world_adapter_test: ordered agent accepted %s, moved %s, camp left %d of 10; unordered moved %s, camp left %d; order for a missing skill refused %s: %s" % [
+		ordered.accepted, ordered.moved, ordered.camp, left_alone.moved, left_alone.camp, refused,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+func _steered_world() -> WorldAdapter:
+	return WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), STEERED_ARMIES, [], RULES)
+
+
+# Runs ORDER_TICKS ticks with the focus on the agent's lead body before each, as a driving adapter
+# does, after ordering it beside the camp when `give_order` is set.
+func _steered_run(give_order: bool) -> Dictionary:
+	var world := _steered_world()
+	var accepted := give_order and world.order(0, BESIDE_CAMP, PackedInt64Array([0]))
+	var home := world.body_positions(0)[0]
+	for i in ORDER_TICKS:
+		world.set_focus(Vector2i(world.body_positions(0)[0]))
+		world.tick()
+	var camp := 0
+	for count in world.body_counts(1):
+		camp += count
+	return {"accepted": accepted, "moved": world.body_positions(0)[0] != home, "camp": camp}
 
 
 func _create(seed: int, armies: Array[Dictionary], rules: Dictionary) -> WorldAdapter:

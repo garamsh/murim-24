@@ -312,5 +312,23 @@ TEST(Region, RejectsInconsistentData) {
                std::invalid_argument);
 }
 
+TEST(Region, ABodyBornIntoAVillageIsOneAgentOfItsFactionInsideIt) {
+  Region region = generate_region(SEED, region_data());
+  const Village& village = region.villages.at(1);
+  const ArmySpec& residents = region.armies.at(village.army);
+  const ArmySpec born = born_in(region, 1);
+
+  EXPECT_EQ(born.count, 1U);
+  EXPECT_EQ(born.faction, village.faction);
+  EXPECT_EQ(born.strength, residents.strength / residents.count);
+  EXPECT_TRUE(inside(village, born.start));
+  EXPECT_TRUE(inside(village, born.objective));
+  region.armies.push_back(born);
+  EXPECT_NO_THROW(world_of(region));
+  // Control: a village the region lacks has no one born into it.
+  EXPECT_THROW(static_cast<void>(born_in(region, region.villages.size())),
+               std::out_of_range);
+}
+
 }  // namespace
 }  // namespace murim
