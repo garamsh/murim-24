@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -12,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "m1_scenario.hpp"
 #include "map.hpp"
 #include "world.hpp"
 
@@ -562,6 +564,210 @@ TEST(Region, EachFactionIsLedByTheFirstResidentOfItsFirstVillage) {
   EXPECT_FALSE(region.leadership.at(0).succession.has_value());
   EXPECT_TRUE(region.leadership.at(1).succession.has_value());
   EXPECT_FALSE(region.leadership.at(2).succession.has_value());
+}
+
+// Combat pace, in ticks: the targets region_data() is tuned to.
+constexpr std::uint64_t SECOND = TICKS_PER_SECOND;
+constexpr std::uint64_t MINUTE = 60 * SECOND;
+constexpr std::uint64_t DUEL_LEAST = 10 * SECOND;
+constexpr std::uint64_t DUEL_MOST = 30 * SECOND;
+constexpr std::uint64_t SKIRMISH_LEAST = 10 * SECOND;
+constexpr std::uint64_t SKIRMISH_MOST = 2 * MINUTE;
+constexpr std::uint64_t RAID_LEAST = MINUTE;
+constexpr std::uint64_t RAID_MOST = 5 * MINUTE;
+constexpr std::size_t DEMONIC = 1;
+constexpr std::size_t SKIRMISHERS = 20;
+constexpr std::size_t RAIDERS = 20;
+// Seeds the pace is measured on, the region tests' own first.
+constexpr std::array<Seed, 3> PACED{SEED, Seed{2026}, Seed{5}};
+
+// Whether ticks `ticks` lie within [least, most].
+bool within(std::uint64_t ticks, std::uint64_t least, std::uint64_t most) {
+  return ticks >= least && ticks <= most;
+}
+
+// The ticks from a person born into the first Demonic village of the region
+// `data` generates from `seed` challenging its leader, as the player does,
+// until the duel is settled, or `limit` if it is not by then.
+std::uint64_t duel_ticks(const RegionData& data, Seed seed,
+                         std::uint64_t limit) {
+  Region region = generate_region(seed, data);
+  region.armies.push_back(born_in(region, first_of(region, DEMONIC)));
+  const std::size_t challenger = region.armies.size() - 1;
+  World world = world_of(region);
+  const std::size_t leader = world.leader(DEMONIC).value_or(0);
+  world.order(challenger, Order{cell_of(world.person(leader).position), {0, 1}},
+              DEMONIC);
+  // Setup: the challenge started a duel.
+  EXPECT_TRUE(world.duel(DEMONIC).has_value());
+  std::uint64_t ticks = 0;
+  for (; ticks < limit && world.duel(DEMONIC).has_value(); ++ticks) {
+    world.tick();
+  }
+  return ticks;
+}
+
+// The block of passable cells a skirmish is fought on, and how far from
+// every village it lies.
+constexpr Footprint FIELD{10, 5};
+constexpr std::int32_t AWAY = 12;
+
+// The top-left cell of the first FIELD of passable cells, AWAY cells from
+// every village, row by row.
+std::optional<Cell> open_field(const Region& region) {
+  const auto clear = [&region](Cell corner) {
+    const auto passable = [&region](Cell cell) {
+      return region.map_rows.at(static_cast<std::size_t>(cell.y))
+                 .at(static_cast<std::size_t>(cell.x)) == '.';
+    };
+    const auto near = [corner](const Village& village) {
+      return corner.x + FIELD.width + AWAY > village.corner.x &&
+             corner.x - AWAY < village.corner.x + village.area.width &&
+             corner.y + FIELD.height + AWAY > village.corner.y &&
+             corner.y - AWAY < village.corner.y + village.area.height;
+    };
+    const std::vector<Cell> cells = cells_of(corner, FIELD);
+    return std::all_of(cells.begin(), cells.end(), passable) &&
+           std::none_of(region.villages.begin(), region.villages.end(), near);
+  };
+  for (const Cell corner : cells_of(
+           Cell{0, 0},
+           Footprint{REGION_SIDE - FIELD.width, REGION_SIDE - FIELD.height})) {
+    if (clear(corner)) {
+      return corner;
+    }
+  }
+  return std::nullopt;
+}
+
+// The ticks two lines of SKIRMISHERS, Orthodox and Demonic, newborn and with
+// their factions' skills, two cells apart on an open field of the region
+// `data` generates from `seed` and bound for each other, fight until one has
+// no one left, or `limit` if neither falls by then.
+std::uint64_t skirmish_ticks(const RegionData& data, Seed seed,
+                             std::uint64_t limit) {
+  constexpr std::int32_t LINE = 4;
+  constexpr std::int32_t APART = 6;
+  Region region = generate_region(seed, data);
+  const std::optional<Cell> field = open_field(region);
+  EXPECT_TRUE(field.has_value());
+  const Cell corner = field.value_or(Cell{0, 0});
+  const Cell west{corner.x + 2, corner.y + 2};
+  const Cell east{corner.x + APART + 2, corner.y + 2};
+  ArmySpec orthodox{east, {}, 0, data.factions.at(0).skills};
+  ArmySpec demonic{west, {}, DEMONIC, data.factions.at(DEMONIC).skills};
+  for (const Cell cell : cells_of(corner, Footprint{LINE, 5})) {
+    orthodox.members.push_back(Recruit{cell, data.life.newborn_health});
+    demonic.members.push_back(
+        Recruit{Cell{cell.x + APART, cell.y}, data.life.newborn_health});
+  }
+  const std::size_t first = region.armies.size();
+  region.armies.push_back(orthodox);
+  region.armies.push_back(demonic);
+  World world = world_of(region);
+  // Setup: two lines of SKIRMISHERS each.
+  EXPECT_EQ(world.roster(first).size(), SKIRMISHERS);
+  EXPECT_EQ(world.roster(first + 1).size(), SKIRMISHERS);
+  std::uint64_t ticks = 0;
+  for (; ticks < limit && !world.roster(first).empty() &&
+         !world.roster(first + 1).empty();
+       ++ticks) {
+    world.tick();
+  }
+  return ticks;
+}
+
+// The first hamlet in the region not owned by the Demonic Cult.
+std::size_t first_hamlet(const Region& region) {
+  std::size_t village = 0;
+  while (region.villages.at(village).faction == DEMONIC ||
+         region.villages.at(village).kind != "hamlet") {
+    ++village;
+  }
+  return village;
+}
+
+// The ticks a Demonic band of RAIDERS, newborn and with its faction's
+// skills, standing on the passable cells west of the first hamlet of the
+// region `data` generates from `seed`, column by column, takes to leave it in
+// ruins once ordered to its centre, or `limit` if it is not by then.
+std::uint64_t raid_ticks(const RegionData& data, Seed seed,
+                         std::uint64_t limit) {
+  Region region = generate_region(seed, data);
+  const std::size_t target = first_hamlet(region);
+  const Village& hamlet = region.villages.at(target);
+  const Cell centre = region.armies.at(hamlet.army).objective;
+  ArmySpec raiders{centre, {}, DEMONIC, data.factions.at(DEMONIC).skills};
+  const Footprint west{hamlet.corner.x, hamlet.area.height};
+  std::vector<Cell> cells = cells_of(Cell{0, hamlet.corner.y}, west);
+  std::stable_sort(cells.begin(), cells.end(),
+                   [](Cell left, Cell right) { return left.x > right.x; });
+  for (const Cell cell : cells) {
+    if (raiders.members.size() < RAIDERS &&
+        region.map_rows.at(static_cast<std::size_t>(cell.y))
+                .at(static_cast<std::size_t>(cell.x)) == '.') {
+      raiders.members.push_back(Recruit{cell, data.life.newborn_health});
+    }
+  }
+  region.armies.push_back(raiders);
+  World world = world_of(region);
+  // Setup: a band of RAIDERS against a hamlet that stands.
+  EXPECT_EQ(world.roster(region.armies.size() - 1).size(), RAIDERS);
+  EXPECT_TRUE(std::all_of(hamlet.structures.begin(), hamlet.structures.end(),
+                          [&world](std::size_t index) {
+                            return world.stage(index) == Stage::INTACT;
+                          }));
+  std::uint64_t ticks = 0;
+  for (; ticks < limit && world.village_state(target) != VillageState::RUINS;
+       ++ticks) {
+    world.tick();
+  }
+  return ticks;
+}
+
+// region_data() with the Demonic Cult's first skill, its strike, doing
+// `damage` to a person.
+RegionData striking(std::uint64_t damage) {
+  RegionData data = region_data();
+  data.factions.at(DEMONIC).skills.front().body_damage = damage;
+  data.factions.at(0).skills.front().body_damage = damage;
+  return data;
+}
+
+TEST(Region, ADuelEndsWithinItsTargetTime) {
+  for (const Seed seed : PACED) {
+    EXPECT_TRUE(within(duel_ticks(region_data(), seed, DUEL_MOST + 1),
+                       DUEL_LEAST, DUEL_MOST))
+        << "seed " << static_cast<std::uint64_t>(seed);
+  }
+  // Control: the placeholder strike of 1 leaves the duel fought past it.
+  EXPECT_GT(duel_ticks(striking(1), SEED, DUEL_MOST + 1), DUEL_MOST);
+}
+
+TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
+  for (const Seed seed : PACED) {
+    EXPECT_TRUE(within(skirmish_ticks(region_data(), seed, SKIRMISH_MOST + 1),
+                       SKIRMISH_LEAST, SKIRMISH_MOST))
+        << "seed " << static_cast<std::uint64_t>(seed);
+  }
+  // Control: the placeholder strike of 1 leaves both lines standing past it.
+  EXPECT_GT(skirmish_ticks(striking(1), SEED, SKIRMISH_MOST + 1),
+            SKIRMISH_MOST);
+}
+
+TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
+  for (const Seed seed : PACED) {
+    EXPECT_TRUE(within(raid_ticks(region_data(), seed, RAID_MOST + 1),
+                       RAID_LEAST, RAID_MOST))
+        << "seed " << static_cast<std::uint64_t>(seed);
+  }
+  // Control: the placeholder torch of a tenth the damage leaves the hamlet
+  // standing past it.
+  RegionData slow = region_data();
+  Skill& torch = slow.factions.at(DEMONIC).skills.back();
+  constexpr std::int32_t SLOWER = 10;
+  torch.structure_damage /= SLOWER;
+  EXPECT_GT(raid_ticks(slow, SEED, RAID_MOST + 1), RAID_MOST);
 }
 
 }  // namespace

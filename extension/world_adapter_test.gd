@@ -1,8 +1,9 @@
 # Checks that a world driven through the adapter reaches the core's own hash
 # and people's positions and health for the same scenario and tick count,
 # the core's coming from the world_hash reference program; that the adapter
-# refuses what the core, or the conversion to the core's types, refuses; and
-# that a body given orders through the adapter moves and strikes.
+# refuses what the core, or the conversion to the core's types, refuses; that
+# a body given orders through the adapter moves and strikes; and that a
+# region's villages keep their residents' own skills off their structures.
 extends RefCounted
 
 const SEED := 42
@@ -39,6 +40,10 @@ const STRUCTURES: Array[Dictionary] = [
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 # One person at home and ten hostile people holding their camp, who strike nothing back.
 const ORDER_TICKS := 800
+# The region the play scene opens on, its first Cult village, and how long it is watched.
+const REGION_SEED := 2026
+const CULT_VILLAGE := 1
+const VILLAGE_TICKS := 600
 const HOME := Vector2i(1, 1)
 const CAMP := Vector2i(12, 7)
 const BESIDE_CAMP := Vector2i(12, 5)
@@ -90,8 +95,38 @@ func run() -> bool:
 		accepted, refused, invalid.size(), "pass" if accepted and refused == invalid.size() else "FAIL"])
 	var orders_pass := _orders_pass()
 	var reads_pass := _reads_pass()
+	var villages_pass := _villages_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass
+			and reads_pass and villages_pass
+
+
+# The region create_region() makes, the player born into the first Cult village, keeps every
+# structure intact while nobody raids it: the Cult's torch, used where its residents stand, spares
+# their own village. Control: the same torch used beside a structure that no village holds breaks
+# it, so the region's structures stand because their villages reach the core.
+func _villages_pass() -> bool:
+	var region := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
+	var torch: Dictionary = region.skills(region.army_count() - 1)[1]
+	for i in VILLAGE_TICKS:
+		region.tick()
+	var intact := 0
+	for structure in region.structure_count():
+		if region.structure_stage(structure) == WorldAdapter.STAGE_INTACT:
+			intact += 1
+	var bare := WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), [
+		{"objective": Vector2i(6, 7), "members": _members(Vector2i(6, 7), 1, 100), "faction": 0,
+			"skills": [torch]}], [{"cell": Vector2i(7, 7), "durability": 10000}],
+		{"separation": 256, "hostile": [[false]], "stage_floors": [10000, 5000, 1]})
+	for i in VILLAGE_TICKS:
+		bare.tick()
+	var broken := bare.structure_stage(0) != WorldAdapter.STAGE_INTACT
+	var faction: int = region.villages()[CULT_VILLAGE].faction
+	var passed: bool = region.structure_count() > 0 and intact == region.structure_count() \
+			and torch.structure_damage > 0 and broken
+	print("world_adapter_test: born into village %d of faction %d, after %d ticks %d of %d region structures intact; the torch beside a structure no village holds breaks it %s: %s" % [
+		CULT_VILLAGE, faction, VILLAGE_TICKS, intact, region.structure_count(), broken,
+		"pass" if passed else "FAIL"])
+	return passed
 
 
 # What the view reads: each army's faction and health, its people's health, each structure's
