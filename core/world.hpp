@@ -8,6 +8,7 @@
 
 #include "flow_field.hpp"
 #include "map.hpp"
+#include "spatial_hash.hpp"
 
 namespace murim {
 
@@ -18,19 +19,55 @@ enum class Seed : std::uint64_t {};
 enum class StateHash : std::uint64_t {};
 
 /// Part of an army: one agent, or the aggregate standing for all of them.
+/// It may use a skill again from tick `ready_at`.
 struct Body {
   Position position;
   std::uint32_t count;
   std::uint64_t strength;
+  std::uint64_t ready_at;
+};
+
+/// An ability as data. A body uses it on the nearest living hostile body
+/// within `range`; every hostile body within `radius` of that target, and
+/// every structure whose cell centre lies there, takes the damage once per
+/// agent the user stands for. The user waits `cooldown` ticks afterwards.
+struct Skill {
+  std::int32_t range;
+  std::int32_t radius;
+  std::uint64_t body_damage;
+  std::uint32_t structure_damage;
+  std::uint64_t cooldown;
 };
 
 /// An army as a world is created with: one aggregate at `start`, bound for
-/// `objective`.
+/// `objective`, of `faction`, choosing among `skills` by the world's seed.
 struct ArmySpec {
   Cell start;
   Cell objective;
   std::uint32_t count;
   std::uint64_t strength;
+  std::size_t faction;
+  std::vector<Skill> skills;
+};
+
+/// A breakable object standing on a map cell.
+struct Structure {
+  Cell cell;
+  std::uint32_t durability;
+};
+
+/// How broken a structure is, from durability by the floors in Rules.
+enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
+
+/// The data a world's rules read.
+struct Rules {
+  /// Sub-cell units moving bodies keep apart; 0 lets them overlap.
+  std::int32_t separation;
+  /// `hostile[a][b]`: whether bodies of faction `a` attack those of `b`.
+  std::vector<std::vector<bool>> hostile;
+  /// The lowest durability of the intact, damaged and destroyed stages; a
+  /// structure below all three is rubble.
+  std::array<std::uint32_t, 3> stage_floors;
 };
 
 /// A level of detail. An army whose lead body lies within `reach` sub-cell
@@ -57,12 +94,12 @@ constexpr std::int32_t SPEED = 16;
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
-  /// Creates a world whose bodies keep `separation` sub-cell units apart
-  /// while they move; 0 lets them overlap. Throws std::invalid_argument when
-  /// `separation` is negative, or an army is empty or starts or ends on a
-  /// cell that is not passable.
-  World(Seed seed, Map map, const std::vector<ArmySpec>& armies,
-        std::int32_t separation);
+  /// Throws std::invalid_argument when the separation is negative,
+  /// `hostile` is not square, an army is empty, has less strength than
+  /// agents, no skills or a faction outside `hostile`, or an army or a
+  /// structure stands on a cell that is not passable.
+  World(Seed seed, Map map, std::vector<ArmySpec> armies,
+        std::vector<Structure> structures, Rules rules);
 
   /// Places the point the tiers are measured from.
   void set_focus(Position focus);
@@ -77,19 +114,39 @@ class World {
   /// first is its lead body.
   [[nodiscard]] const std::vector<Body>& bodies(std::size_t army) const;
 
+  /// Returns structure `structure`, numbered in creation order.
+  [[nodiscard]] const Structure& structure(std::size_t structure) const;
+
+  /// Returns the stage structure `structure` is in.
+  [[nodiscard]] Stage stage(std::size_t structure) const;
+
  private:
   struct Army {
     Cell objective;
+    std::size_t faction;
+    std::vector<Skill> skills;
     FlowField field;
     std::vector<Body> bodies;
   };
 
+  /// Every body as the tick began, indexed together.
+  struct Crowd {
+    SpatialHash hash;
+    std::vector<std::size_t> armies;
+    std::vector<bool> alive;
+  };
+
+  [[nodiscard]] std::uint64_t next_random();
+  void strike(Body& user, std::size_t army, const Crowd& crowd,
+              std::vector<std::uint64_t>& damage);
+
   std::uint64_t rng_state_;
   std::uint64_t tick_count_ = 0;
   Map map_;
-  std::int32_t separation_;
+  Rules rules_;
   Position focus_{0, 0};
   std::vector<Army> armies_;
+  std::vector<Structure> structures_;
 };
 
 }  // namespace murim
