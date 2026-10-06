@@ -10,7 +10,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 760
+local W, H = 608, 848
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -25,6 +25,7 @@ local bodies = {
   unorthodox = load("bodies/unorthodox.aseprite"),
 }
 local house = load("structures/house.aseprite")
+local hall = load("structures/hall.aseprite")
 local army = load("markers/army_marker.aseprite")
 local player = load("markers/player_marker.aseprite")
 
@@ -268,6 +269,15 @@ end
 -- landforms' rise past the top are cut.
 for y = PY, PY + PH * 16 - 1 do
   for x = PX, PX + PW * 16 - 1 do sheet:set(x, y, patch:get(x, y)) end
+end
+
+-- The hall in its four stages, each on its 5x3-cell footprint of plain ground.
+label(8, 760, "HALL, 5 X 3 CELLS", c("paper", 3))
+for k, stage in ipairs({ "intact", "damaged", "destroyed", "rubble" }) do
+  local x, y = 8 + (k - 1) * 104, 770
+  for cy = 0, 2 do for cx = 0, 4 do sheet:stamp(frame(terrain, "plain", 1 + (cx + cy) % 4), x + 8 + cx * 16, y + 8 + cy * 16) end end
+  sheet:stamp(frame(hall, stage), x, y)
+  label(x + 8, y + 62, stage:upper(), c("paper", 2))
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")
