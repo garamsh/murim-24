@@ -48,9 +48,11 @@ func _check_setup() -> void:
 			agents += count
 	if agents != EXPECTED_AGENTS:
 		_fail("the world must hold %d agents, not %d" % [EXPECTED_AGENTS, agents])
-	elif _view.bodies_drawn <= world.army_count():
+	elif _view.bodies <= world.army_count():
 		_fail("the focus must expand armies into agents; %d bodies for %d armies" % [
-			_view.bodies_drawn, world.army_count()])
+			_view.bodies, world.army_count()])
+	elif _view.bodies_drawn == 0:
+		_fail("the camera must have bodies on screen to draw")
 	elif _view.ticks == 0:
 		_fail("the world must tick during the warm-up")
 
@@ -75,8 +77,9 @@ func _report() -> void:
 	print("frames: %d warm-up, then %d timed; %d ticks in %.1f s timed (%d per second set)" % [
 		WARM_UP_FRAMES, TIMED_FRAMES, _view.ticks - _ticks_before, seconds,
 		WorldAdapter.TICKS_PER_SECOND])
-	print("bodies drawn: %d through one MultiMesh; structures broken: %d of %d" % [
-		_view.bodies_drawn, broken, world.structure_count()])
+	print("bodies: %d in the world, %d on screen drawn as sprites through MultiMesh bands" % [
+		_view.bodies, _view.bodies_drawn])
+	print("structures broken: %d of %d" % [broken, world.structure_count()])
 	print("frame time: p50 %.3f ms, p99 %.3f ms, max %.3f ms" % [p50, p99, sorted[-1]])
 	print("%s: p99 %.3f ms against a %.1f ms budget" % ["PASS" if passed else "FAIL", p99, BUDGET_MS])
 	print("frame time is measured on this machine only: CI has no display and does not run make bench")

@@ -10,12 +10,15 @@ CXX_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*
 EXTENSION_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'
 GDEXTENSION_SCOPE := git ls-files --cached --others --exclude-standard -- '*.gdextension'
 GDSCRIPT_TEST_SCOPE := git ls-files --cached --others --exclude-standard -- '*_test.gd'
+IMPORT_SCOPE := git ls-files --cached --others --exclude-standard -- '*.import'
 
 # CMAKE_OSX_SYSROOT puts the macOS SDK into compile_commands.json so clang-tidy finds the standard headers; other hosts ignore it.
 # godot-cpp replaces CMAKE_OSX_SYSROOT with $$SDKROOT, so the extension build passes the SDK there instead; xcrun is absent off macOS, leaving it empty.
 # build/.gdignore keeps Godot from importing every build tree, all of which sit under build/ and include godot-cpp's own test project.
 # .godot/extension_list.cfg names every committed .gdextension, so Godot loads them at startup: a headless
 # Godot 4.7.2 session that discovers an extension itself crashes on exit (godotengine/godot#111645).
+# godot --import imports the textures, fonts and translations the scenes load into .godot/, which
+# a fresh checkout and CI lack; the .import file beside each source sets how it is imported.
 build:
 	$(TOOLS)/cmake -S core -B $(BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx
 	$(TOOLS)/cmake --build $(BUILD_DIR)
@@ -23,6 +26,8 @@ build:
 	$(TOOLS)/cmake --build $(EXTENSION_BUILD_DIR)
 	touch $(BUILD_DIR)/.gdignore
 	mkdir -p .godot && $(GDEXTENSION_SCOPE) | sed 's|^|res://|' > .godot/extension_list.cfg
+	$(GODOT) --headless --path . --import > $(BUILD_DIR)/import.log 2>&1 || { cat $(BUILD_DIR)/import.log; exit 1; }
+	@echo "imported $$($(IMPORT_SCOPE) | wc -l | tr -d ' ') resources into .godot/, selected by: $(IMPORT_SCOPE)"
 	@echo "built every target in core/CMakeLists.txt into $(BUILD_DIR)/, and every default target in extension/CMakeLists.txt into $(EXTENSION_BUILD_DIR)/; registered $$($(GDEXTENSION_SCOPE) | wc -l | tr -d ' ') GDExtension, selected by: $(GDEXTENSION_SCOPE)"
 
 lint: build

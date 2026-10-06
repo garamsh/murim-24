@@ -29,6 +29,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3` |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` (four frames) |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
@@ -139,7 +140,7 @@ An individual agent and an aggregate army read differently:
 
 ## Structures and damage stages
 
-The village house covers 3 x 3 cells, in four stages that follow the core's structure stages:
+The village house covers 3 x 3 cells and the hall 5 x 3, each in four stages that follow the core's structure stages:
 
 | Stage | What shows |
 |---|---|
@@ -158,7 +159,7 @@ The village house covers 3 x 3 cells, in four stages that follow the core's stru
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI.
 - The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the rumour that last reached the player, the technique bar with cooldowns, and the current target.
-- UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The mockup's 5-pixel capital font draws English and numerals only; Korean text needs a bitmap font that carries Hangul, which is not chosen yet. Every panel is laid out for the longer of the two strings.
+- UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
 ## Do and don't
 

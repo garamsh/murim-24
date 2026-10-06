@@ -1,0 +1,11 @@
+keys,ko,en
+HUD_PLAYER,협객,Wanderer
+HUD_HP,체력,HP
+HUD_QI,내공,QI
+HUD_SEASON_YEAR,봄 · 1년,"Spring, Year 1"
+HUD_RUMOR,소문,Rumour
+HUD_RUMOR_NONE,아직 들려온 소문이 없다.,No rumour has reached you yet.
+HUD_LOCALE,F2 English,F2 한국어
+FACTION_ORTHODOX,정파,Orthodox
+FACTION_DEMONIC,마교,Demonic Cult
+FACTION_UNORTHODOX,사파,Unorthodox
