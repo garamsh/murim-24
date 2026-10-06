@@ -1,13 +1,17 @@
 # Checks that a world driven through the adapter reaches the core's own hash
-# for the same scenario and tick count, the core's hash coming from the
-# world_hash reference program, and that the adapter refuses what the core,
-# or the conversion to the core's types, refuses.
+# and body positions and counts for the same scenario, focus and tick count,
+# the core's coming from the world_hash reference program, and that the
+# adapter refuses what the core, or the conversion to the core's types,
+# refuses.
 extends RefCounted
 
 const SEED := 42
 const OTHER_SEED := 43
 const TICKS := 2000
 const REFERENCE := "res://build/extension/world_hash"
+# Sub-cell units: the focus among the armies, and one beyond every tier's reach but the far one's.
+const FOCUS := Vector2i(4 * 256, 4 * 256)
+const FAR_FOCUS := Vector2i(1000000, 1000000)
 const MAP_ROWS: Array[String] = [
 	"........#.......",
 	"........#.......",
@@ -35,14 +39,23 @@ const RULES := {"separation": 72, "hostile": [[false, true], [true, false]], "st
 
 
 func run() -> bool:
-	var core_hash: Variant = _core_hash()
-	var adapter_hash := _adapter_hash(SEED)
+	var core := _core_run(FOCUS)
+	var adapter := _adapter_run(SEED, FOCUS)
 	# Control: another seed must differ, or equality could come from a constant hash.
-	var other_seed_hash := _adapter_hash(OTHER_SEED)
-	var matches: bool = core_hash != null and adapter_hash == core_hash and other_seed_hash != core_hash
-	print("world_adapter_test: %d ticks, %d armies, %d structures; core hash %s, adapter hash %d for seed %d, %d for seed %d: %s" % [
-		TICKS, ARMIES.size(), STRUCTURES.size(), core_hash, adapter_hash, SEED, other_seed_hash,
-		OTHER_SEED, "pass" if matches else "FAIL"])
+	var other_seed := _adapter_run(OTHER_SEED, FOCUS)
+	var hashes_match := core.size() > 0 and adapter[0] == core[0] and other_seed[0] != core[0]
+	print("world_adapter_test: %d ticks, %d armies, %d structures; core hash %s, adapter hash %s for seed %d, %s for seed %d: %s" % [
+		TICKS, ARMIES.size(), STRUCTURES.size(), core[0] if core.size() > 0 else "none", adapter[0], SEED,
+		other_seed[0], OTHER_SEED, "pass" if hashes_match else "FAIL"])
+
+	# Setup: the focus expanded the armies into bodies, so the comparison covers agents, not
+	# only aggregates. Control: from a far focus the bodies differ, so equality is not a constant.
+	var far := _adapter_run(SEED, FAR_FOCUS)
+	var bodies := adapter.slice(1)
+	var expanded := bodies.size() > ARMIES.size()
+	var bodies_match := expanded and core.slice(1) == bodies and far.slice(1) != core.slice(1)
+	print("world_adapter_test: %d bodies through the adapter, %d from the core, %d from a far focus; positions and counts equal: %s" % [
+		bodies.size(), core.size() - 1, far.size() - 1, "pass" if bodies_match else "FAIL"])
 
 	var strike_without_cooldown := STRIKE.duplicate()
 	strike_without_cooldown.erase("cooldown")
@@ -64,7 +77,7 @@ func run() -> bool:
 	var accepted := _create(SEED, ARMIES, RULES) != null
 	print("world_adapter_test: valid scenario accepted %s; %d of %d invalid scenarios refused: %s" % [
 		accepted, refused, invalid.size(), "pass" if accepted and refused == invalid.size() else "FAIL"])
-	return matches and accepted and refused == invalid.size()
+	return hashes_match and bodies_match and accepted and refused == invalid.size()
 
 
 func _create(seed: int, armies: Array[Dictionary], rules: Dictionary) -> WorldAdapter:
@@ -83,15 +96,23 @@ func _with_rules(key: String, value: Variant) -> Dictionary:
 	return rules
 
 
-func _adapter_hash(seed: int) -> int:
+# The run's hash, then one line `army x y count` per body, as world_hash prints them.
+func _adapter_run(seed: int, focus: Vector2i) -> PackedStringArray:
 	var world := _create(seed, ARMIES, RULES)
+	world.set_focus(focus)
 	for i in TICKS:
 		world.tick()
-	return world.hash()
+	var lines := PackedStringArray([str(world.hash())])
+	for army in world.army_count():
+		var counts := world.body_counts(army)
+		var positions := world.body_positions(army)
+		for body in counts.size():
+			lines.append("%d %d %d %d" % [army, int(positions[body].x), int(positions[body].y), counts[body]])
+	return lines
 
 
-# The scenario as world_hash reads it: fields in the core's order, each list after its length.
-func _core_hash() -> Variant:
+# world_hash's output for the scenario, its fields in the core's order, each list after its length, then the focus.
+func _core_run(focus: Vector2i) -> PackedStringArray:
 	var fields: Array = [SEED, TICKS, MAP_ROWS.size()] + MAP_ROWS + [ARMIES.size()]
 	for army in ARMIES:
 		fields += [army.start.x, army.start.y, army.objective.x, army.objective.y, army.count,
@@ -106,8 +127,8 @@ func _core_hash() -> Variant:
 		fields.append(row.size())
 		for hostile in row:
 			fields.append(1 if hostile else 0)
-	fields += RULES.stage_floors
+	fields += RULES.stage_floors + [focus.x, focus.y]
 	var output := []
 	if OS.execute(ProjectSettings.globalize_path(REFERENCE), [" ".join(fields.map(str))], output) != 0:
-		return null
-	return String(output[0]).strip_edges().to_int()
+		return PackedStringArray()
+	return String(output[0]).strip_edges().split("\n")

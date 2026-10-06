@@ -1,9 +1,11 @@
 // Prints the core's hash after running a scenario, its bits read as a signed
-// int as GDScript reads them: the reference extension/world_adapter_test.gd
-// checks the adapter against. The scenario is one argument of
-// whitespace-separated fields in the order the core's types declare them,
-// each list preceded by its length:
+// int as GDScript reads them, then one line `army x y count` per body: the
+// reference extension/world_adapter_test.gd checks the adapter against. The
+// scenario is one argument of whitespace-separated fields in the order the
+// core's types declare them, each list preceded by its length, and the focus
+// in sub-cell units last:
 // seed ticks rows... armies... structures... separation hostile... floors...
+// focus_x focus_y
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -96,14 +98,23 @@ int main(int argc, char** argv) {
     std::vector<murim::ArmySpec> armies = read_list(scenario, read_army);
     std::vector<murim::Structure> structures =
         read_list(scenario, read_structure);
+    const std::size_t army_total = armies.size();
     murim::World world{murim::Seed{seed}, murim::Map{rows}, std::move(armies),
                        std::move(structures), read_rules(scenario)};
+    const auto focus_x = read<std::int32_t>(scenario);
+    world.set_focus(murim::Position{focus_x, read<std::int32_t>(scenario)});
     for (std::uint64_t i = 0; i < ticks; ++i) {
       world.tick();
     }
     std::cout << static_cast<std::int64_t>(
                      static_cast<std::uint64_t>(world.hash()))
               << '\n';
+    for (std::size_t army = 0; army < army_total; ++army) {
+      for (const murim::Body& body : world.bodies(army)) {
+        std::cout << army << ' ' << body.position.x << ' ' << body.position.y
+                  << ' ' << body.count << '\n';
+      }
+    }
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "world_hash: " << error.what() << '\n';
