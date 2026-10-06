@@ -16,7 +16,6 @@ FACTION_UNORTHODOX,사파,Unorthodox
 HUD_LEADER,수장,Leader
 HUD_LEADER_NONE,없음,None
 HUD_LEADER_YOU,당신,You
-HUD_PERSON,인물 %d,Person %d
 HUD_CHALLENGE_KEY,C 도전,C Challenge
 HUD_DUEL,결투,Duel
 HUD_DUEL_NEW_LEADER,새 수장이 섰다.,A new leader stands.

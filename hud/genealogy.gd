@@ -7,6 +7,7 @@
 extends Control
 
 const ART := "res://art/"
+const PersonName := preload("res://hud/person_name.gd")
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const MAX_CHILDREN := 3
 const FONT_SIZE := 10
@@ -91,14 +92,14 @@ func show_person(world: WorldAdapter, person: int, steered: int) -> void:
 		cards.append(_card("child", child))
 	var name := world.person_name(person)
 	details = {
-		"name": _name_of(person),
+		"name": PersonName.of(_world, person),
 		"family": tr("GENEALOGY_FAMILY") % _surname(name),
 		"sect": _sect(person),
 		"age": str(world.person_age(person)),
 		"generation": tr("GENEALOGY_GENERATION") % generation_of(person),
 		"talent": tr("GENEALOGY_UNKNOWN"),
 		"lifespan": tr("GENEALOGY_UNKNOWN"),
-		"spouse": _name_of(spouse) if spouse >= 0 else tr("GENEALOGY_NONE"),
+		"spouse": PersonName.of(_world, spouse) if spouse >= 0 else tr("GENEALOGY_NONE"),
 		"children": tr("GENEALOGY_COUNT") % children.size(),
 	}
 	visible = true
@@ -153,23 +154,10 @@ func close() -> void:
 func _card(role: String, person: int) -> Dictionary:
 	var dead := _world.person_health(person) == 0
 	return {
-		"role": role, "person": person, "name": _name_of(person), "dead": dead,
+		"role": role, "person": person, "name": PersonName.of(_world, person), "dead": dead,
 		"line": tr("GENEALOGY_DEAD") if dead else tr("GENEALOGY_AGE") % _world.person_age(person),
-		"short": _name_of(person, true),
+		"short": PersonName.of(_world, person, true),
 	}
-
-
-# A person's name in the locale's order: surname first in Korean, given name first in English.
-# `short` gives the English given name alone, which fits a card; Korean names fit whole.
-func _name_of(person: int, short := false) -> String:
-	var name := _world.person_name(person)
-	if name.is_empty():
-		return tr("GENEALOGY_UNNAMED")
-	if TranslationServer.get_locale().begins_with("ko"):
-		return name.surname + name.given
-	if short:
-		return name.given_en
-	return "%s %s" % [name.given_en, name.surname_en]
 
 
 func _surname(name: Dictionary) -> String:

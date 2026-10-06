@@ -14,6 +14,7 @@ const FONT_SIZE := 10
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const ART := "res://art/"
 const MAX_SLOTS := 9
+const PersonName := preload("res://hud/person_name.gd")
 # docs/art-direction.md §Palette.
 const INK := Color("2a2433")
 const INK_DARK := Color("14101a")
@@ -178,7 +179,7 @@ func _refresh_leadership(world: WorldAdapter, steered: int) -> void:
 	var faction := world.army_faction(steered)
 	var leader := world.leader(faction)
 	var own := world.roster(steered)
-	labels.leader_value.text = _who(leader, own) if leader >= 0 else tr("HUD_LEADER_NONE")
+	labels.leader_value.text = _who(world, leader, own) if leader >= 0 else tr("HUD_LEADER_NONE")
 	var fought := world.duel(faction)
 	duel_panel.visible = not fought.is_empty()
 	if fought.is_empty():
@@ -192,15 +193,16 @@ func _refresh_leadership(world: WorldAdapter, steered: int) -> void:
 			"from": maxi(world.person_health(fought.challenger), 1),
 			"leader_from": maxi(world.person_health(fought.leader), 1),
 		}
-	labels.duel_challenger.text = _who(fought.challenger, own)
-	labels.duel_leader.text = _who(fought.leader, own)
+	labels.duel_challenger.text = _who(world, fought.challenger, own)
+	labels.duel_leader.text = _who(world, fought.leader, own)
 	duel_bars.challenger.value = 100.0 * world.person_health(fought.challenger) / _duel.from
 	duel_bars.leader.value = 100.0 * world.person_health(fought.leader) / _duel.leader_from
 
 
-# The player, if `person` is the player's own, or the person by number.
-func _who(person: int, own: PackedInt64Array) -> String:
-	return tr("HUD_LEADER_YOU") if own.has(person) else tr("HUD_PERSON") % person
+# The player, if `person` is the player's own, or the person by name: the given name alone in
+# English, as on the genealogy cards.
+func _who(world: WorldAdapter, person: int, own: PackedInt64Array) -> String:
+	return tr("HUD_LEADER_YOU") if own.has(person) else PersonName.of(world, person, true)
 
 
 func _notice(key: String) -> void:
@@ -295,17 +297,14 @@ func _build() -> void:
 
 	var leadership := _panel(Rect2(4, 58, 160, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
-	labels.leader_value = _value(leadership, Vector2(36, 2), 60)
-	labels.leader_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	labels.leader_value = _name(leadership, Vector2(42, 2), 56)
 	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
 
 	duel_panel = _panel(Rect2(176, 4, 128, 44))
 	duel_panel.visible = false
 	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), HP)
-	labels.duel_challenger = _value(duel_panel, Vector2(5, 15), 52)
-	labels.duel_challenger.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	labels.duel_leader = _value(duel_panel, Vector2(5, 28), 52)
-	labels.duel_leader.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	labels.duel_challenger = _name(duel_panel, Vector2(5, 15), 52)
+	labels.duel_leader = _name(duel_panel, Vector2(5, 28), 52)
 	duel_bars.challenger = ProgressBar.new()
 	duel_bars.leader = ProgressBar.new()
 	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), HP)
@@ -356,6 +355,15 @@ func _value(parent: Control, at: Vector2, width: float) -> Label:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	label.add_theme_color_override("font_color", PAPER)
 	parent.add_child(label)
+	return label
+
+
+# A label for a person's name `width` pixels wide from `at`, its text from the left edge and cut
+# short with an ellipsis past the right.
+func _name(parent: Control, at: Vector2, width: float) -> Label:
+	var label := _value(parent, at, width)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	return label
 
 
