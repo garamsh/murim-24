@@ -104,7 +104,8 @@ func step() -> void:
 	ticks += 1
 
 
-## Returns the steered person's position, in sub-cell units, or where it last stood once dead.
+## Returns the steered person's position, in sub-cell units, or where it last stood while it has
+## no body: once dead, until its soul is born again.
 func lead() -> Vector2:
 	var positions := world.body_positions(steered)
 	if not positions.is_empty():

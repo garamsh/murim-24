@@ -120,7 +120,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns how many armies the world was created with.
   [[nodiscard]] std::int64_t army_count() const;
 
-  /// Returns how many skills army `army` was created with.
+  /// Returns the world's date: `year` and `day` counted from 1, `season`
+  /// from 0, as the core's calendar gives them.
+  [[nodiscard]] godot::Dictionary date() const;
+
+  /// Returns how many skills army `army` has now.
   [[nodiscard]] std::int64_t skill_count(std::int64_t army) const;
 
   /// Returns the positions of army `army`'s living members, each one person,
@@ -153,7 +157,8 @@ class WorldAdapter : public godot::RefCounted {
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
 
-  /// Returns the faction army `army` was created with.
+  /// Returns the faction army `army` fights for now; a soul born again
+  /// takes its new family's.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
 
   /// Returns the health army `army`'s members were created with, together.
@@ -194,10 +199,8 @@ class WorldAdapter : public godot::RefCounted {
   // registered abstract.
   std::optional<murim::World> world_;
   std::vector<std::string> map_rows_;
-  std::vector<std::size_t> skill_counts_;
-  std::vector<std::vector<murim::Skill>> skills_;
+  std::size_t army_count_ = 0;
   std::vector<std::string> structure_kinds_;
-  std::vector<std::size_t> factions_;
   std::vector<std::uint64_t> strengths_;
   std::size_t structure_count_ = 0;
   std::size_t faction_count_ = 0;
@@ -213,7 +216,8 @@ class WorldAdapter : public godot::RefCounted {
       murim::Seed seed, std::vector<std::string> map_rows,
       std::vector<murim::ArmySpec> armies,
       std::vector<murim::Structure> structures, murim::Rules rules,
-      std::vector<murim::Leadership> leadership = {});
+      std::vector<murim::VillageSpec> villages = {},
+      std::vector<murim::Leadership> leadership = {}, murim::Life life = {});
   // Returns an adapter over the region generated from `seed`, with one person
   // born into village `village` as the last army; throws std::out_of_range
   // when there is no such village.

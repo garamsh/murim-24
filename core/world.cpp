@@ -180,17 +180,75 @@ Position stepped(const FlowField& field, Position from, Step direction) {
   return reached(along_y) ? along_y : moved_x;
 }
 
+// Folds everything `person` holds into `fold`; `absent` stands for no soul.
+template <typename Fold>
+void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
+  fold(person.position.x);
+  fold(person.position.y);
+  fold(person.health);
+  fold(person.ready_at);
+  fold(person.home.has_value());
+  fold(person.home.value_or(0));
+  fold(person.born);
+  fold(person.family);
+  for (const std::size_t parent : person.parents) {
+    fold(parent);
+  }
+  for (std::size_t discipline = 0; discipline < person.talent.size();
+       ++discipline) {
+    fold(person.talent.at(discipline).growth);
+    fold(person.talent.at(discipline).limit);
+    fold(person.attainment.at(discipline));
+  }
+  fold(person.lifespan.value_or(0));
+  fold(person.soul.value_or(absent));
+}
+
+// Folds a soul's history into `fold`.
+template <typename Fold>
+void fold_soul(const Fold& fold, const Soul& soul) {
+  fold(soul.lives);
+  for (const bool practised : soul.practised) {
+    fold(practised);
+  }
+}
+
+// Throws std::invalid_argument when `life` could draw a talent above
+// MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives a newborn no
+// health or more than MAX_HEALTH.
+void check_life(const Life& life) {
+  const auto too_talented = [&life](const DisciplineDraw& draw) {
+    return std::uint64_t{draw.growth.mean} + draw.growth.spread > MAX_TALENT ||
+           std::uint64_t{draw.limit.mean} + draw.limit.spread +
+                   life.discipline_widening + life.upper_widening >
+               MAX_TALENT;
+  };
+  const bool too_long = life.lifespan && std::uint64_t{life.lifespan->mean} +
+                                                 life.lifespan->spread >
+                                             MAX_LIFESPAN_DAYS;
+  if (std::any_of(life.disciplines.begin(), life.disciplines.end(),
+                  too_talented) ||
+      too_long || life.newborn_health == 0 ||
+      life.newborn_health > MAX_HEALTH) {
+    throw std::invalid_argument(
+        "life must draw talents and lifespans within their limits, and give "
+        "newborns health");
+  }
+}
+
 }  // namespace
 
 World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              std::vector<Structure> structures, Rules rules,
              std::vector<VillageSpec> villages,
-             std::vector<Leadership> leadership)
+             std::vector<Leadership> leadership, Life life)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       map_(std::move(map)),
       rules_(std::move(rules)),
       structures_(std::move(structures)),
-      structure_index_(centres_of(structures_)) {
+      structure_index_(centres_of(structures_)),
+      life_(std::move(life)) {
+  check_life(life_);
   const std::size_t factions = rules_.hostile.size();
   const auto ragged = [factions](const std::vector<bool>& row) {
     return row.size() != factions;
@@ -238,8 +296,14 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     std::vector<std::size_t> roster;
     for (const Recruit& recruit : army.members) {
       roster.push_back(people_.size());
-      people_.push_back(
-          Person{centre_of(recruit.cell), recruit.health, 0, std::nullopt});
+      // Everyone the world starts with is born into the family of the army
+      // it is created in, of no parents, by the same rule as any birth.
+      Person person;
+      person.position = centre_of(recruit.cell);
+      person.health = recruit.health;
+      person.family = armies_.size();
+      bear(person, Soul{});
+      people_.push_back(std::move(person));
     }
     FlowField field{map_, army.objective};
     reachable_from(field, roster);
@@ -437,6 +501,17 @@ void World::tick() {
     struck.health -= std::min(damage.at(index), struck.health);
   }
   settle_duels();
+  age();
+  // A soul whose body died this tick is born again, into the army it served.
+  std::vector<Passing> reborn;
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    for (const std::size_t member : armies_.at(army).roster) {
+      const Person& person = people_.at(member);
+      if (person.health == 0 && person.soul) {
+        reborn.push_back(Passing{member, army});
+      }
+    }
+  }
   for (Army& army : armies_) {
     army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
                                      [this](std::size_t member) {
@@ -463,6 +538,10 @@ void World::tick() {
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     march(army, crowd, slot, pulls, standing);
+  }
+  // The newborn first act on the next tick.
+  for (const Passing& passing : reborn) {
+    rebirth(passing);
   }
 }
 
@@ -532,12 +611,10 @@ StateHash World::hash() const {
     fold(structure.durability);
   }
   for (const Person& person : people_) {
-    fold(person.position.x);
-    fold(person.position.y);
-    fold(person.health);
-    fold(person.ready_at);
-    fold(person.home.has_value());
-    fold(person.home.value_or(0));
+    fold_person(fold, person, people_.size());
+  }
+  for (const Soul& soul : souls_) {
+    fold_soul(fold, soul);
   }
   for (const Army& army : armies_) {
     fold(army.order.objective.x);
@@ -750,17 +827,34 @@ void World::strike(std::size_t user, const Crowd& crowd,
   }
   const Position centre = *aim;
   striker.ready_at = tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
+  // A use that hits anyone or anything practises the striker's best
+  // discipline, its highest limit.
+  bool hit = false;
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (hostile(other)) {
       damage.at(other) += skill.body_damage;
+      hit = true;
     }
   });
   structure_index_.visit_within(
       centre, skill.radius + structure_extent_, [&](std::size_t index) {
         if (reaches(structures_.at(index), centre, skill.radius)) {
-          shift(index, Destroyer{army, own.faction}, skill.structure_damage);
+          hit = shift(index, Destroyer{army, own.faction},
+                      skill.structure_damage) ||
+                hit;
         }
       });
+  if (hit && !striker.talent.empty()) {
+    const auto best = static_cast<std::size_t>(
+        std::max_element(striker.talent.begin(), striker.talent.end(),
+                         [](const Aptitude& left, const Aptitude& right) {
+                           return left.limit < right.limit;
+                         }) -
+        striker.talent.begin());
+    const Aptitude& aptitude = striker.talent.at(best);
+    striker.attainment.at(best) =
+        std::min(aptitude.limit, striker.attainment.at(best) + aptitude.growth);
+  }
 }
 
 // Lowers a structure's durability by `effect`, or raises it by a negative
@@ -771,14 +865,14 @@ void World::strike(std::size_t user, const Crowd& crowd,
 // its last standing structure in rubble, and takes as its residents the army
 // that restores a structure while its residents have no living member; that
 // army's members make it their home.
-void World::shift(std::size_t structure, Destroyer striker,
+bool World::shift(std::size_t structure, Destroyer striker,
                   std::int64_t effect) {
   const std::optional<std::size_t>& home = village_of_.at(structure);
   const bool held =
       home && !armies_.at(villages_.at(*home).spec.residents).roster.empty();
   if (held &&
       (effect > 0) != rules_.hostile.at(striker.faction).at(owner(*home))) {
-    return;
+    return false;
   }
   Structure& shifted = structures_.at(structure);
   const std::int64_t before = shifted.durability;
@@ -788,7 +882,7 @@ void World::shift(std::size_t structure, Destroyer striker,
   shifted.durability = static_cast<std::uint32_t>(
       std::clamp(before - effect, std::int64_t{0}, ceiling));
   if (!home) {
-    return;
+    return effect != 0;
   }
   Village& village = villages_.at(*home);
   const std::vector<std::size_t>& own = village.spec.structures;
@@ -805,6 +899,157 @@ void World::shift(std::size_t structure, Destroyer striker,
       people_.at(member).home = home;
     }
   }
+  return effect != 0;
+}
+
+Range limit_range(const Life& life, const Soul& soul, std::size_t discipline) {
+  const Spread& limit = life.disciplines.at(discipline).limit;
+  const std::uint32_t lives = std::max<std::uint32_t>(soul.lives, 1);
+  const bool practised =
+      discipline < soul.practised.size() && soul.practised.at(discipline);
+  const std::uint32_t wider = practised ? life.discipline_widening / lives : 0;
+  const std::uint32_t higher = soul.lives > 0 ? life.upper_widening / lives : 0;
+  const std::uint32_t reach = limit.spread + wider;
+  return Range{limit.mean - std::min(limit.mean, reach),
+               limit.mean + reach + higher};
+}
+
+// Draws `person`'s talent and lifespan, for a soul of `soul` history: the
+// one rule every birth follows.
+void World::bear(Person& person, const Soul& soul) {
+  const auto draw = [this](Range range) {
+    return range.low +
+           static_cast<std::uint32_t>(
+               next_random() % (std::uint64_t{range.high - range.low} + 1));
+  };
+  const auto spread = [](Spread values) {
+    return Range{values.mean - std::min(values.mean, values.spread),
+                 values.mean + values.spread};
+  };
+  person.born = tick_count_;
+  person.talent.clear();
+  for (std::size_t discipline = 0; discipline < life_.disciplines.size();
+       ++discipline) {
+    const std::uint32_t growth =
+        draw(spread(life_.disciplines.at(discipline).growth));
+    const std::uint32_t limit = draw(limit_range(life_, soul, discipline));
+    person.talent.push_back(Aptitude{growth, limit});
+  }
+  person.attainment.assign(person.talent.size(), 0);
+  person.lifespan =
+      life_.lifespan
+          ? std::optional<std::uint64_t>{draw(spread(*life_.lifespan))}
+          : std::nullopt;
+}
+
+// Ends the life of every living person whose age in days has passed its
+// lifespan, extended by its attainment.
+void World::age() {
+  const std::uint64_t today = tick_count_ / CALENDAR.ticks_per_day;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      Person& person = people_.at(member);
+      std::uint64_t attained = 0;
+      for (const std::uint32_t points : person.attainment) {
+        attained += points;
+      }
+      const std::uint64_t age = today - (person.born / CALENDAR.ticks_per_day);
+      const bool spent =
+          person.lifespan &&
+          age >= *person.lifespan + (attained * life_.days_per_attainment);
+      person.health = spent ? 0 : person.health;
+    }
+  }
+}
+
+// Bears person `dead`'s soul again in a village drawn by the seed among those
+// with living residents: into the family of its first resident, whose first
+// two residents are its parents, at the first's side, home in that village,
+// serving in army `army` and bound for where it was born. The army takes the
+// village's residents' faction and skills, all of them in its order. The soul
+// first counts the life just ended and the disciplines practised in it.
+void World::rebirth(Passing passing) {
+  const std::size_t dead = passing.dead;
+  const std::size_t army = passing.army;
+  const std::optional<std::size_t> carried = people_.at(dead).soul;
+  if (!carried) {
+    return;
+  }
+  const std::size_t soul_index = *carried;
+  Soul& soul = souls_.at(soul_index);
+  soul.lives += 1;
+  soul.practised.resize(life_.disciplines.size(), false);
+  const std::vector<std::uint32_t>& attainment = people_.at(dead).attainment;
+  for (std::size_t discipline = 0; discipline < attainment.size();
+       ++discipline) {
+    soul.practised.at(discipline) =
+        soul.practised.at(discipline) || attainment.at(discipline) > 0;
+  }
+  std::vector<std::size_t> peopled;
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    if (!armies_.at(villages_.at(village).spec.residents).roster.empty()) {
+      peopled.push_back(village);
+    }
+  }
+  if (peopled.empty()) {
+    return;
+  }
+  const std::size_t village = peopled.at(next_random() % peopled.size());
+  const std::vector<std::size_t>& residents =
+      armies_.at(villages_.at(village).spec.residents).roster;
+  Person person;
+  const Person& first = people_.at(residents.front());
+  person.position = first.position;
+  person.health = life_.newborn_health;
+  person.home = village;
+  person.family = first.family;
+  person.parents.assign(
+      residents.begin(),
+      residents.begin() + static_cast<std::ptrdiff_t>(
+                              std::min<std::size_t>(residents.size(), 2)));
+  person.soul = soul_index;
+  bear(person, soul);
+  const std::size_t born = people_.size();
+  people_.push_back(std::move(person));
+  // The soul's army takes its new family's faction and skills.
+  Army& serving = armies_.at(army);
+  const Army& family = armies_.at(villages_.at(village).spec.residents);
+  serving.roster.push_back(born);
+  serving.faction = family.faction;
+  serving.skills = family.skills;
+  serving.order.skills.resize(serving.skills.size());
+  std::iota(serving.order.skills.begin(), serving.order.skills.end(),
+            std::size_t{0});
+  const Cell birthplace = cell_of(people_.at(born).position);
+  serving.field = FlowField{map_, birthplace};
+  serving.order.objective = birthplace;
+}
+
+std::size_t World::faction(std::size_t army) const {
+  return armies_.at(army).faction;
+}
+
+const std::vector<Skill>& World::skills(std::size_t army) const {
+  return armies_.at(army).skills;
+}
+
+std::size_t World::ensoul(std::size_t person) {
+  if (person >= people_.size() || people_.at(person).health == 0) {
+    throw std::invalid_argument("only a living person can carry a soul");
+  }
+  people_.at(person).soul = souls_.size();
+  souls_.push_back(Soul{0, std::vector<bool>(life_.disciplines.size(), false)});
+  return souls_.size() - 1;
+}
+
+const Soul& World::soul(std::size_t soul) const { return souls_.at(soul); }
+
+Date World::date() const {
+  const std::uint64_t day = tick_count_ / CALENDAR.ticks_per_day;
+  const std::uint64_t season = day / CALENDAR.days_per_season;
+  return Date{(season / CALENDAR.seasons_per_year) + 1,
+              season % CALENDAR.seasons_per_year,
+              (day % CALENDAR.days_per_season) + 1};
 }
 
 }  // namespace murim

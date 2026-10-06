@@ -176,7 +176,7 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
     }
     return over(murim::Seed{static_cast<std::uint64_t>(seed)}, std::move(rows),
                 each(armies, army_spec), each(structures, structure),
-                murim_godot::rules(rules), each(leaderships, leadership));
+                murim_godot::rules(rules), {}, each(leaderships, leadership));
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.create: ", error.what());
     return {};
@@ -211,10 +211,14 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
   murim::Region region = murim::generate_region(seed, murim::region_data());
   region.armies.push_back(murim::born_in(region, village));
   std::vector<std::string> kinds = std::move(region.structure_kinds);
+  std::vector<murim::VillageSpec> villages = murim::village_specs(region);
   godot::Ref<WorldAdapter> adapter =
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
            std::move(region.structures), std::move(region.rules),
-           std::move(region.leadership));
+           std::move(villages), std::move(region.leadership),
+           std::move(region.life));
+  // The person born last is the player's body, which carries a soul.
+  adapter->world().ensoul(adapter->world().population() - 1);
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
   adapter->terrain_ = std::move(region.terrain);
@@ -232,13 +236,12 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     murim::Seed seed, std::vector<std::string> map_rows,
     std::vector<murim::ArmySpec> armies,
     std::vector<murim::Structure> structures, murim::Rules rules,
-    std::vector<murim::Leadership> leadership) {
+    std::vector<murim::VillageSpec> villages,
+    std::vector<murim::Leadership> leadership, murim::Life life) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
+  adapter->army_count_ = armies.size();
   for (const murim::ArmySpec& army : armies) {
-    adapter->skill_counts_.push_back(army.skills.size());
-    adapter->skills_.push_back(army.skills);
-    adapter->factions_.push_back(army.faction);
     std::uint64_t health = 0;
     for (const murim::Recruit& member : army.members) {
       health += member.health;
@@ -249,8 +252,8 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   adapter->faction_count_ = rules.hostile.size();
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
                           std::move(structures), std::move(rules),
-                          std::vector<murim::VillageSpec>{},
-                          std::move(leadership));
+                          std::move(villages), std::move(leadership),
+                          std::move(life));
   adapter->map_rows_ = std::move(map_rows);
   return adapter;
 }
@@ -266,9 +269,8 @@ const murim::World& WorldAdapter::world() const {
 }
 
 std::size_t WorldAdapter::army_index(std::int64_t army) const {
-  CRASH_COND_MSG(
-      army < 0 || static_cast<std::uint64_t>(army) >= skill_counts_.size(),
-      "army index out of range");
+  CRASH_COND_MSG(army < 0 || static_cast<std::uint64_t>(army) >= army_count_,
+                 "army index out of range");
   return static_cast<std::size_t>(army);
 }
 
@@ -335,11 +337,20 @@ godot::PackedStringArray WorldAdapter::map_rows() const {
 }
 
 std::int64_t WorldAdapter::army_count() const {
-  return static_cast<std::int64_t>(skill_counts_.size());
+  return static_cast<std::int64_t>(army_count_);
 }
 
 std::int64_t WorldAdapter::skill_count(std::int64_t army) const {
-  return static_cast<std::int64_t>(skill_counts_.at(army_index(army)));
+  return static_cast<std::int64_t>(world().skills(army_index(army)).size());
+}
+
+godot::Dictionary WorldAdapter::date() const {
+  const murim::Date today = world().date();
+  godot::Dictionary fields;
+  fields.set("year", static_cast<std::int64_t>(today.year));
+  fields.set("season", static_cast<std::int64_t>(today.season));
+  fields.set("day", static_cast<std::int64_t>(today.day));
+  return fields;
 }
 
 godot::PackedVector2Array WorldAdapter::body_positions(
@@ -379,7 +390,7 @@ godot::String WorldAdapter::structure_kind(std::int64_t structure) const {
 godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
     std::int64_t army) const {
   godot::TypedArray<godot::Dictionary> skills;
-  for (const murim::Skill& skill : skills_.at(army_index(army))) {
+  for (const murim::Skill& skill : world().skills(army_index(army))) {
     godot::Dictionary fields;
     fields.set("range", skill.range);
     fields.set("radius", skill.radius);
@@ -396,7 +407,7 @@ std::int64_t WorldAdapter::structure_stage(std::int64_t structure) const {
 }
 
 std::int64_t WorldAdapter::army_faction(std::int64_t army) const {
-  return static_cast<std::int64_t>(factions_.at(army_index(army)));
+  return static_cast<std::int64_t>(world().faction(army_index(army)));
 }
 
 std::int64_t WorldAdapter::army_strength(std::int64_t army) const {
@@ -549,6 +560,7 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);
+  godot::ClassDB::bind_method(godot::D_METHOD("date"), &WorldAdapter::date);
   godot::ClassDB::bind_method(godot::D_METHOD("skill_count", "army"),
                               &WorldAdapter::skill_count);
   godot::ClassDB::bind_method(godot::D_METHOD("hash"), &WorldAdapter::hash);

@@ -156,6 +156,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		(_map.texture as AtlasTexture).region = Rect2(corner, MAP_SIZE)
 		_dot.position = _map.position + (lead - Vector2(corner)).floor() - Vector2.ONE
 	_refresh_leadership(world, steered)
+	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = JADE if skills.has(slot) else INK
@@ -208,6 +209,11 @@ func _notice(key: String) -> void:
 func _process(_delta: float) -> void:
 	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
 		labels.notice.visible = false
+
+
+## The season and year of `date`, as the core's calendar gives them, in the current locale.
+func season_text(date: Dictionary) -> String:
+	return tr("HUD_SEASON_YEAR") % [tr("SEASON_%d" % date.season), date.year]
 
 
 func _build() -> void:
