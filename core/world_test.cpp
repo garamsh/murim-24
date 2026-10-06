@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -1015,6 +1016,234 @@ TEST(World, ObjectiveTheArmyCannotReachIsRefused) {
   const ArmySpec bound{{1, 1}, {13, 1}, 1, 1, 0, {IDLE}};
   EXPECT_TRUE(refused_on_walled_map({bound}, {seal}));
   EXPECT_FALSE(refused_on_walled_map({bound}, {}));
+}
+
+// A village of two 2 by 2 houses along the top of a 6 by 3 area from (8, 8),
+// its residents of faction 0 below them; a raider of faction 1 at war with
+// them; and a mender of faction 2, at peace with both.
+constexpr std::size_t RESIDENTS = 0;
+constexpr std::size_t RAIDER = 1;
+constexpr std::size_t MENDER = 2;
+constexpr Cell RAIDER_HOME{2, 9};
+constexpr Cell MENDER_HOME{20, 20};
+constexpr Cell IN_VILLAGE{11, 10};
+constexpr std::uint32_t HOUSE_DURABILITY = 100;
+constexpr std::uint64_t PHASE_TICKS = 2'000;
+constexpr Seed VILLAGE_SEED{5};
+// The houses' west columns, and the rows they cover.
+constexpr std::int32_t WEST_HOUSE = 8;
+constexpr std::int32_t EAST_HOUSE = 12;
+constexpr std::int32_t HOUSE_TOP = 8;
+constexpr Footprint SMALL_HOUSE{2, 2};
+constexpr std::int64_t TORCH_REACH = std::int64_t{3} * CELL_SIZE;
+
+VillageSpec small_village() { return VillageSpec{{0, 1}, RESIDENTS}; }
+
+World village_world(std::uint32_t residents) {
+  const Skill guard{3 * CELL_SIZE, 0, 1, 0, 15};
+  // The raider strikes the residents, and torches what stands around it.
+  const Skill strike{3 * CELL_SIZE, 0, 50, 0, 10};
+  const Skill torch{0, 3 * CELL_SIZE, 0, 10, 10};
+  const Skill mend{0, 3 * CELL_SIZE, 0, -2, 10};
+  const std::vector<ArmySpec> armies{
+      {{10, 10},
+       {10, 10},
+       residents,
+       std::uint64_t{residents} * 100,
+       0,
+       {guard}},
+      {RAIDER_HOME, RAIDER_HOME, 10, 100'000, 1, {strike, torch}},
+      {MENDER_HOME, MENDER_HOME, 10, 100'000, 2, {mend}},
+  };
+  const Rules rules{
+      SEPARATION,
+      {{false, true, false}, {true, false, false}, {false, false, false}},
+      STAGE_FLOORS};
+  return World{VILLAGE_SEED,
+               Map{open_map(ORDERS_SIDE)},
+               armies,
+               {{{WEST_HOUSE, HOUSE_TOP}, HOUSE_DURABILITY, SMALL_HOUSE},
+                {{EAST_HOUSE, HOUSE_TOP}, HOUSE_DURABILITY, SMALL_HOUSE}},
+               rules,
+               {small_village()}};
+}
+
+// Whether the nearest point of the small house whose west column is `left`
+// lies within the torch's reach of `position`.
+bool torch_reaches(std::int32_t left, Position position) {
+  const auto gap = [](std::int64_t point, std::int32_t first,
+                      std::int32_t cells) {
+    return std::max<std::int64_t>(
+        {(std::int64_t{first} * CELL_SIZE) - point, 0,
+         point - (((std::int64_t{first} + cells) * CELL_SIZE) - 1)});
+  };
+  const auto gap_x = gap(position.x, left, SMALL_HOUSE.width);
+  const auto gap_y = gap(position.y, HOUSE_TOP, SMALL_HOUSE.height);
+  return (gap_x * gap_x) + (gap_y * gap_y) <= TORCH_REACH * TORCH_REACH;
+}
+
+// The village's state worked out again from what the world shows: its
+// houses' stages, and whether a living raider stands within its torch's
+// reach of a house while the raider is at war with the owner.
+VillageState derived(const World& world) {
+  const auto all_in = [&world](Stage stage) {
+    return world.stage(0) == stage && world.stage(1) == stage;
+  };
+  bool threatened = false;
+  for (const Body& body : world.bodies(RAIDER)) {
+    threatened = threatened || (body.count > 0 && world.owner(0) == 0 &&
+                                (torch_reaches(WEST_HOUSE, body.position) ||
+                                 torch_reaches(EAST_HOUSE, body.position)));
+  }
+  if (all_in(Stage::RUBBLE)) {
+    return VillageState::RUINS;
+  }
+  if (threatened) {
+    return VillageState::RAIDED;
+  }
+  return all_in(Stage::INTACT) ? VillageState::PROSPEROUS
+                               : VillageState::REBUILDING;
+}
+
+// Ticks until `done` holds or PHASE_TICKS pass, recording each state the
+// village enters and whether its state ever differed from derived().
+void run_until(World& world, std::vector<VillageState>& states, bool& agreed,
+               const std::function<bool()>& done) {
+  for (std::uint64_t tick = 0; tick < PHASE_TICKS && !done(); ++tick) {
+    world.set_focus(centre_of(IN_VILLAGE));
+    world.tick();
+    agreed = agreed && world.village_state(0) == derived(world);
+    if (world.village_state(0) != states.back()) {
+      states.push_back(world.village_state(0));
+    }
+  }
+}
+
+// The army and faction that ruined village `village`, or none.
+std::pair<std::size_t, std::size_t> destroyer_of(const World& world,
+                                                 std::size_t village) {
+  constexpr std::size_t NONE = std::numeric_limits<std::size_t>::max();
+  const Destroyer who =
+      world.destroyer(village).value_or(Destroyer{NONE, NONE});
+  return {who.army, who.faction};
+}
+
+TEST(World, VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder) {
+  World world = village_world(4);
+  std::vector<VillageState> states{world.village_state(0)};
+  bool agreed = true;
+
+  world.order(RAIDER, {IN_VILLAGE, {0, 1}});
+  run_until(world, states, agreed, [&world] {
+    return world.village_state(0) == VillageState::RUINS &&
+           totals(world.bodies(RESIDENTS)).count == 0;
+  });
+  // A state stored when the ruins were reached.
+  const VillageState stored = world.village_state(0);
+  world.order(RAIDER, {RAIDER_HOME, {0, 1}});
+  run_until(world, states, agreed, [&world] {
+    return in(RAIDER_HOME, world.bodies(RAIDER).front().position);
+  });
+  world.order(MENDER, {IN_VILLAGE, {0}});
+  run_until(world, states, agreed, [&world] {
+    return world.village_state(0) == VillageState::PROSPEROUS;
+  });
+
+  const std::vector<VillageState> cycle{
+      VillageState::PROSPEROUS, VillageState::RAIDED, VillageState::RUINS,
+      VillageState::REBUILDING, VillageState::PROSPEROUS};
+  EXPECT_EQ(states, cycle);
+  EXPECT_TRUE(agreed);
+  // Control: the state stored at the ruins no longer describes the village.
+  EXPECT_EQ(stored, VillageState::RUINS);
+  EXPECT_NE(stored, world.village_state(0));
+  EXPECT_EQ(world.owner(0), 2U);
+  EXPECT_EQ(destroyer_of(world, 0), (std::pair{RAIDER, std::size_t{1}}));
+}
+
+TEST(World, RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther) {
+  const Skill mend{0, 2 * CELL_SIZE, 0, -2, 10};
+  const ArmySpec mender{{3, 3}, {3, 3}, 1, 1, 0, {mend}};
+  constexpr std::uint32_t BROKEN = 30;
+  constexpr std::uint32_t ABOVE_FLOOR = 100;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {mender},
+              {{{4, 3}, BROKEN}, {{2, 3}, ABOVE_FLOOR}},
+              peaceful(SEPARATION)};
+  world.set_focus(centre_of(mender.start));
+  run_ticks(world, ARRIVAL_TICKS);
+
+  EXPECT_EQ(world.structure(0).durability, STAGE_FLOORS.front());
+  // Control: a structure above the floor is left as it was.
+  EXPECT_EQ(world.structure(1).durability, ABOVE_FLOOR);
+}
+
+TEST(World, RebuilderBecomesTheOwnerOnlyWhereNoResidentLives) {
+  const auto owner_after_mending = [](std::uint32_t residents) {
+    World world = village_world(residents);
+    world.order(RAIDER, {IN_VILLAGE, {0, 1}});
+    std::vector<VillageState> states{world.village_state(0)};
+    bool agreed = true;
+    run_until(world, states, agreed, [&world] {
+      return world.village_state(0) == VillageState::RUINS;
+    });
+    world.order(RAIDER, {RAIDER_HOME, {0, 1}});
+    world.order(MENDER, {IN_VILLAGE, {0}});
+    run_until(world, states, agreed, [] { return false; });
+    return std::pair{world.owner(0), totals(world.bodies(RESIDENTS)).count};
+  };
+
+  const auto [taken_over, none_left] = owner_after_mending(4);
+  EXPECT_EQ(none_left, 0U);
+  EXPECT_EQ(taken_over, 2U);
+  // Control: residents too strong for the raid keep the village.
+  const auto [kept, survivors] = owner_after_mending(400);
+  EXPECT_GT(survivors, 0U);
+  EXPECT_EQ(kept, 0U);
+}
+
+TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
+  const ArmySpec army{{0, 0}, {0, 0}, 1, 1, 0, {IDLE}};
+  const std::vector<Structure> houses{{{4, 4}, 1}, {{6, 4}, 1}};
+  const auto refused = [&](const std::vector<VillageSpec>& villages) {
+    try {
+      const World world{Seed{1},     Map{open_map(OPEN_SIDE)},
+                        {army},      houses,
+                        peaceful(0), villages};
+      return false;
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+  };
+  EXPECT_FALSE(refused({{{0, 1}, 0}}));
+
+  // A structure the world lacks, one two villages name, an army it lacks.
+  EXPECT_TRUE(refused({{{0, 2}, 0}}));
+  EXPECT_TRUE(refused({{{0}, 0}, {{1}, 0}, {{0}, 0}}));
+  EXPECT_TRUE(refused({{{0, 1}, 1}}));
+}
+
+// The durability left on a village's house after a torch-bearer of
+// `faction` stands beside it, the village's residents being of faction 0.
+std::uint32_t house_after_torch(std::size_t faction) {
+  const Skill torch{0, 2 * CELL_SIZE, 0, 10, 10};
+  const std::vector<ArmySpec> armies{
+      {{1, 1}, {1, 1}, 1, 1, 0, {IDLE}},
+      {{4, 5}, {4, 5}, 1, 1, faction, {torch}},
+  };
+  World world{Seed{1},   Map{open_map(OPEN_SIDE)},
+              armies,    {{{4, 4}, HOUSE_DURABILITY}},
+              at_war(0), {{{0}, 0}}};
+  world.set_focus(centre_of(armies.at(1).start));
+  run_ticks(world, ARRIVAL_TICKS);
+  return world.structure(0).durability;
+}
+
+TEST(World, VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction) {
+  EXPECT_EQ(house_after_torch(0), HOUSE_DURABILITY);
+  // Control: the same torch in hostile hands burns the house.
+  EXPECT_LT(house_after_torch(1), HOUSE_DURABILITY);
 }
 
 }  // namespace

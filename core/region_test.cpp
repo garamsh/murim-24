@@ -8,6 +8,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -119,8 +120,8 @@ std::vector<std::int64_t> flatten(const Region& region) {
 }
 
 World world_of(const Region& region) {
-  return World{region.seed, Map{region.map_rows}, region.armies,
-               region.structures, region.rules};
+  return World{region.seed,       Map{region.map_rows}, region.armies,
+               region.structures, region.rules,         village_specs(region)};
 }
 
 // Whether the region is a world's valid input, footprints and armies
@@ -294,7 +295,8 @@ TEST(Region, VillagesDoNotOverlap) {
 
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = region_data();
-  data.factions.push_back(Faction{"Martial clans", {1}});
+  data.factions.push_back(
+      Faction{"Martial clans", {1}, data.factions.at(0).skills});
   data.factions.at(1).hostile_to.push_back(3);
 
   const Region region = generate_region(SEED, data);
@@ -427,6 +429,82 @@ TEST(Region, ABodyBornIntoAVillageIsOneAgentOfItsFactionInsideIt) {
   // Control: a village the region lacks has no one born into it.
   EXPECT_THROW(static_cast<void>(born_in(region, region.villages.size())),
                std::out_of_range);
+}
+
+// The first village owned by `faction`.
+std::size_t first_of(const Region& region, std::size_t faction) {
+  std::size_t village = 0;
+  while (region.villages.at(village).faction != faction) {
+    ++village;
+  }
+  return village;
+}
+
+TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
+  constexpr std::size_t ORTHODOX = 0;
+  constexpr std::size_t DEMONIC = 1;
+  constexpr std::size_t UNORTHODOX = 2;
+  constexpr std::uint64_t LIMIT = 20'000;
+  constexpr std::uint32_t RAIDERS = 40;
+  constexpr std::uint32_t REBUILDERS = 20;
+  constexpr std::uint64_t PER_AGENT = 100'000;
+  Region region = generate_region(SEED, region_data());
+  const RegionData data = region_data();
+  const std::size_t target = first_of(region, ORTHODOX);
+  const Cell centre = region.armies.at(region.villages.at(target).army).start;
+
+  // Raiders from a Demonic village, with a killing strike beside their
+  // faction's skills; rebuilders from an Unorthodox one, with their
+  // faction's skills alone.
+  const Skill kill{3 * CELL_SIZE, CELL_SIZE, 20'000, 0, 15};
+  ArmySpec raiders = born_in(region, first_of(region, DEMONIC));
+  raiders.count = RAIDERS;
+  raiders.strength = RAIDERS * PER_AGENT;
+  raiders.skills = data.factions.at(DEMONIC).skills;
+  raiders.skills.push_back(kill);
+  const Cell raiders_home = raiders.start;
+  ArmySpec rebuilders = born_in(region, first_of(region, UNORTHODOX));
+  rebuilders.count = REBUILDERS;
+  rebuilders.strength = REBUILDERS * PER_AGENT;
+  const std::size_t raider = region.armies.size();
+  const std::size_t rebuilder = raider + 1;
+  region.armies.push_back(raiders);
+  region.armies.push_back(rebuilders);
+  World world = world_of(region);
+
+  std::vector<VillageState> states{world.village_state(target)};
+  std::vector<std::size_t> owners{world.owner(target)};
+  const auto run_until = [&](const auto& done) {
+    for (std::uint64_t tick = 0; tick < LIMIT && !done(); ++tick) {
+      world.set_focus(centre_of(centre));
+      world.tick();
+      if (world.village_state(target) != states.back()) {
+        states.push_back(world.village_state(target));
+      }
+      if (world.owner(target) != owners.back()) {
+        owners.push_back(world.owner(target));
+      }
+    }
+  };
+
+  world.order(raider, {centre, {0, 1, 2}});
+  run_until([&] { return world.village_state(target) == VillageState::RUINS; });
+  world.order(raider, {raiders_home, {0, 1, 2}});
+  run_until([&] {
+    return same(cell_of(world.bodies(raider).front().position), raiders_home);
+  });
+  world.order(rebuilder, {centre, {0, 1}});
+  run_until(
+      [&] { return world.village_state(target) == VillageState::PROSPEROUS; });
+
+  const std::vector<VillageState> cycle{
+      VillageState::PROSPEROUS, VillageState::RAIDED, VillageState::RUINS,
+      VillageState::REBUILDING, VillageState::PROSPEROUS};
+  EXPECT_EQ(states, cycle);
+  EXPECT_EQ(owners, (std::vector<std::size_t>{ORTHODOX, UNORTHODOX}));
+  const Destroyer none{region.armies.size(), data.factions.size()};
+  const Destroyer who = world.destroyer(target).value_or(none);
+  EXPECT_EQ((std::pair{who.army, who.faction}), (std::pair{raider, DEMONIC}));
 }
 
 }  // namespace

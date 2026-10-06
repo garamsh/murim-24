@@ -18,12 +18,19 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - Bodies move toward their order's objective along the army's flow field, rebuilt when an order changes the objective, and never onto a blocked cell. An objective must be reachable from where the army stands, when it is created and when it is given an order; a body outside its objective's reach would otherwise count every unreachable cell, the map's outside included, as no farther. Agents keep the separation distance from neighbours found through a spatial hash, rebuilt each tick. A query visits the bodies it finds in place, with no result list to allocate or sort; every rule that reads it either adds up what it finds or breaks ties by index, so the order of the visit decides nothing.
 - A skill is data: range, radius, damage to bodies, damage to structures and cooldown. One rule resolves every skill, from an agent, an aggregate or the player's body alike:
   - a body whose army is due and whose cooldown has passed draws one of its order's skills by the seed
-  - it aims at the nearest living hostile body in range
-  - every hostile body in the disc around that target, and every structure whose footprint the disc reaches, takes the damage, times the agents the user stands for and the uses its cooldown allows in its tier's step
+  - it aims at the nearest living hostile body in range; a skill of range 0 reaches only its user, so it lands where the user stands, with or without anyone hostile near
+  - every hostile body in the disc around that point, and every structure whose footprint the disc reaches, takes the damage, times the agents the user stands for and the uses its cooldown allows in its tier's step
+  - damage to structures is signed: a negative amount restores durability, up to the intact stage's floor, and never lowers a structure above that floor. Rebuilding is this rule, not a second one
   - a body struck takes it once for each of its agents the disc covers, at one agent per separation square, so a battle has the same winner near the focus and far from it
   - damage lands after every body has struck
 - Damage folds into count and strength, which is all of an agent's state that a collapse keeps. Strength falls by the damage and count in proportion; a cooldown merges to the latest. Dead bodies leave when the army regroups.
 - A structure is a footprint of width x height cells from its top-left cell, and a durability. One cell is the 1 x 1 footprint, with no rule of its own. Structures are found by area through a spatial hash of their footprints' centres, queried as far beyond a disc as the widest footprint reaches, and a disc hits a structure when the footprint's nearest point lies within it. Its stage — intact, damaged, destroyed or rubble — follows from durability by the floors in the rules.
+- A village is data: its structures and the army living in it, its residents. Its owner is its residents' faction. While its residents have a living agent, it takes damage only from factions hostile to its owner, and repair only from the others. Once none lives, it takes either, and the first army to restore one of its structures becomes its residents, so the owner becomes that army's faction.
+- A village's state is derived on each read and never stored:
+  - ruins while every structure is rubble
+  - otherwise raided while a living body of a faction hostile to its owner could damage one of its structures from where it stands: a skill that damages structures, its range and radius away
+  - otherwise prosperous while every structure is intact, and rebuilding while one is not
+- A village records who ruined it: the army, and its faction, whose strike brought its last standing structure to rubble. The record outlives rebuilding and is part of the hash.
 - A structure's footprint blocks movement for as long as the world runs, rubble included, so the flow fields never change under an army. Footprints must lie on passable cells, cover no other structure, and leave every army's start uncovered.
 - All simulation state is integers: positions are fixed-point at 1/256 of a cell.
 - A world exposes a hash of its whole state. Determinism is tested by comparing hashes: the same seed gives the same hash after 10,000 ticks with armies moving, crossing tiers, fighting and breaking structures. A test pins that hash, so it must be the same on every compiler and platform. The hash covers each army's order, and a log of orders, each with the tick it was given before, replays to the same hash when the focus is set on the steered body's lead before each tick.
@@ -39,6 +46,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - Tiers that differ only in data, the army aggregate and its exact totals, flow fields, the spatial hash, and fixed-point numbers for determinism across builds: ADR 0005 (`adr/0005-simulate-armies-at-three-levels-of-detail-in-fixed-point.md`).
 - Skills as data, the single rule that resolves them, structures and their stages, and damage folded into count and strength: ADR 0006 (`adr/0006-resolve-every-skill-through-one-rule-scaled-by-count.md`).
 - Movement at a per-army phase, with strikes kept on the tier's common tick for tier-invariance: ADR 0007 (`adr/0007-move-each-army-at-its-own-phase-within-its-tier.md`).
+- Villages, their derived state, repair as a signed structure effect, owners following residents, and the recorded destroyer: ADR 0015 (`adr/0015-run-the-village-life-cycle-from-structures-and-residents.md`).
 - Footprints, the hit rule they share, footprints that block in every stage, and objectives that must be reachable: ADR 0013 (`adr/0013-give-structures-footprints-that-block-movement-in-every-stage.md`).
 - Orders as the one shape of every army's intent, the player's body as a one-agent army, and the focus set on the steered body by its driver: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
 
