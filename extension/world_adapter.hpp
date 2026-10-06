@@ -52,6 +52,9 @@ class WorldAdapter : public godot::RefCounted {
   /// the scenario places its focus.
   static godot::Ref<WorldAdapter> create_m1();
 
+  /// Returns where create_m1() places the focus, in sub-cell units.
+  static godot::Vector2i m1_focus();
+
   /// Places the point the tiers are measured from, in sub-cell units.
   void set_focus(const godot::Vector2i& focus);
 

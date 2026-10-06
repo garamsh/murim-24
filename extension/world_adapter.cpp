@@ -164,6 +164,11 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   return adapter;
 }
 
+godot::Vector2i WorldAdapter::m1_focus() {
+  const murim::Position focus = murim::centre_of(murim::m1_scenario().focus);
+  return godot::Vector2i{focus.x, focus.y};
+}
+
 godot::Ref<WorldAdapter> WorldAdapter::over(
     murim::Seed seed, murim::Map map, std::vector<murim::ArmySpec> armies,
     std::vector<murim::Structure> structures, murim::Rules rules) {
@@ -255,6 +260,8 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::create);
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
+  godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_focus"),
+                                     &WorldAdapter::m1_focus);
   godot::ClassDB::bind_method(godot::D_METHOD("set_focus", "focus"),
                               &WorldAdapter::set_focus);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
