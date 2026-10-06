@@ -11,8 +11,9 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - near: agents, moving every tick
   - middle: agents, moving every 4 ticks
   - far: one aggregate, moving every 16 ticks
+- Each army moves at its own phase within its tier's interval, set by its index, so a tier's movement spreads over the interval's ticks. Every army of a tier strikes on the ticks the interval divides, so a step's strikes land together.
 - Crossing into a tier with a different body limit merges the army and splits it again. Count and strength carry over exactly.
-- Bodies move toward their army's objective along the army's flow field, and never onto a blocked cell. Agents keep the separation distance from neighbours found through a spatial hash, rebuilt each tick.
+- Bodies move toward their army's objective along the army's flow field, and never onto a blocked cell. Agents keep the separation distance from neighbours found through a spatial hash, rebuilt each tick. A query visits the bodies it finds in place, with no result list to allocate or sort; every rule that reads it either adds up what it finds or breaks ties by index, so the order of the visit decides nothing.
 - A skill is data: range, radius, damage to bodies, damage to structures and cooldown. One rule resolves every skill, from an agent, an aggregate or the player's body alike:
   - a body whose army is due and whose cooldown has passed draws one of its army's skills by the seed
   - it aims at the nearest living hostile body in range
@@ -33,6 +34,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - The build, test framework, formatter and linter, and how CI installs them: ADR 0003 (`adr/0003-build-the-core-with-cmake-googletest-and-llvm-tools.md`).
 - Tiers that differ only in data, the army aggregate and its exact totals, flow fields, the spatial hash, and fixed-point numbers for determinism across builds: ADR 0005 (`adr/0005-simulate-armies-at-three-levels-of-detail-in-fixed-point.md`).
 - Skills as data, the single rule that resolves them, structures and their stages, and damage folded into count and strength: ADR 0006 (`adr/0006-resolve-every-skill-through-one-rule-scaled-by-count.md`).
+- Movement at a per-army phase, with strikes kept on the tier's common tick for tier-invariance: ADR 0007 (`adr/0007-move-each-army-at-its-own-phase-within-its-tier.md`).
 
 ## Open questions
 

@@ -187,7 +187,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x255B1015DAFB82B3ULL);
+            0xC4F8BB5BCC33A95ULL);
 }
 
 // Keeps the focus `tier.reach` to the side of the army's lead body, so the
@@ -221,6 +221,68 @@ TEST(World, NearTierAgentsReachTheirObjectiveAroundAWall) {
 
 TEST(World, MiddleTierAgentsReachTheirObjectiveAroundAWall) {
   expect_arrival(TIERS.at(1));
+}
+
+// The lead body of each of the first `armies` armies.
+std::vector<Position> leads(const World& world, std::size_t armies) {
+  std::vector<Position> positions;
+  positions.reserve(armies);
+  for (std::size_t army = 0; army < armies; ++army) {
+    positions.push_back(world.bodies(army).front().position);
+  }
+  return positions;
+}
+
+// Runs `ticks` ticks and returns, for each army of `specs`, the ticks on
+// which its lead body moved.
+std::vector<std::vector<std::uint64_t>> ticks_moved(
+    World& world, const std::vector<ArmySpec>& specs, std::uint64_t ticks) {
+  const std::size_t armies = specs.size();
+  std::vector<std::vector<std::uint64_t>> moved(armies);
+  for (std::uint64_t tick = 1; tick <= ticks; ++tick) {
+    const std::vector<Position> before = leads(world, armies);
+    world.tick();
+    const std::vector<Position> after = leads(world, armies);
+    for (std::size_t army = 0; army < armies; ++army) {
+      if (after.at(army).x != before.at(army).x ||
+          after.at(army).y != before.at(army).y) {
+        moved.at(army).push_back(tick);
+      }
+    }
+  }
+  return moved;
+}
+
+TEST(World, ArmiesOfATierMoveEachAtItsOwnPhase) {
+  constexpr std::int32_t LAST_COLUMN = 14;
+  constexpr std::int32_t FOCUS_COLUMN = -12;
+  constexpr std::uint64_t STEPS = 10;
+  constexpr std::uint64_t INTERVAL = TIERS.at(1).interval;
+  std::vector<ArmySpec> armies;
+  armies.reserve(INTERVAL);
+  for (std::int32_t row = 0; row < static_cast<std::int32_t>(INTERVAL); ++row) {
+    armies.push_back(
+        ArmySpec{{2, 3 * row}, {LAST_COLUMN, 3 * row}, 1, 1, 0, {IDLE}});
+  }
+  World world{
+      Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, peaceful(SEPARATION)};
+  // Every army stays within the middle tier's reach of this focus, and
+  // beyond the near tier's.
+  world.set_focus(Position{FOCUS_COLUMN * CELL_SIZE, 0});
+  const auto moved = ticks_moved(world, armies, STEPS * INTERVAL);
+
+  // Each army moved, and only on the ticks its phase picks.
+  for (std::size_t army = 0; army < armies.size(); ++army) {
+    ASSERT_FALSE(moved.at(army).empty()) << "army " << army;
+    const auto off_phase = [army](std::uint64_t tick) {
+      return (tick + army) % INTERVAL != 0;
+    };
+    EXPECT_TRUE(
+        std::none_of(moved.at(army).begin(), moved.at(army).end(), off_phase))
+        << "army " << army;
+  }
+  // Control: no two armies of the tier moved on the same tick.
+  EXPECT_NE(moved.at(0).front(), moved.at(1).front());
 }
 
 TEST(World, ArmyKeepsCountAndStrengthAcrossExpandAndCollapse) {

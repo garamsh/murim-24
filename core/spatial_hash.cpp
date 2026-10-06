@@ -55,34 +55,6 @@ SpatialHash::SpatialHash(std::vector<Position> positions)
   }
 }
 
-std::vector<std::size_t> SpatialHash::within(Position centre,
-                                             std::int32_t radius) const {
-  const auto [low, high] = walk(centre, radius);
-  const std::int64_t radius_squared = std::int64_t{radius} * radius;
-  std::vector<std::size_t> found;
-  for (Cell cell{low.x, low.y}; cell.y <= high.y; ++cell.y) {
-    for (cell.x = low.x; cell.x <= high.x; ++cell.x) {
-      const std::size_t slot = slot_of(cell);
-      for (std::size_t entry = slot_starts_.at(slot);
-           entry < slot_starts_.at(slot + 1); ++entry) {
-        const std::size_t other = entries_.at(entry);
-        const Position position = positions_.at(other);
-        const Cell own = cell_of(position);
-        // Cells share slots, so an entry counts only in its own cell; that
-        // also bounds the offsets squared below.
-        const std::int64_t offset_x = std::int64_t{position.x} - centre.x;
-        const std::int64_t offset_y = std::int64_t{position.y} - centre.y;
-        if (own.x == cell.x && own.y == cell.y &&
-            (offset_x * offset_x) + (offset_y * offset_y) <= radius_squared) {
-          found.push_back(other);
-        }
-      }
-    }
-  }
-  std::sort(found.begin(), found.end());
-  return found;
-}
-
 std::pair<Cell, Cell> SpatialHash::walk(Position centre,
                                         std::int32_t radius) const {
   const Cell low = cell_of(Position{centre.x - radius, centre.y - radius});
