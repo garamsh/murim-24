@@ -548,7 +548,8 @@ void World::tick() {
 // Each member steps away from the people closer to it than the separation,
 // the harder the closer each is, and otherwise along its pull. A person on the
 // move does not give way to people standing still, who give way to it, so a
-// standing crowd parts for a person walking out of it. A step enters any cell
+// standing crowd parts for a person walking out of it, nor to anyone behind
+// it, so a crowd queues through a gap. A step enters any cell
 // the flow field reaches. Positions are read from `crowd`, as the tick began,
 // so the order people move in decides nothing.
 void World::march(std::size_t army, const Crowd& crowd,
@@ -564,20 +565,22 @@ void World::march(std::size_t army, const Crowd& crowd,
     // person exactly in a mover's way steps aside to the side its index
     // fixes.
     const std::int64_t side = (member % 2 == 0) ? 1 : -1;
+    const Step pull = pulls.at(self);
     Push push{0, 0};
     crowd.hash.visit_within(from, rules_.separation, [&](std::size_t other) {
-      const bool ignored =
-          other == self || (!standing.at(self) && standing.at(other));
+      const Position there = crowd.hash.position(other);
+      const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
+                                 ((std::int64_t{there.y} - from.y) * pull.y);
+      const bool ignored = other == self || (!standing.at(self) &&
+                                             (standing.at(other) || ahead < 0));
       const bool yields = standing.at(self) && !standing.at(other);
       const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
-      const Position there = crowd.hash.position(other);
       const Push felt =
           yields ? aside(from, there, separation, pulls.at(other), side)
                  : repulsion(from, there, separation, lean);
       push.x += ignored ? 0 : felt.x;
       push.y += ignored ? 0 : felt.y;
     });
-    const Step pull = pulls.at(self);
     const Step direction{sign((push.x * 2) + pull.x),
                          sign((push.y * 2) + pull.y)};
     people_.at(member).position = stepped(marching.field, from, direction);

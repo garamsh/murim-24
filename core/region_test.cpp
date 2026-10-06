@@ -578,6 +578,12 @@ constexpr std::uint64_t RAID_MOST = 5 * MINUTE;
 constexpr std::size_t DEMONIC = 1;
 constexpr std::size_t SKIRMISHERS = 20;
 constexpr std::size_t RAIDERS = 20;
+// A raid on the walled village, scaled from the hamlet's by its 26
+// residents to the hamlet's 12: at most twice as long.
+constexpr std::uint64_t VILLAGE_RAID_MOST = 2 * RAID_MOST;
+// Seeds a walled village is raided on, each with room west of it for the
+// whole band.
+constexpr std::array<Seed, 3> WALLED{SEED, Seed{7}, Seed{99}};
 // Seeds the pace is measured on, the region tests' own first.
 constexpr std::array<Seed, 3> PACED{SEED, Seed{2026}, Seed{5}};
 
@@ -677,43 +683,65 @@ std::uint64_t skirmish_ticks(const RegionData& data, Seed seed,
   return ticks;
 }
 
-// The first hamlet in the region not owned by the Demonic Cult.
-std::size_t first_hamlet(const Region& region) {
+// A raid: the kind of village raided, the first of that kind not owned by
+// the Demonic Cult, and the size of the Demonic band raiding it.
+struct Raid {
+  const char* kind;
+  std::size_t band;
+};
+
+// How a raid went: the ticks it ran, and the residents still living.
+struct Raided {
+  std::uint64_t ticks;
+  std::size_t residents;
+};
+
+constexpr std::size_t VILLAGE_RAIDERS = 44;
+constexpr Raid HAMLET_RAID{"hamlet", RAIDERS};
+// The hamlet's band scaled to the village's 26 residents.
+constexpr Raid VILLAGE_RAID{"village", VILLAGE_RAIDERS};
+
+// The first village of kind `kind` in the region not owned by the Demonic
+// Cult.
+std::size_t first_raided(const Region& region, const std::string& kind) {
   std::size_t village = 0;
   while (region.villages.at(village).faction == DEMONIC ||
-         region.villages.at(village).kind != "hamlet") {
+         region.villages.at(village).kind != kind) {
     ++village;
   }
   return village;
 }
 
-// The ticks a Demonic band of RAIDERS, newborn and with its faction's
-// skills, standing on the passable cells west of the first hamlet of the
-// region `data` generates from `seed`, column by column, takes to leave it in
-// ruins once ordered to its centre, or `limit` if it is not by then.
-std::uint64_t raid_ticks(const RegionData& data, Seed seed,
-                         std::uint64_t limit) {
+// How `raid` goes on the region `data` generates from `seed`: its band,
+// newborn and with its faction's skills, stands on the passable cells west
+// of the village, column by column, bound for its centre if `bound`, and
+// otherwise for where it stands, until the village is in ruins, or for
+// `limit` ticks if it is not by then.
+Raided raided(const RegionData& data, Seed seed, const Raid& raid,
+              std::uint64_t limit, bool bound = true) {
   Region region = generate_region(seed, data);
-  const std::size_t target = first_hamlet(region);
-  const Village& hamlet = region.villages.at(target);
-  const Cell centre = region.armies.at(hamlet.army).objective;
+  const std::size_t target = first_raided(region, raid.kind);
+  const Village& village = region.villages.at(target);
+  const std::size_t residents = village.army;
+  const Cell centre = region.armies.at(residents).objective;
   ArmySpec raiders{centre, {}, DEMONIC, data.factions.at(DEMONIC).skills};
-  const Footprint west{hamlet.corner.x, hamlet.area.height};
-  std::vector<Cell> cells = cells_of(Cell{0, hamlet.corner.y}, west);
+  const Footprint west{village.corner.x, village.area.height};
+  std::vector<Cell> cells = cells_of(Cell{0, village.corner.y}, west);
   std::stable_sort(cells.begin(), cells.end(),
                    [](Cell left, Cell right) { return left.x > right.x; });
   for (const Cell cell : cells) {
-    if (raiders.members.size() < RAIDERS &&
+    if (raiders.members.size() < raid.band &&
         region.map_rows.at(static_cast<std::size_t>(cell.y))
                 .at(static_cast<std::size_t>(cell.x)) == '.') {
       raiders.members.push_back(Recruit{cell, data.life.newborn_health});
     }
   }
+  raiders.objective = bound ? centre : raiders.members.front().cell;
   region.armies.push_back(raiders);
   World world = world_of(region);
-  // Setup: a band of RAIDERS against a hamlet that stands.
-  EXPECT_EQ(world.roster(region.armies.size() - 1).size(), RAIDERS);
-  EXPECT_TRUE(std::all_of(hamlet.structures.begin(), hamlet.structures.end(),
+  // Setup: the whole band against a village that stands.
+  EXPECT_EQ(world.roster(region.armies.size() - 1).size(), raid.band);
+  EXPECT_TRUE(std::all_of(village.structures.begin(), village.structures.end(),
                           [&world](std::size_t index) {
                             return world.stage(index) == Stage::INTACT;
                           }));
@@ -722,7 +750,7 @@ std::uint64_t raid_ticks(const RegionData& data, Seed seed,
        ++ticks) {
     world.tick();
   }
-  return ticks;
+  return Raided{ticks, world.roster(residents).size()};
 }
 
 // region_data() with the Demonic Cult's first skill, its strike, doing
@@ -757,8 +785,9 @@ TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
 
 TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
-    EXPECT_TRUE(within(raid_ticks(region_data(), seed, RAID_MOST + 1),
-                       RAID_LEAST, RAID_MOST))
+    EXPECT_TRUE(
+        within(raided(region_data(), seed, HAMLET_RAID, RAID_MOST + 1).ticks,
+               RAID_LEAST, RAID_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
   // Control: the placeholder torch of a tenth the damage leaves the hamlet
@@ -767,7 +796,33 @@ TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   Skill& torch = slow.factions.at(DEMONIC).skills.back();
   constexpr std::int32_t SLOWER = 10;
   torch.structure_damage /= SLOWER;
-  EXPECT_GT(raid_ticks(slow, SEED, RAID_MOST + 1), RAID_MOST);
+  EXPECT_GT(raided(slow, SEED, HAMLET_RAID, RAID_MOST + 1).ticks, RAID_MOST);
+}
+
+TEST(Region, ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime) {
+  for (const Seed seed : WALLED) {
+    EXPECT_TRUE(within(
+        raided(region_data(), seed, VILLAGE_RAID, VILLAGE_RAID_MOST + 1).ticks,
+        RAID_LEAST, VILLAGE_RAID_MOST))
+        << "seed " << static_cast<std::uint64_t>(seed);
+  }
+}
+
+TEST(Region, ABandTheWalledVillageOutnumbersStillClosesToStrike) {
+  // The hamlet's band of RAIDERS, which the village's 26 residents outnumber,
+  // passes its walls and strikes its residents down.
+  constexpr Raid OUTNUMBERED{"village", RAIDERS};
+  const Region region = generate_region(SEED, region_data());
+  const std::size_t residents =
+      region.armies.at(region.villages.at(first_raided(region, "village")).army)
+          .members.size();
+  ASSERT_EQ(residents, 26U);
+  EXPECT_LT(raided(region_data(), SEED, OUTNUMBERED, SKIRMISH_MOST).residents,
+            residents);
+  // Control: the same band kept where it stands strikes no one.
+  EXPECT_EQ(
+      raided(region_data(), SEED, OUTNUMBERED, SKIRMISH_MOST, false).residents,
+      residents);
 }
 
 }  // namespace
