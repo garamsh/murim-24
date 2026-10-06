@@ -6,8 +6,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -21,33 +23,15 @@ namespace {
 
 constexpr int TICKS = 10'000;
 constexpr int ARRIVAL_TICKS = 3'000;
-constexpr std::int32_t SEPARATION = 72;
-constexpr std::int32_t FAR_AWAY = 1'000'000;
+// People stand a cell apart, as wide as a body is drawn.
+constexpr std::int32_t SEPARATION = CELL_SIZE;
 constexpr std::size_t OPEN_SIDE = 16;
 constexpr std::array<std::uint32_t, 3> STAGE_FLOORS{75, 25, 1};
 constexpr std::uint64_t NEVER_AGAIN = 1'000'000;
 
-// A skill that never finds a target: nothing stands at distance 0 from its
-// user except the user.
+// A skill that never finds a target: its range reaches only its user, who
+// is hostile to no one, and it does nothing.
 constexpr Skill IDLE{0, 0, 0, 0, 0};
-
-struct Totals {
-  std::uint64_t count;
-  std::uint64_t strength;
-};
-
-Totals totals(const std::vector<Body>& bodies) {
-  Totals sum{0, 0};
-  for (const Body& body : bodies) {
-    sum.count += body.count;
-    sum.strength += body.strength;
-  }
-  return sum;
-}
-
-bool operator==(const Totals& left, const Totals& right) {
-  return left.count == right.count && left.strength == right.strength;
-}
 
 bool in(Cell cell, Position position) {
   const Cell holding = cell_of(position);
@@ -58,17 +42,6 @@ std::int64_t distance_squared(Position origin, Position point) {
   const std::int64_t offset_x = std::int64_t{point.x} - origin.x;
   const std::int64_t offset_y = std::int64_t{point.y} - origin.y;
   return (offset_x * offset_x) + (offset_y * offset_y);
-}
-
-std::int64_t closest_pair_squared(const std::vector<Body>& bodies) {
-  std::int64_t closest = std::numeric_limits<std::int64_t>::max();
-  for (std::size_t i = 0; i < bodies.size(); ++i) {
-    for (std::size_t j = i + 1; j < bodies.size(); ++j) {
-      closest = std::min(closest, distance_squared(bodies.at(i).position,
-                                                   bodies.at(j).position));
-    }
-  }
-  return closest;
 }
 
 // One faction at peace with itself.
@@ -94,6 +67,92 @@ std::vector<std::string> walled_map() {
   };
 }
 
+// A head count of people, as an army is created with.
+struct Muster {
+  std::size_t people;
+  std::uint64_t health;
+};
+
+// `muster.people` people of `muster.health` each on the passable cells of
+// `rows` nearest `start`, by Chebyshev distance and then row by row.
+std::vector<Recruit> recruits(const std::vector<std::string>& rows, Cell start,
+                              Muster muster) {
+  const auto passable = [&rows](Cell cell) {
+    return cell.y >= 0 && cell.x >= 0 &&
+           static_cast<std::size_t>(cell.y) < rows.size() &&
+           static_cast<std::size_t>(cell.x) < rows.front().size() &&
+           rows.at(static_cast<std::size_t>(cell.y))
+                   .at(static_cast<std::size_t>(cell.x)) != '#';
+  };
+  std::vector<Recruit> members;
+  for (std::int32_t ring = 0; members.size() < muster.people; ++ring) {
+    const Cell corner{start.x - ring, start.y - ring};
+    for (const Cell cell : cells_of(corner, {(2 * ring) + 1, (2 * ring) + 1})) {
+      const bool on_ring = std::max(std::abs(cell.x - start.x),
+                                    std::abs(cell.y - start.y)) == ring;
+      if (on_ring && passable(cell) && members.size() < muster.people) {
+        members.push_back(Recruit{cell, muster.health});
+      }
+    }
+  }
+  return members;
+}
+
+// An army of `people` people of `health` each around `start`, on `rows`.
+ArmySpec army(const std::vector<std::string>& rows, Cell start, Cell objective,
+              std::size_t people, std::uint64_t health, std::size_t faction,
+              std::vector<Skill> skills) {
+  return ArmySpec{objective, recruits(rows, start, Muster{people, health}),
+                  faction, std::move(skills)};
+}
+
+// An army of `people` people around `start` on an open map.
+ArmySpec army(Cell start, Cell objective, std::size_t people,
+              std::uint64_t health, std::size_t faction,
+              std::vector<Skill> skills) {
+  return army(open_map(OPEN_SIDE), start, objective, people, health, faction,
+              std::move(skills));
+}
+
+// The health army `army`'s living members have left together.
+std::uint64_t health_of(const World& world, std::size_t army) {
+  std::uint64_t health = 0;
+  for (const std::size_t member : world.roster(army)) {
+    health += world.person(member).health;
+  }
+  return health;
+}
+
+// Where army `army`'s living members stand.
+std::vector<Position> positions(const World& world, std::size_t army) {
+  std::vector<Position> standing;
+  for (const std::size_t member : world.roster(army)) {
+    standing.push_back(world.person(member).position);
+  }
+  return standing;
+}
+
+Position lead(const World& world, std::size_t army) {
+  return world.person(world.roster(army).front()).position;
+}
+
+std::int64_t closest_pair_squared(const std::vector<Position>& standing) {
+  std::int64_t closest = std::numeric_limits<std::int64_t>::max();
+  for (std::size_t i = 0; i < standing.size(); ++i) {
+    for (std::size_t j = i + 1; j < standing.size(); ++j) {
+      closest =
+          std::min(closest, distance_squared(standing.at(i), standing.at(j)));
+    }
+  }
+  return closest;
+}
+
+void run_ticks(World& world, std::uint64_t ticks) {
+  for (std::uint64_t i = 0; i < ticks; ++i) {
+    world.tick();
+  }
+}
+
 // A 48 by 48 map split by a wall down column 24 with gaps at rows 10 and 37.
 std::vector<std::string> crossing_map() {
   constexpr std::size_t SIDE = 48;
@@ -112,12 +171,29 @@ std::vector<std::string> crossing_map() {
 std::vector<ArmySpec> crossing_armies() {
   const Skill strike{2 * CELL_SIZE, CELL_SIZE, 1, 4, 24};
   const Skill blast{3 * CELL_SIZE, 2 * CELL_SIZE, 2, 9, 64};
-  const std::vector<ArmySpec> armies{
-      {{1, 1}, {46, 46}, 12, 1200, 0, {strike, blast}},
-      {{46, 1}, {1, 46}, 30, 3010, 1, {strike}},
-      {{1, 46}, {46, 1}, 5, 500, 1, {blast, strike}},
-      {{46, 46}, {1, 1}, 2, 207, 0, {blast}},
+  // From each corner to the opposite one: how many, of what health, of
+  // which faction, with which skills.
+  struct Crossing {
+    Cell start;
+    Cell objective;
+    Muster muster;
+    std::size_t faction;
+    std::vector<Skill> skills;
   };
+  const std::vector<Crossing> crossings{
+      {{1, 1}, {46, 46}, {12, 10}, 0, {strike, blast}},
+      {{46, 1}, {1, 46}, {30, 10}, 1, {strike}},
+      {{1, 46}, {46, 1}, {5, 10}, 1, {blast, strike}},
+      {{46, 46}, {1, 1}, {2, 10}, 0, {blast}},
+  };
+  const std::vector<std::string> rows = crossing_map();
+  std::vector<ArmySpec> armies;
+  armies.reserve(crossings.size());
+  for (const Crossing& crossing : crossings) {
+    armies.push_back(ArmySpec{crossing.objective,
+                              recruits(rows, crossing.start, crossing.muster),
+                              crossing.faction, crossing.skills});
+  }
   return armies;
 }
 
@@ -131,18 +207,16 @@ std::vector<Structure> crossing_structures() {
   return structures;
 }
 
-// Expects every army to have crossed tiers both ways, left its start and
-// lost strength, and a structure to have broken, or the run did not exercise
+// Runs crossing_armies() for TICKS ticks, and expects every army to have
+// lost a member and a structure to have broken, or the run did not exercise
 // what equal hashes are meant to cover.
-void expect_crossing_exercised(const World& world,
-                               const std::vector<bool>& expanded,
-                               const std::vector<bool>& collapsed) {
+StateHash run_crossing(Seed seed) {
   const std::vector<ArmySpec> armies = crossing_armies();
+  World world{seed, Map{crossing_map()}, armies, crossing_structures(),
+              at_war(SEPARATION)};
+  run_ticks(world, TICKS);
   for (std::size_t army = 0; army < armies.size(); ++army) {
-    EXPECT_TRUE(expanded.at(army) && collapsed.at(army)) << "army " << army;
-    EXPECT_FALSE(in(armies.at(army).start, world.bodies(army).front().position))
-        << "army " << army;
-    EXPECT_LT(totals(world.bodies(army)).strength, armies.at(army).strength)
+    EXPECT_LT(world.roster(army).size(), armies.at(army).members.size())
         << "army " << army;
   }
   bool broken = false;
@@ -151,29 +225,6 @@ void expect_crossing_exercised(const World& world,
     broken = broken || world.stage(structure) != Stage::INTACT;
   }
   EXPECT_TRUE(broken);
-}
-
-// Runs crossing_armies() for TICKS ticks while the focus visits each army's
-// start for FOCUS_DWELL ticks in turn.
-StateHash run_crossing(Seed seed) {
-  constexpr int FOCUS_DWELL = 500;
-  const std::vector<ArmySpec> armies = crossing_armies();
-  World world{seed, Map{crossing_map()}, armies, crossing_structures(),
-              at_war(SEPARATION)};
-  std::vector<bool> expanded(armies.size(), false);
-  std::vector<bool> collapsed(armies.size(), false);
-  for (int i = 0; i < TICKS; ++i) {
-    const auto visited =
-        static_cast<std::size_t>(i / FOCUS_DWELL) % armies.size();
-    world.set_focus(centre_of(armies.at(visited).start));
-    world.tick();
-    for (std::size_t army = 0; army < armies.size(); ++army) {
-      const std::size_t size = world.bodies(army).size();
-      expanded.at(army) = expanded.at(army) || size > 1;
-      collapsed.at(army) = collapsed.at(army) || size == 1;
-    }
-  }
-  expect_crossing_exercised(world, expanded, collapsed);
   return world.hash();
 }
 
@@ -189,209 +240,152 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x4C50A33638415407ULL);
+            0xE4A2CD2A8FEFE169ULL);
 }
 
-// Keeps the focus `tier.reach` to the side of the army's lead body, so the
-// army stays in that tier while it marches around the wall of walled_map().
-void expect_arrival(const Tier& tier) {
-  const ArmySpec army{{2, 1}, {13, 1}, 9, 90, 0, {IDLE}};
-  World world{Seed{1}, Map{walled_map()}, {army}, {}, peaceful(SEPARATION)};
-  for (std::uint64_t i = 1; i <= ARRIVAL_TICKS; ++i) {
-    const Position lead = world.bodies(0).front().position;
-    world.set_focus(
-        Position{lead.x + static_cast<std::int32_t>(tier.reach), lead.y});
-    const std::vector<Body> before = world.bodies(0);
-    world.tick();
-    const std::vector<Body>& after = world.bodies(0);
-    // The army must be split into agents, which move only on the tier's
-    // ticks; the first tick regroups rather than moves them.
-    ASSERT_EQ(after.size(), army.count) << "tick " << i;
-    const bool moved = after.front().position.x != before.front().position.x ||
-                       after.front().position.y != before.front().position.y;
-    ASSERT_TRUE(i == 1 || !moved || i % tier.interval == 0) << "tick " << i;
+TEST(World, PeopleReachTheirObjectiveAroundAWall) {
+  const std::vector<std::string> rows = walled_map();
+  const ArmySpec marching = army(rows, {2, 1}, {13, 1}, 9, 1, 0, {IDLE});
+  World world{Seed{1}, Map{rows}, {marching}, {}, peaceful(SEPARATION)};
+  run_ticks(world, ARRIVAL_TICKS);
+
+  // Every member crossed the wall through the gap, and the first stands on
+  // the objective.
+  for (const Position where : positions(world, 0)) {
+    EXPECT_GT(cell_of(where).x, 8);
   }
-  for (const Body& body : world.bodies(0)) {
-    EXPECT_TRUE(in(army.objective, body.position))
-        << body.position.x << "," << body.position.y;
-  }
+  EXPECT_TRUE(in(marching.objective, lead(world, 0)));
 }
 
-TEST(World, NearTierAgentsReachTheirObjectiveAroundAWall) {
-  expect_arrival(TIERS.at(0));
-}
-
-TEST(World, MiddleTierAgentsReachTheirObjectiveAroundAWall) {
-  expect_arrival(TIERS.at(1));
-}
-
-// The lead body of each of the first `armies` armies.
-std::vector<Position> leads(const World& world, std::size_t armies) {
-  std::vector<Position> positions;
-  positions.reserve(armies);
-  for (std::size_t army = 0; army < armies; ++army) {
-    positions.push_back(world.bodies(army).front().position);
-  }
-  return positions;
-}
-
-// Runs `ticks` ticks and returns, for each army of `specs`, the ticks on
-// which its lead body moved.
-std::vector<std::vector<std::uint64_t>> ticks_moved(
-    World& world, const std::vector<ArmySpec>& specs, std::uint64_t ticks) {
-  const std::size_t armies = specs.size();
-  std::vector<std::vector<std::uint64_t>> moved(armies);
-  for (std::uint64_t tick = 1; tick <= ticks; ++tick) {
-    const std::vector<Position> before = leads(world, armies);
-    world.tick();
-    const std::vector<Position> after = leads(world, armies);
-    for (std::size_t army = 0; army < armies; ++army) {
-      if (after.at(army).x != before.at(army).x ||
-          after.at(army).y != before.at(army).y) {
-        moved.at(army).push_back(tick);
-      }
-    }
-  }
-  return moved;
-}
-
-TEST(World, ArmiesOfATierMoveEachAtItsOwnPhase) {
-  constexpr std::int32_t LAST_COLUMN = 14;
-  constexpr std::int32_t FOCUS_COLUMN = -12;
-  constexpr std::uint64_t STEPS = 10;
-  constexpr std::uint64_t INTERVAL = TIERS.at(1).interval;
-  std::vector<ArmySpec> armies;
-  armies.reserve(INTERVAL);
-  for (std::int32_t row = 0; row < static_cast<std::int32_t>(INTERVAL); ++row) {
-    armies.push_back(
-        ArmySpec{{2, 3 * row}, {LAST_COLUMN, 3 * row}, 1, 1, 0, {IDLE}});
-  }
+// Where an army of nine stands after ARRIVAL_TICKS at its objective, with
+// `separation`.
+std::vector<Position> arrive(std::int32_t separation) {
+  const ArmySpec marching = army({2, 2}, {12, 12}, 9, 1, 0, {IDLE});
   World world{
-      Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, peaceful(SEPARATION)};
-  // Every army stays within the middle tier's reach of this focus, and
-  // beyond the near tier's.
-  world.set_focus(Position{FOCUS_COLUMN * CELL_SIZE, 0});
-  const auto moved = ticks_moved(world, armies, STEPS * INTERVAL);
-
-  // Each army moved, and only on the ticks its phase picks.
-  for (std::size_t army = 0; army < armies.size(); ++army) {
-    ASSERT_FALSE(moved.at(army).empty()) << "army " << army;
-    const auto off_phase = [army](std::uint64_t tick) {
-      return (tick + army) % INTERVAL != 0;
-    };
-    EXPECT_TRUE(
-        std::none_of(moved.at(army).begin(), moved.at(army).end(), off_phase))
-        << "army " << army;
-  }
-  // Control: no two armies of the tier moved on the same tick.
-  EXPECT_NE(moved.at(0).front(), moved.at(1).front());
+      Seed{1}, Map{open_map(OPEN_SIDE)}, {marching}, {}, peaceful(separation)};
+  run_ticks(world, ARRIVAL_TICKS);
+  return positions(world, 0);
 }
 
-TEST(World, ArmyKeepsCountAndStrengthAcrossExpandAndCollapse) {
-  const ArmySpec army{{8, 8}, {8, 8}, 50, 1003, 0, {IDLE}};
-  World world{
-      Seed{1}, Map{open_map(OPEN_SIDE)}, {army}, {}, peaceful(SEPARATION)};
-  const Totals created{army.count, army.strength};
-
-  world.set_focus(Position{FAR_AWAY, FAR_AWAY});
-  world.tick();
-  ASSERT_EQ(world.bodies(0).size(), 1U);
-
-  world.set_focus(centre_of(army.start));
-  world.tick();
-  const std::vector<Body> agents = world.bodies(0);
-  ASSERT_EQ(agents.size(), army.count);
-  EXPECT_TRUE(totals(agents) == created);
-  // Control: the comparison catches a collapse that drops one agent.
-  const std::vector<Body> one_dropped(agents.begin(), agents.end() - 1);
-  EXPECT_FALSE(totals(one_dropped) == created);
-
-  world.set_focus(Position{FAR_AWAY, FAR_AWAY});
-  world.tick();
-  ASSERT_EQ(world.bodies(0).size(), 1U);
-  EXPECT_TRUE(totals(world.bodies(0)) == created);
-}
-
-// Marches a near-tier army across an open map and returns its agents after
-// ARRIVAL_TICKS ticks.
-std::vector<Body> arrive(const ArmySpec& army, std::int32_t separation) {
-  World world{
-      Seed{1}, Map{open_map(OPEN_SIDE)}, {army}, {}, peaceful(separation)};
-  world.set_focus(centre_of(army.objective));
-  for (int i = 0; i < ARRIVAL_TICKS; ++i) {
-    world.tick();
-  }
-  return world.bodies(0);
-}
-
-TEST(World, AgentsAtTheirObjectiveStayTheSeparationApart) {
-  const ArmySpec army{{2, 2}, {12, 12}, 9, 90, 0, {IDLE}};
+TEST(World, PeopleAtTheirObjectiveStandTheSeparationApart) {
   const std::int64_t apart = std::int64_t{SEPARATION} * SEPARATION;
-  const std::vector<Body> separated = arrive(army, SEPARATION);
-  const std::vector<Body> overlapping = arrive(army, 0);
-
-  // Both armies must have arrived as agents, or there is no crowd to measure.
-  for (const std::vector<Body>& bodies : {separated, overlapping}) {
-    ASSERT_EQ(bodies.size(), army.count);
-    for (const Body& body : bodies) {
-      ASSERT_TRUE(in(army.objective, body.position));
-    }
-  }
+  const std::vector<Position> separated = arrive(SEPARATION);
+  // Setup: the army arrived, its lead within a cell of the objective.
+  ASSERT_LE(distance_squared(separated.front(), centre_of({12, 12})),
+            std::int64_t{CELL_SIZE} * CELL_SIZE);
   EXPECT_GE(closest_pair_squared(separated), apart);
-  // Control: without separation the flow field alone packs agents closer.
-  EXPECT_LT(closest_pair_squared(overlapping), apart);
+  // Control: without separation the people pack closer.
+  EXPECT_LT(closest_pair_squared(arrive(0)), apart);
 }
 
-// Strength each single-agent target army starts with in the combat tests.
-constexpr std::uint64_t TARGET_STRENGTH = 1'000'000;
+// The closest any two members of a column of nine come while it marches
+// east across a 32-cell map, once it has spread out from its start and
+// before its first members near the objective and stand.
+std::int64_t closest_while_marching(std::int32_t separation) {
+  constexpr std::size_t SIDE = 32;
+  constexpr int SPREAD_TICKS = 100;
+  constexpr int MARCH_TICKS = 300;
+  const std::vector<std::string> rows = open_map(SIDE);
+  const ArmySpec column = army(rows, {2, 16}, {29, 16}, 9, 1, 0, {IDLE});
+  World world{Seed{1}, Map{rows}, {column}, {}, peaceful(separation)};
+  run_ticks(world, SPREAD_TICKS);
+  std::int64_t closest = std::numeric_limits<std::int64_t>::max();
+  for (int tick = 0; tick < MARCH_TICKS; ++tick) {
+    world.tick();
+    closest = std::min(closest, closest_pair_squared(positions(world, 0)));
+  }
+  // Setup: the column marched, so the distances were measured on the move.
+  EXPECT_GT(cell_of(lead(world, 0)).x, 10);
+  return closest;
+}
 
-// Returns the strength `target` lost in one near-tier tick in which `user`
-// strikes it; both hold their start cells.
-std::uint64_t strength_lost(const ArmySpec& user, const ArmySpec& target,
-                            const Rules& rules) {
+TEST(World, MarchingPeopleKeepNearlyTheSeparationApart) {
+  // Within the distance one tick's step can close on each side.
+  constexpr std::int64_t KEPT = SEPARATION - (2 * SPEED);
+  EXPECT_GE(closest_while_marching(SEPARATION), KEPT * KEPT);
+  // Control: without separation the column bunches far closer.
+  EXPECT_LT(closest_while_marching(0), KEPT * KEPT);
+}
+
+TEST(World, APersonOrderedOutOfAStandingCrowdLeavesIt) {
+  constexpr std::size_t SIDE = 24;
+  constexpr Cell CROWD{12, 12};
+  constexpr Cell OUTSIDE{20, 12};
+  constexpr int EXIT_TICKS = 400;
+  const std::vector<std::string> rows = open_map(SIDE);
+  // A crowd of 24 standing on every cell around the centre, two rings deep,
+  // and one person in its middle.
+  constexpr Muster TWO_RINGS{25, 1};
+  std::vector<Recruit> ring = recruits(rows, CROWD, TWO_RINGS);
+  ring.erase(ring.begin());
+  const std::vector<ArmySpec> armies{
+      ArmySpec{CROWD, ring, 0, {IDLE}},
+      ArmySpec{CROWD, {Recruit{CROWD, 1}}, 0, {IDLE}},
+  };
+  const auto after = [&](bool ordered) {
+    World world{Seed{1}, Map{rows}, armies, {}, peaceful(SEPARATION)};
+    if (ordered) {
+      world.order(1, {OUTSIDE, {0}});
+    }
+    run_ticks(world, EXIT_TICKS);
+    return lead(world, 1);
+  };
+
+  EXPECT_TRUE(in(OUTSIDE, after(true)));
+  // Control: left without the order, the person stays in the crowd.
+  EXPECT_LE(distance_squared(after(false), centre_of(CROWD)),
+            std::int64_t{2} * CELL_SIZE * 2 * CELL_SIZE);
+}
+
+// The health `target` lost in one tick in which `user` strikes it; both
+// hold their ground.
+std::uint64_t health_lost(const ArmySpec& user, const ArmySpec& target,
+                          const Rules& rules) {
   World world{Seed{1}, Map{open_map(OPEN_SIDE)}, {user, target}, {}, rules};
-  world.set_focus(centre_of(user.start));
   world.tick();
-  return target.strength - totals(world.bodies(1)).strength;
+  std::uint64_t start = 0;
+  for (const Recruit& recruit : target.members) {
+    start += recruit.health;
+  }
+  return start - health_of(world, 1);
 }
 
-TEST(World, OnlyHostileBodiesWithinRangeUseTheirSkills) {
+// Health each single-person target starts with in the combat tests.
+constexpr std::uint64_t TARGET_HEALTH = 1'000'000;
+
+TEST(World, OnlyHostilePeopleWithinRangeUseTheirSkills) {
   const Skill reach{2 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN};
   const Skill short_reach{(2 * CELL_SIZE) - 1, 0, 1, 0, NEVER_AGAIN};
-  const ArmySpec target{{4, 0}, {4, 0}, 1, TARGET_STRENGTH, 1, {IDLE}};
-  const ArmySpec user{{2, 0}, {2, 0}, 1, 1, 0, {reach}};
+  const ArmySpec target = army({4, 0}, {4, 0}, 1, TARGET_HEALTH, 1, {IDLE});
+  const ArmySpec user = army({2, 0}, {2, 0}, 1, 1, 0, {reach});
   ArmySpec ally = target;
   ally.faction = 0;
 
-  EXPECT_EQ(strength_lost(user, target, at_war(0)), 1U);
+  EXPECT_EQ(health_lost(user, target, at_war(0)), 1U);
   // Controls: one unit short of the range, or a target of a faction the user
   // is not hostile to, and nothing is used.
   ArmySpec out_of_range = user;
   out_of_range.skills = {short_reach};
-  EXPECT_EQ(strength_lost(out_of_range, target, at_war(0)), 0U);
-  EXPECT_EQ(strength_lost(user, ally, at_war(0)), 0U);
+  EXPECT_EQ(health_lost(out_of_range, target, at_war(0)), 0U);
+  EXPECT_EQ(health_lost(user, ally, at_war(0)), 0U);
 }
 
 TEST(World, EquallyNearTargetsGoToTheLowestIndex) {
-  const ArmySpec user{{4, 4}, {4, 4}, 1,
-                      1,      0,      {{3 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN}}};
+  const ArmySpec user =
+      army({4, 4}, {4, 4}, 1, 1, 0, {{3 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN}});
   // The lower index stands east, where a query visits it last.
-  const ArmySpec east{{6, 4}, {6, 4}, 1, TARGET_STRENGTH, 1, {IDLE}};
-  const ArmySpec west{{2, 4}, {2, 4}, 1, TARGET_STRENGTH, 1, {IDLE}};
-  // The two targets must stand equally near, or there is no tie to break.
-  ASSERT_EQ(distance_squared(centre_of(user.start), centre_of(east.start)),
-            distance_squared(centre_of(user.start), centre_of(west.start)));
+  const ArmySpec east = army({6, 4}, {6, 4}, 1, TARGET_HEALTH, 1, {IDLE});
+  const ArmySpec west = army({2, 4}, {2, 4}, 1, TARGET_HEALTH, 1, {IDLE});
   World world{
       Seed{1}, Map{open_map(OPEN_SIDE)}, {user, east, west}, {}, at_war(0)};
-  world.set_focus(centre_of(user.start));
   world.tick();
 
-  EXPECT_EQ(totals(world.bodies(1)).strength, TARGET_STRENGTH - 1);
+  EXPECT_EQ(health_of(world, 1), TARGET_HEALTH - 1);
   // Control: the other target, as near, is untouched.
-  EXPECT_EQ(totals(world.bodies(2)).strength, TARGET_STRENGTH);
+  EXPECT_EQ(health_of(world, 2), TARGET_HEALTH);
 }
 
-// The cells (2..6, 0..6), each holding a single-agent hostile army in
+// The cells (2..6, 0..6), each holding a single-person hostile army in
 // damaged_cells().
 std::vector<Cell> target_grid() {
   constexpr std::int32_t FIRST_COLUMN = 2;
@@ -409,36 +403,36 @@ std::vector<Cell> target_grid() {
 using Cells = std::vector<std::pair<std::int32_t, std::int32_t>>;
 
 TEST(World, StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap) {
-  const ArmySpec user{
-      {3, 3}, {3, 3}, 1, 1, 0, {{2 * CELL_SIZE, MAX_REACH, 1, 0, NEVER_AGAIN}}};
-  const ArmySpec target{{4, 3}, {4, 3}, 1, TARGET_STRENGTH, 1, {IDLE}};
-  // The walk of the strike's area query over the bodies the world indexes,
-  // which stand at their start cells' centres.
-  const SpatialHash crowd{{centre_of(user.start), centre_of(target.start)}};
-  const auto [first, last] = crowd.walk(centre_of(target.start), MAX_REACH);
+  const ArmySpec user = army({3, 3}, {3, 3}, 1, 1, 0,
+                             {{2 * CELL_SIZE, MAX_REACH, 1, 0, NEVER_AGAIN}});
+  const ArmySpec target = army({4, 3}, {4, 3}, 1, TARGET_HEALTH, 1, {IDLE});
+  // The walk of the strike's area query over the people the world indexes,
+  // who stand at their start cells' centres.
+  const SpatialHash crowd{{centre_of({3, 3}), centre_of({4, 3})}};
+  const auto [first, last] = crowd.walk(centre_of({4, 3}), MAX_REACH);
   const std::int64_t cells = (std::int64_t{last.x} - first.x + 1) *
                              (std::int64_t{last.y} - first.y + 1);
   // Fatal, so an unbounded walk fails here rather than stalling the strike.
   ASSERT_LE(cells, std::int64_t{OPEN_SIDE * OPEN_SIDE});
 
-  EXPECT_EQ(strength_lost(user, target, at_war(0)), 1U);
+  EXPECT_EQ(health_lost(user, target, at_war(0)), 1U);
 }
 
 // Fires one skill of `radius` from (0, 3) at target_grid() and returns the
-// cells of the armies it damaged.
+// cells of the people it damaged.
 Cells damaged_cells(std::int32_t radius) {
-  std::vector<ArmySpec> armies{
-      {{0, 3}, {0, 3}, 1, 1, 0, {{3 * CELL_SIZE, radius, 1, 0, NEVER_AGAIN}}}};
+  std::vector<ArmySpec> armies{army(
+      {0, 3}, {0, 3}, 1, 1, 0, {{3 * CELL_SIZE, radius, 1, 0, NEVER_AGAIN}})};
   for (const Cell cell : target_grid()) {
-    armies.push_back(ArmySpec{cell, cell, 1, TARGET_STRENGTH, 1, {IDLE}});
+    armies.push_back(army(cell, cell, 1, TARGET_HEALTH, 1, {IDLE}));
   }
   World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(0)};
-  world.set_focus(centre_of(armies.front().start));
   world.tick();
   Cells damaged;
-  for (std::size_t army = 1; army < armies.size(); ++army) {
-    if (totals(world.bodies(army)).strength < TARGET_STRENGTH) {
-      damaged.emplace_back(armies.at(army).start.x, armies.at(army).start.y);
+  for (std::size_t target = 1; target < armies.size(); ++target) {
+    if (health_of(world, target) < TARGET_HEALTH) {
+      const Cell cell = armies.at(target).members.front().cell;
+      damaged.emplace_back(cell.x, cell.y);
     }
   }
   return damaged;
@@ -457,69 +451,71 @@ Cells cells_inside(std::int32_t radius) {
   return inside;
 }
 
-TEST(World, AreaSkillHitsExactlyTheBodiesInsideItsShape) {
+TEST(World, AreaSkillHitsExactlyThePeopleInsideItsShape) {
   const std::int32_t radius = 2 * CELL_SIZE;
   const std::pair<std::int32_t, std::int32_t> edge{4, 3};
 
   const auto hit = damaged_cells(radius);
   EXPECT_EQ(hit, cells_inside(radius));
-  // The body on (4, 3) sits exactly on the edge, so the shape takes it in.
+  // The person on (4, 3) stands exactly on the edge, so the shape takes it in.
   EXPECT_NE(std::find(hit.begin(), hit.end(), edge), hit.end());
-  // Control: one unit less radius leaves that body just outside.
+  // Control: one unit less radius leaves that person just outside.
   const auto narrower = damaged_cells(radius - 1);
   EXPECT_EQ(narrower, cells_inside(radius - 1));
   EXPECT_EQ(std::find(narrower.begin(), narrower.end(), edge), narrower.end());
 }
 
-void run_ticks(World& world, std::uint64_t ticks) {
-  for (std::uint64_t i = 0; i < ticks; ++i) {
-    world.tick();
+TEST(World, AStrikeHitsEachHostilePersonInItsDiscOnce) {
+  constexpr std::uint64_t DAMAGE = 7;
+  // Three hostile people in a row, every one inside the disc.
+  const Skill sweep{3 * CELL_SIZE, 2 * CELL_SIZE, DAMAGE, 0, NEVER_AGAIN};
+  const ArmySpec user = army({0, 3}, {0, 3}, 1, 1, 0, {sweep});
+  const std::vector<std::string> rows = open_map(OPEN_SIDE);
+  const ArmySpec three{
+      {3, 3},
+      {Recruit{{2, 3}, TARGET_HEALTH}, Recruit{{3, 3}, TARGET_HEALTH},
+       Recruit{{4, 3}, TARGET_HEALTH}},
+      1,
+      {IDLE}};
+  World world{Seed{1}, Map{rows}, {user, three}, {}, at_war(0)};
+  world.tick();
+
+  for (const std::size_t member : world.roster(1)) {
+    EXPECT_EQ(world.person(member).health, TARGET_HEALTH - DAMAGE);
   }
+  // Control: the user, its own disc's centre aside, takes nothing.
+  EXPECT_EQ(health_of(world, 0), 1U);
 }
 
-// Two armies on neighbouring cells, far from the focus: one agent with
-// `user_skill`, and the rest of MAX_AGENTS as its target with MAX_STRENGTH.
+// Two people on neighbouring cells: one with `user_skill` and as much health
+// as anyone may have, and its target with as much.
 std::vector<ArmySpec> at_the_limits(const Skill& user_skill) {
-  constexpr std::uint32_t TARGETS = MAX_AGENTS - 1;
-  const std::vector<ArmySpec> armies{
-      {{3, 3}, {3, 3}, 1, MAX_STRENGTH, 0, {user_skill}},
-      {{4, 3}, {4, 3}, TARGETS, MAX_STRENGTH, 1, {IDLE}},
+  return {
+      army({3, 3}, {3, 3}, 1, MAX_HEALTH, 0, {user_skill}),
+      army({4, 3}, {4, 3}, 1, MAX_HEALTH, 1, {IDLE}),
   };
-  return armies;
 }
 
-// The separation of at_the_limits(): one sub-cell unit per agent, so a
-// small disc covers every target agent.
-constexpr std::int32_t PACKED = 1;
+// The skill of at_the_limits(): the most damage, and a cooldown of 1.
+constexpr Skill LIMIT_SKILL{2 * CELL_SIZE, 0, MAX_BODY_DAMAGE, 0, 1};
 
-// The skill of at_the_limits(): the most damage, a disc whose area,
-// 355 * 600^2 / 113 = 1130973 squares, covers all 2^20 - 1 target agents,
-// and a cooldown of 1 so a far step holds 16 uses.
-constexpr Skill LIMIT_SKILL{2 * CELL_SIZE, 600, MAX_BODY_DAMAGE, 0, 1};
+TEST(World, StrikeAtTheLargestAcceptedValuesKeepsHealthExact) {
+  constexpr std::uint64_t STRIKES = 16;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              at_the_limits(LIMIT_SKILL),
+              {},
+              at_war(0)};
+  run_ticks(world, STRIKES);
 
-TEST(World, StrikeAtTheLargestAcceptedValuesKeepsTotalsExact) {
-  const std::vector<ArmySpec> armies = at_the_limits(LIMIT_SKILL);
-  World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(PACKED)};
-  world.set_focus(Position{FAR_AWAY, FAR_AWAY});
-  run_ticks(world, TIERS.back().interval);
-
-  // 2^19 damage, times 16 uses, times 2^20 - 1 agents struck, is
-  // 2^43 - 2^23: the target keeps 2^23 strength, and its count falls in
-  // proportion to one agent.
-  const std::uint64_t dealt =
-      MAX_BODY_DAMAGE * TIERS.back().interval * armies.at(1).count;
-  const Totals kept = totals(world.bodies(1));
-  EXPECT_EQ(kept.strength, MAX_STRENGTH - dealt);
-  EXPECT_EQ(kept.count, 1U);
-  EXPECT_TRUE(totals(world.bodies(0)) ==
-              (Totals{armies.at(0).count, armies.at(0).strength}));
+  EXPECT_EQ(health_of(world, 1), MAX_HEALTH - (MAX_BODY_DAMAGE * STRIKES));
+  EXPECT_EQ(health_of(world, 0), MAX_HEALTH);
 }
 
 // Whether the constructor refuses `armies` with std::invalid_argument.
 bool refused(const std::vector<ArmySpec>& armies) {
   try {
-    const World world{
-        Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(PACKED)};
+    const World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(0)};
   } catch (const std::invalid_argument&) {
     return true;
   }
@@ -527,38 +523,57 @@ bool refused(const std::vector<ArmySpec>& armies) {
 }
 
 TEST(World, InputJustPastALimitIsRefused) {
-  std::vector<ArmySpec> agents = at_the_limits(LIMIT_SKILL);
-  ++agents.at(1).count;
-  std::vector<ArmySpec> strength = at_the_limits(LIMIT_SKILL);
-  ++strength.at(1).strength;
+  std::vector<ArmySpec> health = at_the_limits(LIMIT_SKILL);
+  ++health.at(1).members.front().health;
+  std::vector<ArmySpec> lifeless = at_the_limits(LIMIT_SKILL);
+  lifeless.at(1).members.front().health = 0;
   Skill damage = LIMIT_SKILL;
   ++damage.body_damage;
   Skill cooldown = LIMIT_SKILL;
   cooldown.cooldown = MAX_COOLDOWN + 1;
   Skill longest = LIMIT_SKILL;
   longest.cooldown = MAX_COOLDOWN;
-
   // Control: the values at every limit are accepted.
   EXPECT_FALSE(refused(at_the_limits(longest)));
-  EXPECT_TRUE(refused(agents));
-  EXPECT_TRUE(refused(strength));
+  EXPECT_TRUE(refused(health));
+  EXPECT_TRUE(refused(lifeless));
   EXPECT_TRUE(refused(at_the_limits(damage)));
   EXPECT_TRUE(refused(at_the_limits(cooldown)));
+}
+
+// Whether a world of `people` people, standing on a map twice as wide as
+// the open one, is created.
+bool populated(std::size_t people) {
+  const std::vector<std::string> rows = open_map(OPEN_SIDE * 2);
+  try {
+    const World world{Seed{1},
+                      Map{rows},
+                      {army(rows, {0, 0}, {0, 0}, people, 1, 0, {IDLE})},
+                      {},
+                      peaceful(0)};
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+  return true;
+}
+
+TEST(World, AWorldHoldsNoMoreThanMaxPeople) {
+  EXPECT_FALSE(populated(MAX_PEOPLE + 1));
+  // Control: as many as a world may hold are accepted.
+  EXPECT_TRUE(populated(MAX_PEOPLE));
 }
 
 TEST(World, AreaSkillWalksAStructureThroughEveryStage) {
   constexpr std::uint32_t DURABILITY = 100;
   // The disc around the target reaches just into the structure beside it.
-  const ArmySpec user{
-      {0, 0}, {0, 0}, 1, 1, 0, {{2 * CELL_SIZE, CELL_SIZE / 2, 0, 30, 1}}};
-  const ArmySpec target{{2, 0}, {2, 0}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  const ArmySpec user =
+      army({0, 0}, {0, 0}, 1, 1, 0, {{2 * CELL_SIZE, CELL_SIZE / 2, 0, 30, 1}});
+  const ArmySpec target = army({2, 0}, {2, 0}, 1, TARGET_HEALTH, 1, {IDLE});
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
               {user, target},
               {{{3, 0}, DURABILITY}},
               at_war(0)};
-  world.set_focus(centre_of(user.start));
-
   std::vector<Stage> stages{world.stage(0)};
   for (int i = 0; i < ARRIVAL_TICKS && stages.back() != Stage::RUBBLE; ++i) {
     world.tick();
@@ -572,191 +587,126 @@ TEST(World, AreaSkillWalksAStructureThroughEveryStage) {
   EXPECT_EQ(world.structure(0).durability, 0U);
 }
 
-TEST(World, SkillOutcomeScalesWithTheAgentsItsUserStandsFor) {
-  constexpr std::uint64_t DAMAGE = 7;
-  constexpr std::uint32_t AGENTS = 5;
-  const Skill skill{4 * CELL_SIZE, 0, DAMAGE, 0, NEVER_AGAIN};
-  const ArmySpec target{{3, 0}, {3, 0}, 1, TARGET_STRENGTH, 1, {IDLE}};
-  // A single agent, as the player's body is.
-  const ArmySpec one{{0, 0}, {0, 0}, 1, 1, 0, {skill}};
-  const ArmySpec five{{0, 0}, {0, 0}, AGENTS, AGENTS, 0, {skill}};
-  const auto lost = [&target](const ArmySpec& user, Position focus) {
-    World world{
-        Seed{1}, Map{open_map(OPEN_SIDE)}, {user, target}, {}, at_war(0)};
-    world.set_focus(focus);
-    // The far tier acts every TIERS.back().interval ticks.
-    for (std::uint64_t i = 0; i < TIERS.back().interval; ++i) {
-      world.tick();
-    }
-    const std::size_t bodies = world.bodies(0).size();
-    return std::pair{bodies,
-                     target.strength - totals(world.bodies(1)).strength};
-  };
-  const Position near = centre_of(one.start);
-  const Position far{FAR_AWAY, FAR_AWAY};
-
-  EXPECT_EQ(lost(one, near), std::pair(std::size_t{1}, DAMAGE));
-  // Five agents striking one by one, and the aggregate standing for them
-  // striking once, do the same damage: five times one agent's.
-  EXPECT_EQ(lost(five, near), std::pair(std::size_t{AGENTS}, AGENTS * DAMAGE));
-  EXPECT_EQ(lost(five, far), std::pair(std::size_t{1}, AGENTS * DAMAGE));
-}
-
-// Two equal hostile armies on neighbouring cells, holding their ground.
-std::vector<ArmySpec> skirmish(std::uint64_t cooldown) {
-  const Skill skill{2 * CELL_SIZE, CELL_SIZE / 2, 1, 0, cooldown};
+// Fights twelve people using `first` against twelve using `second`, two
+// blocks marching on one point, until a side falls or TICKS pass, and
+// returns the health each side has left.
+std::array<std::uint64_t, 2> fight(const Skill& first, const Skill& second) {
+  constexpr std::size_t PEOPLE = 12;
+  constexpr std::uint64_t HEALTH = 100;
   const std::vector<ArmySpec> armies{
-      {{3, 3}, {3, 3}, 12, 120, 0, {skill}},
-      {{4, 3}, {4, 3}, 12, 120, 1, {skill}},
-  };
-  return armies;
-}
-
-// Whether an army's totals hold together: no more agents than strength,
-// none without strength, and no more strength than it was created with.
-bool consistent(const Totals& now, const ArmySpec& created) {
-  return now.count <= now.strength && (now.count == 0) == (now.strength == 0) &&
-         now.strength <= created.strength;
-}
-
-// Fights skirmish() with the focus at `focus` until a side falls, and
-// checks every side's totals stay consistent on every tick.
-void expect_consistent_battle(Position focus) {
-  const std::vector<ArmySpec> armies = skirmish(4);
-  World world{
-      Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(SEPARATION)};
-  world.set_focus(focus);
-  bool fallen = false;
-  for (int i = 0; i < TICKS && !fallen; ++i) {
-    world.tick();
-    for (std::size_t army = 0; army < armies.size(); ++army) {
-      const Totals now = totals(world.bodies(army));
-      EXPECT_TRUE(consistent(now, armies.at(army)))
-          << "army " << army << " tick " << i;
-      fallen = fallen || now.count == 0;
-    }
-  }
-  EXPECT_TRUE(fallen);
-}
-
-TEST(World, BattleNearTheFocusEndsWithConsistentTotals) {
-  expect_consistent_battle(centre_of(skirmish(0).front().start));
-}
-
-TEST(World, BattleFarFromTheFocusEndsWithConsistentTotals) {
-  expect_consistent_battle(Position{FAR_AWAY, FAR_AWAY});
-}
-
-// Strength each matchup army starts with: 12 agents of 100.
-constexpr std::uint32_t MATCHUP_COUNT = 12;
-constexpr std::uint64_t MATCHUP_STRENGTH = 1200;
-
-// Fights an army using `first` against an equal one using `second`, on
-// neighbouring cells with the focus at `focus`, until a side falls or TICKS
-// pass, and returns the strength each side has left.
-std::array<std::uint64_t, 2> fight(const Skill& first, const Skill& second,
-                                   Position focus) {
-  const std::vector<ArmySpec> armies{
-      {{3, 3}, {3, 3}, MATCHUP_COUNT, MATCHUP_STRENGTH, 0, {first}},
-      {{4, 3}, {4, 3}, MATCHUP_COUNT, MATCHUP_STRENGTH, 1, {second}},
+      army({3, 7}, {7, 7}, PEOPLE, HEALTH, 0, {first}),
+      army({11, 7}, {7, 7}, PEOPLE, HEALTH, 1, {second}),
   };
   World world{
       Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(SEPARATION)};
-  world.set_focus(focus);
-  for (int i = 0; i < TICKS && totals(world.bodies(0)).count > 0 &&
-                  totals(world.bodies(1)).count > 0;
-       ++i) {
+  for (int i = 0;
+       i < TICKS && !world.roster(0).empty() && !world.roster(1).empty(); ++i) {
     world.tick();
   }
-  return {totals(world.bodies(0)).strength, totals(world.bodies(1)).strength};
+  return {health_of(world, 0), health_of(world, 1)};
 }
 
-// The side with strength left, and how much it kept, as the outcome a
-// matchup must reach in every tier.
-struct Outcome {
-  std::size_t winner;
-  std::uint64_t kept;
-};
-
-Outcome outcome(const std::array<std::uint64_t, 2>& left) {
-  const std::size_t winner = left.at(0) > 0 ? 0 : 1;
-  return Outcome{winner, left.at(winner)};
+TEST(World, AreaSkillBeatsSingleTargetSkill) {
+  const Skill single{2 * CELL_SIZE, 0, 4, 0, 24};
+  const Skill area{2 * CELL_SIZE, 2 * CELL_SIZE, 4, 0, 24};
+  const std::array<std::uint64_t, 2> left = fight(area, single);
+  EXPECT_GT(left.at(0), 0U);
+  EXPECT_EQ(left.at(1), 0U);
 }
 
-// Runs one matchup near the focus and far from it, and expects the same side
-// to win with the strength it keeps within a quarter of the start.
-void expect_same_outcome(const Skill& first, const Skill& second,
-                         std::size_t expected_winner) {
-  constexpr std::uint64_t TOLERANCE = MATCHUP_STRENGTH / 4;
-  const auto near = fight(first, second, centre_of({3, 3}));
-  const auto far = fight(first, second, Position{FAR_AWAY, FAR_AWAY});
-  // The battles must have ended, or there is no winner to compare.
-  ASSERT_TRUE(near.at(0) == 0 || near.at(1) == 0);
-  ASSERT_TRUE(far.at(0) == 0 || far.at(1) == 0);
-  const Outcome near_outcome = outcome(near);
-  const Outcome far_outcome = outcome(far);
-  EXPECT_EQ(near_outcome.winner, expected_winner);
-  EXPECT_EQ(far_outcome.winner, expected_winner);
-  EXPECT_LE(std::max(near_outcome.kept, far_outcome.kept) -
-                std::min(near_outcome.kept, far_outcome.kept),
-            TOLERANCE)
-      << "near kept " << near_outcome.kept << ", far kept " << far_outcome.kept;
+TEST(World, QuickSkillBeatsSlowSkill) {
+  const Skill quick{2 * CELL_SIZE, 0, 4, 0, 12};
+  const Skill slow{2 * CELL_SIZE, 0, 4, 0, 24};
+  const std::array<std::uint64_t, 2> left = fight(slow, quick);
+  EXPECT_EQ(left.at(0), 0U);
+  EXPECT_GT(left.at(1), 0U);
 }
 
-// A quick single-target skill: 2 damage every tick, 2 per agent per tick.
-constexpr Skill JAB{2 * CELL_SIZE, 0, 2, 0, 1};
+// A village of one house with three residents at (4, 4), their home; a
+// field army of faction 0 with no members yet; and a hostile post of one
+// person at (12, 4).
+constexpr std::size_t HOME_ARMY = 0;
+constexpr std::size_t FIELD = 1;
+constexpr std::size_t POST = 2;
+constexpr Cell HOME{4, 4};
+constexpr Cell POST_CELL{12, 4};
+constexpr std::uint64_t POST_HEALTH = 200;
+constexpr std::uint32_t HOME_DURABILITY = 100;
 
-TEST(World, AreaSkillBeatsSingleTargetSkillNearAndFarAlike) {
-  // 1 damage every 2 ticks to every agent within a cell's width, which
-  // covers the whole of the other army: up to 6 per agent per tick.
-  const Skill sweep{2 * CELL_SIZE, CELL_SIZE, 1, 0, 2};
-  expect_same_outcome(JAB, sweep, 1);
+World conscription_world() {
+  const Skill strike{2 * CELL_SIZE, 0, 10, 0, 15};
+  const std::vector<ArmySpec> armies{
+      army(HOME, HOME, 3, 1'000, 0, {strike}),
+      ArmySpec{HOME, {}, 0, {strike}},
+      army(POST_CELL, POST_CELL, 1, POST_HEALTH, 1, {strike}),
+  };
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               armies,
+               {{{2, 2}, HOME_DURABILITY}},
+               at_war(SEPARATION),
+               {{{0}, HOME_ARMY}}};
 }
 
-TEST(World, QuickSkillBeatsSlowSkillNearAndFarAlike) {
-  // 24 damage every 20 ticks, 1.2 per agent per tick; its cooldown is longer
-  // than the far tier's 16-tick step.
-  const Skill heave{2 * CELL_SIZE, 0, 24, 0, 20};
-  expect_same_outcome(JAB, heave, 0);
+TEST(World, APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding) {
+  World world = conscription_world();
+  const std::size_t recruit = world.roster(HOME_ARMY).back();
+  ASSERT_EQ(world.person(recruit).home, std::optional<std::size_t>{0});
+
+  world.conscript(recruit, FIELD);
+  EXPECT_EQ(world.roster(FIELD), std::vector<std::size_t>{recruit});
+  world.order(FIELD, {POST_CELL, {0}});
+  run_ticks(world, ARRIVAL_TICKS / 2);
+  // The battle wounded the recruit and killed the post.
+  EXPECT_LT(world.person(recruit).health, 1'000U);
+  EXPECT_TRUE(world.roster(POST).empty());
+  EXPECT_EQ(world.person(world.population() - 1).health, 0U);
+
+  const std::uint64_t wounded = world.person(recruit).health;
+  world.disband(FIELD);
+  EXPECT_TRUE(world.roster(FIELD).empty());
+  EXPECT_EQ(world.roster(HOME_ARMY).back(), recruit);
+  // Control: the person home is the one conscripted, wounds and all.
+  EXPECT_EQ(world.person(recruit).health, wounded);
+  EXPECT_EQ(world.person(recruit).home, std::optional<std::size_t>{0});
 }
 
-// Both armies' totals, compared as a whole.
-bool same_totals(const World& world, const std::array<Totals, 2>& expected) {
-  return totals(world.bodies(0)) == expected.at(0) &&
-         totals(world.bodies(1)) == expected.at(1);
+TEST(World, ConscriptingAndDisbandingKeepEveryPersonOnOneRoster) {
+  World world = conscription_world();
+  const auto on_rosters = [&world] {
+    return world.roster(HOME_ARMY).size() + world.roster(FIELD).size() +
+           world.roster(POST).size();
+  };
+  const std::size_t start = on_rosters();
+  const std::size_t stranger = world.roster(POST).front();
+  const std::vector<std::size_t> residents = world.roster(HOME_ARMY);
+  for (const std::size_t resident : residents) {
+    world.conscript(resident, FIELD);
+  }
+  world.conscript(stranger, FIELD);
+  EXPECT_EQ(world.roster(HOME_ARMY).size(), 0U);
+  EXPECT_EQ(on_rosters(), start);
+
+  world.disband(FIELD);
+  EXPECT_EQ(world.roster(HOME_ARMY).size(), 3U);
+  EXPECT_EQ(on_rosters(), start);
+  // Control: a member with no home stays where it served.
+  EXPECT_EQ(world.roster(FIELD), std::vector<std::size_t>{stranger});
 }
 
-TEST(World, ArmiesKeepCountAndStrengthWhenRegroupedMidBattle) {
-  constexpr std::uint64_t COOLDOWN = 100;
-  constexpr std::uint64_t BEFORE_COLLAPSE = 49;
-  constexpr std::uint64_t COLLAPSED_FOR = 10;
-  const std::vector<ArmySpec> armies = skirmish(COOLDOWN);
-  World world{
-      Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(SEPARATION)};
-  const Position near = centre_of(armies.front().start);
-  world.set_focus(near);
+TEST(World, OnlyALivingPersonCanBeConscripted) {
+  World world = conscription_world();
+  const std::size_t post = world.roster(POST).front();
+  world.order(POST, {HOME, {0}});
+  run_ticks(world, ARRIVAL_TICKS);
+  // Setup: the post marched on the village and died.
+  ASSERT_EQ(world.person(post).health, 0U);
 
-  run_ticks(world, BEFORE_COLLAPSE);
-  const std::array<Totals, 2> struck{totals(world.bodies(0)),
-                                     totals(world.bodies(1))};
-  // The first strikes landed, so the regrouping happens mid-battle.
-  ASSERT_LT(struck.at(0).strength + struck.at(1).strength,
-            armies.at(0).strength + armies.at(1).strength);
-
-  world.set_focus(Position{FAR_AWAY, FAR_AWAY});
-  world.tick();
-  ASSERT_EQ(world.bodies(0).size(), 1U);
-  EXPECT_TRUE(same_totals(world, struck));
-
-  run_ticks(world, COLLAPSED_FOR);
-  world.set_focus(near);
-  world.tick();
-  ASSERT_EQ(world.bodies(0).size(), struck.at(0).count);
-  EXPECT_TRUE(same_totals(world, struck));
-
-  // The battle goes on once the cooldown has passed.
-  run_ticks(world, COOLDOWN - BEFORE_COLLAPSE - COLLAPSED_FOR);
-  EXPECT_FALSE(same_totals(world, struck));
+  EXPECT_THROW(world.conscript(post, FIELD), std::invalid_argument);
+  EXPECT_THROW(world.conscript(world.population(), FIELD),
+               std::invalid_argument);
+  // Control: a living resident is conscripted.
+  EXPECT_NO_THROW(world.conscript(world.roster(HOME_ARMY).front(), FIELD));
 }
 
 // An order given before tick `tick` of a run.
@@ -766,10 +716,9 @@ struct LoggedOrder {
   Order order;
 };
 
-// Ticks `world` `ticks` times as a driving adapter does: gives each logged
-// order before its tick, and places the focus on army `steered`'s lead body
-// before every tick. Returns the orders given, as a recording.
-std::vector<LoggedOrder> drive(World& world, std::size_t steered,
+// Ticks `world` `ticks` times as a driving adapter does, giving each logged
+// order before its tick. Returns the orders given, as a recording.
+std::vector<LoggedOrder> drive(World& world,
                                const std::vector<LoggedOrder>& log,
                                std::uint64_t ticks) {
   std::vector<LoggedOrder> given;
@@ -780,7 +729,6 @@ std::vector<LoggedOrder> drive(World& world, std::size_t steered,
         given.push_back(logged);
       }
     }
-    world.set_focus(world.bodies(steered).front().position);
     world.tick();
   }
   return given;
@@ -791,93 +739,62 @@ constexpr std::size_t ORDERS_SIDE = 24;
 constexpr std::uint64_t ORDER_TICKS = 1'500;
 constexpr Cell STEERED_HOME{2, 2};
 constexpr Cell HOSTILE_HOME{12, 12};
-constexpr Cell BESIDE_HOSTILE{12, 10};
+constexpr Cell BESIDE_HOSTILE{12, 9};
 constexpr Seed ORDERS_SEED{7};
-constexpr std::uint64_t HOSTILE_STRENGTH = 6'000;
+constexpr std::uint64_t HOSTILE_HEALTH = 1'000;
+constexpr std::size_t HOSTILES = 6;
 constexpr std::uint32_t DURABILITY = 100;
 
-// One agent at STEERED_HOME with a skill that spares structures and one that
-// breaks them, bound for `objective`; six hostile agents holding
-// HOSTILE_HOME, with a structure under them.
+// One person at STEERED_HOME with a skill that spares structures and one
+// that breaks them, bound for `objective`; six hostile people holding
+// HOSTILE_HOME, with a structure between them and BESIDE_HOSTILE.
 World orders_world(Cell objective) {
   const Skill strike{3 * CELL_SIZE, 0, 50, 0, 10};
   const Skill smash{3 * CELL_SIZE, CELL_SIZE, 50, 40, 10};
   const Skill guard{3 * CELL_SIZE, 0, 1, 0, 10};
+  const std::vector<std::string> rows = open_map(ORDERS_SIDE);
   const std::vector<ArmySpec> armies{
-      {STEERED_HOME, objective, 1, 100'000, 0, {strike, smash}},
-      {HOSTILE_HOME, HOSTILE_HOME, 6, HOSTILE_STRENGTH, 1, {guard}},
+      army(rows, STEERED_HOME, objective, 1, 100'000, 0, {strike, smash}),
+      army(rows, HOSTILE_HOME, HOSTILE_HOME, HOSTILES, HOSTILE_HEALTH, 1,
+           {guard}),
   };
   return World{ORDERS_SEED,
-               Map{open_map(ORDERS_SIDE)},
+               Map{rows},
                armies,
-               {{{HOSTILE_HOME.x, HOSTILE_HOME.y + 1}, DURABILITY}},
+               {{{HOSTILE_HOME.x, HOSTILE_HOME.y - 2}, DURABILITY}},
                at_war(SEPARATION)};
 }
 
+std::uint64_t hostile_start() { return HOSTILE_HEALTH * HOSTILES; }
+
 TEST(World, OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData) {
   World npc = orders_world(BESIDE_HOSTILE);
-  drive(npc, STEERED, {}, ORDER_TICKS);
+  drive(npc, {}, ORDER_TICKS);
   World ordered = orders_world(STEERED_HOME);
-  drive(ordered, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0, 1}}}},
-        ORDER_TICKS);
+  drive(ordered, {{0, STEERED, {BESIDE_HOSTILE, {0, 1}}}}, ORDER_TICKS);
 
-  // Setup: the body left home and the hostile army took damage, so the run
-  // covered moving and striking.
-  EXPECT_FALSE(in(STEERED_HOME, ordered.bodies(STEERED).front().position));
-  EXPECT_LT(totals(ordered.bodies(1)).strength, HOSTILE_STRENGTH);
+  // Setup: the person left home and the hostile army took damage, so the
+  // run covered moving and striking.
+  EXPECT_FALSE(in(STEERED_HOME, lead(ordered, STEERED)));
+  EXPECT_LT(health_of(ordered, 1), hostile_start());
   EXPECT_EQ(npc.hash(), ordered.hash());
   // Control: the same order with one skill fewer is another run.
   World narrower = orders_world(STEERED_HOME);
-  drive(narrower, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
+  drive(narrower, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
   EXPECT_NE(npc.hash(), narrower.hash());
 }
 
 TEST(World, OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse) {
   World smashing = orders_world(STEERED_HOME);
-  drive(smashing, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {1}}}}, ORDER_TICKS);
+  drive(smashing, {{0, STEERED, {BESIDE_HOSTILE, {1}}}}, ORDER_TICKS);
   EXPECT_LT(smashing.structure(0).durability, DURABILITY);
 
-  // Control: ordered to the skill that spares structures, the body still
+  // Control: ordered to the skill that spares structures, the person still
   // strikes, and the structure stands untouched.
   World striking = orders_world(STEERED_HOME);
-  drive(striking, STEERED, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
-  EXPECT_LT(totals(striking.bodies(1)).strength, HOSTILE_STRENGTH);
+  drive(striking, {{0, STEERED, {BESIDE_HOSTILE, {0}}}}, ORDER_TICKS);
+  EXPECT_LT(health_of(striking, 1), hostile_start());
   EXPECT_EQ(striking.structure(0).durability, DURABILITY);
-}
-
-TEST(World, TiersExpandAndCollapseAroundTheSteeredBody) {
-  constexpr std::size_t SIDE = 64;
-  constexpr std::uint64_t LEG_TICKS = 1'200;
-  const Cell home{2, 4};
-  const ArmySpec steered{home, home, 1, 100, 0, {IDLE}};
-  const ArmySpec camp{{56, 4}, {56, 4}, 20, 2'000, 0, {IDLE}};
-  const auto run = [&](bool follow) {
-    World world{Seed{3},
-                Map{open_map(SIDE)},
-                {steered, camp},
-                {},
-                peaceful(SEPARATION)};
-    world.set_focus(centre_of(home));
-    std::vector<std::size_t> sizes;
-    for (const Cell objective : {Cell{54, 4}, home}) {
-      world.order(STEERED, {objective, {0}});
-      for (std::uint64_t tick = 0; tick < LEG_TICKS; ++tick) {
-        world.set_focus(follow ? world.bodies(STEERED).front().position
-                               : centre_of(home));
-        world.tick();
-        sizes.push_back(world.bodies(1).size());
-      }
-    }
-    return sizes;
-  };
-
-  const std::vector<std::size_t> following = run(true);
-  EXPECT_EQ(following.front(), 1U);
-  EXPECT_GT(*std::max_element(following.begin(), following.end()), 1U);
-  EXPECT_EQ(following.back(), 1U);
-  // Control: with the focus left at home the camp never expands.
-  const std::vector<std::size_t> staying = run(false);
-  EXPECT_EQ(*std::max_element(staying.begin(), staying.end()), 1U);
 }
 
 TEST(World, ReplayingARecordedOrderLogGivesTheSameHash) {
@@ -887,18 +804,17 @@ TEST(World, ReplayingARecordedOrderLogGivesTheSameHash) {
       {900, STEERED, {BESIDE_HOSTILE, {0}}},
   };
   World live = orders_world(STEERED_HOME);
-  const std::vector<LoggedOrder> recorded =
-      drive(live, STEERED, issued, ORDER_TICKS);
+  const std::vector<LoggedOrder> recorded = drive(live, issued, ORDER_TICKS);
   ASSERT_EQ(recorded.size(), issued.size());
   World replayed = orders_world(STEERED_HOME);
-  drive(replayed, STEERED, recorded, ORDER_TICKS);
+  drive(replayed, recorded, ORDER_TICKS);
   EXPECT_EQ(live.hash(), replayed.hash());
 
   // Control: the same log with one order a tick later is another run.
   std::vector<LoggedOrder> late = recorded;
   late.at(1).tick += 1;
   World shifted = orders_world(STEERED_HOME);
-  drive(shifted, STEERED, late, ORDER_TICKS);
+  drive(shifted, late, ORDER_TICKS);
   EXPECT_NE(live.hash(), shifted.hash());
 }
 
@@ -920,15 +836,14 @@ constexpr Footprint HOUSE{3, 3};
 // its west edge with a disc of `radius` around the target for ARRIVAL_TICKS.
 std::uint32_t house_after_strikes(std::int32_t radius) {
   constexpr std::uint32_t DURABILITY = 1'000;
-  const ArmySpec user{{0, 5}, {0, 5}, 1,
-                      1,      0,      {{3 * CELL_SIZE, radius, 0, 1, 1}}};
-  const ArmySpec target{{2, 5}, {2, 5}, 1, TARGET_STRENGTH, 1, {IDLE}};
+  const ArmySpec user =
+      army({0, 5}, {0, 5}, 1, 1, 0, {{3 * CELL_SIZE, radius, 0, 1, 1}});
+  const ArmySpec target = army({2, 5}, {2, 5}, 1, TARGET_HEALTH, 1, {IDLE});
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
               {user, target},
               {{{4, 4}, DURABILITY, HOUSE}},
               at_war(0)};
-  world.set_focus(centre_of(user.start));
   run_ticks(world, ARRIVAL_TICKS);
   return world.structure(0).durability;
 }
@@ -942,20 +857,19 @@ TEST(World, AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint) {
   EXPECT_EQ(house_after_strikes(TO_EDGE - 1), 1'000U);
 }
 
-// The cells an agent marching from (1, 5) to (12, 5) passes through, with
+// The cells a person marching from (1, 5) to (12, 5) passes through, with
 // `structures` standing on the map.
 std::vector<Cell> march_cells(const std::vector<Structure>& structures) {
-  const ArmySpec walker{{1, 5}, {12, 5}, 1, 1, 0, {IDLE}};
+  const ArmySpec walker = army({1, 5}, {12, 5}, 1, 1, 0, {IDLE});
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
               {walker},
               structures,
               peaceful(SEPARATION)};
-  world.set_focus(centre_of(walker.start));
   std::vector<Cell> cells;
   for (int i = 0; i < ARRIVAL_TICKS; ++i) {
     world.tick();
-    cells.push_back(cell_of(world.bodies(0).front().position));
+    cells.push_back(cell_of(lead(world, 0)));
   }
   return cells;
 }
@@ -990,30 +904,30 @@ bool refused_on_walled_map(const std::vector<ArmySpec>& armies,
 }
 
 TEST(World, FootprintsOverWallsArmiesOrEachOtherAreRefused) {
-  const ArmySpec army{{0, 0}, {0, 0}, 1, 1, 0, {IDLE}};
+  const ArmySpec one = army({0, 0}, {0, 0}, 1, 1, 0, {IDLE});
   const Structure house{{1, 1}, 1, HOUSE};
-  EXPECT_FALSE(refused_on_walled_map({army}, {house}));
+  EXPECT_FALSE(refused_on_walled_map({one}, {house}));
 
   // Over the wall down column 8, over the army, over another structure,
   // and of no width.
-  EXPECT_TRUE(refused_on_walled_map({army}, {{{6, 1}, 1, HOUSE}}));
-  EXPECT_TRUE(refused_on_walled_map({army}, {{{0, 0}, 1, HOUSE}}));
-  EXPECT_TRUE(refused_on_walled_map({army}, {house, {{3, 3}, 1, {1, 1}}}));
-  EXPECT_TRUE(refused_on_walled_map({army}, {{{1, 1}, 1, {0, 3}}}));
+  EXPECT_TRUE(refused_on_walled_map({one}, {{{6, 1}, 1, HOUSE}}));
+  EXPECT_TRUE(refused_on_walled_map({one}, {{{0, 0}, 1, HOUSE}}));
+  EXPECT_TRUE(refused_on_walled_map({one}, {house, {{3, 3}, 1, {1, 1}}}));
+  EXPECT_TRUE(refused_on_walled_map({one}, {{{1, 1}, 1, {0, 3}}}));
 }
 
 TEST(World, ObjectiveTheArmyCannotReachIsRefused) {
   // A row of three cells sealing the wall's only gap, in the bottom row of
   // walled_map().
   const Structure seal{{7, 8}, 1, {3, 1}};
-  const ArmySpec west{{1, 1}, {1, 1}, 1, 1, 0, {IDLE}};
+  const ArmySpec west = army({1, 1}, {1, 1}, 1, 1, 0, {IDLE});
   World world{Seed{1}, Map{walled_map()}, {west}, {seal}, peaceful(0)};
   EXPECT_NO_THROW(world.order(0, {Cell{3, 3}, {0}}));
   EXPECT_THROW(world.order(0, {Cell{13, 1}, {0}}), std::invalid_argument);
 
   // Control: created bound for the far side, the same army is refused, and
   // accepted with the gap open.
-  const ArmySpec bound{{1, 1}, {13, 1}, 1, 1, 0, {IDLE}};
+  const ArmySpec bound = army({1, 1}, {13, 1}, 1, 1, 0, {IDLE});
   EXPECT_TRUE(refused_on_walled_map({bound}, {seal}));
   EXPECT_FALSE(refused_on_walled_map({bound}, {}));
 }
@@ -1037,23 +951,28 @@ constexpr std::int32_t HOUSE_TOP = 8;
 constexpr Footprint SMALL_HOUSE{2, 2};
 constexpr std::int64_t TORCH_REACH = std::int64_t{3} * CELL_SIZE;
 
+// Health of each resident a raid can kill.
+constexpr std::uint64_t RESIDENT_HEALTH = 100;
+
 VillageSpec small_village() { return VillageSpec{{0, 1}, RESIDENTS}; }
 
-World village_world(std::uint32_t residents) {
+World village_world(std::uint64_t health) {
   const Skill guard{3 * CELL_SIZE, 0, 1, 0, 15};
   // The raider strikes the residents, and torches what stands around it.
   const Skill strike{3 * CELL_SIZE, 0, 50, 0, 10};
   const Skill torch{0, 3 * CELL_SIZE, 0, 10, 10};
   const Skill mend{0, 3 * CELL_SIZE, 0, -2, 10};
+  // Four residents in the row below the houses.
   const std::vector<ArmySpec> armies{
-      {{10, 10},
-       {10, 10},
-       residents,
-       std::uint64_t{residents} * 100,
-       0,
-       {guard}},
-      {RAIDER_HOME, RAIDER_HOME, 10, 100'000, 1, {strike, torch}},
-      {MENDER_HOME, MENDER_HOME, 10, 100'000, 2, {mend}},
+      ArmySpec{{10, 10},
+               {Recruit{{9, 10}, health}, Recruit{{10, 10}, health},
+                Recruit{{11, 10}, health}, Recruit{{12, 10}, health}},
+               0,
+               {guard}},
+      army(open_map(ORDERS_SIDE), RAIDER_HOME, RAIDER_HOME, 10, 100'000, 1,
+           {strike, torch}),
+      army(open_map(ORDERS_SIDE), MENDER_HOME, MENDER_HOME, 10, 100'000, 2,
+           {mend}),
   };
   const Rules rules{
       SEPARATION,
@@ -1090,10 +1009,10 @@ VillageState derived(const World& world) {
     return world.stage(0) == stage && world.stage(1) == stage;
   };
   bool threatened = false;
-  for (const Body& body : world.bodies(RAIDER)) {
-    threatened = threatened || (body.count > 0 && world.owner(0) == 0 &&
-                                (torch_reaches(WEST_HOUSE, body.position) ||
-                                 torch_reaches(EAST_HOUSE, body.position)));
+  for (const Position where : positions(world, RAIDER)) {
+    threatened = threatened ||
+                 (world.owner(0) == 0 && (torch_reaches(WEST_HOUSE, where) ||
+                                          torch_reaches(EAST_HOUSE, where)));
   }
   if (all_in(Stage::RUBBLE)) {
     return VillageState::RUINS;
@@ -1110,7 +1029,6 @@ VillageState derived(const World& world) {
 void run_until(World& world, std::vector<VillageState>& states, bool& agreed,
                const std::function<bool()>& done) {
   for (std::uint64_t tick = 0; tick < PHASE_TICKS && !done(); ++tick) {
-    world.set_focus(centre_of(IN_VILLAGE));
     world.tick();
     agreed = agreed && world.village_state(0) == derived(world);
     if (world.village_state(0) != states.back()) {
@@ -1129,21 +1047,20 @@ std::pair<std::size_t, std::size_t> destroyer_of(const World& world,
 }
 
 TEST(World, VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder) {
-  World world = village_world(4);
+  World world = village_world(RESIDENT_HEALTH);
   std::vector<VillageState> states{world.village_state(0)};
   bool agreed = true;
 
   world.order(RAIDER, {IN_VILLAGE, {0, 1}});
   run_until(world, states, agreed, [&world] {
     return world.village_state(0) == VillageState::RUINS &&
-           totals(world.bodies(RESIDENTS)).count == 0;
+           world.roster(RESIDENTS).empty();
   });
   // A state stored when the ruins were reached.
   const VillageState stored = world.village_state(0);
   world.order(RAIDER, {RAIDER_HOME, {0, 1}});
-  run_until(world, states, agreed, [&world] {
-    return in(RAIDER_HOME, world.bodies(RAIDER).front().position);
-  });
+  run_until(world, states, agreed,
+            [&world] { return in(RAIDER_HOME, lead(world, RAIDER)); });
   world.order(MENDER, {IN_VILLAGE, {0}});
   run_until(world, states, agreed, [&world] {
     return world.village_state(0) == VillageState::PROSPEROUS;
@@ -1163,7 +1080,7 @@ TEST(World, VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder) {
 
 TEST(World, RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther) {
   const Skill mend{0, 2 * CELL_SIZE, 0, -2, 10};
-  const ArmySpec mender{{3, 3}, {3, 3}, 1, 1, 0, {mend}};
+  const ArmySpec mender = army({3, 3}, {3, 3}, 1, 1, 0, {mend});
   constexpr std::uint32_t BROKEN = 30;
   constexpr std::uint32_t ABOVE_FLOOR = 100;
   World world{Seed{1},
@@ -1171,7 +1088,6 @@ TEST(World, RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther) {
               {mender},
               {{{4, 3}, BROKEN}, {{2, 3}, ABOVE_FLOOR}},
               peaceful(SEPARATION)};
-  world.set_focus(centre_of(mender.start));
   run_ticks(world, ARRIVAL_TICKS);
 
   EXPECT_EQ(world.structure(0).durability, STAGE_FLOORS.front());
@@ -1180,8 +1096,8 @@ TEST(World, RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther) {
 }
 
 TEST(World, RebuilderBecomesTheOwnerOnlyWhereNoResidentLives) {
-  const auto owner_after_mending = [](std::uint32_t residents) {
-    World world = village_world(residents);
+  const auto owner_after_mending = [](std::uint64_t health) {
+    World world = village_world(health);
     world.order(RAIDER, {IN_VILLAGE, {0, 1}});
     std::vector<VillageState> states{world.village_state(0)};
     bool agreed = true;
@@ -1191,25 +1107,25 @@ TEST(World, RebuilderBecomesTheOwnerOnlyWhereNoResidentLives) {
     world.order(RAIDER, {RAIDER_HOME, {0, 1}});
     world.order(MENDER, {IN_VILLAGE, {0}});
     run_until(world, states, agreed, [] { return false; });
-    return std::pair{world.owner(0), totals(world.bodies(RESIDENTS)).count};
+    return std::pair{world.owner(0), world.roster(RESIDENTS).size()};
   };
 
-  const auto [taken_over, none_left] = owner_after_mending(4);
+  const auto [taken_over, none_left] = owner_after_mending(RESIDENT_HEALTH);
   EXPECT_EQ(none_left, 0U);
   EXPECT_EQ(taken_over, 2U);
   // Control: residents too strong for the raid keep the village.
-  const auto [kept, survivors] = owner_after_mending(400);
+  const auto [kept, survivors] = owner_after_mending(TARGET_HEALTH);
   EXPECT_GT(survivors, 0U);
   EXPECT_EQ(kept, 0U);
 }
 
 TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
-  const ArmySpec army{{0, 0}, {0, 0}, 1, 1, 0, {IDLE}};
+  const ArmySpec one = army({0, 0}, {0, 0}, 1, 1, 0, {IDLE});
   const std::vector<Structure> houses{{{4, 4}, 1}, {{6, 4}, 1}};
   const auto refused = [&](const std::vector<VillageSpec>& villages) {
     try {
       const World world{Seed{1},     Map{open_map(OPEN_SIDE)},
-                        {army},      houses,
+                        {one},       houses,
                         peaceful(0), villages};
       return false;
     } catch (const std::invalid_argument&) {
@@ -1229,13 +1145,12 @@ TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
 std::uint32_t house_after_torch(std::size_t faction) {
   const Skill torch{0, 2 * CELL_SIZE, 0, 10, 10};
   const std::vector<ArmySpec> armies{
-      {{1, 1}, {1, 1}, 1, 1, 0, {IDLE}},
-      {{4, 5}, {4, 5}, 1, 1, faction, {torch}},
+      army({1, 1}, {1, 1}, 1, 1, 0, {IDLE}),
+      army({4, 5}, {4, 5}, 1, 1, faction, {torch}),
   };
   World world{Seed{1},   Map{open_map(OPEN_SIDE)},
               armies,    {{{4, 4}, HOUSE_DURABILITY}},
               at_war(0), {{{0}, 0}}};
-  world.set_focus(centre_of(armies.at(1).start));
   run_ticks(world, ARRIVAL_TICKS);
   return world.structure(0).durability;
 }

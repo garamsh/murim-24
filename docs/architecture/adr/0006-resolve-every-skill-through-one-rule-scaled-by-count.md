@@ -1,6 +1,6 @@
 # ADR 0006: Resolve every skill through one rule scaled by the agents its user stands for
 
-> Status: accepted
+> Status: accepted; its scaling by count and agents covered superseded by ADR-0017
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

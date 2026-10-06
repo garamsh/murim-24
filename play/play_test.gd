@@ -1,11 +1,11 @@
-# Checks that play.tscn turns input into orders for the agent it steers: a left click on a passable
-# cell moves the agent toward it, and a click on a blocked cell is refused; key 1 orders the
-# agent's first skill, and key 9, a skill it lacks, is refused.
+# Checks that play.tscn turns input into orders for the person it steers: a left click on a passable
+# cell moves the person toward it, and a click on a blocked cell is refused; key 1 orders the
+# person's first skill, and key 9, a skill it lacks, is refused.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
 const TICKS := 600
-# How far from the agent's home, in cells, to look for the cells to click.
+# How far from the person's home, in cells, to look for the cells to click.
 const SEARCH := 40
 
 

@@ -12,10 +12,10 @@ namespace murim {
 /// Ticks the simulation runs per second.
 constexpr int TICKS_PER_SECOND = 30;
 
-/// The M1 benchmark scenario, built from a fixed seed: 20,000 agents in
-/// armies at every tier around `focus`, a near battle of two hostile lines of
-/// armies with structures between them, and two caster armies whose area
-/// strikes break those structures.
+/// The M1 benchmark scenario, built from a fixed seed: the worst case for
+/// the tick budget, as many people as a world may hold, MAX_PEOPLE, every
+/// one of them in one battle of two hostile lines of armies with a barricade
+/// between them, and two caster armies whose area strikes break it.
 struct M1Scenario {
   Seed seed;
   std::vector<std::string> map_rows;
@@ -25,9 +25,8 @@ struct M1Scenario {
   /// barricade between the lines.
   std::vector<std::string> structure_kinds;
   Rules rules;
-  Cell focus;
-  /// Armies [0, near_armies) are the near battle.
-  std::size_t near_armies;
+  /// The cell the battle is fought around.
+  Cell centre;
   /// Armies casters_first and casters_first + 1 cast the area strikes.
   std::size_t casters_first;
 };

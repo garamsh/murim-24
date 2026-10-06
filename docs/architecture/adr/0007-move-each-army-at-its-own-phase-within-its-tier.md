@@ -1,6 +1,6 @@
 # ADR 0007: Move each army at its own phase within its tier, and strike on the tier's common tick
 
-> Status: accepted
+> Status: superseded by ADR-0017
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

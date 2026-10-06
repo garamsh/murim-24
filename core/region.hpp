@@ -40,8 +40,8 @@ struct Building {
 };
 
 /// A kind of village: the `area` it occupies, and its `buildings`. Its
-/// resident army stands at the area's centre, as many agents as its buildings
-/// house.
+/// resident army, as many people as its buildings house, stands on the open
+/// cells nearest the area's centre.
 struct VillageTemplate {
   std::string name;
   Footprint area;
@@ -102,12 +102,16 @@ struct Region {
 /// village's structures and resident army.
 [[nodiscard]] std::vector<VillageSpec> village_specs(const Region& region);
 
-/// Returns an army of one agent born into village `village` of `region`: of
-/// the village's faction, with their skills and an agent's share of their
-/// strength, standing on the first cell of the village's area, row by row,
-/// that no structure covers and its residents do not crowd, with that cell
-/// as its objective. Throws std::out_of_range when there
-/// is no such village or no such cell.
+/// Returns the cells of `village`'s area that none of its structures
+/// covers, row by row.
+[[nodiscard]] std::vector<Cell> open_cells(const Region& region,
+                                           const Village& village);
+
+/// Returns an army of one person born into village `village` of `region`:
+/// of the village's faction, with its residents' skills and health,
+/// standing on the first open cell of the village's area, row by row, that
+/// no resident stands on, with that cell as its objective. Throws
+/// std::out_of_range when there is no such village or no such cell.
 [[nodiscard]] ArmySpec born_in(const Region& region, std::size_t village);
 
 }  // namespace murim

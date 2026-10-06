@@ -8,7 +8,6 @@ extends RefCounted
 const SCENE := "res://world_art/world_art.tscn"
 const SEED := 2026
 const TICKS := 2000
-const FOCUS := Vector2i(4 * 256, 4 * 256)
 # A wall of blocked cells, drawn as mountain, down column 8 from row 0 to row 7.
 const MAP_ROWS: Array[String] = [
 	"........#.......",
@@ -22,22 +21,22 @@ const MAP_ROWS: Array[String] = [
 	"................",
 ]
 const BLAST := {"range": 768, "radius": 512, "body_damage": 2, "structure_damage": 9, "cooldown": 64}
+# Twelve people from (0, 0) and ten from (12, 6), in rows of four, each bound for the other's corner.
 const ARMIES: Array[Dictionary] = [
-	{"start": Vector2i(1, 1), "objective": Vector2i(14, 7), "count": 12, "strength": 1200,
-		"faction": 0, "skills": [BLAST]},
-	{"start": Vector2i(14, 7), "objective": Vector2i(1, 1), "count": 10, "strength": 1010,
-		"faction": 1, "skills": [BLAST]},
+	{"objective": Vector2i(14, 7), "faction": 0, "skills": [BLAST], "members": [
+		{"cell": Vector2i(0, 0), "health": 100}, {"cell": Vector2i(1, 0), "health": 100}, {"cell": Vector2i(2, 0), "health": 100}, {"cell": Vector2i(3, 0), "health": 100}, {"cell": Vector2i(0, 1), "health": 100}, {"cell": Vector2i(1, 1), "health": 100}, {"cell": Vector2i(2, 1), "health": 100}, {"cell": Vector2i(3, 1), "health": 100}, {"cell": Vector2i(0, 2), "health": 100}, {"cell": Vector2i(1, 2), "health": 100}, {"cell": Vector2i(2, 2), "health": 100}, {"cell": Vector2i(3, 2), "health": 100}]},
+	{"objective": Vector2i(1, 1), "faction": 1, "skills": [BLAST], "members": [
+		{"cell": Vector2i(12, 6), "health": 101}, {"cell": Vector2i(13, 6), "health": 101}, {"cell": Vector2i(14, 6), "health": 101}, {"cell": Vector2i(15, 6), "health": 101}, {"cell": Vector2i(12, 7), "health": 101}, {"cell": Vector2i(13, 7), "health": 101}, {"cell": Vector2i(14, 7), "health": 101}, {"cell": Vector2i(15, 7), "health": 101}, {"cell": Vector2i(12, 8), "health": 101}, {"cell": Vector2i(13, 8), "health": 101}]},
 ]
 const STRUCTURES: Array[Dictionary] = [
 	{"cell": Vector2i(7, 7), "durability": 100},
 	{"cell": Vector2i(9, 7), "durability": 60},
 ]
-const RULES := {"separation": 72, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
+const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 
 
 func run() -> bool:
 	var world := WorldAdapter.create(42, PackedStringArray(MAP_ROWS), ARMIES, STRUCTURES, RULES)
-	world.set_focus(FOCUS)
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(world, -1)
 	var ground: Array[Node] = art.get_node("Ground").get_children()
@@ -65,7 +64,7 @@ func run() -> bool:
 		art.note_tick()
 	var bodies := 0
 	for army in world.army_count():
-		bodies += world.body_counts(army).size()
+		bodies += world.body_positions(army).size()
 	art.refresh(Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * 16))
 	var on_screen: int = art.drawn
 	# Control: a view beside the map, over the same rows, draws nothing, so the count above is the

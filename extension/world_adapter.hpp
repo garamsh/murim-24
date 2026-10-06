@@ -35,8 +35,9 @@ class WorldAdapter : public godot::RefCounted {
   /// `map_rows`, `armies`, `structures` and `rules`, as the core's
   /// constructor takes them, each struct as a Dictionary keyed by its field
   /// names:
-  /// - army: `start` and `objective` (Vector2i cells), `count`, `strength`,
+  /// - army: `objective` (Vector2i cell), `members` (Array of members),
   ///   `faction` (int) and `skills` (Array of skills);
+  /// - member: `cell` (Vector2i) and `health` (int), a new person;
   /// - skill: `range`, `radius`, `body_damage`, `structure_damage`,
   ///   `cooldown` (int);
   /// - structure: `cell` (Vector2i) and `durability` (int);
@@ -50,20 +51,16 @@ class WorldAdapter : public godot::RefCounted {
       const godot::TypedArray<godot::Dictionary>& structures,
       const godot::Dictionary& rules);
 
-  /// Returns an adapter over the core's M1 benchmark scenario, focused where
-  /// the scenario places its focus.
+  /// Returns an adapter over the core's M1 benchmark scenario.
   static godot::Ref<WorldAdapter> create_m1();
 
   /// Returns an adapter over the region the core generates from `seed`, with
-  /// one agent born into its first village as the last army, and the focus on
-  /// that agent.
+  /// one person born into its first village as the last army.
   static godot::Ref<WorldAdapter> create_region(std::int64_t seed);
 
-  /// Returns where create_m1() places the focus, in sub-cell units.
-  static godot::Vector2i m1_focus();
-
-  /// Places the point the tiers are measured from, in sub-cell units.
-  void set_focus(const godot::Vector2i& focus);
+  /// Returns the point the M1 scenario's battle is fought around, in
+  /// sub-cell units.
+  static godot::Vector2i m1_centre();
 
   /// Gives army `army` the order to march toward `objective` and strike with
   /// one of `skills`, indices into its skills. Returns false, after
@@ -87,14 +84,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns how many skills army `army` was created with.
   [[nodiscard]] std::int64_t skill_count(std::int64_t army) const;
 
-  /// Returns the positions of army `army`'s bodies, in sub-cell units and
-  /// creation order; exact while coordinates stay within 2^24.
+  /// Returns the positions of army `army`'s living members, each one person,
+  /// in sub-cell units and roster order; exact while coordinates stay within
+  /// 2^24. Its size is the roster's.
   [[nodiscard]] godot::PackedVector2Array body_positions(
       std::int64_t army) const;
-
-  /// Returns the agent count of each of army `army`'s bodies, in the order
-  /// of body_positions().
-  [[nodiscard]] godot::PackedInt64Array body_counts(std::int64_t army) const;
 
   /// Returns how many structures the world was created with.
   [[nodiscard]] std::int64_t structure_count() const;
@@ -123,11 +117,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the faction army `army` was created with.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
 
-  /// Returns the strength army `army` was created with.
+  /// Returns the health army `army`'s members were created with, together.
   [[nodiscard]] std::int64_t army_strength(std::int64_t army) const;
 
-  /// Returns the strength of each of army `army`'s bodies, in the order of
-  /// body_positions().
+  /// Returns the health of each of army `army`'s living members, in the
+  /// order of body_positions().
   [[nodiscard]] godot::PackedInt64Array body_strengths(std::int64_t army) const;
 
   /// Returns the names of the terrain kinds, by index; empty unless the

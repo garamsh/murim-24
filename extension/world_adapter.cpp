@@ -92,11 +92,14 @@ murim::Skill skill(const godot::Dictionary& fields) {
                       integer<std::uint64_t>(fields, "cooldown")};
 }
 
+murim::Recruit recruit(const godot::Dictionary& fields) {
+  return murim::Recruit{cell(fields, "cell"),
+                        integer<std::uint64_t>(fields, "health")};
+}
+
 murim::ArmySpec army_spec(const godot::Dictionary& fields) {
-  return murim::ArmySpec{cell(fields, "start"),
-                         cell(fields, "objective"),
-                         integer<std::uint32_t>(fields, "count"),
-                         integer<std::uint64_t>(fields, "strength"),
+  return murim::ArmySpec{cell(fields, "objective"),
+                         each(array(fields, "members"), recruit),
                          integer<std::size_t>(fields, "faction"),
                          each(array(fields, "skills"), skill)};
 }
@@ -161,7 +164,6 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   godot::Ref<WorldAdapter> adapter = over(
       scenario.seed, std::move(scenario.map_rows), std::move(scenario.armies),
       std::move(scenario.structures), std::move(scenario.rules));
-  adapter->world().set_focus(murim::centre_of(scenario.focus));
   adapter->structure_kinds_ = std::move(scenario.structure_kinds);
   return adapter;
 }
@@ -171,11 +173,9 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
       murim::Seed{static_cast<std::uint64_t>(seed)}, murim::region_data());
   region.armies.push_back(murim::born_in(region, 0));
   std::vector<std::string> kinds = std::move(region.structure_kinds);
-  const murim::Cell birthplace = region.armies.back().start;
   godot::Ref<WorldAdapter> adapter =
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
            std::move(region.structures), std::move(region.rules));
-  adapter->world().set_focus(murim::centre_of(birthplace));
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
   adapter->terrain_ = std::move(region.terrain);
@@ -184,9 +184,9 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed) {
   return adapter;
 }
 
-godot::Vector2i WorldAdapter::m1_focus() {
-  const murim::Position focus = murim::centre_of(murim::m1_scenario().focus);
-  return godot::Vector2i{focus.x, focus.y};
+godot::Vector2i WorldAdapter::m1_centre() {
+  const murim::Position centre = murim::centre_of(murim::m1_scenario().centre);
+  return godot::Vector2i{centre.x, centre.y};
 }
 
 godot::Ref<WorldAdapter> WorldAdapter::over(
@@ -199,7 +199,11 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     adapter->skill_counts_.push_back(army.skills.size());
     adapter->skills_.push_back(army.skills);
     adapter->factions_.push_back(army.faction);
-    adapter->strengths_.push_back(army.strength);
+    std::uint64_t health = 0;
+    for (const murim::Recruit& member : army.members) {
+      health += member.health;
+    }
+    adapter->strengths_.push_back(health);
   }
   adapter->structure_count_ = structures.size();
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
@@ -230,12 +234,6 @@ std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
                      static_cast<std::uint64_t>(structure) >= structure_count_,
                  "structure index out of range");
   return static_cast<std::size_t>(structure);
-}
-
-void WorldAdapter::set_focus(const godot::Vector2i& focus) {
-  const godot::Variant value = focus;
-  world().set_focus(murim::Position{narrow<std::int32_t>(value.get("x"), "x"),
-                                    narrow<std::int32_t>(value.get("y"), "y")});
 }
 
 bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
@@ -284,19 +282,12 @@ std::int64_t WorldAdapter::skill_count(std::int64_t army) const {
 godot::PackedVector2Array WorldAdapter::body_positions(
     std::int64_t army) const {
   godot::PackedVector2Array positions;
-  for (const murim::Body& body : world().bodies(army_index(army))) {
-    positions.push_back(godot::Vector2(static_cast<float>(body.position.x),
-                                       static_cast<float>(body.position.y)));
+  for (const std::size_t member : world().roster(army_index(army))) {
+    const murim::Position position = world().person(member).position;
+    positions.push_back(godot::Vector2(static_cast<float>(position.x),
+                                       static_cast<float>(position.y)));
   }
   return positions;
-}
-
-godot::PackedInt64Array WorldAdapter::body_counts(std::int64_t army) const {
-  godot::PackedInt64Array counts;
-  for (const murim::Body& body : world().bodies(army_index(army))) {
-    counts.push_back(body.count);
-  }
-  return counts;
 }
 
 std::int64_t WorldAdapter::structure_count() const {
@@ -351,8 +342,9 @@ std::int64_t WorldAdapter::army_strength(std::int64_t army) const {
 
 godot::PackedInt64Array WorldAdapter::body_strengths(std::int64_t army) const {
   godot::PackedInt64Array strengths;
-  for (const murim::Body& body : world().bodies(army_index(army))) {
-    strengths.push_back(static_cast<std::int64_t>(body.strength));
+  for (const std::size_t member : world().roster(army_index(army))) {
+    strengths.push_back(
+        static_cast<std::int64_t>(world().person(member).health));
   }
   return strengths;
 }
@@ -420,10 +412,8 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_static_method(name,
                                      godot::D_METHOD("create_region", "seed"),
                                      &WorldAdapter::create_region);
-  godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_focus"),
-                                     &WorldAdapter::m1_focus);
-  godot::ClassDB::bind_method(godot::D_METHOD("set_focus", "focus"),
-                              &WorldAdapter::set_focus);
+  godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
+                                     &WorldAdapter::m1_centre);
   godot::ClassDB::bind_method(
       godot::D_METHOD("order", "army", "objective", "skills"),
       &WorldAdapter::order);
@@ -437,8 +427,6 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::army_count);
   godot::ClassDB::bind_method(godot::D_METHOD("body_positions", "army"),
                               &WorldAdapter::body_positions);
-  godot::ClassDB::bind_method(godot::D_METHOD("body_counts", "army"),
-                              &WorldAdapter::body_counts);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_count"),
                               &WorldAdapter::structure_count);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_cell", "structure"),

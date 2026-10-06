@@ -29,9 +29,10 @@ constexpr std::int32_t CAPITAL_CANDIDATES = 16;
 constexpr std::int32_t MIN_VILLAGES = 6;
 constexpr std::int32_t VILLAGE_COUNTS = 3;
 
-constexpr std::int32_t SEPARATION = 72;
+// People stand a cell apart, as wide as a body is drawn.
+constexpr std::int32_t SEPARATION = CELL_SIZE;
 constexpr std::uint32_t DURABILITY = 3'000;
-constexpr std::uint64_t STRENGTH_PER_AGENT = 100'000;
+constexpr std::uint64_t HEALTH = 100'000;
 
 // A point a partition is made around, and the value its cells take.
 struct Site {
@@ -383,41 +384,57 @@ Region generate_region(Seed seed, const RegionData& data) {
     }
     const Cell middle = middle_of(kind.area);
     const Cell centre{corner.x + middle.x, corner.y + middle.y};
-    region.armies.push_back(ArmySpec{centre, centre, residents,
-                                     residents * STRENGTH_PER_AGENT, owner,
+    // The residents stand on the open cells nearest the centre.
+    std::vector<Cell> open = open_cells(region, village);
+    std::stable_sort(open.begin(), open.end(), [centre](Cell left, Cell right) {
+      return distance_squared(left, centre) < distance_squared(right, centre);
+    });
+    std::vector<Recruit> members;
+    for (std::size_t person = 0;
+         person < std::min<std::size_t>(residents, open.size()); ++person) {
+      members.push_back(Recruit{open.at(person), HEALTH});
+    }
+    region.armies.push_back(ArmySpec{centre, std::move(members), owner,
                                      data.factions.at(owner).skills});
     region.villages.push_back(village);
   }
   return region;
 }
 
+std::vector<Cell> open_cells(const Region& region, const Village& village) {
+  std::vector<Cell> open;
+  for (const Cell cell : cells_of(village.corner, village.area)) {
+    const auto covers = [&region, cell](std::size_t index) {
+      const Structure& structure = region.structures.at(index);
+      return cell.x >= structure.cell.x && cell.y >= structure.cell.y &&
+             cell.x < structure.cell.x + structure.footprint.width &&
+             cell.y < structure.cell.y + structure.footprint.height;
+    };
+    if (std::none_of(village.structures.begin(), village.structures.end(),
+                     covers)) {
+      open.push_back(cell);
+    }
+  }
+  return open;
+}
+
 ArmySpec born_in(const Region& region, std::size_t village) {
   const Village& home = region.villages.at(village);
   const ArmySpec& residents = region.armies.at(home.army);
-  const auto taken = [&region, &home, &residents](Cell cell) {
-    const auto covers = [&region, cell](std::size_t index) {
-      const Structure& structure = region.structures.at(index);
-      const std::vector<Cell> cells =
-          cells_of(structure.cell, structure.footprint);
-      return std::any_of(cells.begin(), cells.end(), [cell](Cell covered) {
-        return covered.x == cell.x && covered.y == cell.y;
-      });
-    };
-    return (cell.x == residents.start.x && cell.y == residents.start.y) ||
-           std::any_of(home.structures.begin(), home.structures.end(), covers);
+  const auto taken = [&residents](Cell cell) {
+    return std::any_of(residents.members.begin(), residents.members.end(),
+                       [cell](const Recruit& resident) {
+                         return resident.cell.x == cell.x &&
+                                resident.cell.y == cell.y;
+                       });
   };
-  const std::vector<Cell> cells = cells_of(home.corner, home.area);
-  const auto free = std::find_if_not(cells.begin(), cells.end(), taken);
-  if (free == cells.end()) {
+  const std::vector<Cell> open = open_cells(region, home);
+  const auto free = std::find_if_not(open.begin(), open.end(), taken);
+  if (free == open.end()) {
     throw std::out_of_range("the village has no free cell to be born on");
   }
-  const Cell birthplace = *free;
-  return ArmySpec{birthplace,
-                  birthplace,
-                  1,
-                  residents.strength / residents.count,
-                  residents.faction,
-                  residents.skills};
+  return ArmySpec{
+      *free, {Recruit{*free, HEALTH}}, residents.faction, residents.skills};
 }
 
 std::vector<VillageSpec> village_specs(const Region& region) {
