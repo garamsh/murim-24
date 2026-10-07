@@ -706,6 +706,50 @@ void World::restore() {
     return fight.faction >= factions || fight.challenger >= people ||
            fight.leader >= people;
   };
+  const auto stray_soul = [disciplines](const Soul& soul) {
+    return soul.practised.size() > disciplines;
+  };
+  const Manuals manuals = life_.manuals.value_or(Manuals{});
+  const auto unknown = [disciplines](const std::vector<std::size_t>& held) {
+    return !all_below(held, disciplines);
+  };
+  const bool bad_life =
+      (life_.growth && life_.growth->stances.size() > factions) ||
+      manuals.held.size() > sects_.size() ||
+      std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
+      manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
+      !all_below(surnames_, life_.names.surnames.size());
+  if (bad_rules || bad_life || bad_structures || !events_kept() ||
+      !rostered() || living() > MAX_PEOPLE ||
+      std::any_of(people_.begin(), people_.end(), stray_person) ||
+      std::any_of(villages_.begin(), villages_.end(), stray_village) ||
+      leadership_.size() != factions ||
+      std::any_of(leadership_.begin(), leadership_.end(), bad_faction) ||
+      std::any_of(sects_.begin(), sects_.end(), stray_sect) ||
+      std::any_of(manuals_.begin(), manuals_.end(), stray_manual) ||
+      std::any_of(duels_.begin(), duels_.end(), stray_duel) ||
+      std::any_of(souls_.begin(), souls_.end(), stray_soul)) {
+    throw std::invalid_argument(
+        "a restored world must keep the limits a world is created within, "
+        "every reference must name a record it holds, and every living "
+        "person must stand on exactly one roster");
+  }
+  structure_extent_ = 0;
+  for (const Structure& structure : structures_) {
+    structure_extent_ =
+        std::max({structure_extent_, structure.footprint.width * CELL_SIZE,
+                  structure.footprint.height * CELL_SIZE});
+  }
+  structure_index_ = SpatialHash{centres_of(structures_)};
+}
+
+// Whether the events kept are as tick() keeps them: at most
+// EVENT_CAPACITY, oldest first, numbered one after another, none later than
+// the world's tick, each naming records the world holds.
+bool World::events_kept() const {
+  const std::size_t factions = rules_.hostile.size();
+  const std::size_t people = people_.size();
+  const std::size_t villages = villages_.size();
   const auto stray_happening = [&](const Happening& what) {
     if (const auto* founded = std::get_if<Founded>(&what)) {
       return founded->village >= villages || founded->faction >= factions;
@@ -731,8 +775,6 @@ void World::restore() {
     const auto* died = std::get_if<Died>(&what);
     return died == nullptr || died->person >= people;
   };
-  // Events are kept oldest first, numbered one after another, none later
-  // than the world's tick.
   bool bad_events = events_.size() > EVENT_CAPACITY;
   for (std::size_t index = 0; index < events_.size(); ++index) {
     const Event& event = events_.at(index);
@@ -742,41 +784,7 @@ void World::restore() {
     bad_events = bad_events || unordered || event.tick > tick_count_ ||
                  stray_happening(event.what);
   }
-  const auto stray_soul = [disciplines](const Soul& soul) {
-    return soul.practised.size() > disciplines;
-  };
-  const Manuals manuals = life_.manuals.value_or(Manuals{});
-  const auto unknown = [disciplines](const std::vector<std::size_t>& held) {
-    return !all_below(held, disciplines);
-  };
-  const bool bad_life =
-      (life_.growth && life_.growth->stances.size() > factions) ||
-      manuals.held.size() > sects_.size() ||
-      std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
-      manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
-      !all_below(surnames_, life_.names.surnames.size());
-  if (bad_rules || bad_life || bad_structures || bad_events || !rostered() ||
-      living() > MAX_PEOPLE ||
-      std::any_of(people_.begin(), people_.end(), stray_person) ||
-      std::any_of(villages_.begin(), villages_.end(), stray_village) ||
-      leadership_.size() != factions ||
-      std::any_of(leadership_.begin(), leadership_.end(), bad_faction) ||
-      std::any_of(sects_.begin(), sects_.end(), stray_sect) ||
-      std::any_of(manuals_.begin(), manuals_.end(), stray_manual) ||
-      std::any_of(duels_.begin(), duels_.end(), stray_duel) ||
-      std::any_of(souls_.begin(), souls_.end(), stray_soul)) {
-    throw std::invalid_argument(
-        "a restored world must keep the limits a world is created within, "
-        "every reference must name a record it holds, and every living "
-        "person must stand on exactly one roster");
-  }
-  structure_extent_ = 0;
-  for (const Structure& structure : structures_) {
-    structure_extent_ =
-        std::max({structure_extent_, structure.footprint.width * CELL_SIZE,
-                  structure.footprint.height * CELL_SIZE});
-  }
-  structure_index_ = SpatialHash{centres_of(structures_)};
+  return !bad_events;
 }
 
 // Whether every army's faction, skills, order and roster name what the world
@@ -1093,6 +1101,24 @@ void World::note_falls(std::vector<std::size_t> sects) {
   }
 }
 
+// Records the death of every person on a roster with no health left, and
+// returns the sects each was a member of.
+std::vector<std::size_t> World::record_deaths() {
+  std::vector<std::size_t> bereft;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      const Person& dead = people_.at(member);
+      if (dead.health == 0) {
+        record(cell_of(dead.position), Died{member});
+        if (dead.sect) {
+          bereft.push_back(*dead.sect);
+        }
+      }
+    }
+  }
+  return bereft;
+}
+
 const std::vector<Event>& World::events() const { return events_; }
 
 // Whether `other` is `one`'s kin: itself, of its family, its spouse, parent
@@ -1137,14 +1163,13 @@ bool World::heard_by(const Event& event, std::size_t person,
   return changed != nullptr && ours(changed->faction);
 }
 
-std::vector<Event> World::rumours(std::size_t person, std::size_t count) const {
+std::vector<Event> World::rumours(std::size_t person) const {
   if (person >= people_.size()) {
     throw std::out_of_range("no such person hears rumours");
   }
   const std::optional<std::size_t> faction = faction_of(person);
   std::vector<Event> heard;
-  for (auto event = events_.rbegin();
-       event != events_.rend() && heard.size() < count; ++event) {
+  for (auto event = events_.rbegin(); event != events_.rend(); ++event) {
     if (heard_by(*event, person, faction)) {
       heard.push_back(*event);
     }
@@ -1466,18 +1491,7 @@ void World::tick() {
   }
   // A soul whose body died this tick is born again, into the army it served.
   const std::vector<Passing> reborn = passings();
-  std::vector<std::size_t> bereft;
-  for (const Army& army : armies_) {
-    for (const std::size_t member : army.roster) {
-      const Person& dead = people_.at(member);
-      if (dead.health == 0) {
-        record(cell_of(dead.position), Died{member});
-        if (dead.sect) {
-          bereft.push_back(*dead.sect);
-        }
-      }
-    }
-  }
+  std::vector<std::size_t> bereft = record_deaths();
   for (Army& army : armies_) {
     army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
                                      [this](std::size_t member) {

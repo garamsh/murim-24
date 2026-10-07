@@ -723,42 +723,49 @@ void put_event(Writer& out, const Event& event) {
 Event get_event(Reader& input) {
   constexpr std::uint8_t HAPPENINGS = std::variant_size_v<Happening>;
   constexpr std::uint8_t CHOICES = 2;
+  // The happenings' tags, as their index in Happening.
+  constexpr std::uint8_t FOUNDED = 0;
+  constexpr std::uint8_t RAIDED = 1;
+  constexpr std::uint8_t RUINED = 2;
+  constexpr std::uint8_t SECT_FELL = 3;
+  constexpr std::uint8_t LEADER_CHANGED = 4;
+  constexpr std::uint8_t BORN = 5;
   Event event;
   event.sequence = input.u64();
   event.tick = input.u64();
   event.cell = get_cell(input);
   switch (input.tag(HAPPENINGS)) {
-    case 0: {
+    case FOUNDED: {
       const std::size_t village = input.size();
       event.what = Founded{village, input.size()};
       break;
     }
-    case 1: {
+    case RAIDED: {
       const std::size_t village = input.size();
       const std::size_t owner = input.size();
       event.what = Raided{village, owner, input.size()};
       break;
     }
-    case 2: {
+    case RUINED: {
       const std::size_t village = input.size();
       const std::size_t owner = input.size();
       const std::size_t army = input.size();
       event.what = Ruined{village, owner, Destroyer{army, input.size()}};
       break;
     }
-    case 3: {
+    case SECT_FELL: {
       const std::size_t sect = input.size();
       event.what = SectFell{sect, input.size()};
       break;
     }
-    case 4: {
+    case LEADER_CHANGED: {
       const std::size_t faction = input.size();
       const std::size_t leader = input.size();
       event.what = LeaderChanged{faction, leader,
                                  static_cast<ChosenBy>(input.tag(CHOICES))};
       break;
     }
-    case 5:
+    case BORN:
       event.what = Born{input.size()};
       break;
     default:

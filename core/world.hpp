@@ -909,15 +909,14 @@ class World {
   /// first.
   [[nodiscard]] const std::vector<Event>& events() const;
 
-  /// Returns the latest `count` events, newest first, that reach person
-  /// `person` as rumours: those within the rumour reach of where it stands,
+  /// Returns the events kept that reach person `person` as rumours, newest
+  /// first: those within the rumour reach of where it stands,
   /// and wherever they happened, the births and deaths of its kin (its
   /// family, spouses, parents and children) and what befell its faction: a
   /// village of it founded, raided or ruined, or by it raided or ruined, a
   /// sect of it fallen, or its lead changing hands. Throws std::out_of_range
   /// when there is no such person.
-  [[nodiscard]] std::vector<Event> rumours(std::size_t person,
-                                           std::size_t count) const;
+  [[nodiscard]] std::vector<Event> rumours(std::size_t person) const;
 
  private:
   friend class SaveCodec;
@@ -1010,6 +1009,8 @@ class World {
   void admit(const Living& living);
   void record(Cell cell, Happening what);
   void note_falls(std::vector<std::size_t> sects);
+  [[nodiscard]] std::vector<std::size_t> record_deaths();
+  [[nodiscard]] bool events_kept() const;
   [[nodiscard]] bool related(std::size_t one, std::size_t other) const;
   [[nodiscard]] bool heard_by(const Event& event, std::size_t person,
                               std::optional<std::size_t> faction) const;

@@ -12,6 +12,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -2684,6 +2685,34 @@ World application_world(const Applying& applying) {
   return world;
 }
 
+// What person `applying.person` is told on applying in `applying`'s world:
+// the refusal, whether apply() refused it, and the sect it belongs to after.
+using Answer = std::tuple<ApplicationRefusal, bool, std::optional<std::size_t>>;
+
+Answer answer(const Applying& applying) {
+  World world = application_world(applying);
+  const ApplicationRefusal refusal =
+      world.application_refusal(applying.person, SECT);
+  bool refused = false;
+  try {
+    world.apply(applying.person, SECT);
+  } catch (const std::invalid_argument&) {
+    refused = true;
+  }
+  return Answer{refusal, refused, world.sect_of(applying.person)};
+}
+
+// Whether an application to a sect the world lacks is refused.
+bool applying_to_no_sect_is_refused() {
+  const World world = application_world(Applying{});
+  try {
+    static_cast<void>(world.application_refusal(VILLAGER, SECT + 1));
+  } catch (const std::invalid_argument&) {
+    return true;
+  }
+  return false;
+}
+
 TEST(World, AnApplicationIsRefusedForEachReasonApplyRefusesIt) {
   Sectarian mortal;
   mortal.lifespan = Spread{1, 0};
@@ -2714,19 +2743,18 @@ TEST(World, AnApplicationIsRefusedForEachReasonApplyRefusesIt) {
       {Applying{Sectarian{}, VILLAGER, 0, true}, ApplicationRefusal::NO_ELDER},
       {Applying{narrow}, ApplicationRefusal::FULL},
   };
+  std::vector<Answer> answers;
+  std::vector<Answer> refusals;
   for (const auto& [applying, reason] : cases) {
-    World world = application_world(applying);
-    EXPECT_EQ(world.application_refusal(applying.person, SECT), reason);
-    EXPECT_THROW(world.apply(applying.person, SECT), std::invalid_argument);
-    EXPECT_EQ(world.sect_of(applying.person) == SECT,
-              reason == ApplicationRefusal::IN_A_SECT);
+    answers.push_back(answer(applying));
+    const bool member = reason == ApplicationRefusal::IN_A_SECT;
+    refusals.emplace_back(
+        reason, true, member ? std::optional<std::size_t>{SECT} : std::nullopt);
   }
+  EXPECT_EQ(answers, refusals);
   // Control: the same villager, with nothing barring it, is admitted.
-  World open = application_world(Applying{});
-  EXPECT_EQ(open.application_refusal(VILLAGER, SECT), ApplicationRefusal::NONE);
-  EXPECT_NO_THROW(open.apply(VILLAGER, SECT));
-  EXPECT_THROW(static_cast<void>(open.application_refusal(VILLAGER, 1)),
-               std::invalid_argument);
+  EXPECT_EQ(answer(Applying{}), Answer(ApplicationRefusal::NONE, false, SECT));
+  EXPECT_TRUE(applying_to_no_sect_is_refused());
 }
 
 // The happenings of kind `Kind` among the events world `world` keeps, oldest
@@ -2813,7 +2841,7 @@ TEST(World, VillagesFoundedRaidedAndRuinedAreRecorded) {
   ASSERT_EQ(founding.size(), 1U);
   EXPECT_EQ(founding.front().village, FOUNDED);
   EXPECT_EQ(founding.front().faction, 0U);
-  Growing raiding{{Expansion::RAID}};
+  const Growing raiding{{Expansion::RAID}};
   World raided = growth_world(raiding);
   run_ticks(raided, 1);
   const std::vector<Raided> raids = recorded<Raided>(raided);
@@ -2838,6 +2866,8 @@ TEST(World, VillagesFoundedRaidedAndRuinedAreRecorded) {
   EXPECT_TRUE(recorded<Ruined>(quiet).empty());
 }
 
+constexpr Cell MIDDLE{8, 8};
+
 // A world of days of one tick in which `people` people, who live a day, die.
 World dying(std::size_t people) {
   Life life = one_discipline(0);
@@ -2846,7 +2876,7 @@ World dying(std::size_t people) {
   daily.ticks_per_day = 1;
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
-              {army({8, 8}, {8, 8}, people, 1, 0, {IDLE})},
+              {army(MIDDLE, MIDDLE, people, 1, 0, {IDLE})},
               {},
               daily,
               {},
@@ -2893,17 +2923,19 @@ TEST(World, ARumourReachOutsideItsLimitsIsRefused) {
   EXPECT_TRUE(hears_within(MAX_REACH));
 }
 
+constexpr Cell FAR_CORNER{14, 14};
+
 TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
   // A sect of faction 0 fell at its seat: its faction's villager hears of it
   // from afar, and faction 1's outsider, beyond the reach, does not.
   const World world = fallen(Sectarian{});
   ASSERT_EQ(recorded<SectFell>(world).size(), 1U);
-  EXPECT_EQ(world.rumours(VILLAGER, 1).size(), 1U);
-  EXPECT_TRUE(world.rumours(HOMELESS, 1).empty());
+  EXPECT_EQ(world.rumours(VILLAGER).size(), 1U);
+  EXPECT_TRUE(world.rumours(HOMELESS).empty());
   // Control: within the reach, the outsider hears it too.
   Sectarian near;
   near.rumour_reach = OPEN_SIDE;
-  EXPECT_EQ(fallen(near).rumours(HOMELESS, 1).size(), 1U);
+  EXPECT_EQ(fallen(near).rumours(HOMELESS).size(), 1U);
 
   // A death reaches the dead one's family from afar and no stranger of its
   // faction.
@@ -2912,7 +2944,7 @@ TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
                Map{open_map(OPEN_SIDE)},
                {army({1, 1}, {1, 1}, 2, 1, 0, {IDLE}),
                 army({1, 2}, {1, 2}, 1, 1, 1, {once}),
-                army({14, 14}, {14, 14}, 1, 1, 0, {IDLE})},
+                army(FAR_CORNER, FAR_CORNER, 1, 1, 0, {IDLE})},
                {},
                at_war(0)};
   run_ticks(struck, 1);
@@ -2920,10 +2952,8 @@ TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
   const std::size_t dead = recorded<Died>(struck).front().person;
   const std::size_t kin = dead == 0 ? 1 : 0;
   ASSERT_GT(struck.person(kin).health, 0U);
-  EXPECT_EQ(struck.rumours(kin, 1).size(), 1U);
-  EXPECT_TRUE(struck.rumours(3, 1).empty());
-  // The newest come first, as many as asked.
-  EXPECT_TRUE(struck.rumours(kin, 0).empty());
+  EXPECT_EQ(struck.rumours(kin).size(), 1U);
+  EXPECT_TRUE(struck.rumours(3).empty());
 }
 
 }  // namespace

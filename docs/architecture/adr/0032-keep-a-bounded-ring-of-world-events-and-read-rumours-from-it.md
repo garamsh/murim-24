@@ -28,7 +28,7 @@ Options weighed:
   - Rejected: recording only births and deaths in the player's family. The core does not know the player, and the reader decides whose family matters.
 - **How many are kept.** The latest `EVENT_CAPACITY`, 64, oldest first; the oldest gives way. About fifteen years of the region at the rate measured. The sequence tells a reader which entries are new since it last read.
   - Rejected: an unbounded log. It grows with the world, and with every save of it.
-- **Who hears what.** `rumours(person, count)` returns the latest `count` events that reach the person, newest first, derived on read:
+- **Who hears what.** `rumours(person)` returns the events kept that reach the person, newest first, derived on read:
   - those within `rumour_reach` cells of where it stands, along each axis, world data in `Rules`
   - wherever they happened: the births and deaths of its kin, its family, spouses, parents and children; and what befell its faction, a village of it founded, raided or ruined, or one raided or ruined by it, a sect of it fallen, or its lead changing hands
   - Rejected: the selection in GDScript. Who hears a rumour is a rule, and a rule written there exists outside the application.
