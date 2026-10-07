@@ -14,6 +14,7 @@ This document is the single reference for the game concept agreed with the user.
 - Reincarnation [settled]
 - Lifespan [settled]
 - Martial arts [draft]
+- Qi and martial arts [agreed]
 - MVP scope [proposed]
 - Open questions [open]
 
@@ -130,6 +131,21 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Enlightenment**: replaces leveling up.
 - Secret manuals are items that actually exist in the world, and they are scattered or lost when a sect is wiped out.
 
+## Qi and martial arts [agreed]
+
+- **Qi amount.** Every person holds a store of inner energy (naegong), which grows by cultivation: time and practice. Talent bounds how far and how fast it grows, and stays hidden (§Talent).
+- **Realms (gyeongji).** Thresholds of qi make realms, on a ladder familiar from Korean wuxia: for example third-rate (samryu), second-rate (iryu), first-rate (ilryu), peak (jeoljeong), beyond peak (chojeoljeong), transformation (hwagyeong), mystery (hyeongyeong) and life-and-death (saengsagyeong). The names and thresholds are data.
+- **Qi nature.** Qi has two axes:
+  - Orientation: orthodox (jeong), unorthodox (sa) or demonic (ma), set by the person's heart method (simbeop).
+  - Polarity: firm yang (yanggang) or soft yin (eumyu).
+  - Each art has a nature. An art of another nature than one's own is harder to learn or weaker to use.
+- **Skills need qi.** Each skill has a minimum qi or realm to learn and to use, and costs qi to cast.
+- **Three ways to gain an art:**
+  1. **Comprehension (kkaedareum).** On each realm gained, a chance to comprehend a skill of an art one practises. Talent raises the chance. Not every skill unlocks this way.
+  2. **Secret manuals (bigeup).** Manuals are items in the world (`docs/architecture/adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`). Reading one teaches its art when one's qi suffices.
+  3. **Sect teaching (jeonsu).** A member learns its sect's arts from its master and elders, as its realm allows.
+- **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
+
 ## MVP scope [proposed]
 
 - **Scale**: one region, three factions (Orthodox, Demonic, Unorthodox), six to eight villages.
@@ -146,3 +162,6 @@ The items below are not yet decided.
 - How a sect's seat relates to a village: a compound within one, or a settlement of its own.
 - How sect membership is gained and lost, per faction.
 - What caps a sect's size.
+- The realm names and thresholds, which are data.
+- How much an art of a mismatched nature costs: how much harder to learn, how much weaker to use.
+- Whether a lost manual can be copied.
