@@ -496,31 +496,22 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::max({structure_extent_, structure.footprint.width * CELL_SIZE,
                   structure.footprint.height * CELL_SIZE});
   }
-  for (ArmySpec& army : armies) {
-    std::vector<std::size_t> every_skill(army.skills.size());
-    std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
-    std::vector<std::size_t> roster;
-    for (const Recruit& recruit : army.members) {
-      roster.push_back(people_.size());
-      // Everyone the world starts with is born into the family of the army
-      // it is created in, of no parents, by the same rule as any birth.
-      // Founders were born before the world began, by the founding age.
-      Person person;
-      person.position = centre_of(recruit.cell);
-      person.health = recruit.health;
-      person.family = armies_.size();
-      found(person);
-      people_.push_back(std::move(person));
+  // The founders who start as households, by army: two for each household
+  // of the village the army houses.
+  std::vector<std::size_t> paired(armies.size(), 0);
+  for (const VillageSpec& spec : villages) {
+    if (spec.residents < armies.size()) {
+      paired.at(spec.residents) = std::size_t{2} * spec.households;
     }
-    FlowField field{map_, army.objective};
-    reachable_from(field, roster);
-    armies_.push_back(Army{army.faction, std::move(army.skills),
-                           Order{army.objective, std::move(every_skill)},
-                           std::move(field), std::move(roster)});
   }
-  // Each family, one for every army the world starts with, takes a surname.
+  std::size_t families = armies.size();
+  for (ArmySpec& army : armies) {
+    enlist(army, paired.at(armies_.size()), families);
+  }
+  // Each family, one for every army the world starts with and every head of
+  // a household, takes a surname.
   for (std::size_t family = 0;
-       family < armies_.size() && !life_.names.surnames.empty(); ++family) {
+       family < families && !life_.names.surnames.empty(); ++family) {
     surnames_.push_back(next_random() % life_.names.surnames.size());
   }
   village_of_.resize(structures_.size());
@@ -545,11 +536,47 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   leadership_.resize(rules_.hostile.size());
 }
 
+// Creates the army `army` describes, its members born of no parents, by the
+// same rule as any birth, into the family of the army; the first `pairs` of
+// them, two to a household, are a man and a woman who each head a family of
+// their own, numbered from `families` on, and marry. Founders were born
+// before the world began, by the founding age.
+void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
+  std::vector<std::size_t> every_skill(army.skills.size());
+  std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
+  std::vector<std::size_t> roster;
+  for (const Recruit& recruit : army.members) {
+    const bool housed = roster.size() < pairs;
+    const bool wife = housed && roster.size() % 2 == 1;
+    std::optional<Sex> sex;
+    if (housed) {
+      sex = wife ? Sex::FEMALE : Sex::MALE;
+    }
+    roster.push_back(people_.size());
+    Person person;
+    person.position = centre_of(recruit.cell);
+    person.health = recruit.health;
+    person.family = housed ? families++ : armies_.size();
+    found(person, sex);
+    if (wife) {
+      const std::size_t husband = people_.size() - 1;
+      person.spouses.push_back(husband);
+      people_.at(husband).spouses.push_back(people_.size());
+    }
+    people_.push_back(std::move(person));
+  }
+  FlowField field{map_, army.objective};
+  reachable_from(field, roster);
+  armies_.push_back(Army{army.faction, std::move(army.skills),
+                         Order{army.objective, std::move(every_skill)},
+                         std::move(field), std::move(roster)});
+}
+
 // Adds the village `spec` describes, its storage full, making it its
 // residents' home. Throws std::invalid_argument when it names a structure
 // that does not exist or another village names, an army that does not exist
 // or another village houses, or holdings that are not one for each of its
-// structures.
+// structures, or more households than its residents pair into.
 void World::add_village(VillageSpec spec) {
   const auto claimed = [this](std::size_t structure) {
     return structure >= village_of_.size() ||
@@ -562,11 +589,14 @@ void World::add_village(VillageSpec spec) {
       !spec.holdings.empty() && spec.holdings.size() != spec.structures.size();
   if (spec.residents >= armies_.size() ||
       std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
-      std::any_of(villages_.begin(), villages_.end(), housed) || unheld) {
+      std::any_of(villages_.begin(), villages_.end(), housed) || unheld ||
+      std::size_t{2} * spec.households >
+          armies_.at(spec.residents).roster.size()) {
     throw std::invalid_argument(
         "a village must name existing structures no other village names, "
-        "an existing army no other village houses as its residents, and "
-        "what each of its structures holds, if anything");
+        "an existing army no other village houses as its residents, what "
+        "each of its structures holds, if anything, and no more households "
+        "than its residents pair into");
   }
   for (const std::size_t structure : spec.structures) {
     village_of_.at(structure) = villages_.size();
@@ -1197,9 +1227,9 @@ Range limit_range(const Life& life, const Soul& soul, std::size_t discipline) {
                limit.mean + reach + higher};
 }
 
-// Draws `person`'s talent and lifespan, for a soul of `soul` history: the
-// one rule every birth follows.
-void World::bear(Person& person, const Soul& soul) {
+// Draws `person`'s talent and lifespan, for a soul of `soul` history, and
+// its sex unless `sex` gives it: the one rule every birth follows.
+void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
   person.born = static_cast<std::int64_t>(tick_count_);
   person.talent.clear();
   for (std::size_t discipline = 0; discipline < life_.disciplines.size();
@@ -1214,16 +1244,20 @@ void World::bear(Person& person, const Soul& soul) {
       life_.lifespan
           ? std::optional<std::uint64_t>{draw(range_of(*life_.lifespan))}
           : std::nullopt;
-  person.sex = next_random() % 2 == 0 ? Sex::FEMALE : Sex::MALE;
+  if (sex) {
+    person.sex = *sex;
+  } else {
+    person.sex = next_random() % 2 == 0 ? Sex::FEMALE : Sex::MALE;
+  }
   const std::vector<NameEntry>& given =
       person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
   person.given = given.empty() ? 0 : next_random() % given.size();
 }
 
-// Bears founder `person` by the one birth rule, born the founding age before
-// the world began, if the life gives one.
-void World::found(Person& person) {
-  bear(person, Soul{});
+// Bears founder `person`, of `sex` if given, by the one birth rule, born the
+// founding age before the world began, if the life gives one.
+void World::found(Person& person, std::optional<Sex> sex) {
+  bear(person, Soul{}, sex);
   if (life_.founding_age) {
     person.born = -static_cast<std::int64_t>(
         std::uint64_t{draw(range_of(*life_.founding_age))} *

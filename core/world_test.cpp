@@ -2208,5 +2208,49 @@ TEST(World, GrowthPastItsLimitsIsRefused) {
   EXPECT_FALSE(grows_by(too_many));
 }
 
+// A world of one village whose three residents start with `households`
+// households.
+World housed(std::uint32_t households) {
+  constexpr Cell HOME{4, 4};
+  constexpr std::size_t RESIDENTS = 3;
+  return World{Seed{3},
+               Map{open_map(OPEN_SIDE)},
+               {army(HOME, HOME, RESIDENTS, 1, 0, {GUARD})},
+               {},
+               at_war(SEPARATION),
+               {VillageSpec{{}, 0, {}, households}},
+               {},
+               one_discipline(0)};
+}
+
+TEST(World, AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn) {
+  const World world = housed(1);
+  const Person& husband = world.person(0);
+  const Person& wife = world.person(1);
+  const Person& single = world.person(2);
+  EXPECT_EQ(husband.sex, Sex::MALE);
+  EXPECT_EQ(wife.sex, Sex::FEMALE);
+  EXPECT_EQ(husband.spouses, std::vector<std::size_t>{1});
+  EXPECT_EQ(wife.spouses, std::vector<std::size_t>{0});
+  EXPECT_NE(husband.family, wife.family);
+  // The resident outside a household is born single into the army's family,
+  // which neither of the couple heads.
+  EXPECT_TRUE(single.spouses.empty());
+  EXPECT_NE(single.family, husband.family);
+  EXPECT_NE(single.family, wife.family);
+  // Control: with no household, no one starts married, and all share the
+  // army's family.
+  const World unhoused = housed(0);
+  for (std::size_t person = 0; person < 3; ++person) {
+    EXPECT_TRUE(unhoused.person(person).spouses.empty());
+    EXPECT_EQ(unhoused.person(person).family, unhoused.person(0).family);
+  }
+}
+
+TEST(World, RefusesMoreHouseholdsThanItsResidentsPairInto) {
+  EXPECT_NO_THROW(static_cast<void>(housed(1)));
+  EXPECT_THROW(static_cast<void>(housed(2)), std::invalid_argument);
+}
+
 }  // namespace
 }  // namespace murim

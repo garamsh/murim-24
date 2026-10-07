@@ -383,7 +383,7 @@ TEST(Region, RejectsInconsistentData) {
 
   RegionData empty = region_data();
   for (Building& building : empty.villages.at(0).buildings) {
-    building.residents = 0;
+    building.households = 0;
   }
   EXPECT_THROW(static_cast<void>(generate_region(SEED, empty)),
                std::invalid_argument);
@@ -417,28 +417,29 @@ bool kinds_follow(const Region& region, const Village& village,
   return true;
 }
 
+// The people `made_from`'s buildings start with: two for each household.
 std::uint32_t housed_by(const VillageTemplate& made_from) {
   std::uint32_t housed = 0;
   for (const Building& building : made_from.buildings) {
-    housed += building.residents;
+    housed += 2 * building.households;
   }
   return housed;
 }
 
 // Whether `village` was laid out from a template of `data` whose buildings'
-// kinds its structures carry, and whose residents its army counts. A flat count
-// per structure would differ: wells, barrels and the fence house no one, and a
-// hall houses more than a house.
+// kinds its structures carry, and whose households its army counts, two
+// people each. A flat count per structure would differ: most buildings start
+// with no household.
 bool follows_its_template(const RegionData& data, const Region& region,
                           const Village& village) {
   const VillageTemplate* made_from = template_of(data, village);
   return made_from != nullptr && kinds_follow(region, village, *made_from) &&
          region.armies.at(village.army).members.size() ==
              housed_by(*made_from) &&
-         housed_by(*made_from) != 4 * village.structures.size();
+         housed_by(*made_from) != 2 * village.structures.size();
 }
 
-TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheResidents) {
+TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheHouseholds) {
   const RegionData data = region_data();
   const Region region = generate_region(SEED, data);
   EXPECT_EQ(region.structure_kinds.size(), region.structures.size());
@@ -768,6 +769,20 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   return Raided{ticks, world.roster(residents).size()};
 }
 
+// region_data() with every village starting as full as a grown one, as the
+// combat targets and caps are measured against: the hamlet with 6
+// households, 12 people, and the walled village with 13, 26 people.
+RegionData grown() {
+  RegionData data = region_data();
+  for (VillageTemplate& kind : data.villages) {
+    const std::uint32_t households = kind.name == "village" ? 13 : 6;
+    for (Building& building : kind.buildings) {
+      building.households = building.households > 0 ? households : 0;
+    }
+  }
+  return data;
+}
+
 // region_data() with the Demonic Cult's first skill, its strike, doing
 // `damage` to a person.
 RegionData striking(std::uint64_t damage) {
@@ -800,14 +815,13 @@ TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
 
 TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
-    EXPECT_TRUE(
-        within(raided(region_data(), seed, HAMLET_RAID, RAID_MOST + 1).ticks,
-               RAID_LEAST, RAID_MOST))
+    EXPECT_TRUE(within(raided(grown(), seed, HAMLET_RAID, RAID_MOST + 1).ticks,
+                       RAID_LEAST, RAID_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
   // Control: the placeholder torch of a tenth the damage leaves the hamlet
   // standing past it.
-  RegionData slow = region_data();
+  RegionData slow = grown();
   Skill& torch = slow.factions.at(DEMONIC).skills.back();
   constexpr std::int32_t SLOWER = 10;
   torch.structure_damage /= SLOWER;
@@ -816,9 +830,9 @@ TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
 
 TEST(Region, ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime) {
   for (const Seed seed : WALLED) {
-    EXPECT_TRUE(within(
-        raided(region_data(), seed, VILLAGE_RAID, VILLAGE_RAID_MOST + 1).ticks,
-        RAID_LEAST, VILLAGE_RAID_MOST))
+    EXPECT_TRUE(
+        within(raided(grown(), seed, VILLAGE_RAID, VILLAGE_RAID_MOST + 1).ticks,
+               RAID_LEAST, VILLAGE_RAID_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
 }
@@ -827,17 +841,16 @@ TEST(Region, ABandTheWalledVillageOutnumbersStillClosesToStrike) {
   // The hamlet's band of RAIDERS, which the village's 26 residents outnumber,
   // passes its walls and strikes its residents down.
   constexpr Raid OUTNUMBERED{"village", RAIDERS};
-  const Region region = generate_region(SEED, region_data());
+  const Region region = generate_region(SEED, grown());
   const std::size_t residents =
       region.armies.at(region.villages.at(first_raided(region, "village")).army)
           .members.size();
   ASSERT_EQ(residents, 26U);
-  EXPECT_LT(raided(region_data(), SEED, OUTNUMBERED, SKIRMISH_MOST).residents,
+  EXPECT_LT(raided(grown(), SEED, OUTNUMBERED, SKIRMISH_MOST).residents,
             residents);
   // Control: the same band kept where it stands strikes no one.
-  EXPECT_EQ(
-      raided(region_data(), SEED, OUTNUMBERED, SKIRMISH_MOST, false).residents,
-      residents);
+  EXPECT_EQ(raided(grown(), SEED, OUTNUMBERED, SKIRMISH_MOST, false).residents,
+            residents);
 }
 
 // Years a generated region lives through in the kinship tests.
@@ -884,19 +897,34 @@ std::vector<int> generations(const std::vector<Person>& people) {
 }
 
 // Whether every child was born to a married couple of a man and a woman, in
-// its father's family.
-bool born_in_wedlock(const std::vector<Person>& people) {
-  return std::all_of(people.begin(), people.end(), [&](const Person& child) {
+// its father's family or, once it founds a village, a branch bearing its
+// surname.
+bool born_in_wedlock(const Lived& lived) {
+  const std::vector<Person>& people = lived.people;
+  const auto surname = [&lived](std::size_t person) {
+    return lived.names.at(person).value_or(Name{}).surname.romanised;
+  };
+  for (std::size_t index = 0; index < people.size(); ++index) {
+    const Person& child = people.at(index);
     if (child.parents.size() != 2 || child.soul) {
-      return child.parents.empty() || child.soul.has_value();
+      if (!child.parents.empty() && !child.soul) {
+        return false;
+      }
+      continue;
     }
-    const Person& father = people.at(child.parents.front());
+    const std::size_t father_index = child.parents.front();
+    const Person& father = people.at(father_index);
     const Person& mother = people.at(child.parents.back());
-    return father.sex == Sex::MALE && mother.sex == Sex::FEMALE &&
-           std::count(mother.spouses.begin(), mother.spouses.end(),
-                      child.parents.front()) == 1 &&
-           child.family == father.family && father.family != mother.family;
-  });
+    const bool kin = child.family == father.family ||
+                     surname(index) == surname(father_index);
+    if (father.sex != Sex::MALE || mother.sex != Sex::FEMALE ||
+        std::count(mother.spouses.begin(), mother.spouses.end(),
+                   father_index) != 1 ||
+        !kin || father.family == mother.family) {
+      return false;
+    }
+  }
+  return true;
 }
 
 TEST(Region, FamiliesReachAThirdGenerationWithinThirtyYears) {
@@ -904,23 +932,30 @@ TEST(Region, FamiliesReachAThirdGenerationWithinThirtyYears) {
   const std::vector<int> generation = generations(region.people);
   EXPECT_GE(*std::max_element(generation.begin(), generation.end()), 3);
   EXPECT_LE(region.peak, MAX_PEOPLE);
-  EXPECT_TRUE(born_in_wedlock(region.people));
-  // Control: without kinship no one marries, and the world starts with the
-  // only generation it has.
+  EXPECT_TRUE(born_in_wedlock(region));
+  // Control: without kinship no one marries but the households the world
+  // starts with, and the world starts with the only generation it has.
   RegionData unwed = region_data();
   unwed.life.kinship.reset();
   const Lived control = lived(unwed, SEED, GENERATIONS_YEARS);
   const std::vector<int> only = generations(control.people);
   EXPECT_EQ(*std::max_element(only.begin(), only.end()), 1);
-  EXPECT_TRUE(std::none_of(
-      control.people.begin(), control.people.end(),
-      [](const Person& person) { return !person.spouses.empty(); }));
+  std::size_t founders_wed = 0;
+  for (const Village& village : generate_region(SEED, unwed).villages) {
+    founders_wed += std::size_t{2} * village.households;
+  }
+  ASSERT_GT(founders_wed, 0U);
+  EXPECT_EQ(std::count_if(
+                control.people.begin(), control.people.end(),
+                [](const Person& person) { return !person.spouses.empty(); }),
+            static_cast<std::ptrdiff_t>(founders_wed));
 }
 
 TEST(Region, BirthsStopOnceMaxPeopleLive) {
   // Everyone free marries and every wife bears a child each day she may,
-  // with no village's economy to cap them.
-  RegionData fertile = region_data();
+  // with no village's economy to cap them, from villages as full as grown
+  // ones.
+  RegionData fertile = grown();
   fertile.life.husbandry.reset();
   ASSERT_TRUE(fertile.life.kinship.has_value());
   Kinship kinship = fertile.life.kinship.value_or(Kinship{});
@@ -932,7 +967,7 @@ TEST(Region, BirthsStopOnceMaxPeopleLive) {
   // The bound was met and never passed.
   EXPECT_EQ(crowded.peak, MAX_PEOPLE);
   // Control: the game's own odds leave the region below the bound.
-  EXPECT_LT(lived(region_data(), SEED, GENERATIONS_YEARS).peak, MAX_PEOPLE);
+  EXPECT_LT(lived(grown(), SEED, GENERATIONS_YEARS).peak, MAX_PEOPLE);
 }
 
 // Whether every child born to a couple bears its father's surname.
@@ -1004,8 +1039,9 @@ std::pair<std::int64_t, std::size_t> crowding(const RegionData& data,
 
 TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
   // Everyone free marries and every wife may bear a child each day. Growth,
-  // which raises the caps measured against, is left out.
-  RegionData fertile = region_data();
+  // which raises the caps measured against, is left out, and the villages
+  // start as full as grown ones.
+  RegionData fertile = grown();
   fertile.life.growth.reset();
   ASSERT_TRUE(fertile.life.kinship.has_value());
   Kinship kinship = fertile.life.kinship.value_or(Kinship{});
@@ -1107,6 +1143,97 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
   EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
   EXPECT_FALSE(unchanged.building_raised);
+}
+
+// The most households any faction of the region `data` generates from
+// `seed` starts with.
+std::uint32_t most_households(const RegionData& data, Seed seed) {
+  const Region region = generate_region(seed, data);
+  std::vector<std::uint32_t> households(region.leadership.size(), 0);
+  for (const Village& village : region.villages) {
+    households.at(village.faction) += village.households;
+  }
+  return *std::max_element(households.begin(), households.end());
+}
+
+TEST(Region, EachFactionStartsWithAtMostFourHouseholds) {
+  constexpr std::uint32_t MOST = 4;
+  for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
+    EXPECT_LE(most_households(region_data(), Seed{seed}), MOST)
+        << "seed " << seed;
+  }
+  // Control: villages as full as grown ones start with more.
+  EXPECT_GT(most_households(grown(), SEED), MOST);
+}
+
+// How a region lived through CENTURY years with days of GROWTH_TICKS_PER_DAY
+// ticks: the living and the peopled villages at the start and the end, the
+// most living at once, and the fewest factions holding a peopled village at
+// the end of any year.
+struct Century {
+  std::size_t living_before;
+  std::size_t living_after;
+  std::size_t peopled_before;
+  std::size_t peopled_after;
+  std::size_t peak;
+  std::size_t fewest_factions;
+};
+
+constexpr std::uint64_t CENTURY = 100;
+
+Century century(const RegionData& data, Seed seed) {
+  Region region = generate_region(seed, data);
+  region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
+  World world = world_of(region);
+  const std::size_t count = region.rules.hostile.size();
+  const auto peopled = [&world, count]() {
+    std::size_t villages = 0;
+    std::vector<bool> factions(count, false);
+    for (std::size_t village = 0; village < world.village_count(); ++village) {
+      if (world.residents_of(village) > 0) {
+        ++villages;
+        factions.at(world.owner(village)) = true;
+      }
+    }
+    return std::pair<std::size_t, std::size_t>{
+        villages, static_cast<std::size_t>(
+                      std::count(factions.begin(), factions.end(), true))};
+  };
+  Century result{world.living(),  0, peopled().first, 0, world.living(),
+                 peopled().second};
+  for (std::uint64_t year = 0; year < CENTURY; ++year) {
+    for (std::uint64_t tick = 0; tick < DAYS_PER_YEAR * GROWTH_TICKS_PER_DAY;
+         ++tick) {
+      world.tick();
+      result.peak = std::max(result.peak, world.living());
+    }
+    result.fewest_factions = std::min(result.fewest_factions, peopled().second);
+  }
+  result.living_after = world.living();
+  result.peopled_after = peopled().first;
+  return result;
+}
+
+TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
+  const Century grew = century(region_data(), NEIGHBOURLY);
+  // The living at least triple and the peopled villages at least double;
+  // every faction keeps a peopled village, and the living stay within the
+  // bound.
+  EXPECT_GE(grew.living_after, 3 * grew.living_before);
+  EXPECT_GE(grew.peopled_after, 2 * grew.peopled_before);
+  EXPECT_EQ(grew.fewest_factions, region_data().factions.size());
+  EXPECT_LE(grew.peak, MAX_PEOPLE);
+  // Control: without growth no village is founded, although births still
+  // fill the villages there are.
+  RegionData still = region_data();
+  still.life.growth.reset();
+  const Century kept = century(still, NEIGHBOURLY);
+  EXPECT_LE(kept.peopled_after, kept.peopled_before);
+  // Control: without kinship no one is born, and the living do not rise.
+  RegionData unwed = region_data();
+  unwed.life.kinship.reset();
+  const Century barren = century(unwed, NEIGHBOURLY);
+  EXPECT_LE(barren.living_after, barren.living_before);
 }
 
 }  // namespace

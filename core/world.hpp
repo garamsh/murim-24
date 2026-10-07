@@ -325,12 +325,15 @@ struct Structure {
 };
 
 /// A village as a world is created with: its structures by index, and the
-/// army living in it, whose members make it their home.
+/// army living in it, whose members make it their home. The first two
+/// members of each of its `households` start as one: a man and a woman,
+/// married to each other, each heading a family of their own.
 struct VillageSpec {
   std::vector<std::size_t> structures;
   std::size_t residents;
   /// What each of `structures` holds, in their order; none holds nothing.
   std::vector<Holding> holdings;
+  std::uint32_t households = 0;
 };
 
 /// Where a village stands in its life cycle, derived from its structures,
@@ -461,7 +464,8 @@ class World {
   /// that is not passable or that a structure covers, or from which its
   /// army's objective cannot be reached, or a village names a structure or an
   /// army that does not exist, a structure that another village names, or an
-  /// army that is another village's residents, a faction's leader is no
+  /// army that is another village's residents, or more households than its
+  /// residents pair into, a faction's leader is no
   /// person the world creates, or `leadership` names more factions than
   /// `hostile`; a faction it leaves out has no leader; a day lasts no tick;
   /// or `life` could draw a talent above MAX_TALENT or a lifespan or founding
@@ -677,13 +681,15 @@ class World {
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
                                          std::size_t faction) const;
+  void enlist(ArmySpec& army, std::size_t pairs, std::size_t& families);
   void add_village(VillageSpec spec);
   void settle_duels();
-  void bear(Person& person, const Soul& soul);
+  void bear(Person& person, const Soul& soul,
+            std::optional<Sex> sex = std::nullopt);
   [[nodiscard]] std::uint32_t draw(Range range);
   [[nodiscard]] std::int64_t age_in_days(const Person& person) const;
   void age();
-  void found(Person& person);
+  void found(Person& person, std::optional<Sex> sex);
   void kin(const Kinship& kinship);
   void husband(const Husbandry& husbandry);
   [[nodiscard]] Holding held(std::size_t village, Stage worst) const;

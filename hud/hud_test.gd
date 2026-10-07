@@ -12,7 +12,7 @@ const SCENE := "res://hud/hud.tscn"
 const PersonName := preload("res://hud/person_name.gd")
 const SEED := 2026
 # A seed whose first Cult village's leader has the widest given name, Cheonmyeong.
-const LONG_NAME_SEED := 11
+const LONG_NAME_SEED := 4
 # The keys a label shows besides the text it is built with, by its name in `labels`; the notice
 # also shows every challenge verdict.
 const SHOWN := {

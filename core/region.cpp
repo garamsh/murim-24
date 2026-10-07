@@ -49,11 +49,11 @@ constexpr std::uint32_t DISCIPLINE_WIDENING = 200;
 constexpr std::uint32_t UPPER_WIDENING = 100;
 // Kinship in region_data(), ages in days.
 constexpr std::uint32_t YEAR = 120;
-constexpr std::uint32_t FOUNDING_AGE = 28 * YEAR;
-constexpr std::uint32_t FOUNDING_SPREAD = 12 * YEAR;
+constexpr std::uint32_t FOUNDING_AGE = 22 * YEAR;
+constexpr std::uint32_t FOUNDING_SPREAD = 6 * YEAR;
 constexpr std::uint32_t MARRYING_FROM = 16 * YEAR;
 constexpr std::uint32_t MARRYING_TO = 40 * YEAR;
-constexpr std::int32_t NEIGHBOURHOOD = 48;
+constexpr std::int32_t NEIGHBOURHOOD = 80;
 constexpr std::uint32_t MARRIAGE_CHANCE = 500;
 constexpr std::uint32_t BEARING_FROM = 18 * YEAR;
 constexpr std::uint32_t BEARING_TO = 40 * YEAR;
@@ -69,12 +69,12 @@ constexpr std::uint32_t STOREHOUSE_STORAGE = 3'600;
 constexpr std::uint32_t FIELD_YIELD = 600;
 // Growth in region_data(), distances in cells.
 constexpr std::uint32_t GROWTH_INTERVAL_DAYS = 30;
-constexpr std::uint32_t GROWTH_PRESSURE = 800;
+constexpr std::uint32_t GROWTH_PRESSURE = 200;
 constexpr std::int32_t GROWTH_REACH = 40;
 constexpr std::int32_t BUILD_VICINITY = 8;
 constexpr std::int32_t SETTLEMENT_SPACING = 3;
 constexpr std::int32_t TERRITORY_CLAIM = 16;
-constexpr std::uint32_t SETTLERS = 10;
+constexpr std::uint32_t SETTLERS = 6;
 constexpr std::uint32_t RAIDERS = 10;
 
 // Surnames of the murim's clans, common and of the old houses, and given
@@ -352,7 +352,7 @@ void validate(const RegionData& data) {
       return !cells.empty() && std::all_of(cells.begin(), cells.end(), cover);
     };
     const auto housed = [](const Building& building) {
-      return building.residents > 0;
+      return building.households > 0;
     };
     return village.buildings.empty() ||
            std::none_of(village.buildings.begin(), village.buildings.end(),
@@ -410,8 +410,7 @@ RegionData region_data() {
   constexpr std::int32_t RICE_EAST = 7;
   constexpr std::int32_t GRANARY_EAST = 12;
   constexpr std::int32_t GRANARY_ROW = 4;
-  constexpr std::uint32_t HOUSE_RESIDENTS = 4;
-  constexpr std::uint32_t HALL_RESIDENTS = 6;
+  constexpr std::uint32_t FOUNDING_HOUSEHOLDS = 1;
   constexpr std::int32_t HAMLET_WIDTH = 7;
   constexpr std::int32_t VILLAGE_WIDTH = 17;
   constexpr std::int32_t VILLAGE_HEIGHT = 9;
@@ -425,8 +424,8 @@ RegionData region_data() {
   constexpr std::int32_t FENCE_EAST = 5;
   constexpr std::int32_t PLAIN_WEIGHT = 10;
   const auto building = [](Cell cell, Footprint footprint, const char* kind,
-                           std::uint32_t residents) {
-    return Building{Structure{cell, DURABILITY, footprint}, kind, residents};
+                           std::uint32_t households) {
+    return Building{Structure{cell, DURABILITY, footprint}, kind, households};
   };
   RegionData data{
       {
@@ -470,24 +469,26 @@ RegionData region_data() {
       // break like any structure, and house no one. Fields of millet and rice
       // lie where the mockup sows them, a granary stands east of the square
       // and a storehouse in the south-east corner; the hamlet keeps its
-      // millet and a granary in its south-west corner.
+      // millet and a granary in its south-west corner. Each starts with one
+      // household, a married man and woman: the village in its hall, the
+      // hamlet in its first house.
       {
           {"hamlet",
            {HAMLET_WIDTH, VILLAGE_HEIGHT},
-           {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({4, 0}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({2, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
+           {building({0, 0}, HOUSE, "house", FOUNDING_HOUSEHOLDS),
+            building({4, 0}, HOUSE, "house", 0),
+            building({2, SOUTH_ROW}, HOUSE, "house", 0),
             building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
             building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
             building({0, SOUTH_ROW}, GRANARY, "granary", 0)}},
           {"village",
            {VILLAGE_WIDTH, VILLAGE_HEIGHT},
-           {building({0, 0}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({4, 0}, HALL, "hall", HALL_RESIDENTS),
-            building({HALL_EAST, 0}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({FAR_EAST, 0}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({1, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
-            building({SOUTH_EAST, SOUTH_ROW}, HOUSE, "house", HOUSE_RESIDENTS),
+           {building({0, 0}, HOUSE, "house", 0),
+            building({4, 0}, HALL, "hall", FOUNDING_HOUSEHOLDS),
+            building({HALL_EAST, 0}, HOUSE, "house", 0),
+            building({FAR_EAST, 0}, HOUSE, "house", 0),
+            building({1, SOUTH_ROW}, HOUSE, "house", 0),
+            building({SOUTH_EAST, SOUTH_ROW}, HOUSE, "house", 0),
             building({WELL_EAST, ROAD_ROW}, WELL, "well", 0),
             building({0, ROAD_ROW}, BARRELS, "barrels", 0),
             building({VILLAGE_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
@@ -512,9 +513,9 @@ RegionData region_data() {
            1,
            DISCIPLINE_WIDENING,
            UPPER_WIDENING,
-           // The people the region starts with are 16 to 40 years old. A
+           // The people the region starts with are 16 to 28 years old. A
            // person of 16 to 40 marries, at even odds a year, someone of
-           // another family from a village whose centre lies within 48
+           // another family from a village whose centre lies within 80
            // cells; a wife of 18 to 40 bears a child at 2 in 5 a year, two
            // years apart at least, into her husband's family.
            Spread{FOUNDING_AGE, FOUNDING_SPREAD},
@@ -534,7 +535,7 @@ RegionData region_data() {
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village
-      // of 26 founders is capped at 50 people, a hamlet of 12 at 20.
+      // is capped at 50 people, a hamlet at 20.
       {{"house", HOUSE_HOUSING, 0, 0, true},
        {"hall", HALL_HOUSING, 0, 0, true},
        {"well", 0, 0, 0, true},
@@ -544,9 +545,9 @@ RegionData region_data() {
        {"storehouse", 0, STOREHOUSE_STORAGE, 0, true},
        {"field", 0, 0, FIELD_YIELD, false}},
   };
-  // Villages pressing against four fifths of their caps grow, checked every
-  // 30 days. They build a house, a field of rice or a granary within 8 cells
-  // of their centre, or send 10 settlers to lay out a hamlet within 40
+  // Villages pressing against a fifth of their caps grow, checked every 30
+  // days. They build a house, a field of rice or a granary within 8 cells
+  // of their centre, or send 6 settlers to lay out a hamlet within 40
   // cells, 3 cells clear of any structure, or 10 raiders against a hostile
   // village within 40 cells. A village holds the land within 16 cells.
   data.life.growth = growth_of(
@@ -627,8 +628,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                     corner,
                     kind.area,
                     {},
-                    region.armies.size()};
-    std::uint32_t residents = 0;
+                    region.armies.size(),
+                    0};
     for (const Building& building : kind.buildings) {
       const Structure& structure = building.structure;
       village.structures.push_back(region.structures.size());
@@ -642,7 +643,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                                                     structure.footprint.height);
       region.holdings.push_back(
           Holding{made.housing, made.storage, made.yield * cells});
-      residents += building.residents;
+      village.households += building.households;
     }
     const Cell middle = middle_of(kind.area);
     const Cell centre{corner.x + middle.x, corner.y + middle.y};
@@ -653,7 +654,9 @@ Region generate_region(Seed seed, const RegionData& data) {
     });
     std::vector<Recruit> members;
     for (std::size_t person = 0;
-         person < std::min<std::size_t>(residents, open.size()); ++person) {
+         person < std::min<std::size_t>(std::size_t{2} * village.households,
+                                        open.size());
+         ++person) {
       members.push_back(Recruit{open.at(person), HEALTH});
     }
     region.armies.push_back(ArmySpec{centre, std::move(members), owner,
@@ -731,8 +734,8 @@ std::vector<VillageSpec> village_specs(const Region& region) {
     for (const std::size_t structure : village.structures) {
       holdings.push_back(region.holdings.at(structure));
     }
-    specs.push_back(
-        VillageSpec{village.structures, village.army, std::move(holdings)});
+    specs.push_back(VillageSpec{village.structures, village.army,
+                                std::move(holdings), village.households});
   }
   return specs;
 }
