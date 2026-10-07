@@ -460,6 +460,34 @@ TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheHouseholds) {
   }
 }
 
+TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
+  const Region region = generate_region(SEED, region_data());
+  const std::vector<VillageSpec> specs = village_specs(region);
+  ASSERT_FALSE(region.sects.empty());
+  for (const SectSpec& sect : region.sects) {
+    const Village& seat = region.villages.at(sect.seat);
+    const std::vector<Clearing>& clearings = specs.at(sect.seat).clearings;
+    // The world keeps clear what the seat's template does, from its corner,
+    // and every cell of it inside the seat is open, as a court is.
+    ASSERT_EQ(clearings.size(), region_data().seat.clearings.size());
+    const std::vector<Cell> open = open_cells(region, seat);
+    for (const Clearing& clearing : clearings) {
+      for (const Cell cell : cells_of(clearing.corner, clearing.area)) {
+        const bool inside = cell.x < seat.corner.x + seat.area.width &&
+                            cell.y < seat.corner.y + seat.area.height;
+        EXPECT_TRUE(!inside || std::any_of(open.begin(), open.end(),
+                                           [cell](Cell free) {
+                                             return free.x == cell.x &&
+                                                    free.y == cell.y;
+                                           }))
+            << seat.name << " (" << cell.x << ", " << cell.y << ")";
+      }
+    }
+  }
+  // Control: an ordinary village keeps nothing clear.
+  EXPECT_TRUE(specs.front().clearings.empty());
+}
+
 TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
   Region region = generate_region(SEED, region_data());
   const Village& village = region.villages.at(1);

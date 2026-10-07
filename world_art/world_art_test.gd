@@ -201,19 +201,23 @@ func run() -> bool:
 		fields, tiled_right, burnt_apart, "pass" if fields_right else "FAIL"])
 
 	# Decorations: each village's ground tiles cover the cells its template's data names, with a
-	# frame of the tag named; control: the cell west of the village has none.
+	# frame of the tag named, a seat's court and path among them; control: the cell west of the
+	# village has none.
 	var tiled := 0
 	var expected := 0
+	var seat_tiled := 0
 	var outside_bare := true
 	for village: Dictionary in region.villages():
 		var counts := _decorated(region_art.built, village)
 		tiled += counts.x
 		expected += counts.y
+		if village.kind == "seat":
+			seat_tiled += counts.x
 		outside_bare = outside_bare \
 				and region_art.built.get_cell_source_id(village.corner + Vector2i(-1, 4)) == -1
-	var decorations_right := expected > 0 and tiled == expected and outside_bare
-	print("world_art_test: %d of %d decorated cells carry their template's tile; cells beside the villages bare %s: %s" % [
-		tiled, expected, outside_bare, "pass" if decorations_right else "FAIL"])
+	var decorations_right := expected > 0 and tiled == expected and seat_tiled > 0 and outside_bare
+	print("world_art_test: %d of %d decorated cells carry their template's tile, %d of them a seat's; cells beside the villages bare %s: %s" % [
+		tiled, expected, seat_tiled, outside_bare, "pass" if decorations_right else "FAIL"])
 
 	# Landforms: each stands only on cells the map marks rough or blocked, which nothing is built
 	# on, so none covers a structure. Control: every structure stands on buildable cells, marked

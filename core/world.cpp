@@ -2267,8 +2267,8 @@ void World::recall(std::size_t village) {
   }
 }
 
-// Cells of the map: those a structure covers, those not buildable, and those
-// an army's objective or a living person takes.
+// Cells of the map: those a structure or a village's clearing covers, those
+// not buildable, and those an army's objective or a living person takes.
 World::Ground World::ground() const {
   const auto width = static_cast<std::size_t>(map_.width());
   const std::size_t cells = width * static_cast<std::size_t>(map_.height());
@@ -2282,6 +2282,16 @@ World::Ground World::ground() const {
   for (const Structure& structure : structures_) {
     for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
       marked.covered.at(slot(cell)) = true;
+    }
+  }
+  for (const Village& village : villages_) {
+    for (const Clearing& clearing : village.spec.clearings) {
+      for (const Cell cell : cells_of(clearing.corner, clearing.area)) {
+        if (cell.x >= 0 && cell.y >= 0 && cell.x < map_.width() &&
+            cell.y < map_.height()) {
+          marked.covered.at(slot(cell)) = true;
+        }
+      }
     }
   }
   for (Cell cell{0, 0}; cell.y < map_.height(); ++cell.y) {
@@ -2301,8 +2311,8 @@ World::Ground World::ground() const {
 // Lays the plan of the growth's builds that most raises village `village`'s
 // scarcest holding, in people, while every structure of its own is intact:
 // as rubble, on the free cells within the vicinity of its centre nearest it,
-// a cell clear of any structure or unbuildable cell. Returns whether it laid
-// one.
+// a cell clear of any structure, village's clearing or unbuildable cell.
+// Returns whether it laid one.
 bool World::lay_building(std::size_t village, const Growth& growth) {
   const VillageSpec& spec = villages_.at(village).spec;
   const auto unfinished = [this](std::size_t structure) {
@@ -2380,10 +2390,11 @@ bool World::lay_building(std::size_t village, const Growth& growth) {
 
 // Lays the growth's settlement as rubble on free buildable land drawn by the
 // seed, its centre within reach of village `village`'s, `spacing` cells clear
-// of any structure and held by no other faction, and sends the settlers there
-// as the new village's residents; their homes stay until it can hold them.
-// The founder heads a new family, a branch bearing its family's surname, and
-// so do its children among the settlers. Returns whether it founded one.
+// of any structure or village's clearing and held by no other faction, and
+// sends the settlers there as the new village's residents; their homes stay
+// until it can hold them. The founder heads a new family, a branch bearing
+// its family's surname, and so do its children among the settlers. Returns
+// whether it founded one.
 bool World::found_village(std::size_t village, const Growth& growth) {
   const std::vector<std::size_t>& residents =
       armies_.at(villages_.at(village).spec.residents).roster;
@@ -2466,7 +2477,7 @@ bool World::found_village(std::size_t village, const Growth& growth) {
     }
   }
   const std::size_t army = form(village, settlers, centre, std::nullopt);
-  villages_.push_back(Village{VillageSpec{{}, army, {}}, std::nullopt, 0,
+  villages_.push_back(Village{VillageSpec{{}, army, {}, 0, {}}, std::nullopt, 0,
                               std::nullopt, std::nullopt, corner});
   attach(villages_.size() - 1, *laid, growth);
   return true;

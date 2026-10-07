@@ -195,15 +195,16 @@ struct Placement {
 /// - build: while every structure of its own is intact, it lays the plan of
 ///   `builds` that most raises its scarcest holding, in people, as rubble
 ///   on free buildable cells within `vicinity` cells of its centre, nearest
-///   it, for its residents to raise by the repair rule
+///   it, a cell clear of any structure or village's clearing, for its
+///   residents to raise by the repair rule
 /// - found: with more residents than `settlers` and none of its people still
 ///   settling, it lays `layout` as rubble on a `settlement` area of free
 ///   buildable land, drawn by the seed among those whose centre lies within
-///   `reach` cells of its own, `spacing` cells clear of any structure and held
-///   by no other faction; `settlers` of its residents, a founder's household
-///   first, march there as the new village's residents, and the founder heads a
-///   new family; the layout makes a village of `settlement_kind`, which names
-///   its art
+///   `reach` cells of its own, `spacing` cells clear of any structure or
+///   village's clearing and held by no other faction; `settlers` of its
+///   residents, a founder's household first, march there as the new village's
+///   residents, and the founder heads a new family; the layout makes a village
+///   of `settlement_kind`, which names its art
 /// - raid: with more residents than `raiders` and no party out, it sends
 ///   `raiders` of them against the nearest village of a faction it is hostile
 ///   to, with living residents and its centre within `reach` cells
@@ -363,6 +364,13 @@ struct Structure {
   bool blocks = true;
 };
 
+/// Land growth keeps clear as though a structure covered it: `area` from
+/// `corner`, its top-left cell.
+struct Clearing {
+  Cell corner{};
+  Footprint area{1, 1};
+};
+
 /// A village as a world is created with: its structures by index, and the
 /// army living in it, whose members make it their home. The first two
 /// members of each of its `households` start as one: a man and a woman,
@@ -373,6 +381,9 @@ struct VillageSpec {
   /// What each of `structures` holds, in their order; none holds nothing.
   std::vector<Holding> holdings;
   std::uint32_t households = 0;
+  /// The land growth keeps clear in it, such as a seat's court; cells off the
+  /// map are ignored.
+  std::vector<Clearing> clearings;
 };
 
 /// Where a village stands in its life cycle, derived from its structures,
@@ -914,8 +925,9 @@ class World {
               const Growth& growth);
   std::size_t form(std::size_t village, const std::vector<std::size_t>& members,
                    Cell objective, std::optional<std::size_t> into);
-  /// Cells of the map, row by row: those a structure covers, those that are
-  /// not buildable, and those an objective or a living person takes.
+  /// Cells of the map, row by row: those a structure or a village's clearing
+  /// covers, those that are not buildable, and those an objective or a
+  /// living person takes.
   struct Ground {
     std::vector<bool> covered;
     std::vector<bool> rough;

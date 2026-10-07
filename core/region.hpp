@@ -83,6 +83,9 @@ struct VillageTemplate {
   std::string name;
   Footprint area;
   std::vector<Building> buildings;
+  /// The land growth keeps clear, each corner an offset from the area's
+  /// corner; it may reach past the area.
+  std::vector<Clearing> clearings;
 };
 
 /// The tables a region is generated from.
@@ -115,6 +118,8 @@ struct Village {
   std::size_t army;
   /// The households its residents start as.
   std::uint32_t households;
+  /// The land growth keeps clear, from its template's clearings.
+  std::vector<Clearing> clearings;
 };
 
 /// A generated region: the inputs a World is created from, and the terrain
@@ -159,7 +164,8 @@ struct Region {
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Returns the villages of `region` as a World is created with them: each
-/// village's structures, resident army and what its structures hold.
+/// village's structures, resident army, what its structures hold and the land
+/// growth keeps clear.
 [[nodiscard]] std::vector<VillageSpec> village_specs(const Region& region);
 
 /// Returns the cells of `village`'s area that none of its structures

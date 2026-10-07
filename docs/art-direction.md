@@ -201,6 +201,7 @@ A sect's seat is a village of its own (ADR 0026), laid out with the village's bu
 - The training ground is laid with the ground, over the terrain and under everything standing, so people stand and spar on it. What on it rises more than a few pixels, the racks and the dummies, stands along its back row, where anyone in front of it is drawn over it.
 - The seat gate rises 32 rows above its one-row footprint, so its frame holds the footprint at (8, 40), its bottom margin 8 rows as every frame's. Its pillars stand on its two end cells and the middle cell is the opening.
 - The stone curb, the platform and the gate's bases stay in every stage, as the plinth does.
+- The court before the halls is paved, and a road runs down from it to the gate's opening; both are ground decorations, laid as a village's paving and road are.
 
 As a village grows, its people build workshops among its houses (`docs/concept.md` §Growing civilization). What each does is not yet designed; their art is drawn ahead of the rule:
 

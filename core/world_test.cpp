@@ -646,7 +646,7 @@ World conscription_world() {
                armies,
                {{{2, 2}, HOME_DURABILITY}},
                at_war(SEPARATION),
-               {{{0}, HOME_ARMY, {}}}};
+               {{{0}, HOME_ARMY, {}, 0, {}}}};
 }
 
 TEST(World, APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding) {
@@ -955,7 +955,9 @@ constexpr std::int64_t TORCH_REACH = std::int64_t{3} * CELL_SIZE;
 // Health of each resident a raid can kill.
 constexpr std::uint64_t RESIDENT_HEALTH = 100;
 
-VillageSpec small_village() { return VillageSpec{{0, 1}, RESIDENTS, {}}; }
+VillageSpec small_village() {
+  return VillageSpec{{0, 1}, RESIDENTS, {}, 0, {}};
+}
 
 World village_world(std::uint64_t health) {
   const Skill guard{3 * CELL_SIZE, 0, 1, 0, 15};
@@ -1133,12 +1135,13 @@ TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
       return true;
     }
   };
-  EXPECT_FALSE(refused({{{0, 1}, 0, {}}}));
+  EXPECT_FALSE(refused({{{0, 1}, 0, {}, 0, {}}}));
 
   // A structure the world lacks, one two villages name, an army it lacks.
-  EXPECT_TRUE(refused({{{0, 2}, 0, {}}}));
-  EXPECT_TRUE(refused({{{0}, 0, {}}, {{1}, 0, {}}, {{0}, 0, {}}}));
-  EXPECT_TRUE(refused({{{0, 1}, 1, {}}}));
+  EXPECT_TRUE(refused({{{0, 2}, 0, {}, 0, {}}}));
+  EXPECT_TRUE(
+      refused({{{0}, 0, {}, 0, {}}, {{1}, 0, {}, 0, {}}, {{0}, 0, {}, 0, {}}}));
+  EXPECT_TRUE(refused({{{0, 1}, 1, {}, 0, {}}}));
 }
 
 // The durability left on a village's house after a torch-bearer of
@@ -1151,7 +1154,7 @@ std::uint32_t house_after_torch(std::size_t faction) {
   };
   World world{Seed{1},   Map{open_map(OPEN_SIDE)},
               armies,    {{{4, 4}, HOUSE_DURABILITY}},
-              at_war(0), {{{0}, 0, {}}}};
+              at_war(0), {{{0}, 0, {}, 0, {}}}};
   run_ticks(world, ARRIVAL_TICKS);
   return world.structure(0).durability;
 }
@@ -1709,19 +1712,24 @@ World economy_world(const Holdings& first, const Holdings& second,
   const Cell second_square{SQUARE.x, SECOND_ROW + 1};
   const std::vector<std::size_t> first_structures{0, 1, 2};
   const std::vector<std::size_t> second_structures{3, 4, 5};
-  return World{
-      Seed{1},
-      Map{open_map(OPEN_SIDE)},
-      {army(SQUARE, SQUARE, FOUNDERS, 1, 0, {IDLE}),
-       army(second_square, second_square, others, 1, 0, {IDLE})},
-      structures,
-      daily,
-      {VillageSpec{
-           first_structures, 0, {first.house, first.granary, first.field}},
-       VillageSpec{
-           second_structures, 1, {second.house, second.granary, second.field}}},
-      {},
-      life};
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(SQUARE, SQUARE, FOUNDERS, 1, 0, {IDLE}),
+                army(second_square, second_square, others, 1, 0, {IDLE})},
+               structures,
+               daily,
+               {VillageSpec{first_structures,
+                            0,
+                            {first.house, first.granary, first.field},
+                            0,
+                            {}},
+                VillageSpec{second_structures,
+                            1,
+                            {second.house, second.granary, second.field},
+                            0,
+                            {}}},
+               {},
+               life};
 }
 
 // A village of `housing`, `storage` and a field of `harvest`.
@@ -1771,7 +1779,7 @@ TEST(World, AFieldBlocksNoOneAndATorchBurnsIt) {
                 army({4, 1}, {4, 1}, 1, 1, 1, {torch})},
                {Structure{{3, 1}, INTACT, {1, 1}, false}},
                at_war(0),
-               {VillageSpec{{0}, 0, {Holding{0, 0, DAYS_PER_YEAR}}}}};
+               {VillageSpec{{0}, 0, {Holding{0, 0, DAYS_PER_YEAR}}, 0, {}}}};
   run_ticks(raided, 2);
   EXPECT_EQ(raided.field_state(0),
             std::optional<FieldState>{FieldState::BURNT});
@@ -1851,7 +1859,7 @@ World workshop_world(const Workshop& workshop) {
        army(stranger, stranger, 1, STRANGER_HEALTH, 1, {IDLE})},
       {Structure{{1, 1}, workshop.durability, {1, 1}, true}},
       daily,
-      {VillageSpec{{0}, 0, {workshop.holding}}},
+      {VillageSpec{{0}, 0, {workshop.holding}, 0, {}}},
       {},
       life};
 }
@@ -1981,11 +1989,11 @@ Growth growth_of(const Growing& growing) {
 }
 
 // Village A of four residents housed for four, with ten years' food stored
-// and harvested, so housing is its scarcest holding, and village B of four,
-// on open ground but for `rough` cells, which bodies cross and nothing is
-// built on.
-World growth_world(const Growing& growing,
-                   const std::vector<Cell>& rough = {}) {
+// and harvested, so housing is its scarcest holding, keeping `clearings`
+// clear, and village B of four, on open ground but for `rough` cells, which
+// bodies cross and nothing is built on.
+World growth_world(const Growing& growing, const std::vector<Cell>& rough = {},
+                   const std::vector<Clearing>& clearings = {}) {
   const auto row = [](Cell from) {
     return std::vector<Structure>{
         Structure{from, INTACT, {1, 1}, true},
@@ -2013,18 +2021,19 @@ World growth_world(const Growing& growing,
     rows.at(static_cast<std::size_t>(cell.y))
         .at(static_cast<std::size_t>(cell.x)) = tile_of(Footing::ROUGH);
   }
-  return World{Seed{3},
-               Map{rows},
-               {army(rows, GROWING_SEAT, GROWING_SEAT, growing.founders, 1, 0,
-                     {MEND, GUARD}),
-                army(rows, NEIGHBOUR_SEAT, NEIGHBOUR_SEAT, FOUNDERS,
-                     growing.neighbour_health, 1, {IDLE})},
-               structures,
-               daily,
-               {VillageSpec{{0, 1, 2}, 0, holdings},
-                VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings}},
-               {},
-               life};
+  return World{
+      Seed{3},
+      Map{rows},
+      {army(rows, GROWING_SEAT, GROWING_SEAT, growing.founders, 1, 0,
+            {MEND, GUARD}),
+       army(rows, NEIGHBOUR_SEAT, NEIGHBOUR_SEAT, FOUNDERS,
+            growing.neighbour_health, 1, {IDLE})},
+      structures,
+      daily,
+      {VillageSpec{{0, 1, 2}, 0, holdings, 0, clearings},
+       VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings, 0, {}}},
+      {},
+      life};
 }
 
 // Whether `cell` lies within four cells of `centre` along each axis.
@@ -2099,6 +2108,33 @@ TEST(World, APressedVillageBuildsOnlyOnBuildableCells) {
         [cell](Cell hill) { return hill.x == cell.x && hill.y == cell.y; }))
         << "(" << cell.x << ", " << cell.y << ")";
   }
+}
+
+// Whether no cell of `area` from `corner` lies within a cell of `clearing`.
+bool a_cell_clear_of(Cell corner, Footprint area, const Clearing& clearing) {
+  return corner.x > clearing.corner.x + clearing.area.width ||
+         clearing.corner.x > corner.x + area.width ||
+         corner.y > clearing.corner.y + clearing.area.height ||
+         clearing.corner.y > corner.y + area.height;
+}
+
+TEST(World, APressedVillageBuildsACellClearOfItsClearings) {
+  // Control: with no clearing, the house is laid on the cells nearest the
+  // centre.
+  World open = growth_world(Growing{{Expansion::BUILD}});
+  run_ticks(open, 1);
+  ASSERT_EQ(open.structure_count(), STRUCTURES_AT_START + 1);
+  const Structure nearest = open.structure(STRUCTURES_AT_START);
+  // With those cells a clearing, as a seat's court is, it is laid elsewhere,
+  // still beside the centre, a cell clear of the clearing as of a structure.
+  const Clearing court{nearest.cell, nearest.footprint};
+  World world = growth_world(Growing{{Expansion::BUILD}}, {}, {court});
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  const Structure built = world.structure(STRUCTURES_AT_START);
+  EXPECT_TRUE(within_four(built.cell, GROWING_SEAT));
+  EXPECT_TRUE(a_cell_clear_of(built.cell, built.footprint, court))
+      << "(" << built.cell.x << ", " << built.cell.y << ")";
 }
 
 TEST(World, AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary) {
@@ -2364,7 +2400,7 @@ World housed(std::uint32_t households) {
                {army(HOME, HOME, RESIDENTS, 1, 0, {GUARD})},
                {},
                at_war(SEPARATION),
-               {VillageSpec{{}, 0, {}, households}},
+               {VillageSpec{{}, 0, {}, households, {}}},
                {},
                one_discipline(0)};
 }
@@ -2441,8 +2477,8 @@ World sect_world(const Sectarian& sectarian) {
       {Structure{{SEAT_HOME.x, 0}, sectarian.durability, {1, 1}, true},
        Structure{{VILLAGE_HOME.x, 0}, INTACT, {1, 1}, true}},
       peace,
-      {VillageSpec{{0}, SEAT_ARMY, {Holding{0, 0, 0, sectarian.pupils}}},
-       VillageSpec{{1}, VILLAGE_ARMY, {Holding{}}}},
+      {VillageSpec{{0}, SEAT_ARMY, {Holding{0, 0, 0, sectarian.pupils}}, 0, {}},
+       VillageSpec{{1}, VILLAGE_ARMY, {Holding{}}, 0, {}}},
       {faction, faction},
       life,
       {SectSpec{
