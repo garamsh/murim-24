@@ -150,8 +150,8 @@ func _names_pass() -> bool:
 # gives it: within the label where the label has a width of its own, clear of the label after it
 # on its line, and clear of its panel's right edge. Every surname crossed with every given name in
 # names(), as the leader and duel panels show it, fits each of their name labels or is cut short
-# with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the genealogy panel's is measured, and
-# the widths are not zero.
+# with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the genealogy and
+# sect panels' is measured, and the widths are not zero.
 func _fit_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(SCENE).instantiate()
@@ -223,7 +223,8 @@ func _fit_pass() -> bool:
 	csv.get_csv_line()
 	while not csv.eof_reached():
 		var key := csv.get_csv_line()[0]
-		if key != "" and not key.begins_with("GENEALOGY_") and not measured.has(key):
+		if key != "" and not key.begins_with("GENEALOGY_") and not key.begins_with("SECT_") \
+				and not measured.has(key):
 			unmeasured.append(key)
 	var passed := unmeasured.is_empty() and overruns.is_empty() and names > 0
 	print("hud_test: %d keys measured on %d label spans and %d names across %s; unmeasured %s; overruns %s: %s" % [

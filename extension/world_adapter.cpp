@@ -561,6 +561,10 @@ std::int64_t WorldAdapter::leader(std::int64_t faction) const {
   return person ? static_cast<std::int64_t>(*person) : -1;
 }
 
+bool WorldAdapter::elects(std::int64_t faction) const {
+  return world().elects(faction_index(faction));
+}
+
 std::int64_t WorldAdapter::challenge_refusal(std::int64_t army,
                                              std::int64_t faction) const {
   return static_cast<std::int64_t>(
@@ -758,6 +762,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::faction_count);
   godot::ClassDB::bind_method(godot::D_METHOD("leader", "faction"),
                               &WorldAdapter::leader);
+  godot::ClassDB::bind_method(godot::D_METHOD("elects", "faction"),
+                              &WorldAdapter::elects);
   godot::ClassDB::bind_method(
       godot::D_METHOD("challenge_refusal", "army", "faction"),
       &WorldAdapter::challenge_refusal);

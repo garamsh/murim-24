@@ -1,9 +1,9 @@
 ## Lets the player steer one person born into the generated region, through the same orders every
 ## army follows: a left click orders it toward the cell clicked, keys 1 to 9 to strike with that
 ## skill, and 0 with all its skills; C challenges its faction's leader to a duel, with the same
-## order, when the core allows it; G opens the genealogy panel on the person. The camera follows
-## it. It ticks at the core's tick rate, draws the world through world_art.tscn and the HUD through
-## hud.tscn, and holds no game rule.
+## order, when the core allows it; G opens the genealogy panel on the person, and M the sect panel
+## on its sect. The camera follows it. It ticks at the core's tick rate, draws the world through
+## world_art.tscn and the HUD through hud.tscn, and holds no game rule.
 extends Node2D
 
 const SEED := 2026
@@ -73,6 +73,8 @@ func command(event: InputEvent) -> bool:
 		objective = Vector2i((mouse.position / PIXELS_PER_CELL).floor())
 	elif key != null and key.pressed and (key.keycode == KEY_G or _hud.genealogy.visible):
 		return genealogy(key.keycode)
+	elif key != null and key.pressed and (key.keycode == KEY_M or _hud.sect.visible):
+		return sects(key.keycode)
 	elif key != null and key.pressed and key.keycode == KEY_C:
 		return challenge() == WorldAdapter.CHALLENGE_NONE
 	elif key != null and key.pressed and key.keycode >= KEY_0 and key.keycode <= KEY_9:
@@ -122,6 +124,27 @@ func genealogy(keycode: Key) -> bool:
 	if keycode == KEY_ENTER:
 		panel.centre_selected()
 		return true
+	return false
+
+
+## Works the sect panel with `keycode`: M opens it on the steered person's sect or closes it,
+## up and down choose among the shown faction's sects, Tab shows the next faction, Escape closes
+## it. While it is open no key gives an order. Returns whether the key did anything.
+func sects(keycode: Key) -> bool:
+	var panel: Control = _hud.sect
+	if keycode == KEY_M and not panel.visible:
+		if world.sect_count() == 0 or world.roster(steered).is_empty():
+			return false
+		panel.show_sect(world, steered)
+		return true
+	if keycode == KEY_M or keycode == KEY_ESCAPE:
+		panel.close()
+		return true
+	if keycode == KEY_TAB:
+		panel.next_faction()
+		return true
+	if keycode == KEY_UP or keycode == KEY_DOWN:
+		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
 	return false
 
 

@@ -1414,6 +1414,10 @@ std::optional<std::size_t> World::leader(std::size_t faction) const {
   return leadership_.at(faction).leader;
 }
 
+bool World::elects(std::size_t faction) const {
+  return leadership_.at(faction).election.has_value();
+}
+
 bool World::hostile(std::size_t from, std::size_t target) const {
   return rules_.hostile.at(from).at(target);
 }

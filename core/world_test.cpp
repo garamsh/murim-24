@@ -2603,5 +2603,13 @@ TEST(World, AnElectionMakesTheMasterLeaderWhenNoOneLeads) {
   EXPECT_FALSE(sect_world_after(Sectarian{}, 1).leader(0).has_value());
 }
 
+TEST(World, AFactionReadsAsElectingOnlyWithAnElection) {
+  Sectarian electing;
+  electing.election = Election{0};
+  EXPECT_TRUE(sect_world(electing).elects(0));
+  // Control: the same faction without an election does not elect.
+  EXPECT_FALSE(sect_world(Sectarian{}).elects(0));
+}
+
 }  // namespace
 }  // namespace murim

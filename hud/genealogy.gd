@@ -4,43 +4,19 @@
 ## word comes from hud.csv through Godot's translations. What it shows is read from the world: names,
 ## kin, ages and factions through the adapter; talent and lifespan are hidden, and shown unknown.
 ## It holds no game rule.
-extends Control
+extends "res://hud/panel.gd"
 
-const ART := "res://art/"
 const PersonName := preload("res://hud/person_name.gd")
-const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const MAX_CHILDREN := 3
-const FONT_SIZE := 10
 # The mockup's layout, in the native 480x270.
-const PANEL := Rect2(20, 12, 440, 246)
-const CARD := Vector2(66, 40)
 const ROWS := [46, 112, 182]
 const LEFT := 88.0
 const RIGHT := 188.0
 const CHILD_STEP := 78.0
 # The details column is wider than the mockup's so that English, the longer, fits beside the portrait.
 const DETAILS := Rect2(310, 38, 142, 196)
-# Where a card's text starts, and where the details column's name, family and sect start.
-const CARD_TEXT_X := 23
+# Where the details column's name, family and sect start.
 const DETAILS_TEXT_X := 50
-const ELLIPSIS := "…"
-# docs/art-direction.md §Palette.
-const INK := Color("2a2433")
-const INK_DARK := Color("14101a")
-const INK_LIGHT := Color("3d3647")
-const GOLD_DARK := Color("8c6a2a")
-const GOLD := Color("c99a3c")
-const GOLD_LIGHT := Color("f0d080")
-const LACQUER := Color("a83a2c")
-const PAPER := Color("efe3c2")
-const STONE := Color("8a94a0")
-const STONE_DARK := Color("66707d")
-const JADE := Color("4fc49a")
-const JADE_DARK := Color("2f8c6e")
-const GRASS := Color("3b6138")
-const GRASS_LIGHT := Color("4f7a3f")
-const AZURE_LIGHT := Color("5b9ae0")
-const DEAD_TINT := Color(0.45, 0.45, 0.5)
 
 ## The person at the centre of the tree.
 var centre := -1
@@ -55,19 +31,8 @@ var cards: Array[Dictionary] = []
 ## `generation` (as the header shows it), `talent`, `lifespan`, `spouse` and `children`.
 var details := {}
 
-var _world: WorldAdapter
 # Generations counted so far, by person; parents never change once a person is born.
 var _generations := {}
-var _font: Font
-var _bodies := {}
-var _scrim: ImageTexture
-
-
-func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	size = Vector2(480, 270)
-	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	visible = false
 
 
 func _notification(what: int) -> void:
@@ -151,10 +116,6 @@ func centre_selected() -> void:
 	show_person(_world, selected, own)
 
 
-func close() -> void:
-	visible = false
-
-
 func _card(role: String, person: int) -> Dictionary:
 	var dead := _world.person_health(person) == 0
 	return {
@@ -230,12 +191,7 @@ func _couple_knot() -> float:
 func _draw() -> void:
 	if _world == null:
 		return
-	_font = get_theme_default_font() if _font == null else _font
-	draw_texture_rect(_scrim_texture(), Rect2(Vector2.ZERO, size), true)
-	_frame(PANEL, INK)
-	# Title bar.
-	draw_rect(Rect2(PANEL.position + Vector2(3, 3), Vector2(PANEL.size.x - 6, 16)), INK_DARK)
-	draw_rect(Rect2(PANEL.position + Vector2(3, 19), Vector2(PANEL.size.x - 6, 1)), GOLD_DARK)
+	_chrome(tr("GENEALOGY_KEYS"))
 	var title := tr("GENEALOGY_TITLE")
 	var family_x := 8 + _width(title) + 10
 	_text(PANEL.position + Vector2(8, 4), title, PAPER, true)
@@ -252,10 +208,6 @@ func _draw() -> void:
 	for index in cards.size():
 		_draw_card(index)
 	_draw_details()
-	# Keys along the foot.
-	var keys := tr("GENEALOGY_KEYS")
-	draw_rect(Rect2(PANEL.position.x + 3, PANEL.end.y - 20, PANEL.size.x - 6, 1), GOLD_DARK)
-	_text(Vector2(PANEL.position.x + (PANEL.size.x - _width(keys)) / 2.0, PANEL.end.y - 17), keys, STONE)
 
 
 # Lines of kin in gold: a marriage is a double line with a knot, descent a single line.
@@ -310,23 +262,11 @@ func _draw_card(index: int) -> void:
 	var rect := _card_rect(index)
 	var own_card: bool = card.person == own
 	var chosen: bool = card.person == selected
-	var border := JADE if own_card else (GOLD if chosen else INK_DARK)
-	draw_rect(rect, border)
-	draw_rect(rect.grow(-1), JADE_DARK if own_card else (GOLD_DARK if chosen else INK_LIGHT))
-	draw_rect(rect.grow(-2), INK)
-	# The body stands on a cell of ground, as it does in the world.
-	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 16)), GRASS)
-	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 1)), GRASS_LIGHT)
-	_portrait(card.person, Rect2(rect.position + Vector2(4, 12), Vector2(16, 24)), card.dead)
-	# A card's name stays within its 2-pixel frame.
-	var room := CARD.x - CARD_TEXT_X - 2
-	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(card.short, room), STONE if card.dead else PAPER)
-	_text(rect.position + Vector2(CARD_TEXT_X, 21), card.line, STONE_DARK if card.dead else STONE)
+	_person_card(rect, card.person, card.short, card.line, card.dead,
+			JADE if own_card else (GOLD if chosen else INK_DARK),
+			JADE_DARK if own_card else (GOLD_DARK if chosen else INK_LIGHT))
 	if own_card:
-		var tag := tr("GENEALOGY_SELF")
-		var w := _width(tag) + 6
-		draw_rect(Rect2(rect.end.x - w - 3, rect.position.y - 5, w, 11), JADE_DARK)
-		_text(Vector2(rect.end.x - w, rect.position.y - 5), tag, PAPER)
+		_tag(Vector2(rect.end.x - 3, rect.position.y - 5), tr("GENEALOGY_SELF"), JADE_DARK)
 
 
 func _draw_details() -> void:
@@ -355,70 +295,3 @@ func _draw_details() -> void:
 		# The value, such as a spouse's name, keeps 4 pixels from its label.
 		value = fit(value, DETAILS.size.x - 16 - _width(label) - 4)
 		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, STONE_DARK if unknown else PAPER)
-
-
-# A person's idle frame of their faction's body, greyed once dead; someone serving in no army
-# is drawn in the first faction's body, greyed.
-func _portrait(person: int, rect: Rect2, dead: bool) -> void:
-	var faction := _world.person_faction(person)
-	var names := _world.faction_names()
-	var sprite: String = FACTIONS[0]
-	if faction >= 0 and faction < names.size():
-		sprite = names[faction].to_lower()
-	if not _bodies.has(sprite):
-		_bodies[sprite] = load(ART + "bodies/" + sprite + ".png")
-	var tint := DEAD_TINT if dead or faction < 0 else Color.WHITE
-	draw_texture_rect_region(_bodies[sprite], rect, Rect2(0, 0, 16, 24), tint)
-
-
-# A HUD panel: ink with a gold trim and lacquer corner studs.
-func _frame(rect: Rect2, fill: Color) -> void:
-	draw_rect(rect, INK)
-	draw_rect(rect.grow(-1), INK_DARK)
-	draw_rect(rect.grow(-2), fill)
-	draw_rect(Rect2(rect.position + Vector2(2, 0), Vector2(rect.size.x - 4, 1)), GOLD)
-	draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 1), Vector2(rect.size.x - 4, 1)), GOLD_DARK)
-	draw_rect(Rect2(rect.position + Vector2(0, 2), Vector2(1, rect.size.y - 4)), GOLD_DARK)
-	draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1, 2), Vector2(1, rect.size.y - 4)), GOLD_DARK)
-	for corner in [rect.position, Vector2(rect.end.x - 3, rect.position.y),
-			Vector2(rect.position.x, rect.end.y - 3), rect.end - Vector2(3, 3)]:
-		draw_rect(Rect2(corner, Vector2(3, 3)), GOLD)
-		draw_rect(Rect2(corner + Vector2.ONE, Vector2.ONE), LACQUER)
-
-
-func _text(top_left: Vector2, text: String, colour: Color, shadow := false) -> void:
-	var baseline := top_left + Vector2(0, _font.get_ascent(FONT_SIZE))
-	if shadow:
-		draw_string(_font, baseline + Vector2.ONE, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, INK_DARK)
-	draw_string(_font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, colour)
-
-
-func _width(text: String) -> float:
-	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
-
-
-# The game behind the panel shows through a checker of ink, so the panel reads as the one thing
-# open; a checker, not a blend, keeps every pixel in the palette.
-func _scrim_texture() -> ImageTexture:
-	if _scrim == null:
-		var image := Image.create_empty(2, 2, false, Image.FORMAT_RGBA8)
-		image.set_pixel(0, 0, INK_DARK)
-		image.set_pixel(1, 1, INK_DARK)
-		_scrim = ImageTexture.create_from_image(image)
-	return _scrim
-
-
-## Uses `font` for every word the panel draws.
-func use_font(font: Font) -> void:
-	_font = font
-
-
-## Returns `text` as the panel draws it in `room` pixels: whole where it fits, and otherwise cut
-## short with an ellipsis.
-func fit(text: String, room: float) -> String:
-	if _width(text) <= room:
-		return text
-	var kept := text
-	while not kept.is_empty() and _width(kept + ELLIPSIS) > room:
-		kept = kept.left(-1)
-	return kept.strip_edges(false, true) + ELLIPSIS

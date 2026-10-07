@@ -720,6 +720,9 @@ class World {
   /// Returns the person leading faction `faction`, if it has a leader.
   [[nodiscard]] std::optional<std::size_t> leader(std::size_t faction) const;
 
+  /// Returns whether faction `faction` elects its leader.
+  [[nodiscard]] bool elects(std::size_t faction) const;
+
   /// Returns why army `army`'s lead may not challenge faction `faction`'s
   /// leader, which is why order() would refuse that challenge, or
   /// ChallengeRefusal::NONE when it may. Throws std::invalid_argument when

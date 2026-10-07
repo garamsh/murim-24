@@ -87,6 +87,9 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the person leading faction `faction`, or -1 when none does.
   [[nodiscard]] std::int64_t leader(std::int64_t faction) const;
 
+  /// Returns whether faction `faction` elects its leader.
+  [[nodiscard]] bool elects(std::int64_t faction) const;
+
   /// Returns why army `army`'s lead may not challenge faction `faction`'s
   /// leader, one of the CHALLENGE_* constants; CHALLENGE_NONE when it may.
   [[nodiscard]] std::int64_t challenge_refusal(std::int64_t army,

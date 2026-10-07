@@ -45,7 +45,7 @@ func run() -> bool:
 		aimed, wall_refused, target, target_accepted, before, after, key_one, key_nine_refused,
 		"pass" if passed else "FAIL"])
 	scene.free()
-	return passed and _challenge_pass() and _genealogy_pass() and _territory_pass()
+	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass()
 
 
 # The borders and the map follow the territory as it moves. Setup: a tick with no order moves no
@@ -153,6 +153,27 @@ func _genealogy_pass() -> bool:
 	var passed := opened and digit_taken and closed and digit_orders
 	print("play_test: G opens the genealogy on the steered person %s, a digit gives no order while open %s, G closes it %s, then the digit orders %s: %s" % [
 		opened, digit_taken, closed, digit_orders, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# M opens the sect panel on the first sect of the steered person's faction, the person belonging
+# to none as the world begins, and takes the keys while it is open, so a digit gives no order; Tab
+# shows the next faction, and M again closes it. Control: with it closed, the same digit orders.
+func _sect_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var panel: Control = scene.get_node("Hud").sect
+	var faction := world.army_faction(scene.steered)
+	var opened: bool = scene.command(_key(KEY_M)) and panel.visible and panel.faction == faction \
+			and panel.sect >= 0 and world.sect_faction(panel.sect) == faction
+	var digit_taken: bool = not scene.command(_key(KEY_1))
+	var tabbed: bool = scene.command(_key(KEY_TAB)) and panel.faction != faction
+	var closed: bool = scene.command(_key(KEY_M)) and not panel.visible
+	var digit_orders: bool = scene.command(_key(KEY_1))
+	var passed := opened and digit_taken and tabbed and closed and digit_orders
+	print("play_test: M opens the sect panel on the steered person's faction %s, a digit gives no order while open %s, Tab shows the next faction %s, M closes it %s, then the digit orders %s: %s" % [
+		opened, digit_taken, tabbed, closed, digit_orders, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 

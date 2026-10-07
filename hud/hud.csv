@@ -46,3 +46,25 @@ GENEALOGY_NONE,없음,None
 GENEALOGY_COUNT,%d명,%d
 GENEALOGY_UNNAMED,무명,Unnamed
 GENEALOGY_KEYS,방향키 이동 · Enter 중심으로 · G 닫기,Arrows move · Enter centre · G close
+SECT_TITLE,문파,Sects
+SECT_OWN,본인 소속,Yours
+SECT_CLOSE,M 닫기,M Close
+SECT_SEAT,본산,Seat
+SECT_HELD,보유,Held
+SECT_LOST,함락,Lost
+SECT_FALLEN,멸문,Fallen
+SECT_FACTION,세력,Faction
+SECT_MASTER,장문인,Master
+SECT_ELDERS,장로,Elders
+SECT_MEMBERS,문도,Members
+SECT_COUNT,%d명,%d
+SECT_RANKS,장문인 · 장로,Master · Elders
+SECT_NONE,문파 없음,No sect
+SECT_ELECTED,선출,Elected
+SECT_KEYS,방향키 문파 고르기 · Tab 세력 · M 닫기,Arrows choose · Tab faction · M close
+SECT_TAB_ORTHODOX,정파,Orth
+SECT_TAB_DEMONIC,마교,Cult
+SECT_TAB_UNORTHODOX,사파,Unor
+SECT_HWASAN,화산파,Hwasan
+SECT_HEAVENLY_DEMON,천마신교,Heavenly Demon
+SECT_BLACK_FANG,흑아방,Black Fang
