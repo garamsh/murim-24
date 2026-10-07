@@ -1,6 +1,6 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
 ## HUD: the player's portrait, faction, health and inner energy with their values; the
-## genealogy panel, which G opens; its faction's
+## genealogy panel, which G opens; the sect panel, which M opens; its faction's
 ## leader, a duel for the lead while one is fought, and the verdict on a challenge; a map of the
 ## region around the player with the season and year; a rumour log; and the technique bar, an
 ## icon and its number key for each of the player's skills. Every word comes from
@@ -49,6 +49,8 @@ const CHALLENGE_KEYS := {
 var labels := {}
 ## The genealogy panel, open over the HUD while the player reads it.
 var genealogy: Control
+## The sect panel, open over the HUD while the player reads it.
+var sect: Control
 ## The panel shown while a duel for the player's faction's lead is fought, and its two bars:
 ## `challenger` and `leader`.
 var duel_panel: Panel
@@ -300,6 +302,9 @@ func _build() -> void:
 	genealogy = preload("res://hud/genealogy.gd").new()
 	genealogy.use_font(_theme.default_font)
 	genealogy.visible = false
+	sect = preload("res://hud/sect.gd").new()
+	sect.use_font(_theme.default_font)
+	sect.visible = false
 
 	var leadership := _panel(Rect2(4, 58, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
@@ -325,6 +330,7 @@ func _build() -> void:
 	labels.notice.add_theme_constant_override("outline_size", 3)
 	labels.notice.visible = false
 	add_child(genealogy)
+	add_child(sect)
 
 func _panel(rect: Rect2) -> Panel:
 	var panel := Panel.new()
