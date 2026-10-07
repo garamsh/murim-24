@@ -468,6 +468,10 @@ void fold_village(const Fold& fold, const Village& village) {
     fold(holding.housing);
     fold(holding.storage);
     fold(holding.harvest);
+    fold(holding.arms);
+    fold(holding.tends);
+    fold(holding.edge);
+    fold(holding.healing);
   }
 }
 
@@ -1067,9 +1071,10 @@ void World::tick() {
   const Crowd crowd{SpatialHash{std::move(positions)}, std::move(people),
                     std::move(owners)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
+  const std::vector<std::uint32_t> edges = served().edge;
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     if (people_.at(crowd.people.at(index)).ready_at <= tick_count_) {
-      strike(index, crowd, damage);
+      strike(index, crowd, edges, damage);
     }
   }
   // Damage lands after everyone has struck, so the order people strike in
@@ -1128,6 +1133,7 @@ void World::tick() {
     keep_sects();
   }
   if (tick_count_ % rules_.ticks_per_day == 0) {
+    tend();
     hold_elections(day);
   }
 }
@@ -1442,9 +1448,10 @@ std::uint64_t World::next_random() {
 }
 
 // The one rule every skill resolves through, whoever uses it: each use hits
-// every hostile person in its disc once, and every structure its disc
-// reaches.
+// every hostile person in its disc once, as much harder as the edge `edges`
+// gives the user's home, and every structure its disc reaches.
 void World::strike(std::size_t user, const Crowd& crowd,
+                   const std::vector<std::uint32_t>& edges,
                    std::vector<std::uint64_t>& damage) {
   const std::size_t army = crowd.armies.at(user);
   const std::size_t self = crowd.people.at(user);
@@ -1489,9 +1496,12 @@ void World::strike(std::size_t user, const Crowd& crowd,
   // A use that hits anyone or anything practises the striker's best
   // discipline, its highest limit.
   bool hit = false;
+  const std::uint64_t edge = striker.home ? edges.at(*striker.home) : 0;
+  const std::uint64_t body_damage =
+      skill.body_damage * (PER_MILLE + edge) / PER_MILLE;
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (hostile(other)) {
-      damage.at(other) += skill.body_damage;
+      damage.at(other) += body_damage;
       hit = true;
     }
   });
@@ -1905,7 +1915,8 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
 }
 
 // What village `village`'s structures no worse than `worst` hold together,
-// and the harvest of its intact fields.
+// the greatest edge and healing among them, and the harvest of its intact
+// fields.
 Holding World::held(std::size_t village, Stage worst) const {
   const VillageSpec& spec = villages_.at(village).spec;
   Holding total;
@@ -1916,6 +1927,10 @@ Holding World::held(std::size_t village, Stage worst) const {
       total.housing += holding.housing;
       total.storage += holding.storage;
       total.pupils += holding.pupils;
+      total.arms += holding.arms;
+      total.tends += holding.tends;
+      total.edge = std::max(total.edge, holding.edge);
+      total.healing = std::max(total.healing, holding.healing);
     }
     total.harvest += now == Stage::INTACT ? holding.harvest : 0;
   }
@@ -1932,6 +1947,47 @@ std::size_t World::cap(std::size_t village) const {
   return static_cast<std::size_t>(
       std::min({std::uint64_t{standing.housing}, standing.harvest / yearly,
                 standing.storage / yearly}));
+}
+
+// Each village's edge and healing from its standing structures, each kept
+// only while the growth's self-reliance and what they arm, or tend, cover the
+// people whose home it is.
+World::Service World::served() const {
+  if (villages_.empty()) {
+    return {};
+  }
+  const std::vector<std::size_t> population = homes();
+  const std::uint64_t reliance = life_.growth ? life_.growth->self_reliance : 0;
+  Service service{std::vector<std::uint32_t>(villages_.size(), 0),
+                  std::vector<std::uint32_t>(villages_.size(), 0)};
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const Holding standing = held(village, Stage::DAMAGED);
+    const std::uint64_t people = population.at(village);
+    if (reliance + standing.arms >= people) {
+      service.edge.at(village) = standing.edge;
+    }
+    if (reliance + standing.tends >= people) {
+      service.healing.at(village) = standing.healing;
+    }
+  }
+  return service;
+}
+
+// Once a day, every living person whose home's workshops tend it recovers
+// their healing, up to a newborn's health; no one's health is lowered.
+void World::tend() {
+  const std::vector<std::uint32_t> healing = served().healing;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      Person& person = people_.at(member);
+      if (person.health == 0 || !person.home ||
+          person.health >= life_.newborn_health) {
+        continue;
+      }
+      person.health = std::min<std::uint64_t>(
+          person.health + healing.at(*person.home), life_.newborn_health);
+    }
+  }
 }
 
 std::uint64_t World::stock(std::size_t village) const {
@@ -2255,20 +2311,24 @@ bool World::lay_building(std::size_t village, const Growth& growth) {
       std::uint64_t{life_.husbandry ? life_.husbandry->consumption : 1} *
           DAYS_PER_YEAR,
       1);
-  // Housing, food and storage, each in the people it holds.
-  const auto in_people = [yearly](const Holding& holding) {
-    return std::array<std::uint64_t, 3>{
-        holding.housing, holding.harvest / yearly, holding.storage / yearly};
+  // Housing, food, storage, arms and tends, each in the people it holds,
+  // the last two beyond the `reliance` a village holds with no workshop.
+  constexpr std::size_t HOLDINGS = 5;
+  const auto in_people = [yearly](const Holding& holding,
+                                  std::uint64_t reliance) {
+    return std::array<std::uint64_t, HOLDINGS>{
+        holding.housing, holding.harvest / yearly, holding.storage / yearly,
+        reliance + holding.arms, reliance + holding.tends};
   };
-  const std::array<std::uint64_t, 3> holds =
-      in_people(held(village, Stage::DAMAGED));
+  const std::array<std::uint64_t, HOLDINGS> holds =
+      in_people(held(village, Stage::DAMAGED), growth.self_reliance);
   const auto scarcest = static_cast<std::size_t>(
       std::min_element(holds.begin(), holds.end()) - holds.begin());
   std::optional<std::size_t> chosen;
   std::uint64_t most = 0;
   for (const std::size_t plan : growth.builds) {
     const std::uint64_t gain =
-        in_people(growth.plans.at(plan).holding).at(scarcest);
+        in_people(growth.plans.at(plan).holding, 0).at(scarcest);
     if (gain > most) {
       most = gain;
       chosen = plan;

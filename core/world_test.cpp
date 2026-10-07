@@ -1813,6 +1813,104 @@ TEST(World, TheHungryWithNowhereToGoDie) {
   EXPECT_EQ(fed.living(), 5U);
 }
 
+// A village of one workshop at (1, 1), holding `workshop` at `durability`,
+// and `residents` residents of faction 0 around SQUARE of `health` each, who
+// strike once with a blow of WORKSHOP_BLOW within five cells; and one
+// stranger of faction 1, at war with them, of STRANGER_HEALTH, two cells
+// south of SQUARE. A newborn has NEWBORN_HEALTH, and days last a tick.
+constexpr std::uint64_t WORKSHOP_BLOW = 100;
+constexpr std::uint64_t STRANGER_HEALTH = 100'000;
+constexpr std::uint64_t NEWBORN_HEALTH = 100;
+constexpr std::size_t STRANGER = 1;
+// A smithy's edge, half again as hard, and an apothecary's daily healing.
+constexpr std::uint32_t HALF_AGAIN = 500;
+constexpr std::uint32_t DAILY_HEALING = 25;
+// Durability in the damaged and the destroyed stage.
+constexpr std::uint32_t DAMAGED = 50;
+constexpr std::uint32_t DESTROYED = 10;
+
+struct Workshop {
+  Holding holding;
+  std::uint32_t durability = INTACT;
+  std::size_t residents = 2;
+  std::uint64_t health = NEWBORN_HEALTH;
+};
+
+World workshop_world(const Workshop& workshop) {
+  constexpr std::int32_t FIVE_CELLS = 5 * CELL_SIZE;
+  const Skill blow{FIVE_CELLS, 0, WORKSHOP_BLOW, 0, NEVER_AGAIN};
+  const Cell stranger{SQUARE.x, SQUARE.y + 2};
+  Rules daily = at_war(0);
+  daily.ticks_per_day = 1;
+  Life life;
+  life.newborn_health = NEWBORN_HEALTH;
+  return World{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(SQUARE, SQUARE, workshop.residents, workshop.health, 0, {blow}),
+       army(stranger, stranger, 1, STRANGER_HEALTH, 1, {IDLE})},
+      {Structure{{1, 1}, workshop.durability, {1, 1}, true}},
+      daily,
+      {VillageSpec{{0}, 0, {workshop.holding}}},
+      {},
+      life};
+}
+
+// The health the stranger lost to `workshop`'s residents' one strike each.
+std::uint64_t struck(const Workshop& workshop) {
+  World world = workshop_world(workshop);
+  run_ticks(world, 1);
+  return STRANGER_HEALTH - health_of(world, STRANGER);
+}
+
+TEST(World, ResidentsStrikeHarderWhileASmithyArmingThemStands) {
+  Holding smithy;
+  smithy.arms = 2;
+  smithy.edge = HALF_AGAIN;
+  // Two residents' blows land half again as hard, intact or damaged.
+  constexpr std::uint64_t PLAIN = 2 * WORKSHOP_BLOW;
+  constexpr std::uint64_t SHARPENED = PLAIN + (PLAIN / 2);
+  EXPECT_EQ(struck(Workshop{smithy}), SHARPENED);
+  EXPECT_EQ(struck(Workshop{smithy, DAMAGED}), SHARPENED);
+  // Ruined, it sharpens nothing.
+  EXPECT_EQ(struck(Workshop{smithy, DESTROYED}), PLAIN);
+  // Control: arming one of two residents, it sharpens nothing.
+  Holding small = smithy;
+  small.arms = 1;
+  EXPECT_EQ(struck(Workshop{small}), PLAIN);
+}
+
+// The health of `workshop`'s first resident after `days` days.
+std::uint64_t tended(const Workshop& workshop, std::uint64_t days) {
+  World world = workshop_world(workshop);
+  run_ticks(world, days);
+  return world.person(world.roster(0).front()).health;
+}
+
+TEST(World, TheWoundedHealWhileAnApothecaryTendingThemStands) {
+  constexpr std::uint64_t WOUNDED = 40;
+  Holding apothecary;
+  apothecary.tends = 2;
+  apothecary.healing = DAILY_HEALING;
+  // Each day it restores its healing, intact or damaged, up to a newborn's
+  // health and no further.
+  EXPECT_EQ(tended(Workshop{apothecary, INTACT, 2, WOUNDED}, 1),
+            WOUNDED + DAILY_HEALING);
+  EXPECT_EQ(tended(Workshop{apothecary, DAMAGED, 2, WOUNDED}, 2),
+            WOUNDED + (std::uint64_t{2} * DAILY_HEALING));
+  EXPECT_EQ(tended(Workshop{apothecary, INTACT, 2, WOUNDED}, 3),
+            NEWBORN_HEALTH);
+  // No one's health above a newborn's is lowered.
+  EXPECT_EQ(tended(Workshop{apothecary, INTACT, 2, 2 * NEWBORN_HEALTH}, 1),
+            2 * NEWBORN_HEALTH);
+  // Ruined, it heals no one.
+  EXPECT_EQ(tended(Workshop{apothecary, DESTROYED, 2, WOUNDED}, 1), WOUNDED);
+  // Control: tending one of two residents, it heals no one.
+  Holding small = apothecary;
+  small.tends = 1;
+  EXPECT_EQ(tended(Workshop{small, INTACT, 2, WOUNDED}, 1), WOUNDED);
+}
+
 // The growth tests' villages: A, of faction 0, with residents around
 // GROWING_SEAT, and B, of faction 1, with residents around NEIGHBOUR_SEAT, on
 // a 32-cell open map. Days last a tick and growth is checked every day.
@@ -1845,10 +1943,12 @@ struct Growing {
   bool hostile = true;
   std::uint64_t neighbour_health = 1;
   std::size_t founders = FOUNDERS;
+  std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
 };
 
-// Growth of three plans, a granary, a house for four and a field, a 5 x 5
-// settlement of one of each, two settlers and two raiders.
+// Growth of five plans, a granary, a house for four, a field, a smithy and an
+// apothecary each serving four, a 5 x 5 settlement of one of the first three
+// each, two settlers and two raiders.
 Growth growth_of(const Growing& growing) {
   Growth growth;
   growth.interval = 1;
@@ -1860,6 +1960,15 @@ Growth growth_of(const Growing& growing) {
   growth.plans = {Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}},
                   Plan{"house", {2, 2}, true, Holding{HOUSE_FOR_FOUR, 0, 0}},
                   Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}}};
+  Holding smithy;
+  smithy.arms = HOUSE_FOR_FOUR;
+  smithy.edge = HALF_AGAIN;
+  Holding apothecary;
+  apothecary.tends = HOUSE_FOR_FOUR;
+  apothecary.healing = DAILY_HEALING;
+  growth.plans.push_back(Plan{"smithy", {1, 1}, true, smithy});
+  growth.plans.push_back(Plan{"apothecary", {1, 1}, true, apothecary});
+  growth.self_reliance = growing.self_reliance;
   growth.builds = growing.builds;
   growth.settlement = {SETTLEMENT_SIDE, SETTLEMENT_SIDE};
   growth.settlement_kind = "hamlet";
@@ -1990,6 +2099,40 @@ TEST(World, APressedVillageBuildsOnlyOnBuildableCells) {
         [cell](Cell hill) { return hill.x == cell.x && hill.y == cell.y; }))
         << "(" << cell.x << ", " << cell.y << ")";
   }
+}
+
+TEST(World, AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary) {
+  constexpr std::size_t SMITHY = 3;
+  constexpr std::size_t APOTHECARY = 4;
+  constexpr std::size_t HOUSE = 1;
+  constexpr std::uint64_t RAISING_TICKS = 50;
+  Growing growing{{Expansion::BUILD}};
+  growing.builds = {0, HOUSE, SMITHY, APOTHECARY};
+  // Housing for four is its scarcest holding of the three that cap it, and
+  // it arms and tends only three with no workshop.
+  growing.self_reliance = FOUNDERS - 1;
+  World world = growth_world(growing);
+  ASSERT_EQ(world.cap(VILLAGE_A), FOUNDERS);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.plan_of(STRUCTURES_AT_START),
+            std::optional<std::size_t>{SMITHY});
+  EXPECT_EQ(world.stage(STRUCTURES_AT_START), Stage::RUBBLE);
+  // Raised by repair, the smithy arms seven; tends, at three, is scarcest,
+  // and the apothecary is laid next.
+  run_ticks(world, RAISING_TICKS);
+  EXPECT_EQ(world.stage(STRUCTURES_AT_START), Stage::INTACT);
+  ASSERT_GT(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.plan_of(STRUCTURES_AT_START + 1),
+            std::optional<std::size_t>{APOTHECARY});
+  // Control: arming and tending four, as many as its housing holds, it lays
+  // the house, housing coming first among equals.
+  growing.self_reliance = FOUNDERS;
+  World reliant = growth_world(growing);
+  run_ticks(reliant, 1);
+  ASSERT_EQ(reliant.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(reliant.plan_of(STRUCTURES_AT_START),
+            std::optional<std::size_t>{HOUSE});
 }
 
 // Whether `person` is a man.
