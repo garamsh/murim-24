@@ -82,14 +82,13 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Genealogy and families.** Every NPC has parents and belongs to a family (clan), and the genealogy is kept in the world.
 - **Every NPC is an individual person**, with a name, parents, a family, talent and a lifespan.
 - **An army is a roster** of the NPCs conscripted into it, never a count of soldiers.
-- **Population caps.** Each faction's population is capped by its housing, food and storage.
-- **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
-- **A hard upper bound.** A world's population never exceeds about 500 NPCs. That bound is a ceiling, not a target: the caps below it set the actual population.
-- **[proposed]** The cap formula:
-  - A faction's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, each given as data.
+- **Population caps.** Each village's population is capped by its own housing, food and storage (`docs/architecture/adr/0022-cap-each-village-by-its-housing-food-and-storage.md`):
+  - A village's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, derived from its structures, with what each kind holds given as data.
   - Growth slows as the population nears the cap.
   - A shortage brings starvation or migration.
-  - Expansion (building, new villages, territory, raids) is the motive for war.
+- **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
+- **A hard upper bound.** A world's population never exceeds about 500 NPCs. That bound is a ceiling, not a target: the caps below it set the actual population.
+- **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
 - **[proposed]** Building kinds beyond the current set. The current set, in `core/region.cpp`, is houses and halls (housing), fields (harvest), granaries and storehouses (storage), and wells, barrels and fences, which hold nothing. Proposed additions:
   - Smithy: makes and mends weapons.
   - Apothecary: makes medicine and heals the wounded.
