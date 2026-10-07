@@ -281,12 +281,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the tick from which each of army `army`'s living members may
   /// strike again, in the order of body_positions(); it moves on each strike.
   [[nodiscard]] godot::PackedInt64Array body_ready(std::int64_t army) const;
-  /// Returns how many villages the world holds, those founded as it runs
-  /// included.
-  [[nodiscard]] std::int64_t village_count() const;
-  /// Returns the state of village `village` as the core derives it now, one
-  /// of the VILLAGE_* constants.
-  [[nodiscard]] std::int64_t village_state(std::int64_t village) const;
+  /// Returns the events the core keeps from the `from`-th recorded on, oldest
+  /// first, each a Dictionary of its `sequence` and `tick`, its `cell`
+  /// (Vector2i) and its `kind`, one of the EVENT_* constants.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> events(
+      std::int64_t from) const;
   /// Returns the names of the terrain kinds, by index; empty unless the
   /// world was made by create_region().
   [[nodiscard]] godot::PackedStringArray terrain_names() const;
