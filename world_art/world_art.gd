@@ -23,6 +23,7 @@ const BUILDINGS := {
 	"granary": "structures/granary", "storehouse": "structures/storehouse",
 	"training_ground": "structures/training_ground", "manual_hall": "structures/manual_hall",
 	"seat_gate": "structures/seat_gate",
+	"smithy": "structures/smithy", "apothecary": "structures/apothecary",
 }
 # Where a kind's frames hold its footprint's top-left, for a kind that rises higher above it.
 const ANCHORS := {"seat_gate": Vector2(8, 40)}
