@@ -97,13 +97,23 @@ func run() -> bool:
 	var accepted := _create(SEED, _armies, RULES) != null
 	print("world_adapter_test: valid scenario accepted %s; %d of %d invalid scenarios refused: %s" % [
 		accepted, refused, invalid.size(), "pass" if accepted and refused == invalid.size() else "FAIL"])
+	# A region's day is as many ticks as it is given: five ticks bring the next day. A day of no
+	# ticks, or fewer, is refused; control: the five-tick day is accepted.
+	var short := WorldAdapter.create_region(SEED, 0, 5)
+	var first_day: int = short.date().day if short != null else -1
+	for i in 5 if short != null else 0:
+		short.tick()
+	var days_pass: bool = short != null and short.date().day == first_day + 1 \
+			and WorldAdapter.create_region(SEED, 0, 0) == null and WorldAdapter.create_region(SEED, 0, -1) == null
+	print("world_adapter_test: a region of five-tick days accepted %s, on day %d after five ticks from day %d; days of 0 and -1 ticks refused: %s" % [
+		short != null, short.date().day if short != null else -1, first_day, "pass" if days_pass else "FAIL"])
 	var orders_pass := _orders_pass()
 	var reads_pass := _reads_pass()
 	var villages_pass := _villages_pass()
 	var kin_pass := _kin_pass()
 	var economy_pass := _economy_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass
 
 
 # Each village of a region starts with people, under its cap, and food in store; a day later its stock has fed every one of them a measure. Control: the stock read

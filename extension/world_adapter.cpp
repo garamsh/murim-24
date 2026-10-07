@@ -169,32 +169,12 @@ godot::PackedInt64Array indices(const std::vector<std::size_t>& people) {
   return result;
 }
 
-// Returns the name of the template among `data`'s villages that the growth
-// lays out for a founded village: its area the settlement's, and each of its
-// buildings a placement's offset and plan's kind, in order. Empty when none
-// is, or without growth.
-std::string settlement_of(const murim::RegionData& data) {
-  const std::optional<murim::Growth>& growth = data.life.growth;
-  if (!growth) {
-    return {};
-  }
-  const auto laid_out = [&growth](const murim::VillageTemplate& village) {
-    const std::vector<murim::Building>& buildings = village.buildings;
-    return village.area.width == growth->settlement.width &&
-           village.area.height == growth->settlement.height &&
-           std::equal(
-               buildings.begin(), buildings.end(), growth->layout.begin(),
-               growth->layout.end(),
-               [&growth](const murim::Building& building,
-                         const murim::Placement& placement) {
-                 return building.structure.cell.x == placement.offset.x &&
-                        building.structure.cell.y == placement.offset.y &&
-                        building.kind == growth->plans.at(placement.plan).kind;
-               });
-  };
-  const auto found =
-      std::find_if(data.villages.begin(), data.villages.end(), laid_out);
-  return found == data.villages.end() ? std::string() : found->name;
+// Returns the region the core generates from `seed`, its days `ticks_per_day`
+// ticks long.
+murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
+  murim::Region region = murim::generate_region(seed, murim::region_data());
+  region.rules.ticks_per_day = ticks_per_day;
+  return region;
 }
 
 }  // namespace
@@ -229,13 +209,15 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   return adapter;
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed,
-                                                     std::int64_t village) {
-  // The one handler for a village the region lacks: it must not cross into
-  // Godot.
+godot::Ref<WorldAdapter> WorldAdapter::create_region(
+    std::int64_t seed, std::int64_t village, std::int64_t ticks_per_day) {
+  // The one handler for a village the region lacks or a day it refuses: it
+  // must not cross into Godot.
   try {
-    return born_into(murim::Seed{static_cast<std::uint64_t>(seed)},
-                     narrow<std::size_t>(village, "village"));
+    return born_into(
+        region_of(murim::Seed{static_cast<std::uint64_t>(seed)},
+                  narrow<std::uint64_t>(ticks_per_day, "ticks_per_day")),
+        narrow<std::size_t>(village, "village"));
   } catch (const std::logic_error& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
                                         error.what());
@@ -243,9 +225,8 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed,
   }
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
+godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
                                                  std::size_t village) {
-  murim::Region region = murim::generate_region(seed, murim::region_data());
   region.armies.push_back(murim::born_in(region, village));
   std::vector<std::string> kinds = std::move(region.structure_kinds);
   std::vector<murim::VillageSpec> villages = murim::village_specs(region);
@@ -258,7 +239,6 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
   adapter->world().ensoul(adapter->world().population() - 1);
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
-  adapter->settlement_ = settlement_of(adapter->region_data_);
   adapter->terrain_ = std::move(region.terrain);
   adapter->villages_ = std::move(region.villages);
   return adapter;
@@ -549,22 +529,13 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   for (const murim::Village& village : villages_) {
     add(village.name, village.kind, village.corner, village.area);
   }
-  // Those founded since, in the order they were founded, each at the corner
-  // its first placement's structure gives and named as the region numbers
-  // its own.
-  const std::optional<murim::Growth>& growth = region_data_.life.growth;
-  if (!growth || growth->layout.empty() || settlement_.empty()) {
-    return villages;
-  }
-  const murim::Placement& first = growth->layout.front();
-  for (std::size_t structure = 0; structure < world().structure_count();
-       ++structure) {
-    if (world().plan_of(structure) == first.plan) {
-      const murim::Cell cell = world().structure(structure).cell;
-      add(settlement_ + " " + std::to_string(villages.size() + 1), settlement_,
-          murim::Cell{cell.x - first.offset.x, cell.y - first.offset.y},
-          growth->settlement);
-    }
+  // Those founded since, on the land the core says each was founded on.
+  for (std::size_t village = villages_.size();
+       village < world().village_count(); ++village) {
+    const std::optional<murim::Settlement> land = world().settlement(village);
+    CRASH_COND_MSG(!land, "a village added as the world runs was not founded");
+    add(land->kind + " " + std::to_string(village + 1), land->kind,
+        land->corner, land->area);
   }
   return villages;
 }
@@ -688,8 +659,9 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
   godot::ClassDB::bind_static_method(
-      name, godot::D_METHOD("create_region", "seed", "village"),
-      &WorldAdapter::create_region, DEFVAL(0));
+      name,
+      godot::D_METHOD("create_region", "seed", "village", "ticks_per_day"),
+      &WorldAdapter::create_region, DEFVAL(0), DEFVAL(murim::TICKS_PER_DAY));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
   godot::ClassDB::bind_method(
