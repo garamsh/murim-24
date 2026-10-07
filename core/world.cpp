@@ -452,6 +452,23 @@ Range range_of(Spread values) {
                values.mean + values.spread};
 }
 
+// Whether a skill lies outside the limits a world accepts.
+bool invalid_skill(const Skill& skill) {
+  return !reachable(skill.range) || !reachable(skill.radius) ||
+         skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN;
+}
+
+// Whether every one of `indices` names one of `count` records.
+bool all_below(const std::vector<std::size_t>& indices, std::size_t count) {
+  return std::all_of(indices.begin(), indices.end(),
+                     [count](std::size_t index) { return index < count; });
+}
+
+// Whether `index`, if there is one, names one of `count` records.
+bool below(std::optional<std::size_t> index, std::size_t count) {
+  return !index || *index < count;
+}
+
 // Folds what `village` holds, its residents and who ruined it into `fold`.
 template <typename Fold, typename Village>
 void fold_village(const Fold& fold, const Village& village) {
@@ -495,10 +512,6 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   const std::size_t factions = rules_.hostile.size();
   const auto ragged = [factions](const std::vector<bool>& row) {
     return row.size() != factions;
-  };
-  const auto invalid_skill = [](const Skill& skill) {
-    return !reachable(skill.range) || !reachable(skill.radius) ||
-           skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN;
   };
   const auto invalid_recruit = [this](const Recruit& recruit) {
     return recruit.health == 0 || recruit.health > MAX_HEALTH ||
@@ -572,6 +585,148 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   leadership_ = std::move(leadership);
   leadership_.resize(rules_.hostile.size());
   add_sects(std::move(sects));
+}
+
+World::World(Map map, Rules rules, Life life)
+    : rng_state_(0),
+      map_(std::move(map)),
+      rules_(std::move(rules)),
+      structure_index_(std::vector<Position>{}),
+      life_(std::move(life)) {}
+
+void World::restore() {
+  check_life(life_);
+  const std::size_t factions = rules_.hostile.size();
+  const std::size_t people = people_.size();
+  const std::size_t villages = villages_.size();
+  const std::size_t structures = structures_.size();
+  const std::size_t disciplines = life_.disciplines.size();
+  const auto ragged = [factions](const std::vector<bool>& row) {
+    return row.size() != factions;
+  };
+  const bool bad_rules =
+      rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
+      std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
+  const auto off_map = [this](const Structure& structure) {
+    return !spans(structure.footprint) || structure.cell.x < 0 ||
+           structure.cell.y < 0 ||
+           structure.cell.x > map_.width() - structure.footprint.width ||
+           structure.cell.y > map_.height() - structure.footprint.height;
+  };
+  const auto stray_person = [&](const Person& person) {
+    const std::vector<NameEntry>& given =
+        person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
+    return !below(person.home, villages) ||
+           !all_below(person.parents, people) ||
+           !all_below(person.spouses, people) ||
+           !all_below(person.children, people) ||
+           !below(person.soul, souls_.size()) ||
+           !below(person.sect, sects_.size()) || person.health > MAX_HEALTH ||
+           person.talent.size() != disciplines ||
+           person.attainment.size() != disciplines ||
+           (!given.empty() && person.given >= given.size());
+  };
+  const auto stray_village = [&](const Village& village) {
+    const VillageSpec& spec = village.spec;
+    return !all_below(spec.structures, structures) ||
+           spec.residents >= armies_.size() ||
+           (!spec.holdings.empty() &&
+            spec.holdings.size() != spec.structures.size()) ||
+           (village.destroyer && (village.destroyer->army >= armies_.size() ||
+                                  village.destroyer->faction >= factions)) ||
+           !below(village.party, armies_.size()) ||
+           !below(village.raiding, villages);
+  };
+  const std::size_t plans = life_.growth ? life_.growth->plans.size() : 0;
+  const auto unplanned = [plans](std::optional<std::size_t> plan) {
+    return !below(plan, plans);
+  };
+  const auto unvillaged = [villages](std::optional<std::size_t> village) {
+    return !below(village, villages);
+  };
+  const bool bad_structures =
+      std::any_of(structures_.begin(), structures_.end(), off_map) ||
+      village_of_.size() != structures || plans_.size() != structures ||
+      std::any_of(village_of_.begin(), village_of_.end(), unvillaged) ||
+      std::any_of(plans_.begin(), plans_.end(), unplanned);
+  const auto bad_faction = [&](const Leadership& faction) {
+    const Admission admission = faction.admission.value_or(Admission{});
+    return !below(faction.leader, people) || admission.chance > PER_MILLE ||
+           !reachable(admission.reach) || admission.elder_share > PER_MILLE;
+  };
+  const auto stray_sect = [&](const Sect& sect) {
+    return sect.faction >= factions || sect.seat >= villages;
+  };
+  const auto stray_manual = [&](const Manual& manual) {
+    const auto* held = std::get_if<HeldBySect>(&manual.place);
+    return manual.discipline >= disciplines ||
+           (held != nullptr && held->sect >= sects_.size());
+  };
+  const auto stray_duel = [&](const Fight& fight) {
+    return fight.faction >= factions || fight.challenger >= people ||
+           fight.leader >= people;
+  };
+  const auto stray_soul = [disciplines](const Soul& soul) {
+    return soul.practised.size() > disciplines;
+  };
+  const Manuals manuals = life_.manuals.value_or(Manuals{});
+  const auto unknown = [disciplines](const std::vector<std::size_t>& held) {
+    return !all_below(held, disciplines);
+  };
+  const bool bad_life =
+      (life_.growth && life_.growth->stances.size() > factions) ||
+      manuals.held.size() > sects_.size() ||
+      std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
+      manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
+      !all_below(surnames_, life_.names.surnames.size());
+  if (bad_rules || bad_life || bad_structures || !rostered() ||
+      living() > MAX_PEOPLE ||
+      std::any_of(people_.begin(), people_.end(), stray_person) ||
+      std::any_of(villages_.begin(), villages_.end(), stray_village) ||
+      leadership_.size() != factions ||
+      std::any_of(leadership_.begin(), leadership_.end(), bad_faction) ||
+      std::any_of(sects_.begin(), sects_.end(), stray_sect) ||
+      std::any_of(manuals_.begin(), manuals_.end(), stray_manual) ||
+      std::any_of(duels_.begin(), duels_.end(), stray_duel) ||
+      std::any_of(souls_.begin(), souls_.end(), stray_soul)) {
+    throw std::invalid_argument(
+        "a restored world must keep the limits a world is created within, "
+        "every reference must name a record it holds, and every living "
+        "person must stand on exactly one roster");
+  }
+  structure_extent_ = 0;
+  for (const Structure& structure : structures_) {
+    structure_extent_ =
+        std::max({structure_extent_, structure.footprint.width * CELL_SIZE,
+                  structure.footprint.height * CELL_SIZE});
+  }
+  structure_index_ = SpatialHash{centres_of(structures_)};
+}
+
+// Whether every army's faction, skills, order and roster name what the world
+// holds, and every living person stands on exactly one roster and no dead
+// person on any.
+bool World::rostered() const {
+  const std::size_t people = people_.size();
+  std::vector<std::size_t> rosters(people, 0);
+  for (const Army& army : armies_) {
+    if (army.faction >= rules_.hostile.size() || army.skills.empty() ||
+        std::any_of(army.skills.begin(), army.skills.end(), invalid_skill) ||
+        army.order.skills.empty() ||
+        !all_below(army.order.skills, army.skills.size()) ||
+        !all_below(army.roster, people)) {
+      return false;
+    }
+    for (const std::size_t member : army.roster) {
+      rosters.at(member) += 1;
+    }
+  }
+  for (std::size_t person = 0; person < people; ++person) {
+    if (rosters.at(person) != (people_.at(person).health > 0 ? 1 : 0)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // Creates the army `army` describes, its members born of no parents, by the

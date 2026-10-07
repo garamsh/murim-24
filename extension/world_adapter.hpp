@@ -17,6 +17,7 @@
 
 #include "map.hpp"
 #include "region.hpp"
+#include "save.hpp"
 #include "world.hpp"
 
 namespace murim_godot {
@@ -67,6 +68,20 @@ class WorldAdapter : public godot::RefCounted {
   static godot::Ref<WorldAdapter> create_region(
       std::int64_t seed, std::int64_t village = 0,
       std::int64_t ticks_per_day = murim::TICKS_PER_DAY);
+
+  /// Returns an adapter over the world saved in slot `slot`, as save() wrote
+  /// it. Returns null, after push_error naming why, when the slot holds no
+  /// save, the save is refused, or it holds no world made by create_region().
+  static godot::Ref<WorldAdapter> load(std::int64_t slot);
+
+  /// Saves the world in slot `slot`, replacing what it held. Returns false,
+  /// after push_error, when the world was not made by create_region() or the
+  /// save could not be written.
+  [[nodiscard]] bool save(std::int64_t slot) const;
+
+  /// Returns the army the living person carrying the player's soul serves
+  /// in, as the core holds it, or -1 when no such person lives.
+  [[nodiscard]] std::int64_t player_army() const;
 
   /// Returns the point the M1 scenario's battle is fought around, in
   /// sub-cell units.
@@ -304,6 +319,8 @@ class WorldAdapter : public godot::RefCounted {
   murim::RegionData region_data_;
   std::vector<std::size_t> terrain_;
   std::vector<murim::Village> villages_;
+  // How create_region() made the world, which save() keeps beside it.
+  std::optional<murim::Origin> origin_;
 
   // Returns an adapter over a world created from these arguments, as the
   // core's constructor takes them.
@@ -320,6 +337,9 @@ class WorldAdapter : public godot::RefCounted {
   // region's rules.
   static godot::Ref<WorldAdapter> born_into(murim::Region region,
                                             std::size_t village);
+  // Keeps what the view draws of `region`, made by create_region() with the
+  // player born into `origin`'s village as its last army.
+  void show(murim::Region& region, murim::Origin origin);
   [[nodiscard]] murim::World& world();
   [[nodiscard]] const murim::World& world() const;
   [[nodiscard]] std::size_t army_index(std::int64_t army) const;
