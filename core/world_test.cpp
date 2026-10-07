@@ -2779,7 +2779,7 @@ TEST(World, EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened) {
   ASSERT_EQ(world.person(post).health, 0U);
   std::size_t dead = 0;
   for (std::size_t person = 0; person < world.population(); ++person) {
-    dead += world.person(person).health == 0 ? 1 : 0;
+    dead += world.person(person).health == 0 ? 1U : 0U;
   }
   EXPECT_EQ(recorded<Died>(world).size(), dead);
   const auto died = std::find_if(
@@ -2950,7 +2950,7 @@ TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
   run_ticks(struck, 1);
   ASSERT_EQ(recorded<Died>(struck).size(), 1U);
   const std::size_t dead = recorded<Died>(struck).front().person;
-  const std::size_t kin = dead == 0 ? 1 : 0;
+  const std::size_t kin = dead == 0 ? 1U : 0U;
   ASSERT_GT(struck.person(kin).health, 0U);
   EXPECT_EQ(struck.rumours(kin).size(), 1U);
   EXPECT_TRUE(struck.rumours(3).empty());
