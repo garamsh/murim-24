@@ -22,7 +22,9 @@ set(GODOTCPP_SYSTEM_HEADERS ON CACHE BOOL "" FORCE)
 set(GODOTCPP_DISABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(godot-cpp)
 
-add_library(murim_extension SHARED extension.cpp world_adapter.cpp)
+# iOS loads no shared extension, so `make ios` passes STATIC and the export links the archive into the app.
+set(MURIM_EXTENSION_LIBRARY_TYPE SHARED CACHE STRING "SHARED, or STATIC for a platform whose export links the extension in")
+add_library(murim_extension ${MURIM_EXTENSION_LIBRARY_TYPE} extension.cpp world_adapter.cpp)
 target_link_libraries(murim_extension PRIVATE murim_core godot-cpp)
 target_compile_options(murim_extension PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)

@@ -1,8 +1,19 @@
 # Godot stack
 
-The concrete Godot form of naming, file layout, tests, comments, the check entry points, asset export and Android export, for the Godot project at the repository root and its GDScript.
+The concrete Godot form of naming, file layout, tests, comments, the check entry points, asset export, and Android and iOS export, for the Godot project at the repository root and its GDScript.
 
-Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en/4.7`), Aseprite 1.3.18.6 and OpenJDK 17.0.20.1.
+Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en/4.7`), Aseprite 1.3.18.6, OpenJDK 17.0.20.1 and Xcode 26.6 with the iOS 26.5 SDK.
+
+## Contents
+- Naming
+- File layout
+- Tests
+- Comments
+- Entry points
+- Asset export
+- Terrain layers
+- Android export
+- iOS export
 
 ## Naming
 
@@ -46,6 +57,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 | `make bench` | After the tick benchmark, `godot --path . --script res://world_view/frame_bench.gd` renders `world_view/world_view.tscn` in a window with vsync off. It checks the scenario first, then prints p50, p99 and max frame time over its timed frames, and PASS or FAIL against a 16.7 ms p99. It needs a display, so it runs on a developer's machine only, and says so. `make bench` exits non-zero when either benchmark fails. |
 | `make android` | After the C++ build for Android, `godot --headless --path . --export-debug Android build/android/murim.apk` exports the `Android` preset in `export_presets.cfg`. It needs the prerequisites in §Android export, so it is not part of `make ci`. |
+| `make ios TEAM_ID=<id>` | After the C++ build for iOS, `godot --headless --path . --script res://ios_team_id.gd -- <id>` writes the Team ID into `.godot/export_credentials.cfg`, then `godot --headless --path . --export-debug iOS build/ios/murim.ipa` exports the `iOS` preset in `export_presets.cfg` as the Xcode project `build/ios/murim.xcodeproj`. It fails without `TEAM_ID`, and needs the prerequisites in §iOS export, so it is not part of `make ci`. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
 
@@ -84,3 +96,21 @@ What Godot 4.7's "Exporting for Android" (`tutorials/export/exporting_for_androi
 - The `Android` preset exports arm64-v8a only, from the prebuilt template without Gradle, signed with the editor's debug keystore. Its `command_line/extra_args` runs `world_view/frame_bench.gd` at launch.
 - `project.godot` sets `rendering/textures/vram_compression/import_etc2_astc`, without which Godot refuses an Android export.
 - A release export needs a release keystore, which is never committed.
+
+## iOS export
+
+What Godot 4.7's "Exporting for iOS" (`tutorials/export/exporting_for_ios.html`) requires on the exporting Mac, and what Xcode 26.6 adds:
+
+| Prerequisite | Version |
+|---|---|
+| Xcode | 26.6 with the iOS 26.5 SDK, selected with `xcode-select` |
+| iOS platform | The iOS 26.5 Simulator runtime, installed with `xcodebuild -downloadPlatform iOS`. Without it, Xcode 26.6 refuses the exported project's asset catalog and launch storyboard even in a device build, with "No available simulator runtimes" or "iOS 26.5 Platform Not Installed". |
+| Export templates | Godot 4.7.2's, as in §Android export; they include `ios.zip` |
+| Signing | An Apple ID signed in under Xcode › Settings › Accounts: a free Personal Team installs on the user's own devices for 7 days, a paid Apple Developer team for a year. |
+
+- The Team ID is the 10-character ID of the signing team, free Personal Teams included. With the Apple ID signed in, Xcode › Settings › Accounts › Manage Certificates creates an "Apple Development" certificate if none exists. Its Organizational Unit (OU) in Keychain Access is the Team ID, which `security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject` also prints.
+- Godot 4.7.2 refuses to export with an empty `application/app_store_team_id`, and the committed preset leaves it empty. `make ios TEAM_ID=<id>` writes it into `.godot/export_credentials.cfg`, which is never committed and which Godot reads over `export_presets.cfg`. Setting it in the editor's export dialog writes it into `export_presets.cfg` instead, and that change is not committed.
+- The `iOS` preset exports arm64 only, with `application/export_project_only`, so Godot writes the Xcode project and builds no `.ipa`. Its `application/additional_plist_content` sets `godot_cmdline`, the launch arguments the iOS app reads from its `Info.plist`, to run `world_view/frame_bench.gd` at launch.
+- iOS loads no shared extension. `murim.gdextension` names a static archive for `ios.debug.arm64`, and the core's and godot-cpp's archives under `[dependencies]`. The export copies all three into the project and links them, and registers `murim_init`.
+- To run on a device: open `build/ios/murim.xcodeproj` in Xcode. Under the `murim` target's Signing & Capabilities, turn on "Automatically manage signing" and pick the team. Connect the iPhone and turn on Settings › Privacy & Security › Developer Mode. Pick the iPhone as the run destination, and Run. With a Personal Team, the first launch also needs the developer trusted under Settings › General › VPN & Device Management. Xcode's console shows the frame benchmark's output.
+- If Xcode refuses the bundle identifier as taken, change `application/bundle_identifier` in the preset and export again.

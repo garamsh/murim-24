@@ -1,4 +1,4 @@
-.PHONY: lint format test build ci bench sweep android
+.PHONY: lint format test build ci bench sweep android ios
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
@@ -7,6 +7,7 @@ LINT_DIR := $(BUILD_DIR)/lint
 ANDROID_BUILD_DIR := $(BUILD_DIR)/android
 ANDROID_HOME ?= $(HOME)/Library/Android/sdk
 ANDROID_NDK := $(ANDROID_HOME)/ndk/28.1.13356709
+IOS_BUILD_DIR := $(BUILD_DIR)/ios
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -95,3 +96,14 @@ android: build
 	$(TOOLS)/cmake --build $(ANDROID_BUILD_DIR) --target murim_extension murim_core_bench
 	$(GODOT) --headless --path . --export-debug Android $(ANDROID_BUILD_DIR)/murim.apk
 	@echo "built $(ANDROID_BUILD_DIR)/libmurim.android.template_debug.arm64.so and $(ANDROID_BUILD_DIR)/core/murim_core_bench for Android arm64, and exported $(ANDROID_BUILD_DIR)/murim.apk with the Android preset in export_presets.cfg"
+
+# Not part of ci: CI has no Xcode. CMake's own iOS support selects the target, at the 15.0 floor Godot 4.7.2's iOS export sets,
+# and extension/CMakeLists.txt builds a static archive there, which the export links into the Xcode project.
+# The export refuses an empty Team ID, so ios_team_id.gd puts TEAM_ID into .godot/export_credentials.cfg, leaving the preset's empty.
+ios: build
+	@test -n "$(TEAM_ID)" || { echo "make ios needs TEAM_ID=<10-character App Store Team ID>; docs/convention/stack-godot.md §iOS export says where to find it" >&2; exit 1; }
+	$(TOOLS)/cmake -S extension -B $(IOS_BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_OSX_SYSROOT=$$(xcrun --sdk iphoneos --show-sdk-path) -DMURIM_EXTENSION_LIBRARY_TYPE=STATIC
+	$(TOOLS)/cmake --build $(IOS_BUILD_DIR) --target murim_extension murim_core godot-cpp
+	$(GODOT) --headless --path . --script res://ios_team_id.gd -- $(TEAM_ID)
+	$(GODOT) --headless --path . --export-debug iOS $(IOS_BUILD_DIR)/murim.ipa
+	@echo "built $(IOS_BUILD_DIR)/libmurim.ios.template_debug.arm64.a for iOS arm64, and exported $(IOS_BUILD_DIR)/murim.xcodeproj, linking it, with the iOS preset in export_presets.cfg"
