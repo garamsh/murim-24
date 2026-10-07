@@ -16,12 +16,18 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const ACCENTS: Array[Color] = [Color("2f63b8"), Color("d63a2f"), Color("e8a830")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
 # The art for each kind of structure; its frames hold the structure's footprint at
-# (FOOTPRINT_INSET, FOOTPRINT_INSET).
+# (FOOTPRINT_INSET, FOOTPRINT_INSET) unless ANCHORS names another corner.
 const BUILDINGS := {
 	"house": "structures/house", "hall": "structures/hall", "well": "structures/well",
 	"barrels": "structures/barrels", "fence": "structures/fence",
 	"granary": "structures/granary", "storehouse": "structures/storehouse",
+	"training_ground": "structures/training_ground", "manual_hall": "structures/manual_hall",
+	"seat_gate": "structures/seat_gate",
 }
+# Where a kind's frames hold its footprint's top-left, for a kind that rises higher above it.
+const ANCHORS := {"seat_gate": Vector2(8, 40)}
+# The kinds laid with the ground, over the terrain and under everything standing.
+const GROUND_KINDS := ["training_ground"]
 # The fields' tile for each FIELD_* state the core gives, in their order; in winter each takes
 # its tag with WINTER after it.
 const FIELD_TAGS := ["sown", "growing", "ripe", "fallow", "burnt"]
@@ -30,6 +36,8 @@ const WINTER_SEASON := 3
 # The decorations of each village template, which never block or break: ground tiles over
 # rectangles of cells and banners on cells, as offsets from the village's corner.
 const DECORATIONS := "res://world_art/villages.json"
+# The art of each kind of banner a template names, by the key it is named with.
+const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 const FOOTPRINT_INSET := 8
 # How often a free cell is left without a landform: mountains mostly covered, hills open.
 const LANDFORM_SKIP := {"mountain": 0.05, "hills": 0.3}
@@ -64,7 +72,7 @@ var built: TileMapLayer
 var _decorated := 0
 var _layouts := {}
 var _ground_sheet := {}
-var _banner_sheet := {}
+var _banner_sheets := {}
 var _colours: Array[Color] = []
 ## The layer of the fields, each cell tiled by its field's state and the season.
 var fields: TileMapLayer
@@ -335,7 +343,8 @@ func _fits(x: int, y: int, size: Vector2i, kind: String, taken: PackedByteArray)
 
 # One sprite per structure whose kind has art, the bottom edge of its footprint as its
 # position, for each structure laid since they were last laid, those the world's growth lays
-# among them. A structure with no kind, as from WorldAdapter.create(), is not drawn.
+# among them; a kind of GROUND_KINDS on the ground, the rest standing. A structure with no
+# kind, as from WorldAdapter.create(), is not drawn.
 func _lay_structures() -> void:
 	var laid := structure_sprites.size()
 	structure_sprites.resize(world.structure_count())
@@ -349,9 +358,10 @@ func _lay_structures() -> void:
 		var sprite := Sprite2D.new()
 		sprite.centered = false
 		sprite.position = Vector2(corner.x * CELL, (corner.y + footprint.y) * CELL)
-		sprite.offset = -Vector2(FOOTPRINT_INSET, FOOTPRINT_INSET + footprint.y * CELL)
+		sprite.offset = -ANCHORS.get(kind, Vector2(FOOTPRINT_INSET, FOOTPRINT_INSET)) \
+				- Vector2(0, footprint.y * CELL)
 		sprite.set_meta("frames", frames)
-		_standing.add_child(sprite)
+		(_ground if GROUND_KINDS.has(kind) else _standing).add_child(sprite)
 		structure_sprites[structure] = sprite
 
 
@@ -401,7 +411,8 @@ func _tile_fields() -> void:
 func _lay_decorations() -> void:
 	_layouts = JSON.parse_string(FileAccess.get_file_as_string(DECORATIONS))
 	_ground_sheet = _sheet("decorations/ground")
-	_banner_sheet = _sheet("decorations/banner")
+	for banner: String in BANNERS:
+		_banner_sheets[banner] = _sheet(BANNERS[banner])
 	var tiles := TileSet.new()
 	tiles.tile_size = Vector2i(CELL, CELL)
 	var source := TileSetAtlasSource.new()
@@ -432,13 +443,16 @@ func _decorate(villages: Array[Dictionary]) -> void:
 						var cell := corner + Vector2i(x, y)
 						var variant: int = tagged[0] + _hash(cell.x, cell.y, 6) % (tagged[1] - tagged[0] + 1)
 						built.set_cell(cell, 0, Vector2i(variant, 0))
-			elif item.has("banner"):
-				var cell := corner + Vector2i(int(item.banner[0]), int(item.banner[1]))
+			else:
+				# Any other item is a banner, keyed by its kind.
+				var banner: String = item.keys()[0]
+				var sheet: Dictionary = _banner_sheets[banner]
+				var cell := corner + Vector2i(int(item[banner][0]), int(item[banner][1]))
 				var sprite := Sprite2D.new()
-				sprite.texture = _region(_banner_sheet, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
+				sprite.texture = _region(sheet, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
 				sprite.centered = false
 				sprite.position = Vector2(cell.x * CELL, (cell.y + 1) * CELL)
-				sprite.offset = Vector2(0, -_banner_sheet.frame.y)
+				sprite.offset = Vector2(0, -sheet.frame.y)
 				_standing.add_child(sprite)
 	_decorated = villages.size()
 
