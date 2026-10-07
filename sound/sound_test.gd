@@ -6,7 +6,9 @@
 # before the raid, while the core records other events; an event outside what is heard starts no
 # voice. In the M1 battle of 500
 # people the voices sounding never pass the cap, reach it, and drop what finds no voice; control:
-# below the cap every event heard starts a voice, and once the sounds end the voices free up.
+# below the cap every event heard starts a voice, and once the sounds end the voices free up. Freed
+# while its voices and music play, the scene leaves the audio server holding none of them at exit;
+# control: players of the same sounds freed with nothing else leave them held.
 extends RefCounted
 
 const Sound := preload("res://sound/sound.gd")
@@ -42,10 +44,11 @@ const REGION_SEED := 2026
 const RAID_TICKS_PER_DAY := 5
 const RAID_TICKS := 30000
 const CAP_TICKS := 300
+const EXIT_PROBE := "res://sound/exit_probe.gd"
 
 
 func run() -> bool:
-	return _mapping_pass() and _bell_pass() and _cap_pass()
+	return _mapping_pass() and _bell_pass() and _cap_pass() and _exit_pass()
 
 
 func _mapping_pass() -> bool:
@@ -138,6 +141,36 @@ func _cap_pass() -> bool:
 		CAP_TICKS, most, Sound.VOICES, dropped, longest, freed, started,
 		Sound.STREAMS.size(), "pass" if passed else "FAIL"])
 	return passed
+
+
+# Runs exit_probe.gd in a Godot of its own, through sound.tscn and through bare players, and reads
+# each exit log for what the audio server still held.
+func _exit_pass() -> bool:
+	var scene := _probe("scene")
+	var bare := _probe("bare")
+	var played: bool = scene.playing == Sound.STREAMS.size() + 1 and bare.playing == Sound.STREAMS.size()
+	var passed: bool = played and scene.leaked == 0 and scene.in_use == 0 and bare.leaked > 0 and bare.in_use > 0
+	print("sound_test: freed while %d players sounded, the scene left %d instances leaked and %d resources in use at exit; %d bare players left %d and %d: %s" % [
+		scene.playing, scene.leaked, scene.in_use, bare.playing, bare.leaked, bare.in_use,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+# Runs exit_probe.gd with `holder`, returning how many players it reported sounding, and how many
+# instances its exit log reported leaked and resources still in use.
+func _probe(holder: String) -> Dictionary:
+	var output := []
+	OS.execute(OS.get_executable_path(), ["--headless", "--verbose", "--path",
+		ProjectSettings.globalize_path("res://"), "--script", EXIT_PROBE, "--", holder], output, true)
+	var probe := {"playing": -1, "leaked": 0, "in_use": 0}
+	for line in "\n".join(output).split("\n"):
+		if line.begins_with("exit_probe: "):
+			probe.playing = int(line.split(" ")[1])
+		elif line.begins_with("Leaked instance: "):
+			probe.leaked += 1
+		elif line.begins_with("Resource still in use: "):
+			probe.in_use += 1
+	return probe
 
 
 # A world of two hostile bands of four, a torch-bearer beside an intact structure and a mender
