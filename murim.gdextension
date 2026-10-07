@@ -1,4 +1,5 @@
 ; Loads the GDExtension adapter that `make build` writes to build/extension/, and `make android` to build/android/.
+; `make ios` writes a static archive to build/ios/ instead, which the export links into the app with the core and godot-cpp archives beside it.
 
 [configuration]
 
@@ -10,3 +11,11 @@ compatibility_minimum = "4.7"
 macos.debug.arm64 = "res://build/extension/libmurim.macos.template_debug.arm64.dylib"
 linux.debug.x86_64 = "res://build/extension/libmurim.linux.template_debug.x86_64.so"
 android.debug.arm64 = "res://build/android/libmurim.android.template_debug.arm64.so"
+ios.debug.arm64 = "res://build/ios/libmurim.ios.template_debug.arm64.a"
+
+[dependencies]
+
+ios.debug.arm64 = {
+	"res://build/ios/core/libmurim_core.a": "",
+	"res://build/ios/bin/libgodot-cpp.ios.template_debug.arm64.a": ""
+}
