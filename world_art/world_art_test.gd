@@ -39,9 +39,10 @@ const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "s
 const VIEW := Vector2(480, 270)
 # Days of five ticks, as the core's region test lives them: marching and raising run far faster
 # against the calendar than in play, so the region SEED makes founds its first village within
-# FOUNDING_DAYS in a few thousand ticks.
+# FOUNDING_DAYS in a few tens of thousands of ticks: from one household a village, its first after
+# 2,490 days.
 const SHORT_DAY := 5
-const FOUNDING_DAYS := 2000
+const FOUNDING_DAYS := 3000
 
 
 func run() -> bool:

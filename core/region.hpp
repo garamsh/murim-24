@@ -50,16 +50,17 @@ struct StructureKind {
 
 /// A structure a village template places, its cell an offset from the area's
 /// corner; the `kind` of building it is, which names its art and its data;
-/// and how many `residents` the village starts with in it.
+/// and how many `households` the village starts with in it, each a married
+/// man and woman.
 struct Building {
   Structure structure;
   std::string kind;
-  std::uint32_t residents;
+  std::uint32_t households;
 };
 
 /// A kind of village: the `area` it occupies, and its `buildings`. Its
-/// resident army, as many people as its buildings start with, stands on the
-/// open cells nearest the area's centre.
+/// resident army, two people for each household its buildings start with,
+/// stands on the open cells nearest the area's centre.
 struct VillageTemplate {
   std::string name;
   Footprint area;
@@ -89,6 +90,8 @@ struct Village {
   Footprint area;
   std::vector<std::size_t> structures;
   std::size_t army;
+  /// The households its residents start as.
+  std::uint32_t households;
 };
 
 /// A generated region: the inputs a World is created from, and the terrain
@@ -121,7 +124,7 @@ struct Region {
 /// its owner's territory and overlapping no other. The same seed and data give
 /// the same region. Throws std::invalid_argument when a table is empty, the
 /// terrain weights are not positive, a faction has no skills, a village
-/// template has no buildings, houses no residents, has one outside its area,
+/// template has no buildings, houses no household, has one outside its area,
 /// two that overlap, one over the area's centre, or one of a kind the kinds do
 /// not name, or a faction is hostile to one that does not exist; throws
 /// std::runtime_error when a village finds no room.
