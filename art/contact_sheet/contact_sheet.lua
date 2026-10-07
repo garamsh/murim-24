@@ -1,7 +1,8 @@
 -- Draws contact_sheet.aseprite: every frame of the production set, read back from the
 -- .aseprite sources, a small scene built from them on the 16-pixel grid with shadows drawn
--- the way the view is to draw them, and a mixed-terrain patch laid as the view is
--- to lay it. It is a review image; the game does not load it.
+-- the way the view is to draw them, a mixed-terrain patch laid as the view is to lay it, a
+-- farming village and a sect's seat assembled from them. It is a review image; the game does
+-- not load it.
 -- Run: aseprite --batch --script art/contact_sheet/contact_sheet.lua (after the asset scripts)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -10,7 +11,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 1424
+local W, H = 608, 1912
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -388,6 +389,82 @@ table.sort(standing_village, function(a, b) if a[1] == b[1] then return a[2] < b
 for _, s in ipairs(standing_village) do s[3]() end
 for y = VY, VY + 159 do
   for x = VX, VX + 479 do sheet:set(x, y, village:get(x, y)) end
+end
+
+-- A sect's seat (ADR 0026): the training ground, the manual hall and the seat gate in their
+-- stages, the sect's banners beside the faction's, then a seat village assembled from them.
+local training_ground = load("structures/training_ground.aseprite")
+local manual_hall = load("structures/manual_hall.aseprite")
+local seat_gate = load("structures/seat_gate.aseprite")
+local sect_banner = load("decorations/sect_banner.aseprite")
+label(8, 1396, "SECT SEAT", c("paper", 3))
+stages(training_ground, "TRAINING GROUND, 6 X 4", 6, 4, 8, 1420, 120)
+stages(manual_hall, "MANUAL HALL, 4 X 3", 4, 3, 8, 1520, 88)
+label(372, 1510, "SECT AND FACTION BANNERS, 1 X 1", c("paper", 3))
+for k, tag in ipairs({ "orthodox", "demonic", "unorthodox" }) do
+  local x = 372 + (k - 1) * 44
+  sheet:stamp(frame(terrain, "plain", k), x, 1552); sheet:stamp(frame(terrain, "plain", k + 1), x + 18, 1552)
+  sheet:stamp(frame(sect_banner, tag), x, 1536)
+  sheet:stamp(frame(banner, tag), x + 18, 1544)
+end
+-- The gate's footprint is the 48 x 16 at (8, 40) in its frame; what rises stands above it.
+label(8, 1594, "SEAT GATE, 3 X 1", c("paper", 3))
+for k, stage in ipairs({ "intact", "damaged", "destroyed", "rubble" }) do
+  local x = 8 + (k - 1) * 72
+  for cx = 0, 2 do sheet:stamp(frame(terrain, "plain", 1 + cx % 4), x + 8 + cx * 16, 1604 + 40) end
+  sheet:stamp(frame(seat_gate, stage), x, 1604)
+end
+
+-- A seat of 30 x 13 cells: the manual hall at the head of a paved square, the training ground
+-- in it, the gate at its foot where the road comes in; around them the houses, stores and fields
+-- every village has. The training ground is laid with the ground, so pupils stand on it; the
+-- rest stands and is drawn in order of the bottom edge of its footprint.
+local SVX, SVY = 8, 1690
+label(8, SVY - 12, "ASSEMBLED IN A SECT'S SEAT", c("paper", 3))
+local seat = px.canvas(W, H)
+for row = 0, 12 do
+  for col = 0, 29 do
+    seat:stamp(frame(terrain, "plain", 1 + math.floor(px.hash(col, row, 91) * 4)), SVX + col * 16, SVY + row * 16)
+  end
+end
+for row = 4, 9 do
+  for col = 10, 20 do seat:stamp(ground_tiles.frames[ground_tiles.tags.paving[1] + (col + row) % 4], SVX + col * 16, SVY + row * 16) end
+end
+for row = 10, 12 do seat:stamp(ground_tiles.frames[ground_tiles.tags.road[1] + row % 4], SVX + 15 * 16, SVY + row * 16) end
+for _, p in ipairs({ { "ripe", 1 }, { "growing", 5 }, { "ripe", 22 }, { "sown", 26 } }) do plot(seat, p[1], SVX + p[2] * 16, SVY + 11 * 16, 3, 2) end
+seat:stamp(frame(training_ground, "intact"), SVX + 12 * 16 - 8, SVY + 5 * 16 - 8)
+local standing_seat = {}
+-- Stands a frame whose footprint's top-left sits at (ox, oy) in it, footprint at (col, row).
+local function stand_seat(set, tag, col, row, rows, ox, oy)
+  standing_seat[#standing_seat + 1] = { row + rows, #standing_seat, function()
+    seat:stamp(frame(set, tag), SVX + col * 16 - ox, SVY + row * 16 - oy)
+  end }
+end
+stand_seat(manual_hall, "intact", 13, 1, 3, 8, 8)
+stand_seat(seat_gate, "intact", 14, 12, 1, 8, 40)
+for _, b in ipairs({ { 12, 3 }, { 17, 3 }, { 13, 12 }, { 17, 12 } }) do stand_seat(sect_banner, "orthodox", b[1], b[2], 1, 0, 16) end
+stand_seat(house, "intact", 1, 2, 3, 8, 8)
+stand_seat(house, "intact", 5, 1, 3, 8, 8)
+stand_seat(granary, "intact", 1, 6, 2, 8, 8)
+stand_seat(storehouse, "intact", 4, 6, 2, 8, 8)
+stand_seat(well, "intact", 8, 7, 2, 8, 8)
+stand_seat(hall, "intact", 21, 1, 3, 8, 8)
+stand_seat(house, "intact", 26, 2, 3, 8, 8)
+stand_seat(granary, "intact", 22, 6, 2, 8, 8)
+stand_seat(house, "intact", 25, 6, 3, 8, 8)
+stand_seat(barrels, "intact", 20, 8, 1, 8, 8)
+for _, b in ipairs({
+  { 13, 7, "idle" }, { 14, 7, "walk", 2 }, { 16, 6, "walk", 1 }, { 17, 7, "idle" },
+  { 15, 8, "walk", 3 }, { 11, 9, "idle" }, { 15, 11, "walk", 4 },
+}) do
+  standing_seat[#standing_seat + 1] = { b[2] + 1, #standing_seat, function()
+    seat:stamp(frame(bodies.orthodox, b[3], b[4]), SVX + b[1] * 16, SVY + b[2] * 16 - 8)
+  end }
+end
+table.sort(standing_seat, function(a, b) if a[1] == b[1] then return a[2] < b[2] end return a[1] < b[1] end)
+for _, s in ipairs(standing_seat) do s[3]() end
+for y = SVY, SVY + 207 do
+  for x = SVX, SVX + 479 do sheet:set(x, y, seat:get(x, y)) end
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")
