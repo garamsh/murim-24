@@ -43,6 +43,11 @@ CHALLENGE_NO_CHALLENGER,도전할 사람이 남지 않았다.,No one is left to 
 CHALLENGE_NOT_A_MEMBER,문파의 일원만 도전할 수 있다.,Only a member may challenge.
 CHALLENGE_IS_LEADER,이미 수장이다.,You already lead.
 CHALLENGE_DUEL_IN_PROGRESS,이미 결투가 벌어지고 있다.,A duel is already being fought.
+CAST_DEAD,쓰러진 몸으로는 기술을 쓸 수 없다.,You cannot cast while fallen.
+CAST_NO_SKILL,그 자리에 익힌 기술이 없다.,No skill is learned in that slot.
+CAST_ON_COOLDOWN,아직 기술을 다시 쓸 수 없다.,That skill is not ready yet.
+CAST_NO_TARGET,겨눌 상대가 없다.,There is no one to aim at.
+CAST_OUT_OF_RANGE,상대가 기술이 닿는 거리 밖에 있다.,The target is out of the skill's range.
 GENEALOGY_TITLE,족보,Genealogy
 GENEALOGY_FAMILY,%s씨 가문,%s family
 GENEALOGY_GENERATION,%d대,Generation %d
@@ -127,16 +132,16 @@ PAUSE_QUIT,게임 종료,Quit Game
 PAUSE_SEED,시드,Seed
 PAUSE_KEYS,↑↓ 고르기 · Enter 선택 · Esc 계속,↑↓ Choose · Enter Select · Esc Resume
 CONTROLS_TITLE,조작법,Controls
-CONTROLS_MOVE,이동,Move
-CONTROLS_CLICK,좌클릭,Click
-CONTROLS_CLICK_MOVE,그곳으로 이동,Go there
+CONTROLS_CLICK,우클릭,R-Click
+CONTROLS_CLICK_MOVE,커서로 이동,Move to cursor
+CONTROLS_CAST,커서에 기술,Cast at cursor
 CONTROLS_SKILL,기술 하나,One skill
 CONTROLS_ALL_SKILLS,모든 기술,All skills
 CONTROLS_CHALLENGE,수장에게 도전,Challenge leader
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_LANGUAGE,언어,Language
-CONTROLS_PAUSE,일시정지,Pause
+CONTROLS_PAUSE_CANCEL,일시정지 · 조준 취소,Pause · Cancel aim
 SETTINGS_TITLE,설정,Settings
 SETTINGS_BACK,Esc 뒤로,Esc Back
 SETTINGS_KEYS,↑↓ 고르기 · ←→ 바꾸기 · Esc 뒤로,↑↓ Choose · ←→ Change · Esc Back
@@ -157,6 +162,10 @@ SETTINGS_MUSIC,음악,Music
 SETTINGS_MASTER_ABOUT,모든 소리의 크기.,How loud every sound is.
 SETTINGS_EFFECTS_ABOUT,싸움과 마을과 메뉴의 소리 크기.,"How loud fights, villages and menus are."
 SETTINGS_MUSIC_ABOUT,배경 음악의 크기.,How loud the music is.
+SETTINGS_CAST,기술 시전,Casting
+SETTINGS_CAST_PRESS,누를 때,On press
+SETTINGS_CAST_RELEASE,뗄 때,On release
+SETTINGS_CAST_ABOUT,Q~T를 누르는 즉시 쓰거나 겨눈 뒤 떼어서 쓴다.,"Cast as Q-T is pressed, or aim and cast on release."
 LOCALE_KO,한국어,한국어
 LOCALE_EN,English,English
 REBIRTH_TITLE,윤회,Rebirth

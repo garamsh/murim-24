@@ -1,10 +1,13 @@
 ## Opens on the title screen, where a new game generates a region from a seed, typed or drawn at
 ## random, and continue resumes the world saved in SAVE_SLOT, and lets the player steer one person
-## in it, through the same orders every army follows: W, A, S and D order it a few cells their
-## way, a left click toward the cell clicked, keys 1 to 9 to strike with that skill, and 0 with all
-## its skills; C challenges its faction's leader to a duel, with the same order, when the core
-## allows it; G opens the genealogy panel on the person, and M the sect panel on its sect, where
-## Enter applies to the sect shown. The person is the one the core says carries the player's soul,
+## in it, through the same orders every army follows: a right click orders it toward the cell
+## clicked, and while the button is held, toward the cell under the cursor; keys 1 to 9 order it to
+## strike with that skill, and 0 with all its skills. Q, W, E, R and T cast its first five skills
+## at the cursor through the core's cast port, at once or, as the settings choose, on the key's
+## release after aiming while it is held; the same key again or Escape cancels the aim. C
+## challenges its faction's leader to a duel, with the same order, when the core allows it; G
+## opens the genealogy panel on the person, and M the sect panel on its sect, where Enter applies
+## to the sect shown. The person is the one the core says carries the player's soul,
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
 ## screen sums up the life just ended. Escape pauses the world under the pause panel, which saves
 ## it and whose guide shows the controls as bound here; it is also saved every AUTOSAVE_DAYS days.
@@ -17,11 +20,10 @@ const PIXELS_PER_CELL := 16.0
 # Ticks one frame may run to catch up at the core's own rate, and as many times more at a higher
 # speed; beyond it the simulation falls behind instead of stalling.
 const MAX_TICKS_PER_FRAME := 4
-## The keys that steer the person, each with the way it orders it.
-const MOVE_KEYS := {KEY_W: Vector2i.UP, KEY_A: Vector2i.LEFT, KEY_S: Vector2i.DOWN, KEY_D: Vector2i.RIGHT}
-## How many cells ahead a move key sets the objective; nearer cells are tried when the core
-## refuses it.
-const STRIDE := 3
+## The button that orders the person toward the cell under the cursor, and keeps doing so while held.
+const MOVE_BUTTON := MOUSE_BUTTON_RIGHT
+## The keys that cast one skill each at the cursor, the first skill's first.
+const CAST_KEYS := [KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T]
 ## The keys that strike with one skill each, the first skill's first, and the key that strikes with
 ## all of them.
 const SKILL_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9]
@@ -51,8 +53,12 @@ var _skills := PackedInt64Array()
 var _since_tick := 0.0
 # Where the steered person last stood, kept for the camera once it has died.
 var _last_lead := Vector2.ZERO
-# The move keys held, in the order they were pressed.
-var _held: Array[Key] = []
+# Where the cursor is, in this node's pixels, and whether the move button is held, so the person
+# follows it.
+var _cursor := Vector2.ZERO
+var _moving := false
+# The cast key being held to aim, or KEY_NONE.
+var _aiming := KEY_NONE
 # The person last steered, whose death the rebirth screen sums up once its soul is born again.
 var _body := -1
 # The date at the last tick, and the days that have begun since the world was last saved.
@@ -63,6 +69,7 @@ var _unsaved_days := 0
 @onready var _art: Node2D = $WorldArt
 @onready var _hud: CanvasLayer = $Hud
 @onready var _sound: Node2D = $Sound
+@onready var _aim: Node2D = $Aim
 
 
 func _ready() -> void:
@@ -138,9 +145,9 @@ func navigate(event: InputEvent) -> bool:
 	var open: Control = _hud.screen()
 	if open == null:
 		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
-				or _hud.sect.visible:
+				or _hud.sect.visible or _aiming != KEY_NONE:
 			return false
-		_held.clear()
+		_moving = false
 		_hud.pause.open(controls(), world_seed)
 		_sound.ui("open")
 		return true
@@ -182,20 +189,20 @@ func _take(action: String) -> void:
 ## Returns the controls as this scene binds them, for the pause panel's guide: each a Dictionary
 ## of its `keys`, the words on its caps, and `does`, the hud.csv key of what it does.
 func controls() -> Array[Dictionary]:
-	var moves: Array[String] = []
-	for keycode: Key in MOVE_KEYS:
-		moves.append(OS.get_keycode_string(keycode))
+	var casts := ""
+	for keycode: Key in CAST_KEYS:
+		casts += OS.get_keycode_string(keycode)
 	var skills := "%s-%s" % [OS.get_keycode_string(SKILL_KEYS.front()), OS.get_keycode_string(SKILL_KEYS.back())]
 	var rows: Array[Dictionary] = [
-		{"keys": moves, "does": "CONTROLS_MOVE"},
 		{"keys": ["CONTROLS_CLICK"], "does": "CONTROLS_CLICK_MOVE"},
+		{"keys": [casts], "does": "CONTROLS_CAST"},
 		{"keys": [skills], "does": "CONTROLS_SKILL"},
 		{"keys": [OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_ALL_SKILLS"},
 		{"keys": [OS.get_keycode_string(CHALLENGE_KEY)], "does": "CONTROLS_CHALLENGE"},
 		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
 		{"keys": [OS.get_keycode_string(_hud.LOCALE_KEY)], "does": "CONTROLS_LANGUAGE"},
-		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE"},
+		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows
 
@@ -209,6 +216,11 @@ func _process(delta: float) -> void:
 	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
 	_art.refresh(view)
 	_sound.hearing = view
+	# The cursor stays on the screen while the camera moves, so it moves over the world.
+	_cursor = get_local_mouse_position()
+	if _moving:
+		follow(_cursor)
+	_show_aim()
 	_hud.refresh(world, steered, _skills)
 
 
@@ -221,17 +233,32 @@ func command(event: InputEvent) -> bool:
 	var objective := _objective
 	var skills := _skills
 	var mouse := event as InputEventMouseButton
+	var motion := event as InputEventMouseMotion
 	var key := event as InputEventKey
-	if mouse != null and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
-		objective = Vector2i((mouse.position / PIXELS_PER_CELL).floor())
+	if mouse != null:
+		_cursor = mouse.position
+	elif motion != null:
+		_cursor = motion.position
+		_show_aim()
+	if mouse != null and mouse.button_index == MOVE_BUTTON:
+		_moving = mouse.pressed
+		return mouse.pressed and follow(_cursor)
+	elif motion != null:
+		return _moving and follow(_cursor)
 	elif key != null and key.pressed and (key.keycode == GENEALOGY_KEY or _hud.genealogy.visible):
 		return genealogy(key.keycode)
 	elif key != null and key.pressed and (key.keycode == SECT_KEY or _hud.sect.visible):
 		return sects(key.keycode)
 	elif key != null and key.pressed and key.keycode == CHALLENGE_KEY:
 		return challenge() == WorldAdapter.CHALLENGE_NONE
-	elif key != null and MOVE_KEYS.has(key.keycode) and not _hud.genealogy.visible and not _hud.sect.visible:
-		return walk(key)
+	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
+		var cast := quick_cast(key, _cursor)
+		_show_aim()
+		return cast
+	elif key != null and key.pressed and key.keycode == PAUSE_KEY and _aiming != KEY_NONE:
+		_aiming = KEY_NONE
+		_show_aim()
+		return false
 	elif key != null and key.pressed and (SKILL_KEYS.has(key.keycode) or key.keycode == ALL_SKILLS_KEY):
 		skills = _all_skills() if key.keycode == ALL_SKILLS_KEY else PackedInt64Array([SKILL_KEYS.find(key.keycode)])
 	else:
@@ -243,27 +270,67 @@ func command(event: InputEvent) -> bool:
 	return true
 
 
-## Steers the person with move key `key`, pressed or released: while move keys are held it is
-## ordered STRIDE cells the way they point together, or as many fewer as the core accepts, and
-## once none is held, to stop where it stands. The order keeps its skills. Returns whether the
-## core accepted an order.
-func walk(key: InputEventKey) -> bool:
-	if key.pressed and not _held.has(key.keycode):
-		_held.append(key.keycode)
-	elif not key.pressed:
-		_held.erase(key.keycode)
-	var way := Vector2i.ZERO
-	for held in _held:
-		way += MOVE_KEYS[held]
-	var here := Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
-	# With no way held, the one objective is where the person stands.
-	var strides: Array = [0] if way == Vector2i.ZERO else range(STRIDE, 0, -1)
-	for stride: int in strides:
-		var objective := here + way * stride
-		if world.order(steered, objective, _skills):
-			_objective = objective
-			return true
-	return false
+## Orders the person toward the cell under `at`, a position in this node's pixels, keeping its
+## skills, unless it is ordered there already. Returns whether the core accepted an order.
+func follow(at: Vector2) -> bool:
+	var objective := Vector2i((at / PIXELS_PER_CELL).floor())
+	if objective == _objective:
+		return false
+	if not world.order(steered, objective, _skills):
+		return false
+	_objective = objective
+	return true
+
+
+## Works cast key `key`, pressed or released, with the cursor at `at`, a position in this node's
+## pixels. Cast on press, a press casts its skill there at once. Cast on release, a press aims it
+## and the release casts it there, unless the same key pressed again or Escape cancelled the aim.
+## Returns whether a cast was given and the core accepted it.
+func quick_cast(key: InputEventKey, at: Vector2) -> bool:
+	if not _hud.settings.cast_on_release():
+		return key.pressed and cast_at(CAST_KEYS.find(key.keycode), at) == WorldAdapter.CAST_NONE
+	if key.pressed:
+		_aiming = KEY_NONE if _aiming == key.keycode else key.keycode
+		return false
+	if _aiming != key.keycode:
+		return false
+	_aiming = KEY_NONE
+	return cast_at(CAST_KEYS.find(key.keycode), at) == WorldAdapter.CAST_NONE
+
+
+## Returns the cast key held to aim, or KEY_NONE while none is.
+func aiming() -> Key:
+	return _aiming
+
+
+## Has the steered person cast skill `skill` at `at`, a position in this node's pixels, and shows
+## on the HUD why the core refuses it, if it does. Returns the core's verdict, one of the
+## WorldAdapter.CAST_* constants, of which CAST_NONE means it will cast; or -1 while the person
+## has no body.
+func cast_at(skill: int, at: Vector2) -> int:
+	var roster := world.roster(steered)
+	if roster.is_empty():
+		return -1
+	var point := at / PIXELS_PER_CELL * WorldAdapter.CELL_SIZE
+	var refusal := world.cast_refusal(roster[0], skill, point)
+	if refusal == WorldAdapter.CAST_NONE:
+		world.cast(roster[0], skill, point)
+	else:
+		_hud.show_cast(refusal)
+	return refusal
+
+
+# Shows the aimed skill's range round the person and its area at the cursor while a cast key is held
+# to aim, and hides it otherwise.
+func _show_aim() -> void:
+	var skill := CAST_KEYS.find(_aiming)
+	var skills := world.skills(steered)
+	if skill < 0 or skill >= skills.size():
+		_aim.visible = false
+		return
+	var reach: float = skills[skill]["range"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	var radius: float = skills[skill]["radius"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	_aim.show_aim(_to_pixels(lead()), reach, _cursor, radius)
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current
@@ -384,7 +451,9 @@ func step() -> void:
 	if roster.is_empty() or roster[0] == _body:
 		return
 	if _body >= 0 and world.person_health(_body) == 0:
-		_held.clear()
+		_moving = false
+		_aiming = KEY_NONE
+		_show_aim()
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]

@@ -3,7 +3,8 @@
 ## the discipline of its highest attainment with that attainment; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
-## fought, and the verdict on a challenge, or whether an autosave was written; a map of the region
+## fought, and the verdict on a challenge, why a cast was refused, or whether an autosave was
+## written; a map of the region
 ## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
 ## player; and the technique bar, an icon and its number key for each of the player's skills.
 ## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
@@ -50,6 +51,14 @@ const CHALLENGE_KEYS := {
 	WorldAdapter.CHALLENGE_NOT_A_MEMBER: "CHALLENGE_NOT_A_MEMBER",
 	WorldAdapter.CHALLENGE_IS_LEADER: "CHALLENGE_IS_LEADER",
 	WorldAdapter.CHALLENGE_DUEL_IN_PROGRESS: "CHALLENGE_DUEL_IN_PROGRESS",
+}
+# The translation key of each reason a cast is refused, by WorldAdapter.CAST_* constant.
+const CAST_KEYS := {
+	WorldAdapter.CAST_DEAD: "CAST_DEAD",
+	WorldAdapter.CAST_NO_SKILL: "CAST_NO_SKILL",
+	WorldAdapter.CAST_ON_COOLDOWN: "CAST_ON_COOLDOWN",
+	WorldAdapter.CAST_NO_TARGET: "CAST_NO_TARGET",
+	WorldAdapter.CAST_OUT_OF_RANGE: "CAST_OUT_OF_RANGE",
 }
 
 ## Labels that show a translated key or a value, by what they show, so a test can read them.
@@ -247,6 +256,13 @@ func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
 func show_challenge(refusal: int) -> void:
 	_set_up()
 	_notice(CHALLENGE_KEYS.get(refusal, "CHALLENGE_NONE"))
+
+
+## Shows for NOTICE_MS why the core refused the player's cast, one of the WorldAdapter.CAST_*
+## constants other than CAST_NONE.
+func show_cast(refusal: int) -> void:
+	_set_up()
+	_notice(CAST_KEYS[refusal])
 
 
 ## Shows for NOTICE_MS whether the autosave was written, as `written` says.

@@ -1,6 +1,7 @@
 ## The settings panel, drawn as art/mockup/settings_screen.png lays it out: the speed of the
 ## world's time, the window mode, the resolution in whole multiples of the native size, the
-## language and the volume of all sound, of the effects and of the music, each a row of its choices
+## language, the volume of all sound, of the effects and of the music, and whether a cast key
+## casts on its press or on its release, each a row of its choices
 ## with the chosen one in jade, and a line saying what the row being changed sets. The choices are
 ## the player's preferences, not the world's state: they are kept in a file under user:// and
 ## applied to the window, the translations, the audio buses and the play scene's pace. Every word comes from hud.csv through Godot's translations. It holds no game rule.
@@ -10,18 +11,21 @@ const PATH := "user://settings.cfg"
 const SECTION := "settings"
 # The mockup's layout, in the native 480x270.
 const DIALOG := Rect2(60, 10, 360, 250)
-const ROW_STEP := 26
+# The mockup's rows were 26 pixels apart; a row for casting closes them up to keep the line under
+# them within the panel.
+const ROW_STEP := 22
 const CHOICE_WIDTH := 64
 const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
-const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music"]
+const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music", "cast"]
 const LABEL_KEYS := {"speed": "SETTINGS_SPEED", "window": "SETTINGS_WINDOW",
 		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE",
-		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC"}
+		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC",
+		"cast": "SETTINGS_CAST"}
 const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW_ABOUT",
 		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
 		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
-		"music": "SETTINGS_MUSIC_ABOUT"}
+		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
@@ -31,10 +35,13 @@ const RESOLUTIONS := [Vector2i(960, 540), Vector2i(1440, 810), Vector2i(1920, 10
 ## The volume rows' audio buses, and the share of full volume each of their choices sets.
 const BUSES := {"master": &"Master", "effects": &"Effects", "music": &"Music"}
 const VOLUMES := [0.0, 0.25, 0.5, 0.75, 1.0]
+## Whether a cast key casts on its press or on its release.
+const CAST_KEYS := ["SETTINGS_CAST_PRESS", "SETTINGS_CAST_RELEASE"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
-## and the music sits under the effects.
+## the music sits under the effects, and a cast key casts on its press, as Albion Online's quick
+## cast does.
 const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
-		"effects": 4, "music": 3}
+		"effects": 4, "music": 3, "cast": 0}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -108,6 +115,9 @@ func choices(name: String) -> Array[String]:
 		"language":
 			for locale: String in locales:
 				words.append(tr("LOCALE_" + locale.to_upper()))
+		"cast":
+			for cast_key: String in CAST_KEYS:
+				words.append(tr(cast_key))
 		_:
 			for volume: float in VOLUMES:
 				words.append("%d%%" % roundi(volume * 100))
@@ -117,6 +127,12 @@ func choices(name: String) -> Array[String]:
 ## Returns how many times the core's tick rate the world runs at.
 func speed() -> int:
 	return SPEEDS[chosen.speed]
+
+
+## Returns whether a cast key casts on its release, after aiming while it is held, rather than on
+## its press.
+func cast_on_release() -> bool:
+	return chosen.cast == 1
 
 
 ## Keeps every row's choice in `path`.
@@ -168,6 +184,8 @@ func _count(name: String) -> int:
 			return RESOLUTIONS.size()
 		"language":
 			return locales.size()
+		"cast":
+			return CAST_KEYS.size()
 	return VOLUMES.size()
 
 
@@ -182,8 +200,8 @@ func _draw() -> void:
 		if n > 0:
 			draw_rect(Rect2(left, y - 5, width, 1), INK_LIGHT)
 		if n == row:
-			draw_rect(Rect2(left, y - 4, width, 22), INK_DARK)
-			draw_rect(Rect2(left, y - 4, 1, 22), JADE)
+			draw_rect(Rect2(left, y - 4, width, ROW_STEP - 2), INK_DARK)
+			draw_rect(Rect2(left, y - 4, 1, ROW_STEP - 2), JADE)
 		_text(Vector2(left + 8, y + 3), tr(LABEL_KEYS[name]), GOLD_LIGHT if n == row else GOLD)
 		var words := choices(name)
 		var slip := choice_width(name)
