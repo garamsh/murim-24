@@ -53,7 +53,7 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   region.rules.ticks_per_day = TICKS_PER_SWEPT_DAY;
   World world{region.seed,       Map{region.map_rows}, region.armies,
               region.structures, region.rules,         village_specs(region),
-              region.leadership, region.life};
+              region.leadership, region.life,          region.sects};
   const std::size_t factions = data.factions.size();
   Lived lived{world.living(), 0,   peopled(world, factions).first, 0,
               world.living(), true};

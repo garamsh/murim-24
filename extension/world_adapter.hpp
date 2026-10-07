@@ -210,6 +210,44 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns how many living people make village `village` their home.
   [[nodiscard]] std::int64_t village_population(std::int64_t village) const;
 
+  /// Returns how many sects the world holds, standing or fallen.
+  [[nodiscard]] std::int64_t sect_count() const;
+
+  /// Returns the sect person `person` belongs to, or -1 for none.
+  [[nodiscard]] std::int64_t person_sect(std::int64_t person) const;
+
+  /// Returns sect `sect`'s name.
+  [[nodiscard]] godot::String sect_name(std::int64_t sect) const;
+
+  /// Returns the faction sect `sect` belongs to.
+  [[nodiscard]] std::int64_t sect_faction(std::int64_t sect) const;
+
+  /// Returns the village that is sect `sect`'s seat.
+  [[nodiscard]] std::int64_t sect_seat(std::int64_t sect) const;
+
+  /// Returns whether sect `sect`'s seat is held by its faction.
+  [[nodiscard]] bool sect_seat_held(std::int64_t sect) const;
+
+  /// Returns sect `sect`'s living members, as person indices, ascending.
+  [[nodiscard]] godot::PackedInt64Array sect_members(std::int64_t sect) const;
+
+  /// Returns sect `sect`'s elders, as person indices, ascending.
+  [[nodiscard]] godot::PackedInt64Array sect_elders(std::int64_t sect) const;
+
+  /// Returns sect `sect`'s master, or -1 if it has no elder.
+  [[nodiscard]] std::int64_t sect_master(std::int64_t sect) const;
+
+  /// Returns how many members sect `sect` may hold.
+  [[nodiscard]] std::int64_t sect_cap(std::int64_t sect) const;
+
+  /// Returns whether sect `sect` stands, with a living member.
+  [[nodiscard]] bool sect_stands(std::int64_t sect) const;
+
+  /// Returns every manual as a Dictionary: its `discipline`, and `place`, one
+  /// of "sect", "cell" or "lost", with its `sect` or its `cell` as a
+  /// Vector2i.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> manuals() const;
+
   /// Returns the faction army `army` fights for now; a soul born again
   /// takes its new family's.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
@@ -271,7 +309,8 @@ class WorldAdapter : public godot::RefCounted {
       std::vector<murim::ArmySpec> armies,
       std::vector<murim::Structure> structures, murim::Rules rules,
       std::vector<murim::VillageSpec> villages = {},
-      std::vector<murim::Leadership> leadership = {}, murim::Life life = {});
+      std::vector<murim::Leadership> leadership = {}, murim::Life life = {},
+      std::vector<murim::SectSpec> sects = {});
   // Returns an adapter over `region`, with one person born into village
   // `village` as the last army; throws std::out_of_range when there is no
   // such village, and std::invalid_argument when the core refuses the
@@ -285,6 +324,7 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] std::size_t village_index(std::int64_t village) const;
   [[nodiscard]] std::size_t faction_index(std::int64_t faction) const;
   [[nodiscard]] std::size_t person_index(std::int64_t person) const;
+  [[nodiscard]] std::size_t sect_index(std::int64_t sect) const;
 };
 
 }  // namespace murim_godot

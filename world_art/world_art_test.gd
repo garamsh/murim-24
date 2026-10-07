@@ -40,9 +40,9 @@ const VIEW := Vector2(480, 270)
 # Days of five ticks, as the core's region test lives them: marching and raising run far faster
 # against the calendar than in play, so the region SEED makes founds its first village within
 # FOUNDING_DAYS in a few tens of thousands of ticks: from one household a village, its first after
-# 2,490 days.
+# 3,660 days.
 const SHORT_DAY := 5
-const FOUNDING_DAYS := 3000
+const FOUNDING_DAYS := 4500
 
 
 func run() -> bool:
@@ -87,9 +87,10 @@ func run() -> bool:
 		TICKS, bodies, on_screen, off_screen]
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
-	# Buildings: each region structure is drawn as its kind's art, its footprint's bottom-left on
-	# the sprite's position, showing its stage's frame. Control: the structures above, made by
-	# create() with no kind, get no sprite.
+	# Buildings: each region structure of a kind world_art draws is drawn as its kind's art, its
+	# footprint's bottom-left on the sprite's position, showing its stage's frame; a sect seat's
+	# training ground, manual hall and gate, which it does not draw yet, get no sprite. Control:
+	# the structures above, made by create() with no kind, get no sprite.
 	var region := WorldAdapter.create_region(SEED)
 	var region_art: Node2D = load(SCENE).instantiate()
 	region_art.show_world(region, region.army_count() - 1)
@@ -97,6 +98,7 @@ func run() -> bool:
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var placed := 0
 	var fields := 0
+	var undrawn := 0
 	var kinds := {}
 	for structure in region.structure_count():
 		var sprite: Sprite2D = region_art.structure_sprites[structure]
@@ -105,6 +107,9 @@ func run() -> bool:
 		var kind := region.structure_kind(structure)
 		if kind == "field":
 			fields += 1
+			continue
+		if not region_art.BUILDINGS.has(kind):
+			undrawn += 1 if sprite == null else 0
 			continue
 		var sheet := _sheet("res://art/structures/%s.json" % kind)
 		if sprite == null or sheet.is_empty():
@@ -117,10 +122,10 @@ func run() -> bool:
 			placed += 1
 			kinds[kind] = true
 	var unkinded_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
-	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 7 \
-			and unkinded_skipped
-	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, %d fields tiled; structures without a kind left undrawn %s: %s" % [
-		placed, region.structure_count(), kinds.keys(), fields, unkinded_skipped, "pass" if buildings_right else "FAIL"])
+	var buildings_right := placed + fields + undrawn == region.structure_count() and kinds.size() == 7 \
+			and undrawn > 0 and unkinded_skipped
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, %d fields tiled, %d of a seat's kinds left undrawn; structures without a kind left undrawn %s: %s" % [
+		placed, region.structure_count(), kinds.keys(), fields, undrawn, unkinded_skipped, "pass" if buildings_right else "FAIL"])
 
 	# Fields: every cell of each field carries a frame of its state's tag, sown in spring as the
 	# world begins. Control: the same cells carry no frame of the burnt tag, so the check tells
@@ -262,7 +267,7 @@ func _decorated(built: TileMapLayer, village: Dictionary) -> Vector2i:
 	var ground_tiles := _sheet("res://art/decorations/ground.json")
 	var corner: Vector2i = village.corner
 	var counts := Vector2i.ZERO
-	for item: Dictionary in layouts[village.kind]:
+	for item: Dictionary in layouts.get(village.kind, []):
 		if not item.has("tile"):
 			continue
 		var rect: Array = item.rect

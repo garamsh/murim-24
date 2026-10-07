@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "flow_field.hpp"
@@ -43,7 +44,8 @@ enum class Sex : std::uint8_t { FEMALE, MALE };
 /// family it heads.
 /// `spouses` are the people it married, in order, and `children` the people
 /// born to it. It has gone `hunger` days unfed. A person carrying soul `soul`
-/// is born again when it dies.
+/// is born again when it dies. It belongs to sect `sect`, if any, and keeps it
+/// while it serves in an army of the sect's faction.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -61,6 +63,7 @@ struct Person {
   std::vector<std::uint32_t> attainment;
   std::optional<std::uint64_t> lifespan;
   std::optional<std::size_t> soul;
+  std::optional<std::size_t> sect;
 };
 
 /// A uniform draw over [mean - spread, mean + spread].
@@ -148,11 +151,13 @@ constexpr std::uint32_t PER_MILLE = 1'000;
 enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
 
 /// What a structure gives its village: the people it houses, the food it
-/// stores, and the food it yields each harvest, which makes it a field.
+/// stores, the food it yields each harvest, which makes it a field, and the
+/// pupils it teaches a sect seated in the village.
 struct Holding {
   std::uint32_t housing = 0;
   std::uint32_t storage = 0;
   std::uint32_t harvest = 0;
+  std::uint32_t pupils = 0;
 };
 
 /// What a village pressing against its cap may do: raise a structure, found
@@ -212,6 +217,18 @@ struct Growth {
   std::vector<std::vector<Expansion>> stances;
 };
 
+/// The secret manuals the world's sects start with and where a fallen sect's
+/// go, as data: `held` gives, by sect, the discipline of each manual it
+/// holds. When a sect falls, each manual it holds scatters, with
+/// `scatter_chance` per mille, to a passable cell drawn by the seed within
+/// `scatter_reach` cells of its seat's centre along each axis, and is
+/// otherwise lost.
+struct Manuals {
+  std::vector<std::vector<std::size_t>> held;
+  std::uint32_t scatter_chance = 0;
+  std::int32_t scatter_reach = 0;
+};
+
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
 /// age passes its lifespan plus `days_per_attainment` days for every point of
@@ -224,7 +241,8 @@ struct Growth {
 /// `founding_age` days old, or newborn without one. People marry and have
 /// children by `kinship`, if given, and bear `names`. Villages feed their
 /// people by `husbandry`, if given, which caps how many a village holds, and
-/// grow by `growth`, if given, as they press against their caps.
+/// grow by `growth`, if given, as they press against their caps. Sects hold
+/// `manuals`, if given.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -237,6 +255,8 @@ struct Life {
   Names names;
   std::optional<Husbandry> husbandry;
   std::optional<Growth> growth;
+  /// The secret manuals sects start with, and where a fallen sect's go.
+  std::optional<Manuals> manuals;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -431,11 +451,72 @@ struct Duellists {
   std::size_t leader;
 };
 
+/// Who a faction's sects admit, as data, checked once a day: a living person
+/// of no sect, serving in an army of the faction, at least `age` days old,
+/// with a talent limit of at least `talent` and an attainment of at least
+/// `attainment` in one discipline, whose home's centre lies within `reach`
+/// cells of a sect's seat's centre along each axis, joins with `chance` per
+/// mille a year. It joins a sect of the faction whose seat is held, with a
+/// living elder and fewer members than its cap, drawn by the seed among
+/// those. Its elders are the `elder_share` per mille of a sect's members of
+/// the highest best attainment, the lower index among equals, and at least
+/// one while the sect stands.
+struct Admission {
+  std::uint32_t age = 0;
+  std::uint32_t talent = 0;
+  std::uint32_t attainment = 0;
+  std::int32_t reach = 0;
+  std::uint32_t chance = 0;
+  std::uint32_t elder_share = 0;
+};
+
+/// How a faction elects its leader: when its leader is dead or no one leads,
+/// and every `term` days if `term` is not 0, the master of its sects with the
+/// most favour leads, each elder of its sects favouring its own sect's
+/// master; ties go to the higher best attainment, then the lower index.
+struct Election {
+  std::uint32_t term = 0;
+};
+
 /// A faction's leadership as a world is created with: the person leading
-/// it, if anyone does, and how the lead passes, if it passes at all.
+/// it, if anyone does, how the lead passes by duel, if it does, who its
+/// sects admit, if they admit anyone, and how it elects its leader, if it
+/// does.
 struct Leadership {
   std::optional<std::size_t> leader;
   std::optional<Duel> succession;
+  std::optional<Admission> admission;
+  std::optional<Election> election;
+};
+
+/// A member a sect is created with: a person by index, and the attainment its
+/// discipline of highest talent limit starts at, up to that limit.
+struct Founder {
+  std::size_t person = 0;
+  std::uint32_t attainment = 0;
+};
+
+/// A sect as a world is created with: its name, its faction, its seat
+/// village by index, and its founding members.
+struct SectSpec {
+  std::string name;
+  std::size_t faction = 0;
+  std::size_t seat = 0;
+  std::vector<Founder> founders;
+};
+
+/// A manual held by a sect, by index.
+struct HeldBySect {
+  std::size_t sect = 0;
+};
+
+/// A manual no one will find again.
+struct Lost {};
+
+/// A secret manual: the discipline it teaches, and where it is now.
+struct Manual {
+  std::size_t discipline = 0;
+  std::variant<HeldBySect, Cell, Lost> place;
 };
 
 /// The data a world's rules read.
@@ -480,13 +561,20 @@ class World {
   /// spacing or claim outside [0, MAX_REACH], a plan or settlement of a side
   /// outside [1, MAX_FOOTPRINT], a build or placement naming no plan, a
   /// layout with a structure outside its settlement, over another or over
-  /// its centre, or stances for more factions than `hostile`. Within these
-  /// limits no damage, health, durability or cooldown arithmetic exceeds its
-  /// type.
+  /// its centre, or stances for more factions than `hostile`; or an
+  /// admission gives a chance above PER_MILLE or a reach outside
+  /// [0, MAX_REACH] or an elder share above PER_MILLE; or a sect names a
+  /// faction outside `hostile`, a village
+  /// that does not exist, or a founder who is no person the world creates or
+  /// who serves in no army of the sect's faction, or `life`'s manuals name a
+  /// discipline it does not draw, more sects than there are, a chance above
+  /// PER_MILLE or a reach outside [0, MAX_REACH]. Within these limits no
+  /// damage, health, durability or cooldown arithmetic exceeds its type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules,
         std::vector<VillageSpec> villages = {},
-        std::vector<Leadership> leadership = {}, Life life = {});
+        std::vector<Leadership> leadership = {}, Life life = {},
+        std::vector<SectSpec> sects = {});
 
   /// Gives army `army` an order, which it follows from the next tick on.
   /// With `challenge`, the army's lead also challenges that faction's
@@ -638,6 +726,47 @@ class World {
   /// village the world was created with.
   [[nodiscard]] std::optional<Settlement> settlement(std::size_t village) const;
 
+  /// Returns how many sects the world holds, standing or fallen.
+  [[nodiscard]] std::size_t sect_count() const;
+
+  /// Returns the sect person `person` belongs to, if any.
+  [[nodiscard]] std::optional<std::size_t> sect_of(std::size_t person) const;
+
+  /// Returns sect `sect`'s name.
+  [[nodiscard]] const std::string& sect_name(std::size_t sect) const;
+
+  /// Returns the faction sect `sect` belongs to.
+  [[nodiscard]] std::size_t sect_faction(std::size_t sect) const;
+
+  /// Returns the village that is sect `sect`'s seat.
+  [[nodiscard]] std::size_t sect_seat(std::size_t sect) const;
+
+  /// Returns whether sect `sect`'s seat is held: its village is not in
+  /// ruins and is owned by the sect's faction.
+  [[nodiscard]] bool seat_held(std::size_t sect) const;
+
+  /// Returns sect `sect`'s living members, by person index, ascending.
+  [[nodiscard]] std::vector<std::size_t> sect_members(std::size_t sect) const;
+
+  /// Returns sect `sect`'s elders, ascending: the elder share of its living
+  /// members of the highest best attainment, the lower index among equals,
+  /// at least one while it stands; none for a faction with no admission.
+  [[nodiscard]] std::vector<std::size_t> sect_elders(std::size_t sect) const;
+
+  /// Returns sect `sect`'s master: its elder of the highest best attainment,
+  /// the lower index among equals, if it has an elder.
+  [[nodiscard]] std::optional<std::size_t> sect_master(std::size_t sect) const;
+
+  /// Returns how many members sect `sect` may hold: the pupils its seat's
+  /// standing structures teach while the seat is held, and 0 otherwise.
+  [[nodiscard]] std::size_t sect_cap(std::size_t sect) const;
+
+  /// Returns whether sect `sect` stands: whether it has a living member.
+  [[nodiscard]] bool sect_stands(std::size_t sect) const;
+
+  /// Returns every manual and where it is now.
+  [[nodiscard]] const std::vector<Manual>& manuals() const;
+
  private:
   /// A duel fought for faction `faction`'s lead, under its rule.
   struct Fight {
@@ -687,6 +816,19 @@ class World {
                                          std::size_t faction) const;
   void enlist(ArmySpec& army, std::size_t pairs, std::size_t& families);
   void add_village(VillageSpec spec);
+  void add_sects(std::vector<SectSpec> sects);
+  [[nodiscard]] std::uint32_t best_attainment(std::size_t person) const;
+  void keep_sects();
+  void elect(std::size_t faction);
+  void hold_elections(std::uint64_t day);
+  /// The living, in index order, and the army each living person serves in,
+  /// by person index.
+  struct Living {
+    std::vector<std::size_t> people;
+    std::vector<std::size_t> army_of;
+  };
+  [[nodiscard]] Living living_people() const;
+  void admit(const Living& living);
   void settle_duels();
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
@@ -772,6 +914,14 @@ class World {
   std::int32_t structure_extent_ = 0;
   std::vector<Village> villages_;
   std::vector<Leadership> leadership_;
+  /// A sect: its name, its faction and its seat village.
+  struct Sect {
+    std::string name;
+    std::size_t faction = 0;
+    std::size_t seat = 0;
+  };
+  std::vector<Sect> sects_;
+  std::vector<Manual> manuals_;
   std::vector<Fight> duels_;
   Life life_;
   std::vector<Soul> souls_;

@@ -23,6 +23,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "m1_scenario.hpp"
@@ -177,6 +178,15 @@ murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
   return region;
 }
 
+// The person indices `people` as GDScript reads them.
+godot::PackedInt64Array packed(const std::vector<std::size_t>& people) {
+  godot::PackedInt64Array indices;
+  for (const std::size_t person : people) {
+    indices.push_back(static_cast<std::int64_t>(person));
+  }
+  return indices;
+}
+
 }  // namespace
 
 godot::Ref<WorldAdapter> WorldAdapter::create(
@@ -234,7 +244,7 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
       over(region.seed, std::move(region.map_rows), std::move(region.armies),
            std::move(region.structures), std::move(region.rules),
            std::move(villages), std::move(region.leadership),
-           std::move(region.life));
+           std::move(region.life), std::move(region.sects));
   // The person born last is the player's body, which carries a soul.
   adapter->world().ensoul(adapter->world().population() - 1);
   adapter->structure_kinds_ = std::move(kinds);
@@ -254,7 +264,8 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     std::vector<murim::ArmySpec> armies,
     std::vector<murim::Structure> structures, murim::Rules rules,
     std::vector<murim::VillageSpec> villages,
-    std::vector<murim::Leadership> leadership, murim::Life life) {
+    std::vector<murim::Leadership> leadership, murim::Life life,
+    std::vector<murim::SectSpec> sects) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
   for (const murim::ArmySpec& army : armies) {
@@ -269,7 +280,7 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
                           std::move(structures), std::move(rules),
                           std::move(villages), std::move(leadership),
-                          std::move(life));
+                          std::move(life), std::move(sects));
   adapter->map_rows_ = std::move(map_rows);
   return adapter;
 }
@@ -649,6 +660,82 @@ std::int64_t WorldAdapter::person_faction(std::int64_t person) const {
   return faction ? static_cast<std::int64_t>(*faction) : -1;
 }
 
+std::size_t WorldAdapter::sect_index(std::int64_t sect) const {
+  CRASH_COND_MSG(
+      sect < 0 || static_cast<std::uint64_t>(sect) >= world().sect_count(),
+      "sect index out of range");
+  return static_cast<std::size_t>(sect);
+}
+
+std::int64_t WorldAdapter::sect_count() const {
+  return world_ ? static_cast<std::int64_t>(world().sect_count()) : 0;
+}
+
+std::int64_t WorldAdapter::person_sect(std::int64_t person) const {
+  const std::optional<std::size_t> sect = world().sect_of(person_index(person));
+  return sect ? static_cast<std::int64_t>(*sect) : -1;
+}
+
+godot::String WorldAdapter::sect_name(std::int64_t sect) const {
+  return {world().sect_name(sect_index(sect)).c_str()};
+}
+
+std::int64_t WorldAdapter::sect_faction(std::int64_t sect) const {
+  return static_cast<std::int64_t>(world().sect_faction(sect_index(sect)));
+}
+
+std::int64_t WorldAdapter::sect_seat(std::int64_t sect) const {
+  return static_cast<std::int64_t>(world().sect_seat(sect_index(sect)));
+}
+
+bool WorldAdapter::sect_seat_held(std::int64_t sect) const {
+  return world().seat_held(sect_index(sect));
+}
+
+godot::PackedInt64Array WorldAdapter::sect_members(std::int64_t sect) const {
+  return packed(world().sect_members(sect_index(sect)));
+}
+
+godot::PackedInt64Array WorldAdapter::sect_elders(std::int64_t sect) const {
+  return packed(world().sect_elders(sect_index(sect)));
+}
+
+std::int64_t WorldAdapter::sect_master(std::int64_t sect) const {
+  const std::optional<std::size_t> master =
+      world().sect_master(sect_index(sect));
+  return master ? static_cast<std::int64_t>(*master) : -1;
+}
+
+std::int64_t WorldAdapter::sect_cap(std::int64_t sect) const {
+  return static_cast<std::int64_t>(world().sect_cap(sect_index(sect)));
+}
+
+bool WorldAdapter::sect_stands(std::int64_t sect) const {
+  return world().sect_stands(sect_index(sect));
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::manuals() const {
+  godot::TypedArray<godot::Dictionary> manuals;
+  if (!world_) {
+    return manuals;
+  }
+  for (const murim::Manual& manual : world().manuals()) {
+    godot::Dictionary fields;
+    fields.set("discipline", static_cast<std::int64_t>(manual.discipline));
+    if (const auto* held = std::get_if<murim::HeldBySect>(&manual.place)) {
+      fields.set("place", "sect");
+      fields.set("sect", static_cast<std::int64_t>(held->sect));
+    } else if (const auto* cell = std::get_if<murim::Cell>(&manual.place)) {
+      fields.set("place", "cell");
+      fields.set("cell", godot::Vector2i{cell->x, cell->y});
+    } else {
+      fields.set("place", "lost");
+    }
+    manuals.push_back(fields);
+  }
+  return manuals;
+}
+
 void WorldAdapter::_bind_methods() {
   const godot::StringName& name = WorldAdapter::get_class_static();
   godot::ClassDB::bind_static_method(
@@ -699,6 +786,30 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_age);
   godot::ClassDB::bind_method(godot::D_METHOD("person_faction", "person"),
                               &WorldAdapter::person_faction);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_count"),
+                              &WorldAdapter::sect_count);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_sect", "person"),
+                              &WorldAdapter::person_sect);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_name", "sect"),
+                              &WorldAdapter::sect_name);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_faction", "sect"),
+                              &WorldAdapter::sect_faction);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_seat", "sect"),
+                              &WorldAdapter::sect_seat);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_seat_held", "sect"),
+                              &WorldAdapter::sect_seat_held);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_members", "sect"),
+                              &WorldAdapter::sect_members);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_elders", "sect"),
+                              &WorldAdapter::sect_elders);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_master", "sect"),
+                              &WorldAdapter::sect_master);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_cap", "sect"),
+                              &WorldAdapter::sect_cap);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_stands", "sect"),
+                              &WorldAdapter::sect_stands);
+  godot::ClassDB::bind_method(godot::D_METHOD("manuals"),
+                              &WorldAdapter::manuals);
   godot::ClassDB::bind_method(godot::D_METHOD("tick"), &WorldAdapter::tick);
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);

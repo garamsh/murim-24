@@ -10,7 +10,9 @@
 #include <numeric>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "flow_field.hpp"
@@ -187,6 +189,35 @@ Position stepped(const FlowField& field, Position from, Step direction) {
 }
 
 // Folds everything `person` holds into `fold`; `absent` stands for no soul.
+// Folds who faction `faction`'s sects admit and how it elects its leader.
+template <typename Fold>
+void fold_selection(const Fold& fold, const Leadership& faction) {
+  const Admission admission = faction.admission.value_or(Admission{});
+  fold(faction.admission.has_value());
+  fold(admission.age);
+  fold(admission.talent);
+  fold(admission.attainment);
+  fold(admission.reach);
+  fold(admission.chance);
+  fold(admission.elder_share);
+  fold(faction.election.has_value());
+  fold(faction.election.value_or(Election{}).term);
+}
+
+// Folds manual `manual`'s discipline and place.
+template <typename Fold>
+void fold_manual(const Fold& fold, const Manual& manual) {
+  fold(manual.discipline);
+  fold(manual.place.index());
+  if (const auto* held = std::get_if<HeldBySect>(&manual.place)) {
+    fold(held->sect);
+  }
+  if (const auto* cell = std::get_if<Cell>(&manual.place)) {
+    fold(cell->x);
+    fold(cell->y);
+  }
+}
+
 template <typename Fold>
 void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
   fold(person.position.x);
@@ -208,6 +239,7 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
   }
   fold(person.lifespan.value_or(0));
   fold(person.soul.value_or(absent));
+  fold(person.sect.value_or(absent));
   fold(person.sex);
   fold(person.given);
   for (const std::size_t spouse : person.spouses) {
@@ -444,7 +476,8 @@ void fold_village(const Fold& fold, const Village& village) {
 World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              std::vector<Structure> structures, Rules rules,
              std::vector<VillageSpec> villages,
-             std::vector<Leadership> leadership, Life life)
+             std::vector<Leadership> leadership, Life life,
+             std::vector<SectSpec> sects)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       map_(std::move(map)),
       rules_(std::move(rules)),
@@ -534,6 +567,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   leadership_ = std::move(leadership);
   leadership_.resize(rules_.hostile.size());
+  add_sects(std::move(sects));
 }
 
 // Creates the army `army` describes, its members born of no parents, by the
@@ -571,6 +605,288 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
                          Order{army.objective, std::move(every_skill)},
                          std::move(field), std::move(roster)});
 }
+
+// Adds the sects `sects` describe, each founder joining its sect with its
+// discipline of highest talent limit at its starting attainment, up to that
+// limit, and gives each sect the manuals the life says it holds. Throws
+// std::invalid_argument when an admission or a sect or the manuals are
+// outside the limits the constructor documents.
+void World::add_sects(std::vector<SectSpec> sects) {
+  const auto bad_admission = [](const Leadership& faction) {
+    const Admission admission = faction.admission.value_or(Admission{});
+    return admission.chance > PER_MILLE || !reachable(admission.reach) ||
+           admission.elder_share > PER_MILLE;
+  };
+  const auto stray = [this](const SectSpec& sect) {
+    return sect.faction >= rules_.hostile.size() ||
+           sect.seat >= villages_.size() ||
+           std::any_of(sect.founders.begin(), sect.founders.end(),
+                       [this, &sect](const Founder& founder) {
+                         return founder.person >= people_.size() ||
+                                faction_of(founder.person) != sect.faction;
+                       });
+  };
+  const Manuals manuals = life_.manuals.value_or(Manuals{});
+  const auto unknown = [this](const std::vector<std::size_t>& held) {
+    return std::any_of(held.begin(), held.end(), [this](std::size_t taught) {
+      return taught >= life_.disciplines.size();
+    });
+  };
+  if (std::any_of(leadership_.begin(), leadership_.end(), bad_admission) ||
+      std::any_of(sects.begin(), sects.end(), stray) ||
+      manuals.held.size() > sects.size() ||
+      std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
+      manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach)) {
+    throw std::invalid_argument(
+        "an admission must have a chance and an elder share within PER_MILLE "
+        "and a reach within MAX_REACH; a sect must name a known faction, an "
+        "existing village and "
+        "founders serving in its faction; and the manuals must name known "
+        "disciplines for known sects, a chance within PER_MILLE and a reach "
+        "within MAX_REACH");
+  }
+  for (SectSpec& sect : sects) {
+    for (const Founder& founder : sect.founders) {
+      Person& person = people_.at(founder.person);
+      person.sect = sects_.size();
+      if (!person.talent.empty()) {
+        const auto best = static_cast<std::size_t>(
+            std::max_element(person.talent.begin(), person.talent.end(),
+                             [](const Aptitude& left, const Aptitude& right) {
+                               return left.limit < right.limit;
+                             }) -
+            person.talent.begin());
+        person.attainment.at(best) =
+            std::min(founder.attainment, person.talent.at(best).limit);
+      }
+    }
+    sects_.push_back(Sect{std::move(sect.name), sect.faction, sect.seat});
+  }
+  for (std::size_t sect = 0; sect < manuals.held.size(); ++sect) {
+    for (const std::size_t taught : manuals.held.at(sect)) {
+      manuals_.push_back(Manual{taught, HeldBySect{sect}});
+    }
+  }
+}
+
+// The highest attainment person `person` holds in any discipline.
+std::uint32_t World::best_attainment(std::size_t person) const {
+  const std::vector<std::uint32_t>& attainment = people_.at(person).attainment;
+  return attainment.empty()
+             ? 0
+             : *std::max_element(attainment.begin(), attainment.end());
+}
+
+// The daily check of sects: a member serving in an army of another faction
+// leaves its sect; a fallen sect's manuals each scatter or are lost; then the
+// faction's people are admitted.
+World::Living World::living_people() const {
+  Living living{{}, std::vector<std::size_t>(people_.size())};
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    for (const std::size_t member : armies_.at(army).roster) {
+      living.people.push_back(member);
+      living.army_of.at(member) = army;
+    }
+  }
+  std::sort(living.people.begin(), living.people.end());
+  return living;
+}
+
+void World::keep_sects() {
+  const Living living = living_people();
+  for (const std::size_t member : living.people) {
+    std::optional<std::size_t>& sect = people_.at(member).sect;
+    if (sect && armies_.at(living.army_of.at(member)).faction !=
+                    sects_.at(*sect).faction) {
+      sect.reset();
+    }
+  }
+  const Manuals scattering = life_.manuals.value_or(Manuals{});
+  for (Manual& manual : manuals_) {
+    const auto* held = std::get_if<HeldBySect>(&manual.place);
+    if (held == nullptr || sect_stands(held->sect)) {
+      continue;
+    }
+    const Cell centre = seat(sects_.at(held->sect).seat);
+    std::vector<Cell> cells;
+    const std::int32_t reach = scattering.scatter_reach;
+    for (const Cell cell :
+         cells_of(Cell{centre.x - reach, centre.y - reach},
+                  Footprint{(2 * reach) + 1, (2 * reach) + 1})) {
+      if (map_.passable(cell)) {
+        cells.push_back(cell);
+      }
+    }
+    const bool scatters =
+        next_random() % PER_MILLE < scattering.scatter_chance && !cells.empty();
+    manual.place = scatters ? std::variant<HeldBySect, Cell, Lost>{cells.at(
+                                  next_random() % cells.size())}
+                            : std::variant<HeldBySect, Cell, Lost>{Lost{}};
+  }
+  admit(living);
+}
+
+// Admits each living person of no sect, in index order, by its faction's
+// admission, to one of the sects open to it, drawn by the seed.
+void World::admit(const Living& living) {
+  std::vector<std::size_t> members(sects_.size());
+  std::vector<bool> open(sects_.size());
+  for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
+    members.at(sect) = sect_members(sect).size();
+    open.at(sect) = seat_held(sect) && !sect_elders(sect).empty();
+  }
+  for (const std::size_t candidate : living.people) {
+    Person& person = people_.at(candidate);
+    const std::size_t faction =
+        armies_.at(living.army_of.at(candidate)).faction;
+    const std::optional<Admission>& admission =
+        leadership_.at(faction).admission;
+    if (person.sect || !person.home || !admission ||
+        age_in_days(person) < static_cast<std::int64_t>(admission->age)) {
+      continue;
+    }
+    bool able = false;
+    for (std::size_t discipline = 0; discipline < person.talent.size();
+         ++discipline) {
+      able =
+          able || (person.talent.at(discipline).limit >= admission->talent &&
+                   person.attainment.at(discipline) >= admission->attainment);
+    }
+    const Cell home = seat(*person.home);
+    std::vector<std::size_t> sects;
+    for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
+      const Cell centre = seat(sects_.at(sect).seat);
+      if (sects_.at(sect).faction == faction && open.at(sect) &&
+          members.at(sect) < sect_cap(sect) &&
+          std::abs(centre.x - home.x) <= admission->reach &&
+          std::abs(centre.y - home.y) <= admission->reach) {
+        sects.push_back(sect);
+      }
+    }
+    if (!able || sects.empty() ||
+        next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) >=
+            admission->chance) {
+      continue;
+    }
+    const std::size_t joined = sects.at(next_random() % sects.size());
+    person.sect = joined;
+    ++members.at(joined);
+  }
+}
+
+// Makes the master of faction `faction`'s sects with the most favour its
+// leader, each elder of its sects favouring its own sect's master; ties go to
+// the higher best attainment, then the lower index. A faction whose sects
+// have no master keeps its leader.
+void World::elect(std::size_t faction) {
+  std::optional<std::size_t> chosen;
+  std::size_t most = 0;
+  for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
+    const std::optional<std::size_t> master = sect_master(sect);
+    if (sects_.at(sect).faction != faction || !master) {
+      continue;
+    }
+    const std::size_t favour = sect_elders(sect).size();
+    const bool better =
+        !chosen || favour > most ||
+        (favour == most &&
+         (best_attainment(*master) > best_attainment(*chosen) ||
+          (best_attainment(*master) == best_attainment(*chosen) &&
+           *master < *chosen)));
+    if (better) {
+      chosen = master;
+      most = favour;
+    }
+  }
+  if (chosen) {
+    leadership_.at(faction).leader = chosen;
+  }
+}
+
+std::size_t World::sect_count() const { return sects_.size(); }
+
+std::optional<std::size_t> World::sect_of(std::size_t person) const {
+  return people_.at(person).sect;
+}
+
+const std::string& World::sect_name(std::size_t sect) const {
+  return sects_.at(sect).name;
+}
+
+std::size_t World::sect_faction(std::size_t sect) const {
+  return sects_.at(sect).faction;
+}
+
+std::size_t World::sect_seat(std::size_t sect) const {
+  return sects_.at(sect).seat;
+}
+
+bool World::seat_held(std::size_t sect) const {
+  const Sect& held = sects_.at(sect);
+  return village_state(held.seat) != VillageState::RUINS &&
+         owner(held.seat) == held.faction;
+}
+
+std::vector<std::size_t> World::sect_members(std::size_t sect) const {
+  std::vector<std::size_t> members;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      if (people_.at(member).sect == sect) {
+        members.push_back(member);
+      }
+    }
+  }
+  std::sort(members.begin(), members.end());
+  return members;
+}
+
+std::vector<std::size_t> World::sect_elders(std::size_t sect) const {
+  const std::optional<Admission>& admission =
+      leadership_.at(sects_.at(sect).faction).admission;
+  std::vector<std::size_t> elders;
+  if (!admission) {
+    return elders;
+  }
+  std::vector<std::size_t> members = sect_members(sect);
+  std::stable_sort(members.begin(), members.end(),
+                   [this](std::size_t left, std::size_t right) {
+                     return best_attainment(left) > best_attainment(right);
+                   });
+  const std::size_t share = members.size() * admission->elder_share / PER_MILLE;
+  const std::size_t count =
+      std::min(members.size(), std::max<std::size_t>(share, 1));
+  elders.assign(members.begin(),
+                members.begin() + static_cast<std::ptrdiff_t>(count));
+  std::sort(elders.begin(), elders.end());
+  return elders;
+}
+
+std::optional<std::size_t> World::sect_master(std::size_t sect) const {
+  std::optional<std::size_t> master;
+  for (const std::size_t elder : sect_elders(sect)) {
+    if (!master || best_attainment(elder) > best_attainment(*master)) {
+      master = elder;
+    }
+  }
+  return master;
+}
+
+std::size_t World::sect_cap(std::size_t sect) const {
+  return seat_held(sect) ? held(sects_.at(sect).seat, Stage::DAMAGED).pupils
+                         : 0;
+}
+
+bool World::sect_stands(std::size_t sect) const {
+  return std::any_of(
+      armies_.begin(), armies_.end(), [this, sect](const Army& army) {
+        return std::any_of(army.roster.begin(), army.roster.end(),
+                           [this, sect](std::size_t member) {
+                             return people_.at(member).sect == sect;
+                           });
+      });
+}
+
+const std::vector<Manual>& World::manuals() const { return manuals_; }
 
 // Adds the village `spec` describes, its storage full, making it its
 // residents' home. Throws std::invalid_argument when it names a structure
@@ -808,6 +1124,28 @@ void World::tick() {
   if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
     kin(*life_.kinship);
   }
+  if (!sects_.empty() && tick_count_ % rules_.ticks_per_day == 0) {
+    keep_sects();
+  }
+  if (tick_count_ % rules_.ticks_per_day == 0) {
+    hold_elections(day);
+  }
+}
+
+// Elects a leader, on day `day`, for each faction with an election whose
+// leader is dead or missing, or whose term `day` completes.
+void World::hold_elections(std::uint64_t day) {
+  for (std::size_t faction = 0; faction < leadership_.size(); ++faction) {
+    const Leadership& lead = leadership_.at(faction);
+    if (!lead.election) {
+      continue;
+    }
+    const bool vacant = !lead.leader || people_.at(*lead.leader).health == 0;
+    const std::uint32_t term = lead.election->term;
+    if (vacant || (term > 0 && day % term == 0)) {
+      elect(faction);
+    }
+  }
 }
 
 // The people carrying a soul who died this tick, each with the army it
@@ -931,6 +1269,14 @@ StateHash World::hash() const {
     fold(rule.members_only);
     fold(rule.yield_health);
     fold(rule.allies_turn_hostile);
+    fold_selection(fold, faction);
+  }
+  for (const Sect& sect : sects_) {
+    fold(sect.faction);
+    fold(sect.seat);
+  }
+  for (const Manual& manual : manuals_) {
+    fold_manual(fold, manual);
   }
   for (const Fight& fight : duels_) {
     fold(fight.faction);
@@ -1569,6 +1915,7 @@ Holding World::held(std::size_t village, Stage worst) const {
     if (now <= worst) {
       total.housing += holding.housing;
       total.storage += holding.storage;
+      total.pupils += holding.pupils;
     }
     total.harvest += now == Stage::INTACT ? holding.harvest : 0;
   }
