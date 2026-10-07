@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <godot_cpp/classes/ref.hpp>
@@ -27,6 +28,7 @@
 #include <vector>
 
 #include "file_saves.hpp"
+#include "flow_field.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "region.hpp"
@@ -55,6 +57,38 @@ godot::Variant typed(const godot::Variant& value, godot::Variant::Type type,
                                 " is missing or of the wrong type");
   }
   return value;
+}
+
+// Returns a Vector2 `vector` as sub-cell units, or throws when an axis is not
+// finite or does not fit 32 bits.
+murim::Position units(const godot::Variant& vector, const char* name) {
+  const auto axis = [name](double value) {
+    if (!std::isfinite(value)) {
+      throw std::invalid_argument(std::string(name) + " is not finite");
+    }
+    constexpr double BOUND = 2'147'483'648.0;
+    if (value < -BOUND || value >= BOUND) {
+      throw std::invalid_argument(std::string(name) + " is out of range");
+    }
+    return static_cast<std::int32_t>(value);
+  };
+  return murim::Position{axis(vector.get("x")), axis(vector.get("y"))};
+}
+
+// Returns a cast's target as cast() takes it: a Vector2 point, an int person
+// or null for the caster itself; throws for any other.
+murim::Target target_of(const godot::Variant& target) {
+  switch (target.get_type()) {
+    case godot::Variant::VECTOR2:
+      return murim::Point{units(target, "target")};
+    case godot::Variant::INT:
+      return murim::AtPerson{narrow<std::size_t>(target, "target")};
+    case godot::Variant::NIL:
+      return murim::Itself{};
+    default:
+      throw std::invalid_argument(
+          "a target must be a Vector2 point, an int person or null");
+  }
 }
 
 godot::Variant field(const godot::Dictionary& fields, const char* key,
@@ -871,6 +905,46 @@ bool WorldAdapter::apply(std::int64_t person, std::int64_t sect) {
   }
 }
 
+bool WorldAdapter::cast(std::int64_t person, std::int64_t skill,
+                        const godot::Variant& target) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    world().cast(person_index(person), narrow<std::size_t>(skill, "skill"),
+                 target_of(target));
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.cast: ", error.what());
+    return false;
+  }
+}
+
+std::int64_t WorldAdapter::cast_refusal(std::int64_t person, std::int64_t skill,
+                                        const godot::Variant& target) const {
+  try {
+    return static_cast<std::int64_t>(world().cast_refusal(
+        person_index(person), narrow<std::size_t>(skill, "skill"),
+        target_of(target)));
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.cast_refusal: ",
+                                        error.what());
+    return -1;
+  }
+}
+
+std::int64_t WorldAdapter::aim(std::int64_t person, std::int64_t skill,
+                               const godot::Vector2& facing) const {
+  try {
+    const murim::Position way = units(facing, "facing");
+    const std::optional<std::size_t> aimed =
+        world().aim(person_index(person), narrow<std::size_t>(skill, "skill"),
+                    murim::Step{way.x, way.y});
+    return aimed ? static_cast<std::int64_t>(*aimed) : -1;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.aim: ", error.what());
+    return -1;
+  }
+}
+
 godot::TypedArray<godot::Dictionary> WorldAdapter::rumours(
     std::int64_t person) const {
   godot::TypedArray<godot::Dictionary> heard;
@@ -1077,6 +1151,14 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::application_refusal);
   godot::ClassDB::bind_method(godot::D_METHOD("apply", "person", "sect"),
                               &WorldAdapter::apply);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("cast", "person", "skill", "target"),
+      &WorldAdapter::cast);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("cast_refusal", "person", "skill", "target"),
+      &WorldAdapter::cast_refusal);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("aim", "person", "skill", "facing"), &WorldAdapter::aim);
   godot::ClassDB::bind_method(godot::D_METHOD("rumours", "person"),
                               &WorldAdapter::rumours);
   godot::ClassDB::bind_method(godot::D_METHOD("person_attainment", "person"),
@@ -1226,6 +1308,18 @@ void WorldAdapter::_bind_methods() {
           {"APPLICATION_FULL", murim::ApplicationRefusal::FULL},
       }};
   for (const auto& [constant, refusal] : applications) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::CastRefusal>, 6> casts{{
+      {"CAST_NONE", murim::CastRefusal::NONE},
+      {"CAST_DEAD", murim::CastRefusal::DEAD},
+      {"CAST_NO_SKILL", murim::CastRefusal::NO_SKILL},
+      {"CAST_ON_COOLDOWN", murim::CastRefusal::ON_COOLDOWN},
+      {"CAST_NO_TARGET", murim::CastRefusal::NO_TARGET},
+      {"CAST_OUT_OF_RANGE", murim::CastRefusal::OUT_OF_RANGE},
+  }};
+  for (const auto& [constant, refusal] : casts) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }

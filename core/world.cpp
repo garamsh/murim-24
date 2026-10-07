@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -143,6 +144,62 @@ std::int64_t root(std::int64_t value) {
   }
   return low;
 }
+
+// `point` brought within `range` of `from`, along the line between them.
+Position within_range(Position from, Position point, std::int32_t range) {
+  std::int64_t offset_x = std::int64_t{point.x} - from.x;
+  std::int64_t offset_y = std::int64_t{point.y} - from.y;
+  const std::int64_t reach = range;
+  if (std::abs(offset_x) <= reach && std::abs(offset_y) <= reach &&
+      (offset_x * offset_x) + (offset_y * offset_y) <= reach * reach) {
+    return point;
+  }
+  // Halving keeps the direction and the squares below within 64 bits.
+  while (std::abs(offset_x) > MAX_REACH || std::abs(offset_y) > MAX_REACH) {
+    offset_x /= 2;
+    offset_y /= 2;
+  }
+  const std::int64_t squared = (offset_x * offset_x) + (offset_y * offset_y);
+  // Rounded up, so the point brought in lies within range.
+  std::int64_t length = root(squared);
+  length += static_cast<std::int64_t>(length * length < squared);
+  return Position{
+      static_cast<std::int32_t>(from.x + (offset_x * reach / length)),
+      static_cast<std::int32_t>(from.y + (offset_y * reach / length))};
+}
+
+// The nearest of the people offered from `from`, those ahead of `facing`,
+// within a quarter turn either side, before those behind, and the first
+// offered among equals.
+class Nearest {
+ public:
+  Nearest(Position from, Step facing) : from_(from), facing_(facing) {}
+
+  // Offers the person at `at`, the `order`th in the order people are offered.
+  void offer(std::size_t order, Position where) {
+    const std::int64_t offset_x = std::int64_t{where.x} - from_.x;
+    const std::int64_t offset_y = std::int64_t{where.y} - from_.y;
+    const Key key{(offset_x * facing_.x) + (offset_y * facing_.y) < 0,
+                  (offset_x * offset_x) + (offset_y * offset_y), order};
+    if (!best_ || key < *best_) {
+      best_ = key;
+    }
+  }
+
+  // The order of the nearest offered, if anyone was.
+  [[nodiscard]] std::optional<std::size_t> found() const {
+    return best_ ? std::optional<std::size_t>{std::get<2>(*best_)}
+                 : std::nullopt;
+  }
+
+ private:
+  // Behind the facing, the distance squared, and the order offered.
+  using Key = std::tuple<bool, std::int64_t, std::size_t>;
+
+  Position from_;
+  Step facing_;
+  std::optional<Key> best_;
+};
 
 // The push a person at `from` takes from one at `there`, closer than the
 // separation: away along the line between them, the harder the closer. Two on
@@ -286,6 +343,19 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
     fold(child);
   }
   fold(person.hunger);
+  // Folded only when given, so a world no one casts in hashes as before.
+  if (person.casting) {
+    fold(person.casting->skill);
+    const Target& target = person.casting->target;
+    fold(target.index());
+    if (const auto* point = std::get_if<Point>(&target)) {
+      fold(point->position.x);
+      fold(point->position.y);
+    }
+    if (const auto* aimed = std::get_if<AtPerson>(&target)) {
+      fold(aimed->person);
+    }
+  }
 }
 
 // Folds a soul's history into `fold`.
@@ -659,6 +729,11 @@ void World::restore() {
            structure.cell.x > map_.width() - structure.footprint.width ||
            structure.cell.y > map_.height() - structure.footprint.height;
   };
+  // A cast names a person the world holds, if it names one.
+  const auto aimed = [people](const Cast& cast) {
+    const auto* aimed = std::get_if<AtPerson>(&cast.target);
+    return aimed == nullptr || aimed->person < people;
+  };
   const auto stray_person = [&](const Person& person) {
     const std::vector<NameEntry>& given =
         person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
@@ -668,6 +743,8 @@ void World::restore() {
            !all_below(person.children, people) ||
            !below(person.soul, souls_.size()) ||
            !below(person.sect, sects_.size()) || person.health > MAX_HEALTH ||
+           (person.casting &&
+            (person.health == 0 || !aimed(*person.casting))) ||
            person.talent.size() != disciplines ||
            person.attainment.size() != disciplines ||
            (!given.empty() && person.given >= given.size());
@@ -1434,6 +1511,57 @@ std::optional<Duellists> World::duel(std::size_t faction) const {
   return Duellists{found->challenger, found->leader};
 }
 
+void World::cast(std::size_t person, std::size_t skill, const Target& target) {
+  if (cast_refusal(person, skill, target) != CastRefusal::NONE) {
+    throw std::invalid_argument(
+        "a cast must come from a living person, ready on the next tick, of a "
+        "skill its army has, at a living person within its range");
+  }
+  people_.at(person).casting = Cast{skill, target};
+}
+
+CastRefusal World::cast_refusal(std::size_t person, std::size_t skill,
+                                const Target& target) const {
+  if (person >= people_.size()) {
+    throw std::invalid_argument("no such person casts");
+  }
+  return assess_cast(person, army_of(person), Cast{skill, target},
+                     tick_count_ + 1);
+}
+
+std::optional<std::size_t> World::aim(std::size_t person, std::size_t skill,
+                                      Step facing) const {
+  if (person >= people_.size() || std::abs(facing.x) > MAX_REACH ||
+      std::abs(facing.y) > MAX_REACH) {
+    throw std::invalid_argument(
+        "an aim must be a person's, facing no farther than MAX_REACH");
+  }
+  // One who could never cast the skill, being dead or without it, aims at
+  // no one.
+  const std::optional<std::size_t> army = army_of(person);
+  if (!army || assess_cast(person, army, Cast{skill, Itself{}}, UINT64_LIMIT) !=
+                   CastRefusal::NONE) {
+    return std::nullopt;
+  }
+  const Position from = people_.at(person).position;
+  const std::int64_t range = armies_.at(*army).skills.at(skill).range;
+  // Offered in the order the tick's strikes visit people.
+  Nearest nearest{from, facing};
+  std::vector<std::size_t> offered;
+  for (std::size_t other_army = 0; other_army < armies_.size(); ++other_army) {
+    for (const std::size_t other : armies_.at(other_army).roster) {
+      const Position where = people_.at(other).position;
+      if (distance_squared(from, where) <= range * range &&
+          foes(person, *army, other, other_army)) {
+        nearest.offer(offered.size(), where);
+        offered.push_back(other);
+      }
+    }
+  }
+  const std::optional<std::size_t> found = nearest.found();
+  return found ? std::optional<std::size_t>{offered.at(*found)} : std::nullopt;
+}
+
 void World::conscript(std::size_t person, std::size_t army) {
   const auto serving = [person](const Army& candidate) {
     return std::find(candidate.roster.begin(), candidate.roster.end(),
@@ -1481,9 +1609,7 @@ void World::tick() {
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
-    if (people_.at(crowd.people.at(index)).ready_at <= tick_count_) {
-      strike(index, crowd, edges, damage);
-    }
+    strike(index, crowd, edges, damage);
   }
   // Damage lands after everyone has struck, so the order people strike in
   // does not decide who strikes. The dead leave their army's roster.
@@ -1867,9 +1993,9 @@ std::uint64_t World::next_random() {
   return mix(rng_state_);
 }
 
-// The one rule every skill resolves through, whoever uses it: each use hits
-// every hostile person in its disc once, as much harder as the edge `edges`
-// gives the user's home, and every structure its disc reaches.
+// A person's use on this tick: the cast it was given, unless it lapses, or,
+// once its cooldown has passed, one of its order's skills drawn by the seed
+// at the nearest hostile person.
 void World::strike(std::size_t user, const Crowd& crowd,
                    const std::vector<std::uint32_t>& edges,
                    std::vector<std::uint64_t>& damage) {
@@ -1877,41 +2003,50 @@ void World::strike(std::size_t user, const Crowd& crowd,
   const std::size_t self = crowd.people.at(user);
   Person& striker = people_.at(self);
   const Army& own = armies_.at(army);
-  const std::vector<std::size_t>& choice = own.order.skills;
-  const Skill& skill = own.skills.at(choice.at(next_random() % choice.size()));
-  // Duellists are hostile to each other whatever their factions.
-  const auto hostile = [this, &own, &crowd, self](std::size_t other) {
-    return rules_.hostile.at(own.faction)
-               .at(armies_.at(crowd.armies.at(other)).faction) ||
-           duelling(self, crowd.people.at(other));
-  };
-  // The nearest hostile person, the lowest index among equals, so the order
-  // the query visits people in does not decide the target.
-  const auto nearest_hostile = [&]() -> std::optional<Position> {
-    std::optional<std::size_t> target;
-    std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-    crowd.hash.visit_within(
-        striker.position, skill.range, [&](std::size_t other) {
-          const std::int64_t distance =
-              distance_squared(striker.position, crowd.hash.position(other));
-          const bool closer = distance < nearest || (distance == nearest &&
-                                                     target && other < *target);
-          if (hostile(other) && closer) {
-            nearest = distance;
-            target = other;
-          }
-        });
-    return target ? std::optional<Position>{crowd.hash.position(*target)}
-                  : std::nullopt;
-  };
-  // A skill of range 0 reaches only its user, so it lands where it stands.
-  const std::optional<Position> aim =
-      skill.range == 0 ? std::optional<Position>{striker.position}
-                       : nearest_hostile();
-  if (!aim) {
+  const std::optional<Cast> cast = std::exchange(striker.casting, std::nullopt);
+  if (cast) {
+    if (assess_cast(self, army, *cast, tick_count_) == CastRefusal::NONE) {
+      const Skill& skill = own.skills.at(cast->skill);
+      use(user, crowd, skill, landing(striker, skill, cast->target), edges,
+          damage);
+    }
     return;
   }
-  const Position centre = *aim;
+  if (striker.ready_at > tick_count_) {
+    return;
+  }
+  const std::vector<std::size_t>& choice = own.order.skills;
+  const Skill& skill = own.skills.at(choice.at(next_random() % choice.size()));
+  // A skill of range 0 reaches only its user, so it lands where it stands.
+  if (skill.range == 0) {
+    use(user, crowd, skill, striker.position, edges, damage);
+    return;
+  }
+  // The crowd's order breaks ties, so the order the query visits people in
+  // does not decide the target.
+  Nearest nearest{striker.position, Step{0, 0}};
+  crowd.hash.visit_within(
+      striker.position, skill.range, [&](std::size_t other) {
+        if (foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
+          nearest.offer(other, crowd.hash.position(other));
+        }
+      });
+  if (const std::optional<std::size_t> target = nearest.found()) {
+    use(user, crowd, skill, crowd.hash.position(*target), edges, damage);
+  }
+}
+
+// The one rule every skill resolves through, whoever uses it and however it
+// was aimed: each use hits every hostile person in the disc around `centre`
+// once, as much harder as the edge `edges` gives the user's home, and every
+// structure its disc reaches.
+void World::use(std::size_t user, const Crowd& crowd, const Skill& skill,
+                Position centre, const std::vector<std::uint32_t>& edges,
+                std::vector<std::uint64_t>& damage) {
+  const std::size_t army = crowd.armies.at(user);
+  const std::size_t self = crowd.people.at(user);
+  Person& striker = people_.at(self);
+  const Army& own = armies_.at(army);
   striker.ready_at = tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
   // A use that hits anyone or anything practises the striker's best
   // discipline, its highest limit.
@@ -1920,7 +2055,7 @@ void World::strike(std::size_t user, const Crowd& crowd,
   const std::uint64_t body_damage =
       skill.body_damage * (PER_MILLE + edge) / PER_MILLE;
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
-    if (hostile(other)) {
+    if (foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
       damage.at(other) += body_damage;
       hit = true;
     }
@@ -1944,6 +2079,68 @@ void World::strike(std::size_t user, const Crowd& crowd,
     striker.attainment.at(best) =
         std::min(aptitude.limit, striker.attainment.at(best) + aptitude.growth);
   }
+}
+
+// Whether person `person` of army `army` strikes person `other` of army
+// `other_army`: their factions are hostile, or the two fight a duel, whatever
+// their factions.
+bool World::foes(std::size_t person, std::size_t army, std::size_t other,
+                 std::size_t other_army) const {
+  return rules_.hostile.at(armies_.at(army).faction)
+             .at(armies_.at(other_army).faction) ||
+         duelling(person, other);
+}
+
+// Where a cast of `skill` by `caster` at `target` lands.
+Position World::landing(const Person& caster, const Skill& skill,
+                        const Target& target) const {
+  if (const auto* point = std::get_if<Point>(&target)) {
+    return within_range(caster.position, point->position, skill.range);
+  }
+  if (const auto* aimed = std::get_if<AtPerson>(&target)) {
+    return people_.at(aimed->person).position;
+  }
+  return caster.position;
+}
+
+// Why person `person`, serving in army `army` if it serves in one, may not
+// make cast `cast` on tick `due`.
+CastRefusal World::assess_cast(std::size_t person,
+                               std::optional<std::size_t> army,
+                               const Cast& cast, std::uint64_t due) const {
+  const Person& caster = people_.at(person);
+  if (caster.health == 0 || !army) {
+    return CastRefusal::DEAD;
+  }
+  const std::vector<Skill>& skills = armies_.at(*army).skills;
+  if (cast.skill >= skills.size()) {
+    return CastRefusal::NO_SKILL;
+  }
+  if (caster.ready_at > due) {
+    return CastRefusal::ON_COOLDOWN;
+  }
+  if (const auto* aimed = std::get_if<AtPerson>(&cast.target)) {
+    if (aimed->person >= people_.size() ||
+        people_.at(aimed->person).health == 0) {
+      return CastRefusal::NO_TARGET;
+    }
+    const std::int64_t range = skills.at(cast.skill).range;
+    if (distance_squared(caster.position, people_.at(aimed->person).position) >
+        range * range) {
+      return CastRefusal::OUT_OF_RANGE;
+    }
+  }
+  return CastRefusal::NONE;
+}
+
+std::optional<std::size_t> World::army_of(std::size_t person) const {
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    const std::vector<std::size_t>& roster = armies_.at(army).roster;
+    if (std::find(roster.begin(), roster.end(), person) != roster.end()) {
+      return army;
+    }
+  }
+  return std::nullopt;
 }
 
 // Lowers a structure's durability by `effect`, or raises it by a negative

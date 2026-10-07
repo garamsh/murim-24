@@ -297,6 +297,28 @@ class WorldAdapter : public godot::RefCounted {
   /// push_error, when the core refuses the application.
   bool apply(std::int64_t person, std::int64_t sect);
 
+  /// Has person `person` cast skill `skill`, by index among its army's
+  /// skills, at `target` on the next tick: a Vector2 point in sub-cell
+  /// units, an int person, or null for itself. Returns false, after
+  /// push_error, when the core refuses the cast or the target is of another
+  /// type.
+  bool cast(std::int64_t person, std::int64_t skill,
+            const godot::Variant& target);
+
+  /// Returns why person `person` may not cast skill `skill` at `target`, as
+  /// cast() takes it, one of the CAST_* constants; CAST_NONE when it may, and
+  /// -1, after push_error, for a target of another type.
+  [[nodiscard]] std::int64_t cast_refusal(std::int64_t person,
+                                          std::int64_t skill,
+                                          const godot::Variant& target) const;
+
+  /// Returns the hostile person person `person`'s skill `skill` would aim at,
+  /// nearest ahead of `facing`, a direction in sub-cell units, before those
+  /// behind it; -1 for no one, and after push_error for a facing past the
+  /// core's reach.
+  [[nodiscard]] std::int64_t aim(std::int64_t person, std::int64_t skill,
+                                 const godot::Vector2& facing) const;
+
   /// Returns the events that reach person `person` as rumours, newest first,
   /// each a Dictionary of `sequence`, `tick`, `cell` (Vector2i) and `kind`,
   /// with the records it names: "founded" with `village` and `faction`;

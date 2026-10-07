@@ -31,6 +31,29 @@ struct Aptitude {
 /// A person's sex, drawn at birth.
 enum class Sex : std::uint8_t { FEMALE, MALE };
 
+/// A cast's target: a point, in sub-cell units.
+struct Point {
+  Position position;
+};
+
+/// A cast's target: a person, by index.
+struct AtPerson {
+  std::size_t person = 0;
+};
+
+/// A cast's target: the caster itself.
+struct Itself {};
+
+/// What a cast is aimed at.
+using Target = std::variant<Point, AtPerson, Itself>;
+
+/// A use of one skill, by index among the caster's army's skills, at a
+/// target, made on the next tick in place of the automatic strike.
+struct Cast {
+  std::size_t skill = 0;
+  Target target;
+};
+
 /// A person of the world. A person keeps its identity, its index among the
 /// world's people, for as long as the world runs, through every army it
 /// serves in and after it dies; a dead person has no health and stands in no
@@ -45,7 +68,8 @@ enum class Sex : std::uint8_t { FEMALE, MALE };
 /// `spouses` are the people it married, in order, and `children` the people
 /// born to it. It has gone `hunger` days unfed. A person carrying soul `soul`
 /// is born again when it dies. It belongs to sect `sect`, if any, and keeps it
-/// while it serves in an army of the sect's faction.
+/// while it serves in an army of the sect's faction. It casts `casting` on
+/// the next tick, if it was given a cast.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -64,6 +88,7 @@ struct Person {
   std::optional<std::uint64_t> lifespan;
   std::optional<std::size_t> soul;
   std::optional<std::size_t> sect;
+  std::optional<Cast> casting;
 };
 
 /// A uniform draw over [mean - spread, mean + spread].
@@ -562,6 +587,22 @@ enum class ApplicationRefusal : std::uint8_t {
   FULL,
 };
 
+/// Why a person may not cast a skill at a target, the first that holds in
+/// this order; `NONE` when it may.
+enum class CastRefusal : std::uint8_t {
+  NONE,
+  /// The caster is dead.
+  DEAD,
+  /// The caster's army has no skill of that index.
+  NO_SKILL,
+  /// The caster may not use a skill again on the next tick.
+  ON_COOLDOWN,
+  /// The target is a person the world lacks or a dead one.
+  NO_TARGET,
+  /// The target is a person farther from the caster than the skill's range.
+  OUT_OF_RANGE,
+};
+
 /// A manual held by a sect, by index.
 struct HeldBySect {
   std::size_t sect = 0;
@@ -713,6 +754,16 @@ class World {
   void order(std::size_t army, Order order,
              std::optional<std::size_t> challenge = std::nullopt);
 
+  /// Has person `person` use skill `skill`, by index among its army's
+  /// skills, at `target` on the next tick, in place of its automatic strike,
+  /// the same cast for the player's body as for an NPC. A point beyond the
+  /// skill's range is brought within it along the line from the caster, and
+  /// the caster itself is the centre of a skill cast at itself. A later cast
+  /// before that tick replaces this one, and a cast that cast_refusal()
+  /// refuses on that tick lapses. Throws std::invalid_argument when
+  /// cast_refusal() names a reason, or there is no such person.
+  void cast(std::size_t person, std::size_t skill, const Target& target);
+
   /// Moves living person `person` from the army it serves in to the end of
   /// army `army`'s roster. Throws std::invalid_argument when there is no
   /// such army, the person is dead or does not exist, or `army`'s objective
@@ -839,6 +890,24 @@ class World {
   /// there is no such army.
   [[nodiscard]] ChallengeRefusal challenge_refusal(std::size_t army,
                                                    std::size_t faction) const;
+
+  /// Returns why person `person` may not cast skill `skill` at `target`,
+  /// which is why cast() would refuse it, or CastRefusal::NONE when it may.
+  /// Throws std::invalid_argument when there is no such person.
+  [[nodiscard]] CastRefusal cast_refusal(std::size_t person, std::size_t skill,
+                                         const Target& target) const;
+
+  /// Returns the living person hostile to person `person` that its skill
+  /// `skill` would aim at: the nearest within the skill's range ahead of
+  /// `facing`, within a quarter turn either side, or the nearest behind when
+  /// none is ahead, the first in roster order among equals. A facing of
+  /// (0, 0) has everyone ahead, as the automatic strike aims. Returns
+  /// nothing when no one is in range, or the person is dead or its army has
+  /// no such skill. Throws std::invalid_argument when there is no such
+  /// person or the facing is longer than MAX_REACH along an axis.
+  [[nodiscard]] std::optional<std::size_t> aim(std::size_t person,
+                                               std::size_t skill,
+                                               Step facing) const;
 
   /// Returns the duel being fought for faction `faction`'s lead, if one is.
   [[nodiscard]] std::optional<Duellists> duel(std::size_t faction) const;
@@ -979,6 +1048,19 @@ class World {
   void strike(std::size_t user, const Crowd& crowd,
               const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
+  void use(std::size_t user, const Crowd& crowd, const Skill& skill,
+           Position centre, const std::vector<std::uint32_t>& edges,
+           std::vector<std::uint64_t>& damage);
+  [[nodiscard]] bool foes(std::size_t person, std::size_t army,
+                          std::size_t other, std::size_t other_army) const;
+  [[nodiscard]] Position landing(const Person& caster, const Skill& skill,
+                                 const Target& target) const;
+  [[nodiscard]] CastRefusal assess_cast(std::size_t person,
+                                        std::optional<std::size_t> army,
+                                        const Cast& cast,
+                                        std::uint64_t due) const;
+  /// The army person `person` serves in, if it serves in one.
+  [[nodiscard]] std::optional<std::size_t> army_of(std::size_t person) const;
   [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
