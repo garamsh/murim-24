@@ -346,7 +346,7 @@ void lay_village(Region& region, const RegionData& data,
                  const VillageTemplate& kind, std::size_t owner, Cell corner,
                  std::string name) {
   Village village{std::move(name),      kind.name, owner, corner, kind.area, {},
-                  region.armies.size(), 0};
+                  region.armies.size(), 0,         {}};
   for (const Building& building : kind.buildings) {
     const Structure& structure = building.structure;
     village.structures.push_back(region.structures.size());
@@ -358,6 +358,11 @@ void lay_village(Region& region, const RegionData& data,
     region.structure_kinds.push_back(building.kind);
     region.holdings.push_back(holding_of(made, structure.footprint));
     village.households += building.households;
+  }
+  for (const Clearing& clearing : kind.clearings) {
+    village.clearings.push_back(Clearing{
+        Cell{corner.x + clearing.corner.x, corner.y + clearing.corner.y},
+        clearing.area});
   }
   const Cell middle = middle_of(kind.area);
   const Cell centre{corner.x + middle.x, corner.y + middle.y};
@@ -553,9 +558,11 @@ RegionData region_data() {
   constexpr std::int32_t SEAT_HEIGHT = 9;
   constexpr std::int32_t SEAT_HALL_EAST = 7;
   constexpr std::int32_t SEAT_YARD_ROW = 5;
-  constexpr std::int32_t SEAT_GRANARY_EAST = 7;
+  constexpr std::int32_t SEAT_GRANARY_EAST = 6;
   constexpr std::int32_t SEAT_FIELD_EAST = 9;
   constexpr std::int32_t SEAT_GATE_EAST = 7;
+  constexpr std::int32_t SEAT_COURT_ROW = 3;
+  constexpr std::int32_t SEAT_PATH_EAST = SEAT_GATE_EAST + 1;
   const auto building = [](Cell cell, Footprint footprint, const char* kind,
                            std::uint32_t households) {
     return Building{Structure{cell, DURABILITY, footprint}, kind, households};
@@ -628,7 +635,8 @@ RegionData region_data() {
             building({2, SOUTH_ROW}, HOUSE, "house", 0),
             building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
             building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
-            building({0, SOUTH_ROW}, GRANARY, "granary", 0)}},
+            building({0, SOUTH_ROW}, GRANARY, "granary", 0)},
+           {}},
           {"village",
            {VILLAGE_WIDTH, VILLAGE_HEIGHT},
            {building({0, 0}, HOUSE, "house", 0),
@@ -644,7 +652,8 @@ RegionData region_data() {
             building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
             building({RICE_EAST, SOUTH_ROW}, RICE, "field", 0),
             building({GRANARY_EAST, GRANARY_ROW}, GRANARY, "granary", 0),
-            building({FAR_EAST, SOUTH_ROW}, STOREHOUSE, "storehouse", 0)}},
+            building({FAR_EAST, SOUTH_ROW}, STOREHOUSE, "storehouse", 0)},
+           {}},
       },
       // Five disciplines, each drawn the same way: growth of 5 to 15 a use,
       // a limit of 300 to 700. People live 45 to 75 years of 120 days, a
@@ -713,7 +722,9 @@ RegionData region_data() {
       // for: a house for its founding household, a manual hall and a
       // hall along its north side, a training ground in its south-west
       // corner, a granary and a field of rice east of it, and the seat gate
-      // on its south edge below them.
+      // on its south edge below them. Growth keeps clear its court, the two
+      // rows before the halls, the path down from it between the granary and
+      // the field to the gate, and two rows before the gate outside.
       {"seat",
        {SEAT_WIDTH, SEAT_HEIGHT},
        {building({0, 0}, HOUSE, "house", FOUNDING_HOUSEHOLDS),
@@ -722,8 +733,10 @@ RegionData region_data() {
         building({0, SEAT_YARD_ROW}, TRAINING_GROUND, "training_ground", 0),
         building({SEAT_GRANARY_EAST, SEAT_YARD_ROW}, GRANARY, "granary", 0),
         building({SEAT_FIELD_EAST, SEAT_YARD_ROW}, RICE, "field", 0),
-        building({SEAT_GATE_EAST, SEAT_HEIGHT - 1}, SEAT_GATE, "seat_gate",
-                 0)}},
+        building({SEAT_GATE_EAST, SEAT_HEIGHT - 1}, SEAT_GATE, "seat_gate", 0)},
+       {Clearing{{0, SEAT_COURT_ROW}, {SEAT_WIDTH, 2}},
+        Clearing{{SEAT_PATH_EAST, SEAT_YARD_ROW}, {1, 3}},
+        Clearing{{SEAT_GATE_EAST, SEAT_HEIGHT}, {SEAT_GATE.width, 2}}}},
       {{"Hwasan", 0}, {"Heavenly Demon", 1}, {"Black Fang", 2}},
   };
   // Villages pressing against a fifth of their caps grow, checked every 30
@@ -889,7 +902,8 @@ std::vector<VillageSpec> village_specs(const Region& region) {
       holdings.push_back(region.holdings.at(structure));
     }
     specs.push_back(VillageSpec{village.structures, village.army,
-                                std::move(holdings), village.households});
+                                std::move(holdings), village.households,
+                                village.clearings});
   }
   return specs;
 }
