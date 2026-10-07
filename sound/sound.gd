@@ -25,6 +25,8 @@ const BATTLE_HOLD := 8.0
 const PIXELS_PER_CELL := 16.0
 # How far past a voice's position it fades out, in pixels.
 const VOICE_DISTANCE := 480.0
+# How long await_mix waits for the audio server to start a mix, in microseconds, before it gives up.
+const MIX_WAIT_USEC := 1000000
 
 ## The part of the world sounds are heard from, in pixels; set by the scene each frame.
 var hearing := Rect2()
@@ -77,6 +79,38 @@ func _init() -> void:
 
 func _ready() -> void:
 	_music.play()
+
+
+# Stops every player and waits out the audio server's next mix, which releases what they played:
+# a sound it still holds when the engine shuts down is reported leaked. The players, leaving the
+# tree first, have paused their sounds, and a mix finishing a pause overwrites a stop made during
+# it, so they are stopped under the lock the driver mixes in.
+func _exit_tree() -> void:
+	AudioServer.lock()
+	for voice in _voices:
+		voice.stop()
+	_ui.stop()
+	_music.stop()
+	AudioServer.unlock()
+	await_mix()
+
+
+## Returns once the audio server has finished a mix started after the call, or after MIX_WAIT_USEC
+## when none starts.
+static func await_mix() -> void:
+	var called := Time.get_ticks_usec()
+	while _last_mix_start() <= called and Time.get_ticks_usec() - called <= MIX_WAIT_USEC:
+		OS.delay_usec(1000)
+	# The driver holds the lock while it mixes.
+	AudioServer.lock()
+	AudioServer.unlock()
+
+
+# Returns when the audio server's last mix started, in Time.get_ticks_usec() microseconds; the clock
+# is read first, so a mix starting meanwhile reads as no later than it began.
+static func _last_mix_start() -> int:
+	var now := Time.get_ticks_usec()
+	return now - int(AudioServer.get_time_since_last_mix() * 1e6)
 
 
 ## Starts listening to `shown`: what it holds now is read as it stands, and only what changes

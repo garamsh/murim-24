@@ -41,6 +41,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 
 - Framework: none beyond Godot. `run_tests.gd` at the root runs each test it is given and exits non-zero unless every test loaded and passed; a test that fails to parse counts as failed.
 - A test is `<unit>_test.gd` next to the code it tests, extends `RefCounted`, and has `func run() -> bool`, returning `true` on pass and printing what it compared.
+- A script a test runs in a Godot process of its own is `<name>_probe.gd` next to the test that runs it.
 - Assertions read what GDScript reads: the return values of the registered classes' methods.
 
 ## Comments
@@ -107,7 +108,7 @@ What Godot 4.7's "Exporting for macOS" (`tutorials/export/exporting_for_macos.ht
 | Export templates | Godot 4.7.2's, as §Android export names them |
 
 - `make export` writes `build/export/macos/Murim24.app`, and `build/export/windows/Murim24.exe` with `Murim24.pck` and the extension's DLL beside it.
-- The `macOS` preset exports a universal app; the `Windows` preset exports x86_64, its pack beside the executable. Both export the release template, leave `*_test.gd` and `run_tests.gd` out of the pack by `exclude_filter`, and scale `application/config/icon`, `art/icon/icon.png`, by nearest neighbour.
+- The `macOS` preset exports a universal app; the `Windows` preset exports x86_64, its pack beside the executable. Both export the release template, leave `*_test.gd`, `*_probe.gd` and `run_tests.gd` out of the pack by `exclude_filter`, and scale `application/config/icon`, `art/icon/icon.png`, by nearest neighbour.
 - The window title is `application/config/name`.
 - The bundle identifier is the placeholder `com.example.murim24`, as Android's package name is, and changes in `export_presets.cfg` alone once the game's name is chosen.
 - The macOS app is signed ad hoc, Godot's default, and not notarized. Its entitlements disable library validation, which the guide asks of an app loading a GDExtension or signed ad hoc. A copy downloaded to another Mac is refused on first launch until it is opened once from System Settings, Privacy & Security, Open Anyway.
