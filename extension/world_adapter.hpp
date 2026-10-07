@@ -61,10 +61,12 @@ class WorldAdapter : public godot::RefCounted {
 
   /// Returns an adapter over the region the core generates from `seed`, with
   /// each faction's leadership, and one person born into village `village`
-  /// as the last army. Returns null, after push_error, when the region has no
-  /// such village.
-  static godot::Ref<WorldAdapter> create_region(std::int64_t seed,
-                                                std::int64_t village = 0);
+  /// as the last army, its days `ticks_per_day` ticks long. Returns null,
+  /// after push_error, when the region has no such village or the day is not
+  /// a positive number of ticks.
+  static godot::Ref<WorldAdapter> create_region(
+      std::int64_t seed, std::int64_t village = 0,
+      std::int64_t ticks_per_day = murim::TICKS_PER_DAY);
 
   /// Returns the point the M1 scenario's battle is fought around, in
   /// sub-cell units.
@@ -232,16 +234,16 @@ class WorldAdapter : public godot::RefCounted {
   /// made by create_region().
   [[nodiscard]] godot::PackedStringArray faction_names() const;
 
-  /// Returns the faction owning each cell, row by row; empty unless the
-  /// world was made by create_region().
+  /// Returns the faction whose territory each cell lies in, row by row, as
+  /// the core derives it now, or -1 for a cell no village holds; empty unless
+  /// the world was made by create_region().
   [[nodiscard]] godot::PackedInt64Array territory() const;
 
   /// Returns each village as a Dictionary of `name`, `kind` (its template's
-  /// name), `faction` (int),
-  /// `corner` (Vector2i) and `area` (Vector2i, its width and height in
-  /// cells); empty unless the world was made
-  /// by create_region(). It lists the region's villages, not those founded
-  /// as the world runs.
+  /// name), `faction` (int, its owner now), `corner` (Vector2i) and `area`
+  /// (Vector2i, its width and height in cells): the region's, then those
+  /// founded as the world runs, on the land the core says each was founded
+  /// on; empty unless the world was made by create_region().
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
 
  protected:
@@ -260,7 +262,6 @@ class WorldAdapter : public godot::RefCounted {
   // What create_region() keeps of the region for display; empty otherwise.
   murim::RegionData region_data_;
   std::vector<std::size_t> terrain_;
-  std::vector<std::size_t> territory_;
   std::vector<murim::Village> villages_;
 
   // Returns an adapter over a world created from these arguments, as the
@@ -271,10 +272,11 @@ class WorldAdapter : public godot::RefCounted {
       std::vector<murim::Structure> structures, murim::Rules rules,
       std::vector<murim::VillageSpec> villages = {},
       std::vector<murim::Leadership> leadership = {}, murim::Life life = {});
-  // Returns an adapter over the region generated from `seed`, with one person
-  // born into village `village` as the last army; throws std::out_of_range
-  // when there is no such village.
-  static godot::Ref<WorldAdapter> born_into(murim::Seed seed,
+  // Returns an adapter over `region`, with one person born into village
+  // `village` as the last army; throws std::out_of_range when there is no
+  // such village, and std::invalid_argument when the core refuses the
+  // region's rules.
+  static godot::Ref<WorldAdapter> born_into(murim::Region region,
                                             std::size_t village);
   [[nodiscard]] murim::World& world();
   [[nodiscard]] const murim::World& world() const;

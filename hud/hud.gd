@@ -62,7 +62,8 @@ var _portrait := TextureRect.new()
 var hp_bar := ProgressBar.new()
 var qi_bar := ProgressBar.new()
 var _map := TextureRect.new()
-var _map_texture: ImageTexture
+## The map of the whole region, one pixel per cell, so a test can read it.
+var map_texture: ImageTexture
 var _dot := ColorRect.new()
 var _slots: Array[Panel] = []
 var _icons := {}
@@ -122,10 +123,7 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 	# The idle frame's head and shoulders.
 	portrait.region = Rect2(0, 6, 16, 16)
 	_portrait.texture = portrait
-	_map_texture = ImageTexture.create_from_image(_map_image(world))
-	var view := AtlasTexture.new()
-	view.atlas = _map_texture
-	_map.texture = view
+	show_map(world)
 	var skills := world.skills(steered)
 	var shown := mini(skills.size(), MAX_SLOTS)
 	for slot in _slots.size():
@@ -139,6 +137,13 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 			slot_icons[slot].texture = icon
 	_skill_bar.size.x = shown * 22 + 6
 	_skill_bar.position.x = 240 - _skill_bar.size.x / 2.0
+
+
+## Draws `world`'s region on the map as it stands: its terrain, the territory the core derives
+## now and its villages.
+func show_map(world: WorldAdapter) -> void:
+	map_texture = ImageTexture.create_from_image(_map_image(world))
+	(_map.texture as AtlasTexture).atlas = map_texture
 
 
 ## Updates the bars, the map around the player and the technique bar: `skills` are the skill
@@ -249,6 +254,7 @@ func _build() -> void:
 	_map.position = Vector2(4, 4)
 	_map.size = Vector2(MAP_SIZE)
 	_map.stretch_mode = TextureRect.STRETCH_SCALE
+	_map.texture = AtlasTexture.new()
 	map.add_child(_map)
 	_dot.color = JADE
 	_dot.size = Vector2(2, 2)
@@ -380,8 +386,9 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 	parent.add_child(bar)
 
 
-# One pixel per cell: the terrain kind's colour, its owner's accent along territory borders,
-# and each village's square in its owner's accent.
+# One pixel per cell: the terrain kind's colour, the accent of the faction holding it along
+# territory borders, or of its neighbour's where it lies in no territory, and each village's
+# square in its owner's accent.
 func _map_image(world: WorldAdapter) -> Image:
 	var rows := world.map_rows()
 	_world_size = Vector2i(rows[0].length() if rows.size() > 0 else 0, rows.size())
@@ -400,12 +407,12 @@ func _map_image(world: WorldAdapter) -> Image:
 				colour = KIND_COLOURS.get(names[terrain[i]], KIND_COLOURS.plain)
 			else:
 				colour = KIND_COLOURS.plain if rows[y][x] == "." else KIND_COLOURS.mountain
-			if owners.size() == terrain.size() and owners.size() > 0 and x + 1 < _world_size.x \
-					and owners[i] != owners[i + 1]:
-				colour = ACCENTS[sprites[owners[i]]]
-			if owners.size() == terrain.size() and owners.size() > 0 and y + 1 < _world_size.y \
-					and owners[i] != owners[i + _world_size.x]:
-				colour = ACCENTS[sprites[owners[i]]]
+			if owners.size() == terrain.size() and owners.size() > 0:
+				var right := i + 1 if x + 1 < _world_size.x else i
+				var below := i + _world_size.x if y + 1 < _world_size.y else i
+				for next in [right, below]:
+					if owners[next] != owners[i]:
+						colour = ACCENTS[sprites[owners[i] if owners[i] >= 0 else owners[next]]]
 			image.set_pixel(x, y, colour)
 	for village: Dictionary in world.villages():
 		var corner: Vector2i = village.corner

@@ -169,6 +169,14 @@ godot::PackedInt64Array indices(const std::vector<std::size_t>& people) {
   return result;
 }
 
+// Returns the region the core generates from `seed`, its days `ticks_per_day`
+// ticks long.
+murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
+  murim::Region region = murim::generate_region(seed, murim::region_data());
+  region.rules.ticks_per_day = ticks_per_day;
+  return region;
+}
+
 }  // namespace
 
 godot::Ref<WorldAdapter> WorldAdapter::create(
@@ -201,13 +209,15 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
   return adapter;
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed,
-                                                     std::int64_t village) {
-  // The one handler for a village the region lacks: it must not cross into
-  // Godot.
+godot::Ref<WorldAdapter> WorldAdapter::create_region(
+    std::int64_t seed, std::int64_t village, std::int64_t ticks_per_day) {
+  // The one handler for a village the region lacks or a day it refuses: it
+  // must not cross into Godot.
   try {
-    return born_into(murim::Seed{static_cast<std::uint64_t>(seed)},
-                     narrow<std::size_t>(village, "village"));
+    return born_into(
+        region_of(murim::Seed{static_cast<std::uint64_t>(seed)},
+                  narrow<std::uint64_t>(ticks_per_day, "ticks_per_day")),
+        narrow<std::size_t>(village, "village"));
   } catch (const std::logic_error& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
                                         error.what());
@@ -215,9 +225,8 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(std::int64_t seed,
   }
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
+godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
                                                  std::size_t village) {
-  murim::Region region = murim::generate_region(seed, murim::region_data());
   region.armies.push_back(murim::born_in(region, village));
   std::vector<std::string> kinds = std::move(region.structure_kinds);
   std::vector<murim::VillageSpec> villages = murim::village_specs(region);
@@ -231,7 +240,6 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Seed seed,
   adapter->structure_kinds_ = std::move(kinds);
   adapter->region_data_ = murim::region_data();
   adapter->terrain_ = std::move(region.terrain);
-  adapter->territory_ = std::move(region.territory);
   adapter->villages_ = std::move(region.villages);
   return adapter;
 }
@@ -496,23 +504,38 @@ godot::PackedStringArray WorldAdapter::faction_names() const {
 
 godot::PackedInt64Array WorldAdapter::territory() const {
   godot::PackedInt64Array owners;
-  for (const std::size_t owner : territory_) {
-    owners.push_back(static_cast<std::int64_t>(owner));
+  if (!terrain_.empty()) {
+    for (const std::optional<std::size_t> owner : world().territory()) {
+      owners.push_back(owner ? static_cast<std::int64_t>(*owner) : -1);
+    }
   }
   return owners;
 }
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   godot::TypedArray<godot::Dictionary> villages;
-  for (const murim::Village& village : villages_) {
+  const auto add = [this, &villages](
+                       const std::string& name, const std::string& kind,
+                       murim::Cell corner, murim::Footprint area) {
+    const auto index = static_cast<std::size_t>(villages.size());
     godot::Dictionary fields;
-    fields.set("name", godot::String(village.name.c_str()));
-    fields.set("kind", godot::String(village.kind.c_str()));
-    fields.set("faction", static_cast<std::int64_t>(village.faction));
-    fields.set("corner", godot::Vector2i{village.corner.x, village.corner.y});
-    fields.set("area",
-               godot::Vector2i{village.area.width, village.area.height});
+    fields.set("name", godot::String(name.c_str()));
+    fields.set("kind", godot::String(kind.c_str()));
+    fields.set("faction", static_cast<std::int64_t>(world().owner(index)));
+    fields.set("corner", godot::Vector2i{corner.x, corner.y});
+    fields.set("area", godot::Vector2i{area.width, area.height});
     villages.push_back(fields);
+  };
+  for (const murim::Village& village : villages_) {
+    add(village.name, village.kind, village.corner, village.area);
+  }
+  // Those founded since, on the land the core says each was founded on.
+  for (std::size_t village = villages_.size();
+       village < world().village_count(); ++village) {
+    const std::optional<murim::Settlement> land = world().settlement(village);
+    CRASH_COND_MSG(!land, "a village added as the world runs was not founded");
+    add(land->kind + " " + std::to_string(village + 1), land->kind,
+        land->corner, land->area);
   }
   return villages;
 }
@@ -636,8 +659,9 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
   godot::ClassDB::bind_static_method(
-      name, godot::D_METHOD("create_region", "seed", "village"),
-      &WorldAdapter::create_region, DEFVAL(0));
+      name,
+      godot::D_METHOD("create_region", "seed", "village", "ticks_per_day"),
+      &WorldAdapter::create_region, DEFVAL(0), DEFVAL(murim::TICKS_PER_DAY));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
   godot::ClassDB::bind_method(
