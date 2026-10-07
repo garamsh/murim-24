@@ -74,6 +74,11 @@ class WorldAdapter : public godot::RefCounted {
   /// save, the save is refused, or it holds no world made by create_region().
   static godot::Ref<WorldAdapter> load(std::int64_t slot);
 
+  /// Returns why load() refuses slot `slot`, one of the LOAD_* constants, the
+  /// core's LoadError: LOAD_NOT_A_SAVE for a save of no world made by
+  /// create_region(), and LOAD_NONE when the core reads it.
+  static std::int64_t load_refusal(std::int64_t slot);
+
   /// Saves the world in slot `slot`, replacing what it held. Returns false,
   /// after push_error, when the world was not made by create_region() or the
   /// save could not be written.
@@ -82,6 +87,10 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the army the living person carrying the player's soul serves
   /// in, as the core holds it, or -1 when no such person lives.
   [[nodiscard]] std::int64_t player_army() const;
+
+  /// Returns the seed create_region() generated the world's region from, or
+  /// -1 for a world with no region.
+  [[nodiscard]] std::int64_t region_seed() const;
 
   /// Returns the point the M1 scenario's battle is fought around, in
   /// sub-cell units.

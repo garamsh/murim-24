@@ -194,6 +194,10 @@ std::vector<std::string> discipline_names_of(const murim::Life& life) {
   return names;
 }
 
+// load_refusal()'s verdict on a slot the core reads, beside the LoadError
+// values.
+constexpr std::int64_t LOAD_NONE = -1;
+
 // The health each army's members were created with, together, by army.
 std::vector<std::uint64_t> strengths_of(
     const std::vector<murim::ArmySpec>& armies) {
@@ -340,6 +344,24 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot) {
   }
 }
 
+std::int64_t WorldAdapter::load_refusal(std::int64_t slot) {
+  // The one handler for a slot out of range: it must not cross into Godot.
+  try {
+    const std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
+        FileSaves{}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
+    if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
+      return static_cast<std::int64_t>(*error);
+    }
+    return std::get<murim::Saved>(loaded).origin
+               ? LOAD_NONE
+               : static_cast<std::int64_t>(murim::LoadError::NOT_A_SAVE);
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.load_refusal: ",
+                                        error.what());
+    return static_cast<std::int64_t>(murim::LoadError::MISSING);
+  }
+}
+
 bool WorldAdapter::save(std::int64_t slot) const {
   if (!origin_) {
     godot::UtilityFunctions::push_error(
@@ -378,6 +400,10 @@ std::int64_t WorldAdapter::player_army() const {
     return -1;
   }
   return -1;
+}
+
+std::int64_t WorldAdapter::region_seed() const {
+  return origin_ ? static_cast<std::int64_t>(origin_->region) : -1;
 }
 
 godot::Vector2i WorldAdapter::m1_centre() {
@@ -987,10 +1013,15 @@ void WorldAdapter::_bind_methods() {
                                      &WorldAdapter::m1_centre);
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("load", "slot"),
                                      &WorldAdapter::load);
+  godot::ClassDB::bind_static_method(name,
+                                     godot::D_METHOD("load_refusal", "slot"),
+                                     &WorldAdapter::load_refusal);
   godot::ClassDB::bind_method(godot::D_METHOD("save", "slot"),
                               &WorldAdapter::save);
   godot::ClassDB::bind_method(godot::D_METHOD("player_army"),
                               &WorldAdapter::player_army);
+  godot::ClassDB::bind_method(godot::D_METHOD("region_seed"),
+                              &WorldAdapter::region_seed);
   godot::ClassDB::bind_method(
       godot::D_METHOD("order", "army", "objective", "skills", "challenge"),
       &WorldAdapter::order, DEFVAL(-1));
@@ -1186,6 +1217,18 @@ void WorldAdapter::_bind_methods() {
   for (const auto& [constant, refusal] : applications) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
+  }
+  godot::ClassDB::bind_integer_constant(name, "", "LOAD_NONE", LOAD_NONE);
+  const std::array<std::pair<const char*, murim::LoadError>, 5> load_errors{{
+      {"LOAD_MISSING", murim::LoadError::MISSING},
+      {"LOAD_NOT_A_SAVE", murim::LoadError::NOT_A_SAVE},
+      {"LOAD_UNSUPPORTED_VERSION", murim::LoadError::UNSUPPORTED_VERSION},
+      {"LOAD_TRUNCATED", murim::LoadError::TRUNCATED},
+      {"LOAD_CORRUPTED", murim::LoadError::CORRUPTED},
+  }};
+  for (const auto& [constant, error] : load_errors) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(error));
   }
 }
 

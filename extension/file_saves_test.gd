@@ -1,6 +1,8 @@
 # Checks that a region saved through the adapter to user://saves loads as the same world: the same
 # hash, the same hash after more ticks, and the player found again as the army its soul's body
-# serves in; that an empty slot loads nothing; and that a world made without a region is not saved.
+# serves in, and the region's seed; that an empty slot loads nothing, and load_refusal names it
+# missing, a slot of bytes no save begins with not a save, and a saved slot none; and that a world
+# made without a region is not saved.
 extends RefCounted
 
 const REGION_SEED := 3
@@ -29,7 +31,8 @@ func run() -> bool:
 	var loaded := WorldAdapter.load(SLOT)
 	var same := loaded != null and loaded.hash() == world.hash() \
 			and loaded.player_army() == player and loaded.villages() == world.villages() \
-			and loaded.terrain() == world.terrain() and loaded.date() == world.date()
+			and loaded.terrain() == world.terrain() and loaded.date() == world.date() \
+			and loaded.region_seed() == REGION_SEED
 	_tick(world, MORE_TICKS)
 	if loaded != null:
 		_tick(loaded, MORE_TICKS)
@@ -44,17 +47,28 @@ func run() -> bool:
 			and other_loaded.hash() != world.hash()
 	# An empty slot loads nothing, and a world without a region is not saved; control: the region
 	# above was saved and loaded, so these refusals are the slot's and the world's.
-	var empty_refused := WorldAdapter.load(EMPTY_SLOT) == null
+	var empty_refused := WorldAdapter.load(EMPTY_SLOT) == null \
+			and WorldAdapter.load_refusal(EMPTY_SLOT) == WorldAdapter.LOAD_MISSING
+	# The refusal is the bytes', not every slot's: the slot saved above reads, and the same slot of
+	# other bytes does not.
+	var read := WorldAdapter.load_refusal(SLOT) == WorldAdapter.LOAD_NONE
+	var garbage := FileAccess.open("user://saves/slot_%d.sav" % OTHER_SLOT, FileAccess.WRITE)
+	garbage.store_string("not a save")
+	garbage.close()
+	var garbage_refused := WorldAdapter.load_refusal(OTHER_SLOT) == WorldAdapter.LOAD_NOT_A_SAVE \
+			and WorldAdapter.load(OTHER_SLOT) == null
 	var plain := WorldAdapter.create(1, PackedStringArray(["....", "...."]), [], [],
 			{"separation": 0, "hostile": [[false]], "stage_floors": STAGE_FLOORS})
 	var plain_refused := plain != null and not plain.save(EMPTY_SLOT) and WorldAdapter.load(EMPTY_SLOT) == null
 	_remove(SLOT)
 	_remove(OTHER_SLOT)
-	print("file_saves_test: player army %d of %d armies, grown past it %s; saved %s, loaded with the same hash, player, villages, terrain and date %s; the same after %d more ticks %s; another region saved %s and loaded as itself %s; an empty slot refused %s; a world without a region refused %s: %s" % [
+	print("file_saves_test: player army %d of %d armies, grown past it %s; saved %s, loaded with the same hash, player, villages, terrain, date and seed %s; the same after %d more ticks %s; another region saved %s and loaded as itself %s; an empty slot refused as missing %s; a saved slot read %s and other bytes refused as not a save %s; a world without a region refused %s: %s" % [
 		player, world.army_count(), grown, saved, same, MORE_TICKS, ticked_on, other_saved, distinct,
-		empty_refused, plain_refused,
-		"pass" if grown and saved and same and ticked_on and other_saved and distinct and empty_refused and plain_refused else "FAIL"])
-	return grown and saved and same and ticked_on and other_saved and distinct and empty_refused and plain_refused
+		empty_refused, read, garbage_refused, plain_refused,
+		"pass" if grown and saved and same and ticked_on and other_saved and distinct and empty_refused and read \
+				and garbage_refused and plain_refused else "FAIL"])
+	return grown and saved and same and ticked_on and other_saved and distinct and empty_refused and read \
+			and garbage_refused and plain_refused
 
 
 func _tick(world: WorldAdapter, ticks: int) -> void:
