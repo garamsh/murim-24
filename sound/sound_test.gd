@@ -1,9 +1,10 @@
 # Checks that sound.tscn maps each kind of event the core reports to its sound: in a world of two
 # hostile bands, a torch-bearer beside a structure and a mender beside a damaged one, strikes, hits,
 # deaths, a structure breaking and one mended each start a voice with their kind's stream; in a
-# region, the player marching on a hostile village rings its bell. Controls: the same world at
-# peace, with no skill reaching a structure, reports none of them; the region with the player left
-# at home rings no bell; an event outside what is heard starts no voice. In the M1 battle of 500
+# region, a raid its growth sends rings the bell on the tick the core records it. Controls: the same
+# world at peace, with no skill reaching a structure, reports none of them; the region rings no bell
+# before the raid, while the core records other events; an event outside what is heard starts no
+# voice. In the M1 battle of 500
 # people the voices sounding never pass the cap, reach it, and drop what finds no voice; control:
 # below the cap every event heard starts a voice, and once the sounds end the voices free up.
 extends RefCounted
@@ -35,10 +36,11 @@ const STRUCTURES: Array[Dictionary] = [
 	{"cell": Vector2i(11, 8), "durability": 30},
 ]
 const FLOORS := [75, 25, 1]
-# The region the play scene opens on, and its first Cult village, the player's home.
+# The region the play scene opens on, at days of five ticks: its growth sends its first raid within
+# RAID_TICKS.
 const REGION_SEED := 2026
-const CULT_VILLAGE := 1
-const MARCH_TICKS := 3000
+const RAID_TICKS_PER_DAY := 5
+const RAID_TICKS := 30000
 const CAP_TICKS := 300
 
 
@@ -67,25 +69,39 @@ func _mapping_pass() -> bool:
 	return passed
 
 
-# Marches the player on the nearest village of a faction hostile to its own, its torch in hand,
-# until the bell rings there.
+# Lives the region until its growth sends a raid, counting the events the core records: the bell
+# is heard once for each raid, on the tick it is recorded, with the bell's stream.
 func _bell_pass() -> bool:
-	var marched := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
-	var player := marched.army_count() - 1
-	var home: Vector2 = marched.body_positions(player)[0] / WorldAdapter.CELL_SIZE
-	var target := Vector2i(-1, -1)
-	for village: Dictionary in marched.villages():
-		var centre: Vector2i = village.corner + village.area / 2
-		if marched.hostile(marched.army_faction(player), village.faction) \
-				and (target.x < 0 or home.distance_to(centre) < home.distance_to(target)):
-			target = centre
-	var ordered := target.x >= 0 and marched.order(player, target, PackedInt64Array([1]))
-	var rung := _listen(marched, MARCH_TICKS, true)
-	var stayed := _listen(WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE), MARCH_TICKS)
-	var passed: bool = ordered and rung.played[Sound.Heard.BELL] > 0 \
-			and rung.streams.has(Sound.STREAMS[Sound.Heard.BELL]) and stayed.heard[Sound.Heard.BELL] == 0
-	print("sound_test: the player ordered on the hostile village at %s %s, the bell heard %d times after %d ticks; left at home, heard %d times in %d: %s" % [
-		target, ordered, rung.heard[Sound.Heard.BELL], rung.ticks, stayed.heard[Sound.Heard.BELL], MARCH_TICKS,
+	var world := WorldAdapter.create_region(REGION_SEED, 0, RAID_TICKS_PER_DAY)
+	var sound: Node2D = load(SCENE).instantiate()
+	sound.hearing = EVERYWHERE
+	sound.show_world(world)
+	var next := 0
+	var raids := 0
+	var others := 0
+	var early := false
+	var ran := 0
+	while raids == 0 and ran < RAID_TICKS:
+		world.tick()
+		sound.note_tick()
+		sound.advance(STEP)
+		ran += 1
+		for event: Dictionary in world.events(next):
+			next = event.sequence + 1
+			if event.kind == WorldAdapter.EVENT_RAIDED:
+				raids += 1
+			else:
+				others += 1
+		early = early or (raids == 0 and sound.heard[Sound.Heard.BELL] > 0)
+	var streamed := false
+	for voice in Sound.VOICES:
+		streamed = streamed or sound.voice_stream(voice) == Sound.STREAMS[Sound.Heard.BELL]
+	var bells: int = sound.heard[Sound.Heard.BELL]
+	var rung: bool = raids > 0 and bells == raids and sound.played[Sound.Heard.BELL] > 0 and streamed
+	sound.free()
+	var passed := rung and not early and others > 0
+	print("sound_test: the region recorded %d raids after %d ticks, the bell heard %d times, its stream sounded %s; before it, %d other events recorded and the bell heard early %s: %s" % [
+		raids, ran, bells, streamed, others, early,
 		"pass" if passed else "FAIL"])
 	return passed
 

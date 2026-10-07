@@ -1,7 +1,8 @@
-## Plays what the core reports as sound. After each tick it compares what the adapter reads with
-## what it read on the tick before: a body whose ready tick moved struck, a living body whose
-## health fell was hit, a body that lived and now has none fell, a structure a stage worse caught
-## fire, a structure a stage better was mended, and a village newly raided rings its bell. Each is
+## Plays what the core reports as sound. After each tick it reads the core's events recorded since
+## the last: a death is a fall, and a raid sent against a village rings its bell. For what the core
+## records no event of, it compares what the adapter reads with what it read on the tick before: a
+## body whose ready tick moved struck, a living body whose health fell was hit, a structure a stage
+## worse caught fire, and a structure a stage better was mended. Each is
 ## heard where it happened, within `hearing`, through a fixed pool of voices on the Effects bus:
 ## at most one of each kind starts a tick, and once every voice sounds, the rest are dropped. The
 ## music on the Music bus is the battle track while strikes are heard, and the explore track
@@ -43,16 +44,14 @@ var _started := PackedInt64Array()
 var _battle_until := -1.0
 var _music: AudioStreamPlayer
 var _ui: AudioStreamPlayer
-# By person: the tick it was last read alive, its health, its ready tick and where it stood.
+# By person: the tick it was last read alive, its health and its ready tick.
 var _seen := PackedInt64Array()
 var _health := PackedInt64Array()
 var _ready_at := PackedInt64Array()
-var _where := PackedVector2Array()
-# By army, its roster as last read; by structure, its stage; by village, its state and centre.
-var _rosters: Array[PackedInt64Array] = []
+# By structure, its stage.
 var _stages := PackedInt64Array()
-var _states := PackedInt64Array()
-var _centres := PackedVector2Array()
+# The sequence of the next event to read.
+var _next_event := 0
 
 
 func _init() -> void:
@@ -85,10 +84,9 @@ func _ready() -> void:
 func show_world(shown: WorldAdapter) -> void:
 	_world = shown
 	_tick = 0
-	_rosters.clear()
 	_stages.clear()
-	_states.clear()
 	_seen.fill(-2)
+	_next_event = 0
 	_read(false)
 
 
@@ -171,13 +169,18 @@ func advance(delta: float) -> void:
 			_music.play()
 
 
-# Reads the bodies, structures and villages, hearing what changed since the last read when
+# Reads the events, bodies and structures, hearing what happened since the last read when
 # `listen` is set.
 func _read(listen: bool) -> void:
+	for event: Dictionary in _world.events(_next_event):
+		_next_event = event.sequence + 1
+		var at := (Vector2(event.cell) + Vector2.ONE / 2.0) * PIXELS_PER_CELL
+		if listen and event.kind == WorldAdapter.EVENT_DIED:
+			hear(Heard.FALL, at)
+		elif listen and event.kind == WorldAdapter.EVENT_RAIDED:
+			hear(Heard.BELL, at)
 	var cell := PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	for army in _world.army_count():
-		if army == _rosters.size():
-			_rosters.append(PackedInt64Array())
 		var roster := _world.roster(army)
 		var healths := _world.body_strengths(army)
 		var ready := _world.body_ready(army)
@@ -195,13 +198,6 @@ func _read(listen: bool) -> void:
 			_seen[person] = _tick
 			_health[person] = healths[body]
 			_ready_at[person] = ready[body]
-			_where[person] = at
-		# Someone on the last roster not read since has left it: the dead have no health left,
-		# while the living have joined another army.
-		for person in _rosters[army]:
-			if listen and _seen[person] == _tick - 1 and _world.person_health(person) == 0:
-				hear(Heard.FALL, _where[person])
-		_rosters[army] = roster
 	for structure in _world.structure_count():
 		var stage := _world.structure_stage(structure)
 		if structure == _stages.size():
@@ -212,19 +208,6 @@ func _read(listen: bool) -> void:
 			if listen:
 				hear(Heard.FIRE if stage > _stages[structure] else Heard.MEND, at)
 			_stages[structure] = stage
-	var villages := _world.village_count()
-	if villages != _centres.size():
-		_centres.clear()
-		for village: Dictionary in _world.villages():
-			_centres.append((Vector2(village.corner) + Vector2(village.area) / 2.0) * PIXELS_PER_CELL)
-	for village in mini(villages, _centres.size()):
-		var state := _world.village_state(village)
-		if village == _states.size():
-			_states.append(state)
-		elif state != _states[village]:
-			if listen and state == WorldAdapter.VILLAGE_RAIDED:
-				hear(Heard.BELL, _centres[village])
-			_states[village] = state
 
 
 func _grow(size: int) -> void:
@@ -233,6 +216,5 @@ func _grow(size: int) -> void:
 	_seen.resize(to)
 	_health.resize(to)
 	_ready_at.resize(to)
-	_where.resize(to)
 	for person in range(from, to):
 		_seen[person] = -2

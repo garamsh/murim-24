@@ -10,10 +10,10 @@ The sound scene, `sound/sound.tscn`, plays what the core reports and holds no ga
 |---|---|---|
 | `sound/strike.wav` | A body strikes: its ready tick moves | A blade's swish, noise swept up through a low-pass |
 | `sound/hit.wav` | A living body's health falls | A thud, a tone falling from 150 to 55 Hz under a click |
-| `sound/fall.wav` | A body that lived on the last tick has died | A body falling, two low thumps |
+| `sound/fall.wav` | The core records a death | A body falling, two low thumps |
 | `sound/fire.wav` | A structure falls a stage | A torch catching, a rising roar with crackles |
 | `sound/mend.wav` | A structure rises a stage | Building, two wooden knocks |
-| `sound/bell.wav` | A village comes to be raided | The village's bell, struck twice |
+| `sound/bell.wav` | The core records a raid sent against a village | The village's bell, struck twice |
 | `sound/click.wav` | A screen takes a key | A short tick |
 | `sound/open.wav` | A screen or panel opens | A paper rustle and a plucked note |
 | `sound/explore.wav` | No strike was heard in the last 8 seconds | A slow pentatonic melody on a plucked string over a drone, a gong every four bars; loops |
