@@ -101,4 +101,5 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - **When a settlement fails.** A founded village that raids burn back before its settlers raise it keeps them, and keeps its mother village from founding again, for as long as they live.
 
 - **Whether rubble should free its cells.** Rubble blocks as an intact structure does. Freeing it would mean rebuilding the flow fields that cross it when a structure falls, on the tick it falls.
+- **How sects are modelled.** ADR 0026 (`adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`), proposed: membership a field on the person and a sect's members, elders, cap and standing derived on read; its seat a village of its own; admission by per-faction thresholds; the cap from the pupils its seat teaches; manuals scattered when it falls; and an election among sect masters by elders' favour. Nothing above changes until it is accepted.
 - **Whether two people on the move can block each other.** A person on the move gives way to another on the move as to anyone, so two marching head-on into each other may hold each other up. No test or scenario covers it yet.
