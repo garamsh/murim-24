@@ -21,7 +21,7 @@ The approved target, which the production set is taken from:
 - `art/mockup/lineup_sheet.png` — the bodies of each faction, villagers and the player, the village house in its four stages and the aggregate-army marker; `lineup_sheet_4x.png` at 4x.
 - `art/mockup/genealogy_panel.png` — the genealogy panel open over the target screen: a three-generation tree of cards (parents, the steered person and their spouse, their children) joined by gold lines of kin, and a column of the centred person's details, in Korean; `genealogy_panel_4x.png` at 4x. Its Hangul is Galmuri9, drawn from `hud/fonts/Galmuri9.bdf` by `art/mockup/bdf.lua`.
 - `art/mockup/sect_panel.png` — the sect panel open over the target screen, in the genealogy panel's frame and cards: the steered person's sect with its seat village's gate and whether the seat is held, its faction, master, elders and members against its cap, the cards of its master and elders, and a column of a faction's leader, how the leader is chosen and its sects, in Korean; `sect_panel_4x.png` at 4x.
-- `art/mockup/title_screen.png` — the title screen: ridges of mountains in mist under a low sun, the working title at 4x of the font, and a menu in the HUD's frame with a new game, a greyed continue that waits for saving, settings and quit, in Korean; `title_screen_4x.png` at 4x.
+- `art/mockup/title_screen.png` — the title screen: `art/title/backdrop`'s ridges of mountains in mist under a low sun and the working title at 4x of the font, and a menu in the HUD's frame with a new game, a greyed continue that waits for saving, settings and quit, in Korean; `title_screen_4x.png` at 4x.
 - `art/mockup/new_game_screen.png` — the new-game panel over the dimmed title screen: a seed typed into its field or drawn at random, and the button that starts the world, in Korean; `new_game_screen_4x.png` at 4x.
 - `art/mockup/pause_screen.png` — the pause panel over the target screen: a menu to resume, open the settings, leave for the title or quit, the world's seed, and the controls guide of each key's cap beside what it does, in Korean; `pause_screen_4x.png` at 4x.
 - `art/mockup/settings_screen.png` — the settings panel over the target screen: time speed, window mode, resolution in whole multiples of the native size and language, each a row of choices with the chosen one in jade, and a line saying what the row being changed sets, in Korean; `settings_screen_4x.png` at 4x.
@@ -54,8 +54,9 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/icons/economy_icons` | 16 x 16 | `food`, `stock`, `housing` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
+| `art/title/backdrop` | 480 x 270 | none: one frame, the title screen's mountains and working title |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set but the title backdrop, which `art/mockup/title_screen.png` shows, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
 
 ## Screen and grid
 
