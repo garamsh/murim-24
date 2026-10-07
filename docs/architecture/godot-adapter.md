@@ -54,7 +54,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - The calendar kept by the core and read by the HUD, and the player's body carrying a soul: ADR 0019 (`adr/0019-draw-talent-and-lifespan-at-birth-and-bear-a-soul-again.md`).
 - Every body one person, read and drawn one by one, and no focus to set: ADR 0017 (`adr/0017-make-every-npc-an-individual-and-every-army-a-roster.md`).
 - Saving through the core's save port, served by files under `user://saves/`, and what the adapter regenerates from the region's origin on load: ADR 0030 (`adr/0030-save-a-world-through-a-save-port-in-the-cores-own-versioned-encoding.md`).
-- Cross-building the Windows library with a pinned llvm-mingw, and the alternatives measured: ADR 0030 (`adr/0030-cross-build-the-windows-extension-with-a-pinned-llvm-mingw.md`).
+- Cross-building the Windows library with a pinned llvm-mingw, and the alternatives weighed: ADR 0033 (`adr/0033-cross-build-the-windows-extension-with-a-pinned-llvm-mingw.md`).
 - Steering through the orders every army follows: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
 - The three-quarter top-down view, structure footprints, real-time combat, pixel art on a 16-pixel tile grid and Korean-first UI text, and the alternatives rejected: ADR 0012 (`adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`), which supersedes ADR 0008 (`adr/0008-present-the-world-top-down-in-real-time-as-pixel-art.md`).
 

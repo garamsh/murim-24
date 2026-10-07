@@ -1,4 +1,4 @@
-# ADR 0030: Cross-build the Windows extension with a pinned llvm-mingw
+# ADR 0033: Cross-build the Windows extension with a pinned llvm-mingw
 
 > Status: accepted
 > Date: 2026-10-08
