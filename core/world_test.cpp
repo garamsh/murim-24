@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "map.hpp"
@@ -240,7 +241,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xB40A2479B312866EULL);
+            0x17F3F597F63D7FEAULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -1191,13 +1192,14 @@ World cult_world(std::uint64_t challenger_health,
       SEPARATION,
       {{false, true, false}, {true, false, false}, {false, false, false}},
       STAGE_FLOORS};
-  return World{CULT_SEED,
-               Map{rows},
-               armies,
-               {},
-               rules,
-               {},
-               {{}, {cult_leader, Duel{true, 0, true}}, {}}};
+  return World{
+      CULT_SEED,
+      Map{rows},
+      armies,
+      {},
+      rules,
+      {},
+      {{}, {cult_leader, Duel{true, 0, true}, std::nullopt, std::nullopt}, {}}};
 }
 
 // Has army `army` challenge the Cult's leader at its seat and runs the duel
@@ -1376,6 +1378,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               std::nullopt,
               std::nullopt,
               {},
+              std::nullopt,
               std::nullopt,
               std::nullopt};
 }
@@ -2250,6 +2253,208 @@ TEST(World, AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn) {
 TEST(World, RefusesMoreHouseholdsThanItsResidentsPairInto) {
   EXPECT_NO_THROW(static_cast<void>(housed(1)));
   EXPECT_THROW(static_cast<void>(housed(2)), std::invalid_argument);
+}
+
+// A world of sects, with days of one tick: a seat village of two people of
+// `seat_faction` around (2, 3), whose one structure teaches `pupils`, a
+// village of `villagers` of `villager_faction` around (12, 3), and an army of
+// one of faction 1 around (8, 13). Faction 0's sect 0 is seated in the seat
+// village; its founders are persons `founders`, at attainments `founding`.
+struct Sectarian {
+  std::uint32_t pupils = 4;
+  std::uint32_t durability = INTACT;
+  Admission admission{0, 0, 0, OPEN_SIDE, PER_MILLE, 10};
+  std::optional<Election> election;
+  std::size_t villagers = 3;
+  std::size_t villager_faction = 0;
+  std::array<std::uint32_t, 2> founding{20, 0};
+  std::size_t seat_faction = 0;
+  std::array<std::size_t, 2> founders{0, 1};
+  Manuals manuals{{{0}}, 0, 0};
+};
+
+constexpr Cell SEAT_HOME{2, 3};
+constexpr Cell VILLAGE_HOME{12, 3};
+constexpr Cell OUTSIDERS_HOME{8, 13};
+constexpr std::size_t SEAT_ARMY = 0;
+constexpr std::size_t VILLAGE_ARMY = 1;
+constexpr std::size_t OUTSIDERS = 2;
+constexpr std::size_t SECT = 0;
+
+World sect_world(const Sectarian& sectarian) {
+  Rules peace{SEPARATION, {{false, false}, {false, false}}, STAGE_FLOORS};
+  peace.ticks_per_day = 1;
+  Life life = one_discipline(0);
+  life.manuals = sectarian.manuals;
+  const Leadership faction{std::nullopt, std::nullopt, sectarian.admission,
+                           sectarian.election};
+  return World{
+      Seed{3},
+      Map{open_map(OPEN_SIDE)},
+      {army(SEAT_HOME, SEAT_HOME, 2, 1, sectarian.seat_faction, {IDLE}),
+       army(VILLAGE_HOME, VILLAGE_HOME, sectarian.villagers, 1,
+            sectarian.villager_faction, {IDLE}),
+       army(OUTSIDERS_HOME, OUTSIDERS_HOME, 1, 1, 1, {IDLE})},
+      {Structure{{SEAT_HOME.x, 0}, sectarian.durability, {1, 1}, true},
+       Structure{{VILLAGE_HOME.x, 0}, INTACT, {1, 1}, true}},
+      peace,
+      {VillageSpec{{0}, SEAT_ARMY, {Holding{0, 0, 0, sectarian.pupils}}},
+       VillageSpec{{1}, VILLAGE_ARMY, {Holding{}}}},
+      {faction, faction},
+      life,
+      {SectSpec{
+          "Hwasan",
+          0,
+          0,
+          {Founder{sectarian.founders.at(0), sectarian.founding.at(0)},
+           Founder{sectarian.founders.at(1), sectarian.founding.at(1)}}}}};
+}
+
+// Sectarian `sectarian`'s world after `days` days.
+World sect_world_after(const Sectarian& sectarian, std::uint64_t days) {
+  World world = sect_world(sectarian);
+  run_ticks(world, days);
+  return world;
+}
+
+constexpr std::uint64_t SECT_YEARS = 2 * DAYS_PER_YEAR;
+
+TEST(World, ASectAdmitsItsFactionsPeopleWithinReachUpToItsCap) {
+  const World world = sect_world_after(Sectarian{}, SECT_YEARS);
+  // Its two founders and two of the three villagers, as many as the seat's
+  // pupils.
+  EXPECT_EQ(world.sect_members(SECT).size(), 4U);
+  EXPECT_EQ(world.sect_cap(SECT), 4U);
+  // Control: a seat teaching two holds only its founders.
+  Sectarian narrow;
+  narrow.pupils = 2;
+  EXPECT_EQ(sect_world_after(narrow, SECT_YEARS).sect_members(SECT),
+            (std::vector<std::size_t>{0, 1}));
+}
+
+TEST(World, ASectAdmitsNoOneBelowItsThresholdsBeyondReachOrOfAnotherFaction) {
+  const std::vector<std::size_t> founders{0, 1};
+  // Control: the same world with nothing barring them admits villagers.
+  ASSERT_GT(sect_world_after(Sectarian{}, SECT_YEARS).sect_members(SECT).size(),
+            founders.size());
+  Sectarian untalented;
+  untalented.admission.talent = MAX_TALENT;
+  Sectarian unproven;
+  unproven.admission.attainment = 1;
+  Sectarian distant;
+  distant.admission.reach = 4;
+  Sectarian foreign;
+  foreign.villager_faction = 1;
+  for (const Sectarian& barred : {untalented, unproven, distant, foreign}) {
+    EXPECT_EQ(sect_world_after(barred, SECT_YEARS).sect_members(SECT),
+              founders);
+  }
+}
+
+TEST(World, ALostSeatCapsItsSectAtNothingAndKeepsItsMembers) {
+  Sectarian ruined;
+  ruined.durability = 0;
+  const World world = sect_world_after(ruined, SECT_YEARS);
+  ASSERT_EQ(world.village_state(0), VillageState::RUINS);
+  EXPECT_FALSE(world.seat_held(SECT));
+  EXPECT_EQ(world.sect_cap(SECT), 0U);
+  EXPECT_EQ(world.sect_members(SECT), (std::vector<std::size_t>{0, 1}));
+  EXPECT_TRUE(world.sect_stands(SECT));
+  // A seat standing intact but held by another faction is lost all the same.
+  Sectarian taken;
+  taken.seat_faction = 1;
+  taken.founders = {2, 3};
+  const World occupied = sect_world(taken);
+  ASSERT_EQ(occupied.stage(0), Stage::INTACT);
+  EXPECT_FALSE(occupied.seat_held(SECT));
+  EXPECT_EQ(occupied.sect_cap(SECT), 0U);
+  EXPECT_EQ(occupied.sect_members(SECT), (std::vector<std::size_t>{2, 3}));
+  // Control: the seat standing, its pupils make the cap.
+  const World held = sect_world(Sectarian{});
+  EXPECT_TRUE(held.seat_held(SECT));
+  EXPECT_EQ(held.sect_cap(SECT), 4U);
+}
+
+TEST(World, AMemberServingAnotherFactionLeavesItsSect) {
+  World world = sect_world(Sectarian{});
+  world.conscript(1, OUTSIDERS);
+  run_ticks(world, 1);
+  EXPECT_FALSE(world.sect_of(1).has_value());
+  EXPECT_EQ(world.sect_members(SECT), std::vector<std::size_t>{0});
+  // Control: serving another army of its own faction, it stays.
+  World kept = sect_world(Sectarian{});
+  kept.conscript(1, VILLAGE_ARMY);
+  run_ticks(kept, 1);
+  EXPECT_EQ(kept.sect_of(1), std::optional<std::size_t>{SECT});
+}
+
+TEST(World, EldersAndTheMasterFollowAttainment) {
+  constexpr std::uint32_t STRONGER = 30;
+  constexpr std::uint32_t WEAKER = 20;
+  constexpr std::uint32_t BETWEEN = 25;
+  Sectarian both;
+  both.founding = {STRONGER, WEAKER};
+  World world = sect_world(both);
+  EXPECT_EQ(world.sect_elders(SECT), (std::vector<std::size_t>{0, 1}));
+  EXPECT_EQ(world.sect_master(SECT), std::optional<std::size_t>{0});
+  // The master leaving, the next elder is master.
+  world.conscript(0, OUTSIDERS);
+  run_ticks(world, 1);
+  EXPECT_EQ(world.sect_master(SECT), std::optional<std::size_t>{1});
+  // Control: under an elder attainment between theirs, only the first is an
+  // elder.
+  Sectarian strict = both;
+  strict.admission.elder_attainment = BETWEEN;
+  EXPECT_EQ(sect_world(strict).sect_elders(SECT), std::vector<std::size_t>{0});
+}
+
+// Sectarian `sectarian`'s world a day after both founders were conscripted
+// into faction 1's army, which leaves the sect with no member.
+World fallen(const Sectarian& sectarian) {
+  World world = sect_world(sectarian);
+  world.conscript(0, OUTSIDERS);
+  world.conscript(1, OUTSIDERS);
+  run_ticks(world, 1);
+  return world;
+}
+
+TEST(World, AFallenSectScattersOrLosesItsManuals) {
+  Sectarian scattering;
+  scattering.manuals = Manuals{{{0}}, PER_MILLE, 3};
+  const World world = fallen(scattering);
+  ASSERT_FALSE(world.sect_stands(SECT));
+  const Cell* cell = std::get_if<Cell>(&world.manuals().front().place);
+  ASSERT_NE(cell, nullptr);
+  EXPECT_LE(std::abs(cell->x - SEAT_HOME.x), 3);
+  EXPECT_LE(std::abs(cell->y - SEAT_HOME.y), 3);
+  // The same seed scatters it to the same cell.
+  const World repeated = fallen(scattering);
+  const Cell* again = std::get_if<Cell>(&repeated.manuals().front().place);
+  ASSERT_NE(again, nullptr);
+  EXPECT_EQ(again->x, cell->x);
+  EXPECT_EQ(again->y, cell->y);
+  // With no chance to scatter, it is lost.
+  EXPECT_TRUE(std::holds_alternative<Lost>(
+      fallen(Sectarian{}).manuals().front().place));
+  // A fallen sect admits no one.
+  World emptied = fallen(Sectarian{});
+  run_ticks(emptied, SECT_YEARS);
+  EXPECT_TRUE(emptied.sect_members(SECT).empty());
+  // Control: a standing sect keeps its manual.
+  EXPECT_TRUE(std::holds_alternative<HeldBySect>(
+      sect_world_after(scattering, 1).manuals().front().place));
+}
+
+TEST(World, AnElectionMakesTheMasterLeaderWhenNoOneLeads) {
+  Sectarian electing;
+  electing.election = Election{0};
+  const World world = sect_world_after(electing, 1);
+  EXPECT_EQ(world.leader(0), std::optional<std::size_t>{0});
+  // A faction with an election and no duel still refuses every challenge.
+  EXPECT_EQ(world.challenge_refusal(VILLAGE_ARMY, 0),
+            ChallengeRefusal::NO_SUCCESSION);
+  // Control: without an election no one comes to lead.
+  EXPECT_FALSE(sect_world_after(Sectarian{}, 1).leader(0).has_value());
 }
 
 }  // namespace
