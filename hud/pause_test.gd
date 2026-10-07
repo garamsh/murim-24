@@ -1,5 +1,5 @@
 # Checks that the pause panel's menu takes the entry chosen, with Escape resuming, and that every
-# word it draws from hud.csv, the controls guide as play.tscn binds it, and a seed as long as the
+# word it draws from hud.csv, whether a save was written among them, the controls guide as play.tscn binds it, and a seed as long as the
 # new-game field takes fit the room the panel gives them, in each locale.
 extends RefCounted
 
@@ -23,7 +23,7 @@ func run() -> bool:
 		steps.append(Pause.ENTRIES[panel.chosen])
 	var taken: String = panel.key(_key(KEY_ENTER))
 	var escape: String = panel.key(_key(KEY_ESCAPE))
-	var passed := opened_on == "resume" and steps == ["settings", "title", "quit", "quit"] \
+	var passed := opened_on == "resume" and steps == ["save", "settings", "title", "quit", "quit"] \
 			and taken == "quit" and escape == "resume"
 	print("pause_test: opened on %s; down steps %s; Enter takes %s; Escape %s: %s" % [
 		opened_on, steps, taken, escape, "pass" if passed else "FAIL"])
@@ -33,8 +33,8 @@ func run() -> bool:
 	return passed and fits
 
 
-# In each locale: the title clear of the close key in the title bar; each menu entry within the
-# menu; the seed's label clear of a seed of the new-game field's length; each control's caps within
+# In each locale: the title clear of the close key in the title bar; each menu entry, and whether a
+# save was written, within the menu; the seed's label clear of a seed of the new-game field's length; each control's caps within
 # the room left of what it does, and what it does within the panel; every row of the guide above
 # the foot, and the keys along the foot within the panel. Setup: every PAUSE_ and CONTROLS_ key is
 # measured, and the guide has rows.
@@ -51,6 +51,9 @@ func _fit_pass(controls: Array[Dictionary]) -> bool:
 		for entry: String in Pause.ENTRIES:
 			var text := fit.say(Pause.ENTRY_KEYS[entry])
 			fit.check(text, 12 + fit.width(text), Pause.MENU_WIDTH - 4)
+		for key: String in ["PAUSE_SAVED", "PAUSE_NOT_SAVED"]:
+			var notice := fit.say(key)
+			fit.check(notice, 2 + fit.width(notice), Pause.MENU_WIDTH - 4)
 		var label := fit.say("PAUSE_SEED")
 		var longest := "9".repeat(NewGame.MAX_DIGITS)
 		fit.check(label, 2 + fit.width(label) + 4 + fit.width(longest), Pause.MENU_WIDTH - 4)

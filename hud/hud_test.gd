@@ -14,13 +14,13 @@ const SEED := 2026
 # A seed whose first Cult village's leader has the widest given name, Cheonmyeong.
 const LONG_NAME_SEED := 4
 # The keys a label shows besides the text it is built with, by its name in `labels`; the notice
-# also shows every challenge verdict.
+# also shows every challenge verdict and whether an autosave was written.
 const SHOWN := {
 	"faction": ["FACTION_ORTHODOX", "FACTION_DEMONIC", "FACTION_UNORTHODOX"],
 	"leader_value": ["HUD_LEADER_NONE", "HUD_LEADER_YOU"],
 	"duel_challenger": ["HUD_LEADER_YOU"],
 	"duel_leader": ["HUD_LEADER_YOU"],
-	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD"],
+	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD", "HUD_AUTOSAVED", "HUD_AUTOSAVE_FAILED"],
 	"rumour_0": ["HUD_RUMOR_NONE"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,

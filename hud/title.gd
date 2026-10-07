@@ -1,8 +1,8 @@
 ## The title screen, drawn as art/mockup/title_screen.png lays it out: the backdrop of mountains
 ## and the working title from art/title/backdrop.png, a line under it, and a menu to start a new
-## game, continue, which waits for saving and cannot be taken yet, open the settings or quit, with
-## its keys along the foot of the screen. Every word comes from hud.csv through Godot's
-## translations. It holds no game rule.
+## game, continue the saved one, which cannot be taken while there is none, open the settings or
+## quit, with its keys along the foot of the screen; under the menu, a notice of why a save was not
+## loaded. Every word comes from hud.csv through Godot's translations. It holds no game rule.
 extends "res://hud/panel.gd"
 
 const BACKDROP := "res://art/title/backdrop.png"
@@ -11,14 +11,28 @@ const LINE := Vector2(40, 110)
 const MENU := Rect2(40, 150, 136, 86)
 const MENU_INSET := Vector2(6, 10)
 const FOOT := 16
-## The menu's entries, by what choosing each does; an entry in WAITING cannot be taken yet.
+# The notice's line, between the menu and the foot.
+const NOTICE := Vector2(40, 239)
+## The menu's entries, by what choosing each does.
 const ENTRIES := ["new", "continue", "settings", "quit"]
-const WAITING := ["continue"]
 const ENTRY_KEYS := {"new": "TITLE_NEW", "continue": "TITLE_CONTINUE", "settings": "TITLE_SETTINGS",
 		"quit": "TITLE_QUIT"}
+## The hud.csv key of the notice for each reason a save is not loaded, by WorldAdapter.LOAD_*
+## constant.
+const LOAD_KEYS := {
+	WorldAdapter.LOAD_MISSING: "TITLE_LOAD_MISSING",
+	WorldAdapter.LOAD_NOT_A_SAVE: "TITLE_LOAD_NOT_A_SAVE",
+	WorldAdapter.LOAD_UNSUPPORTED_VERSION: "TITLE_LOAD_UNSUPPORTED_VERSION",
+	WorldAdapter.LOAD_TRUNCATED: "TITLE_LOAD_TRUNCATED",
+	WorldAdapter.LOAD_CORRUPTED: "TITLE_LOAD_CORRUPTED",
+}
 
 ## The entry the menu has chosen, an index into ENTRIES.
 var chosen := 0
+## The entries that cannot be taken: continue while there is no save.
+var unavailable: Array[String] = []
+## The hud.csv key of the notice under the menu, or "" while there is none.
+var notice := ""
 
 var _backdrop: Texture2D
 
@@ -28,10 +42,20 @@ func _notification(what: int) -> void:
 		queue_redraw()
 
 
-## Shows the title screen with its first entry chosen.
-func open() -> void:
+## Shows the title screen with its first entry chosen, continue taken or not as `saved` says
+## whether there is a save to continue.
+func open(saved: bool) -> void:
 	chosen = 0
+	unavailable.assign([] if saved else ["continue"])
+	notice = ""
 	visible = true
+	queue_redraw()
+
+
+## Shows under the menu why the save was not loaded, `refusal` one of the WorldAdapter.LOAD_*
+## constants.
+func refuse(refusal: int) -> void:
+	notice = LOAD_KEYS.get(refusal, "TITLE_LOAD_CORRUPTED")
 	queue_redraw()
 
 
@@ -50,7 +74,7 @@ func key(event: InputEventKey) -> String:
 func _next(from: int, step: int) -> int:
 	var at := from + step
 	while at >= 0 and at < ENTRIES.size():
-		if not WAITING.has(ENTRIES[at]):
+		if not unavailable.has(ENTRIES[at]):
 			return at
 		at += step
 	return from
@@ -66,10 +90,12 @@ func _draw() -> void:
 	var items: Array[Dictionary] = []
 	for entry: String in ENTRIES:
 		var item := {"text": tr(ENTRY_KEYS[entry])}
-		if WAITING.has(entry):
-			item.note = tr("TITLE_LATER")
+		if unavailable.has(entry):
+			item.note = tr("TITLE_NO_SAVE")
 		items.append(item)
 	_menu(MENU.position + MENU_INSET, MENU.size.x - 2 * MENU_INSET.x, items, chosen)
+	if not notice.is_empty():
+		_text(NOTICE, tr(notice), PAPER_DARK, true)
 	draw_rect(Rect2(0, size.y - FOOT, size.x, FOOT), INK_DARK)
 	draw_rect(Rect2(0, size.y - FOOT - 1, size.x, 1), GOLD_DARK)
 	var keys := tr("TITLE_KEYS")

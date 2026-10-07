@@ -3,9 +3,9 @@
 ## the discipline of its highest attainment with that attainment; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
-## fought, and the verdict on a challenge; a map of the region around the player with the season
-## and year; the latest RUMOUR_LINES rumours that reach the player; and the technique bar, an icon
-## and its number key for each of the player's skills.
+## fought, and the verdict on a challenge, or whether an autosave was written; a map of the region
+## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
+## player; and the technique bar, an icon and its number key for each of the player's skills.
 ## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
 ## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
 extends CanvasLayer
@@ -124,10 +124,11 @@ func switch_locale() -> String:
 	return next
 
 
-## Builds the HUD if it is not yet built, and opens the title screen.
-func open_title() -> void:
+## Builds the HUD if it is not yet built, and opens the title screen, with continue taken or not
+## as `saved` says whether there is a save to continue.
+func open_title(saved: bool) -> void:
 	_set_up()
-	title_screen.open()
+	title_screen.open(saved)
 
 
 ## Returns the screen open on top, the one that takes the keys: the rebirth screen, the settings,
@@ -246,6 +247,12 @@ func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
 func show_challenge(refusal: int) -> void:
 	_set_up()
 	_notice(CHALLENGE_KEYS.get(refusal, "CHALLENGE_NONE"))
+
+
+## Shows for NOTICE_MS whether the autosave was written, as `written` says.
+func show_autosave(written: bool) -> void:
+	_set_up()
+	_notice("HUD_AUTOSAVED" if written else "HUD_AUTOSAVE_FAILED")
 
 
 # Shows the player's faction's leader, and while a duel for its lead is fought, both duellists'
