@@ -39,12 +39,19 @@ struct Footprint {
 /// Returns the position at the centre of a cell.
 [[nodiscard]] Position centre_of(Cell cell);
 
-/// A rectangular grid of cells, each passable or blocked.
+/// What a cell bears: buildings and bodies, bodies only, or neither.
+enum class Footing : std::uint8_t { BUILDABLE, ROUGH, BLOCKED };
+
+/// Returns the character a map row marks a cell of `footing` with: `.`, `^`
+/// or `#`.
+[[nodiscard]] char tile_of(Footing footing);
+
+/// A rectangular grid of cells, each buildable, rough or blocked.
 class Map {
  public:
-  /// Parses rows of equal, non-zero length, where `#` is a blocked cell and
-  /// any other character a passable one. Throws std::invalid_argument
-  /// otherwise.
+  /// Parses rows of equal, non-zero length, where `#` is a blocked cell, `^`
+  /// a rough one and any other character a buildable one. Throws
+  /// std::invalid_argument otherwise.
   explicit Map(const std::vector<std::string>& rows);
 
   [[nodiscard]] std::int32_t width() const;
@@ -52,6 +59,10 @@ class Map {
 
   /// Returns whether the cell lies inside the map and is not blocked.
   [[nodiscard]] bool passable(Cell cell) const;
+
+  /// Returns whether the cell is passable and not rough, so something may be
+  /// built on it.
+  [[nodiscard]] bool buildable(Cell cell) const;
 
   /// Blocks a cell that lies inside the map.
   void block(Cell cell);
@@ -62,6 +73,7 @@ class Map {
   std::int32_t width_;
   std::int32_t height_;
   std::vector<bool> blocked_;
+  std::vector<bool> rough_;
 };
 
 }  // namespace murim

@@ -37,6 +37,18 @@ Position centre_of(Cell cell) {
                   (cell.y * CELL_SIZE) + (CELL_SIZE / 2)};
 }
 
+char tile_of(Footing footing) {
+  switch (footing) {
+    case Footing::BUILDABLE:
+      return '.';
+    case Footing::ROUGH:
+      return '^';
+    case Footing::BLOCKED:
+      return '#';
+  }
+  return '#';
+}
+
 Map::Map(const std::vector<std::string>& rows)
     : width_(rows.empty() ? 0 : static_cast<std::int32_t>(rows.front().size())),
       height_(static_cast<std::int32_t>(rows.size())) {
@@ -48,7 +60,8 @@ Map::Map(const std::vector<std::string>& rows)
   }
   for (const std::string& row : rows) {
     for (const char tile : row) {
-      blocked_.push_back(tile == '#');
+      blocked_.push_back(tile == tile_of(Footing::BLOCKED));
+      rough_.push_back(tile == tile_of(Footing::ROUGH));
     }
   }
 }
@@ -60,6 +73,10 @@ std::int32_t Map::height() const { return height_; }
 bool Map::passable(Cell cell) const {
   return cell.x >= 0 && cell.y >= 0 && cell.x < width_ && cell.y < height_ &&
          !blocked_.at(index(cell));
+}
+
+bool Map::buildable(Cell cell) const {
+  return passable(cell) && !rough_.at(index(cell));
 }
 
 void Map::block(Cell cell) { blocked_.at(index(cell)) = true; }

@@ -25,6 +25,9 @@ constexpr std::uint64_t SEEDS = 200;
 constexpr int TICKS = 300;
 constexpr Seed SEED{24};
 constexpr Seed OTHER_SEED{25};
+// A region whose every village has another within the marrying
+// neighbourhood, and a Demonic village within raiding reach of a hostile one.
+constexpr Seed NEIGHBOURLY{2026};
 constexpr std::size_t MIN_VILLAGES = 6;
 constexpr std::size_t MAX_VILLAGES = 8;
 
@@ -149,17 +152,17 @@ StateHash hash_after_ticks(const Region& region) {
   return world.hash();
 }
 
-// Whether every cell of each village's area is passable, every cell of its
+// Whether every cell of each village's area is buildable, every cell of its
 // structures' footprints lies inside that area, and each of its residents
 // stands inside it on a cell no structure covers.
-bool villages_on_passable_cells(const Region& region) {
+bool villages_on_buildable_cells(const Region& region) {
   const Map map{region.map_rows};
   for (const Village& village : region.villages) {
     const std::vector<Recruit>& residents =
         region.armies.at(village.army).members;
     bool fits = true;
     for (const Cell cell : area_of(village)) {
-      fits = fits && map.passable(cell);
+      fits = fits && map.buildable(cell);
     }
     for (const Recruit& resident : residents) {
       fits =
@@ -266,20 +269,34 @@ TEST(Region, HasThreeFactionsWithTerritoryAndSixToEightVillages) {
   }
 }
 
-TEST(Region, VillagesStandOnPassableCells) {
+// `region` with `cell` marked as of `footing`, checked to read back as such.
+Region marked(const Region& region, Cell cell, Footing footing) {
+  Region changed = region;
+  changed.map_rows.at(static_cast<std::size_t>(cell.y))
+      .at(static_cast<std::size_t>(cell.x)) = tile_of(footing);
+  const Map map{changed.map_rows};
+  EXPECT_EQ(map.passable(cell), footing != Footing::BLOCKED);
+  EXPECT_EQ(map.buildable(cell), footing == Footing::BUILDABLE);
+  return changed;
+}
+
+TEST(Region, VillagesStandOnBuildableCells) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
     const Region region = generate_region(Seed{seed}, region_data());
-    EXPECT_TRUE(villages_on_passable_cells(region)) << "seed " << seed;
+    EXPECT_TRUE(villages_on_buildable_cells(region)) << "seed " << seed;
     EXPECT_TRUE(builds_a_world(region)) << "seed " << seed;
 
     // Control: blocking the cell a resident army stands on breaks it.
-    Region blocked = region;
     const Cell home =
-        blocked.armies.at(blocked.villages.at(0).army).members.front().cell;
-    blocked.map_rows.at(static_cast<std::size_t>(home.y))
-        .at(static_cast<std::size_t>(home.x)) = '#';
-    ASSERT_FALSE(Map{blocked.map_rows}.passable(home));
-    EXPECT_FALSE(villages_on_passable_cells(blocked)) << "seed " << seed;
+        region.armies.at(region.villages.at(0).army).members.front().cell;
+    EXPECT_FALSE(
+        villages_on_buildable_cells(marked(region, home, Footing::BLOCKED)))
+        << "seed " << seed;
+
+    // Control: a rough cell, which bodies cross, under a village breaks it.
+    EXPECT_FALSE(villages_on_buildable_cells(
+        marked(region, region.villages.at(0).corner, Footing::ROUGH)))
+        << "seed " << seed;
   }
 }
 
@@ -322,7 +339,7 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
     const Region generated = generate_region(Seed{seed}, data);
     EXPECT_TRUE(
-        populated(generated, 4) && villages_on_passable_cells(generated) &&
+        populated(generated, 4) && villages_on_buildable_cells(generated) &&
         villages_in_owner_territory(generated) && villages_disjoint(generated))
         << "seed " << seed;
   }
@@ -584,7 +601,7 @@ constexpr std::size_t RAIDERS = 20;
 constexpr std::uint64_t VILLAGE_RAID_MOST = 2 * RAID_MOST;
 // Seeds a walled village is raided on, each with room west of it for the
 // whole band.
-constexpr std::array<Seed, 3> WALLED{SEED, Seed{7}, Seed{99}};
+constexpr std::array<Seed, 3> WALLED{SEED, Seed{7}, Seed{1}};
 // Seeds the pace is measured on, the region tests' own first.
 constexpr std::array<Seed, 3> PACED{SEED, Seed{2026}, Seed{5}};
 
@@ -622,11 +639,9 @@ constexpr std::int32_t AWAY = 12;
 // The top-left cell of the first FIELD of passable cells, AWAY cells from
 // every village, row by row.
 std::optional<Cell> open_field(const Region& region) {
-  const auto clear = [&region](Cell corner) {
-    const auto passable = [&region](Cell cell) {
-      return region.map_rows.at(static_cast<std::size_t>(cell.y))
-                 .at(static_cast<std::size_t>(cell.x)) == '.';
-    };
+  const Map map{region.map_rows};
+  const auto clear = [&region, &map](Cell corner) {
+    const auto passable = [&map](Cell cell) { return map.passable(cell); };
     const auto near = [corner](const Village& village) {
       return corner.x + FIELD.width + AWAY > village.corner.x &&
              corner.x - AWAY < village.corner.x + village.area.width &&
@@ -730,10 +745,9 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   std::vector<Cell> cells = cells_of(Cell{0, village.corner.y}, west);
   std::stable_sort(cells.begin(), cells.end(),
                    [](Cell left, Cell right) { return left.x > right.x; });
+  const Map map{region.map_rows};
   for (const Cell cell : cells) {
-    if (raiders.members.size() < raid.band &&
-        region.map_rows.at(static_cast<std::size_t>(cell.y))
-                .at(static_cast<std::size_t>(cell.x)) == '.') {
+    if (raiders.members.size() < raid.band && map.passable(cell)) {
       raiders.members.push_back(Recruit{cell, data.life.newborn_health});
     }
   }
@@ -962,14 +976,15 @@ TEST(Region, EveryPersonBearsTheirFamilySurnameAndAGivenName) {
 }
 
 // The most people above its cap any village of the region `data` generates
-// from SEED ever held, measured against `capping`'s caps, and the most people
-// its villages together held, over GENERATIONS_YEARS years of one-tick days.
+// from NEIGHBOURLY ever held, measured against `capping`'s caps, and the most
+// people its villages together held, over GENERATIONS_YEARS years of one-tick
+// days.
 std::pair<std::int64_t, std::size_t> crowding(const RegionData& data,
                                               const RegionData& capping) {
-  Region region = generate_region(SEED, data);
+  Region region = generate_region(NEIGHBOURLY, data);
   region.rules.ticks_per_day = 1;
   World world = world_of(region);
-  const Region capped_region = generate_region(SEED, capping);
+  const Region capped_region = generate_region(NEIGHBOURLY, capping);
   const World capped = world_of(capped_region);
   std::int64_t over = std::numeric_limits<std::int64_t>::min();
   std::size_t most = 0;
@@ -998,7 +1013,7 @@ TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
   kinship.birth_chance = PER_MILLE;
   kinship.birth_spacing = 0;
   fertile.life.kinship = kinship;
-  const Region region = generate_region(SEED, fertile);
+  const Region region = generate_region(NEIGHBOURLY, fertile);
   const World start = world_of(region);
   std::size_t caps = 0;
   for (std::size_t village = 0; village < region.villages.size(); ++village) {
@@ -1068,7 +1083,7 @@ Grew grew(const RegionData& data, Seed seed) {
 }
 
 TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
-  const Grew region = grew(region_data(), SEED);
+  const Grew region = grew(region_data(), NEIGHBOURLY);
   // Villages were founded, and one came to house its settlers; a building
   // was raised; a raiding party, an army housing no village, was sent; the
   // factions' territories changed; the living stayed within the bound.
@@ -1079,7 +1094,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_NE(region.territory_after, region.territory_before);
   EXPECT_LE(region.peak, MAX_PEOPLE);
   // The same seed grows the same way; control: another seed does not.
-  EXPECT_EQ(static_cast<std::uint64_t>(grew(region_data(), SEED).hash),
+  EXPECT_EQ(static_cast<std::uint64_t>(grew(region_data(), NEIGHBOURLY).hash),
             static_cast<std::uint64_t>(region.hash));
   EXPECT_NE(static_cast<std::uint64_t>(grew(region_data(), OTHER_SEED).hash),
             static_cast<std::uint64_t>(region.hash));
@@ -1088,7 +1103,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   for (Faction& faction : still.factions) {
     faction.stance.clear();
   }
-  const Grew unchanged = grew(still, SEED);
+  const Grew unchanged = grew(still, NEIGHBOURLY);
   EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
   EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
   EXPECT_FALSE(unchanged.building_raised);

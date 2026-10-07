@@ -1868,8 +1868,11 @@ Growth growth_of(const Growing& growing) {
 }
 
 // Village A of four residents housed for four, with ten years' food stored
-// and harvested, so housing is its scarcest holding, and village B of four.
-World growth_world(const Growing& growing) {
+// and harvested, so housing is its scarcest holding, and village B of four,
+// on open ground but for `rough` cells, which bodies cross and nothing is
+// built on.
+World growth_world(const Growing& growing,
+                   const std::vector<Cell>& rough = {}) {
   const auto row = [](Cell from) {
     return std::vector<Structure>{
         Structure{from, INTACT, {1, 1}, true},
@@ -1892,7 +1895,11 @@ World growth_world(const Growing& growing) {
   Life life = one_discipline(0);
   life.husbandry = FED;
   life.growth = growth_of(growing);
-  const std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  for (const Cell cell : rough) {
+    rows.at(static_cast<std::size_t>(cell.y))
+        .at(static_cast<std::size_t>(cell.x)) = tile_of(Footing::ROUGH);
+  }
   return World{Seed{3},
                Map{rows},
                {army(rows, GROWING_SEAT, GROWING_SEAT, growing.founders, 1, 0,
@@ -1956,6 +1963,29 @@ TEST(World, APressedVillageBuildsWhatItLacksAndRaisesItByRepair) {
   ASSERT_EQ(unraised.structure_count(), STRUCTURES_AT_START + 1);
   EXPECT_EQ(unraised.stage(BUILT), Stage::RUBBLE);
   EXPECT_EQ(unraised.cap(VILLAGE_A), FOUNDERS);
+}
+
+TEST(World, APressedVillageBuildsOnlyOnBuildableCells) {
+  // Control: on open ground the house is laid on the cells nearest the
+  // centre.
+  World open = growth_world(Growing{{Expansion::BUILD}});
+  run_ticks(open, 1);
+  ASSERT_EQ(open.structure_count(), STRUCTURES_AT_START + 1);
+  const Structure nearest = open.structure(STRUCTURES_AT_START);
+  // With rough ground, as hills are, over those cells, it is laid elsewhere,
+  // still beside the centre, on none of them.
+  const std::vector<Cell> hills = cells_of(nearest.cell, nearest.footprint);
+  World world = growth_world(Growing{{Expansion::BUILD}}, hills);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  const Structure built = world.structure(STRUCTURES_AT_START);
+  EXPECT_TRUE(within_four(built.cell, GROWING_SEAT));
+  for (const Cell cell : cells_of(built.cell, built.footprint)) {
+    EXPECT_TRUE(std::none_of(
+        hills.begin(), hills.end(),
+        [cell](Cell hill) { return hill.x == cell.x && hill.y == cell.y; }))
+        << "(" << cell.x << ", " << cell.y << ")";
+  }
 }
 
 // Whether `person` is a man.

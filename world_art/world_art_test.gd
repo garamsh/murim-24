@@ -3,8 +3,9 @@
 # cells around it; that it draws every body on screen and none off it; that a structure is drawn
 # over its footprint with its stage's frame of its kind's art; that each field is tiled with its
 # state's tag; that each village's ground decorations cover the cells its template's data
-# names; and that after the view jumps across the region, every body a band holds lies inside the
-# bounds the renderer culls that band by.
+# names; that no landform stands on a buildable cell or over a structure; and that after the view
+# jumps across the region, every body a band holds lies inside the bounds the renderer culls that
+# band by.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -159,9 +160,47 @@ func run() -> bool:
 	var decorations_right := expected > 0 and tiled == expected and outside_bare
 	print("world_art_test: %d of %d decorated cells carry their template's tile; cells beside the villages bare %s: %s" % [
 		tiled, expected, outside_bare, "pass" if decorations_right else "FAIL"])
+
+	# Landforms: each stands only on cells the map marks rough or blocked, which nothing is built
+	# on, so none covers a structure. Control: every structure stands on buildable cells, marked
+	# ".", so the check tells the two apart.
+	var landform_path := "res://art/terrain/landforms.json"
+	var landform_tags := _tags(landform_path)
+	var landform_width: int = _sheet(landform_path).width
+	var landform_texture: Texture2D = load("res://art/terrain/landforms.png")
+	var rows := region.map_rows()
+	var built_on := {}
+	var structures_buildable := true
+	for structure in region.structure_count():
+		for cell in _cells(region.structure_cell(structure), region.structure_footprint(structure)):
+			built_on[cell] = true
+			structures_buildable = structures_buildable and rows[cell.y][cell.x] == "."
+	var landforms := 0
+	var landforms_unbuildable := true
+	var landforms_clear := true
+	for sprite in region_art.get_node("Standing").get_children():
+		if not (sprite is Sprite2D and sprite.texture is AtlasTexture \
+				and sprite.texture.atlas == landform_texture):
+			continue
+		landforms += 1
+		var frame := int(sprite.texture.region.position.x) / landform_width
+		var size := Vector2i.ZERO
+		for tag: String in landform_tags:
+			if frame >= landform_tags[tag][0] and frame <= landform_tags[tag][1]:
+				var parts := tag.split("_")[1].split("x")
+				size = Vector2i(int(parts[0]), int(parts[1]))
+		var corner := Vector2i(int(sprite.position.x) / 16, int(sprite.position.y) / 16 - size.y)
+		for cell in _cells(corner, size):
+			landforms_unbuildable = landforms_unbuildable and rows[cell.y][cell.x] != "."
+			landforms_clear = landforms_clear and not built_on.has(cell)
+	var landforms_right := landforms > 0 and landforms_unbuildable and landforms_clear \
+			and structures_buildable
+	print("world_art_test: %d landforms, all on unbuildable cells %s, none over a structure %s; every structure on buildable cells %s: %s" % [
+		landforms, landforms_unbuildable, landforms_clear, structures_buildable,
+		"pass" if landforms_right else "FAIL"])
 	region_art.free()
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
-			and decorations_right and fields_right
+			and decorations_right and fields_right and landforms_right
 	art.free()
 	return _bands_pass() and passed
 
@@ -255,6 +294,15 @@ func _field_tagged(layer: TileMapLayer, world: WorldAdapter, structure: int, tag
 			if at < tag[0] or at > tag[1]:
 				return false
 	return true
+
+
+# The cells of a `size` footprint from `corner`, row by row.
+func _cells(corner: Vector2i, size: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for y in size.y:
+		for x in size.x:
+			cells.append(corner + Vector2i(x, y))
+	return cells
 
 
 # The last tile a layout lays on `cell`, which is the one left showing.

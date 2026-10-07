@@ -9,7 +9,7 @@ extends RefCounted
 const SCENE := "res://play/play.tscn"
 const TICKS := 600
 # How far from the person's home, in cells, to look for the cells to click.
-const SEARCH := 40
+const SEARCH := 64
 
 
 func run() -> bool:

@@ -422,17 +422,20 @@ RegionData region_data() {
   constexpr std::int32_t SOUTH_EAST = 11;
   constexpr std::int32_t WELL_EAST = 6;
   constexpr std::int32_t FENCE_EAST = 5;
+  constexpr std::int32_t PLAIN_WEIGHT = 10;
   const auto building = [](Cell cell, Footprint footprint, const char* kind,
                            std::uint32_t residents) {
     return Building{Structure{cell, DURABILITY, footprint}, kind, residents};
   };
   RegionData data{
       {
-          {"plain", true, 4},
-          {"forest", true, 3},
-          {"hills", true, 2},
-          {"water", false, 1},
-          {"mountain", false, 1},
+          // Villages build on the plain and in forest; bodies cross hills,
+          // where landforms stand, but nothing is built there.
+          {"plain", Footing::BUILDABLE, PLAIN_WEIGHT},
+          {"forest", Footing::BUILDABLE, 3},
+          {"hills", Footing::ROUGH, 2},
+          {"water", Footing::BLOCKED, 1},
+          {"mountain", Footing::BLOCKED, 1},
       },
       {
           // The Orthodox and Unorthodox mend villages; the Demonic Cult burns
@@ -573,16 +576,19 @@ Region generate_region(Seed seed, const RegionData& data) {
                 {},
                 life_of(data),
                 {}};
-  // The owner of each free passable cell; a blocked or built-on cell is
-  // owned by no faction, so no village fits on it.
+  for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
+    region.map_rows.at(static_cast<std::size_t>(cell.y))
+        .at(static_cast<std::size_t>(cell.x)) =
+        tile_of(data.terrain.at(region.terrain.at(index_of(cell))).footing);
+  }
+  // The owner of each free buildable cell; any other cell, or a built-on
+  // one, is owned by no faction, so no village fits on it.
+  const Map map{region.map_rows};
   const std::size_t nobody = data.factions.size();
   std::vector<std::size_t> room(CELLS);
   for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
-    const std::size_t place = index_of(cell);
-    const bool passable = data.terrain.at(region.terrain.at(place)).passable;
-    region.map_rows.at(static_cast<std::size_t>(cell.y))
-        .at(static_cast<std::size_t>(cell.x)) = passable ? '.' : '#';
-    room.at(place) = passable ? region.territory.at(place) : nobody;
+    room.at(index_of(cell)) =
+        map.buildable(cell) ? region.territory.at(index_of(cell)) : nobody;
   }
 
   const std::int32_t villages = MIN_VILLAGES + random.below(VILLAGE_COUNTS);

@@ -176,15 +176,15 @@ struct Placement {
 /// owner's stance, `stances` by faction, that it can:
 /// - build: while every structure of its own is intact, it lays the plan of
 ///   `builds` that most raises its scarcest holding, in people, as rubble
-///   on free cells within `vicinity` cells of its centre, nearest it, for
-///   its residents to raise by the repair rule
+///   on free buildable cells within `vicinity` cells of its centre, nearest
+///   it, for its residents to raise by the repair rule
 /// - found: with more residents than `settlers` and none of its people still
 ///   settling, it lays `layout` as rubble on a `settlement` area of free
-///   land, drawn by the seed among those whose centre lies within `reach`
-///   cells of its own, `spacing` cells clear of any structure and held by no
-///   other faction; `settlers` of its residents, a founder's household first,
-///   march there as the new village's residents, and the founder heads a new
-///   family
+///   buildable land, drawn by the seed among those whose centre lies within
+///   `reach` cells of its own, `spacing` cells clear of any structure and held
+///   by no other faction; `settlers` of its residents, a founder's household
+///   first, march there as the new village's residents, and the founder heads a
+///   new family
 /// - raid: with more residents than `raiders` and no party out, it sends
 ///   `raiders` of them against the nearest village of a faction it is hostile
 ///   to, with living residents and its centre within `reach` cells
@@ -717,7 +717,7 @@ class World {
   std::size_t form(std::size_t village, const std::vector<std::size_t>& members,
                    Cell objective, std::optional<std::size_t> into);
   /// Cells of the map, row by row: those a structure covers, those that are
-  /// not passable, and those an objective or a living person takes.
+  /// not buildable, and those an objective or a living person takes.
   struct Ground {
     std::vector<bool> covered;
     std::vector<bool> rough;
