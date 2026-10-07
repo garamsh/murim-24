@@ -6,7 +6,7 @@
 ## the person, and M the sect panel on its sect. Escape pauses the world under the pause panel,
 ## whose guide shows the controls as bound here. The camera follows the person. It ticks at the
 ## core's tick rate times the speed the settings choose, draws the world through world_art.tscn and
-## the HUD and its screens through hud.tscn, and holds no game rule.
+## the HUD and its screens through hud.tscn, sounds it through sound.tscn, and holds no game rule.
 extends Node2D
 
 const PIXELS_PER_CELL := 16.0
@@ -47,6 +47,7 @@ var _held: Array[Key] = []
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
 @onready var _hud: CanvasLayer = $Hud
+@onready var _sound: Node2D = $Sound
 
 
 func _ready() -> void:
@@ -68,6 +69,7 @@ func start(from_seed: int) -> bool:
 	_skills = _all_skills()
 	_camera.position = _to_pixels(lead()).floor()
 	_art.show_world(world, steered)
+	_sound.show_world(world)
 	_hud.show_player(world, steered)
 	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
@@ -87,8 +89,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Works the screens with `event`: the screen open on top takes every key, and while none is
-## open, Escape pauses the world unless a panel is open for it to close. Returns whether a screen
-## took the event.
+## open, Escape pauses the world unless a panel is open for it to close. A screen opening sounds,
+## and so does a key a screen takes. Returns whether a screen took the event.
 func navigate(event: InputEvent) -> bool:
 	var key := event as InputEventKey
 	var open: Control = _hud.screen()
@@ -98,9 +100,12 @@ func navigate(event: InputEvent) -> bool:
 			return false
 		_held.clear()
 		_hud.pause.open(controls(), world_seed)
+		_sound.ui("open")
 		return true
 	if key != null and key.pressed:
 		_take(open.key(key))
+		var now: Control = _hud.screen()
+		_sound.ui("open" if now != null and now != open else "click")
 	return true
 
 
@@ -153,7 +158,9 @@ func _process(delta: float) -> void:
 		return
 	_camera.position = _to_pixels(lead()).floor()
 	var screen := get_viewport_rect().size / _camera.zoom
-	_art.refresh(Rect2(_camera.get_screen_center_position() - screen / 2.0, screen))
+	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
+	_art.refresh(view)
+	_sound.hearing = view
 	_hud.refresh(world, steered, _skills)
 
 
@@ -235,6 +242,7 @@ func genealogy(keycode: Key) -> bool:
 		if roster.is_empty():
 			return false
 		panel.show_person(world, roster[0], roster[0])
+		_sound.ui("open")
 		return true
 	if keycode == GENEALOGY_KEY or keycode == KEY_ESCAPE:
 		panel.close()
@@ -258,6 +266,7 @@ func sects(keycode: Key) -> bool:
 		if world.sect_count() == 0 or world.roster(steered).is_empty():
 			return false
 		panel.show_sect(world, steered)
+		_sound.ui("open")
 		return true
 	if keycode == SECT_KEY or keycode == KEY_ESCAPE:
 		panel.close()
@@ -287,6 +296,7 @@ func advance(delta: float) -> void:
 func step() -> void:
 	world.tick()
 	_art.note_tick()
+	_sound.note_tick()
 	ticks += 1
 
 
