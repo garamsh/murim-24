@@ -52,6 +52,7 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | `make test` | `ctest --no-tests=error` in `build/`. Runs `make build` first. |
 | `make ci` | `lint`, `format`, `test` and `build`, in that order. |
 | `make bench` | Runs `make build` first. CMake configures `core/` into `build/bench/` as a Release build, builds `murim_core_bench`, and runs it. It prints the scenario it ran and the tick times against the budget, and exits non-zero on a failed setup check or a missed budget. Not part of `make ci`. |
+| `make sweep` | Runs `make build` first. CMake configures `core/` into `build/bench/` as a Release build, builds `murim_core_sweep`, and runs it over seeds `FIRST_SEED` to `LAST_SEED` for `YEARS` years, printing a Markdown table with, per seed, its households, the living and peopled villages at the start and the end, the peak, and whether every faction stays peopled. Not part of `make ci`. |
 | `make android` | Runs `make build` first. CMake configures `extension/` into `build/android/` with the NDK's `build/cmake/android.toolchain.cmake` for `arm64-v8a` at API level 24, as a Release build, and builds `murim_extension` and `murim_core_bench`. Not part of `make ci`: CI has no Android SDK. |
 
 The C++ compiler is the platform's default. CMake, Ninja, clang-format and clang-tidy come only from `core/requirements.txt`, installed into `.venv/` at the repository root, and every entry point runs them from `.venv/bin/`:
