@@ -1181,7 +1181,8 @@ TEST(Region, EachFactionStartsWithAtMostFourHouseholds) {
 // How a region lived through CENTURY years with days of GROWTH_TICKS_PER_DAY
 // ticks: the living and the villages, founded ones included, at the start
 // and the end, the most living at once, and the fewest factions holding a
-// peopled village at the end of any year; and, checked each day, the most
+// peopled village at the end of any year; whether its standing sects' elders
+// were few at the end; and, checked each day, the most
 // members its sects held together beyond their founders, how often a sect's
 // master changed, and how often the first faction's dead leader gave way to
 // another.
@@ -1195,6 +1196,9 @@ struct Century {
   std::size_t admitted;
   std::size_t master_changes;
   std::size_t successions;
+  /// Whether, at the end, every standing sect has at least one elder and at
+  /// most a third of its members, or one, as elders.
+  bool elders_few;
 };
 
 constexpr std::uint64_t CENTURY = 100;
@@ -1261,7 +1265,8 @@ Century century(const RegionData& data, Seed seed) {
                  peopled(),
                  0,
                  0,
-                 0};
+                 0,
+                 false};
   for (std::uint64_t day = 0; day < CENTURY * DAYS_PER_YEAR; ++day) {
     for (std::uint64_t tick = 0; tick < GROWTH_TICKS_PER_DAY; ++tick) {
       world.tick();
@@ -1274,6 +1279,15 @@ Century century(const RegionData& data, Seed seed) {
   }
   result.living_after = world.living();
   result.villages_after = world.village_count();
+  result.elders_few = true;
+  for (std::size_t sect = 0; sect < world.sect_count(); ++sect) {
+    const std::size_t members = world.sect_members(sect).size();
+    const std::size_t elders = world.sect_elders(sect).size();
+    result.elders_few =
+        result.elders_few &&
+        (!world.sect_stands(sect) ||
+         (elders >= 1 && elders <= std::max<std::size_t>(members / 3, 1)));
+  }
   return result;
 }
 
@@ -1304,12 +1318,21 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
 // even odds: their faction's founders aged out with no son to marry them.
 constexpr Seed SONLESS{9};
 
+// region_data() with no sects, whose seats would change the region SONLESS
+// was chosen on; ADR 0027's rule does not depend on sects.
+RegionData sectless() {
+  RegionData data = region_data();
+  data.sects.clear();
+  data.life.manuals.reset();
+  return data;
+}
+
 TEST(Region, ChildrenOfTheScarcerSexKeepEveryFactionPeopled) {
-  const Century balanced = century(region_data(), SONLESS);
+  const Century balanced = century(sectless(), SONLESS);
   EXPECT_EQ(balanced.fewest_factions, region_data().factions.size());
   EXPECT_GE(balanced.living_after, 2 * balanced.living_before);
   // Control: with sexes drawn at even odds, a faction dies out.
-  RegionData drawn = region_data();
+  RegionData drawn = sectless();
   Kinship kinship = drawn.life.kinship.value_or(Kinship{});
   kinship.balanced_sexes = false;
   drawn.life.kinship = kinship;
@@ -1341,6 +1364,9 @@ TEST(Region, SectsAdmitChangeMastersAndElectOverACentury) {
   EXPECT_GT(lived.master_changes, 0U);
   EXPECT_GT(lived.successions, 0U);
   EXPECT_LE(lived.peak, MAX_PEOPLE);
+  // Each standing sect's elders are at least one and at most a third of its
+  // members.
+  EXPECT_TRUE(lived.elders_few);
   // Control: without admission no sect admits anyone, no member is an elder,
   // so no sect has a master to change or to elect.
   EXPECT_EQ(sect_deeds(century(closed(), NEIGHBOURLY)),
