@@ -31,7 +31,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 ## File layout
 
 - The repository root is the Godot project: `project.godot` and `murim.gdextension` sit there.
-- `murim.gdextension` names, per platform, the library `make build` writes to `build/extension/`.
+- `murim.gdextension` names, per platform, the library each entry point writes: `make build`'s debug libraries in `build/extension/`, `make android`'s in `build/android/`, and `make export`'s release libraries in `build/macos/` and `build/windows/`.
 - A scene is `<name>/<name>.tscn` in a folder at the repository root named for it, with its script `<name>.gd` beside it, such as `world_view/world_view.tscn`. The scene keeps the scripts and resources only it uses in that folder; a resource two scenes share sits in the nearest folder both are under.
 - Aseprite sources sit under `art/` at the repository root, each beside the script that draws it and its exports.
 - Every `.uid` file Godot writes beside a script or resource is committed with it, and so is the `.import` file it writes beside each texture, font or translation a scene loads.
