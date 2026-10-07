@@ -594,6 +594,23 @@ godot::PackedInt64Array WorldAdapter::body_strengths(std::int64_t army) const {
   return strengths;
 }
 
+godot::PackedInt64Array WorldAdapter::body_ready(std::int64_t army) const {
+  godot::PackedInt64Array ready;
+  for (const std::size_t member : world().roster(army_index(army))) {
+    ready.push_back(static_cast<std::int64_t>(world().person(member).ready_at));
+  }
+  return ready;
+}
+
+std::int64_t WorldAdapter::village_count() const {
+  return static_cast<std::int64_t>(world().village_count());
+}
+
+std::int64_t WorldAdapter::village_state(std::int64_t village) const {
+  return static_cast<std::int64_t>(
+      world().village_state(village_index(village)));
+}
+
 godot::PackedStringArray WorldAdapter::terrain_names() const {
   godot::PackedStringArray names;
   if (!terrain_.empty()) {
@@ -970,6 +987,12 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::army_strength);
   godot::ClassDB::bind_method(godot::D_METHOD("body_strengths", "army"),
                               &WorldAdapter::body_strengths);
+  godot::ClassDB::bind_method(godot::D_METHOD("body_ready", "army"),
+                              &WorldAdapter::body_ready);
+  godot::ClassDB::bind_method(godot::D_METHOD("village_count"),
+                              &WorldAdapter::village_count);
+  godot::ClassDB::bind_method(godot::D_METHOD("village_state", "village"),
+                              &WorldAdapter::village_state);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain_names"),
                               &WorldAdapter::terrain_names);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain"),
@@ -1000,6 +1023,16 @@ void WorldAdapter::_bind_methods() {
       {"FIELD_BURNT", murim::FieldState::BURNT},
   }};
   for (const auto& [constant, state] : fields) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(state));
+  }
+  const std::array<std::pair<const char*, murim::VillageState>, 4> states{{
+      {"VILLAGE_PROSPEROUS", murim::VillageState::PROSPEROUS},
+      {"VILLAGE_RAIDED", murim::VillageState::RAIDED},
+      {"VILLAGE_RUINS", murim::VillageState::RUINS},
+      {"VILLAGE_REBUILDING", murim::VillageState::REBUILDING},
+  }};
+  for (const auto& [constant, state] : states) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(state));
   }
