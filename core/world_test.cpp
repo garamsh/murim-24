@@ -2388,12 +2388,12 @@ TEST(World, AMemberServingAnotherFactionLeavesItsSect) {
   EXPECT_EQ(kept.sect_of(1), std::optional<std::size_t>{SECT});
 }
 
-TEST(World, EldersAndTheMasterFollowAttainment) {
+TEST(World, EldersAreTheShareOfMembersOfHighestAttainment) {
   constexpr std::uint32_t STRONGER = 30;
   constexpr std::uint32_t WEAKER = 20;
-  constexpr std::uint32_t BETWEEN = 25;
   Sectarian both;
   both.founding = {STRONGER, WEAKER};
+  both.admission.elder_share = PER_MILLE;
   World world = sect_world(both);
   EXPECT_EQ(world.sect_elders(SECT), (std::vector<std::size_t>{0, 1}));
   EXPECT_EQ(world.sect_master(SECT), std::optional<std::size_t>{0});
@@ -2401,11 +2401,14 @@ TEST(World, EldersAndTheMasterFollowAttainment) {
   world.conscript(0, OUTSIDERS);
   run_ticks(world, 1);
   EXPECT_EQ(world.sect_master(SECT), std::optional<std::size_t>{1});
-  // Control: under an elder attainment between theirs, only the first is an
-  // elder.
-  Sectarian strict = both;
-  strict.admission.elder_attainment = BETWEEN;
-  EXPECT_EQ(sect_world(strict).sect_elders(SECT), std::vector<std::size_t>{0});
+  // A third of two members is none, and a standing sect keeps at least one:
+  // the one of higher attainment.
+  Sectarian third = both;
+  third.admission.elder_share = PER_MILLE / 3;
+  EXPECT_EQ(sect_world(third).sect_elders(SECT), std::vector<std::size_t>{0});
+  // Control: with the second founder the stronger, it is the elder.
+  third.founding = {WEAKER, STRONGER};
+  EXPECT_EQ(sect_world(third).sect_elders(SECT), std::vector<std::size_t>{1});
 }
 
 // Sectarian `sectarian`'s world a day after both founders were conscripted

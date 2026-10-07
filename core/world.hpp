@@ -458,15 +458,16 @@ struct Duellists {
 /// cells of a sect's seat's centre along each axis, joins with `chance` per
 /// mille a year. It joins a sect of the faction whose seat is held, with a
 /// living elder and fewer members than its cap, drawn by the seed among
-/// those. A member whose best attainment reaches `elder_attainment` is an
-/// elder.
+/// those. Its elders are the `elder_share` per mille of a sect's members of
+/// the highest best attainment, the lower index among equals, and at least
+/// one while the sect stands.
 struct Admission {
   std::uint32_t age = 0;
   std::uint32_t talent = 0;
   std::uint32_t attainment = 0;
   std::int32_t reach = 0;
   std::uint32_t chance = 0;
-  std::uint32_t elder_attainment = 0;
+  std::uint32_t elder_share = 0;
 };
 
 /// How a faction elects its leader: when its leader is dead or no one leads,
@@ -562,7 +563,8 @@ class World {
   /// layout with a structure outside its settlement, over another or over
   /// its centre, or stances for more factions than `hostile`; or an
   /// admission gives a chance above PER_MILLE or a reach outside
-  /// [0, MAX_REACH]; or a sect names a faction outside `hostile`, a village
+  /// [0, MAX_REACH] or an elder share above PER_MILLE; or a sect names a
+  /// faction outside `hostile`, a village
   /// that does not exist, or a founder who is no person the world creates or
   /// who serves in no army of the sect's faction, or `life`'s manuals name a
   /// discipline it does not draw, more sects than there are, a chance above
@@ -746,8 +748,9 @@ class World {
   /// Returns sect `sect`'s living members, by person index, ascending.
   [[nodiscard]] std::vector<std::size_t> sect_members(std::size_t sect) const;
 
-  /// Returns sect `sect`'s elders: its living members whose best attainment
-  /// reaches their faction's admission's elder attainment, ascending.
+  /// Returns sect `sect`'s elders, ascending: the elder share of its living
+  /// members of the highest best attainment, the lower index among equals,
+  /// at least one while it stands; none for a faction with no admission.
   [[nodiscard]] std::vector<std::size_t> sect_elders(std::size_t sect) const;
 
   /// Returns sect `sect`'s master: its elder of the highest best attainment,

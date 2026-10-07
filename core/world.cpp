@@ -199,7 +199,7 @@ void fold_selection(const Fold& fold, const Leadership& faction) {
   fold(admission.attainment);
   fold(admission.reach);
   fold(admission.chance);
-  fold(admission.elder_attainment);
+  fold(admission.elder_share);
   fold(faction.election.has_value());
   fold(faction.election.value_or(Election{}).term);
 }
@@ -614,7 +614,8 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
 void World::add_sects(std::vector<SectSpec> sects) {
   const auto bad_admission = [](const Leadership& faction) {
     const Admission admission = faction.admission.value_or(Admission{});
-    return admission.chance > PER_MILLE || !reachable(admission.reach);
+    return admission.chance > PER_MILLE || !reachable(admission.reach) ||
+           admission.elder_share > PER_MILLE;
   };
   const auto stray = [this](const SectSpec& sect) {
     return sect.faction >= rules_.hostile.size() ||
@@ -637,8 +638,9 @@ void World::add_sects(std::vector<SectSpec> sects) {
       std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
       manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach)) {
     throw std::invalid_argument(
-        "an admission must have a chance within PER_MILLE and a reach within "
-        "MAX_REACH; a sect must name a known faction, an existing village and "
+        "an admission must have a chance and an elder share within PER_MILLE "
+        "and a reach within MAX_REACH; a sect must name a known faction, an "
+        "existing village and "
         "founders serving in its faction; and the manuals must name known "
         "disciplines for known sects, a chance within PER_MILLE and a reach "
         "within MAX_REACH");
@@ -845,11 +847,17 @@ std::vector<std::size_t> World::sect_elders(std::size_t sect) const {
   if (!admission) {
     return elders;
   }
-  for (const std::size_t member : sect_members(sect)) {
-    if (best_attainment(member) >= admission->elder_attainment) {
-      elders.push_back(member);
-    }
-  }
+  std::vector<std::size_t> members = sect_members(sect);
+  std::stable_sort(members.begin(), members.end(),
+                   [this](std::size_t left, std::size_t right) {
+                     return best_attainment(left) > best_attainment(right);
+                   });
+  const std::size_t share = members.size() * admission->elder_share / PER_MILLE;
+  const std::size_t count =
+      std::min(members.size(), std::max<std::size_t>(share, 1));
+  elders.assign(members.begin(),
+                members.begin() + static_cast<std::ptrdiff_t>(count));
+  std::sort(elders.begin(), elders.end());
   return elders;
 }
 

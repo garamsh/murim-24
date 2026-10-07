@@ -82,7 +82,8 @@ constexpr std::uint32_t ASSESSED_TALENT = 550;
 constexpr std::uint32_t PROVEN_ATTAINMENT = 20;
 constexpr std::int32_t ADMISSION_REACH = 48;
 constexpr std::uint32_t ADMISSION_CHANCE = 300;
-constexpr std::uint32_t ELDER_ATTAINMENT = 120;
+constexpr std::uint32_t ELDER_SHARE = 333;
+constexpr std::uint32_t FOUNDER_ATTAINMENT = 120;
 constexpr std::uint32_t HALL_PUPILS = 4;
 constexpr std::uint32_t MANUAL_HALL_PUPILS = 4;
 constexpr std::uint32_t TRAINING_GROUND_PUPILS = 12;
@@ -398,7 +399,7 @@ std::vector<std::size_t> seat_sects(Region& region, const RegionData& data,
 
 // The sects of `region` as a World is created with them, each seated in its
 // village of `seats`, its founders that village's residents, the first of
-// them at its faction's elder attainment and so an elder.
+// them at FOUNDER_ATTAINMENT, so it is its sect's master.
 std::vector<SectSpec> sects_of(const Region& region, const RegionData& data,
                                const std::vector<std::size_t>& seats) {
   std::vector<std::size_t> first_of(region.armies.size());
@@ -412,13 +413,10 @@ std::vector<SectSpec> sects_of(const Region& region, const RegionData& data,
     const SectData& made = data.sects.at(sect);
     const std::size_t army = region.villages.at(seats.at(sect)).army;
     SectSpec spec{made.name, made.faction, seats.at(sect), {}};
-    const std::uint32_t elder = data.factions.at(made.faction)
-                                    .admission.value_or(Admission{})
-                                    .elder_attainment;
     for (std::size_t member = 0; member < region.armies.at(army).members.size();
          ++member) {
-      spec.founders.push_back(
-          Founder{first_of.at(army) + member, member == 0 ? elder : 0});
+      spec.founders.push_back(Founder{first_of.at(army) + member,
+                                      member == 0 ? FOUNDER_ATTAINMENT : 0});
     }
     sects.push_back(std::move(spec));
   }
@@ -574,15 +572,16 @@ RegionData region_data() {
           // Sects admit their faction's people of 12 within 48 cells of the
           // seat at 3 in 10 a year: the Orthodox and the Cult assess a
           // talent limit of 550, the Unorthodox proof of usefulness, an
-          // attainment of 20. A member of 120 attainment is an elder. The
-          // Orthodox elect their leader among their sects' masters.
+          // attainment of 20. The third of a sect's members of the highest
+          // attainment are its elders, at least one. The Orthodox elect their
+          // leader among their sects' masters.
           {"Orthodox",
            {1},
            {GUARD, MEND},
            std::nullopt,
            {Expansion::BUILD, Expansion::FOUND, Expansion::RAID},
            Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+                     ADMISSION_CHANCE, ELDER_SHARE},
            Election{0}},
           {"Demonic",
            {0, 2},
@@ -590,7 +589,7 @@ RegionData region_data() {
            Duel{true, 0, true},
            {Expansion::RAID},
            Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+                     ADMISSION_CHANCE, ELDER_SHARE},
            std::nullopt},
           {"Unorthodox",
            {1},
@@ -598,7 +597,7 @@ RegionData region_data() {
            std::nullopt,
            {Expansion::FOUND, Expansion::RAID, Expansion::BUILD},
            Admission{ADMISSION_AGE, 0, PROVEN_ATTAINMENT, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+                     ADMISSION_CHANCE, ELDER_SHARE},
            std::nullopt},
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
