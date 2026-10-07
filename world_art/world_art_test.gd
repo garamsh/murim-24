@@ -37,9 +37,11 @@ const STRUCTURES: Array[Dictionary] = [
 ]
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const VIEW := Vector2(480, 270)
-# Days within which the region SEED makes founds its first village.
-const FOUNDING_DAYS := 500
-const TICKS_PER_DAY := 1800
+# Days of five ticks, as the core's region test lives them: marching and raising run far faster
+# against the calendar than in play, so the region SEED makes founds its first village within
+# FOUNDING_DAYS in a few thousand ticks.
+const SHORT_DAY := 5
+const FOUNDING_DAYS := 2000
 
 
 func run() -> bool:
@@ -198,16 +200,17 @@ func run() -> bool:
 
 # A village the region founds is drawn as its template is: its structures stand at the offsets a
 # generated village of that template has from its corner, and its ground decorations cover the
-# cells the template's data names. Setup: the region founds a village within FOUNDING_DAYS. Control:
+# cells the template's data names. Setup: the region, on short days, founds a village within
+# FOUNDING_DAYS. Control:
 # a corner a cell off matches no structure layout, and the cell west of the village is bare.
 func _founded_pass() -> bool:
-	var region := WorldAdapter.create_region(SEED)
+	var region := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(region, region.army_count() - 1)
 	var generated := region.villages()
 	var created := region.structure_count()
 	var ticks := 0
-	while region.villages().size() == generated.size() and ticks < FOUNDING_DAYS * TICKS_PER_DAY:
+	while region.villages().size() == generated.size() and ticks < FOUNDING_DAYS * SHORT_DAY:
 		region.tick()
 		ticks += 1
 	art.note_tick()
@@ -232,7 +235,7 @@ func _founded_pass() -> bool:
 			and art.built.get_cell_source_id(founded.corner + Vector2i(-1, 4)) == -1
 	var passed := structures_right and counts.y > 0 and counts.x == counts.y and outside_bare
 	print("world_art_test: after %d days a village founded %s at %s, laid out as %s at %s: its %d structures at the template's offsets %s, a cell off not %s; %d of %d decorated cells carry their template's tile, the cell beside it bare %s: %s" % [
-		ticks / TICKS_PER_DAY, founded.get("kind", "none"), founded.get("corner", "none"),
+		ticks / SHORT_DAY, founded.get("kind", "none"), founded.get("corner", "none"),
 		model.get("name", "none"), model.get("corner", "none"), layout.size(), at_offsets,
 		off_apart, counts.x, counts.y, outside_bare, "pass" if passed else "FAIL"])
 	art.free()
