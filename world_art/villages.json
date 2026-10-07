@@ -7,5 +7,11 @@
 		{"tile": "road", "rect": [0, 4, 17, 1]},
 		{"tile": "paving", "rect": [4, 3, 7, 3]},
 		{"banner": [10, 3]}
+	],
+	"seat": [
+		{"sect_banner": [3, 3]},
+		{"sect_banner": [6, 3]},
+		{"sect_banner": [6, 8]},
+		{"sect_banner": [10, 8]}
 	]
 }

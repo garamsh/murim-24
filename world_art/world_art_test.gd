@@ -1,9 +1,10 @@
 # Checks that world_art.tscn lays a world as docs/convention/stack-godot.md §Terrain layers sets
 # out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
-# cells around it; that it draws every body on screen and none off it; that a structure is drawn
-# over its footprint with its stage's frame of its kind's art; that each field is tiled with its
-# state's tag; that each village's ground decorations cover the cells its template's data
-# names, a village the world founds as it runs included; that no landform stands on a buildable
+# cells around it; that it draws every body on screen and none off it; that every structure of a
+# region is drawn over its footprint with its stage's frame of its kind's art, a seat's training
+# ground on the ground; that each field is tiled with its state's tag; that each village's ground
+# decorations cover the cells its template's data names, a village the world founds as it runs
+# included, and its banners stand on the cells it names; that no landform stands on a buildable
 # cell or over a structure; and that after the view jumps across the region, every body a band
 # holds lies inside the bounds the renderer culls that band by.
 extends RefCounted
@@ -43,6 +44,10 @@ const VIEW := Vector2(480, 270)
 # 3,660 days.
 const SHORT_DAY := 5
 const FOUNDING_DAYS := 4500
+# Where a kind's frames hold its footprint's top-left, as docs/art-direction.md §Structures and
+# damage stages gives it: (8, 8) for every kind but the seat gate.
+const GATE_ANCHOR := Vector2(8, 40)
+const ANCHOR := Vector2(8, 8)
 
 
 func run() -> bool:
@@ -87,10 +92,12 @@ func run() -> bool:
 		TICKS, bodies, on_screen, off_screen]
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
-	# Buildings: each region structure of a kind world_art draws is drawn as its kind's art, its
-	# footprint's bottom-left on the sprite's position, showing its stage's frame; a sect seat's
-	# training ground, manual hall and gate, which it does not draw yet, get no sprite. Control:
-	# the structures above, made by create() with no kind, get no sprite.
+	# Buildings: every region structure but a field is drawn as its kind's art, its footprint's
+	# bottom-left on the sprite's position and its top-left on the frame's anchor, holding each
+	# stage's frame and showing its stage's; a training ground lies on the ground, under every
+	# body, and every other kind stands. Setup: the region holds a seat's training ground, manual
+	# hall and gate. Control: the structures above, made by create() with no kind, are counted
+	# undrawn by the same count.
 	var region := WorldAdapter.create_region(SEED)
 	var region_art: Node2D = load(SCENE).instantiate()
 	region_art.show_world(region, region.army_count() - 1)
@@ -98,7 +105,6 @@ func run() -> bool:
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var placed := 0
 	var fields := 0
-	var undrawn := 0
 	var kinds := {}
 	for structure in region.structure_count():
 		var sprite: Sprite2D = region_art.structure_sprites[structure]
@@ -108,24 +114,73 @@ func run() -> bool:
 		if kind == "field":
 			fields += 1
 			continue
-		if not region_art.BUILDINGS.has(kind):
-			undrawn += 1 if sprite == null else 0
-			continue
 		var sheet := _sheet("res://art/structures/%s.json" % kind)
 		if sprite == null or sheet.is_empty():
 			continue
 		var frame := (sprite.texture as AtlasTexture).region
 		var stage: String = stages[region.structure_stage(structure)]
+		var anchor := GATE_ANCHOR if kind == "seat_gate" else ANCHOR
+		var layer := "Ground" if kind == "training_ground" else "Standing"
+		var staged := true
+		for index in stages.size():
+			var held: AtlasTexture = sprite.get_meta("frames")[index]
+			staged = staged and held.region.position.x == sheet.tags[stages[index]][0] * sheet.width
 		if sprite.position == Vector2(corner.x, corner.y + footprint.y) * 16 \
+				and sprite.position + sprite.offset + anchor == Vector2(corner) * 16 \
+				and sprite.get_parent().name == layer and staged \
 				and frame.position.x == sheet.tags[stage][0] * sheet.width \
 				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
 			placed += 1
 			kinds[kind] = true
-	var unkinded_skipped: bool = art.structure_sprites.all(func(sprite: Sprite2D) -> bool: return sprite == null)
-	var buildings_right := placed + fields + undrawn == region.structure_count() and kinds.size() == 7 \
-			and undrawn > 0 and unkinded_skipped
-	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, %d fields tiled, %d of a seat's kinds left undrawn; structures without a kind left undrawn %s: %s" % [
-		placed, region.structure_count(), kinds.keys(), fields, undrawn, unkinded_skipped, "pass" if buildings_right else "FAIL"])
+	var undrawn := _undrawn(region, region_art)
+	var unkinded := _undrawn(world, art)
+	var seat_kinds := ["training_ground", "manual_hall", "seat_gate"].all(func(kind: String) -> bool: return kinds.has(kind))
+	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 10 \
+			and seat_kinds and undrawn == 0 and unkinded == world.structure_count() and unkinded > 0
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
+		placed, region.structure_count(), kinds.keys(), seat_kinds, fields, undrawn, unkinded,
+		world.structure_count(), "pass" if buildings_right else "FAIL"])
+
+	# Banners: each village's banners stand on the cells its template's data names, a seat's in the
+	# sect banner's art and every other's in the banner's, in its owner's colours, and every seat
+	# has sect banners. Control: no sprite of either art stands anywhere else.
+	var banners_named := 0
+	var banners_placed := 0
+	var seats_bannered := {}
+	var banner_sprites := {}
+	for sprite in region_art.get_node("Standing").get_children():
+		if sprite is Sprite2D and sprite.texture is AtlasTexture:
+			banner_sprites[sprite] = true
+	var factions := ["orthodox", "demonic", "unorthodox"]
+	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
+	for village: Dictionary in region.villages():
+		for item: Dictionary in layouts.get(village.kind, []):
+			if item.has("tile"):
+				continue
+			var banner: String = item.keys()[0]
+			var cell: Vector2i = village.corner + Vector2i(int(item[banner][0]), int(item[banner][1]))
+			var sheet := _sheet("res://art/decorations/%s.json" % banner)
+			var texture: Texture2D = load("res://art/decorations/%s.png" % banner)
+			var tag: Array = sheet.tags[factions[int(village.faction)]]
+			banners_named += 1
+			for sprite: Sprite2D in banner_sprites:
+				if sprite.texture.atlas == texture and sprite.position == Vector2(cell.x, cell.y + 1) * 16 \
+						and sprite.texture.region.position.x == tag[0] * sheet.width:
+					banners_placed += 1
+					if village.kind == "seat" and banner == "sect_banner":
+						seats_bannered[village.corner] = true
+					banner_sprites.erase(sprite)
+					break
+	var stray := 0
+	for sprite: Sprite2D in banner_sprites:
+		var atlas: Texture2D = sprite.texture.atlas
+		if atlas.resource_path.begins_with("res://art/decorations/"):
+			stray += 1
+	var seats := region.villages().filter(func(village: Dictionary) -> bool: return village.kind == "seat").size()
+	var banners_right := seats > 0 and seats_bannered.size() == seats and banners_placed == banners_named \
+			and stray == 0
+	print("world_art_test: %d of %d banners the templates name stand on their cells in their owner's colours, sect banners at %d of %d seats; %d stand elsewhere: %s" % [
+		banners_placed, banners_named, seats_bannered.size(), seats, stray, "pass" if banners_right else "FAIL"])
 
 	# Fields: every cell of each field carries a frame of its state's tag, sown in spring as the
 	# world begins. Control: the same cells carry no frame of the burnt tag, so the check tells
@@ -199,7 +254,7 @@ func run() -> bool:
 		"pass" if landforms_right else "FAIL"])
 	region_art.free()
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
-			and decorations_right and fields_right and landforms_right
+			and banners_right and decorations_right and fields_right and landforms_right
 	art.free()
 	return _bands_pass() and _founded_pass() and passed
 
@@ -246,6 +301,15 @@ func _founded_pass() -> bool:
 		off_apart, counts.x, counts.y, outside_bare, "pass" if passed else "FAIL"])
 	art.free()
 	return passed
+
+
+# How many of `world`'s structures other than fields `art` gives no sprite.
+func _undrawn(world: WorldAdapter, art: Node2D) -> int:
+	var undrawn := 0
+	for structure in world.structure_count():
+		if world.structure_kind(structure) != "field" and art.structure_sprites[structure] == null:
+			undrawn += 1
+	return undrawn
 
 
 # Each structure among `from` to `to` of `world` inside `village`'s area, as its kind and its
