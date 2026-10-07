@@ -1,6 +1,6 @@
 # ADR 0021: Let people marry, have children and bear family names
 
-> Status: accepted; its one family per army the world starts with superseded by ADR-0025 for the families of a village's households
+> Status: accepted; its one family per army the world starts with superseded by ADR-0025 for the families of a village's households; its sex drawn at even odds for every birth superseded by ADR-0027 for children where kinship balances sexes
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
