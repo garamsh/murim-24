@@ -517,7 +517,8 @@ RegionData region_data() {
            // person of 16 to 40 marries, at even odds a year, someone of
            // another family from a village whose centre lies within 80
            // cells; a wife of 18 to 40 bears a child at 2 in 5 a year, two
-           // years apart at least, into her husband's family.
+           // years apart at least, into her husband's family, of the sex
+           // fewer among her village's unmarried.
            Spread{FOUNDING_AGE, FOUNDING_SPREAD},
            Kinship{{MARRYING_FROM, MARRYING_TO},
                    NEIGHBOURHOOD,
@@ -525,6 +526,7 @@ RegionData region_data() {
                    {BEARING_FROM, BEARING_TO},
                    BIRTH_CHANCE,
                    BIRTH_SPACING,
+                   true,
                    true},
            names(),
            // Each person eats a measure of food a day. Unfed for ten days,
