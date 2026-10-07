@@ -1,8 +1,19 @@
 # Godot stack
 
-The concrete Godot form of naming, file layout, tests, comments, the check entry points, asset export and Android export, for the Godot project at the repository root and its GDScript.
+The concrete Godot form of naming, file layout, tests, comments, the check entry points, asset export, Android export and PC export, for the Godot project at the repository root and its GDScript.
 
 Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en/4.7`), Aseprite 1.3.18.6 and OpenJDK 17.0.20.1.
+
+## Contents
+- Naming
+- File layout
+- Tests
+- Comments
+- Entry points
+- Asset export
+- Terrain layers
+- Android export
+- PC export
 
 ## Naming
 
@@ -46,6 +57,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 | `make bench` | After the tick benchmark, `godot --path . --script res://world_view/frame_bench.gd` renders `world_view/world_view.tscn` in a window with vsync off. It checks the scenario first, then prints p50, p99 and max frame time over its timed frames, and PASS or FAIL against a 16.7 ms p99. It needs a display, so it runs on a developer's machine only, and says so. `make bench` exits non-zero when either benchmark fails. |
 | `make android` | After the C++ build for Android, `godot --headless --path . --export-debug Android build/android/murim.apk` exports the `Android` preset in `export_presets.cfg`. It needs the prerequisites in §Android export, so it is not part of `make ci`. |
+| `make export` | After the C++ builds for macOS and Windows, `godot --headless --path . --export-release macOS build/export/macos/Murim24.app` and `godot --headless --path . --export-release Windows build/export/windows/Murim24.exe` export the `macOS` and `Windows` presets in `export_presets.cfg`. It needs the prerequisites in §PC export, so it is not part of `make ci`. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
 
@@ -84,3 +96,20 @@ What Godot 4.7's "Exporting for Android" (`tutorials/export/exporting_for_androi
 - The `Android` preset exports arm64-v8a only, from the prebuilt template without Gradle, signed with the editor's debug keystore. Its `command_line/extra_args` runs `world_view/frame_bench.gd` at launch.
 - `project.godot` sets `rendering/textures/vram_compression/import_etc2_astc`, without which Godot refuses an Android export.
 - A release export needs a release keystore, which is never committed.
+
+## PC export
+
+What Godot 4.7's "Exporting for macOS" (`tutorials/export/exporting_for_macos.html`) and "Exporting for Windows" (`tutorials/export/exporting_for_windows.html`) require on the exporting machine:
+
+| Prerequisite | Version |
+|---|---|
+| Host | A Mac with the Xcode command line tools, for `xcrun` and the macOS SDK |
+| Export templates | Godot 4.7.2's, as §Android export names them |
+
+- `make export` writes `build/export/macos/Murim24.app`, and `build/export/windows/Murim24.exe` with `Murim24.pck` and the extension's DLL beside it.
+- The `macOS` preset exports a universal app; the `Windows` preset exports x86_64, its pack beside the executable. Both export the release template and scale `application/config/icon`, `art/icon/icon.png`, by nearest neighbour.
+- The window title is `application/config/name`.
+- The bundle identifier is the placeholder `com.example.murim24`, as Android's package name is, and changes in `export_presets.cfg` alone once the game's name is chosen.
+- The macOS app is signed ad hoc, Godot's default, and not notarized. Its entitlements disable library validation, which the guide asks of an app loading a GDExtension or signed ad hoc. A copy downloaded to another Mac is refused on first launch until it is opened once from System Settings, Privacy & Security, Open Anyway.
+- A release for others is signed with a Developer ID Application certificate and notarized with an Apple Developer account, both the account holder's: set `codesign/codesign`, `codesign/identity` and `notarization/notarization` in the preset on the signing machine, and never commit the certificate or credentials.
+- The Windows executable is not signed, so SmartScreen warns on first launch; More info, Run anyway opens it.

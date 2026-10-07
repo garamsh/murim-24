@@ -1,4 +1,5 @@
-; Loads the GDExtension adapter that `make build` writes to build/extension/, and `make android` to build/android/.
+; Loads the GDExtension adapter that `make build` writes to build/extension/, `make android` to build/android/,
+; and `make export` to build/macos/ and build/windows/.
 
 [configuration]
 
@@ -10,3 +11,5 @@ compatibility_minimum = "4.7"
 macos.debug.arm64 = "res://build/extension/libmurim.macos.template_debug.arm64.dylib"
 linux.debug.x86_64 = "res://build/extension/libmurim.linux.template_debug.x86_64.so"
 android.debug.arm64 = "res://build/android/libmurim.android.template_debug.arm64.so"
+macos.release = "res://build/macos/libmurim.macos.template_release.universal.dylib"
+windows.release.x86_64 = "res://build/windows/libmurim.windows.template_release.x86_64.dll"

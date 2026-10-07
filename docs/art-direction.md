@@ -58,6 +58,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 
 `art/contact_sheet/contact_sheet.png` shows every frame of the set but the title backdrop, which `art/mockup/title_screen.png` shows, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
 
+`art/icon/icon.aseprite`, drawn by `icon.lua` and exported as a 32 x 32 `icon.png` tagged `icon`, is the application icon: a jian planted before the title screen's ridges and low sun, in the HUD's frame. The PC exports scale it by nearest neighbour, and the contact sheet leaves it out.
+
 ## Screen and grid
 
 | Property | Value |
