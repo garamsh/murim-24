@@ -2956,5 +2956,34 @@ TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
   EXPECT_TRUE(struck.rumours(3).empty());
 }
 
+// The home of the member of an army making village `home` its home, beside
+// a village of one structure housing another army, or nothing when the
+// world refuses it.
+std::optional<std::optional<std::size_t>> homed(
+    std::optional<std::size_t> home) {
+  ArmySpec born = army(VILLAGE_HOME, VILLAGE_HOME, 1, 1, 0, {IDLE});
+  born.home = home;
+  try {
+    const World world{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army(SEAT_HOME, SEAT_HOME, 1, 1, 0, {IDLE}), born},
+                      {Structure{{SEAT_HOME.x, 0}, INTACT, {1, 1}, true}},
+                      peaceful(0),
+                      {VillageSpec{{0}, 0, {Holding{}}, 0, {}}}};
+    return world.person(1).home;
+  } catch (const std::invalid_argument&) {
+    return std::nullopt;
+  }
+}
+
+TEST(World, AnArmyMakesTheVillageItNamesItsMembersHome) {
+  EXPECT_EQ(homed(0), std::optional<std::optional<std::size_t>>{0});
+  // A home that is no village is refused.
+  EXPECT_FALSE(homed(1).has_value());
+  // Control: an army naming no home leaves its members homeless.
+  EXPECT_EQ(homed(std::nullopt),
+            std::make_optional(std::optional<std::size_t>{}));
+}
+
 }  // namespace
 }  // namespace murim

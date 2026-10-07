@@ -1,9 +1,11 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
-## HUD: the player's portrait, faction, health and inner energy with their values; the
+## HUD: the player's portrait, faction, health and inner energy with their values, and its art,
+## the discipline of its highest attainment with that attainment; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the title, new-game, pause and
-## settings screens; its faction's leader, a duel for the lead while one is fought, and the
-## verdict on a challenge; a map of the region around the player with the season and year; a
-## rumour log; and the technique bar, an icon and its number key for each of the player's skills.
+## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
+## fought, and the verdict on a challenge; a map of the region around the player with the season
+## and year; the latest RUMOUR_LINES rumours that reach the player; and the technique bar, an icon
+## and its number key for each of the player's skills.
 ## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
 ## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
 extends CanvasLayer
@@ -17,6 +19,9 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const ART := "res://art/"
 const MAX_SLOTS := 9
 const PersonName := preload("res://hud/person_name.gd")
+const Attainment := preload("res://hud/attainment.gd")
+## How many of the latest rumours the rumour log shows.
+const RUMOUR_LINES := 3
 # docs/art-direction.md §Palette.
 const INK := Color("2a2433")
 const INK_DARK := Color("14101a")
@@ -59,6 +64,7 @@ var title_screen: Control
 var new_game: Control
 var pause: Control
 var settings: Control
+var rebirth: Control
 ## The panel shown while a duel for the player's faction's lead is fought, and its two bars:
 ## `challenger` and `leader`.
 var duel_panel: Panel
@@ -124,10 +130,10 @@ func open_title() -> void:
 	title_screen.open()
 
 
-## Returns the screen open on top, the one that takes the keys: the settings, the new-game panel,
-## the pause panel or the title, or null while none is open.
+## Returns the screen open on top, the one that takes the keys: the rebirth screen, the settings,
+## the new-game panel, the pause panel or the title, or null while none is open.
 func screen() -> Control:
-	for open: Control in [settings, new_game, pause, title_screen]:
+	for open: Control in [rebirth, settings, new_game, pause, title_screen]:
 		if open.visible:
 			return open
 	return null
@@ -191,10 +197,48 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		(_map.texture as AtlasTexture).region = Rect2(corner, MAP_SIZE)
 		_dot.position = _map.position + (lead - Vector2(corner)).floor() - Vector2.ONE
 	_refresh_leadership(world, steered)
+	var roster := world.roster(steered)
+	if not roster.is_empty():
+		labels.attainment_value.text = Attainment.of(world, roster[0])
+		show_rumours(world, roster[0])
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = JADE if skills.has(slot) else INK
+
+
+## Shows the latest RUMOUR_LINES rumours that reach `person`, newest first, or that none has come.
+func show_rumours(world: WorldAdapter, person: int) -> void:
+	var heard := world.rumours(person)
+	for line in RUMOUR_LINES:
+		var label: Label = labels["rumour_%d" % line]
+		label.text = rumour_text(world, heard[line]) if line < heard.size() else ""
+	if heard.is_empty():
+		labels.rumour_0.text = tr("HUD_RUMOR_NONE")
+
+
+## Returns `event`, a rumour as WorldAdapter.rumours gives it, worded in the current locale.
+func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
+	var faction := func(index: int) -> String:
+		return tr("FACTION_" + world.faction_names()[index].to_upper())
+	var person := func(index: int) -> String:
+		return PersonName.of(world, index, true)
+	match event.kind:
+		"founded":
+			return tr("RUMOUR_FOUNDED") % faction.call(event.faction)
+		"raided":
+			return tr("RUMOUR_RAIDED") % [faction.call(event.raider), faction.call(event.owner)]
+		"ruined":
+			return tr("RUMOUR_RUINED") % faction.call(event.owner)
+		"sect_fell":
+			return tr("RUMOUR_SECT_FELL") % tr("SECT_" + world.sect_name(event.sect).to_upper().replace(" ", "_"))
+		"leader_changed":
+			var key := "RUMOUR_DUEL" if event.by == "duel" else "RUMOUR_ELECTED"
+			return tr(key) % [person.call(event.leader), faction.call(event.faction)]
+		"born":
+			return tr("RUMOUR_BORN") % person.call(event.person)
+		_:
+			return tr("RUMOUR_DIED") % person.call(event.person)
 
 
 ## Shows the core's verdict on the player's challenge, one of the WorldAdapter.CHALLENGE_*
@@ -253,7 +297,7 @@ func season_text(date: Dictionary) -> String:
 
 
 func _build() -> void:
-	var player := _panel(Rect2(4, 4, 168, 50))
+	var player := _panel(Rect2(4, 4, 168, 62))
 	_portrait.position = Vector2(4, 8)
 	_portrait.size = Vector2(32, 32)
 	_portrait.stretch_mode = TextureRect.STRETCH_SCALE
@@ -270,6 +314,9 @@ func _build() -> void:
 	labels.hp_value = _value(player, Vector2(42, 14), 120)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
 	labels.qi_value = _value(player, Vector2(42, 30), 120)
+	labels.attainment = _label(player, "HUD_ATTAINMENT", Vector2(42, 47), GOLD_LIGHT)
+	labels.attainment_value = _value(player, Vector2(42, 47), 120)
+	labels.attainment_value.text = Attainment.NONE
 	_bar(player, hp_bar, Vector2(42, 26), HP)
 	_bar(player, qi_bar, Vector2(42, 42), QI)
 	# Inner energy is not in the core yet: its bar stands empty and its value is a dash.
@@ -287,9 +334,12 @@ func _build() -> void:
 	map.add_child(_dot)
 	labels.season = _trimmed(map, Vector2(5, 48), 74)
 
-	var rumour := _panel(Rect2(4, 230, 164, 36))
+	# Above the technique bar's row, so the widest bar never meets it.
+	var rumour := _panel(Rect2(4, 184, 220, 52))
 	labels.rumour = _label(rumour, "HUD_RUMOR", Vector2(5, 2), GOLD_LIGHT)
-	labels.rumour_text = _label(rumour, "HUD_RUMOR_NONE", Vector2(5, 16), PAPER)
+	for line in RUMOUR_LINES:
+		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), 209)
+	labels.rumour_0.text = tr("HUD_RUMOR_NONE")
 
 	_skill_bar = _panel(Rect2(0, 240, 0, 26))
 	var bar := _skill_bar
@@ -330,7 +380,7 @@ func _build() -> void:
 	sect.use_font(_theme.default_font)
 	sect.visible = false
 
-	var leadership := _panel(Rect2(4, 58, 168, 18))
+	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
 	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
 	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
@@ -347,7 +397,7 @@ func _build() -> void:
 	duel_bars.challenger.size.x = 62
 	duel_bars.leader.size.x = 62
 
-	labels.notice = _label(self, "", Vector2(90, 80), PAPER)
+	labels.notice = _label(self, "", Vector2(90, 92), PAPER)
 	labels.notice.size = Vector2(300, 12)
 	labels.notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
@@ -360,9 +410,10 @@ func _build() -> void:
 	new_game = preload("res://hud/new_game.gd").new()
 	pause = preload("res://hud/pause.gd").new()
 	settings = preload("res://hud/settings.gd").new()
+	rebirth = preload("res://hud/rebirth.gd").new()
 	settings.locales = LOCALES
 	settings.locale_key = OS.get_keycode_string(LOCALE_KEY)
-	for screen_panel: Control in [title_screen, new_game, pause, settings]:
+	for screen_panel: Control in [title_screen, new_game, pause, settings, rebirth]:
 		screen_panel.use_font(_theme.default_font)
 		screen_panel.visible = false
 		add_child(screen_panel)

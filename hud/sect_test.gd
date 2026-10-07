@@ -5,9 +5,9 @@
 # lead passes by duel or the faction elects it; Tab shows the next faction's column and sect.
 # Control: the Orthodox carry the election tag and no duel tag, the Cult the duel tag and no
 # election tag, and the Unorthodox, who do neither, carry neither; a world from create() opens on
-# no sect. Every
-# word the panel draws from hud.csv, and every name the world's data can make, fits the room the
-# panel gives it, in each locale.
+# no sect. The verdict on an application reads admitted, then already belonging, where a player
+# lacking proof reads unproven. Every word the panel draws from hud.csv, every verdict among them,
+# and every name the world's data can make, fits the room the panel gives it, in each locale.
 extends RefCounted
 
 const SEED := 2026
@@ -20,6 +20,10 @@ const Hud := preload("res://hud/hud.gd")
 const PersonName := preload("res://hud/person_name.gd")
 # Counts are measured at two digits, ages at two: a sect's cap and people's ages stay under 100.
 const WIDEST_NUMBER := 99
+# In the region of SEED, the player born into village 1, of the Cult, may join the Heavenly Demon,
+# and born into village 2, of the Unorthodox, has not the attainment the Black Fang asks.
+const CULT_VILLAGE := 1
+const UNORTHODOX_VILLAGE := 2
 const BLAST := {"range": 768, "radius": 512, "body_damage": 2, "structure_damage": 9, "cooldown": 64}
 
 
@@ -94,7 +98,46 @@ func run() -> bool:
 		YEARS, army, person, sect, "match" if details_right else str(panel.details), shown, master, elders,
 		"match" if column_right else str(panel.column), tabbed, duels, elections, control, "pass" if passed else "FAIL"])
 	panel.free()
-	return passed and fits
+	return passed and fits and _verdict_pass()
+
+
+# Born into a Cult village of the region, whose sect admits the player, the panel shows the core's
+# verdict on an application: the player joins, the verdict reads admitted, and the sect it shows
+# carries the title's tag as the player's own; applying again reads that it already belongs.
+# Control: born into an Unorthodox village, whose sect takes proof the player lacks, the verdict
+# reads unproven and the player stays out. Moving to another faction clears the verdict.
+func _verdict_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED, CULT_VILLAGE)
+	var army := world.army_count() - 1
+	var person := world.roster(army)[0]
+	var panel: Control = Sect.new()
+	panel.show_sect(world, army)
+	var sect: int = panel.sect
+	var before: int = panel.own_sect
+	var refusal := world.application_refusal(person, sect)
+	var joined := refusal == WorldAdapter.APPLICATION_NONE and world.apply(person, sect)
+	panel.show_verdict(refusal)
+	var admitted: bool = joined and panel.verdict == "APPLICATION_NONE" and panel.own_sect == sect \
+			and world.person_sect(person) == sect and before == -1
+	panel.show_verdict(world.application_refusal(person, sect))
+	var again: bool = panel.verdict == "APPLICATION_IN_A_SECT"
+	panel.next_faction()
+	var cleared: bool = panel.verdict == ""
+	panel.free()
+
+	var other := WorldAdapter.create_region(SEED, UNORTHODOX_VILLAGE)
+	var other_army := other.army_count() - 1
+	var other_person := other.roster(other_army)[0]
+	var refused_panel: Control = Sect.new()
+	refused_panel.show_sect(other, other_army)
+	refused_panel.show_verdict(other.application_refusal(other_person, refused_panel.sect))
+	var refused: bool = refused_panel.verdict == "APPLICATION_UNPROVEN" and refused_panel.own_sect == -1 \
+			and other.person_sect(other_person) == -1
+	refused_panel.free()
+	var passed := admitted and again and cleared and refused
+	print("sect_test: born in village %d, the player applies to sect %d: admitted %s, again %s, cleared on Tab %s; born in village %d, refused as unproven %s: %s" % [
+		CULT_VILLAGE, sect, admitted, again, cleared, UNORTHODOX_VILLAGE, refused, "pass" if passed else "FAIL"])
+	return passed
 
 
 # In each locale, every word the panel draws, in the HUD's font at the panel's size, fits where
@@ -190,6 +233,9 @@ func _fit_pass() -> bool:
 						overruns.append("ko %s drawn as %s" % [place[0], drawn])
 		var keys: String = say.call("SECT_KEYS")
 		fits.append([keys, 8 + width.call(keys), Sect.PANEL.size.x - 8])
+		for verdict: String in Sect.APPLICATION_KEYS.values():
+			var said: String = say.call(verdict)
+			fits.append([said, width.call(said), Sect.FIGURES.end.x - Sect.SEAT.position.x])
 		for fit: Array in fits:
 			checks += 1
 			if fit[1] > fit[2] or width.call(str(fit[0])) <= 0.0:
@@ -201,7 +247,7 @@ func _fit_pass() -> bool:
 	csv.get_csv_line()
 	while not csv.eof_reached():
 		var key := csv.get_csv_line()[0]
-		if key.begins_with("SECT_") and not measured.has(key):
+		if (key.begins_with("SECT_") or key.begins_with("APPLICATION_")) and not measured.has(key):
 			unmeasured.append(key)
 	var passed := unmeasured.is_empty() and untranslated.is_empty() and overruns.is_empty() \
 			and names.size() > 0 and region.sect_count() > 0

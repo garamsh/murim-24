@@ -266,6 +266,34 @@ class WorldAdapter : public godot::RefCounted {
   /// Vector2i.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> manuals() const;
 
+  /// Returns why person `person` may not join sect `sect`, one of the
+  /// APPLICATION_* constants; APPLICATION_NONE when it may.
+  [[nodiscard]] std::int64_t application_refusal(std::int64_t person,
+                                                 std::int64_t sect) const;
+
+  /// Makes person `person` a member of sect `sect`. Returns false, after
+  /// push_error, when the core refuses the application.
+  bool apply(std::int64_t person, std::int64_t sect);
+
+  /// Returns the events that reach person `person` as rumours, newest first,
+  /// each a Dictionary of `sequence`, `tick`, `cell` (Vector2i) and `kind`,
+  /// with the records it names: "founded" with `village` and `faction`;
+  /// "raided" with `village`, `owner` and `raider`; "ruined" with `village`,
+  /// `owner`, `army` and `destroyer`, the destroyer's faction; "sect_fell"
+  /// with `sect` and `faction`; "leader_changed" with `faction`, `leader`
+  /// and `by`, "election" or "duel"; "born" and "died" with `person`.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> rumours(
+      std::int64_t person) const;
+
+  /// Returns person `person`'s attainment in each discipline, in the order
+  /// of discipline_names().
+  [[nodiscard]] godot::PackedInt64Array person_attainment(
+      std::int64_t person) const;
+
+  /// Returns the names of the disciplines the world's rules of life draw,
+  /// by index; empty for a world given none.
+  [[nodiscard]] godot::PackedStringArray discipline_names() const;
+
   /// Returns the faction army `army` fights for now; a soul born again
   /// takes its new family's.
   [[nodiscard]] std::int64_t army_faction(std::int64_t army) const;
@@ -323,6 +351,7 @@ class WorldAdapter : public godot::RefCounted {
   std::size_t faction_count_ = 0;
   // The names the world's rules of life were given.
   murim::Names names_;
+  std::vector<std::string> disciplines_;
   // What create_region() keeps of the region for display; empty otherwise.
   murim::RegionData region_data_;
   std::vector<std::size_t> terrain_;

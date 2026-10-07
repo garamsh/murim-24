@@ -336,12 +336,14 @@ struct Skill {
 
 /// An army as a world is created with: its `members`, each a new person,
 /// bound for `objective`, of `faction`, choosing among `skills` by the
-/// world's seed. An army is a roster of people, never a count.
+/// world's seed, and making village `home` their home, if it names one,
+/// without being its residents. An army is a roster of people, never a count.
 struct ArmySpec {
   Cell objective;
   std::vector<Recruit> members;
   std::size_t faction;
   std::vector<Skill> skills;
+  std::optional<std::size_t> home = std::nullopt;
 };
 
 /// What an army does: march toward `objective`, and at each strike use one
@@ -664,7 +666,8 @@ class World {
   /// skill's range or radius, lies outside [0, MAX_REACH], `hostile` is not
   /// square, a recruit has no health or more than MAX_HEALTH, the world would
   /// hold more than MAX_PEOPLE people, an army has no skills or a faction
-  /// outside `hostile`, a skill does more than MAX_BODY_DAMAGE to a person or
+  /// outside `hostile` or a home that is no village,
+  /// a skill does more than MAX_BODY_DAMAGE to a person or
   /// waits longer than MAX_COOLDOWN, a structure's footprint is not 1 to
   /// MAX_FOOTPRINT cells along each side or covers a cell that is not
   /// passable or that another structure covers, a recruit stands on a cell

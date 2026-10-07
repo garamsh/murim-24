@@ -174,10 +174,10 @@ struct Region {
                                            const Village& village);
 
 /// Returns an army of one person born into village `village` of `region`:
-/// of the village's faction, with its residents' skills and health,
-/// standing on the first open cell of the village's area, row by row, that
-/// no resident stands on, with that cell as its objective. Throws
-/// std::out_of_range when there is no such village or no such cell.
+/// of the village's faction, with its residents' skills and health, making
+/// the village its home, standing on the first open cell of the village's area,
+/// row by row, that no resident stands on, with that cell as its objective.
+/// Throws std::out_of_range when there is no such village or no such cell.
 [[nodiscard]] ArmySpec born_in(const Region& region, std::size_t village);
 
 }  // namespace murim

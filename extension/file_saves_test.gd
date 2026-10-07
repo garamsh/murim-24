@@ -3,7 +3,7 @@
 # serves in; that an empty slot loads nothing; and that a world made without a region is not saved.
 extends RefCounted
 
-const REGION_SEED := 7
+const REGION_SEED := 3
 const OTHER_SEED := 8
 const TICKS_PER_DAY := 5
 # Fifteen years of five-tick days: this region's growth forms an army after the player's in its
