@@ -1,4 +1,4 @@
-.PHONY: lint format test build ci bench sweep android
+.PHONY: lint format test build ci bench sweep android export
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
@@ -7,6 +7,10 @@ LINT_DIR := $(BUILD_DIR)/lint
 ANDROID_BUILD_DIR := $(BUILD_DIR)/android
 ANDROID_HOME ?= $(HOME)/Library/Android/sdk
 ANDROID_NDK := $(ANDROID_HOME)/ndk/28.1.13356709
+MACOS_BUILD_DIR := $(BUILD_DIR)/macos
+WINDOWS_BUILD_DIR := $(BUILD_DIR)/windows
+MINGW_DIR := $(BUILD_DIR)/mingw
+EXPORT_DIR := $(BUILD_DIR)/export
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
 CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
@@ -95,3 +99,18 @@ android: build
 	$(TOOLS)/cmake --build $(ANDROID_BUILD_DIR) --target murim_extension murim_core_bench
 	$(GODOT) --headless --path . --export-debug Android $(ANDROID_BUILD_DIR)/murim.apk
 	@echo "built $(ANDROID_BUILD_DIR)/libmurim.android.template_debug.arm64.so and $(ANDROID_BUILD_DIR)/core/murim_core_bench for Android arm64, and exported $(ANDROID_BUILD_DIR)/murim.apk with the Android preset in export_presets.cfg"
+
+# Not part of ci: it builds the macOS universal library with the host's SDK, so it runs on a Mac, and fetches
+# the Windows cross toolchain mingw-toolchain.sh pins. Both libraries are release builds, which a release export loads.
+EXTENSION_RELEASE := -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DGODOTCPP_TARGET=template_release
+export: build
+	SDKROOT=$$(xcrun --show-sdk-path) $(TOOLS)/cmake -S extension -B $(MACOS_BUILD_DIR) $(EXTENSION_RELEASE) -DCMAKE_OSX_ARCHITECTURES='arm64;x86_64'
+	$(TOOLS)/cmake --build $(MACOS_BUILD_DIR) --target murim_extension
+	./mingw-toolchain.sh $(MINGW_DIR)
+	$(TOOLS)/cmake -S extension -B $(WINDOWS_BUILD_DIR) $(EXTENSION_RELEASE) -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+		-DCMAKE_CXX_COMPILER=$(CURDIR)/$(MINGW_DIR)/bin/x86_64-w64-mingw32-clang++
+	$(TOOLS)/cmake --build $(WINDOWS_BUILD_DIR) --target murim_extension
+	rm -rf $(EXPORT_DIR) && mkdir -p $(EXPORT_DIR)/macos $(EXPORT_DIR)/windows
+	$(GODOT) --headless --path . --export-release macOS $(EXPORT_DIR)/macos/Murim24.app
+	$(GODOT) --headless --path . --export-release Windows $(EXPORT_DIR)/windows/Murim24.exe
+	@echo "built $(MACOS_BUILD_DIR)/libmurim.macos.template_release.universal.dylib and $(WINDOWS_BUILD_DIR)/libmurim.windows.template_release.x86_64.dll, and exported $(EXPORT_DIR)/macos/Murim24.app and $(EXPORT_DIR)/windows/Murim24.exe with the macOS and Windows presets in export_presets.cfg"
