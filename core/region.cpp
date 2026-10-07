@@ -892,8 +892,11 @@ ArmySpec born_in(const Region& region, std::size_t village) {
   if (free == open.end()) {
     throw std::out_of_range("the village has no free cell to be born on");
   }
-  return ArmySpec{
-      *free, {Recruit{*free, HEALTH}}, residents.faction, residents.skills};
+  return ArmySpec{*free,
+                  {Recruit{*free, HEALTH}},
+                  residents.faction,
+                  residents.skills,
+                  village};
 }
 
 std::vector<VillageSpec> village_specs(const Region& region) {

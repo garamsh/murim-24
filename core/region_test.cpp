@@ -511,6 +511,57 @@ TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
                std::out_of_range);
 }
 
+// The first sect of faction `faction` in `world`.
+std::size_t sect_of_faction(const World& world, std::size_t faction) {
+  std::size_t sect = 0;
+  while (sect + 1 < world.sect_count() && world.sect_faction(sect) != faction) {
+    ++sect;
+  }
+  return sect;
+}
+
+// The region of seed 7, with days of one tick and a person born into village
+// `village`, homed there unless `homeless`, as the last army, lived `days`
+// days. On that seed partners free to marry come of age within 20 years.
+constexpr Seed MARRYING_SEED{7};
+
+World born_and_lived(std::size_t village, bool homeless, std::uint64_t days) {
+  Region region = generate_region(MARRYING_SEED, region_data());
+  region.rules.ticks_per_day = 1;
+  ArmySpec born = born_in(region, village);
+  if (homeless) {
+    born.home.reset();
+  }
+  region.armies.push_back(born);
+  World world = world_of(region);
+  for (std::uint64_t day = 0; day < days; ++day) {
+    world.tick();
+  }
+  return world;
+}
+
+TEST(Region, APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith) {
+  constexpr std::size_t VILLAGE = 1;
+  constexpr std::uint64_t YEARS = 20;
+  // The body is the last person the world is created with.
+  const World young = born_and_lived(VILLAGE, false, 0);
+  const std::size_t body = young.population() - 1;
+  ASSERT_EQ(young.person(body).home, std::optional<std::size_t>{VILLAGE});
+  const World world = born_and_lived(VILLAGE, false, YEARS * DAYS_PER_YEAR);
+  EXPECT_FALSE(world.person(body).spouses.empty());
+  // Control: the same body with no home never marries.
+  const World homeless = born_and_lived(VILLAGE, true, YEARS * DAYS_PER_YEAR);
+  ASSERT_FALSE(homeless.person(body).home.has_value());
+  EXPECT_TRUE(homeless.person(body).spouses.empty());
+  // It may apply to a sect as far as its home goes, where the homeless body
+  // is refused for having none.
+  const std::size_t sect =
+      sect_of_faction(young, young.faction(young.army_count() - 1));
+  EXPECT_NE(young.application_refusal(body, sect), ApplicationRefusal::NO_HOME);
+  EXPECT_EQ(born_and_lived(VILLAGE, true, 0).application_refusal(body, sect),
+            ApplicationRefusal::NO_HOME);
+}
+
 // Health of each person gathered().
 constexpr std::uint64_t GATHERED_HEALTH = 100'000;
 

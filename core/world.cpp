@@ -593,6 +593,12 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       paired.at(spec.residents) = std::size_t{2} * spec.households;
     }
   }
+  const auto homeless = [&villages](const ArmySpec& army) {
+    return army.home && *army.home >= villages.size();
+  };
+  if (std::any_of(armies.begin(), armies.end(), homeless)) {
+    throw std::invalid_argument("an army's home must be a village");
+  }
   std::size_t families = armies.size();
   for (ArmySpec& army : armies) {
     enlist(army, paired.at(armies_.size()), families);
@@ -833,6 +839,7 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
     Person person;
     person.position = centre_of(recruit.cell);
     person.health = recruit.health;
+    person.home = army.home;
     person.family = housed ? families++ : armies_.size();
     found(person, sex);
     if (wife) {
