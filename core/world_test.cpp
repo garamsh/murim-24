@@ -1859,6 +1859,7 @@ Growth growth_of(const Growing& growing) {
                   Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}}};
   growth.builds = growing.builds;
   growth.settlement = {SETTLEMENT_SIDE, SETTLEMENT_SIDE};
+  growth.settlement_kind = "hamlet";
   growth.layout = {Placement{1, {0, 0}}, Placement{0, {3, 0}},
                    Placement{2, {0, 3}}};
   growth.settlers = 2;
@@ -2036,6 +2037,31 @@ TEST(World, APressedVillageFoundsAVillageOnFreeLand) {
   run_ticks(nowhere, 1);
   EXPECT_EQ(nowhere.village_count(), 2U);
   EXPECT_EQ(nowhere.roster(VILLAGE_A).size(), FOUNDERS);
+}
+
+TEST(World, AFoundedVillageNamesTheLandItWasLaidOutOn) {
+  const World world = founded();
+  const std::optional<Settlement> land = world.settlement(FOUNDED);
+  ASSERT_TRUE(land.has_value());
+  const Settlement laid_on = land.value_or(Settlement{"", {-1, -1}, {0, 0}});
+  EXPECT_EQ(laid_on.kind, "hamlet");
+  EXPECT_EQ(laid_on.area.width, SETTLEMENT_SIDE);
+  EXPECT_EQ(laid_on.area.height, SETTLEMENT_SIDE);
+  // Each placement of the layout stands at its offset from the corner.
+  const Growth growth = growth_of(Growing{{Expansion::FOUND}});
+  for (const Placement& placement : growth.layout) {
+    bool laid = false;
+    for (std::size_t structure = 0; structure < world.structure_count();
+         ++structure) {
+      const Cell cell = world.structure(structure).cell;
+      laid = laid || (world.plan_of(structure) == placement.plan &&
+                      cell.x == laid_on.corner.x + placement.offset.x &&
+                      cell.y == laid_on.corner.y + placement.offset.y);
+    }
+    EXPECT_TRUE(laid);
+  }
+  // Control: a village the world was created with was founded on no land.
+  EXPECT_FALSE(world.settlement(VILLAGE_A).has_value());
 }
 
 TEST(World, SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem) {

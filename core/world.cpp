@@ -574,8 +574,8 @@ void World::add_village(VillageSpec spec) {
   for (const std::size_t member : armies_.at(spec.residents).roster) {
     people_.at(member).home = villages_.size();
   }
-  villages_.push_back(
-      Village{std::move(spec), std::nullopt, 0, std::nullopt, std::nullopt});
+  villages_.push_back(Village{std::move(spec), std::nullopt, 0, std::nullopt,
+                              std::nullopt, std::nullopt});
   // A village starts with its storage full.
   villages_.back().stock = held(villages_.size() - 1, Stage::DAMAGED).storage;
 }
@@ -1042,6 +1042,15 @@ std::size_t World::owner(std::size_t village) const {
 
 std::optional<Destroyer> World::destroyer(std::size_t village) const {
   return villages_.at(village).destroyer;
+}
+
+std::optional<Settlement> World::settlement(std::size_t village) const {
+  const std::optional<Cell> corner = villages_.at(village).founded;
+  if (!corner || !life_.growth) {
+    return std::nullopt;
+  }
+  return Settlement{life_.growth->settlement_kind, *corner,
+                    life_.growth->settlement};
 }
 
 Stage World::stage(std::size_t structure) const {
@@ -1986,7 +1995,7 @@ bool World::found_village(std::size_t village, const Growth& growth) {
   }
   const std::size_t army = form(village, settlers, centre, std::nullopt);
   villages_.push_back(Village{VillageSpec{{}, army, {}}, std::nullopt, 0,
-                              std::nullopt, std::nullopt});
+                              std::nullopt, std::nullopt, corner});
   attach(villages_.size() - 1, *laid, growth);
   return true;
 }

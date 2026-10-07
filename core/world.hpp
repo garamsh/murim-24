@@ -184,7 +184,8 @@ struct Placement {
 ///   `reach` cells of its own, `spacing` cells clear of any structure and held
 ///   by no other faction; `settlers` of its residents, a founder's household
 ///   first, march there as the new village's residents, and the founder heads a
-///   new family
+///   new family; the layout makes a village of `settlement_kind`, which names
+///   its art
 /// - raid: with more residents than `raiders` and no party out, it sends
 ///   `raiders` of them against the nearest village of a faction it is hostile
 ///   to, with living residents and its centre within `reach` cells
@@ -200,6 +201,7 @@ struct Growth {
   std::vector<Plan> plans;
   std::vector<std::size_t> builds;
   Footprint settlement{1, 1};
+  std::string settlement_kind;
   std::vector<Placement> layout;
   std::uint32_t settlers = 0;
   std::uint32_t raiders = 0;
@@ -338,6 +340,14 @@ enum class VillageState : std::uint8_t {
   RAIDED,
   RUINS,
   REBUILDING
+};
+
+/// The land a founded village was laid out on: the growth's settlement `area`
+/// from `corner`, making a village of `kind`.
+struct Settlement {
+  std::string kind;
+  Cell corner;
+  Footprint area;
 };
 
 /// The army whose strike brought a village's last standing structure to
@@ -616,6 +626,10 @@ class World {
   /// is kept when the village is rebuilt.
   [[nodiscard]] std::optional<Destroyer> destroyer(std::size_t village) const;
 
+  /// Returns the land village `village` was founded on, or nothing for a
+  /// village the world was created with.
+  [[nodiscard]] std::optional<Settlement> settlement(std::size_t village) const;
+
  private:
   /// A duel fought for faction `faction`'s lead, under its rule.
   struct Fight {
@@ -633,6 +647,8 @@ class World {
     /// its party is out against.
     std::optional<std::size_t> party;
     std::optional<std::size_t> raiding;
+    /// The corner of the land it was founded on, if it was founded.
+    std::optional<Cell> founded;
   };
 
   struct Army {

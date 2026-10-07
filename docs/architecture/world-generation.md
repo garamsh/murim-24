@@ -18,7 +18,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - or it sends 10 settlers to lay out a hamlet, the template's buildings as the layout, on buildable land within 40 cells and 3 cells clear of any structure
   - or it sends 10 raiders against a hostile village within 40 cells
 
-  A village holds the land within 16 cells as territory. `region_data` builds the growth's plans from the structure kinds and the hamlet template; `generate_region` gives each faction's stance to it.
+  A village holds the land within 16 cells as territory. `region_data` builds the growth's plans from the structure kinds and the hamlet template, and names the hamlet as the kind of village the settlement makes; `generate_region` gives each faction's stance to it.
 - A test lives the region through 50 years with days of five ticks: villages are founded and one comes to house its settlers, a building is raised, a raiding party is sent, the factions' territories change, the living stay within 500, and the same seed grows the same way. With no faction taking a stance, no village is founded and no party sent.
 - Combat is paced by the tables' data, at 30 ticks a second. Every person has 120 health. The guard strike does 10 damage within 3 cells every 15 ticks, the torch 10 to structures and the mend 5 back every 30 ticks, and a structure has 10,000 durability, with stage floors of 10,000, 5,000 and 1. The targets:
   - a duel to the death, from the challenge, in 10 to 30 seconds
