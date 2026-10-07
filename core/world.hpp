@@ -152,12 +152,21 @@ enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
 
 /// What a structure gives its village: the people it houses, the food it
 /// stores, the food it yields each harvest, which makes it a field, and the
-/// pupils it teaches a sect seated in the village.
+/// pupils it teaches a sect seated in the village. A workshop arms `arms` and
+/// tends `tends` of the people whose home the village is; while it stands
+/// and its village's arms cover them, they strike `edge` per mille harder,
+/// and while its tends cover them, they recover `healing` health a day. A
+/// village's capacities add up over its standing structures; its edge and
+/// healing are the greatest among them.
 struct Holding {
   std::uint32_t housing = 0;
   std::uint32_t storage = 0;
   std::uint32_t harvest = 0;
   std::uint32_t pupils = 0;
+  std::uint32_t arms = 0;
+  std::uint32_t tends = 0;
+  std::uint32_t edge = 0;
+  std::uint32_t healing = 0;
 };
 
 /// What a village pressing against its cap may do: raise a structure, found
@@ -198,6 +207,10 @@ struct Placement {
 /// - raid: with more residents than `raiders` and no party out, it sends
 ///   `raiders` of them against the nearest village of a faction it is hostile
 ///   to, with living residents and its centre within `reach` cells
+/// A village arms and tends `self_reliance` people with no workshop, beside
+/// what its standing workshops arm and tend; building counts both among its
+/// holdings, after housing, food and storage. By default it arms and tends
+/// any number, so it never builds for them.
 /// A cell lies in the territory of the owner of the nearest village with
 /// living residents whose centre lies within `claim` cells of it.
 struct Growth {
@@ -215,6 +228,7 @@ struct Growth {
   std::uint32_t settlers = 0;
   std::uint32_t raiders = 0;
   std::vector<std::vector<Expansion>> stances;
+  std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
 };
 
 /// The secret manuals the world's sects start with and where a fallen sect's
@@ -237,7 +251,8 @@ struct Manuals {
 /// down and up, and every discipline `upper_widening` further up, each
 /// divided by the lives it has lived, so the widening shrinks as lives
 /// repeat. Without a lifespan no one ages. A soul is born again, and a child
-/// born, with `newborn_health`. The people a world starts with are
+/// born, with `newborn_health`, which is also as far as a village's healing
+/// restores anyone. The people a world starts with are
 /// `founding_age` days old, or newborn without one. People marry and have
 /// children by `kinship`, if given, and bear `names`. Villages feed their
 /// people by `husbandry`, if given, which caps how many a village holds, and
@@ -809,6 +824,7 @@ class World {
                                   std::int32_t reach) const;
   bool shift(std::size_t structure, Destroyer striker, std::int64_t effect);
   void strike(std::size_t user, const Crowd& crowd,
+              const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
   [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
   void start_duel(std::size_t army, std::size_t faction);
@@ -839,6 +855,15 @@ class World {
   void kin(const Kinship& kinship);
   void husband(const Husbandry& husbandry);
   [[nodiscard]] Holding held(std::size_t village, Stage worst) const;
+  /// What a village's standing workshops do for its people: the edge they
+  /// strike with and the healing they recover, by village, each 0 where its
+  /// arms or tends fall short of the people whose home it is.
+  struct Service {
+    std::vector<std::uint32_t> edge;
+    std::vector<std::uint32_t> healing;
+  };
+  [[nodiscard]] Service served() const;
+  void tend();
   [[nodiscard]] std::vector<std::size_t> homes() const;
   /// A person unfed too long, and the army it serves in.
   struct Unfed {

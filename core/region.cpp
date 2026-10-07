@@ -67,6 +67,9 @@ constexpr std::uint32_t HALL_HOUSING = 12;
 constexpr std::uint32_t GRANARY_STORAGE = 2'400;
 constexpr std::uint32_t STOREHOUSE_STORAGE = 3'600;
 constexpr std::uint32_t FIELD_YIELD = 600;
+constexpr std::uint32_t WORKSHOP_SERVES = 40;
+constexpr std::uint32_t SMITHY_EDGE = 250;
+constexpr std::uint32_t APOTHECARY_HEALING = 12;
 // Growth in region_data(), distances in cells.
 constexpr std::uint32_t GROWTH_INTERVAL_DAYS = 30;
 constexpr std::uint32_t GROWTH_PRESSURE = 200;
@@ -76,6 +79,7 @@ constexpr std::int32_t SETTLEMENT_SPACING = 3;
 constexpr std::int32_t TERRITORY_CLAIM = 16;
 constexpr std::uint32_t SETTLERS = 6;
 constexpr std::uint32_t RAIDERS = 10;
+constexpr std::uint32_t SELF_RELIANCE = 20;
 // Sects in region_data(), ages in days and chances per mille a year.
 constexpr std::uint32_t ADMISSION_AGE = 12 * YEAR;
 constexpr std::uint32_t ASSESSED_TALENT = 550;
@@ -273,17 +277,22 @@ std::optional<StructureKind> kind_named(const RegionData& data,
                                    : std::optional<StructureKind>{*found};
 }
 
-// The plan of `building`, from what its kind holds: the yield of a field is
+// What a structure of `kind` over `footprint` holds: the yield of a field is
 // per cell of its footprint.
+Holding holding_of(const StructureKind& kind, Footprint footprint) {
+  const auto cells =
+      static_cast<std::uint32_t>(footprint.width * footprint.height);
+  return Holding{kind.housing, kind.storage, kind.yield * cells, kind.pupils,
+                 kind.arms,    kind.tends,   kind.edge,          kind.healing};
+}
+
+// The plan of `building`, from what its kind holds.
 Plan plan_of(const RegionData& data, const Building& building) {
   const StructureKind kind =
       kind_named(data, building.kind).value_or(StructureKind{});
   const Footprint footprint = building.structure.footprint;
-  const auto cells =
-      static_cast<std::uint32_t>(footprint.width * footprint.height);
-  return Plan{
-      building.kind, footprint, kind.blocks,
-      Holding{kind.housing, kind.storage, kind.yield * cells, kind.pupils}};
+  return Plan{building.kind, footprint, kind.blocks,
+              holding_of(kind, footprint)};
 }
 
 // Growth that builds `builds` and lays out `settlement`'s buildings for a
@@ -304,7 +313,8 @@ Growth growth_of(const RegionData& data, const std::vector<Building>& builds,
                 {},
                 SETTLERS,
                 RAIDERS,
-                {}};
+                {},
+                SELF_RELIANCE};
   for (const Building& building : builds) {
     growth.builds.push_back(growth.plans.size());
     growth.plans.push_back(plan_of(data, building));
@@ -346,10 +356,7 @@ void lay_village(Region& region, const RegionData& data,
         Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
         structure.durability, structure.footprint, made.blocks});
     region.structure_kinds.push_back(building.kind);
-    const auto cells = static_cast<std::uint32_t>(structure.footprint.width *
-                                                  structure.footprint.height);
-    region.holdings.push_back(
-        Holding{made.housing, made.storage, made.yield * cells, made.pupils});
+    region.holdings.push_back(holding_of(made, structure.footprint));
     village.households += building.households;
   }
   const Cell middle = middle_of(kind.area);
@@ -520,6 +527,8 @@ RegionData region_data() {
   constexpr Footprint RICE{3, 2};
   constexpr Footprint GRANARY{2, 2};
   constexpr Footprint STOREHOUSE{3, 2};
+  constexpr Footprint SMITHY{3, 2};
+  constexpr Footprint APOTHECARY{4, 2};
   constexpr std::int32_t MILLET_EAST = 5;
   constexpr std::int32_t RICE_EAST = 7;
   constexpr std::int32_t GRANARY_EAST = 12;
@@ -683,7 +692,9 @@ RegionData region_data() {
       // cell of a field yields 600 a harvest. A field never blocks. A village
       // is capped at 50 people, a hamlet at 20. A seat's hall and manual
       // hall each teach 4 pupils and its training ground 12, on which people
-      // stand, so it blocks nothing.
+      // stand, so it blocks nothing. A smithy arms 40 people, who strike a
+      // quarter harder, and an apothecary tends 40, who recover 12 health a
+      // day, a tenth of theirs.
       {{"house", HOUSE_HOUSING, 0, 0, true, 0},
        {"hall", HALL_HOUSING, 0, 0, true, HALL_PUPILS},
        {"well", 0, 0, 0, true, 0},
@@ -694,7 +705,10 @@ RegionData region_data() {
        {"field", 0, 0, FIELD_YIELD, false, 0},
        {"training_ground", 0, 0, 0, false, TRAINING_GROUND_PUPILS},
        {"manual_hall", 0, 0, 0, true, MANUAL_HALL_PUPILS},
-       {"seat_gate", 0, 0, 0, true, 0}},
+       {"seat_gate", 0, 0, 0, true, 0},
+       {"smithy", 0, 0, 0, true, 0, WORKSHOP_SERVES, 0, SMITHY_EDGE, 0},
+       {"apothecary", 0, 0, 0, true, 0, 0, WORKSHOP_SERVES, 0,
+        APOTHECARY_HEALING}},
       // A sect's seat of 12 by 9 cells, which every one of 200 seeds has room
       // for: a house for its founding household, a manual hall and a
       // hall along its north side, a training ground in its south-west
@@ -713,14 +727,18 @@ RegionData region_data() {
       {{"Hwasan", 0}, {"Heavenly Demon", 1}, {"Black Fang", 2}},
   };
   // Villages pressing against a fifth of their caps grow, checked every 30
-  // days. They build a house, a field of rice or a granary within 8 cells
-  // of their centre, or send 6 settlers to lay out a hamlet within 40
-  // cells, 3 cells clear of any structure, or 10 raiders against a hostile
-  // village within 40 cells. A village holds the land within 16 cells.
+  // days. They build a house, a field of rice, a granary, a smithy or an
+  // apothecary within 8 cells of their centre, or send 6 settlers to lay out
+  // a hamlet within 40 cells, 3 cells clear of any structure, or 10 raiders
+  // against a hostile village within 40 cells. A village holds the land
+  // within 16 cells. It arms and tends 20 people with no workshop, so a
+  // hamlet, capped at 20, builds neither, and a village, at 50, builds both.
   data.life.growth = growth_of(
       data,
       {building({0, 0}, HOUSE, "house", 0), building({0, 0}, RICE, "field", 0),
-       building({0, 0}, GRANARY, "granary", 0)},
+       building({0, 0}, GRANARY, "granary", 0),
+       building({0, 0}, SMITHY, "smithy", 0),
+       building({0, 0}, APOTHECARY, "apothecary", 0)},
       data.villages.front());
   return data;
 }

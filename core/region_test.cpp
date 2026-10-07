@@ -1078,10 +1078,11 @@ TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
   EXPECT_GT(crowding(unfed, fertile).first, 0);
 }
 
-// How a region grew over GROWTH_YEARS years: its villages and territory at
-// the start and the end, its armies at the end, the most living at once,
-// whether a founded village came to house its settlers and a building was
-// raised, and the hash.
+// How a region grew over some years, GROWTH_YEARS unless a test says: its
+// villages and territory at the start and the end, its armies at the end,
+// the most living at once, whether a founded village came to house its
+// settlers and a building was raised, the kinds of those raised, and the
+// hash.
 struct Grew {
   std::size_t villages_before;
   std::size_t villages_after;
@@ -1092,6 +1093,7 @@ struct Grew {
   bool founded_village_housed;
   bool building_raised;
   StateHash hash;
+  std::vector<std::string> raised;
 };
 
 constexpr std::uint64_t GROWTH_YEARS = 50;
@@ -1099,14 +1101,15 @@ constexpr std::uint64_t GROWTH_YEARS = 50;
 // the calendar than in play, so fifty years see many growth checks resolve.
 constexpr std::uint64_t GROWTH_TICKS_PER_DAY = 5;
 
-Grew grew(const RegionData& data, Seed seed) {
+Grew grew(const RegionData& data, Seed seed,
+          std::uint64_t years = GROWTH_YEARS) {
   Region region = generate_region(seed, data);
   region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
   World world = world_of(region);
   Grew result{world.village_count(), 0,     0,     world.territory(), {},
-              world.living(),        false, false, StateHash{}};
+              world.living(),        false, false, StateHash{},       {}};
   for (std::uint64_t tick = 0;
-       tick < GROWTH_YEARS * DAYS_PER_YEAR * GROWTH_TICKS_PER_DAY; ++tick) {
+       tick < years * DAYS_PER_YEAR * GROWTH_TICKS_PER_DAY; ++tick) {
     world.tick();
     result.peak = std::max(result.peak, world.living());
   }
@@ -1118,13 +1121,15 @@ Grew grew(const RegionData& data, Seed seed) {
     result.founded_village_housed =
         result.founded_village_housed || world.residents_of(village) > 0;
   }
-  const std::size_t builds = data.life.growth.value_or(Growth{}).builds.size();
+  const Growth growth = data.life.growth.value_or(Growth{});
+  const std::size_t builds = growth.builds.size();
   for (std::size_t structure = region.structures.size();
        structure < world.structure_count(); ++structure) {
-    result.building_raised =
-        result.building_raised ||
-        (world.plan_of(structure).value_or(builds) < builds &&
-         world.stage(structure) == Stage::INTACT);
+    const std::size_t plan = world.plan_of(structure).value_or(builds);
+    if (plan < builds && world.stage(structure) == Stage::INTACT) {
+      result.building_raised = true;
+      result.raised.push_back(growth.plans.at(plan).kind);
+    }
   }
   result.hash = world.hash();
   return result;
@@ -1155,6 +1160,30 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
   EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
   EXPECT_FALSE(unchanged.building_raised);
+}
+
+// Whether `kinds` names `kind`.
+bool includes(const std::vector<std::string>& kinds, const std::string& kind) {
+  return std::find(kinds.begin(), kinds.end(), kind) != kinds.end();
+}
+
+TEST(Region, VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary) {
+  // A village raises its first workshop in its fourth or fifth decade.
+  constexpr std::uint64_t CENTURY = 100;
+  const Grew region = grew(region_data(), NEIGHBOURLY, CENTURY);
+  EXPECT_TRUE(includes(region.raised, "smithy"));
+  EXPECT_TRUE(includes(region.raised, "apothecary"));
+  // Control: arming and tending any number with no workshop, villages raise
+  // other buildings and no workshop.
+  RegionData reliant = region_data();
+  ASSERT_TRUE(reliant.life.growth.has_value());
+  Growth growth = reliant.life.growth.value_or(Growth{});
+  growth.self_reliance = MAX_PEOPLE;
+  reliant.life.growth = growth;
+  const Grew unarmed = grew(reliant, NEIGHBOURLY, CENTURY);
+  EXPECT_TRUE(unarmed.building_raised);
+  EXPECT_FALSE(includes(unarmed.raised, "smithy"));
+  EXPECT_FALSE(includes(unarmed.raised, "apothecary"));
 }
 
 // The most households any faction of the region `data` generates from
