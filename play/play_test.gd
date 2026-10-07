@@ -12,6 +12,9 @@
 # Enter in the sect panel applies to the sect shown, joining it where the core admits the person and
 # showing why where it refuses. A Cult body marched on an Orthodox village dies there, and the
 # rebirth screen opens on it and the soul's new body, holding the ticks until Enter goes on.
+# The pause panel's Save writes the world, and back on the title Continue resumes it, steering the
+# same person, while with no save Continue cannot be taken and with a broken one the title names
+# why; the world is saved again every AUTOSAVE_DAYS days.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -35,6 +38,11 @@ const CULT_VILLAGE := 1
 const UNORTHODOX_VILLAGE := 2
 # Ticks a Cult body marched on the nearest Orthodox village has to die there.
 const MARCH_LIMIT := 12000
+# A region whose growth forms an army after the player's within fifteen years of five-tick days.
+const GROWN_SEED := 3
+const GROWN_TICKS_PER_DAY := 5
+const GROWN_TICKS := 9000
+const TestSaves := preload("res://extension/test_saves.gd")
 
 
 func run() -> bool:
@@ -63,7 +71,8 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _walk_pass() and _screens_pass() and _apply_pass() and _rebirth_pass()
+			and _walk_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _autosave_pass()
 
 
 # A move key pressed orders the person STRIDE cells its way, and it walks there: further its way
@@ -162,6 +171,111 @@ func _screens_pass() -> bool:
 		titled, new_game_open, TYPED_SEED, started, SEED, same_world, paused, caps, guided, held, ran, ran_fast,
 		"pass" if passed else "FAIL"])
 	scene.free()
+	return passed
+
+
+# A new game saved from the pause panel, which says so, is resumed by Continue on a fresh title, as
+# leaving for the title reloads the scene: the same hash, seed and steered person, the title closed.
+# Control: with no save, the title opens with Continue unavailable, and down from a new game
+# passes over it. A slot of bytes no save begins with leaves Continue available, and taking it
+# starts no world and names why on the title. A world whose growth formed armies after the
+# player's continues steering the army the player's soul serves in, not the last. Setup: the world
+# ran before it was saved, so a fresh world from the same seed has another hash, and the grown
+# world has an army after the player's.
+func _save_pass() -> bool:
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
+	var bare := _title()
+	var bare_hud: CanvasLayer = bare.get_node("Hud")
+	bare.navigate(_key(KEY_DOWN))
+	var passed_over: bool = bare_hud.title_screen.unavailable.has("continue") \
+			and bare_hud.title_screen.ENTRIES[bare_hud.title_screen.chosen] == "settings"
+	bare.free()
+
+	var scene := _scene(0)
+	for i in TICKS:
+		scene.step()
+	var hud: CanvasLayer = scene.get_node("Hud")
+	scene.navigate(_key(scene.PAUSE_KEY))
+	scene.navigate(_key(KEY_DOWN))
+	var chose_save: bool = hud.pause.ENTRIES[hud.pause.chosen] == "save"
+	scene.navigate(_key(KEY_ENTER))
+	var noted: bool = hud.pause.notice == "PAUSE_SAVED" and hud.screen() == hud.pause
+	var saved_hash: int = scene.world.hash()
+	var saved_person: int = scene.world.roster(scene.steered)[0]
+	var ran := saved_hash != WorldAdapter.create_region(SEED, 0).hash()
+	scene.free()
+
+	var resumed := _title()
+	var resumed_hud: CanvasLayer = resumed.get_node("Hud")
+	resumed.navigate(_key(KEY_DOWN))
+	var on_continue: bool = resumed_hud.title_screen.ENTRIES[resumed_hud.title_screen.chosen] == "continue"
+	resumed.navigate(_key(KEY_ENTER))
+	var same: bool = resumed.world != null and resumed.world.hash() == saved_hash \
+			and resumed.world_seed == SEED and resumed_hud.screen() == null \
+			and resumed.world.roster(resumed.steered)[0] == saved_person
+	resumed.free()
+
+	var file := FileAccess.open(TestSaves.path(0), FileAccess.WRITE)
+	file.store_string("not a save")
+	file.close()
+	var broken := _title()
+	var broken_hud: CanvasLayer = broken.get_node("Hud")
+	broken.navigate(_key(KEY_DOWN))
+	broken.navigate(_key(KEY_ENTER))
+	var refused: bool = broken.world == null and broken_hud.screen() == broken_hud.title_screen \
+			and broken_hud.title_screen.notice == "TITLE_LOAD_NOT_A_SAVE"
+	broken.free()
+
+	# A world whose growth formed armies after the player's, so the last army is not the player's.
+	var grown := WorldAdapter.create_region(GROWN_SEED, 0, GROWN_TICKS_PER_DAY)
+	for i in GROWN_TICKS:
+		grown.tick()
+	var player := grown.player_army()
+	var grown_past := player >= 0 and grown.army_count() > player + 1 and grown.save(0, TestSaves.DIRECTORY)
+	var continued := _title()
+	continued.navigate(_key(KEY_DOWN))
+	continued.navigate(_key(KEY_ENTER))
+	var found: bool = continued.world != null and continued.steered == player \
+			and continued.world.roster(continued.steered) == grown.roster(player)
+	continued.free()
+	TestSaves.clear()
+	# Every save above went to the tests' own directory: the game's slot 0 is as it was.
+	var untouched := TestSaves.game_slot() == game_slot
+	var passed := passed_over and chose_save and noted and ran and on_continue and same and refused \
+			and grown_past and found and untouched
+	print("play_test: with no save, Continue passed over %s; saved from the pause panel %s with its notice %s, after ticks that changed the world %s; on a fresh title Continue chosen %s resumes the same hash, seed %d and person %d %s; a broken save refused on the title with its reason %s; a world grown past the player's army %d saved %s, and Continue steers that army %s; the game's slot 0 untouched %s: %s" % [
+		passed_over, chose_save, noted, ran, on_continue, SEED, saved_person, same, refused, player,
+		grown_past, found, untouched, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The world is saved on the tick the AUTOSAVE_DAYS-th day begins, and the save loads as the world
+# then is. Control: on every tick before it the slot holds no save.
+func _autosave_pass() -> bool:
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
+	var scene := _scene(0)
+	var every: int = scene.AUTOSAVE_DAYS
+	var date: Dictionary = scene.world.date()
+	var days := 0
+	var early := false
+	while not FileAccess.file_exists(TestSaves.path(0)) and days <= every:
+		scene.step()
+		if scene.world.date() != date:
+			date = scene.world.date()
+			days += 1
+		early = early or (days < every and FileAccess.file_exists(TestSaves.path(0)))
+	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.DIRECTORY)
+	var saved: bool = loaded != null and loaded.hash() == scene.world.hash()
+	var ticks: int = scene.ticks
+	scene.free()
+	TestSaves.clear()
+	var untouched := TestSaves.game_slot() == game_slot
+	var passed := days == every and not early and saved and untouched
+	print("play_test: autosaved as day %d began, after %d ticks, every %d days %s; none earlier %s; it loads as the world then was %s; the game's slot 0 untouched %s: %s" % [
+		days, ticks, every, days == every, not early, saved, untouched,
+		"pass" if passed else "FAIL"])
 	return passed
 
 
@@ -324,13 +438,24 @@ func _challenge_pass() -> bool:
 	return passed
 
 
-# The scene with a world started from SEED, its player born into `village`.
+# The scene with a world started from SEED, its player born into `village`, saving to the tests'
+# own directory.
 func _scene(village: int) -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
 	scene.birth_village = village
+	scene.save_directory = TestSaves.DIRECTORY
 	# The runner has no running tree to add the scene to, so it is readied directly.
 	scene.notification(Node.NOTIFICATION_READY)
 	scene.start(SEED)
+	return scene
+
+
+# The scene on the title screen, as it opens or as leaving for the title reloads it, its saves in
+# the tests' own directory.
+func _title() -> Node2D:
+	var scene: Node2D = load(SCENE).instantiate()
+	scene.save_directory = TestSaves.DIRECTORY
+	scene.notification(Node.NOTIFICATION_READY)
 	return scene
 
 

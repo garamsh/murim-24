@@ -10,24 +10,23 @@
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "save.hpp"
 
 namespace murim_godot {
-namespace {
 
-constexpr const char* SAVES = "user://saves";
+FileSaves::FileSaves(godot::String directory)
+    : directory_(std::move(directory)) {}
 
-godot::String path_of(murim::Slot slot) {
-  return godot::String(SAVES) + "/slot_" +
+godot::String FileSaves::path_of(murim::Slot slot) const {
+  return directory_ + godot::String("/slot_") +
          godot::String::num_uint64(static_cast<std::uint32_t>(slot)) + ".sav";
 }
 
-}  // namespace
-
 bool FileSaves::put(murim::Slot slot, const std::vector<std::uint8_t>& bytes) {
-  if (godot::DirAccess::make_dir_recursive_absolute(SAVES) != godot::OK) {
+  if (godot::DirAccess::make_dir_recursive_absolute(directory_) != godot::OK) {
     return false;
   }
   const godot::Ref<godot::FileAccess> file =

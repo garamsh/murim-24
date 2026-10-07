@@ -1,6 +1,6 @@
 ## The pause panel over the game, drawn as art/mockup/pause_screen.png lays it out: a menu to
-## resume, open the settings, leave for the title or quit, over the seed the world was opened
-## from; beside it the controls guide, each control's keys on their caps and what it does, as the
+## resume, save, open the settings, leave for the title or quit, under it whether the save was
+## written, over the seed the world was opened from; beside it the controls guide, each control's keys on their caps and what it does, as the
 ## play scene binds them. Every word comes from hud.csv through Godot's translations. It holds no
 ## game rule.
 extends "res://hud/panel.gd"
@@ -13,9 +13,9 @@ const GUIDE_STEP := 16
 # Where what a control does starts, right of its keys' caps.
 const GUIDE_TEXT_X := 64
 ## The menu's entries, by what choosing each does.
-const ENTRIES := ["resume", "settings", "title", "quit"]
-const ENTRY_KEYS := {"resume": "PAUSE_RESUME", "settings": "PAUSE_SETTINGS", "title": "PAUSE_TO_TITLE",
-		"quit": "PAUSE_QUIT"}
+const ENTRIES := ["resume", "save", "settings", "title", "quit"]
+const ENTRY_KEYS := {"resume": "PAUSE_RESUME", "save": "PAUSE_SAVE", "settings": "PAUSE_SETTINGS",
+		"title": "PAUSE_TO_TITLE", "quit": "PAUSE_QUIT"}
 
 ## The entry the menu has chosen, an index into ENTRIES.
 var chosen := 0
@@ -24,6 +24,8 @@ var chosen := 0
 var controls: Array[Dictionary] = []
 ## The seed the world was opened from.
 var world_seed := 0
+## The hud.csv key of the notice under the menu, or "" while there is none.
+var notice := ""
 
 
 func _notification(what: int) -> void:
@@ -37,7 +39,14 @@ func open(shown: Array[Dictionary], opened_from: int) -> void:
 	controls = shown
 	world_seed = opened_from
 	chosen = 0
+	notice = ""
 	visible = true
+	queue_redraw()
+
+
+## Shows under the menu whether the save was written, as `written` says.
+func note_save(written: bool) -> void:
+	notice = "PAUSE_SAVED" if written else "PAUSE_NOT_SAVED"
 	queue_redraw()
 
 
@@ -62,6 +71,10 @@ func _draw() -> void:
 	for entry: String in ENTRIES:
 		items.append({"text": tr(ENTRY_KEYS[entry])})
 	_menu(Vector2(left, DIALOG.position.y + 32), MENU_WIDTH, items, chosen)
+	if not notice.is_empty():
+		# A row under the menu's last entry.
+		var notice_y := DIALOG.position.y + 32 + ENTRIES.size() * MENU_STEP + 4
+		_text(Vector2(left + 2, notice_y), tr(notice), JADE if notice == "PAUSE_SAVED" else LACQUER)
 	var seed_y := DIALOG.end.y - 40
 	draw_rect(Rect2(left, seed_y - 5, MENU_WIDTH, 1), INK_LIGHT)
 	_text(Vector2(left + 2, seed_y), tr("PAUSE_SEED"), GOLD)

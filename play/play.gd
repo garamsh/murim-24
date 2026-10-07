@@ -1,13 +1,16 @@
 ## Opens on the title screen, where a new game generates a region from a seed, typed or drawn at
-## random, and lets the player steer one person born into it, through the same orders every army
-## follows: W, A, S and D order it a few cells their way, a left click toward the cell clicked,
-## keys 1 to 9 to strike with that skill, and 0 with all its skills; C challenges its faction's
-## leader to a duel, with the same order, when the core allows it; G opens the genealogy panel on
-## the person, and M the sect panel on its sect, where Enter applies to the sect shown. When the
-## person dies and its soul is born again, the rebirth screen sums up the life just ended. Escape pauses the world under the pause panel,
-## whose guide shows the controls as bound here. The camera follows the person. It ticks at the
-## core's tick rate times the speed the settings choose, draws the world through world_art.tscn and
-## the HUD and its screens through hud.tscn, sounds it through sound.tscn, and holds no game rule.
+## random, and continue resumes the world saved in SAVE_SLOT, and lets the player steer one person
+## in it, through the same orders every army follows: W, A, S and D order it a few cells their
+## way, a left click toward the cell clicked, keys 1 to 9 to strike with that skill, and 0 with all
+## its skills; C challenges its faction's leader to a duel, with the same order, when the core
+## allows it; G opens the genealogy panel on the person, and M the sect panel on its sect, where
+## Enter applies to the sect shown. The person is the one the core says carries the player's soul,
+## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
+## screen sums up the life just ended. Escape pauses the world under the pause panel, which saves
+## it and whose guide shows the controls as bound here; it is also saved every AUTOSAVE_DAYS days.
+## The camera follows the person. It ticks at the core's tick rate times the speed the settings
+## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
+## sounds it through sound.tscn, and holds no game rule.
 extends Node2D
 
 const PIXELS_PER_CELL := 16.0
@@ -27,7 +30,13 @@ const CHALLENGE_KEY := KEY_C
 const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const PAUSE_KEY := KEY_ESCAPE
+## The slot the pause panel saves to, the autosave writes and continue loads.
+const SAVE_SLOT := 0
+## The in-game days between autosaves.
+const AUTOSAVE_DAYS := 3
 
+## The directory SAVE_SLOT is kept in, set before the scene is ready; tests keep their own.
+var save_directory := WorldAdapter.saves_directory()
 ## The village the player is born into, set before a game starts.
 var birth_village := 0
 ## The seed the world was generated from.
@@ -46,6 +55,9 @@ var _last_lead := Vector2.ZERO
 var _held: Array[Key] = []
 # The person last steered, whose death the rebirth screen sums up once its soul is born again.
 var _body := -1
+# The date at the last tick, and the days that have begun since the world was last saved.
+var _date := {}
+var _unsaved_days := 0
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -54,7 +66,7 @@ var _body := -1
 
 
 func _ready() -> void:
-	_hud.open_title()
+	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.read()
 	_hud.settings.apply()
 
@@ -65,9 +77,36 @@ func start(from_seed: int) -> bool:
 	var made := WorldAdapter.create_region(from_seed, birth_village)
 	if made == null:
 		return false
+	_play(made)
+	return true
+
+
+## Resumes the world saved in SAVE_SLOT and closes the title screen, or shows on it why the save
+## was not loaded. Returns whether it was loaded.
+func resume_saved() -> bool:
+	var loaded := WorldAdapter.load(SAVE_SLOT, save_directory)
+	if loaded == null:
+		_hud.title_screen.refuse(WorldAdapter.load_refusal(SAVE_SLOT, save_directory))
+		return false
+	_play(loaded)
+	return true
+
+
+## Saves the world in SAVE_SLOT, unless no body carries the player's soul, since a world loaded
+## then would have no person to steer. Returns whether it was written.
+func save() -> bool:
+	if world.player_army() < 0:
+		return false
+	_unsaved_days = 0
+	return world.save(SAVE_SLOT, save_directory)
+
+
+# Plays `made`, steering the person carrying the player's soul, and closes the title screen.
+func _play(made: WorldAdapter) -> void:
 	world = made
-	world_seed = from_seed
-	steered = world.army_count() - 1
+	world_seed = world.region_seed()
+	steered = world.player_army()
+	_date = world.date()
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
 	_camera.position = _to_pixels(lead()).floor()
@@ -84,7 +123,6 @@ func start(from_seed: int) -> bool:
 	_camera.limit_bottom = int(rows.size() * PIXELS_PER_CELL)
 	_hud.title_screen.close()
 	_hud.new_game.close()
-	return true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -120,6 +158,10 @@ func _take(action: String) -> void:
 			_hud.new_game.open()
 		"start":
 			start(_hud.new_game.world_seed())
+		"continue":
+			resume_saved()
+		"save":
+			_hud.pause.note_save(save())
 		"settings":
 			_hud.pause.close()
 			_hud.settings.open()
@@ -129,7 +171,7 @@ func _take(action: String) -> void:
 				_hud.pause.visible = true
 		"resume":
 			_hud.pause.close()
-		"continue":
+		"go_on":
 			_hud.rebirth.close()
 		"title":
 			get_tree().reload_current_scene()
@@ -317,13 +359,27 @@ func advance(delta: float) -> void:
 		_since_tick -= step_seconds
 
 
-## Advances the world one tick, and opens the rebirth screen once the steered person has died
-## and its soul is born again as another.
+## Advances the world one tick, follows the player's soul into the army its body serves in now,
+## saves the world once AUTOSAVE_DAYS days have begun since it was last saved and a body carries
+## the soul, and opens the rebirth screen once the steered person has died and its soul is born
+## again as another.
 func step() -> void:
 	world.tick()
 	_art.note_tick()
 	_sound.note_tick()
 	ticks += 1
+	var army := world.player_army()
+	# While no body carries the soul, the camera keeps the army it last served in.
+	if army >= 0 and army != steered:
+		steered = army
+		_art.steered = army
+		_hud.show_player(world, army)
+	var date := world.date()
+	if date != _date:
+		_date = date
+		_unsaved_days += 1
+	if _unsaved_days >= AUTOSAVE_DAYS and army >= 0:
+		_hud.show_autosave(save())
 	var roster := world.roster(steered)
 	if roster.is_empty() or roster[0] == _body:
 		return

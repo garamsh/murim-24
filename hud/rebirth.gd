@@ -39,11 +39,11 @@ func open(world: WorldAdapter, ended: int, begun: int) -> void:
 	visible = true
 
 
-## Works the screen with `key`: Enter or Escape goes on. Returns "continue" when it does, and ""
+## Works the screen with `key`: Enter or Escape goes on. Returns "go_on" when it does, and ""
 ## for any other key.
 func key(event: InputEventKey) -> String:
 	if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
-		return "continue"
+		return "go_on"
 	return ""
 
 
