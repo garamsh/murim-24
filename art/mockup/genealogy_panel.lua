@@ -8,6 +8,7 @@
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
 local px = dofile(here .. "/../pixel.lua")
 local bdf = dofile(here .. "/bdf.lua")
+local panel_ui = dofile(here .. "/panel.lua")(px, bdf)
 local c = px.c
 
 local W, H = 480, 270
@@ -34,28 +35,9 @@ for _, p in pairs(people) do texts[#texts + 1] = p.name; texts[#texts + 1] = p.a
 for _, w in pairs(words) do texts[#texts + 1] = w end
 local font = bdf.load(here .. "/../../hud/fonts/Galmuri9.bdf", texts)
 
-local background = px.canvas(W, H)
+local background = panel_ui.backdrop(here .. "/target_screen.aseprite", W, H)
 local panel = px.canvas(W, H)
-
--- The game behind the panel, three steps darker along each colour's ramp under a checker of
--- ink, so the panel reads as the one thing open.
-local frames = px.load_frames(here .. "/target_screen.aseprite")
-for k, i in pairs(frames[1].p) do
-  local x, y = k % W, k // W
-  background.p[k] = (x + y) % 2 == 0 and c("ink", 1) or px.shift(i, -3)
-end
-
--- A HUD panel: ink with a gold trim and lacquer corner studs.
-local function frame(cv, x, y, w, h, fill)
-  cv:rect(x, y, w, h, c("ink", 2))
-  cv:rect(x + 1, y + 1, w - 2, h - 2, c("ink", 1))
-  cv:rect(x + 2, y + 2, w - 4, h - 4, fill or c("ink", 2))
-  cv:hline(x + 2, y, w - 4, c("gold", 3)); cv:hline(x + 2, y + h - 1, w - 4, c("gold", 2))
-  cv:vline(x, y + 2, h - 4, c("gold", 2)); cv:vline(x + w - 1, y + 2, h - 4, c("gold", 2))
-  for _, p in ipairs({ { x, y }, { x + w - 3, y }, { x, y + h - 3 }, { x + w - 3, y + h - 3 } }) do
-    cv:rect(p[1], p[2], 3, 3, c("gold", 3)); cv:set(p[1] + 1, p[2] + 1, c("lacquer", 3))
-  end
-end
+local frame = panel_ui.frame
 
 local PX, PY, PW, PH = 20, 12, 440, 246
 frame(panel, PX, PY, PW, PH)
@@ -74,29 +56,13 @@ for _, f in ipairs({ "orthodox", "demonic", "unorthodox" }) do
   bodies[f] = px.load_frames(here .. "/../bodies/" .. f .. ".aseprite")[1]
 end
 
-local CARD_W, CARD_H = 66, 40
--- A person's card at (x, y): the body on a slip of ground, the name, the age or that they died;
--- the steered person's card carries a jade frame and a tag over it.
+local CARD_W, CARD_H = panel_ui.CARD_W, panel_ui.CARD_H
+-- A person's card at (x, y); the steered person's card carries a jade frame and a tag over it.
 local function card(p, x, y, chosen)
-  panel:rect(x, y, CARD_W, CARD_H, chosen and c("jade", 3) or c("ink", 1))
-  panel:rect(x + 1, y + 1, CARD_W - 2, CARD_H - 2, chosen and c("jade", 2) or c("ink", 3))
-  panel:rect(x + 2, y + 2, CARD_W - 4, CARD_H - 4, c("ink", 2))
-  -- The body stands on a cell of ground, as it does in the world.
-  panel:rect(x + 4, y + 20, 16, 16, c("grass", 3))
-  panel:hline(x + 4, y + 20, 16, c("grass", 4))
-  local body = bodies[p.faction]
-  for k, i in pairs(body.p) do
-    local bx, by = k % body.w, k // body.w
-    panel:set(x + 4 + bx, y + 12 + by, p.dead and px.shift(i, -2) or i)
-  end
-  local name_colour = p.dead and c("stone", 4) or c("paper", 3)
-  bdf.text(panel, font, x + 23, y + 6, p.name, name_colour)
-  bdf.text(panel, font, x + 23, y + 21, p.dead and words.dead or p.age, p.dead and c("stone", 3) or c("stone", 4))
-  if chosen then
-    local w = bdf.width(font, words.own) + 6
-    panel:rect(x + CARD_W - w - 3, y - 5, w, 11, c("jade", 2))
-    bdf.text(panel, font, x + CARD_W - w, y - 5, words.own, c("paper", 3))
-  end
+  panel_ui.card(panel, font, x, y, {
+    body = bodies[p.faction], name = p.name, line = p.dead and words.dead or p.age, dead = p.dead,
+    ramp = chosen and "jade" or nil, tag = chosen and words.own or nil,
+  })
 end
 
 -- Lines of kin in gold: a marriage is a double line with a knot, descent a single line.
