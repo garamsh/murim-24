@@ -14,6 +14,10 @@ add_executable(murim_core_bench bench.cpp)
 target_link_libraries(murim_core_bench PRIVATE murim_core)
 target_compile_options(murim_core_bench PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
+add_executable(murim_core_sweep sweep.cpp)
+target_link_libraries(murim_core_sweep PRIVATE murim_core)
+target_compile_options(murim_core_sweep PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
