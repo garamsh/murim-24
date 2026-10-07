@@ -1,14 +1,16 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
 ## HUD: the player's portrait, faction, health and inner energy with their values; the
-## genealogy panel, which G opens; the sect panel, which M opens; its faction's
-## leader, a duel for the lead while one is fought, and the verdict on a challenge; a map of the
-## region around the player with the season and year; a rumour log; and the technique bar, an
-## icon and its number key for each of the player's skills. Every word comes from
-## hud.csv through Godot's translations, Korean first; F2 switches between Korean and English.
-## It reads the world and holds no game rule.
+## genealogy panel, which G opens; the sect panel, which M opens; the title, new-game, pause and
+## settings screens; its faction's leader, a duel for the lead while one is fought, and the
+## verdict on a challenge; a map of the region around the player with the season and year; a
+## rumour log; and the technique bar, an icon and its number key for each of the player's skills.
+## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
+## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
 extends CanvasLayer
 
 const LOCALES := ["ko", "en"]
+## The key that switches the language.
+const LOCALE_KEY := KEY_F2
 const FONT := "res://hud/fonts/Galmuri9.ttf"
 const FONT_SIZE := 10
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
@@ -51,6 +53,12 @@ var labels := {}
 var genealogy: Control
 ## The sect panel, open over the HUD while the player reads it.
 var sect: Control
+## The title screen, the new-game panel over it, the pause panel over the game, and the settings
+## panel over either.
+var title_screen: Control
+var new_game: Control
+var pause: Control
+var settings: Control
 ## The panel shown while a duel for the player's faction's lead is fought, and its two bars:
 ## `challenger` and `leader`.
 var duel_panel: Panel
@@ -98,8 +106,9 @@ func _set_up() -> void:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key != null and key.pressed and key.keycode == KEY_F2:
+	if key != null and key.pressed and key.keycode == LOCALE_KEY:
 		switch_locale()
+		settings.note_locale()
 
 
 ## Switches the HUD to the next locale in LOCALES, and returns it.
@@ -107,6 +116,21 @@ func switch_locale() -> String:
 	var next: String = LOCALES[(LOCALES.find(TranslationServer.get_locale().left(2)) + 1) % LOCALES.size()]
 	TranslationServer.set_locale(next)
 	return next
+
+
+## Builds the HUD if it is not yet built, and opens the title screen.
+func open_title() -> void:
+	_set_up()
+	title_screen.open()
+
+
+## Returns the screen open on top, the one that takes the keys: the settings, the new-game panel,
+## the pause panel or the title, or null while none is open.
+func screen() -> Control:
+	for open: Control in [settings, new_game, pause, title_screen]:
+		if open.visible:
+			return open
+	return null
 
 
 ## Shows `world`'s region on the map and army `steered`'s faction on the portrait.
@@ -331,6 +355,17 @@ func _build() -> void:
 	labels.notice.visible = false
 	add_child(genealogy)
 	add_child(sect)
+	# The screens, closed until the play scene opens one, over every panel and each over the last.
+	title_screen = preload("res://hud/title.gd").new()
+	new_game = preload("res://hud/new_game.gd").new()
+	pause = preload("res://hud/pause.gd").new()
+	settings = preload("res://hud/settings.gd").new()
+	settings.locales = LOCALES
+	settings.locale_key = OS.get_keycode_string(LOCALE_KEY)
+	for screen_panel: Control in [title_screen, new_game, pause, settings]:
+		screen_panel.use_font(_theme.default_font)
+		screen_panel.visible = false
+		add_child(screen_panel)
 
 func _panel(rect: Rect2) -> Panel:
 	var panel := Panel.new()

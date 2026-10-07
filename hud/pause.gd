@@ -1,0 +1,78 @@
+## The pause panel over the game, drawn as art/mockup/pause_screen.png lays it out: a menu to
+## resume, open the settings, leave for the title or quit, over the seed the world was opened
+## from; beside it the controls guide, each control's keys on their caps and what it does, as the
+## play scene binds them. Every word comes from hud.csv through Godot's translations. It holds no
+## game rule.
+extends "res://hud/panel.gd"
+
+# The mockup's layout, in the native 480x270, grown by a row of the guide for the keys 1 to 9 and 0.
+const DIALOG := Rect2(80, 26, 320, 218)
+const MENU_WIDTH := 120
+const GUIDE_X := 230
+const GUIDE_STEP := 16
+# Where what a control does starts, right of its keys' caps.
+const GUIDE_TEXT_X := 64
+## The menu's entries, by what choosing each does.
+const ENTRIES := ["resume", "settings", "title", "quit"]
+const ENTRY_KEYS := {"resume": "PAUSE_RESUME", "settings": "PAUSE_SETTINGS", "title": "PAUSE_TO_TITLE",
+		"quit": "PAUSE_QUIT"}
+
+## The entry the menu has chosen, an index into ENTRIES.
+var chosen := 0
+## The controls the guide shows, each a Dictionary of its `keys`, the words on its caps, and
+## `does`, the hud.csv key of what it does.
+var controls: Array[Dictionary] = []
+## The seed the world was opened from.
+var world_seed := 0
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		queue_redraw()
+
+
+## Opens the panel on the world opened from `opened_from`, its guide showing `shown`, as
+## `controls` holds them, with its first entry chosen.
+func open(shown: Array[Dictionary], opened_from: int) -> void:
+	controls = shown
+	world_seed = opened_from
+	chosen = 0
+	visible = true
+	queue_redraw()
+
+
+## Works the menu with `key`: up and down choose an entry, Enter takes it and Escape resumes.
+## Returns what taking it does, one of ENTRIES, or "" when the key took none.
+func key(event: InputEventKey) -> String:
+	if event.keycode == KEY_UP or event.keycode == KEY_DOWN:
+		chosen = clampi(chosen + (1 if event.keycode == KEY_DOWN else -1), 0, ENTRIES.size() - 1)
+		queue_redraw()
+	elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+		return ENTRIES[chosen]
+	elif event.keycode == KEY_ESCAPE:
+		return "resume"
+	return ""
+
+
+func _draw() -> void:
+	_dim()
+	_dialog(DIALOG, tr("PAUSE_TITLE"), tr("PAUSE_CLOSE"), tr("PAUSE_KEYS"))
+	var left := DIALOG.position.x + 10
+	var items: Array[Dictionary] = []
+	for entry: String in ENTRIES:
+		items.append({"text": tr(ENTRY_KEYS[entry])})
+	_menu(Vector2(left, DIALOG.position.y + 32), MENU_WIDTH, items, chosen)
+	var seed_y := DIALOG.end.y - 40
+	draw_rect(Rect2(left, seed_y - 5, MENU_WIDTH, 1), INK_LIGHT)
+	_text(Vector2(left + 2, seed_y), tr("PAUSE_SEED"), GOLD)
+	var value := str(world_seed)
+	_text(Vector2(left + MENU_WIDTH - 4 - _width(value), seed_y), value, STONE)
+	draw_rect(Rect2(GUIDE_X - 10, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), INK_LIGHT)
+	_text(Vector2(GUIDE_X, DIALOG.position.y + 26), tr("CONTROLS_TITLE"), GOLD)
+	draw_rect(Rect2(GUIDE_X, DIALOG.position.y + 39, DIALOG.end.x - 10 - GUIDE_X, 1), INK_LIGHT)
+	for n in controls.size():
+		var y := DIALOG.position.y + 44 + n * GUIDE_STEP
+		var x := GUIDE_X
+		for cap: String in controls[n].keys:
+			x += _keycap(Vector2(x, y), tr(cap)) + 2
+		_text(Vector2(GUIDE_X + GUIDE_TEXT_X, y), tr(controls[n].does), PAPER)
