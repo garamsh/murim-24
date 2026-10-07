@@ -1,8 +1,8 @@
 -- Draws contact_sheet.aseprite: every frame of the production set, read back from the
 -- .aseprite sources, a small scene built from them on the 16-pixel grid with shadows drawn
 -- the way the view is to draw them, a mixed-terrain patch laid as the view is to lay it, a
--- farming village and a sect's seat assembled from them. It is a review image; the game does
--- not load it.
+-- farming village, a sect's seat and a grown village with its workshops assembled from them. It
+-- is a review image; the game does not load it.
 -- Run: aseprite --batch --script art/contact_sheet/contact_sheet.lua (after the asset scripts)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -11,7 +11,7 @@ local S = dofile(here .. "/../sprites.lua")(px)
 local c = px.c
 local art = here .. "/.."
 
-local W, H = 608, 1912
+local W, H = 608, 2250
 local sheet = px.canvas(W, H)
 sheet:rect(0, 0, W, H, c("ink", 2))
 
@@ -465,6 +465,54 @@ table.sort(standing_seat, function(a, b) if a[1] == b[1] then return a[2] < b[2]
 for _, s in ipairs(standing_seat) do s[3]() end
 for y = SVY, SVY + 207 do
   for x = SVX, SVX + 479 do sheet:set(x, y, seat:get(x, y)) end
+end
+
+-- The workshops a growing village builds: the smithy and the apothecary in their stages, then a
+-- grown village of 30 x 10 cells, its workshops among the houses and stores by the road and
+-- fields south of it. Everything standing is drawn in order of the bottom edge of its footprint.
+local smithy = load("structures/smithy.aseprite")
+local apothecary = load("structures/apothecary.aseprite")
+label(8, 1912, "WORKSHOPS", c("paper", 3))
+stages(smithy, "SMITHY, 3 X 2", 3, 2, 8, 1936, 72)
+stages(apothecary, "APOTHECARY, 4 X 2", 4, 2, 8, 2000, 88)
+local GVX, GVY = 8, 2076
+label(8, GVY - 12, "ASSEMBLED IN A GROWN VILLAGE", c("paper", 3))
+local grown = px.canvas(W, H)
+for row = 0, 9 do
+  for col = 0, 29 do
+    grown:stamp(frame(terrain, "plain", 1 + math.floor(px.hash(col, row, 108) * 4)), GVX + col * 16, GVY + row * 16)
+  end
+end
+for col = 0, 29 do
+  grown:stamp(ground_tiles.frames[ground_tiles.tags.road[1] + col % 4], GVX + col * 16, GVY + 5 * 16)
+end
+for k, p in ipairs({ { "ripe", 9 }, { "growing", 13 }, { "ripe", 17 }, { "sown", 21 } }) do plot(grown, p[1], GVX + p[2] * 16, GVY + 7 * 16, 3, 3) end
+local standing_grown = {}
+local function stand_grown(set, tag, col, row, rows)
+  standing_grown[#standing_grown + 1] = { row + rows, #standing_grown, function()
+    grown:stamp(frame(set, tag), GVX + col * 16 - 8, GVY + row * 16 - 8)
+  end }
+end
+stand_grown(house, "intact", 1, 1, 3)
+stand_grown(smithy, "intact", 5, 3, 2)
+stand_grown(granary, "intact", 9, 2, 2)
+stand_grown(house, "intact", 12, 1, 3)
+stand_grown(apothecary, "intact", 16, 3, 2)
+stand_grown(storehouse, "intact", 21, 2, 2)
+stand_grown(well, "intact", 25, 3, 2)
+stand_grown(barrels, "intact", 28, 4, 1)
+stand_grown(house, "intact", 1, 6, 3)
+stand_grown(smithy, "damaged", 5, 7, 2)
+stand_grown(apothecary, "destroyed", 25, 7, 2)
+for _, b in ipairs({ { "unorthodox", 8, 4, "idle" }, { "unorthodox", 15, 5, "walk", 2 }, { "orthodox", 20, 4, "idle" } }) do
+  standing_grown[#standing_grown + 1] = { b[3] + 1, #standing_grown, function()
+    grown:stamp(frame(bodies[b[1]], b[4], b[5]), GVX + b[2] * 16, GVY + b[3] * 16 - 8)
+  end }
+end
+table.sort(standing_grown, function(a, b) if a[1] == b[1] then return a[2] < b[2] end return a[1] < b[1] end)
+for _, s in ipairs(standing_grown) do s[3]() end
+for y = GVY, GVY + 159 do
+  for x = GVX, GVX + 479 do sheet:set(x, y, grown:get(x, y)) end
 end
 
 px.save(W, H, { { "sheet", sheet } }, here .. "/contact_sheet.aseprite")
