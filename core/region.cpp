@@ -61,7 +61,7 @@ constexpr std::uint32_t BIRTH_CHANCE = 400;
 constexpr std::uint32_t BIRTH_SPACING = 2 * YEAR;
 // Husbandry and the structure kinds in region_data().
 constexpr std::uint32_t HUNGER_DAYS = 10;
-constexpr std::int32_t MIGRATION_REACH = 64;
+constexpr std::int32_t MIGRATION_REACH = 48;
 constexpr std::uint32_t HOUSE_HOUSING = 8;
 constexpr std::uint32_t HALL_HOUSING = 12;
 constexpr std::uint32_t GRANARY_STORAGE = 2'400;
@@ -678,7 +678,7 @@ RegionData region_data() {
                    true},
            names(),
            // Each person eats a measure of food a day. Unfed for ten days,
-           // a person moves to a village within 64 cells with room and food,
+           // a person moves to a village within 48 cells with room and food,
            // or dies.
            Husbandry{1, HUNGER_DAYS, MIGRATION_REACH},
            std::nullopt,
