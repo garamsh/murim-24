@@ -218,6 +218,43 @@ void fold_manual(const Fold& fold, const Manual& manual) {
   }
 }
 
+// The indices an event's happening names, in their order.
+std::vector<std::size_t> named(const Founded& what) {
+  return {what.village, what.faction};
+}
+std::vector<std::size_t> named(const Raided& what) {
+  return {what.village, what.owner, what.raider};
+}
+std::vector<std::size_t> named(const Ruined& what) {
+  return {what.village, what.owner, what.destroyer.army,
+          what.destroyer.faction};
+}
+std::vector<std::size_t> named(const SectFell& what) {
+  return {what.sect, what.faction};
+}
+std::vector<std::size_t> named(const LeaderChanged& what) {
+  return {what.faction, what.leader, static_cast<std::size_t>(what.by)};
+}
+std::vector<std::size_t> named(const Born& what) { return {what.person}; }
+std::vector<std::size_t> named(const Died& what) { return {what.person}; }
+
+// Folds event `event` into `fold`.
+template <typename Fold>
+void fold_event(const Fold& fold, const Event& event) {
+  fold(event.sequence);
+  fold(event.tick);
+  fold(event.cell.x);
+  fold(event.cell.y);
+  fold(event.what.index());
+  std::visit(
+      [&fold](const auto& what) {
+        for (const std::size_t index : named(what)) {
+          fold(index);
+        }
+      },
+      event.what);
+}
+
 template <typename Fold>
 void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
   fold(person.position.x);
@@ -530,11 +567,13 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   for (const ArmySpec& army : armies) {
     recruits += army.members.size();
   }
-  if (!reachable(rules_.separation) || recruits > MAX_PEOPLE ||
+  if (!reachable(rules_.separation) || !reachable(rules_.rumour_reach) ||
+      recruits > MAX_PEOPLE ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
-        "separation, range and radius must lie in [0, MAX_REACH], hostility "
+        "separation, rumour reach, range and radius must lie in "
+        "[0, MAX_REACH], hostility "
         "must be square, the world must hold at most MAX_PEOPLE people, each "
         "with health up to MAX_HEALTH on a passable cell, every army must "
         "have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known "
@@ -853,13 +892,16 @@ World::Living World::living_people() const {
 
 void World::keep_sects() {
   const Living living = living_people();
+  std::vector<std::size_t> bereft;
   for (const std::size_t member : living.people) {
     std::optional<std::size_t>& sect = people_.at(member).sect;
     if (sect && armies_.at(living.army_of.at(member)).faction !=
                     sects_.at(*sect).faction) {
+      bereft.push_back(*sect);
       sect.reset();
     }
   }
+  note_falls(std::move(bereft));
   const Manuals scattering = life_.manuals.value_or(Manuals{});
   for (Manual& manual : manuals_) {
     const auto* held = std::get_if<HeldBySect>(&manual.place);
@@ -885,52 +927,192 @@ void World::keep_sects() {
   admit(living);
 }
 
+// What sect `sect` offers an applicant now: whether its seat is held, whether
+// it has a living elder, its members and its cap.
+World::Opening World::opening(std::size_t sect) const {
+  return Opening{seat_held(sect), !sect_elders(sect).empty(),
+                 sect_members(sect).size(), sect_cap(sect)};
+}
+
+// Why person `person`, serving in an army of `faction`, or in none once dead,
+// may not join sect `sect`, as `open` finds it: the first refusal that holds,
+// or NONE.
+ApplicationRefusal World::assess(std::size_t person,
+                                 std::optional<std::size_t> faction,
+                                 std::size_t sect, const Opening& open) const {
+  const Person& applicant = people_.at(person);
+  if (!faction) {
+    return ApplicationRefusal::DEAD;
+  }
+  if (applicant.sect) {
+    return ApplicationRefusal::IN_A_SECT;
+  }
+  if (!applicant.home) {
+    return ApplicationRefusal::NO_HOME;
+  }
+  const std::optional<Admission>& admission =
+      leadership_.at(*faction).admission;
+  if (*faction != sects_.at(sect).faction || !admission) {
+    return ApplicationRefusal::NOT_OF_FACTION;
+  }
+  if (age_in_days(applicant) < static_cast<std::int64_t>(admission->age)) {
+    return ApplicationRefusal::TOO_YOUNG;
+  }
+  bool able = false;
+  for (std::size_t discipline = 0; discipline < applicant.talent.size();
+       ++discipline) {
+    able =
+        able || (applicant.talent.at(discipline).limit >= admission->talent &&
+                 applicant.attainment.at(discipline) >= admission->attainment);
+  }
+  if (!able) {
+    return ApplicationRefusal::UNPROVEN;
+  }
+  if (!within(seat(*applicant.home), seat(sects_.at(sect).seat),
+              admission->reach)) {
+    return ApplicationRefusal::TOO_FAR;
+  }
+  if (!open.held) {
+    return ApplicationRefusal::SEAT_LOST;
+  }
+  if (!open.elder) {
+    return ApplicationRefusal::NO_ELDER;
+  }
+  if (open.members >= open.cap) {
+    return ApplicationRefusal::FULL;
+  }
+  return ApplicationRefusal::NONE;
+}
+
 // Admits each living person of no sect, in index order, by its faction's
-// admission, to one of the sects open to it, drawn by the seed.
+// admission's chance, to one of the sects it may join, drawn by the seed.
 void World::admit(const Living& living) {
-  std::vector<std::size_t> members(sects_.size());
-  std::vector<bool> open(sects_.size());
+  std::vector<Opening> openings;
+  openings.reserve(sects_.size());
   for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
-    members.at(sect) = sect_members(sect).size();
-    open.at(sect) = seat_held(sect) && !sect_elders(sect).empty();
+    openings.push_back(opening(sect));
   }
   for (const std::size_t candidate : living.people) {
-    Person& person = people_.at(candidate);
     const std::size_t faction =
         armies_.at(living.army_of.at(candidate)).faction;
     const std::optional<Admission>& admission =
         leadership_.at(faction).admission;
-    if (person.sect || !person.home || !admission ||
-        age_in_days(person) < static_cast<std::int64_t>(admission->age)) {
-      continue;
-    }
-    bool able = false;
-    for (std::size_t discipline = 0; discipline < person.talent.size();
-         ++discipline) {
-      able =
-          able || (person.talent.at(discipline).limit >= admission->talent &&
-                   person.attainment.at(discipline) >= admission->attainment);
-    }
-    const Cell home = seat(*person.home);
     std::vector<std::size_t> sects;
     for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
-      const Cell centre = seat(sects_.at(sect).seat);
-      if (sects_.at(sect).faction == faction && open.at(sect) &&
-          members.at(sect) < sect_cap(sect) &&
-          std::abs(centre.x - home.x) <= admission->reach &&
-          std::abs(centre.y - home.y) <= admission->reach) {
+      if (assess(candidate, faction, sect, openings.at(sect)) ==
+          ApplicationRefusal::NONE) {
         sects.push_back(sect);
       }
     }
-    if (!able || sects.empty() ||
+    if (sects.empty() || !admission ||
         next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) >=
             admission->chance) {
       continue;
     }
     const std::size_t joined = sects.at(next_random() % sects.size());
-    person.sect = joined;
-    ++members.at(joined);
+    people_.at(candidate).sect = joined;
+    ++openings.at(joined).members;
   }
+}
+
+ApplicationRefusal World::application_refusal(std::size_t person,
+                                              std::size_t sect) const {
+  if (person >= people_.size() || sect >= sects_.size()) {
+    throw std::invalid_argument("no such person or sect applies");
+  }
+  return assess(person, faction_of(person), sect, opening(sect));
+}
+
+void World::apply(std::size_t person, std::size_t sect) {
+  if (application_refusal(person, sect) != ApplicationRefusal::NONE) {
+    throw std::invalid_argument(
+        "an applicant must meet its faction's admission and the sect have "
+        "room");
+  }
+  people_.at(person).sect = sect;
+}
+
+// Records `what`, which happened at `cell` on this tick, letting the oldest
+// event go once EVENT_CAPACITY are kept.
+void World::record(Cell cell, Happening what) {
+  const std::uint64_t sequence =
+      events_.empty() ? 0 : events_.back().sequence + 1;
+  if (events_.size() == EVENT_CAPACITY) {
+    events_.erase(events_.begin());
+  }
+  events_.push_back(Event{sequence, tick_count_, cell, what});
+}
+
+// Records the fall of each of `sects` that no longer stands, once each; a
+// sect's fall is noted when its last member leaves.
+void World::note_falls(std::vector<std::size_t> sects) {
+  std::sort(sects.begin(), sects.end());
+  sects.erase(std::unique(sects.begin(), sects.end()), sects.end());
+  for (const std::size_t sect : sects) {
+    if (!sect_stands(sect)) {
+      record(seat(sects_.at(sect).seat),
+             SectFell{sect, sects_.at(sect).faction});
+    }
+  }
+}
+
+const std::vector<Event>& World::events() const { return events_; }
+
+// Whether `other` is `one`'s kin: itself, of its family, its spouse, parent
+// or child.
+bool World::related(std::size_t one, std::size_t other) const {
+  const Person& self = people_.at(one);
+  const auto among = [other](const std::vector<std::size_t>& people) {
+    return std::find(people.begin(), people.end(), other) != people.end();
+  };
+  return one == other || self.family == people_.at(other).family ||
+         among(self.spouses) || among(self.parents) || among(self.children);
+}
+
+// Whether event `event` reaches person `person`, of `faction` if it serves
+// in an army, as a rumour.
+bool World::heard_by(const Event& event, std::size_t person,
+                     std::optional<std::size_t> faction) const {
+  if (within(cell_of(people_.at(person).position), event.cell,
+             rules_.rumour_reach)) {
+    return true;
+  }
+  const auto ours = [faction](std::size_t other) { return faction == other; };
+  if (const auto* born = std::get_if<Born>(&event.what)) {
+    return related(person, born->person);
+  }
+  if (const auto* died = std::get_if<Died>(&event.what)) {
+    return related(person, died->person);
+  }
+  if (const auto* founded = std::get_if<Founded>(&event.what)) {
+    return ours(founded->faction);
+  }
+  if (const auto* raided = std::get_if<Raided>(&event.what)) {
+    return ours(raided->owner) || ours(raided->raider);
+  }
+  if (const auto* ruined = std::get_if<Ruined>(&event.what)) {
+    return ours(ruined->owner) || ours(ruined->destroyer.faction);
+  }
+  if (const auto* fell = std::get_if<SectFell>(&event.what)) {
+    return ours(fell->faction);
+  }
+  const auto* changed = std::get_if<LeaderChanged>(&event.what);
+  return changed != nullptr && ours(changed->faction);
+}
+
+std::vector<Event> World::rumours(std::size_t person, std::size_t count) const {
+  if (person >= people_.size()) {
+    throw std::out_of_range("no such person hears rumours");
+  }
+  const std::optional<std::size_t> faction = faction_of(person);
+  std::vector<Event> heard;
+  for (auto event = events_.rbegin();
+       event != events_.rend() && heard.size() < count; ++event) {
+    if (heard_by(*event, person, faction)) {
+      heard.push_back(*event);
+    }
+  }
+  return heard;
 }
 
 // Makes the master of faction `faction`'s sects with the most favour its
@@ -957,8 +1139,10 @@ void World::elect(std::size_t faction) {
       most = favour;
     }
   }
-  if (chosen) {
+  if (chosen && chosen != leadership_.at(faction).leader) {
     leadership_.at(faction).leader = chosen;
+    record(cell_of(people_.at(*chosen).position),
+           LeaderChanged{faction, *chosen, ChosenBy::ELECTION});
   }
 }
 
@@ -1245,6 +1429,18 @@ void World::tick() {
   }
   // A soul whose body died this tick is born again, into the army it served.
   const std::vector<Passing> reborn = passings();
+  std::vector<std::size_t> bereft;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      const Person& dead = people_.at(member);
+      if (dead.health == 0) {
+        record(cell_of(dead.position), Died{member});
+        if (dead.sect) {
+          bereft.push_back(*dead.sect);
+        }
+      }
+    }
+  }
   for (Army& army : armies_) {
     army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
                                      [this](std::size_t member) {
@@ -1252,6 +1448,7 @@ void World::tick() {
                                      }),
                       army.roster.end());
   }
+  note_falls(std::move(bereft));
   // Each person's pull toward its objective, from where it stood: none
   // within its arrival ring, as many cells from the objective as the square
   // root of its rank in its army. A person within two cells of its ring
@@ -1447,6 +1644,10 @@ StateHash World::hash() const {
   for (const Village& village : villages_) {
     fold_village(fold, village);
   }
+  fold(rules_.rumour_reach);
+  for (const Event& event : events_) {
+    fold_event(fold, event);
+  }
   return StateHash{digest};
 }
 
@@ -1551,6 +1752,8 @@ void World::settle_duels() {
       continue;
     }
     leadership_.at(fight.faction).leader = fight.challenger;
+    record(cell_of(people_.at(fight.challenger).position),
+           LeaderChanged{fight.faction, fight.challenger, ChosenBy::DUEL});
     std::vector<std::vector<bool>>& hostility = rules_.hostile;
     for (std::size_t other = 0; other < hostility.size(); ++other) {
       const bool ally = other != fight.faction &&
@@ -1719,6 +1922,7 @@ bool World::shift(std::size_t structure, Destroyer striker,
       [this](std::size_t index) { return stage(index) == Stage::RUBBLE; });
   if (stood && ruined) {
     village.destroyer = striker;
+    record(seat(*home), Ruined{*home, owner(*home), striker});
   }
   if (shifted.durability > before &&
       armies_.at(village.spec.residents).roster.empty()) {
@@ -1863,6 +2067,7 @@ void World::rebirth(Passing passing) {
     people_.at(parent).children.push_back(born);
   }
   people_.push_back(std::move(person));
+  record(cell_of(people_.at(born).position), Born{born});
   // The soul's army takes its new family's faction and skills.
   Army& serving = armies_.at(army);
   const Army& family = armies_.at(villages_.at(village).spec.residents);
@@ -2069,6 +2274,7 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   people_.at(father).children.push_back(born);
   people_.at(mother).children.push_back(born);
   people_.push_back(std::move(child));
+  record(cell_of(people_.at(born).position), Born{born});
   army_of.push_back(army_of.at(lineage));
   armies_.at(army_of.at(lineage)).roster.push_back(born);
 }
@@ -2635,6 +2841,7 @@ bool World::found_village(std::size_t village, const Growth& growth) {
   villages_.push_back(Village{VillageSpec{{}, army, {}, 0, {}}, std::nullopt, 0,
                               std::nullopt, std::nullopt, corner});
   attach(villages_.size() - 1, *laid, growth);
+  record(centre, Founded{villages_.size() - 1, faction});
   return true;
 }
 
@@ -2682,6 +2889,7 @@ bool World::send_raid(std::size_t village, const Growth& growth) {
       form(village, raiders, seat(*target), raiding.party);
   villages_.at(village).party = party;
   villages_.at(village).raiding = target;
+  record(seat(*target), Raided{*target, owner(*target), faction});
   return true;
 }
 

@@ -61,6 +61,6 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 
 - **Banners after a change of owner.** A banner keeps the colours of the owner its village had when it was laid, while the map's square and the borders follow the owner now.
 - **Inner energy.** The core has none. The HUD's inner-energy bar stands empty with a dash for its value until the core holds it.
-- **Rumours.** The HUD's rumour log shows a placeholder line until the core spreads rumours (`docs/concept.md` §Reputation and rumors).
+- **Rumours.** The HUD's rumour log shows a placeholder line until the adapter reads the core's `rumours` (ADR 0032).
 
 - **Which platforms the library is built for.** It is built for the host, macOS arm64 and Linux x86_64 so far, and for Android arm64; iOS exports are not built.
