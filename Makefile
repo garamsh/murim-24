@@ -1,4 +1,4 @@
-.PHONY: lint format test build ci bench android
+.PHONY: lint format test build ci bench sweep android
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
@@ -78,6 +78,15 @@ bench: build
 	$(GODOT) --path . --script res://world_view/frame_bench.gd; frame=$$?; \
 	echo "make bench ran the tick benchmark (exit $$tick) and the frame benchmark (exit $$frame)"; \
 	test $$tick -eq 0 && test $$frame -eq 0
+
+# Not part of ci: it measures how regions grow over seeds and years, which tunes data and gates nothing.
+FIRST_SEED ?= 0
+LAST_SEED ?= 49
+YEARS ?= 100
+sweep: build
+	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
+	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_sweep
+	$(BENCH_DIR)/murim_core_sweep $(FIRST_SEED) $(LAST_SEED) $(YEARS)
 
 # Not part of ci: CI installs no Android SDK. The NDK's toolchain file selects the target; extension/CMakeLists.txt is the same for every platform.
 # The export runs frame_bench.gd at launch through the preset's command_line/extra_args, and murim_core_bench is pushed to the device separately.

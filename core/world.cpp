@@ -1464,6 +1464,30 @@ bool World::may_bear(std::size_t mother, const Kinship& kinship) const {
          age >= kinship.bearing_age.low && age <= kinship.bearing_age.high;
 }
 
+// The sex fewer among the living unmarried whose home is village `village`
+// and who are not past marrying age, children included; none when as many
+// men as women.
+std::optional<Sex> World::scarcer_sex(std::size_t village,
+                                      const Kinship& kinship) const {
+  std::int64_t men_over_women = 0;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      const Person& person = people_.at(member);
+      const bool wed = !person.spouses.empty() &&
+                       people_.at(person.spouses.back()).health > 0;
+      if (person.home != village || wed ||
+          age_in_days(person) > kinship.marrying_age.high) {
+        continue;
+      }
+      men_over_women += person.sex == Sex::MALE ? 1 : -1;
+    }
+  }
+  if (men_over_women == 0) {
+    return std::nullopt;
+  }
+  return men_over_women > 0 ? Sex::FEMALE : Sex::MALE;
+}
+
 // Whether living person `person` may marry: of marrying age, with a home and
 // no living spouse.
 bool World::free_to_marry(std::size_t person, const Kinship& kinship) const {
@@ -1510,7 +1534,8 @@ void World::marry(std::size_t person, const std::vector<std::size_t>& living,
 }
 
 // Bears a child to `mother` and her husband by the one birth rule, into the
-// family, home and army of the parent the lineage follows, at its side.
+// family, home and army of the parent the lineage follows, at its side; with
+// balanced sexes, of the sex scarcer among its home's unmarried.
 void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
                        const Kinship& kinship) {
   const std::size_t father = people_.at(mother).spouses.back();
@@ -1522,7 +1547,9 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   child.home = parent.home;
   child.family = parent.family;
   child.parents = {father, mother};
-  bear(child, Soul{});
+  bear(child, Soul{},
+       kinship.balanced_sexes && child.home ? scarcer_sex(*child.home, kinship)
+                                            : std::nullopt);
   const std::size_t born = people_.size();
   people_.at(father).children.push_back(born);
   people_.at(mother).children.push_back(born);

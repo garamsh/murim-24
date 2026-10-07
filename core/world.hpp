@@ -112,7 +112,10 @@ struct Name {
 /// sooner than `birth_spacing` days after her last, while the world holds
 /// fewer than MAX_PEOPLE living. The child is born by the one birth rule
 /// into its father's family, or its mother's unless `fathers_family`, and
-/// at that parent's side, home and army.
+/// at that parent's side, home and army. With `balanced_sexes` it takes the
+/// sex fewer among the living unmarried whose home is its own and who are not
+/// past marrying age, children included; otherwise, or when they are as many,
+/// its sex is drawn at even odds.
 struct Kinship {
   Range marrying_age;
   std::int32_t neighbourhood = 0;
@@ -121,6 +124,7 @@ struct Kinship {
   std::uint32_t birth_chance = 0;
   std::uint32_t birth_spacing = 0;
   bool fathers_family = true;
+  bool balanced_sexes = false;
 };
 
 /// How a village feeds its people, as data, checked once a day. Each person
@@ -702,6 +706,8 @@ class World {
   void migrate_or_starve(Unfed unfed, std::int32_t reach,
                          std::vector<std::size_t>& population);
   [[nodiscard]] bool may_bear(std::size_t mother, const Kinship& kinship) const;
+  [[nodiscard]] std::optional<Sex> scarcer_sex(std::size_t village,
+                                               const Kinship& kinship) const;
   [[nodiscard]] bool free_to_marry(std::size_t person,
                                    const Kinship& kinship) const;
   [[nodiscard]] Cell seat(std::size_t village) const;

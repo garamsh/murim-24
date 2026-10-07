@@ -1236,5 +1236,23 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
   EXPECT_LE(barren.living_after, barren.living_before);
 }
 
+// A seed whose first children were 17 daughters of 18, with sexes drawn at
+// even odds: their faction's founders aged out with no son to marry them.
+constexpr Seed SONLESS{9};
+
+TEST(Region, ChildrenOfTheScarcerSexKeepEveryFactionPeopled) {
+  const Century balanced = century(region_data(), SONLESS);
+  EXPECT_EQ(balanced.fewest_factions, region_data().factions.size());
+  EXPECT_GE(balanced.living_after, 2 * balanced.living_before);
+  // Control: with sexes drawn at even odds, a faction dies out.
+  RegionData drawn = region_data();
+  Kinship kinship = drawn.life.kinship.value_or(Kinship{});
+  kinship.balanced_sexes = false;
+  drawn.life.kinship = kinship;
+  const Century unbalanced = century(drawn, SONLESS);
+  EXPECT_LT(unbalanced.fewest_factions, drawn.factions.size());
+  EXPECT_LT(unbalanced.living_after, 2 * unbalanced.living_before);
+}
+
 }  // namespace
 }  // namespace murim
