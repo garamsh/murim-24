@@ -1,7 +1,9 @@
 -- Draws the village decorations, which never block or break and are laid by the view from
 -- presentation data: ground.aseprite, 16x16 tiles of built ground tagged paving, road, millet
 -- and rice; and banner.aseprite, a faction's banner on a pole in a 16x24 frame whose bottom 16
--- rows are its cell, tagged orthodox, demonic and unorthodox.
+-- rows are its cell, tagged orthodox, demonic and unorthodox; and sect_banner.aseprite, a sect's
+-- tall streamer hung from a crossbar, in a 16x32 frame whose bottom 16 rows are its cell, tagged
+-- the same.
 -- Run: aseprite --batch --script art/decorations/decorations.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -81,3 +83,45 @@ for n, f in ipairs({ { "orthodox", "azure" }, { "demonic", "crimson" }, { "unort
   banner_tags[n] = { f[1], n, n, 100 }
 end
 px.save_frames(T, 24, banners, banner_tags, here .. "/banner.aseprite")
+
+-- A sect's banner: a tall pole on a stone foot, a crossbar near its top, and a long streamer of
+-- paper-white cloth edged in the faction's accent, two ink characters down it and a swallowtail
+-- with tassels at its foot. The faction's banner is a short pennant of the accent itself, so the
+-- two read apart at a glance.
+local function sect_banner(cv, ramp)
+  local x = 3
+  cv:rect(x - 1, 29, 4, 3, c("stone", 4)); cv:hline(x - 1, 29, 4, c("stone", 5))
+  cv:vline(x, 2, 27, c("wood", 4)); cv:vline(x + 1, 2, 27, c("wood", 2))
+  cv:set(x, 0, c("stone", 6)); cv:set(x, 1, c("stone", 5)); cv:set(x + 1, 1, c("stone", 4))
+  cv:hline(x, 3, 10, c("wood", 4)); cv:hline(x + 2, 4, 8, c("wood", 2))
+  cv:set(x + 9, 2, c("gold", 4))
+  local top, bottom = 5, 21
+  for yy = top, bottom do
+    for xx = x + 3, x + 9 do
+      local col = c("paper", 3)
+      if xx == x + 3 or yy == top then col = c(ramp, 4) end
+      if xx == x + 9 or yy == bottom then col = c(ramp, 2) end
+      if xx == x + 8 and yy > top and yy < bottom then col = c("paper", 2) end
+      cv:set(xx, yy, col)
+    end
+  end
+  -- The swallowtail: the cloth's foot cut in two points.
+  for xx = x + 3, x + 9 do
+    if xx ~= x + 6 then cv:set(xx, bottom + 1, xx < x + 6 and c(ramp, 3) or c(ramp, 2)) end
+  end
+  cv:set(x + 3, bottom + 2, c(ramp, 3)); cv:set(x + 9, bottom + 2, c(ramp, 2))
+  cv:set(x + 3, bottom + 3, c("gold", 3)); cv:set(x + 9, bottom + 3, c("gold", 3))
+  -- Two characters, brushed in ink.
+  cv:hline(x + 5, 8, 3, c("ink", 1)); cv:vline(x + 6, 7, 5, c("ink", 1)); cv:set(x + 5, 11, c("ink", 1))
+  cv:hline(x + 5, 14, 3, c("ink", 1)); cv:vline(x + 5, 15, 3, c("ink", 1)); cv:vline(x + 7, 15, 3, c("ink", 1))
+  cv:hline(x + 5, 17, 3, c("ink", 1))
+  cv:outline(0, 0, T, 32, c("ink", 1))
+end
+local sects, sect_tags = {}, {}
+for n, f in ipairs({ { "orthodox", "azure" }, { "demonic", "crimson" }, { "unorthodox", "amber" } }) do
+  local cv = px.canvas(T, 32)
+  sect_banner(cv, f[2])
+  sects[n] = cv
+  sect_tags[n] = { f[1], n, n, 100 }
+end
+px.save_frames(T, 32, sects, sect_tags, here .. "/sect_banner.aseprite")

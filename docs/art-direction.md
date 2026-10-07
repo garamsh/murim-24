@@ -36,15 +36,19 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/fence` | 96 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/granary` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/storehouse` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/training_ground` | 112 x 80 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/manual_hall` | 80 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/seat_gate` | 64 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 16 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 16 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
+| `art/decorations/sect_banner` | 16 x 32 | `orthodox`, `demonic`, `unorthodox` |
 | `art/icons/skill_icons` | 16 x 16 | `strike`, `burst` |
 | `art/icons/economy_icons` | 16 x 16 | `food`, `stock`, `housing` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, and a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village and a sect's seat assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
 
 ## Screen and grid
 
@@ -179,8 +183,21 @@ The village is furnished as the approved mockup's is. What blocks movement or br
 | Storehouse | Structure | 3 x 2 | A long plastered store on a stone plinth, iron-studded double doors and vents, no windows, a crate by the door, under a low slate roof; its stages break it as the house's break the house |
 | Field | Decoration | a plot | Rows of tilled soil four pixels apart, an earth border at the plot's edge, in five states: sown (dark soil with seeds showing), growing (green shoots in rows), ripe (amber grain), fallow (grass and weeds over old rows), burnt (black soil, ash, charred stubble and embers); in winter each lies under snow gathered in its furrows |
 
-- Every frame holds its footprint at (8, 8), as the house's does.
+- Every frame holds its footprint at (8, 8), as the house's does, except the seat gate's (see below).
 - Ground decorations are tiles laid over the terrain and under everything standing; the banner stands and is sorted with bodies and buildings.
+
+A sect's seat is a village of its own (ADR 0026), laid out with the village's buildings and these of its own, so that a seat reads apart from a farming village at a glance:
+
+| Prop | Kind | Footprint | Look |
+|---|---|---|---|
+| Training ground (연무장) | Structure | 6 x 4 | An open yard of raked sand in a stone curb, a ring trodden where pupils spar; two weapon racks of spears, glaives and staves and three wooden dummies along its back row, plum-blossom poles and stone weights on the sand; damaged scorches the sand, knocks a rack flat and snaps a dummy, destroyed burns the racks to their bare frames and the dummies and poles to stumps, rubble is grass and ash inside the curb with a heap of burnt wood at the back |
+| Manual hall (장경각) | Structure | 4 x 3 | A two-storey library on a high stone platform with steps: latticed shutters over paper and a double door between lacquered pillars below, a gold-framed name plaque under the upper roof, two slate roofs with upturned eaves; damaged holes both roofs, scorches the wall and blows pages onto the steps, destroyed takes the upper storey and drops the lower roof in, rubble is a heap on the platform |
+| Seat gate | Structure | 3 x 1 | A one-bay paifang: two lacquered pillars on stone bases, a painted bracket band, a gold-framed name board between the lintels, a slate roof with upturned eaves; damaged holes the roof and cracks the board, destroyed drops the roof, breaks one pillar and lays the board in the dust, rubble is the two bases and a burnt beam |
+| Sect banner | Decoration | one cell | A tall pole on a stone foot with a crossbar, a long paper-white streamer edged in the owner's accent, two ink characters down it and a swallowtail with tassels; the faction's banner is a short pennant of the accent itself |
+
+- The training ground is laid with the ground, over the terrain and under everything standing, so people stand and spar on it. What on it rises more than a few pixels, the racks and the dummies, stands along its back row, where anyone in front of it is drawn over it.
+- The seat gate rises 32 rows above its one-row footprint, so its frame holds the footprint at (8, 40), its bottom margin 8 rows as every frame's. Its pillars stand on its two end cells and the middle cell is the opening.
+- The stone curb, the platform and the gate's bases stay in every stage, as the plinth does.
 
 ## Effects and HUD
 
