@@ -5,13 +5,23 @@
 # HUD says so; born into a Cult village, it starts a duel the HUD shows, and a second C while it is
 # fought is refused for that. When a village's residents march away, its territory follows them,
 # and the world's borders and the HUD's map follow the territory the core derives, redrawn on that
-# tick and not on every frame.
+# tick and not on every frame. W, A, S and D move the person their way through the orders port, and
+# releasing them stops it. The scene opens on the title screen with no world; a new game starts the
+# world from the seed typed; Escape pauses it, the pause panel's guide showing the keys the scene
+# binds, and no tick runs while it is paused; the speed the settings choose runs that many ticks.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
+# The seed every scene here starts its world from; MARCHERS and MARCHED_ON are of its region.
+const SEED := 2026
 const TICKS := 600
 # How far from the person's home, in cells, to look for the cells to click.
 const SEARCH := 64
+# Ticks a move key is held for, and ticks after its release.
+const WALK_TICKS := 60
+const STOP_TICKS := 60
+# The seed the new game is typed with.
+const TYPED_SEED := 4817
 # In the region the scene's seed makes, village 5's residents are army 4, of the Cult; ordered on
 # village 7, of the Orthodox, they take village 5's seat, and its claim, with them.
 const MARCHERS := 4
@@ -19,9 +29,7 @@ const MARCHED_ON := 6
 
 
 func run() -> bool:
-	var scene: Node2D = load(SCENE).instantiate()
-	# The runner has no running tree to add the scene to, so it is readied directly.
-	scene.notification(Node.NOTIFICATION_READY)
+	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
 	var home_cell := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
 	var target := _cell_near(scene.world.map_rows(), home_cell, ".")
@@ -45,7 +53,107 @@ func run() -> bool:
 		aimed, wall_refused, target, target_accepted, before, after, key_one, key_nine_refused,
 		"pass" if passed else "FAIL"])
 	scene.free()
-	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass()
+	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
+			and _walk_pass() and _screens_pass()
+
+
+# A move key pressed orders the person STRIDE cells its way, and it walks there: further its way
+# than across it. Released, the key orders it to stop where it stands, and it moves less than a
+# cell. Control: the same scene with no key pressed, ticked as long, leaves the person in place,
+# so the walk is the key's. Setup: the way chosen is passable for STRIDE cells.
+func _walk_pass() -> bool:
+	var scene := _scene(0)
+	var control := _scene(0)
+	var rows: PackedStringArray = scene.world.map_rows()
+	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	var keycode := KEY_NONE
+	for candidate: Key in scene.MOVE_KEYS:
+		var way: Vector2i = scene.MOVE_KEYS[candidate]
+		var clear := true
+		for stride in range(1, scene.STRIDE + 1):
+			var cell := home + way * stride
+			clear = clear and cell.y >= 0 and cell.y < rows.size() and cell.x >= 0 \
+					and cell.x < rows[cell.y].length() and rows[cell.y][cell.x] == "."
+		if keycode == KEY_NONE and clear:
+			keycode = candidate
+	if keycode == KEY_NONE:
+		print("play_test: no way from %s is passable for %d cells: FAIL" % [home, scene.STRIDE])
+		return false
+	var direction := Vector2(scene.MOVE_KEYS[keycode])
+	var from: Vector2 = scene.lead()
+	var control_from: Vector2 = control.lead()
+	var pressed: bool = scene.command(_key(keycode))
+	for i in WALK_TICKS:
+		scene.step()
+		control.step()
+	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE
+	var along := walked.dot(direction)
+	var across := absf(walked.dot(Vector2(direction.y, direction.x)))
+	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
+	var release := _key(keycode)
+	release.pressed = false
+	var stopped_at: Vector2 = scene.lead()
+	var released: bool = scene.command(release)
+	for i in STOP_TICKS:
+		scene.step()
+	var after_stop: float = (scene.lead() - stopped_at).length() / WorldAdapter.CELL_SIZE
+	var passed := pressed and along >= 1.0 and along > across and stood < 0.5 and released and after_stop < 1.0
+	print("play_test: %s from %s ordered %s, walked %.2f cells its way and %.2f across in %d ticks; released %s, then moved %.2f cells in %d; control without a key moved %.2f cells: %s" % [
+		OS.get_keycode_string(keycode), home, pressed, along, across, WALK_TICKS, released, after_stop,
+		STOP_TICKS, stood, "pass" if passed else "FAIL"])
+	scene.free()
+	control.free()
+	return passed
+
+
+# The scene opens on the title with no world; Enter on a new game opens the new-game panel, and the
+# digits typed and Enter start the world from that seed, closing both. Escape opens the pause
+# panel on that seed, its guide showing the move keys, the first and last skill keys and the key
+# for all skills as the scene binds them, and no tick runs while it is open. Control: once resumed,
+# the same time runs its ticks, and at the settings' fourfold speed at least four times as many.
+func _screens_pass() -> bool:
+	var scene: Node2D = load(SCENE).instantiate()
+	scene.notification(Node.NOTIFICATION_READY)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var titled: bool = scene.world == null and hud.screen() == hud.title_screen
+	scene.navigate(_key(KEY_ENTER))
+	var new_game_open: bool = hud.screen() == hud.new_game
+	for digit in str(TYPED_SEED):
+		scene.navigate(_key(KEY_0 + int(digit)))
+	scene.navigate(_key(KEY_ENTER))
+	var started: bool = scene.world != null and scene.world_seed == TYPED_SEED and hud.screen() == null
+	var same_world := false
+	if started:
+		var again := WorldAdapter.create_region(TYPED_SEED, 0)
+		same_world = scene.world.hash() == again.hash() \
+				and scene.world.hash() != WorldAdapter.create_region(SEED, 0).hash()
+
+	var paused: bool = scene.navigate(_key(scene.PAUSE_KEY)) and hud.screen() == hud.pause \
+			and hud.pause.world_seed == TYPED_SEED
+	var caps := []
+	for control: Dictionary in hud.pause.controls:
+		caps.append_array(control.keys)
+	var skills := "%s-%s" % [OS.get_keycode_string(scene.SKILL_KEYS.front()), OS.get_keycode_string(scene.SKILL_KEYS.back())]
+	var guided: bool = caps.has(skills) and caps.has(OS.get_keycode_string(scene.ALL_SKILLS_KEY)) \
+			and scene.MOVE_KEYS.keys().all(func(keycode: Key) -> bool: return caps.has(OS.get_keycode_string(keycode)))
+	# Three and a half ticks' time, so that the half left over is not lost to rounding.
+	var span := 3.5 / WorldAdapter.TICKS_PER_SECOND
+	var before: int = scene.ticks
+	scene.advance(span)
+	var held: bool = scene.ticks == before
+	scene.navigate(_key(KEY_ESCAPE))
+	scene.advance(span)
+	var ran: int = scene.ticks - before
+	hud.settings.chosen.speed = hud.settings.SPEEDS.find(4)
+	scene.advance(span)
+	var ran_fast: int = scene.ticks - before - ran
+	var passed := titled and new_game_open and started and same_world and paused and guided and held \
+			and ran == 3 and ran_fast >= 4 * ran
+	print("play_test: opens on the title with no world %s; Enter opens the new game %s; %d typed and Enter starts that world %s, the same as the core makes from it and not seed %d's %s; Escape pauses it on that seed %s, the guide showing %s %s; no tick while paused %s; resumed, 3.5 ticks' time runs %d ticks, at 4x %d: %s" % [
+		titled, new_game_open, TYPED_SEED, started, SEED, same_world, paused, caps, guided, held, ran, ran_fast,
+		"pass" if passed else "FAIL"])
+	scene.free()
+	return passed
 
 
 # The borders and the map follow the territory as it moves. Setup: a tick with no order moves no
@@ -207,10 +315,13 @@ func _challenge_pass() -> bool:
 	return passed
 
 
+# The scene with a world started from SEED, its player born into `village`.
 func _scene(village: int) -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
 	scene.birth_village = village
+	# The runner has no running tree to add the scene to, so it is readied directly.
 	scene.notification(Node.NOTIFICATION_READY)
+	scene.start(SEED)
 	return scene
 
 

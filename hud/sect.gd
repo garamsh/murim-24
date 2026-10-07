@@ -35,7 +35,6 @@ const CRIMSON := Color("d63a2f")
 const CRIMSON_DARK := Color("9c1f24")
 const JADE_LIGHT := Color("a6f0cf")
 const AZURE_DARK := Color("1f3d7a")
-const INK_PALE := Color("524a5e")
 
 ## The faction whose column is shown.
 var faction := -1

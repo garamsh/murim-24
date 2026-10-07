@@ -1,18 +1,37 @@
-## Lets the player steer one person born into the generated region, through the same orders every
-## army follows: a left click orders it toward the cell clicked, keys 1 to 9 to strike with that
-## skill, and 0 with all its skills; C challenges its faction's leader to a duel, with the same
-## order, when the core allows it; G opens the genealogy panel on the person, and M the sect panel
-## on its sect. The camera follows it. It ticks at the core's tick rate, draws the world through
-## world_art.tscn and the HUD through hud.tscn, and holds no game rule.
+## Opens on the title screen, where a new game generates a region from a seed, typed or drawn at
+## random, and lets the player steer one person born into it, through the same orders every army
+## follows: W, A, S and D order it a few cells their way, a left click toward the cell clicked,
+## keys 1 to 9 to strike with that skill, and 0 with all its skills; C challenges its faction's
+## leader to a duel, with the same order, when the core allows it; G opens the genealogy panel on
+## the person, and M the sect panel on its sect. Escape pauses the world under the pause panel,
+## whose guide shows the controls as bound here. The camera follows the person. It ticks at the
+## core's tick rate times the speed the settings choose, draws the world through world_art.tscn and
+## the HUD and its screens through hud.tscn, and holds no game rule.
 extends Node2D
 
-const SEED := 2026
 const PIXELS_PER_CELL := 16.0
-# Ticks one frame may run to catch up; beyond it the simulation falls behind instead of stalling.
+# Ticks one frame may run to catch up at the core's own rate, and as many times more at a higher
+# speed; beyond it the simulation falls behind instead of stalling.
 const MAX_TICKS_PER_FRAME := 4
+## The keys that steer the person, each with the way it orders it.
+const MOVE_KEYS := {KEY_W: Vector2i.UP, KEY_A: Vector2i.LEFT, KEY_S: Vector2i.DOWN, KEY_D: Vector2i.RIGHT}
+## How many cells ahead a move key sets the objective; nearer cells are tried when the core
+## refuses it.
+const STRIDE := 3
+## The keys that strike with one skill each, the first skill's first, and the key that strikes with
+## all of them.
+const SKILL_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9]
+const ALL_SKILLS_KEY := KEY_0
+const CHALLENGE_KEY := KEY_C
+const GENEALOGY_KEY := KEY_G
+const SECT_KEY := KEY_M
+const PAUSE_KEY := KEY_ESCAPE
 
-## The village the player is born into, set before the scene is ready.
+## The village the player is born into, set before a game starts.
 var birth_village := 0
+## The seed the world was generated from.
+var world_seed := 0
+## The world being played, or null on the title screen.
 var world: WorldAdapter
 var steered := 0
 var ticks := 0
@@ -22,6 +41,8 @@ var _skills := PackedInt64Array()
 var _since_tick := 0.0
 # Where the steered person last stood, kept for the camera once it has died.
 var _last_lead := Vector2.ZERO
+# The move keys held, in the order they were pressed.
+var _held: Array[Key] = []
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -29,7 +50,19 @@ var _last_lead := Vector2.ZERO
 
 
 func _ready() -> void:
-	world = WorldAdapter.create_region(SEED, birth_village)
+	_hud.open_title()
+	_hud.settings.read()
+	_hud.settings.apply()
+
+
+## Starts a world generated from `from_seed`, the player born into `birth_village`, and closes
+## the title screen. Returns whether the core made the world.
+func start(from_seed: int) -> bool:
+	var made := WorldAdapter.create_region(from_seed, birth_village)
+	if made == null:
+		return false
+	world = made
+	world_seed = from_seed
 	steered = world.army_count() - 1
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
@@ -43,18 +76,81 @@ func _ready() -> void:
 	_camera.limit_top = 0
 	_camera.limit_right = int(rows[0].length() * PIXELS_PER_CELL)
 	_camera.limit_bottom = int(rows.size() * PIXELS_PER_CELL)
+	_hud.title_screen.close()
+	_hud.new_game.close()
+	return true
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	command(make_input_local(event))
+	if not navigate(event):
+		command(make_input_local(event))
+
+
+## Works the screens with `event`: the screen open on top takes every key, and while none is
+## open, Escape pauses the world unless a panel is open for it to close. Returns whether a screen
+## took the event.
+func navigate(event: InputEvent) -> bool:
+	var key := event as InputEventKey
+	var open: Control = _hud.screen()
+	if open == null:
+		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
+				or _hud.sect.visible:
+			return false
+		_held.clear()
+		_hud.pause.open(controls(), world_seed)
+		return true
+	if key != null and key.pressed:
+		_take(open.key(key))
+	return true
+
+
+# Does what a screen's entry or key asks: one of the actions the screens' key() returns.
+func _take(action: String) -> void:
+	match action:
+		"new":
+			_hud.new_game.open()
+		"start":
+			start(_hud.new_game.world_seed())
+		"settings":
+			_hud.pause.close()
+			_hud.settings.open()
+		"back":
+			# Back from the settings to the pause panel they were opened from, in a game.
+			if world != null:
+				_hud.pause.visible = true
+		"resume":
+			_hud.pause.close()
+		"title":
+			get_tree().reload_current_scene()
+		"quit":
+			get_tree().quit()
+
+
+## Returns the controls as this scene binds them, for the pause panel's guide: each a Dictionary
+## of its `keys`, the words on its caps, and `does`, the hud.csv key of what it does.
+func controls() -> Array[Dictionary]:
+	var moves: Array[String] = []
+	for keycode: Key in MOVE_KEYS:
+		moves.append(OS.get_keycode_string(keycode))
+	var skills := "%s-%s" % [OS.get_keycode_string(SKILL_KEYS.front()), OS.get_keycode_string(SKILL_KEYS.back())]
+	var rows: Array[Dictionary] = [
+		{"keys": moves, "does": "CONTROLS_MOVE"},
+		{"keys": ["CONTROLS_CLICK"], "does": "CONTROLS_CLICK_MOVE"},
+		{"keys": [skills], "does": "CONTROLS_SKILL"},
+		{"keys": [OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_ALL_SKILLS"},
+		{"keys": [OS.get_keycode_string(CHALLENGE_KEY)], "does": "CONTROLS_CHALLENGE"},
+		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
+		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
+		{"keys": [OS.get_keycode_string(_hud.LOCALE_KEY)], "does": "CONTROLS_LANGUAGE"},
+		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE"},
+	]
+	return rows
 
 
 func _process(delta: float) -> void:
-	var step_seconds := 1.0 / WorldAdapter.TICKS_PER_SECOND
-	_since_tick = minf(_since_tick + delta, step_seconds * MAX_TICKS_PER_FRAME)
-	while _since_tick >= step_seconds:
-		step()
-		_since_tick -= step_seconds
+	advance(delta)
+	if world == null or _hud.screen() != null:
+		return
 	_camera.position = _to_pixels(lead()).floor()
 	var screen := get_viewport_rect().size / _camera.zoom
 	_art.refresh(Rect2(_camera.get_screen_center_position() - screen / 2.0, screen))
@@ -65,21 +161,24 @@ func _process(delta: float) -> void:
 ## the part of its last order the event does not change. Returns whether it gave an order and the
 ## core accepted it.
 func command(event: InputEvent) -> bool:
+	if world == null:
+		return false
 	var objective := _objective
 	var skills := _skills
 	var mouse := event as InputEventMouseButton
 	var key := event as InputEventKey
 	if mouse != null and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
 		objective = Vector2i((mouse.position / PIXELS_PER_CELL).floor())
-	elif key != null and key.pressed and (key.keycode == KEY_G or _hud.genealogy.visible):
+	elif key != null and key.pressed and (key.keycode == GENEALOGY_KEY or _hud.genealogy.visible):
 		return genealogy(key.keycode)
-	elif key != null and key.pressed and (key.keycode == KEY_M or _hud.sect.visible):
+	elif key != null and key.pressed and (key.keycode == SECT_KEY or _hud.sect.visible):
 		return sects(key.keycode)
-	elif key != null and key.pressed and key.keycode == KEY_C:
+	elif key != null and key.pressed and key.keycode == CHALLENGE_KEY:
 		return challenge() == WorldAdapter.CHALLENGE_NONE
-	elif key != null and key.pressed and key.keycode >= KEY_0 and key.keycode <= KEY_9:
-		var number := key.keycode - KEY_0
-		skills = _all_skills() if number == 0 else PackedInt64Array([number - 1])
+	elif key != null and MOVE_KEYS.has(key.keycode) and not _hud.genealogy.visible and not _hud.sect.visible:
+		return walk(key)
+	elif key != null and key.pressed and (SKILL_KEYS.has(key.keycode) or key.keycode == ALL_SKILLS_KEY):
+		skills = _all_skills() if key.keycode == ALL_SKILLS_KEY else PackedInt64Array([SKILL_KEYS.find(key.keycode)])
 	else:
 		return false
 	if not world.order(steered, objective, skills):
@@ -87,6 +186,29 @@ func command(event: InputEvent) -> bool:
 	_objective = objective
 	_skills = skills
 	return true
+
+
+## Steers the person with move key `key`, pressed or released: while move keys are held it is
+## ordered STRIDE cells the way they point together, or as many fewer as the core accepts, and
+## once none is held, to stop where it stands. The order keeps its skills. Returns whether the
+## core accepted an order.
+func walk(key: InputEventKey) -> bool:
+	if key.pressed and not _held.has(key.keycode):
+		_held.append(key.keycode)
+	elif not key.pressed:
+		_held.erase(key.keycode)
+	var way := Vector2i.ZERO
+	for held in _held:
+		way += MOVE_KEYS[held]
+	var here := Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
+	# With no way held, the one objective is where the person stands.
+	var strides: Array = [0] if way == Vector2i.ZERO else range(STRIDE, 0, -1)
+	for stride: int in strides:
+		var objective := here + way * stride
+		if world.order(steered, objective, _skills):
+			_objective = objective
+			return true
+	return false
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current
@@ -109,12 +231,12 @@ func challenge() -> int:
 func genealogy(keycode: Key) -> bool:
 	var panel: Control = _hud.genealogy
 	var roster := world.roster(steered)
-	if keycode == KEY_G and not panel.visible:
+	if keycode == GENEALOGY_KEY and not panel.visible:
 		if roster.is_empty():
 			return false
 		panel.show_person(world, roster[0], roster[0])
 		return true
-	if keycode == KEY_G or keycode == KEY_ESCAPE:
+	if keycode == GENEALOGY_KEY or keycode == KEY_ESCAPE:
 		panel.close()
 		return true
 	var directions := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT,
@@ -132,12 +254,12 @@ func genealogy(keycode: Key) -> bool:
 ## it. While it is open no key gives an order. Returns whether the key did anything.
 func sects(keycode: Key) -> bool:
 	var panel: Control = _hud.sect
-	if keycode == KEY_M and not panel.visible:
+	if keycode == SECT_KEY and not panel.visible:
 		if world.sect_count() == 0 or world.roster(steered).is_empty():
 			return false
 		panel.show_sect(world, steered)
 		return true
-	if keycode == KEY_M or keycode == KEY_ESCAPE:
+	if keycode == SECT_KEY or keycode == KEY_ESCAPE:
 		panel.close()
 		return true
 	if keycode == KEY_TAB:
@@ -146,6 +268,19 @@ func sects(keycode: Key) -> bool:
 	if keycode == KEY_UP or keycode == KEY_DOWN:
 		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
 	return false
+
+
+## Runs the ticks `delta` seconds of play call for, at the core's tick rate times the speed the
+## settings choose: none on the title screen or while a screen is open over the world.
+func advance(delta: float) -> void:
+	if world == null or _hud.screen() != null:
+		return
+	var speed: int = _hud.settings.speed()
+	var step_seconds := 1.0 / (WorldAdapter.TICKS_PER_SECOND * speed)
+	_since_tick = minf(_since_tick + delta, step_seconds * MAX_TICKS_PER_FRAME * speed)
+	while _since_tick >= step_seconds:
+		step()
+		_since_tick -= step_seconds
 
 
 ## Advances the world one tick.

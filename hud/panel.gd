@@ -1,7 +1,7 @@
 ## What the HUD's full-screen panels share, as art/mockup/panel.lua shares it among their mockups:
 ## the game behind a panel dimmed by a checker of ink, the panel's frame, its title bar and the keys
-## along its foot, a person's card and portrait, and words drawn in the HUD's font, cut short where
-## they would overrun. It holds no game rule.
+## along its foot, a menu, a choice's slip, a key's cap, a person's card and portrait, and words
+## drawn in the HUD's font, cut short where they would overrun. It holds no game rule.
 extends Control
 
 const ART := "res://art/"
@@ -22,14 +22,20 @@ const GOLD := Color("c99a3c")
 const GOLD_LIGHT := Color("f0d080")
 const LACQUER := Color("a83a2c")
 const PAPER := Color("efe3c2")
+const PAPER_DARK := Color("d9c9a3")
 const STONE := Color("8a94a0")
 const STONE_DARK := Color("66707d")
 const JADE := Color("4fc49a")
 const JADE_DARK := Color("2f8c6e")
+const INK_PALE := Color("524a5e")
 const GRASS := Color("3b6138")
 const GRASS_LIGHT := Color("4f7a3f")
 const AZURE_LIGHT := Color("5b9ae0")
 const DEAD_TINT := Color(0.45, 0.45, 0.5)
+# A menu's rows, and the height of a key's cap and a choice's slip.
+const MENU_STEP := 18
+const KEYCAP_HEIGHT := 13
+const SLIP_HEIGHT := 14
 
 var _world: WorldAdapter
 var _font: Font
@@ -50,13 +56,66 @@ func close() -> void:
 
 # The dimmed game, the panel's frame, its title bar and `keys` along its foot.
 func _chrome(keys: String) -> void:
+	_dim()
+	_dialog(PANEL, "", "", keys)
+
+
+# The game behind a panel, dimmed by a checker of ink.
+func _dim() -> void:
 	_font = get_theme_default_font() if _font == null else _font
 	draw_texture_rect(_scrim_texture(), Rect2(Vector2.ZERO, size), true)
-	_frame(PANEL, INK)
-	draw_rect(Rect2(PANEL.position + Vector2(3, 3), Vector2(PANEL.size.x - 6, 16)), INK_DARK)
-	draw_rect(Rect2(PANEL.position + Vector2(3, 19), Vector2(PANEL.size.x - 6, 1)), GOLD_DARK)
-	draw_rect(Rect2(PANEL.position.x + 3, PANEL.end.y - 20, PANEL.size.x - 6, 1), GOLD_DARK)
-	_text(Vector2(PANEL.position.x + (PANEL.size.x - _width(keys)) / 2.0, PANEL.end.y - 17), keys, STONE)
+
+
+# A panel in `rect` with `title` and `close` in its title bar and `keys` along its foot.
+func _dialog(rect: Rect2, title: String, close: String, keys: String) -> void:
+	_frame(rect, INK)
+	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(rect.size.x - 6, 16)), INK_DARK)
+	draw_rect(Rect2(rect.position + Vector2(3, 19), Vector2(rect.size.x - 6, 1)), GOLD_DARK)
+	draw_rect(Rect2(rect.position.x + 3, rect.end.y - 20, rect.size.x - 6, 1), GOLD_DARK)
+	_text(rect.position + Vector2(8, 4), title, PAPER, true)
+	_text(Vector2(rect.end.x - 8 - _width(close), rect.position.y + 4), close, STONE)
+	_text(Vector2(rect.position.x + (rect.size.x - _width(keys)) / 2.0, rect.end.y - 17), keys, STONE)
+
+
+# A menu of `items` from `top_left`, `width` wide, a row every MENU_STEP pixels. An item is a
+# Dictionary of its `text` and, for an entry that cannot be taken yet, a `note` drawn beside it,
+# greyed. Row `chosen` is lit and marked in jade.
+func _menu(top_left: Vector2, width: float, items: Array[Dictionary], chosen: int) -> void:
+	for n in items.size():
+		var item := items[n]
+		var y := top_left.y + n * MENU_STEP
+		if n > 0:
+			draw_rect(Rect2(top_left.x, y - 3, width, 1), INK_LIGHT)
+		if n == chosen:
+			draw_rect(Rect2(top_left.x, y - 2, width, 16), INK)
+			draw_rect(Rect2(top_left.x, y - 2, 1, 16), JADE)
+			for k in 4:
+				draw_rect(Rect2(top_left.x + 4 + k, y + 2 + k, 1, 7 - 2 * k), GOLD_LIGHT)
+		var note: String = item.get("note", "")
+		var colour := STONE_DARK if not note.is_empty() else (GOLD_LIGHT if n == chosen else PAPER)
+		_text(Vector2(top_left.x + 12, y), item.text, colour)
+		if not note.is_empty():
+			_text(Vector2(top_left.x + width - 4 - _width(note), y), note, STONE_DARK)
+
+
+# A choice's slip `width` wide from `top_left`, its word centred: jade when `on`, ink when not.
+func _slip(top_left: Vector2, width: float, text: String, on: bool) -> void:
+	if on:
+		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), JADE_DARK)
+		draw_rect(Rect2(top_left, Vector2(width, 1)), JADE)
+	else:
+		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), INK_LIGHT)
+		draw_rect(Rect2(top_left + Vector2(0, SLIP_HEIGHT - 1), Vector2(width, 1)), INK_PALE)
+	_text(top_left + Vector2(floorf((width - _width(text)) / 2.0), 1), text, PAPER if on else STONE)
+
+
+# A key's cap from `top_left` with `text` on it; returns its width.
+func _keycap(top_left: Vector2, text: String) -> float:
+	var w := keycap_width(text)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT)), INK_PALE)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT - 1)), INK_LIGHT)
+	_text(top_left + Vector2(floorf((w - _width(text)) / 2.0), 0), text, PAPER)
+	return w
 
 
 # A person's card in `rect`: their portrait on a cell of ground, `name` cut to the card and `line`
@@ -133,6 +192,11 @@ func _scrim_texture() -> ImageTexture:
 		image.set_pixel(1, 1, INK_DARK)
 		_scrim = ImageTexture.create_from_image(image)
 	return _scrim
+
+
+## Returns the width of a key's cap bearing `text`.
+func keycap_width(text: String) -> float:
+	return maxf(_width(text) + 6, KEYCAP_HEIGHT)
 
 
 ## Uses `font` for every word the panel draws.

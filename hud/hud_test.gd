@@ -22,6 +22,8 @@ const SHOWN := {
 	"duel_leader": ["HUD_LEADER_YOU"],
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD"],
 }
+# The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure.
+const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_"]
 # The season label is measured at a three-digit year.
 const LATEST_YEAR := 999
 # Text keeps clear of a panel's right edge by its 1-pixel border and the 4 pixels labels keep from
@@ -150,8 +152,8 @@ func _names_pass() -> bool:
 # gives it: within the label where the label has a width of its own, clear of the label after it
 # on its line, and clear of its panel's right edge. Every surname crossed with every given name in
 # names(), as the leader and duel panels show it, fits each of their name labels or is cut short
-# with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the genealogy and
-# sect panels' is measured, and the widths are not zero.
+# with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the panels' and
+# screens' over the HUD is measured, and the widths are not zero.
 func _fit_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(SCENE).instantiate()
@@ -223,7 +225,7 @@ func _fit_pass() -> bool:
 	csv.get_csv_line()
 	while not csv.eof_reached():
 		var key := csv.get_csv_line()[0]
-		if key != "" and not key.begins_with("GENEALOGY_") and not key.begins_with("SECT_") \
+		if key != "" and not PANEL_PREFIXES.any(func(prefix: String) -> bool: return key.begins_with(prefix)) \
 				and not measured.has(key):
 			unmeasured.append(key)
 	var passed := unmeasured.is_empty() and overruns.is_empty() and names > 0
