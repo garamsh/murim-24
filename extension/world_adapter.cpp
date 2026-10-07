@@ -184,6 +184,16 @@ murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
 // create_region() gives.
 constexpr std::size_t PLAYER_SOUL = 0;
 
+// The names of the disciplines `life` draws, by index.
+std::vector<std::string> discipline_names_of(const murim::Life& life) {
+  std::vector<std::string> names;
+  names.reserve(life.disciplines.size());
+  for (const murim::DisciplineDraw& discipline : life.disciplines) {
+    names.push_back(discipline.name);
+  }
+  return names;
+}
+
 // The health each army's members were created with, together, by army.
 std::vector<std::uint64_t> strengths_of(
     const std::vector<murim::ArmySpec>& armies) {
@@ -319,6 +329,7 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot) {
     adapter->strengths_ = strengths_of(region.armies);
     adapter->faction_count_ = region.rules.hostile.size();
     adapter->names_ = region.life.names;
+    adapter->disciplines_ = discipline_names_of(region.life);
     adapter->map_rows_ = region.map_rows;
     adapter->world_.emplace(std::move(saved.world));
     adapter->show(region, *saved.origin);
@@ -386,6 +397,7 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
   adapter->strengths_ = strengths_of(armies);
   adapter->faction_count_ = rules.hostile.size();
   adapter->names_ = life.names;
+  adapter->disciplines_ = discipline_names_of(life);
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
                           std::move(structures), std::move(rules),
                           std::move(villages), std::move(leadership),
@@ -809,6 +821,90 @@ std::int64_t WorldAdapter::sect_count() const {
   return world_ ? static_cast<std::int64_t>(world().sect_count()) : 0;
 }
 
+std::int64_t WorldAdapter::application_refusal(std::int64_t person,
+                                               std::int64_t sect) const {
+  return static_cast<std::int64_t>(
+      world().application_refusal(person_index(person), sect_index(sect)));
+}
+
+bool WorldAdapter::apply(std::int64_t person, std::int64_t sect) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    world().apply(person_index(person), sect_index(sect));
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.apply: ", error.what());
+    return false;
+  }
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::rumours(
+    std::int64_t person) const {
+  godot::TypedArray<godot::Dictionary> heard;
+  for (const murim::Event& event : world().rumours(person_index(person))) {
+    godot::Dictionary fields;
+    fields.set("sequence", static_cast<std::int64_t>(event.sequence));
+    fields.set("tick", static_cast<std::int64_t>(event.tick));
+    fields.set("cell", godot::Vector2i{event.cell.x, event.cell.y});
+    const auto index = [](std::size_t value) {
+      return static_cast<std::int64_t>(value);
+    };
+    if (const auto* founded = std::get_if<murim::Founded>(&event.what)) {
+      fields.set("kind", "founded");
+      fields.set("village", index(founded->village));
+      fields.set("faction", index(founded->faction));
+    } else if (const auto* raided = std::get_if<murim::Raided>(&event.what)) {
+      fields.set("kind", "raided");
+      fields.set("village", index(raided->village));
+      fields.set("owner", index(raided->owner));
+      fields.set("raider", index(raided->raider));
+    } else if (const auto* ruined = std::get_if<murim::Ruined>(&event.what)) {
+      fields.set("kind", "ruined");
+      fields.set("village", index(ruined->village));
+      fields.set("owner", index(ruined->owner));
+      fields.set("army", index(ruined->destroyer.army));
+      fields.set("destroyer", index(ruined->destroyer.faction));
+    } else if (const auto* fell = std::get_if<murim::SectFell>(&event.what)) {
+      fields.set("kind", "sect_fell");
+      fields.set("sect", index(fell->sect));
+      fields.set("faction", index(fell->faction));
+    } else if (const auto* changed =
+                   std::get_if<murim::LeaderChanged>(&event.what)) {
+      fields.set("kind", "leader_changed");
+      fields.set("faction", index(changed->faction));
+      fields.set("leader", index(changed->leader));
+      fields.set("by",
+                 changed->by == murim::ChosenBy::DUEL ? "duel" : "election");
+    } else if (const auto* born = std::get_if<murim::Born>(&event.what)) {
+      fields.set("kind", "born");
+      fields.set("person", index(born->person));
+    } else if (const auto* died = std::get_if<murim::Died>(&event.what)) {
+      fields.set("kind", "died");
+      fields.set("person", index(died->person));
+    }
+    heard.append(fields);
+  }
+  return heard;
+}
+
+godot::PackedInt64Array WorldAdapter::person_attainment(
+    std::int64_t person) const {
+  godot::PackedInt64Array attained;
+  for (const std::uint32_t points :
+       world().person(person_index(person)).attainment) {
+    attained.append(points);
+  }
+  return attained;
+}
+
+godot::PackedStringArray WorldAdapter::discipline_names() const {
+  godot::PackedStringArray names;
+  for (const std::string& name : disciplines_) {
+    names.append(name.c_str());
+  }
+  return names;
+}
+
 std::int64_t WorldAdapter::person_sect(std::int64_t person) const {
   const std::optional<std::size_t> sect = world().sect_of(person_index(person));
   return sect ? static_cast<std::int64_t>(*sect) : -1;
@@ -934,6 +1030,17 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_faction);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_count"),
                               &WorldAdapter::sect_count);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("application_refusal", "person", "sect"),
+      &WorldAdapter::application_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("apply", "person", "sect"),
+                              &WorldAdapter::apply);
+  godot::ClassDB::bind_method(godot::D_METHOD("rumours", "person"),
+                              &WorldAdapter::rumours);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_attainment", "person"),
+                              &WorldAdapter::person_attainment);
+  godot::ClassDB::bind_method(godot::D_METHOD("discipline_names"),
+                              &WorldAdapter::discipline_names);
   godot::ClassDB::bind_method(godot::D_METHOD("person_sect", "person"),
                               &WorldAdapter::person_sect);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_name", "sect"),
@@ -1058,6 +1165,25 @@ void WorldAdapter::_bind_methods() {
            murim::ChallengeRefusal::DUEL_IN_PROGRESS},
       }};
   for (const auto& [constant, refusal] : refusals) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::ApplicationRefusal>, 11>
+      applications{{
+          {"APPLICATION_NONE", murim::ApplicationRefusal::NONE},
+          {"APPLICATION_DEAD", murim::ApplicationRefusal::DEAD},
+          {"APPLICATION_IN_A_SECT", murim::ApplicationRefusal::IN_A_SECT},
+          {"APPLICATION_NO_HOME", murim::ApplicationRefusal::NO_HOME},
+          {"APPLICATION_NOT_OF_FACTION",
+           murim::ApplicationRefusal::NOT_OF_FACTION},
+          {"APPLICATION_TOO_YOUNG", murim::ApplicationRefusal::TOO_YOUNG},
+          {"APPLICATION_UNPROVEN", murim::ApplicationRefusal::UNPROVEN},
+          {"APPLICATION_TOO_FAR", murim::ApplicationRefusal::TOO_FAR},
+          {"APPLICATION_SEAT_LOST", murim::ApplicationRefusal::SEAT_LOST},
+          {"APPLICATION_NO_ELDER", murim::ApplicationRefusal::NO_ELDER},
+          {"APPLICATION_FULL", murim::ApplicationRefusal::FULL},
+      }};
+  for (const auto& [constant, refusal] : applications) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }

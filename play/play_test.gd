@@ -9,6 +9,9 @@
 # releasing them stops it. The scene opens on the title screen with no world; a new game starts the
 # world from the seed typed; Escape pauses it, the pause panel's guide showing the keys the scene
 # binds, and no tick runs while it is paused; the speed the settings choose runs that many ticks.
+# Enter in the sect panel applies to the sect shown, joining it where the core admits the person and
+# showing why where it refuses. A Cult body marched on an Orthodox village dies there, and the
+# rebirth screen opens on it and the soul's new body, holding the ticks until Enter goes on.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -26,6 +29,12 @@ const TYPED_SEED := 4817
 # village 7, of the Orthodox, they take village 5's seat, and its claim, with them.
 const MARCHERS := 4
 const MARCHED_ON := 6
+# Born into village 1, of the Cult, the person may join the Heavenly Demon; born into village 2, of
+# the Unorthodox, it lacks the proof the Black Fang asks.
+const CULT_VILLAGE := 1
+const UNORTHODOX_VILLAGE := 2
+# Ticks a Cult body marched on the nearest Orthodox village has to die there.
+const MARCH_LIMIT := 12000
 
 
 func run() -> bool:
@@ -54,7 +63,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _walk_pass() and _screens_pass()
+			and _walk_pass() and _screens_pass() and _apply_pass() and _rebirth_pass()
 
 
 # A move key pressed orders the person STRIDE cells its way, and it walks there: further its way
@@ -353,3 +362,72 @@ func _key(keycode: Key) -> InputEventKey:
 
 func _distance(position: Vector2, cell: Vector2i) -> float:
 	return position.distance_to((Vector2(cell) + Vector2.ONE * 0.5) * WorldAdapter.CELL_SIZE)
+
+
+# M opens the sect panel on the Cult person's sect, and Enter makes it a member, the panel saying it
+# was admitted. Control: born into an Unorthodox village, Enter is refused for want of proof, the
+# panel says so, and the person stays out of every sect.
+func _apply_pass() -> bool:
+	var scene := _scene(CULT_VILLAGE)
+	var world: WorldAdapter = scene.world
+	var panel: Control = scene.get_node("Hud").sect
+	var person := world.roster(scene.steered)[0]
+	var opened: bool = scene.command(_key(KEY_M)) and panel.sect >= 0 and world.person_sect(person) == -1
+	var entered: bool = scene.command(_key(KEY_ENTER))
+	var joined: bool = world.person_sect(person) == panel.sect and panel.verdict == "APPLICATION_NONE"
+	scene.free()
+	var refused_scene := _scene(UNORTHODOX_VILLAGE)
+	var other: WorldAdapter = refused_scene.world
+	var other_panel: Control = refused_scene.get_node("Hud").sect
+	var other_person := other.roster(refused_scene.steered)[0]
+	refused_scene.command(_key(KEY_M))
+	var other_entered: bool = refused_scene.command(_key(KEY_ENTER))
+	var refused: bool = other_entered and other_panel.verdict == "APPLICATION_UNPROVEN" \
+			and other.person_sect(other_person) == -1
+	refused_scene.free()
+	var passed := opened and entered and joined and refused
+	print("play_test: M opens the sect panel %s; Enter applies %s and joins %s; from an Unorthodox village Enter is refused as unproven %s: %s" % [
+		opened, entered, joined, refused, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A Cult body ordered on the nearest Orthodox village's residents dies among them and its soul is
+# born again: on that tick the rebirth screen opens on the body that died and the new one, and no
+# tick runs while it is open; Enter closes it and the ticks run again. Setup: the screen was not
+# open before the death, and the dead body and the new one differ.
+func _rebirth_pass() -> bool:
+	var scene := _scene(CULT_VILLAGE)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var body := world.roster(scene.steered)[0]
+	var home := world.person_position(body)
+	var target := Vector2i(-1, -1)
+	for army in world.army_count() - 1:
+		var roster := world.roster(army)
+		if world.army_faction(army) == 0 and not roster.is_empty():
+			var cell := Vector2i((world.person_position(roster[0]) / WorldAdapter.CELL_SIZE).floor())
+			if target.x < 0 or Vector2(cell).distance_to(home / WorldAdapter.CELL_SIZE) \
+					< Vector2(target).distance_to(home / WorldAdapter.CELL_SIZE):
+				target = cell
+	var ordered := target.x >= 0 and world.order(scene.steered, target, PackedInt64Array([0]))
+	var closed_before := true
+	var ticks := 0
+	while ordered and not hud.rebirth.visible and ticks < MARCH_LIMIT:
+		closed_before = closed_before and hud.screen() == null
+		scene.step()
+		ticks += 1
+	var reborn: int = world.roster(scene.steered)[0] if not world.roster(scene.steered).is_empty() else -1
+	var shown: bool = hud.rebirth.visible and hud.screen() == hud.rebirth and hud.rebirth.past == body \
+			and hud.rebirth.next == reborn and reborn != body and world.person_health(body) == 0
+	var before: int = scene.ticks
+	scene.advance(1.0)
+	var held: bool = scene.ticks == before
+	scene.navigate(_key(KEY_ENTER))
+	scene.advance(1.0)
+	var resumed: bool = not hud.rebirth.visible and scene.ticks > before
+	scene.free()
+	var passed := ordered and closed_before and shown and held and resumed
+	print("play_test: Cult body %d ordered on %s %s; after %d ticks the rebirth screen shows %d dead and %d born %s, not open before %s; no tick while open %s; Enter goes on and ticks run %s: %s" % [
+		body, target, ordered, ticks, body, reborn, shown, closed_before, held, resumed, "pass" if passed else "FAIL"])
+	return passed
+

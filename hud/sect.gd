@@ -1,9 +1,10 @@
 ## The sect panel, drawn as art/mockup/sect_panel.png lays it out: a sect's seat, shown by its
 ## gate in its stage now and whether the seat is held, its faction, master, elders and members
 ## against its cap, and the cards of its master and elders; beside it a column for a faction, with
-## its leader, whether the faction elects it or the lead passes by duel, and its sects. Every word comes from hud.csv through
-## Godot's translations. What it shows is read from the world through the adapter. It holds no
-## game rule.
+## its leader, whether the faction elects it or the lead passes by duel, and its sects; and under
+## the cards, the core's verdict on the player's application to the sect shown. Every word comes
+## from hud.csv through Godot's translations. What it shows is read from the world through the
+## adapter. It holds no game rule.
 extends "res://hud/panel.gd"
 
 const PersonName := preload("res://hud/person_name.gd")
@@ -24,6 +25,21 @@ const TAB_INSET := 6
 const TAB_GAP := 4
 const TAB_PAD := 2
 const LIST_Y := 118
+const VERDICT_Y := 222
+# The hud.csv key of each verdict on an application, by WorldAdapter.APPLICATION_* constant.
+const APPLICATION_KEYS := {
+	WorldAdapter.APPLICATION_NONE: "APPLICATION_NONE",
+	WorldAdapter.APPLICATION_DEAD: "APPLICATION_DEAD",
+	WorldAdapter.APPLICATION_IN_A_SECT: "APPLICATION_IN_A_SECT",
+	WorldAdapter.APPLICATION_NO_HOME: "APPLICATION_NO_HOME",
+	WorldAdapter.APPLICATION_NOT_OF_FACTION: "APPLICATION_NOT_OF_FACTION",
+	WorldAdapter.APPLICATION_TOO_YOUNG: "APPLICATION_TOO_YOUNG",
+	WorldAdapter.APPLICATION_UNPROVEN: "APPLICATION_UNPROVEN",
+	WorldAdapter.APPLICATION_TOO_FAR: "APPLICATION_TOO_FAR",
+	WorldAdapter.APPLICATION_SEAT_LOST: "APPLICATION_SEAT_LOST",
+	WorldAdapter.APPLICATION_NO_ELDER: "APPLICATION_NO_ELDER",
+	WorldAdapter.APPLICATION_FULL: "APPLICATION_FULL",
+}
 const ROW_STEP := 18
 # Where the leader's name and sect start in the column.
 const LEADER_TEXT_X := 30
@@ -52,6 +68,8 @@ var cards: Array[Dictionary] = []
 ## the faction elects its leader, `duel` when the lead passes by duel, and `sects`, each a Dictionary of `sect`, `name` and `count`, or
 ## `state` of lost or fallen.
 var column := {}
+## The hud.csv key of the verdict on the last application to the sect shown, or "" for none.
+var verdict := ""
 
 var _army := -1
 var _gate: Texture2D
@@ -71,6 +89,7 @@ func show_sect(world: WorldAdapter, army: int) -> void:
 	var roster := world.roster(army)
 	own_sect = world.person_sect(roster[0]) if not roster.is_empty() else -1
 	faction = world.army_faction(army)
+	verdict = ""
 	sect = own_sect
 	if sect >= 0:
 		faction = world.sect_faction(sect)
@@ -89,6 +108,7 @@ func move(direction: Vector2i) -> bool:
 	if direction.y == 0 or at < 0 or at >= sects.size():
 		return false
 	sect = sects[at]
+	verdict = ""
 	_compose()
 	return true
 
@@ -98,6 +118,17 @@ func next_faction() -> void:
 	faction = (faction + 1) % _world.faction_names().size()
 	var sects := _sects_of(faction)
 	sect = sects.front() if not sects.is_empty() else -1
+	verdict = ""
+	_compose()
+
+
+## Shows the core's verdict on an application to the sect shown, one of the
+## WorldAdapter.APPLICATION_* constants, and reads the panel again, so an admitted person's sect
+## carries the title's tag.
+func show_verdict(refusal: int) -> void:
+	verdict = APPLICATION_KEYS.get(refusal, "")
+	var roster := _world.roster(_army)
+	own_sect = _world.person_sect(roster[0]) if not roster.is_empty() else -1
 	_compose()
 
 
@@ -217,6 +248,9 @@ func _draw() -> void:
 		_draw_seat()
 		_draw_figures()
 		_draw_cards()
+	if not verdict.is_empty():
+		var said := fit(tr(verdict), FIGURES.end.x - SEAT.position.x)
+		_text(Vector2(SEAT.position.x, VERDICT_Y), said, JADE_LIGHT if verdict == "APPLICATION_NONE" else CRIMSON)
 	else:
 		_text(SEAT.position + Vector2(8, 8), tr("SECT_NONE"), STONE)
 	_draw_column()

@@ -6,7 +6,8 @@
 # villages keep their residents' own skills off their structures; and that a
 # region's people are read back with their names and kin; that a region's
 # villages are read back with the cap, stock and population the core derives;
-# and that a region's sects and manuals are read back as the core holds them.
+# and that a region's sects and manuals are read back as the core holds them; and that the player
+# applies to a sect, hears rumours and shows attainment through the adapter as the core holds them.
 extends RefCounted
 
 const SEED := 42
@@ -114,8 +115,10 @@ func run() -> bool:
 	var kin_pass := _kin_pass()
 	var economy_pass := _economy_pass()
 	var sects_pass := _sects_pass()
+	var play_loop_pass := _play_loop_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
+			and play_loop_pass
 
 
 # Each village of a region starts with people, under its cap, and food in store; a day later its stock has fed every one of them a measure. Control: the stock read
@@ -423,3 +426,53 @@ func _core_run() -> PackedStringArray:
 	if OS.execute(ProjectSettings.globalize_path(REFERENCE), [" ".join(fields.map(str))], output) != 0:
 		return PackedStringArray()
 	return String(output[0]).strip_edges().split("\n")
+
+
+# Born into the region's Cult village 1, the player may join its sect: application_refusal reads
+# APPLICATION_NONE, apply makes it a member and applying again reads APPLICATION_IN_A_SECT and is
+# refused. Control: born into Unorthodox village 2, the player is refused as APPLICATION_UNPROVEN
+# and stays out. Lived ten years of five-tick days, the region's rumours reach the player, newest
+# first, each of a kind the adapter names and naming records the world holds. Attainment reads
+# one value per discipline the region names, the five of its rules of life, and a sect's founding
+# master 120 in one; a world from create() names no discipline.
+func _play_loop_pass() -> bool:
+	var world := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
+	var player := world.roster(world.army_count() - 1)[0]
+	var sect := -1
+	for index in world.sect_count():
+		if world.sect_faction(index) == world.army_faction(world.army_count() - 1):
+			sect = index
+	var open := world.application_refusal(player, sect) == WorldAdapter.APPLICATION_NONE
+	var applied := world.apply(player, sect) and world.person_sect(player) == sect
+	var again := world.application_refusal(player, sect) == WorldAdapter.APPLICATION_IN_A_SECT \
+			and not world.apply(player, sect)
+	var other := WorldAdapter.create_region(REGION_SEED, 2)
+	var outsider := other.roster(other.army_count() - 1)[0]
+	var refused := other.application_refusal(outsider, 2) == WorldAdapter.APPLICATION_UNPROVEN \
+			and not other.apply(outsider, 2) and other.person_sect(outsider) == -1
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
+	for i in 10 * 120 * 5:
+		lived.tick()
+	var heard := lived.rumours(lived.roster(lived.army_count() - 1)[0])
+	var kinds := ["founded", "raided", "ruined", "sect_fell", "leader_changed", "born", "died"]
+	var rumours_right := heard.size() > 0
+	for n in heard.size():
+		var event: Dictionary = heard[n]
+		rumours_right = rumours_right and kinds.has(event.kind) and event.cell is Vector2i \
+				and (n == 0 or event.sequence < heard[n - 1].sequence) \
+				and (not event.has("person") or lived.person_family(event.person) >= 0) \
+				and (not event.has("village") or event.village < lived.villages().size())
+	var names := world.discipline_names()
+	var master := world.sect_master(0)
+	var attained := world.person_attainment(master)
+	var attainment_right: bool = names == PackedStringArray(["sword", "saber", "fist", "hidden weapons", "medicine"]) \
+			and attained.size() == names.size() and Array(attained).max() == 120 \
+			and world.person_attainment(player).size() == names.size()
+	var bare := _create(SEED, _armies, RULES)
+	var bare_right := bare.discipline_names().is_empty() and bare.person_attainment(0).is_empty()
+	var passed := open and applied and again and refused and rumours_right and attainment_right and bare_right
+	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused as unproven %s; %d rumours after ten years, newest first and well formed %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
+		sect, open, applied, again, refused, heard.size(), rumours_right, heard[0] if heard.size() > 0 else {},
+		names, master, attained, attainment_right, bare_right, "pass" if passed else "FAIL"])
+	return passed
+

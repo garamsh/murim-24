@@ -2,6 +2,12 @@ keys,ko,en
 HUD_PLAYER,협객,Wanderer
 HUD_HP,체력,HP
 HUD_QI,내공,QI
+HUD_ATTAINMENT,경지,Art
+DISCIPLINE_SWORD,검,Sword
+DISCIPLINE_SABER,도,Saber
+DISCIPLINE_FIST,권,Fist
+DISCIPLINE_HIDDEN_WEAPONS,암기,Hidden Weapons
+DISCIPLINE_MEDICINE,의술,Medicine
 HUD_SEASON_YEAR,%s · %d년,"%s, Y%d"
 SEASON_0,봄,Spring
 SEASON_1,여름,Summer
@@ -9,6 +15,14 @@ SEASON_2,가을,Autumn
 SEASON_3,겨울,Winter
 HUD_RUMOR,소문,Rumour
 HUD_RUMOR_NONE,아직 들려온 소문이 없다.,No rumour has come yet.
+RUMOUR_FOUNDED,"%s, 새 마을을 세우다",New %s village founded
+RUMOUR_RAIDED,"%s, %s 마을을 습격하다",%s raid on %s village
+RUMOUR_RUINED,"%s 마을, 폐허가 되다",%s village in ruins
+RUMOUR_SECT_FELL,%s 멸문,%s falls
+RUMOUR_ELECTED,"%s, %s 수장에 선출",%s elected %s leader
+RUMOUR_DUEL,"%s, 결투로 %s 수장에 오르다",%s wins %s lead by duel
+RUMOUR_BORN,%s 태어나다,%s born
+RUMOUR_DIED,%s 세상을 떠나다,%s dies
 HUD_LOCALE,F2 English,F2 한국어
 FACTION_ORTHODOX,정파,Orthodox
 FACTION_DEMONIC,마교,Demonic Cult
@@ -61,10 +75,21 @@ SECT_COUNT,%d명,%d
 SECT_RANKS,장문인 · 장로,Master · Elders
 SECT_NONE,문파 없음,No sect
 SECT_ELECTED,선출,Elected
-SECT_KEYS,방향키 문파 고르기 · Tab 세력 · M 닫기,Arrows choose · Tab faction · M close
+SECT_KEYS,방향키 문파 고르기 · Enter 입문 · Tab 세력 · M 닫기,Arrows choose · Enter join · Tab faction · M close
 SECT_TAB_ORTHODOX,정파,Orth
 SECT_TAB_DEMONIC,마교,Cult
 SECT_TAB_UNORTHODOX,사파,Unor
+APPLICATION_NONE,입문을 허락받았다!,You are admitted!
+APPLICATION_DEAD,죽은 몸으로는 입문할 수 없다.,The dead cannot join.
+APPLICATION_IN_A_SECT,이미 문파에 속해 있다.,You already belong to a sect.
+APPLICATION_NO_HOME,머물 곳이 없어 받아 주지 않는다.,No home: they will not take you.
+APPLICATION_NOT_OF_FACTION,다른 세력의 사람은 받지 않는다.,They take no one of another faction.
+APPLICATION_TOO_YOUNG,아직 너무 어리다.,You are too young yet.
+APPLICATION_UNPROVEN,아직 자질을 증명하지 못했다.,You have not proven yourself.
+APPLICATION_TOO_FAR,본산에서 너무 멀리 산다.,You live too far from the seat.
+APPLICATION_SEAT_LOST,본산을 잃은 문파는 받지 않는다.,A sect without its seat takes no one.
+APPLICATION_NO_ELDER,받아 줄 장로가 없다.,No elder is left to admit you.
+APPLICATION_FULL,문도가 이미 가득하다.,The sect is full.
 SECT_HWASAN,화산파,Hwasan
 SECT_HEAVENLY_DEMON,천마신교,Heavenly Demon
 SECT_BLACK_FANG,흑아방,Black Fang
@@ -124,3 +149,17 @@ SETTINGS_EFFECTS_ABOUT,싸움과 마을과 메뉴의 소리 크기.,"How loud fi
 SETTINGS_MUSIC_ABOUT,배경 음악의 크기.,How loud the music is.
 LOCALE_KO,한국어,한국어
 LOCALE_EN,English,English
+REBIRTH_TITLE,윤회,Rebirth
+REBIRTH_CLOSE,Enter 계속,Enter Go on
+REBIRTH_PAST,지난 생,Life ended
+REBIRTH_NEXT,새 생,Life begun
+REBIRTH_FAMILY,가문,Family
+REBIRTH_YEARS,향년,Lived
+REBIRTH_YEARS_VALUE,%d세,%d years
+REBIRTH_SECT,문파,Sect
+REBIRTH_ATTAINMENT,경지,Art
+REBIRTH_CHILDREN,자녀,Children
+REBIRTH_FACTION,세력,Faction
+REBIRTH_AGE,나이,Age
+REBIRTH_NONE,없음,None
+REBIRTH_KEYS,Enter 새 몸으로 이어 살기,Enter Live on in the new body

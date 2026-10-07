@@ -3,7 +3,8 @@
 ## follows: W, A, S and D order it a few cells their way, a left click toward the cell clicked,
 ## keys 1 to 9 to strike with that skill, and 0 with all its skills; C challenges its faction's
 ## leader to a duel, with the same order, when the core allows it; G opens the genealogy panel on
-## the person, and M the sect panel on its sect. Escape pauses the world under the pause panel,
+## the person, and M the sect panel on its sect, where Enter applies to the sect shown. When the
+## person dies and its soul is born again, the rebirth screen sums up the life just ended. Escape pauses the world under the pause panel,
 ## whose guide shows the controls as bound here. The camera follows the person. It ticks at the
 ## core's tick rate times the speed the settings choose, draws the world through world_art.tscn and
 ## the HUD and its screens through hud.tscn, sounds it through sound.tscn, and holds no game rule.
@@ -43,6 +44,8 @@ var _since_tick := 0.0
 var _last_lead := Vector2.ZERO
 # The move keys held, in the order they were pressed.
 var _held: Array[Key] = []
+# The person last steered, whose death the rebirth screen sums up once its soul is born again.
+var _body := -1
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -71,6 +74,7 @@ func start(from_seed: int) -> bool:
 	_art.show_world(world, steered)
 	_sound.show_world(world)
 	_hud.show_player(world, steered)
+	_body = world.roster(steered)[0]
 	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
 	var rows := world.map_rows()
@@ -125,6 +129,8 @@ func _take(action: String) -> void:
 				_hud.pause.visible = true
 		"resume":
 			_hud.pause.close()
+		"continue":
+			_hud.rebirth.close()
 		"title":
 			get_tree().reload_current_scene()
 		"quit":
@@ -258,8 +264,9 @@ func genealogy(keycode: Key) -> bool:
 
 
 ## Works the sect panel with `keycode`: M opens it on the steered person's sect or closes it,
-## up and down choose among the shown faction's sects, Tab shows the next faction, Escape closes
-## it. While it is open no key gives an order. Returns whether the key did anything.
+## up and down choose among the shown faction's sects, Tab shows the next faction, Enter applies to
+## the sect shown, Escape closes it. While it is open no key gives an order. Returns whether the
+## key did anything.
 func sects(keycode: Key) -> bool:
 	var panel: Control = _hud.sect
 	if keycode == SECT_KEY and not panel.visible:
@@ -274,9 +281,26 @@ func sects(keycode: Key) -> bool:
 	if keycode == KEY_TAB:
 		panel.next_faction()
 		return true
+	if keycode == KEY_ENTER or keycode == KEY_KP_ENTER:
+		return apply_to_sect() >= 0
 	if keycode == KEY_UP or keycode == KEY_DOWN:
 		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
 	return false
+
+
+## Has the steered person apply to the sect the sect panel shows, and shows the core's verdict on
+## the panel. Returns the verdict, one of the WorldAdapter.APPLICATION_* constants, of which
+## APPLICATION_NONE means it joined; or -1 while the panel shows no sect or the person has no body.
+func apply_to_sect() -> int:
+	var panel: Control = _hud.sect
+	var roster := world.roster(steered)
+	if panel.sect < 0 or roster.is_empty():
+		return -1
+	var refusal := world.application_refusal(roster[0], panel.sect)
+	if refusal == WorldAdapter.APPLICATION_NONE:
+		world.apply(roster[0], panel.sect)
+	panel.show_verdict(refusal)
+	return refusal
 
 
 ## Runs the ticks `delta` seconds of play call for, at the core's tick rate times the speed the
@@ -287,17 +311,27 @@ func advance(delta: float) -> void:
 	var speed: int = _hud.settings.speed()
 	var step_seconds := 1.0 / (WorldAdapter.TICKS_PER_SECOND * speed)
 	_since_tick = minf(_since_tick + delta, step_seconds * MAX_TICKS_PER_FRAME * speed)
-	while _since_tick >= step_seconds:
+	# A screen a tick opens, such as the rebirth screen, stops the ticks after it.
+	while _since_tick >= step_seconds and _hud.screen() == null:
 		step()
 		_since_tick -= step_seconds
 
 
-## Advances the world one tick.
+## Advances the world one tick, and opens the rebirth screen once the steered person has died
+## and its soul is born again as another.
 func step() -> void:
 	world.tick()
 	_art.note_tick()
 	_sound.note_tick()
 	ticks += 1
+	var roster := world.roster(steered)
+	if roster.is_empty() or roster[0] == _body:
+		return
+	if _body >= 0 and world.person_health(_body) == 0:
+		_held.clear()
+		_hud.show_player(world, steered)
+		_hud.rebirth.open(world, _body, roster[0])
+	_body = roster[0]
 
 
 ## Returns the steered person's position, in sub-cell units, or where it last stood while it has

@@ -21,9 +21,19 @@ const SHOWN := {
 	"duel_challenger": ["HUD_LEADER_YOU"],
 	"duel_leader": ["HUD_LEADER_YOU"],
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD"],
+	"rumour_0": ["HUD_RUMOR_NONE"],
 }
-# The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure.
-const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_"]
+# The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
+# and of the rumours' and arts' words, which _rumours_pass and _attainment_pass measure.
+const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_"]
+const Attainment := preload("res://hud/attainment.gd")
+# Attainment is measured at three digits: a talent limit stays under 1,000.
+const WIDEST_ATTAINMENT := 999
+# Years with days of five ticks for rumours to reach the player.
+const RUMOUR_YEARS := 10
+const SHORT_DAY := 5
+const DAYS_PER_YEAR := 120
 # The season label is measured at a three-digit year.
 const LATEST_YEAR := 999
 # Text keeps clear of a panel's right edge by its 1-pixel border and the 4 pixels labels keep from
@@ -88,7 +98,9 @@ func run() -> bool:
 	var measure_passed := _measure_pass()
 	var names_passed := _names_pass()
 	var fit_passed := _fit_pass()
-	return passed and measure_passed and names_passed and fit_passed
+	var rumours_passed := _rumours_pass()
+	var attainment_passed := _attainment_pass()
+	return passed and measure_passed and names_passed and fit_passed and rumours_passed and attainment_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -244,6 +256,8 @@ func _texts(hud: CanvasLayer, name: String, label: Label, measured: Dictionary) 
 			measured["SEASON_%d" % season] = true
 			seasons.append(hud.season_text({"year": LATEST_YEAR, "season": season}))
 		return seasons
+	if name == "rumour_1" or name == "rumour_2":
+		return []
 	var keys: Array = SHOWN.get(name, [])
 	if name == "notice":
 		keys = keys + hud.CHALLENGE_KEYS.values()
@@ -309,3 +323,134 @@ func _measure_pass() -> bool:
 	print("hud_test: \"%s\" is %d px in Galmuri9; refused in a %d px untrimmed label %s, accepted in a %d px one %s (setup %s): %s" % [
 		text, drawn, drawn - 1, narrow_refused, drawn, exact_accepted, set_up, "pass" if passed else "FAIL"])
 	return passed
+
+
+# The region lived RUMOUR_YEARS years of five-tick days: the rumour log shows the latest rumours
+# that reach the player, newest first, each worded as rumour_text words it, and a person's birth
+# or death names that person. Control: the same region as it begins has no rumour, and the log
+# says none has come. In each locale, every rumour about villages, sects and leads, with every
+# faction and sect name, fits its line whole; one naming a person fits whole in Korean, and in
+# English is cut short with an ellipsis past its line, for every surname crossed with every given
+# name. Setup: every RUMOUR_ key is measured.
+func _rumours_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
+	var steered := world.army_count() - 1
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.refresh(world, steered, PackedInt64Array([0]))
+	var none_shown: String = hud.labels.rumour_0.text
+	var none_right: bool = world.rumours(world.roster(steered)[0]).is_empty() \
+			and none_shown == hud.tr("HUD_RUMOR_NONE") and hud.labels.rumour_1.text == ""
+	for tick in RUMOUR_YEARS * DAYS_PER_YEAR * SHORT_DAY:
+		world.tick()
+	hud.refresh(world, steered, PackedInt64Array([0]))
+	var heard := world.rumours(world.roster(steered)[0])
+	var shown := []
+	var expected := []
+	for line in hud.RUMOUR_LINES:
+		shown.append(hud.labels["rumour_%d" % line].text)
+		expected.append(hud.rumour_text(world, heard[line]) if line < heard.size() else "")
+	var newest_first: bool = heard.size() >= 2 and heard[0].sequence > heard[1].sequence
+	var named := true
+	for event: Dictionary in heard:
+		if event.kind == "born" or event.kind == "died":
+			named = named and hud.rumour_text(world, event).contains(PersonName.of(world, event.person, true))
+	var live_right: bool = heard.size() >= hud.RUMOUR_LINES and shown == expected and newest_first and named
+	# Fits, in each locale.
+	var label: Label = hud.labels.rumour_0
+	var measured := {}
+	var overruns: Array[String] = []
+	var cut := 0
+	var checks := 0
+	var factions := world.faction_names()
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var texts: Array[String] = []
+		for owner in factions.size():
+			texts.append(_said(hud, measured, "RUMOUR_FOUNDED", [_faction(hud, factions, owner)]))
+			texts.append(_said(hud, measured, "RUMOUR_RUINED", [_faction(hud, factions, owner)]))
+			for raider in factions.size():
+				texts.append(_said(hud, measured, "RUMOUR_RAIDED",
+						[_faction(hud, factions, raider), _faction(hud, factions, owner)]))
+		for sect in world.sect_count():
+			texts.append(_said(hud, measured, "RUMOUR_SECT_FELL",
+					[hud.tr("SECT_" + world.sect_name(sect).to_upper().replace(" ", "_"))]))
+		for text in texts:
+			checks += 1
+			if _width(label, text) > label.size.x:
+				overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
+		for name in _every_name(world):
+			var person := PersonName.shown(name, true)
+			for owner in factions.size():
+				for key: String in ["RUMOUR_ELECTED", "RUMOUR_DUEL", "RUMOUR_BORN", "RUMOUR_DIED"]:
+					var args := [person, _faction(hud, factions, owner)] if key in ["RUMOUR_ELECTED", "RUMOUR_DUEL"] else [person]
+					var text := _said(hud, measured, key, args)
+					checks += 1
+					var whole := _width(label, text) <= label.size.x
+					cut += 0 if whole else 1
+					if not _within(label, text) or (locale == "ko" and not whole):
+						overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var unmeasured := ["RUMOUR_FOUNDED", "RUMOUR_RAIDED", "RUMOUR_RUINED", "RUMOUR_SECT_FELL", "RUMOUR_ELECTED",
+			"RUMOUR_DUEL", "RUMOUR_BORN", "RUMOUR_DIED"].filter(func(key: String) -> bool: return not measured.has(key))
+	var passed := none_right and live_right and unmeasured.is_empty() and overruns.is_empty()
+	print("hud_test: a new region shows \"%s\" %s; after %d years %d rumours reach the player, the log showing %s against %s, newest first %s, births and deaths named %s; %d rumours measured, %d cut short in English; unmeasured %s; overruns %s: %s" % [
+		none_shown, none_right, RUMOUR_YEARS, heard.size(), shown, expected, newest_first, named, checks, cut,
+		unmeasured, overruns.slice(0, 3), "pass" if passed else "FAIL"])
+	return passed
+
+
+# A sect's founding master shows the discipline of its highest attainment and that attainment, its
+# founding attainment of 120, and the HUD shows the player's art as Attainment.of gives it.
+# Control: the player, newborn to the world, has attained nothing and shows Attainment.NONE. In each
+# locale, every discipline at three digits, right-aligned on the art's line, keeps 4 pixels clear
+# of the art's label.
+func _attainment_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	var steered := world.army_count() - 1
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.refresh(world, steered, PackedInt64Array([0]))
+	var master := world.sect_master(0)
+	var attained := world.person_attainment(master)
+	var best := -1
+	for discipline in attained.size():
+		if best < 0 or attained[discipline] > attained[best]:
+			best = discipline
+	var names := world.discipline_names()
+	var master_shown := Attainment.of(world, master)
+	var master_right := attained[best] == 120 and names.size() == attained.size() \
+			and master_shown == "%s 120" % hud.tr("DISCIPLINE_" + names[best].to_upper().replace(" ", "_"))
+	var player := world.roster(steered)[0]
+	var shown: String = hud.labels.attainment_value.text
+	var player_right := Array(world.person_attainment(player)).all(func(points: int) -> bool: return points == 0) \
+			and shown == Attainment.NONE
+	var label: Label = hud.labels.attainment
+	var value: Label = hud.labels.attainment_value
+	var overruns: Array[String] = []
+	var checks := 0
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var room := value.size.x - _width(label, hud.tr(label.text)) - 4
+		for discipline: String in names:
+			var text := Attainment.shown(discipline, WIDEST_ATTAINMENT)
+			checks += 1
+			if _width(value, text) > room or hud.tr("DISCIPLINE_" + discipline.to_upper().replace(" ", "_")).begins_with("DISCIPLINE_"):
+				overruns.append("%s %s is %d px in %d" % [locale, text, _width(value, text), room])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var passed := master_right and player_right and overruns.is_empty() and checks == 2 * names.size()
+	print("hud_test: master %d attained %s in %s, shown \"%s\"; the player shown \"%s\"; %d arts measured, overruns %s: %s" % [
+		master, attained, names, master_shown, shown, checks, overruns, "pass" if passed else "FAIL"])
+	return passed
+
+
+# `key` in the current locale with `args`, noting it measured.
+func _said(hud: CanvasLayer, measured: Dictionary, key: String, args: Array) -> String:
+	measured[key] = true
+	return hud.tr(key) % args
+
+
+func _faction(hud: CanvasLayer, factions: PackedStringArray, index: int) -> String:
+	return hud.tr("FACTION_" + factions[index].to_upper())
