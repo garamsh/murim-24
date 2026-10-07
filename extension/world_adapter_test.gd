@@ -4,8 +4,9 @@
 # refuses what the core, or the conversion to the core's types, refuses; that
 # a body given orders through the adapter moves and strikes; that a region's
 # villages keep their residents' own skills off their structures; and that a
-# region's people are read back with their names and kin; and that a region's
-# villages are read back with the cap, stock and population the core derives.
+# region's people are read back with their names and kin; that a region's
+# villages are read back with the cap, stock and population the core derives;
+# and that a region's sects and manuals are read back as the core holds them.
 extends RefCounted
 
 const SEED := 42
@@ -112,8 +113,9 @@ func run() -> bool:
 	var villages_pass := _villages_pass()
 	var kin_pass := _kin_pass()
 	var economy_pass := _economy_pass()
+	var sects_pass := _sects_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass
 
 
 # Each village of a region starts with people, under its cap, and food in store; a day later its stock has fed every one of them a measure. Control: the stock read
@@ -137,6 +139,39 @@ func _economy_pass() -> bool:
 	print("world_adapter_test: %d villages, first with %d people under a cap of %d and %d food, %d a day later: %s" % [
 		villages.size(), region.village_population(0), region.village_cap(0), starts[0][0],
 		region.village_stock(0), "pass" if passed else "FAIL"])
+	return passed
+
+
+# Each sect of a region is read back as the core holds it: a name, its faction, a seat that is a
+# village of the seat template held by that faction, its founders as members with an elder among
+# them as master, a cap from its seat's pupils, standing, and its manual held. The player's body,
+# born into an ordinary village, belongs to no sect. Control: a world made by create() has no sects
+# and no manuals.
+func _sects_pass() -> bool:
+	var region := WorldAdapter.create_region(REGION_SEED)
+	var villages := region.villages()
+	var right := region.sect_count() == region.faction_names().size()
+	for sect in region.sect_count():
+		var seat := region.sect_seat(sect)
+		var members := region.sect_members(sect)
+		var master := region.sect_master(sect)
+		right = right and not region.sect_name(sect).is_empty() and region.sect_faction(sect) == sect \
+				and villages[seat].kind == "seat" and region.sect_seat_held(sect) \
+				and members.size() == 2 and region.sect_elders(sect).has(master) \
+				and region.person_sect(master) == sect and region.sect_cap(sect) > members.size() \
+				and region.sect_stands(sect)
+	var manuals := region.manuals()
+	var held := manuals.size() == region.sect_count()
+	for manual: Dictionary in manuals:
+		held = held and manual.place == "sect"
+	var player: int = region.roster(region.army_count() - 1)[0]
+	var plain := WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), _armies, STRUCTURES, RULES)
+	var none: bool = plain.sect_count() == 0 and plain.manuals().is_empty()
+	var passed: bool = right and held and region.person_sect(player) == -1 and none
+	print("world_adapter_test: %d sects, first %s of faction %d seated in village %d, members %s, elders %s, master %d, cap %d; manuals %s; player's sect %d; a world from create has %d sects: %s" % [
+		region.sect_count(), region.sect_name(0), region.sect_faction(0), region.sect_seat(0),
+		region.sect_members(0), region.sect_elders(0), region.sect_master(0), region.sect_cap(0),
+		manuals, region.person_sect(player), plain.sect_count(), "pass" if passed else "FAIL"])
 	return passed
 
 
@@ -246,7 +281,9 @@ func _reads_pass() -> bool:
 		var centre: Vector2i = village.corner + village.area / 2
 		claimed = claimed and territory[centre.y * rows[0].length() + centre.x] == village.faction
 	var born_faction := region.army_faction(region.army_count() - 1)
-	var villages_read := villages.size() >= 6 and villages.size() <= 8 \
+	# Six to eight villages, and a seat for each sect besides.
+	var farms := villages.filter(func(village: Dictionary) -> bool: return village.kind != "seat").size()
+	var villages_read := farms >= 6 and farms <= 8 and villages.size() == farms + region.sect_count() \
 			and born_faction == int(villages[0].faction)
 	# Every region structure lies inside a village's area, and some span several cells.
 	var footprints := {}

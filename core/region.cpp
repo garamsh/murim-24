@@ -76,6 +76,18 @@ constexpr std::int32_t SETTLEMENT_SPACING = 3;
 constexpr std::int32_t TERRITORY_CLAIM = 16;
 constexpr std::uint32_t SETTLERS = 6;
 constexpr std::uint32_t RAIDERS = 10;
+// Sects in region_data(), ages in days and chances per mille a year.
+constexpr std::uint32_t ADMISSION_AGE = 12 * YEAR;
+constexpr std::uint32_t ASSESSED_TALENT = 550;
+constexpr std::uint32_t PROVEN_ATTAINMENT = 20;
+constexpr std::int32_t ADMISSION_REACH = 48;
+constexpr std::uint32_t ADMISSION_CHANCE = 300;
+constexpr std::uint32_t ELDER_ATTAINMENT = 120;
+constexpr std::uint32_t HALL_PUPILS = 4;
+constexpr std::uint32_t MANUAL_HALL_PUPILS = 4;
+constexpr std::uint32_t TRAINING_GROUND_PUPILS = 12;
+constexpr std::uint32_t SCATTER_CHANCE = 500;
+constexpr std::int32_t SCATTER_REACH = 16;
 
 // Surnames of the murim's clans, common and of the old houses, and given
 // names for women and men, in Korean with their romanised forms.
@@ -268,8 +280,9 @@ Plan plan_of(const RegionData& data, const Building& building) {
   const Footprint footprint = building.structure.footprint;
   const auto cells =
       static_cast<std::uint32_t>(footprint.width * footprint.height);
-  return Plan{building.kind, footprint, kind.blocks,
-              Holding{kind.housing, kind.storage, kind.yield * cells}};
+  return Plan{
+      building.kind, footprint, kind.blocks,
+      Holding{kind.housing, kind.storage, kind.yield * cells, kind.pupils}};
 }
 
 // Growth that builds `builds` and lays out `settlement`'s buildings for a
@@ -312,6 +325,104 @@ Life life_of(const RegionData& data) {
     }
   }
   return life;
+}
+
+// Lays village `name` of template `kind` owned by `owner` with its area's
+// corner at `corner`: its structures, with what each holds, and its resident
+// army, two people for each household, standing on the open cells nearest
+// its centre, bound for the centre.
+void lay_village(Region& region, const RegionData& data,
+                 const VillageTemplate& kind, std::size_t owner, Cell corner,
+                 std::string name) {
+  Village village{std::move(name),      kind.name, owner, corner, kind.area, {},
+                  region.armies.size(), 0};
+  for (const Building& building : kind.buildings) {
+    const Structure& structure = building.structure;
+    village.structures.push_back(region.structures.size());
+    const StructureKind made =
+        kind_named(data, building.kind).value_or(StructureKind{});
+    region.structures.push_back(Structure{
+        Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
+        structure.durability, structure.footprint, made.blocks});
+    region.structure_kinds.push_back(building.kind);
+    const auto cells = static_cast<std::uint32_t>(structure.footprint.width *
+                                                  structure.footprint.height);
+    region.holdings.push_back(
+        Holding{made.housing, made.storage, made.yield * cells, made.pupils});
+    village.households += building.households;
+  }
+  const Cell middle = middle_of(kind.area);
+  const Cell centre{corner.x + middle.x, corner.y + middle.y};
+  // The residents stand on the open cells nearest the centre.
+  std::vector<Cell> open = open_cells(region, village);
+  std::stable_sort(open.begin(), open.end(), [centre](Cell left, Cell right) {
+    return distance_squared(left, centre) < distance_squared(right, centre);
+  });
+  std::vector<Recruit> members;
+  for (std::size_t person = 0;
+       person <
+       std::min<std::size_t>(std::size_t{2} * village.households, open.size());
+       ++person) {
+    members.push_back(Recruit{open.at(person), HEALTH});
+  }
+  region.armies.push_back(ArmySpec{centre, std::move(members), owner,
+                                   data.factions.at(owner).skills});
+  region.villages.push_back(village);
+}
+
+// Lays each sect's seat from the seat template at a corner drawn among those
+// where it lies on cells `room` gives its faction, which then hold `nobody`.
+// Returns each seat's village, in the sects' order. Throws
+// std::runtime_error when a seat finds no room.
+std::vector<std::size_t> seat_sects(Region& region, const RegionData& data,
+                                    std::vector<std::size_t>& room,
+                                    Random& random, std::size_t nobody) {
+  std::vector<std::size_t> seats;
+  for (const SectData& sect : data.sects) {
+    const std::vector<Cell> corners =
+        corners_for(room, sect.faction, data.seat.area);
+    if (corners.empty()) {
+      throw std::runtime_error("no room for a seat");
+    }
+    const Cell corner = corners.at(static_cast<std::size_t>(
+        random.below(static_cast<std::int32_t>(corners.size()))));
+    for (const Cell cell : cells_of(corner, data.seat.area)) {
+      room.at(index_of(cell)) = nobody;
+    }
+    seats.push_back(region.villages.size());
+    lay_village(region, data, data.seat, sect.faction, corner,
+                data.seat.name + " of " + sect.name);
+  }
+  return seats;
+}
+
+// The sects of `region` as a World is created with them, each seated in its
+// village of `seats`, its founders that village's residents, the first of
+// them at its faction's elder attainment and so an elder.
+std::vector<SectSpec> sects_of(const Region& region, const RegionData& data,
+                               const std::vector<std::size_t>& seats) {
+  std::vector<std::size_t> first_of(region.armies.size());
+  std::size_t counted = 0;
+  for (std::size_t army = 0; army < region.armies.size(); ++army) {
+    first_of.at(army) = counted;
+    counted += region.armies.at(army).members.size();
+  }
+  std::vector<SectSpec> sects;
+  for (std::size_t sect = 0; sect < data.sects.size(); ++sect) {
+    const SectData& made = data.sects.at(sect);
+    const std::size_t army = region.villages.at(seats.at(sect)).army;
+    SectSpec spec{made.name, made.faction, seats.at(sect), {}};
+    const std::uint32_t elder = data.factions.at(made.faction)
+                                    .admission.value_or(Admission{})
+                                    .elder_attainment;
+    for (std::size_t member = 0; member < region.armies.at(army).members.size();
+         ++member) {
+      spec.founders.push_back(
+          Founder{first_of.at(army) + member, member == 0 ? elder : 0});
+    }
+    sects.push_back(std::move(spec));
+  }
+  return sects;
 }
 
 void validate(const RegionData& data) {
@@ -361,6 +472,12 @@ void validate(const RegionData& data) {
                         placed) ||
            !cover(middle_of(village.area));
   };
+  const auto unknown_kind = [&data](const VillageTemplate& village) {
+    return std::any_of(village.buildings.begin(), village.buildings.end(),
+                       [&data](const Building& building) {
+                         return !kind_named(data, building.kind);
+                       });
+  };
   if (data.terrain.empty() || data.factions.empty() || data.villages.empty() ||
       std::any_of(data.terrain.begin(), data.terrain.end(), weightless) ||
       std::any_of(data.factions.begin(), data.factions.end(), unknown_enemy) ||
@@ -368,14 +485,13 @@ void validate(const RegionData& data) {
           data.factions.begin(), data.factions.end(),
           [](const Faction& faction) { return faction.skills.empty(); }) ||
       std::any_of(data.villages.begin(), data.villages.end(), malformed) ||
-      std::any_of(data.villages.begin(), data.villages.end(),
-                  [&data](const VillageTemplate& village) {
-                    return std::any_of(
-                        village.buildings.begin(), village.buildings.end(),
-                        [&data](const Building& building) {
-                          return !kind_named(data, building.kind);
-                        });
-                  })) {
+      (!data.sects.empty() && malformed(data.seat)) ||
+      std::any_of(data.sects.begin(), data.sects.end(),
+                  [&data](const SectData& sect) {
+                    return sect.faction >= data.factions.size();
+                  }) ||
+      std::any_of(data.villages.begin(), data.villages.end(), unknown_kind) ||
+      (!data.sects.empty() && unknown_kind(data.seat))) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
 }
@@ -423,6 +539,16 @@ RegionData region_data() {
   constexpr std::int32_t WELL_EAST = 6;
   constexpr std::int32_t FENCE_EAST = 5;
   constexpr std::int32_t PLAIN_WEIGHT = 10;
+  constexpr Footprint MANUAL_HALL{4, 3};
+  constexpr Footprint TRAINING_GROUND{6, 4};
+  constexpr Footprint SEAT_GATE{3, 1};
+  constexpr std::int32_t SEAT_WIDTH = 12;
+  constexpr std::int32_t SEAT_HEIGHT = 9;
+  constexpr std::int32_t SEAT_HALL_EAST = 7;
+  constexpr std::int32_t SEAT_YARD_ROW = 5;
+  constexpr std::int32_t SEAT_GRANARY_EAST = 7;
+  constexpr std::int32_t SEAT_FIELD_EAST = 9;
+  constexpr std::int32_t SEAT_GATE_EAST = 7;
   const auto building = [](Cell cell, Footprint footprint, const char* kind,
                            std::uint32_t households) {
     return Building{Structure{cell, DURABILITY, footprint}, kind, households};
@@ -445,21 +571,35 @@ RegionData region_data() {
           // As their villages press against their caps, the Orthodox build
           // first, then found and raid; the Unorthodox found first; the
           // Demonic Cult, which raises nothing, raids.
+          // Sects admit their faction's people of 12 within 48 cells of the
+          // seat at 3 in 10 a year: the Orthodox and the Cult assess a
+          // talent limit of 550, the Unorthodox proof of usefulness, an
+          // attainment of 20. A member of 120 attainment is an elder. The
+          // Orthodox elect their leader among their sects' masters.
           {"Orthodox",
            {1},
            {GUARD, MEND},
            std::nullopt,
-           {Expansion::BUILD, Expansion::FOUND, Expansion::RAID}},
+           {Expansion::BUILD, Expansion::FOUND, Expansion::RAID},
+           Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
+                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+           Election{0}},
           {"Demonic",
            {0, 2},
            {GUARD, TORCH},
            Duel{true, 0, true},
-           {Expansion::RAID}},
+           {Expansion::RAID},
+           Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
+                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+           std::nullopt},
           {"Unorthodox",
            {1},
            {GUARD, MEND},
            std::nullopt,
-           {Expansion::FOUND, Expansion::RAID, Expansion::BUILD}},
+           {Expansion::FOUND, Expansion::RAID, Expansion::BUILD},
+           Admission{ADMISSION_AGE, 0, PROVEN_ATTAINMENT, ADMISSION_REACH,
+                     ADMISSION_CHANCE, ELDER_ATTAINMENT},
+           std::nullopt},
       },
       // The approved target mockup's village: houses of 3 by 3 cells and a
       // hall of 5 by 3 north of the road through its centre, more houses
@@ -533,19 +673,45 @@ RegionData region_data() {
            // a person moves to a village within 64 cells with room and food,
            // or dies.
            Husbandry{1, HUNGER_DAYS, MIGRATION_REACH},
-           std::nullopt},
+           std::nullopt,
+           // Each sect holds the manual of its faction's art: Hwasan the
+           // sword, the Heavenly Demon the saber, the Black Fang hidden
+           // weapons. A fallen sect's manuals scatter at even odds within 16
+           // cells of its seat, and are otherwise lost.
+           Manuals{{{0}, {1}, {3}}, SCATTER_CHANCE, SCATTER_REACH}},
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village
-      // is capped at 50 people, a hamlet at 20.
-      {{"house", HOUSE_HOUSING, 0, 0, true},
-       {"hall", HALL_HOUSING, 0, 0, true},
-       {"well", 0, 0, 0, true},
-       {"barrels", 0, 0, 0, true},
-       {"fence", 0, 0, 0, true},
-       {"granary", 0, GRANARY_STORAGE, 0, true},
-       {"storehouse", 0, STOREHOUSE_STORAGE, 0, true},
-       {"field", 0, 0, FIELD_YIELD, false}},
+      // is capped at 50 people, a hamlet at 20. A seat's hall and manual
+      // hall each teach 4 pupils and its training ground 12, on which people
+      // stand, so it blocks nothing.
+      {{"house", HOUSE_HOUSING, 0, 0, true, 0},
+       {"hall", HALL_HOUSING, 0, 0, true, HALL_PUPILS},
+       {"well", 0, 0, 0, true, 0},
+       {"barrels", 0, 0, 0, true, 0},
+       {"fence", 0, 0, 0, true, 0},
+       {"granary", 0, GRANARY_STORAGE, 0, true, 0},
+       {"storehouse", 0, STOREHOUSE_STORAGE, 0, true, 0},
+       {"field", 0, 0, FIELD_YIELD, false, 0},
+       {"training_ground", 0, 0, 0, false, TRAINING_GROUND_PUPILS},
+       {"manual_hall", 0, 0, 0, true, MANUAL_HALL_PUPILS},
+       {"seat_gate", 0, 0, 0, true, 0}},
+      // A sect's seat of 12 by 9 cells, which every one of 200 seeds has room
+      // for: a house for its founding household, a manual hall and a
+      // hall along its north side, a training ground in its south-west
+      // corner, a granary and a field of rice east of it, and the seat gate
+      // on its south edge below them.
+      {"seat",
+       {SEAT_WIDTH, SEAT_HEIGHT},
+       {building({0, 0}, HOUSE, "house", FOUNDING_HOUSEHOLDS),
+        building({3, 0}, MANUAL_HALL, "manual_hall", 0),
+        building({SEAT_HALL_EAST, 0}, HALL, "hall", 0),
+        building({0, SEAT_YARD_ROW}, TRAINING_GROUND, "training_ground", 0),
+        building({SEAT_GRANARY_EAST, SEAT_YARD_ROW}, GRANARY, "granary", 0),
+        building({SEAT_FIELD_EAST, SEAT_YARD_ROW}, RICE, "field", 0),
+        building({SEAT_GATE_EAST, SEAT_HEIGHT - 1}, SEAT_GATE, "seat_gate",
+                 0)}},
+      {{"Hwasan", 0}, {"Heavenly Demon", 1}, {"Black Fang", 2}},
   };
   // Villages pressing against a fifth of their caps grow, checked every 30
   // days. They build a house, a field of rice or a granary within 8 cells
@@ -579,6 +745,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 {},
                 {},
                 life_of(data),
+                {},
                 {}};
   for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     region.map_rows.at(static_cast<std::size_t>(cell.y))
@@ -624,47 +791,11 @@ Region generate_region(Seed seed, const RegionData& data) {
       room.at(index_of(cell)) = nobody;
     }
 
-    Village village{kind.name + " " + std::to_string(number + 1),
-                    kind.name,
-                    owner,
-                    corner,
-                    kind.area,
-                    {},
-                    region.armies.size(),
-                    0};
-    for (const Building& building : kind.buildings) {
-      const Structure& structure = building.structure;
-      village.structures.push_back(region.structures.size());
-      const StructureKind made =
-          kind_named(data, building.kind).value_or(StructureKind{});
-      region.structures.push_back(Structure{
-          Cell{corner.x + structure.cell.x, corner.y + structure.cell.y},
-          structure.durability, structure.footprint, made.blocks});
-      region.structure_kinds.push_back(building.kind);
-      const auto cells = static_cast<std::uint32_t>(structure.footprint.width *
-                                                    structure.footprint.height);
-      region.holdings.push_back(
-          Holding{made.housing, made.storage, made.yield * cells});
-      village.households += building.households;
-    }
-    const Cell middle = middle_of(kind.area);
-    const Cell centre{corner.x + middle.x, corner.y + middle.y};
-    // The residents stand on the open cells nearest the centre.
-    std::vector<Cell> open = open_cells(region, village);
-    std::stable_sort(open.begin(), open.end(), [centre](Cell left, Cell right) {
-      return distance_squared(left, centre) < distance_squared(right, centre);
-    });
-    std::vector<Recruit> members;
-    for (std::size_t person = 0;
-         person < std::min<std::size_t>(std::size_t{2} * village.households,
-                                        open.size());
-         ++person) {
-      members.push_back(Recruit{open.at(person), HEALTH});
-    }
-    region.armies.push_back(ArmySpec{centre, std::move(members), owner,
-                                     data.factions.at(owner).skills});
-    region.villages.push_back(village);
+    lay_village(region, data, kind, owner, corner,
+                kind.name + " " + std::to_string(number + 1));
   }
+  const std::vector<std::size_t> seats =
+      seat_sects(region, data, room, random, nobody);
   // A faction is led by the first resident of its first village; people are
   // numbered in army order, so that resident's index counts every member of
   // the armies before it.
@@ -672,6 +803,9 @@ Region generate_region(Seed seed, const RegionData& data) {
   for (std::size_t faction = 0; faction < data.factions.size(); ++faction) {
     region.leadership.at(faction).succession =
         data.factions.at(faction).succession;
+    region.leadership.at(faction).admission =
+        data.factions.at(faction).admission;
+    region.leadership.at(faction).election = data.factions.at(faction).election;
   }
   std::size_t counted = 0;
   for (std::size_t army = 0; army < region.armies.size(); ++army) {
@@ -688,6 +822,7 @@ Region generate_region(Seed seed, const RegionData& data) {
     }
     counted += region.armies.at(army).members.size();
   }
+  region.sects = sects_of(region, data, seats);
   return region;
 }
 

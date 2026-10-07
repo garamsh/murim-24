@@ -35,17 +35,30 @@ struct Faction {
   /// What its villages do as they press against their caps, in order of
   /// preference; none grows no village.
   std::vector<Expansion> stance;
+  /// Who its sects admit; none admits no one, and its sects have no elders.
+  std::optional<Admission> admission;
+  /// How it elects its leader; none elects no one.
+  std::optional<Election> election;
+};
+
+/// A sect: its name and its faction, by index. Its seat is laid out from the
+/// seat template in its faction's territory.
+struct SectData {
+  std::string name;
+  std::size_t faction;
 };
 
 /// A kind of structure, by `name`: the people it houses, the food it stores,
 /// the food each cell of its footprint yields each harvest, which makes it a
-/// field, and whether it blocks movement.
+/// field, whether it blocks movement, and the pupils it teaches a sect
+/// seated in its village.
 struct StructureKind {
   std::string name;
   std::uint32_t housing;
   std::uint32_t storage;
   std::uint32_t yield;
   bool blocks;
+  std::uint32_t pupils;
 };
 
 /// A structure a village template places, its cell an offset from the area's
@@ -76,6 +89,11 @@ struct RegionData {
   Life life;
   /// The kinds of structure the templates build.
   std::vector<StructureKind> kinds;
+  /// The template every sect's seat is laid out from.
+  VillageTemplate seat;
+  /// The sects, each seated in a village of its own. The life's manuals give
+  /// the manuals each holds, in this order.
+  std::vector<SectData> sects;
 };
 
 /// A village as generated: the `area` from `corner` it occupies, its owner,
@@ -114,20 +132,25 @@ struct Region {
   Life life;
   /// What each structure holds, by its kind, in the order of `structures`.
   std::vector<Holding> holdings;
+  /// The sects, each seated in a village laid out after the others, its
+  /// founders that village's residents, the first an elder.
+  std::vector<SectSpec> sects;
 };
 
 /// Returns the game's terrain kinds, factions, village templates and life.
 [[nodiscard]] RegionData region_data();
 
-/// Generates a region from `seed` and `data`: terrain and territories, and six
-/// to eight villages owned in turn by each faction, each on buildable cells in
-/// its owner's territory and overlapping no other. The same seed and data give
-/// the same region. Throws std::invalid_argument when a table is empty, the
-/// terrain weights are not positive, a faction has no skills, a village
-/// template has no buildings, houses no household, has one outside its area,
-/// two that overlap, one over the area's centre, or one of a kind the kinds do
-/// not name, or a faction is hostile to one that does not exist; throws
-/// std::runtime_error when a village finds no room.
+/// Generates a region from `seed` and `data`: terrain and territories, six
+/// to eight villages owned in turn by each faction, and a seat for each sect
+/// in its faction's territory, each village on buildable cells in its owner's
+/// territory and overlapping no other. The same seed and data give the same
+/// region. Throws std::invalid_argument when a table is empty, the terrain
+/// weights are not positive, a faction has no skills, a village template or
+/// the seat template has no buildings, houses no household, has one outside
+/// its area, two that overlap, one over the area's centre, or one of a kind
+/// the kinds do not name, a faction is hostile to one that does not exist, or
+/// a sect names a faction that does not exist; throws std::runtime_error when
+/// a village or a seat finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Returns the villages of `region` as a World is created with them: each
