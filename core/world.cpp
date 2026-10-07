@@ -645,6 +645,7 @@ void World::restore() {
   };
   const bool bad_rules =
       rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
+      !reachable(rules_.rumour_reach) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
@@ -705,6 +706,42 @@ void World::restore() {
     return fight.faction >= factions || fight.challenger >= people ||
            fight.leader >= people;
   };
+  const auto stray_happening = [&](const Happening& what) {
+    if (const auto* founded = std::get_if<Founded>(&what)) {
+      return founded->village >= villages || founded->faction >= factions;
+    }
+    if (const auto* raided = std::get_if<Raided>(&what)) {
+      return raided->village >= villages || raided->owner >= factions ||
+             raided->raider >= factions;
+    }
+    if (const auto* ruined = std::get_if<Ruined>(&what)) {
+      return ruined->village >= villages || ruined->owner >= factions ||
+             ruined->destroyer.army >= armies_.size() ||
+             ruined->destroyer.faction >= factions;
+    }
+    if (const auto* fell = std::get_if<SectFell>(&what)) {
+      return fell->sect >= sects_.size() || fell->faction >= factions;
+    }
+    if (const auto* changed = std::get_if<LeaderChanged>(&what)) {
+      return changed->faction >= factions || changed->leader >= people;
+    }
+    if (const auto* born = std::get_if<Born>(&what)) {
+      return born->person >= people;
+    }
+    const auto* died = std::get_if<Died>(&what);
+    return died == nullptr || died->person >= people;
+  };
+  // Events are kept oldest first, numbered one after another, none later
+  // than the world's tick.
+  bool bad_events = events_.size() > EVENT_CAPACITY;
+  for (std::size_t index = 0; index < events_.size(); ++index) {
+    const Event& event = events_.at(index);
+    const bool unordered =
+        index > 0 && (event.sequence != events_.at(index - 1).sequence + 1 ||
+                      event.tick < events_.at(index - 1).tick);
+    bad_events = bad_events || unordered || event.tick > tick_count_ ||
+                 stray_happening(event.what);
+  }
   const auto stray_soul = [disciplines](const Soul& soul) {
     return soul.practised.size() > disciplines;
   };
@@ -718,7 +755,7 @@ void World::restore() {
       std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
       manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
       !all_below(surnames_, life_.names.surnames.size());
-  if (bad_rules || bad_life || bad_structures || !rostered() ||
+  if (bad_rules || bad_life || bad_structures || bad_events || !rostered() ||
       living() > MAX_PEOPLE ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
       std::any_of(villages_.begin(), villages_.end(), stray_village) ||

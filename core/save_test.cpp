@@ -225,5 +225,42 @@ TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
+TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
+  // Two hostile people strike each other dead on the first tick: the save
+  // keeps both deaths, then the souls, surnames, structures' villages and
+  // plans, each an empty list.
+  const Skill once{2 * CELL_SIZE, 0, 1, 0, 1'000};
+  World world{Seed{1},
+              Map{{"....", "...."}},
+              {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {once}},
+               ArmySpec{{1, 0}, {Recruit{{1, 0}, 1}}, 1, {once}}},
+              {},
+              Rules{0, {{false, true}, {true, false}}, STAGE_FLOORS}};
+  world.tick();
+  ASSERT_EQ(world.events().size(), 2U);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The last event's person, before four empty lists.
+  constexpr std::size_t EMPTY_LISTS = 4 * sizeof(std::uint64_t);
+  const std::size_t person =
+      payload.size() - EMPTY_LISTS - sizeof(std::uint64_t);
+  ASSERT_EQ(payload.at(person), 1);
+  // Control: resealing the same payload loads with its events.
+  store.bytes(SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.hash(), world.hash());
+  EXPECT_EQ(restored.world.events().size(), 2U);
+  // The death now names a person the world never held.
+  payload.at(person) = 2;
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
 }  // namespace
 }  // namespace murim

@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -489,6 +490,7 @@ void put_rules(Writer& out, const Rules& rules) {
     out.u32(floor);
   }
   out.u64(rules.ticks_per_day);
+  out.i32(rules.rumour_reach);
 }
 
 Rules get_rules(Reader& input) {
@@ -501,6 +503,7 @@ Rules get_rules(Reader& input) {
     floor = input.u32();
   }
   rules.ticks_per_day = input.u64();
+  rules.rumour_reach = input.i32();
   return rules;
 }
 
@@ -683,6 +686,88 @@ Manual get_manual(Reader& input) {
   return manual;
 }
 
+void put_event(Writer& out, const Event& event) {
+  out.u64(event.sequence);
+  out.u64(event.tick);
+  put_cell(out, event.cell);
+  out.u8(static_cast<std::uint8_t>(event.what.index()));
+  std::visit(
+      [&out](const auto& what) {
+        using Kind = std::decay_t<decltype(what)>;
+        if constexpr (std::is_same_v<Kind, Founded>) {
+          out.size(what.village);
+          out.size(what.faction);
+        } else if constexpr (std::is_same_v<Kind, Raided>) {
+          out.size(what.village);
+          out.size(what.owner);
+          out.size(what.raider);
+        } else if constexpr (std::is_same_v<Kind, Ruined>) {
+          out.size(what.village);
+          out.size(what.owner);
+          out.size(what.destroyer.army);
+          out.size(what.destroyer.faction);
+        } else if constexpr (std::is_same_v<Kind, SectFell>) {
+          out.size(what.sect);
+          out.size(what.faction);
+        } else if constexpr (std::is_same_v<Kind, LeaderChanged>) {
+          out.size(what.faction);
+          out.size(what.leader);
+          out.u8(static_cast<std::uint8_t>(what.by));
+        } else {
+          out.size(what.person);
+        }
+      },
+      event.what);
+}
+
+Event get_event(Reader& input) {
+  constexpr std::uint8_t HAPPENINGS = std::variant_size_v<Happening>;
+  constexpr std::uint8_t CHOICES = 2;
+  Event event;
+  event.sequence = input.u64();
+  event.tick = input.u64();
+  event.cell = get_cell(input);
+  switch (input.tag(HAPPENINGS)) {
+    case 0: {
+      const std::size_t village = input.size();
+      event.what = Founded{village, input.size()};
+      break;
+    }
+    case 1: {
+      const std::size_t village = input.size();
+      const std::size_t owner = input.size();
+      event.what = Raided{village, owner, input.size()};
+      break;
+    }
+    case 2: {
+      const std::size_t village = input.size();
+      const std::size_t owner = input.size();
+      const std::size_t army = input.size();
+      event.what = Ruined{village, owner, Destroyer{army, input.size()}};
+      break;
+    }
+    case 3: {
+      const std::size_t sect = input.size();
+      event.what = SectFell{sect, input.size()};
+      break;
+    }
+    case 4: {
+      const std::size_t faction = input.size();
+      const std::size_t leader = input.size();
+      event.what = LeaderChanged{faction, leader,
+                                 static_cast<ChosenBy>(input.tag(CHOICES))};
+      break;
+    }
+    case 5:
+      event.what = Born{input.size()};
+      break;
+    default:
+      event.what = Died{input.size()};
+      break;
+  }
+  return event;
+}
+
 }  // namespace
 
 /// Writes a world's state to a save's payload and reads it back.
@@ -738,6 +823,8 @@ class SaveCodec {
       out.size(fight.leader);
       put_duel(out, fight.rule);
     });
+    put_all(out, world.events_,
+            [&out](const Event& event) { put_event(out, event); });
     put_all(out, world.souls_, [&out](const Soul& soul) {
       out.u32(soul.lives);
       put_all(out, soul.practised,
@@ -819,6 +906,8 @@ class SaveCodec {
       fight.rule = get_duel(input);
       return fight;
     });
+    world.events_ =
+        get_all<Event>(input, [&input] { return get_event(input); });
     world.souls_ = get_all<Soul>(input, [&input] {
       Soul soul;
       soul.lives = input.u32();
