@@ -1,5 +1,5 @@
 -- Draws icon.aseprite: the game's 32x32 application icon, which the macOS and Windows exports
--- scale up by whole multiples. A jian stands planted before ridges of mountains under a low sun,
+-- scale by nearest neighbour. A jian stands planted before ridges of mountains under a low sun,
 -- as on the title screen, inside the HUD's ink frame with its gold trim and lacquer corners.
 -- Run: aseprite --batch --script art/icon/icon.lua
 
