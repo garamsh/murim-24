@@ -35,6 +35,8 @@ const SAVE_SLOT := 0
 ## The in-game days between autosaves.
 const AUTOSAVE_DAYS := 3
 
+## The directory SAVE_SLOT is kept in, set before the scene is ready; tests keep their own.
+var save_directory := WorldAdapter.saves_directory()
 ## The village the player is born into, set before a game starts.
 var birth_village := 0
 ## The seed the world was generated from.
@@ -64,7 +66,7 @@ var _unsaved_days := 0
 
 
 func _ready() -> void:
-	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT) != WorldAdapter.LOAD_MISSING)
+	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.read()
 	_hud.settings.apply()
 
@@ -82,9 +84,9 @@ func start(from_seed: int) -> bool:
 ## Resumes the world saved in SAVE_SLOT and closes the title screen, or shows on it why the save
 ## was not loaded. Returns whether it was loaded.
 func resume_saved() -> bool:
-	var loaded := WorldAdapter.load(SAVE_SLOT)
+	var loaded := WorldAdapter.load(SAVE_SLOT, save_directory)
 	if loaded == null:
-		_hud.title_screen.refuse(WorldAdapter.load_refusal(SAVE_SLOT))
+		_hud.title_screen.refuse(WorldAdapter.load_refusal(SAVE_SLOT, save_directory))
 		return false
 	_play(loaded)
 	return true
@@ -96,7 +98,7 @@ func save() -> bool:
 	if world.player_army() < 0:
 		return false
 	_unsaved_days = 0
-	return world.save(SAVE_SLOT)
+	return world.save(SAVE_SLOT, save_directory)
 
 
 # Plays `made`, steering the person carrying the player's soul, and closes the title screen.

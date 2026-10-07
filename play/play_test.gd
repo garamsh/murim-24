@@ -42,8 +42,7 @@ const MARCH_LIMIT := 12000
 const GROWN_SEED := 7
 const GROWN_TICKS_PER_DAY := 5
 const GROWN_TICKS := 9000
-# Where FileSaves keeps play.gd's save slot.
-const SAVE_PATH := "user://saves/slot_0.sav"
+const TestSaves := preload("res://extension/test_saves.gd")
 
 
 func run() -> bool:
@@ -184,7 +183,8 @@ func _screens_pass() -> bool:
 # ran before it was saved, so a fresh world from the same seed has another hash, and the grown
 # world has an army after the player's.
 func _save_pass() -> bool:
-	_remove_save()
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
 	var bare := _title()
 	var bare_hud: CanvasLayer = bare.get_node("Hud")
 	bare.navigate(_key(KEY_DOWN))
@@ -216,7 +216,7 @@ func _save_pass() -> bool:
 			and resumed.world.roster(resumed.steered)[0] == saved_person
 	resumed.free()
 
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(TestSaves.path(0), FileAccess.WRITE)
 	file.store_string("not a save")
 	file.close()
 	var broken := _title()
@@ -232,45 +232,49 @@ func _save_pass() -> bool:
 	for i in GROWN_TICKS:
 		grown.tick()
 	var player := grown.player_army()
-	var grown_past := player >= 0 and grown.army_count() > player + 1 and grown.save(0)
+	var grown_past := player >= 0 and grown.army_count() > player + 1 and grown.save(0, TestSaves.DIRECTORY)
 	var continued := _title()
 	continued.navigate(_key(KEY_DOWN))
 	continued.navigate(_key(KEY_ENTER))
 	var found: bool = continued.world != null and continued.steered == player \
 			and continued.world.roster(continued.steered) == grown.roster(player)
 	continued.free()
-	_remove_save()
+	TestSaves.clear()
+	# Every save above went to the tests' own directory: the game's slot 0 is as it was.
+	var untouched := TestSaves.game_slot() == game_slot
 	var passed := passed_over and chose_save and noted and ran and on_continue and same and refused \
-			and grown_past and found
-	print("play_test: with no save, Continue passed over %s; saved from the pause panel %s with its notice %s, after ticks that changed the world %s; on a fresh title Continue chosen %s resumes the same hash, seed %d and person %d %s; a broken save refused on the title with its reason %s; a world grown past the player's army %d saved %s, and Continue steers that army %s: %s" % [
+			and grown_past and found and untouched
+	print("play_test: with no save, Continue passed over %s; saved from the pause panel %s with its notice %s, after ticks that changed the world %s; on a fresh title Continue chosen %s resumes the same hash, seed %d and person %d %s; a broken save refused on the title with its reason %s; a world grown past the player's army %d saved %s, and Continue steers that army %s; the game's slot 0 untouched %s: %s" % [
 		passed_over, chose_save, noted, ran, on_continue, SEED, saved_person, same, refused, player,
-		grown_past, found, "pass" if passed else "FAIL"])
+		grown_past, found, untouched, "pass" if passed else "FAIL"])
 	return passed
 
 
 # The world is saved on the tick the AUTOSAVE_DAYS-th day begins, and the save loads as the world
 # then is. Control: on every tick before it the slot holds no save.
 func _autosave_pass() -> bool:
-	_remove_save()
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
 	var scene := _scene(0)
 	var every: int = scene.AUTOSAVE_DAYS
 	var date: Dictionary = scene.world.date()
 	var days := 0
 	var early := false
-	while not FileAccess.file_exists(SAVE_PATH) and days <= every:
+	while not FileAccess.file_exists(TestSaves.path(0)) and days <= every:
 		scene.step()
 		if scene.world.date() != date:
 			date = scene.world.date()
 			days += 1
-		early = early or (days < every and FileAccess.file_exists(SAVE_PATH))
-	var loaded := WorldAdapter.load(scene.SAVE_SLOT)
+		early = early or (days < every and FileAccess.file_exists(TestSaves.path(0)))
+	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.DIRECTORY)
 	var saved: bool = loaded != null and loaded.hash() == scene.world.hash()
 	var ticks: int = scene.ticks
 	scene.free()
-	_remove_save()
-	var passed := days == every and not early and saved
-	print("play_test: autosaved as day %d began, after %d ticks, every %d days %s; none earlier %s; it loads as the world then was %s: %s" % [
-		days, ticks, every, days == every, not early, saved,
+	TestSaves.clear()
+	var untouched := TestSaves.game_slot() == game_slot
+	var passed := days == every and not early and saved and untouched
+	print("play_test: autosaved as day %d began, after %d ticks, every %d days %s; none earlier %s; it loads as the world then was %s; the game's slot 0 untouched %s: %s" % [
+		days, ticks, every, days == every, not early, saved, untouched,
 		"pass" if passed else "FAIL"])
 	return passed
 
@@ -434,26 +438,25 @@ func _challenge_pass() -> bool:
 	return passed
 
 
-# The scene with a world started from SEED, its player born into `village`.
+# The scene with a world started from SEED, its player born into `village`, saving to the tests'
+# own directory.
 func _scene(village: int) -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
 	scene.birth_village = village
+	scene.save_directory = TestSaves.DIRECTORY
 	# The runner has no running tree to add the scene to, so it is readied directly.
 	scene.notification(Node.NOTIFICATION_READY)
 	scene.start(SEED)
 	return scene
 
 
-# The scene on the title screen, as it opens or as leaving for the title reloads it.
+# The scene on the title screen, as it opens or as leaving for the title reloads it, its saves in
+# the tests' own directory.
 func _title() -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
+	scene.save_directory = TestSaves.DIRECTORY
 	scene.notification(Node.NOTIFICATION_READY)
 	return scene
-
-
-func _remove_save() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(SAVE_PATH)
 
 
 # The nearest cell to `home` within SEARCH cells, at least two away, whose tile is `tile`.

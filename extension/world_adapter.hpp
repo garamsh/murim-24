@@ -8,6 +8,7 @@
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
@@ -15,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "file_saves.hpp"
 #include "map.hpp"
 #include "region.hpp"
 #include "save.hpp"
@@ -69,20 +71,31 @@ class WorldAdapter : public godot::RefCounted {
       std::int64_t seed, std::int64_t village = 0,
       std::int64_t ticks_per_day = murim::TICKS_PER_DAY);
 
-  /// Returns an adapter over the world saved in slot `slot`, as save() wrote
-  /// it. Returns null, after push_error naming why, when the slot holds no
-  /// save, the save is refused, or it holds no world made by create_region().
-  static godot::Ref<WorldAdapter> load(std::int64_t slot);
+  /// Returns an adapter over the world saved in slot `slot` of `directory`,
+  /// as save() wrote it. Returns null, after push_error naming why, when the
+  /// slot holds no save, the save is refused, or it holds no world made by
+  /// create_region().
+  static godot::Ref<WorldAdapter> load(
+      std::int64_t slot,
+      const godot::String& directory = FileSaves::DEFAULT_DIRECTORY);
 
-  /// Returns why load() refuses slot `slot`, one of the LOAD_* constants, the
-  /// core's LoadError: LOAD_NOT_A_SAVE for a save of no world made by
-  /// create_region(), and LOAD_NONE when the core reads it.
-  static std::int64_t load_refusal(std::int64_t slot);
+  /// Returns why load() refuses slot `slot` of `directory`, one of the LOAD_*
+  /// constants, the core's LoadError: LOAD_NOT_A_SAVE for a save of no world
+  /// made by create_region(), and LOAD_NONE when the core reads it.
+  static std::int64_t load_refusal(
+      std::int64_t slot,
+      const godot::String& directory = FileSaves::DEFAULT_DIRECTORY);
 
-  /// Saves the world in slot `slot`, replacing what it held. Returns false,
-  /// after push_error, when the world was not made by create_region() or the
-  /// save could not be written.
-  [[nodiscard]] bool save(std::int64_t slot) const;
+  /// Returns the directory save(), load() and load_refusal() keep slots in
+  /// unless given another.
+  static godot::String saves_directory();
+
+  /// Saves the world in slot `slot` of `directory`, replacing what it held.
+  /// Returns false, after push_error, when the world was not made by
+  /// create_region() or the save could not be written.
+  [[nodiscard]] bool save(
+      std::int64_t slot,
+      const godot::String& directory = FileSaves::DEFAULT_DIRECTORY) const;
 
   /// Returns the army the living person carrying the player's soul serves
   /// in, as the core holds it, or -1 when no such person lives.

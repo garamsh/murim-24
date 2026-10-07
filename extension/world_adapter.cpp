@@ -308,12 +308,13 @@ void WorldAdapter::show(murim::Region& region, murim::Origin origin) {
   origin_ = origin;
 }
 
-godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot) {
+godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
+                                            const godot::String& directory) {
   // The one handler for a slot out of range or a region the save names that
   // no longer has its village: it must not cross into Godot.
   try {
     std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
-        FileSaves{}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
+        FileSaves{directory}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
     if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
       godot::UtilityFunctions::push_error("WorldAdapter.load: ",
                                           refusal_of(*error));
@@ -344,11 +345,12 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot) {
   }
 }
 
-std::int64_t WorldAdapter::load_refusal(std::int64_t slot) {
+std::int64_t WorldAdapter::load_refusal(std::int64_t slot,
+                                        const godot::String& directory) {
   // The one handler for a slot out of range: it must not cross into Godot.
   try {
     const std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
-        FileSaves{}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
+        FileSaves{directory}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
     if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
       return static_cast<std::int64_t>(*error);
     }
@@ -362,7 +364,12 @@ std::int64_t WorldAdapter::load_refusal(std::int64_t slot) {
   }
 }
 
-bool WorldAdapter::save(std::int64_t slot) const {
+godot::String WorldAdapter::saves_directory() {
+  return FileSaves::DEFAULT_DIRECTORY;
+}
+
+bool WorldAdapter::save(std::int64_t slot,
+                        const godot::String& directory) const {
   if (!origin_) {
     godot::UtilityFunctions::push_error(
         "WorldAdapter.save: only a world made by create_region() is saved");
@@ -370,7 +377,7 @@ bool WorldAdapter::save(std::int64_t slot) const {
   }
   // The one handler for a slot out of range: it must not cross into Godot.
   try {
-    FileSaves files;
+    FileSaves files{directory};
     if (!murim::save(murim::Saved{origin_, world()}, files,
                      murim::Slot{narrow<std::uint32_t>(slot, "slot")})) {
       godot::UtilityFunctions::push_error(
@@ -1011,13 +1018,17 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::create_region, DEFVAL(0), DEFVAL(murim::TICKS_PER_DAY));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
-  godot::ClassDB::bind_static_method(name, godot::D_METHOD("load", "slot"),
-                                     &WorldAdapter::load);
-  godot::ClassDB::bind_static_method(name,
-                                     godot::D_METHOD("load_refusal", "slot"),
-                                     &WorldAdapter::load_refusal);
-  godot::ClassDB::bind_method(godot::D_METHOD("save", "slot"),
-                              &WorldAdapter::save);
+  godot::ClassDB::bind_static_method(
+      name, godot::D_METHOD("load", "slot", "directory"), &WorldAdapter::load,
+      DEFVAL(FileSaves::DEFAULT_DIRECTORY));
+  godot::ClassDB::bind_static_method(
+      name, godot::D_METHOD("load_refusal", "slot", "directory"),
+      &WorldAdapter::load_refusal, DEFVAL(FileSaves::DEFAULT_DIRECTORY));
+  godot::ClassDB::bind_static_method(name, godot::D_METHOD("saves_directory"),
+                                     &WorldAdapter::saves_directory);
+  godot::ClassDB::bind_method(godot::D_METHOD("save", "slot", "directory"),
+                              &WorldAdapter::save,
+                              DEFVAL(FileSaves::DEFAULT_DIRECTORY));
   godot::ClassDB::bind_method(godot::D_METHOD("player_army"),
                               &WorldAdapter::player_army);
   godot::ClassDB::bind_method(godot::D_METHOD("region_seed"),
