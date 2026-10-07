@@ -262,5 +262,63 @@ TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
+// Two hostile people a cell apart, the first casting its skill at `target`
+// on the next tick.
+World casting(const Target& target) {
+  constexpr std::uint64_t HEALTH = 10;
+  const Skill bolt{2 * CELL_SIZE, 0, 1, 0, 1'000};
+  World world{Seed{1},
+              Map{{"....", "...."}},
+              {ArmySpec{{0, 0}, {Recruit{{0, 0}, HEALTH}}, 0, {bolt}},
+               ArmySpec{{1, 0}, {Recruit{{1, 0}, HEALTH}}, 1, {bolt}}},
+              {},
+              Rules{0, {{false, true}, {true, false}}, STAGE_FLOORS}};
+  world.cast(0, 0, target);
+  return world;
+}
+
+TEST(Save, APendingCastLoadsAndLandsAsTheSavedOne) {
+  const World world = casting(Point{centre_of(Cell{1, 0})});
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+
+  EXPECT_EQ(restored.world.hash(), world.hash());
+  EXPECT_EQ(ticked(restored.world, 1).hash(), ticked(world, 1).hash());
+  // Control: a cast at itself is another state.
+  EXPECT_NE(casting(Itself{}).hash(), world.hash());
+}
+
+TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, casting(AtPerson{0})}, store, SLOT));
+  ASSERT_TRUE(
+      save(Saved{std::nullopt, casting(AtPerson{1})}, store, OTHER_SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(OTHER_SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The one payload byte the two saves differ in is the cast's person.
+  const std::vector<std::uint8_t>& at_first = store.bytes(SLOT);
+  const auto person = static_cast<std::size_t>(
+      std::mismatch(
+          payload.begin(), payload.end(),
+          at_first.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES))
+          .first -
+      payload.begin());
+  ASSERT_EQ(payload.at(person), 1);
+
+  // Control: resealing the same payload loads with its cast.
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  EXPECT_EQ(loaded(load(store, OTHER_SLOT)).world.hash(),
+            casting(AtPerson{1}).hash());
+  // The cast now names a person the world never held.
+  payload.at(person) = 2;
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, OTHER_SLOT)), LoadError::CORRUPTED);
+}
+
 }  // namespace
 }  // namespace murim

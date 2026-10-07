@@ -565,6 +565,16 @@ void put_person(Writer& out, const Person& person) {
             [&out](std::uint64_t lifespan) { out.u64(lifespan); });
   put_index(out, person.soul);
   put_index(out, person.sect);
+  put_maybe(out, person.casting, [&out](const Cast& cast) {
+    out.size(cast.skill);
+    out.u8(static_cast<std::uint8_t>(cast.target.index()));
+    if (const auto* point = std::get_if<Point>(&cast.target)) {
+      out.i32(point->position.x);
+      out.i32(point->position.y);
+    } else if (const auto* aimed = std::get_if<AtPerson>(&cast.target)) {
+      out.size(aimed->person);
+    }
+  });
 }
 
 Person get_person(Reader& input) {
@@ -593,6 +603,25 @@ Person get_person(Reader& input) {
       get_maybe<std::uint64_t>(input, [&input] { return input.u64(); });
   person.soul = get_index(input);
   person.sect = get_index(input);
+  person.casting = get_maybe<Cast>(input, [&input] {
+    constexpr std::uint8_t TARGETS = std::variant_size_v<Target>;
+    Cast cast;
+    cast.skill = input.size();
+    switch (input.tag(TARGETS)) {
+      case 0: {
+        const std::int32_t across = input.i32();
+        cast.target = Point{Position{across, input.i32()}};
+        break;
+      }
+      case 1:
+        cast.target = AtPerson{input.size()};
+        break;
+      default:
+        cast.target = Itself{};
+        break;
+    }
+    return cast;
+  });
   return person;
 }
 

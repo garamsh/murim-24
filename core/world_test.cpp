@@ -17,6 +17,7 @@
 #include <variant>
 #include <vector>
 
+#include "flow_field.hpp"
 #include "map.hpp"
 #include "spatial_hash.hpp"
 
@@ -2983,6 +2984,249 @@ TEST(World, AnArmyMakesTheVillageItNamesItsMembersHome) {
   // Control: an army naming no home leaves its members homeless.
   EXPECT_EQ(homed(std::nullopt),
             std::make_optional(std::optional<std::size_t>{}));
+}
+
+constexpr std::size_t CASTER = 0;
+constexpr std::size_t NEAR_FOE = 1;
+constexpr std::size_t FAR_FOE = 2;
+constexpr std::size_t BEHIND_FOE = 3;
+constexpr Cell CASTER_CELL{6, 8};
+constexpr Cell NEAR_FOE_CELL{8, 8};
+constexpr Cell FAR_FOE_CELL{10, 8};
+constexpr Cell BEHIND_FOE_CELL{5, 8};
+constexpr std::uint64_t CAST_COOLDOWN = 30;
+constexpr std::uint64_t BOLT_DAMAGE = 10;
+constexpr std::uint64_t NOVA_DAMAGE = 5;
+// The caster's skills: IDLE, which its order strikes with, then these.
+constexpr std::size_t BOLT = 1;
+constexpr std::size_t SHORT_BOLT = 2;
+constexpr std::size_t NOVA = 3;
+constexpr std::size_t SKILLS = 4;
+// A cell on the map's east edge, on the caster's row.
+constexpr Cell EAST_EDGE{15, CASTER_CELL.y};
+
+// A caster at CASTER_CELL whose order strikes with IDLE alone, so it uses
+// nothing unless it casts, and three hostile people, each an army of its own
+// with IDLE: two cells east, four cells east and one cell west.
+World cast_world() {
+  const Skill bolt{4 * CELL_SIZE, 0, BOLT_DAMAGE, 0, CAST_COOLDOWN};
+  const Skill short_bolt{3 * CELL_SIZE, 0, BOLT_DAMAGE, 0, CAST_COOLDOWN};
+  const Skill nova{0, (3 * CELL_SIZE) / 2, NOVA_DAMAGE, 0, CAST_COOLDOWN};
+  World world{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(CASTER_CELL, CASTER_CELL, 1, TARGET_HEALTH, 0,
+            {IDLE, bolt, short_bolt, nova}),
+       army(NEAR_FOE_CELL, NEAR_FOE_CELL, 1, TARGET_HEALTH, 1, {IDLE}),
+       army(FAR_FOE_CELL, FAR_FOE_CELL, 1, TARGET_HEALTH, 1, {IDLE}),
+       army(BEHIND_FOE_CELL, BEHIND_FOE_CELL, 1, TARGET_HEALTH, 1, {IDLE})},
+      {},
+      at_war(0)};
+  world.order(CASTER, {CASTER_CELL, {0}});
+  return world;
+}
+
+// The health person `person` has lost from TARGET_HEALTH.
+std::uint64_t lost(const World& world, std::size_t person) {
+  return TARGET_HEALTH - world.person(person).health;
+}
+
+TEST(World, ACastAtAPersonLandsOnThatPersonInPlaceOfTheNearest) {
+  World world = cast_world();
+  world.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+  world.tick();
+
+  EXPECT_EQ(lost(world, FAR_FOE), BOLT_DAMAGE);
+  // Control: the nearer people, whom an automatic strike would aim at first,
+  // are untouched.
+  EXPECT_EQ(lost(world, NEAR_FOE), 0U);
+  EXPECT_EQ(lost(world, BEHIND_FOE), 0U);
+}
+
+TEST(World, ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt) {
+  // Bolt reaches four cells: a point at the map's east edge is brought in to
+  // FAR_FOE_CELL's centre, four cells east of the caster.
+  World far = cast_world();
+  far.cast(CASTER, BOLT, Point{centre_of(EAST_EDGE)});
+  far.tick();
+  EXPECT_EQ(lost(far, FAR_FOE), BOLT_DAMAGE);
+  EXPECT_EQ(lost(far, NEAR_FOE), 0U);
+
+  // Control: a bolt of three cells, aimed the same way, lands a cell short
+  // and hits no one.
+  World short_of = cast_world();
+  short_of.cast(CASTER, SHORT_BOLT, Point{centre_of(EAST_EDGE)});
+  short_of.tick();
+  EXPECT_EQ(lost(short_of, FAR_FOE), 0U);
+  EXPECT_EQ(lost(short_of, NEAR_FOE), 0U);
+  // A cast that hits no one still starts its cooldown.
+  EXPECT_EQ(short_of.person(CASTER).ready_at, 1 + CAST_COOLDOWN);
+}
+
+TEST(World, ACastAtItselfCentresItsDiscOnTheCaster) {
+  World world = cast_world();
+  world.cast(CASTER, NOVA, Itself{});
+  world.tick();
+
+  // The disc of a cell and a half takes the person a cell behind, and spares
+  // the caster, whom no one in it is hostile to.
+  EXPECT_EQ(lost(world, BEHIND_FOE), NOVA_DAMAGE);
+  EXPECT_EQ(lost(world, CASTER), 0U);
+  // Control: the person two cells away lies outside it.
+  EXPECT_EQ(lost(world, NEAR_FOE), 0U);
+}
+
+TEST(World, ACastIsRefusedWithItsReason) {
+  World world = cast_world();
+  // Bolt reaches four cells; the far foe stands four cells east.
+  EXPECT_EQ(world.cast_refusal(CASTER, BOLT, AtPerson{FAR_FOE}),
+            CastRefusal::NONE);
+  EXPECT_EQ(world.cast_refusal(CASTER, SHORT_BOLT, AtPerson{FAR_FOE}),
+            CastRefusal::OUT_OF_RANGE);
+  EXPECT_THROW(world.cast(CASTER, SHORT_BOLT, AtPerson{FAR_FOE}),
+               std::invalid_argument);
+  EXPECT_EQ(world.cast_refusal(CASTER, SKILLS, Itself{}),
+            CastRefusal::NO_SKILL);
+  EXPECT_EQ(world.cast_refusal(CASTER, BOLT, AtPerson{world.population()}),
+            CastRefusal::NO_TARGET);
+  EXPECT_THROW(
+      static_cast<void>(world.cast_refusal(world.population(), BOLT, Itself{})),
+      std::invalid_argument);
+
+  world.cast(CASTER, BOLT, AtPerson{NEAR_FOE});
+  world.tick();
+  ASSERT_EQ(lost(world, NEAR_FOE), BOLT_DAMAGE);
+  EXPECT_EQ(world.cast_refusal(CASTER, BOLT, AtPerson{NEAR_FOE}),
+            CastRefusal::ON_COOLDOWN);
+  EXPECT_THROW(world.cast(CASTER, BOLT, AtPerson{NEAR_FOE}),
+               std::invalid_argument);
+  // Control: once the cooldown has passed, the same cast may be made.
+  run_ticks(world, CAST_COOLDOWN - 1);
+  EXPECT_EQ(world.cast_refusal(CASTER, BOLT, AtPerson{NEAR_FOE}),
+            CastRefusal::NONE);
+}
+
+TEST(World, ACastByOrAtTheDeadIsRefused) {
+  // A hostile of the caster's bolt's damage dies to one.
+  const Skill bolt{4 * CELL_SIZE, 0, BOLT_DAMAGE, 0, 1};
+  World world{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(CASTER_CELL, CASTER_CELL, 1, TARGET_HEALTH, 0, {IDLE, bolt}),
+       army(NEAR_FOE_CELL, NEAR_FOE_CELL, 1, BOLT_DAMAGE, 1, {IDLE, bolt})},
+      {},
+      at_war(0)};
+  world.order(CASTER, {CASTER_CELL, {0}});
+  world.order(NEAR_FOE, {NEAR_FOE_CELL, {0}});
+  // Control: both may cast before the bolt lands.
+  EXPECT_EQ(world.cast_refusal(NEAR_FOE, 1, Itself{}), CastRefusal::NONE);
+  EXPECT_EQ(world.cast_refusal(CASTER, 1, AtPerson{NEAR_FOE}),
+            CastRefusal::NONE);
+  world.cast(CASTER, 1, AtPerson{NEAR_FOE});
+  world.tick();
+  ASSERT_EQ(world.person(NEAR_FOE).health, 0U);
+
+  EXPECT_EQ(world.cast_refusal(NEAR_FOE, 1, Itself{}), CastRefusal::DEAD);
+  EXPECT_EQ(world.cast_refusal(CASTER, 1, AtPerson{NEAR_FOE}),
+            CastRefusal::NO_TARGET);
+}
+
+TEST(World, AnNpcCastsThroughTheSameFunction) {
+  // The foe, an NPC of faction 1, casts a bolt at a person of faction 0.
+  const Skill bolt{4 * CELL_SIZE, 0, BOLT_DAMAGE, 0, CAST_COOLDOWN};
+  World npc{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(CASTER_CELL, CASTER_CELL, 1, TARGET_HEALTH, 0, {IDLE}),
+       army(NEAR_FOE_CELL, NEAR_FOE_CELL, 1, TARGET_HEALTH, 1, {IDLE, bolt})},
+      {},
+      at_war(0)};
+  npc.order(NEAR_FOE, {NEAR_FOE_CELL, {0}});
+  npc.cast(NEAR_FOE, 1, AtPerson{CASTER});
+  npc.tick();
+  EXPECT_EQ(lost(npc, CASTER), BOLT_DAMAGE);
+  EXPECT_EQ(npc.person(NEAR_FOE).ready_at, 1 + CAST_COOLDOWN);
+  // Control: with no cast, its order's IDLE hits no one.
+  npc.tick();
+  run_ticks(npc, CAST_COOLDOWN);
+  EXPECT_EQ(lost(npc, CASTER), BOLT_DAMAGE);
+}
+
+TEST(World, ALaterCastBeforeTheTickReplacesTheFirst) {
+  World world = cast_world();
+  world.cast(CASTER, BOLT, AtPerson{NEAR_FOE});
+  world.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+  world.tick();
+
+  EXPECT_EQ(lost(world, FAR_FOE), BOLT_DAMAGE);
+  EXPECT_EQ(lost(world, NEAR_FOE), 0U);
+  // The cast is spent: the next tick makes no use of it.
+  EXPECT_FALSE(world.person(CASTER).casting.has_value());
+}
+
+TEST(World, ACastNoLongerAllowedOnItsTickLapses) {
+  World world = cast_world();
+  world.cast(CASTER, BOLT, AtPerson{NEAR_FOE});
+  // An army of IDLE alone has no skill of the bolt's index.
+  world.conscript(CASTER, NEAR_FOE);
+  ASSERT_EQ(world.cast_refusal(CASTER, BOLT, AtPerson{NEAR_FOE}),
+            CastRefusal::NO_SKILL);
+  world.tick();
+  EXPECT_EQ(lost(world, NEAR_FOE), 0U);
+  EXPECT_FALSE(world.person(CASTER).casting.has_value());
+}
+
+TEST(World, CastsReplayToTheSameHash) {
+  const auto played = [](std::uint64_t first) {
+    World world = cast_world();
+    for (std::uint64_t tick = 0; tick < 2 * CAST_COOLDOWN; ++tick) {
+      if (tick == first) {
+        world.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+      }
+      if (tick == first + CAST_COOLDOWN) {
+        world.cast(CASTER, NOVA, Itself{});
+      }
+      world.tick();
+    }
+    return world.hash();
+  };
+  EXPECT_EQ(played(1), played(1));
+  // Control: the same casts a tick later are another run.
+  EXPECT_NE(played(1), played(2));
+}
+
+TEST(World, APendingCastIsPartOfTheHash) {
+  World cast = cast_world();
+  cast.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+  World other = cast_world();
+  other.cast(CASTER, BOLT, AtPerson{NEAR_FOE});
+  EXPECT_NE(cast.hash(), other.hash());
+  // Control: the same cast hashes the same.
+  World same = cast_world();
+  same.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+  EXPECT_EQ(cast.hash(), same.hash());
+}
+
+TEST(World, AimTakesTheNearestFoeAheadOfTheFacing) {
+  const World world = cast_world();
+  const Step east{1, 0};
+  const Step west{-1, 0};
+  const Step south{0, 1};
+  EXPECT_EQ(world.aim(CASTER, BOLT, east),
+            std::optional<std::size_t>{NEAR_FOE});
+  EXPECT_EQ(world.aim(CASTER, BOLT, west),
+            std::optional<std::size_t>{BEHIND_FOE});
+  // Controls: with no facing, or one with no one ahead but those beside it,
+  // the nearest is taken, as the automatic strike takes it.
+  EXPECT_EQ(world.aim(CASTER, BOLT, Step{0, 0}),
+            std::optional<std::size_t>{BEHIND_FOE});
+  EXPECT_EQ(world.aim(CASTER, BOLT, south),
+            std::optional<std::size_t>{BEHIND_FOE});
+  // A skill whose range reaches no one aims at no one.
+  EXPECT_EQ(world.aim(CASTER, NOVA, east), std::nullopt);
+  EXPECT_THROW(
+      static_cast<void>(world.aim(CASTER, BOLT, Step{MAX_REACH + 1, 0})),
+      std::invalid_argument);
 }
 
 }  // namespace

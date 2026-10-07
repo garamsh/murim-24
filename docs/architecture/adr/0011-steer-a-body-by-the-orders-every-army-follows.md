@@ -1,6 +1,6 @@
 # ADR 0011: Steer a body by the orders every army follows
 
-> Status: accepted; its focus set by the driver superseded by ADR-0017
+> Status: accepted; its focus set by the driver superseded by ADR-0017, and its rejection of a one-shot strike by ADR-0034
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
