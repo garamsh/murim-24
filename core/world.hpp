@@ -531,6 +531,35 @@ struct SectSpec {
   std::vector<Founder> founders;
 };
 
+/// Why a person may not join the sect it applies to, the first that holds in
+/// this order; `NONE` when it may. The daily admission reads the same
+/// thresholds.
+enum class ApplicationRefusal : std::uint8_t {
+  NONE,
+  /// The person is dead.
+  DEAD,
+  /// The person belongs to a sect already.
+  IN_A_SECT,
+  /// The person has no home.
+  NO_HOME,
+  /// The person serves in no army of the sect's faction, or the faction's
+  /// sects admit no one.
+  NOT_OF_FACTION,
+  /// The person is younger than the admission's age.
+  TOO_YOUNG,
+  /// No discipline of the person's meets both the admission's talent and its
+  /// attainment.
+  UNPROVEN,
+  /// The person's home lies beyond the admission's reach of the seat.
+  TOO_FAR,
+  /// The sect's seat is not held.
+  SEAT_LOST,
+  /// The sect has no living elder to admit anyone.
+  NO_ELDER,
+  /// The sect holds as many members as its cap.
+  FULL,
+};
+
 /// A manual held by a sect, by index.
 struct HeldBySect {
   std::size_t sect = 0;
@@ -545,6 +574,68 @@ struct Manual {
   std::variant<HeldBySect, Cell, Lost> place;
 };
 
+/// The most events a world keeps; the oldest gives way to the newest.
+constexpr std::size_t EVENT_CAPACITY = 64;
+
+/// Village `village` was founded by people of `faction`.
+struct Founded {
+  std::size_t village = 0;
+  std::size_t faction = 0;
+};
+
+/// A party of `raider` was sent against village `village`, owned by `owner`.
+struct Raided {
+  std::size_t village = 0;
+  std::size_t owner = 0;
+  std::size_t raider = 0;
+};
+
+/// Village `village`, owned by `owner`, was brought to ruins by `destroyer`.
+struct Ruined {
+  std::size_t village = 0;
+  std::size_t owner = 0;
+  Destroyer destroyer{};
+};
+
+/// Sect `sect`, of `faction`, lost its last member.
+struct SectFell {
+  std::size_t sect = 0;
+  std::size_t faction = 0;
+};
+
+/// How a faction's lead changed hands.
+enum class ChosenBy : std::uint8_t { ELECTION, DUEL };
+
+/// Person `leader` came to lead faction `faction`, chosen `by`.
+struct LeaderChanged {
+  std::size_t faction = 0;
+  std::size_t leader = 0;
+  ChosenBy by = ChosenBy::ELECTION;
+};
+
+/// Person `person` was born, as a child or a soul born again.
+struct Born {
+  std::size_t person = 0;
+};
+
+/// Person `person` died.
+struct Died {
+  std::size_t person = 0;
+};
+
+/// What happened in an event.
+using Happening =
+    std::variant<Founded, Raided, Ruined, SectFell, LeaderChanged, Born, Died>;
+
+/// Something that happened in the world: the `sequence`-th event recorded,
+/// counted from 0, on tick `tick`, at `cell`.
+struct Event {
+  std::uint64_t sequence = 0;
+  std::uint64_t tick = 0;
+  Cell cell{};
+  Happening what;
+};
+
 /// The data a world's rules read.
 struct Rules {
   /// Sub-cell units people keep apart; 0 lets them overlap.
@@ -556,6 +647,9 @@ struct Rules {
   std::array<std::uint32_t, 3> stage_floors;
   /// Ticks in a day of the calendar.
   std::uint64_t ticks_per_day = TICKS_PER_DAY;
+  /// Cells, along each axis, within which an event reaches a person as a
+  /// rumour wherever it concerns.
+  std::int32_t rumour_reach = 0;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -566,12 +660,12 @@ class SaveCodec;
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
-  /// Throws std::invalid_argument when the separation, or a skill's range or
-  /// radius, lies outside [0, MAX_REACH], `hostile` is not square, a recruit
-  /// has no health or more than MAX_HEALTH, the world would hold more than
-  /// MAX_PEOPLE people, an army has no skills or a faction outside
-  /// `hostile`, a skill does more than MAX_BODY_DAMAGE to a person or waits
-  /// longer than MAX_COOLDOWN, a structure's footprint is not 1 to
+  /// Throws std::invalid_argument when the separation, the rumour reach, or a
+  /// skill's range or radius, lies outside [0, MAX_REACH], `hostile` is not
+  /// square, a recruit has no health or more than MAX_HEALTH, the world would
+  /// hold more than MAX_PEOPLE people, an army has no skills or a faction
+  /// outside `hostile`, a skill does more than MAX_BODY_DAMAGE to a person or
+  /// waits longer than MAX_COOLDOWN, a structure's footprint is not 1 to
   /// MAX_FOOTPRINT cells along each side or covers a cell that is not
   /// passable or that another structure covers, a recruit stands on a cell
   /// that is not passable or that a structure covers, or from which its
@@ -798,6 +892,32 @@ class World {
   /// Returns every manual and where it is now.
   [[nodiscard]] const std::vector<Manual>& manuals() const;
 
+  /// Returns why person `person` may not join sect `sect`, which is why
+  /// apply() would refuse it, or ApplicationRefusal::NONE when it may: the
+  /// thresholds of the daily admission, without its chance or its draw among
+  /// sects. Throws std::invalid_argument when there is no such person or sect.
+  [[nodiscard]] ApplicationRefusal application_refusal(std::size_t person,
+                                                       std::size_t sect) const;
+
+  /// Makes person `person` a member of sect `sect` at once, the same
+  /// application for the player's body as for an NPC. Throws
+  /// std::invalid_argument when application_refusal() names a reason, or
+  /// there is no such person or sect.
+  void apply(std::size_t person, std::size_t sect);
+
+  /// Returns the events the world keeps, at most EVENT_CAPACITY, oldest
+  /// first.
+  [[nodiscard]] const std::vector<Event>& events() const;
+
+  /// Returns the events kept that reach person `person` as rumours, newest
+  /// first: those within the rumour reach of where it stands,
+  /// and wherever they happened, the births and deaths of its kin (its
+  /// family, spouses, parents and children) and what befell its faction: a
+  /// village of it founded, raided or ruined, or by it raided or ruined, a
+  /// sect of it fallen, or its lead changing hands. Throws std::out_of_range
+  /// when there is no such person.
+  [[nodiscard]] std::vector<Event> rumours(std::size_t person) const;
+
  private:
   friend class SaveCodec;
 
@@ -874,7 +994,26 @@ class World {
     std::vector<std::size_t> army_of;
   };
   [[nodiscard]] Living living_people() const;
+  /// What admission reads of a sect, counted once for many applicants.
+  struct Opening {
+    bool held = false;
+    bool elder = false;
+    std::size_t members = 0;
+    std::size_t cap = 0;
+  };
+  [[nodiscard]] Opening opening(std::size_t sect) const;
+  [[nodiscard]] ApplicationRefusal assess(std::size_t person,
+                                          std::optional<std::size_t> faction,
+                                          std::size_t sect,
+                                          const Opening& open) const;
   void admit(const Living& living);
+  void record(Cell cell, Happening what);
+  void note_falls(std::vector<std::size_t> sects);
+  [[nodiscard]] std::vector<std::size_t> record_deaths();
+  [[nodiscard]] bool events_kept() const;
+  [[nodiscard]] bool related(std::size_t one, std::size_t other) const;
+  [[nodiscard]] bool heard_by(const Event& event, std::size_t person,
+                              std::optional<std::size_t> faction) const;
   void settle_duels();
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
@@ -979,6 +1118,8 @@ class World {
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
   std::vector<Fight> duels_;
+  /// The latest events, oldest first, at most EVENT_CAPACITY.
+  std::vector<Event> events_;
   Life life_;
   std::vector<Soul> souls_;
   /// Each family's surname, by index among the life's surnames.

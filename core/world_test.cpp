@@ -12,6 +12,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -241,7 +242,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x17F3F597F63D7FEAULL);
+            0x821A3A1023A37426ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -2450,6 +2451,8 @@ struct Sectarian {
   std::size_t seat_faction = 0;
   std::array<std::size_t, 2> founders{0, 1};
   Manuals manuals{{{0}}, 0, 0};
+  std::optional<Spread> lifespan;
+  std::int32_t rumour_reach = 0;
 };
 
 constexpr Cell SEAT_HOME{2, 3};
@@ -2463,8 +2466,10 @@ constexpr std::size_t SECT = 0;
 World sect_world(const Sectarian& sectarian) {
   Rules peace{SEPARATION, {{false, false}, {false, false}}, STAGE_FLOORS};
   peace.ticks_per_day = 1;
+  peace.rumour_reach = sectarian.rumour_reach;
   Life life = one_discipline(0);
   life.manuals = sectarian.manuals;
+  life.lifespan = sectarian.lifespan;
   const Leadership faction{std::nullopt, std::nullopt, sectarian.admission,
                            sectarian.election};
   return World{
@@ -2645,6 +2650,310 @@ TEST(World, AFactionReadsAsElectingOnlyWithAnElection) {
   EXPECT_TRUE(sect_world(electing).elects(0));
   // Control: the same faction without an election does not elect.
   EXPECT_FALSE(sect_world(Sectarian{}).elects(0));
+}
+
+constexpr std::size_t VILLAGER = 2;
+constexpr std::size_t HOMELESS = 5;
+
+TEST(World, AnApplicantJoinsAtOnceByTheAdmissionsThresholdsWithoutItsChance) {
+  Sectarian unlikely;
+  unlikely.admission.chance = 0;
+  World world = sect_world(unlikely);
+  ASSERT_EQ(world.application_refusal(VILLAGER, SECT),
+            ApplicationRefusal::NONE);
+  world.apply(VILLAGER, SECT);
+  EXPECT_EQ(world.sect_of(VILLAGER), std::optional<std::size_t>{SECT});
+  EXPECT_EQ(world.sect_members(SECT), (std::vector<std::size_t>{0, 1, 2}));
+  // Control: with no chance, the daily admission takes no one in two years.
+  EXPECT_EQ(sect_world_after(unlikely, SECT_YEARS).sect_members(SECT),
+            (std::vector<std::size_t>{0, 1}));
+}
+
+// The world `sectarian` makes, after `days` days, in which person `person`
+// applies to the sect.
+struct Applying {
+  Sectarian sectarian;
+  std::size_t person = VILLAGER;
+  std::uint64_t days = 0;
+  bool fallen = false;
+};
+
+World application_world(const Applying& applying) {
+  World world = applying.fallen ? fallen(applying.sectarian)
+                                : sect_world(applying.sectarian);
+  run_ticks(world, applying.days);
+  return world;
+}
+
+// What person `applying.person` is told on applying in `applying`'s world:
+// the refusal, whether apply() refused it, and the sect it belongs to after.
+using Answer = std::tuple<ApplicationRefusal, bool, std::optional<std::size_t>>;
+
+Answer answer(const Applying& applying) {
+  World world = application_world(applying);
+  const ApplicationRefusal refusal =
+      world.application_refusal(applying.person, SECT);
+  bool refused = false;
+  try {
+    world.apply(applying.person, SECT);
+  } catch (const std::invalid_argument&) {
+    refused = true;
+  }
+  return Answer{refusal, refused, world.sect_of(applying.person)};
+}
+
+// Whether an application to a sect the world lacks is refused.
+bool applying_to_no_sect_is_refused() {
+  const World world = application_world(Applying{});
+  try {
+    static_cast<void>(world.application_refusal(VILLAGER, SECT + 1));
+  } catch (const std::invalid_argument&) {
+    return true;
+  }
+  return false;
+}
+
+TEST(World, AnApplicationIsRefusedForEachReasonApplyRefusesIt) {
+  Sectarian mortal;
+  mortal.lifespan = Spread{1, 0};
+  Sectarian foreign;
+  foreign.villager_faction = 1;
+  Sectarian older;
+  older.admission.age = 1;
+  Sectarian untalented;
+  untalented.admission.talent = MAX_TALENT;
+  Sectarian unproven;
+  unproven.admission.attainment = 1;
+  Sectarian distant;
+  distant.admission.reach = 4;
+  Sectarian ruined;
+  ruined.durability = 0;
+  Sectarian narrow;
+  narrow.pupils = 2;
+  const std::vector<std::pair<Applying, ApplicationRefusal>> cases{
+      {Applying{mortal, VILLAGER, 2}, ApplicationRefusal::DEAD},
+      {Applying{Sectarian{}, 0}, ApplicationRefusal::IN_A_SECT},
+      {Applying{Sectarian{}, HOMELESS}, ApplicationRefusal::NO_HOME},
+      {Applying{foreign}, ApplicationRefusal::NOT_OF_FACTION},
+      {Applying{older}, ApplicationRefusal::TOO_YOUNG},
+      {Applying{untalented}, ApplicationRefusal::UNPROVEN},
+      {Applying{unproven}, ApplicationRefusal::UNPROVEN},
+      {Applying{distant}, ApplicationRefusal::TOO_FAR},
+      {Applying{ruined}, ApplicationRefusal::SEAT_LOST},
+      {Applying{Sectarian{}, VILLAGER, 0, true}, ApplicationRefusal::NO_ELDER},
+      {Applying{narrow}, ApplicationRefusal::FULL},
+  };
+  std::vector<Answer> answers;
+  std::vector<Answer> refusals;
+  for (const auto& [applying, reason] : cases) {
+    answers.push_back(answer(applying));
+    const bool member = reason == ApplicationRefusal::IN_A_SECT;
+    refusals.emplace_back(
+        reason, true, member ? std::optional<std::size_t>{SECT} : std::nullopt);
+  }
+  EXPECT_EQ(answers, refusals);
+  // Control: the same villager, with nothing barring it, is admitted.
+  EXPECT_EQ(answer(Applying{}), Answer(ApplicationRefusal::NONE, false, SECT));
+  EXPECT_TRUE(applying_to_no_sect_is_refused());
+}
+
+// The happenings of kind `Kind` among the events world `world` keeps, oldest
+// first.
+template <typename Kind>
+std::vector<Kind> recorded(const World& world) {
+  std::vector<Kind> found;
+  for (const Event& event : world.events()) {
+    if (const auto* what = std::get_if<Kind>(&event.what)) {
+      found.push_back(*what);
+    }
+  }
+  return found;
+}
+
+TEST(World, EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened) {
+  World world = soul_world();
+  ASSERT_TRUE(world.events().empty());
+  const std::size_t post = world.roster(POST).front();
+  const std::size_t reborn = world.population();
+  run_ticks(world, ARRIVAL_TICKS);
+  ASSERT_EQ(world.person(post).health, 0U);
+  std::size_t dead = 0;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    dead += world.person(person).health == 0 ? 1 : 0;
+  }
+  EXPECT_EQ(recorded<Died>(world).size(), dead);
+  const auto died = std::find_if(
+      world.events().begin(), world.events().end(), [post](const Event& event) {
+        const auto* what = std::get_if<Died>(&event.what);
+        return what != nullptr && what->person == post;
+      });
+  ASSERT_NE(died, world.events().end());
+  EXPECT_TRUE(in(died->cell, world.person(post).position));
+  // The soul is born again on the tick its body died, after the death.
+  const Event& born = world.events().back();
+  ASSERT_TRUE(std::holds_alternative<Born>(born.what));
+  EXPECT_EQ(std::get<Born>(born.what).person, reborn);
+  EXPECT_EQ(born.tick, died->tick);
+  EXPECT_GT(born.sequence, died->sequence);
+  // Control: no one was born but the soul.
+  EXPECT_EQ(recorded<Born>(world).size(), 1U);
+}
+
+TEST(World, ASectsFallIsRecordedOnceWhenItsLastMemberLeaves) {
+  World world = fallen(Sectarian{});
+  run_ticks(world, SECT_YEARS);
+  const std::vector<SectFell> fell = recorded<SectFell>(world);
+  ASSERT_EQ(fell.size(), 1U);
+  EXPECT_EQ(fell.front().sect, SECT);
+  EXPECT_EQ(fell.front().faction, 0U);
+  // Control: with one founder left, the sect stands and nothing is recorded.
+  World standing = sect_world(Sectarian{});
+  standing.conscript(0, OUTSIDERS);
+  run_ticks(standing, 1);
+  ASSERT_TRUE(standing.sect_stands(SECT));
+  EXPECT_TRUE(recorded<SectFell>(standing).empty());
+}
+
+TEST(World, ALeadChangingHandsIsRecordedAndARenewedOneIsNot) {
+  // Elected each day, the same master is recorded once.
+  Sectarian electing;
+  electing.election = Election{1};
+  const std::vector<LeaderChanged> elected =
+      recorded<LeaderChanged>(sect_world_after(electing, 3));
+  ASSERT_EQ(elected.size(), 1U);
+  EXPECT_EQ(elected.front().leader, 0U);
+  EXPECT_EQ(elected.front().by, ChosenBy::ELECTION);
+  // A challenger who wins is recorded as winning the lead by duel.
+  World won = cult_world(TARGET_HEALTH);
+  ASSERT_EQ(after_challenge(won, PLAYER), std::optional<std::size_t>{1});
+  const std::vector<LeaderChanged> duelled = recorded<LeaderChanged>(won);
+  ASSERT_EQ(duelled.size(), 1U);
+  EXPECT_EQ(duelled.front().faction, CULT);
+  EXPECT_EQ(duelled.front().by, ChosenBy::DUEL);
+  // Control: a lost duel changes no hands.
+  World lost = cult_world(1);
+  ASSERT_EQ(after_challenge(lost, PLAYER), std::optional<std::size_t>{0});
+  EXPECT_TRUE(recorded<LeaderChanged>(lost).empty());
+}
+
+TEST(World, VillagesFoundedRaidedAndRuinedAreRecorded) {
+  const std::vector<Founded> founding = recorded<Founded>(founded());
+  ASSERT_EQ(founding.size(), 1U);
+  EXPECT_EQ(founding.front().village, FOUNDED);
+  EXPECT_EQ(founding.front().faction, 0U);
+  const Growing raiding{{Expansion::RAID}};
+  World raided = growth_world(raiding);
+  run_ticks(raided, 1);
+  const std::vector<Raided> raids = recorded<Raided>(raided);
+  ASSERT_EQ(raids.size(), 1U);
+  EXPECT_EQ(raids.front().village, VILLAGE_B);
+  EXPECT_EQ(raids.front().raider, 0U);
+  EXPECT_EQ(raids.front().owner, raided.owner(VILLAGE_B));
+  World ruined = village_world(RESIDENT_HEALTH);
+  ruined.order(RAIDER, {IN_VILLAGE, {0, 1}});
+  run_ticks(ruined, PHASE_TICKS);
+  ASSERT_EQ(ruined.village_state(0), VillageState::RUINS);
+  const std::vector<Ruined> ruins = recorded<Ruined>(ruined);
+  ASSERT_EQ(ruins.size(), 1U);
+  EXPECT_EQ(ruins.front().destroyer.army, RAIDER);
+  // Control: a village at peace raids no one, and none is founded or ruined.
+  Growing peace{{Expansion::RAID}};
+  peace.hostile = false;
+  World quiet = growth_world(peace);
+  run_ticks(quiet, 1);
+  EXPECT_TRUE(recorded<Raided>(quiet).empty());
+  EXPECT_TRUE(recorded<Founded>(quiet).empty());
+  EXPECT_TRUE(recorded<Ruined>(quiet).empty());
+}
+
+constexpr Cell MIDDLE{8, 8};
+
+// A world of days of one tick in which `people` people, who live a day, die.
+World dying(std::size_t people) {
+  Life life = one_discipline(0);
+  life.lifespan = Spread{1, 0};
+  Rules daily = peaceful(0);
+  daily.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(MIDDLE, MIDDLE, people, 1, 0, {IDLE})},
+              {},
+              daily,
+              {},
+              {},
+              life};
+  run_ticks(world, 2);
+  return world;
+}
+
+TEST(World, TheWorldKeepsItsLatestEventsUpToItsCapacity) {
+  constexpr std::size_t PAST_CAPACITY = EVENT_CAPACITY + 6;
+  const World world = dying(PAST_CAPACITY);
+  ASSERT_EQ(world.living(), 0U);
+  ASSERT_EQ(world.events().size(), EVENT_CAPACITY);
+  EXPECT_EQ(world.events().front().sequence, 6U);
+  EXPECT_EQ(world.events().back().sequence, PAST_CAPACITY - 1);
+  // Control: fewer than its capacity are all kept, from the first.
+  const World few = dying(EVENT_CAPACITY - 1);
+  ASSERT_EQ(few.events().size(), EVENT_CAPACITY - 1);
+  EXPECT_EQ(few.events().front().sequence, 0U);
+}
+
+// Whether a world whose rumours reach `reach` cells is created.
+bool hears_within(std::int32_t reach) {
+  Rules rules = peaceful(0);
+  rules.rumour_reach = reach;
+  try {
+    const World world{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      rules};
+    return world.living() == 1;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
+TEST(World, ARumourReachOutsideItsLimitsIsRefused) {
+  EXPECT_FALSE(hears_within(-1));
+  EXPECT_FALSE(hears_within(MAX_REACH + 1));
+  // Control: the limits themselves are accepted.
+  EXPECT_TRUE(hears_within(0));
+  EXPECT_TRUE(hears_within(MAX_REACH));
+}
+
+constexpr Cell FAR_CORNER{14, 14};
+
+TEST(World, ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse) {
+  // A sect of faction 0 fell at its seat: its faction's villager hears of it
+  // from afar, and faction 1's outsider, beyond the reach, does not.
+  const World world = fallen(Sectarian{});
+  ASSERT_EQ(recorded<SectFell>(world).size(), 1U);
+  EXPECT_EQ(world.rumours(VILLAGER).size(), 1U);
+  EXPECT_TRUE(world.rumours(HOMELESS).empty());
+  // Control: within the reach, the outsider hears it too.
+  Sectarian near;
+  near.rumour_reach = OPEN_SIDE;
+  EXPECT_EQ(fallen(near).rumours(HOMELESS).size(), 1U);
+
+  // A death reaches the dead one's family from afar and no stranger of its
+  // faction.
+  const Skill once{2 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN};
+  World struck{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army({1, 1}, {1, 1}, 2, 1, 0, {IDLE}),
+                army({1, 2}, {1, 2}, 1, 1, 1, {once}),
+                army(FAR_CORNER, FAR_CORNER, 1, 1, 0, {IDLE})},
+               {},
+               at_war(0)};
+  run_ticks(struck, 1);
+  ASSERT_EQ(recorded<Died>(struck).size(), 1U);
+  const std::size_t dead = recorded<Died>(struck).front().person;
+  const std::size_t kin = dead == 0 ? 1 : 0;
+  ASSERT_GT(struck.person(kin).health, 0U);
+  EXPECT_EQ(struck.rumours(kin).size(), 1U);
+  EXPECT_TRUE(struck.rumours(3).empty());
 }
 
 }  // namespace

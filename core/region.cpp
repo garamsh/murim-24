@@ -38,6 +38,9 @@ constexpr std::int32_t SEPARATION = CELL_SIZE;
 // to twelve guard strikes; durability sets the raid.
 constexpr std::uint32_t DURABILITY = 10'000;
 constexpr std::uint64_t HEALTH = 120;
+// An event reaches everyone within 32 cells of it as a rumour, a quarter of
+// the region's side.
+constexpr std::int32_t RUMOUR_REACH = 32;
 // The rules of life in region_data().
 constexpr std::uint32_t GROWTH = 10;
 constexpr std::uint32_t GROWTH_SPREAD = 5;
@@ -769,7 +772,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                 Rules{SEPARATION,
                       hostility(data.factions),
                       {DURABILITY, DURABILITY / 2, 1},
-                      TICKS_PER_DAY},
+                      TICKS_PER_DAY,
+                      RUMOUR_REACH},
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
                 {},
