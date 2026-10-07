@@ -5,6 +5,7 @@
 # - sect_ko.png and sect_en.png: the region of seed 2026 with days of five ticks after YEARS years,
 #   drawn through world_art.tscn round the shown sect's seat, with the panel opened on the first
 #   army whose lead person belongs to a sect, in Korean and then in English.
+# - sect_en_orthodox.png: the same panel in English after Tab twice, on the Orthodox column.
 # Prints what the panel shows and fails if two images repeat.
 # Run: godot --path . --script <this file> -- <dir>
 extends SceneTree
@@ -46,6 +47,10 @@ func _process(_delta: float) -> bool:
 		TranslationServer.set_locale("en")
 	if _frame == 3 * SETTLE_FRAMES:
 		_shot("sect_en", _panel)
+		_panel.next_faction()
+		_panel.next_faction()
+	if _frame == 4 * SETTLE_FRAMES:
+		_shot("sect_en_orthodox", _panel)
 		return true
 	return false
 
