@@ -26,9 +26,11 @@
 #include <variant>
 #include <vector>
 
+#include "file_saves.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "region.hpp"
+#include "save.hpp"
 #include "world.hpp"
 
 namespace murim_godot {
@@ -178,6 +180,41 @@ murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
   return region;
 }
 
+// The soul the player's body carries: the first, and only, one a world from
+// create_region() gives.
+constexpr std::size_t PLAYER_SOUL = 0;
+
+// The health each army's members were created with, together, by army.
+std::vector<std::uint64_t> strengths_of(
+    const std::vector<murim::ArmySpec>& armies) {
+  std::vector<std::uint64_t> strengths;
+  for (const murim::ArmySpec& army : armies) {
+    std::uint64_t health = 0;
+    for (const murim::Recruit& member : army.members) {
+      health += member.health;
+    }
+    strengths.push_back(health);
+  }
+  return strengths;
+}
+
+// Why the core refused a save, as push_error reports it.
+const char* refusal_of(murim::LoadError error) {
+  switch (error) {
+    case murim::LoadError::MISSING:
+      return "the slot holds no save";
+    case murim::LoadError::NOT_A_SAVE:
+      return "the slot holds no save of this game";
+    case murim::LoadError::UNSUPPORTED_VERSION:
+      return "the save was written by another version of the game";
+    case murim::LoadError::TRUNCATED:
+      return "the save is cut short";
+    case murim::LoadError::CORRUPTED:
+      return "the save is corrupted";
+  }
+  return "the save is corrupted";
+}
+
 // The person indices `people` as GDScript reads them.
 godot::PackedInt64Array packed(const std::vector<std::size_t>& people) {
   godot::PackedInt64Array indices;
@@ -238,20 +275,98 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(
 godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
                                                  std::size_t village) {
   region.armies.push_back(murim::born_in(region, village));
-  std::vector<std::string> kinds = std::move(region.structure_kinds);
   std::vector<murim::VillageSpec> villages = murim::village_specs(region);
   godot::Ref<WorldAdapter> adapter =
-      over(region.seed, std::move(region.map_rows), std::move(region.armies),
-           std::move(region.structures), std::move(region.rules),
-           std::move(villages), std::move(region.leadership),
-           std::move(region.life), std::move(region.sects));
+      over(region.seed, region.map_rows, region.armies, region.structures,
+           region.rules, std::move(villages), region.leadership, region.life,
+           region.sects);
   // The person born last is the player's body, which carries a soul.
   adapter->world().ensoul(adapter->world().population() - 1);
-  adapter->structure_kinds_ = std::move(kinds);
-  adapter->region_data_ = murim::region_data();
-  adapter->terrain_ = std::move(region.terrain);
-  adapter->villages_ = std::move(region.villages);
+  adapter->show(region, murim::Origin{region.seed, village});
   return adapter;
+}
+
+void WorldAdapter::show(murim::Region& region, murim::Origin origin) {
+  structure_kinds_ = std::move(region.structure_kinds);
+  region_data_ = murim::region_data();
+  terrain_ = std::move(region.terrain);
+  villages_ = std::move(region.villages);
+  origin_ = origin;
+}
+
+godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot) {
+  // The one handler for a slot out of range or a region the save names that
+  // no longer has its village: it must not cross into Godot.
+  try {
+    std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
+        FileSaves{}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
+    if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
+      godot::UtilityFunctions::push_error("WorldAdapter.load: ",
+                                          refusal_of(*error));
+      return {};
+    }
+    auto& saved = std::get<murim::Saved>(loaded);
+    if (!saved.origin) {
+      godot::UtilityFunctions::push_error(
+          "WorldAdapter.load: the save holds no generated region");
+      return {};
+    }
+    murim::Region region =
+        region_of(saved.origin->region, murim::TICKS_PER_DAY);
+    region.armies.push_back(murim::born_in(region, saved.origin->village));
+    godot::Ref<WorldAdapter> adapter;
+    adapter.instantiate();
+    adapter->strengths_ = strengths_of(region.armies);
+    adapter->faction_count_ = region.rules.hostile.size();
+    adapter->names_ = region.life.names;
+    adapter->map_rows_ = region.map_rows;
+    adapter->world_.emplace(std::move(saved.world));
+    adapter->show(region, *saved.origin);
+    return adapter;
+  } catch (const std::logic_error& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
+    return {};
+  }
+}
+
+bool WorldAdapter::save(std::int64_t slot) const {
+  if (!origin_) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.save: only a world made by create_region() is saved");
+    return false;
+  }
+  // The one handler for a slot out of range: it must not cross into Godot.
+  try {
+    FileSaves files;
+    if (!murim::save(murim::Saved{origin_, world()}, files,
+                     murim::Slot{narrow<std::uint32_t>(slot, "slot")})) {
+      godot::UtilityFunctions::push_error(
+          "WorldAdapter.save: the save could not be written");
+      return false;
+    }
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.save: ", error.what());
+    return false;
+  }
+}
+
+std::int64_t WorldAdapter::player_army() const {
+  const murim::World& held = world();
+  // The soul's latest body is the last person carrying it.
+  for (std::size_t person = held.population(); person-- > 0;) {
+    if (held.person(person).soul != PLAYER_SOUL) {
+      continue;
+    }
+    for (std::size_t army = 0; army < held.army_count(); ++army) {
+      const std::vector<std::size_t>& roster = held.roster(army);
+      if (std::find(roster.begin(), roster.end(), person) != roster.end()) {
+        return static_cast<std::int64_t>(army);
+      }
+    }
+    return -1;
+  }
+  return -1;
 }
 
 godot::Vector2i WorldAdapter::m1_centre() {
@@ -268,13 +383,7 @@ godot::Ref<WorldAdapter> WorldAdapter::over(
     std::vector<murim::SectSpec> sects) {
   godot::Ref<WorldAdapter> adapter;
   adapter.instantiate();
-  for (const murim::ArmySpec& army : armies) {
-    std::uint64_t health = 0;
-    for (const murim::Recruit& member : army.members) {
-      health += member.health;
-    }
-    adapter->strengths_.push_back(health);
-  }
+  adapter->strengths_ = strengths_of(armies);
   adapter->faction_count_ = rules.hostile.size();
   adapter->names_ = life.names;
   adapter->world_.emplace(seed, murim::Map{map_rows}, std::move(armies),
@@ -755,6 +864,12 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::create_region, DEFVAL(0), DEFVAL(murim::TICKS_PER_DAY));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
+  godot::ClassDB::bind_static_method(name, godot::D_METHOD("load", "slot"),
+                                     &WorldAdapter::load);
+  godot::ClassDB::bind_method(godot::D_METHOD("save", "slot"),
+                              &WorldAdapter::save);
+  godot::ClassDB::bind_method(godot::D_METHOD("player_army"),
+                              &WorldAdapter::player_army);
   godot::ClassDB::bind_method(
       godot::D_METHOD("order", "army", "objective", "skills", "challenge"),
       &WorldAdapter::order, DEFVAL(-1));

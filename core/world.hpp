@@ -561,6 +561,8 @@ struct Rules {
 /// Sub-cell units a person moves per tick.
 constexpr std::int32_t SPEED = 16;
 
+class SaveCodec;
+
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
@@ -797,6 +799,20 @@ class World {
   [[nodiscard]] const std::vector<Manual>& manuals() const;
 
  private:
+  friend class SaveCodec;
+
+  /// A world holding `map`, `rules` and `life` and nothing else yet, for a
+  /// save to fill in before restore().
+  World(Map map, Rules rules, Life life);
+
+  /// Rebuilds what a world derives from the rest of its state. Throws
+  /// std::invalid_argument when that state breaks an invariant the
+  /// constructor and tick() keep: a reference to a record that does not
+  /// exist, a living person on no roster or on two, or data outside the
+  /// constructor's limits.
+  void restore();
+  [[nodiscard]] bool rostered() const;
+
   /// A duel fought for faction `faction`'s lead, under its rule.
   struct Fight {
     std::size_t faction = 0;
