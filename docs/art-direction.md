@@ -39,6 +39,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/training_ground` | 112 x 80 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/manual_hall` | 80 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/seat_gate` | 64 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 16 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 16 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
@@ -48,7 +50,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village and a sect's seat assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
 
 ## Screen and grid
 
@@ -198,6 +200,15 @@ A sect's seat is a village of its own (ADR 0026), laid out with the village's bu
 - The training ground is laid with the ground, over the terrain and under everything standing, so people stand and spar on it. What on it rises more than a few pixels, the racks and the dummies, stands along its back row, where anyone in front of it is drawn over it.
 - The seat gate rises 32 rows above its one-row footprint, so its frame holds the footprint at (8, 40), its bottom margin 8 rows as every frame's. Its pillars stand on its two end cells and the middle cell is the opening.
 - The stone curb, the platform and the gate's bases stay in every stage, as the plinth does.
+
+As a village grows, its people build workshops among its houses (`docs/concept.md` §Growing civilization). What each does is not yet designed; their art is drawn ahead of the rule:
+
+| Prop | Kind | Footprint | Look |
+|---|---|---|---|
+| Smithy (대장간) | Structure | 3 x 2 | A forge shed on a stone plinth under a low slate roof, its left bay open on a stone hearth of white-hot coals whose glow is dithered over the dark inside and the plinth, bellows beside it, a stone chimney rising from the hearth through the roof; a plank wall hung with tongs and hammers in its right bay; an anvil on a stump, a quench tub of water and a heap of charcoal before it; damaged holes the roof, knocks the chimney's crown off, scorches the planks and dims the coals, destroyed drops the roof into the shed, breaks the chimney half down and burns the plank wall to stumps with a few embers left, rubble is a heap with the hearth and the chimney's stub standing out of it |
+| Apothecary (약방) | Structure | 4 x 2 | A plastered shop on a stone plinth under a slate roof over its left three cells: a counter window on a cabinet of small drawers with gold pulls, jars and a mortar on the sill, herbs hung under the eave, a door under a split cloth curtain and a name board; in the yard at its right a herb rack of two posts and two bars hung with bundles, a drying tray of woven bamboo on trestles and a round tray on the ground, herbs spread on both; damaged holes the roof, scorches the wall, pulls drawers out and snaps the rack's lower bar onto the ground, destroyed drops the roof in and burns the walls to stumps, the rack to two posts and the tray where it fell, rubble is a heap on the plinth and ash in the yard |
+
+- The anvil outlasts the smithy: it stands on its stump intact and damaged and lies on its side, destroyed and rubble.
 
 ## Effects and HUD
 
