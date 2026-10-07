@@ -2,8 +2,10 @@
 # for its sects to admit members and raise elders, the panel opened on a member's army shows that
 # person's sect with its name, faction, master, elders, members, cap and seat as the adapter gives
 # them, the master's card first and then elders', and its faction's leader, sects and whether its
-# lead passes by duel; Tab shows the next faction's column and sect. Control: the Orthodox, who
-# elect, carry no duel tag while the Cult does, and a world from create() opens on no sect. Every
+# lead passes by duel or the faction elects it; Tab shows the next faction's column and sect.
+# Control: the Orthodox carry the election tag and no duel tag, the Cult the duel tag and no
+# election tag, and the Unorthodox, who do neither, carry neither; a world from create() opens on
+# no sect. Every
 # word the panel draws from hud.csv, and every name the world's data can make, fits the room the
 # panel gives it, in each locale.
 extends RefCounted
@@ -61,15 +63,19 @@ func run() -> bool:
 			and listed == of_faction and panel.column.sects[0].count == "%d/%d" % [
 				world.sect_members(sect).size(), world.sect_cap(sect)]
 
-	# Tab shows each faction in turn; the duel tag stands where the core settles the lead by duel.
+	# Tab shows each faction in turn; the election tag stands where the faction elects its leader,
+	# the duel tag where the lead passes by duel.
 	var duels := {}
+	var elections := {}
 	var tabbed := true
 	for step in world.faction_names().size():
 		duels[world.faction_names()[panel.faction]] = panel.column.duel
+		elections[world.faction_names()[panel.faction]] = panel.column.elects
 		panel.next_faction()
 		tabbed = tabbed and panel.faction == (faction + step + 1) % world.faction_names().size() \
 				and (panel.sect < 0 or world.sect_faction(panel.sect) == panel.faction)
-	var duel_right: bool = duels.get("Demonic", false) and not duels.get("Orthodox", true)
+	var duel_right: bool = duels == {"Orthodox": false, "Demonic": true, "Unorthodox": false} \
+			and elections == {"Orthodox": true, "Demonic": false, "Unorthodox": false}
 
 	# Control: a world from create() has no sects, and the panel opens on none.
 	var bare := WorldAdapter.create(42, PackedStringArray(["...."]), [{"objective": Vector2i(3, 0), "faction": 0,
@@ -84,18 +90,18 @@ func run() -> bool:
 	empty.free()
 
 	var passed := details_right and cards_right and column_right and tabbed and duel_right and control
-	print("sect_test: after %d years army %d's lead %d in sect %d; details %s; cards %s against master %d and elders %s; column %s; Tab through each faction %s, duel tags %s; a world without sects opens on none %s: %s" % [
+	print("sect_test: after %d years army %d's lead %d in sect %d; details %s; cards %s against master %d and elders %s; column %s; Tab through each faction %s, duel tags %s, election tags %s; a world without sects opens on none %s: %s" % [
 		YEARS, army, person, sect, "match" if details_right else str(panel.details), shown, master, elders,
-		"match" if column_right else str(panel.column), tabbed, duels, control, "pass" if passed else "FAIL"])
+		"match" if column_right else str(panel.column), tabbed, duels, elections, control, "pass" if passed else "FAIL"])
 	panel.free()
 	return passed and fits
 
 
 # In each locale, every word the panel draws, in the HUD's font at the panel's size, fits where
 # _draw places it: the title bar's words and tag clear of the close key, each faction tab's word
-# within its tab, the leader's label clear of the duel tag, the seat's label clear of its state's
-# tag, each figure's label clear of its value, the sect list's names clear of their counts and
-# states, the master's tag over its card, and the keys along the foot within the panel. Every
+# within its tab, the leader's label clear of the election and duel tags, the seat's label clear
+# of its state's tag, each figure's label clear of its value, the sect list's names clear of their
+# counts and states, the master's tag over its card, and the keys along the foot within the panel. Every
 # surname crossed with every given name in names() is measured as a card, the master's figure and
 # the leader show it, as the panel fits it, and in Korean drawn whole. Setup: every SECT_ key in
 # hud.csv is measured, every sect the region holds has its name in hud.csv, and the widths are
@@ -145,8 +151,9 @@ func _fit_pass() -> bool:
 						+ width.call(faction) + 10 + width.call(own) + 6, Sect.PANEL.size.x - 8 - close - 10])
 		for tab in tabs:
 			fits.append([tab, width.call(tab) + 2 * Sect.TAB_PAD, Sect.tab_width(tabs.size())])
-		fits.append([say.call("HUD_LEADER"), 8 + width.call(say.call("HUD_LEADER")) + 4 + width.call(say.call("HUD_DUEL")) + 6,
-				Sect.COLUMN.size.x - 8])
+		for succession: String in [say.call("HUD_DUEL"), say.call("SECT_ELECTED")]:
+			fits.append([succession, 8 + width.call(say.call("HUD_LEADER")) + 4 + width.call(succession) + 6,
+					Sect.COLUMN.size.x - 8])
 		for state in states:
 			fits.append([state, 8 + width.call(say.call("SECT_SEAT")) + 4 + width.call(state) + 6, Sect.SEAT.size.x - 8])
 		var rows := [["SECT_ELDERS", say.call("SECT_COUNT") % WIDEST_NUMBER],

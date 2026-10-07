@@ -145,8 +145,8 @@ func _economy_pass() -> bool:
 # Each sect of a region is read back as the core holds it: a name, its faction, a seat that is a
 # village of the seat template held by that faction, its founders as members with an elder among
 # them as master, a cap from its seat's pupils, standing, and its manual held. The player's body,
-# born into an ordinary village, belongs to no sect. Control: a world made by create() has no sects
-# and no manuals.
+# born into an ordinary village, belongs to no sect. Only the Orthodox elect their leader.
+# Control: a world made by create() has no sects and no manuals, and its factions elect no one.
 func _sects_pass() -> bool:
 	var region := WorldAdapter.create_region(REGION_SEED)
 	var villages := region.villages()
@@ -166,12 +166,22 @@ func _sects_pass() -> bool:
 		held = held and manual.place == "sect"
 	var player: int = region.roster(region.army_count() - 1)[0]
 	var plain := WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), _armies, STRUCTURES, RULES)
-	var none: bool = plain.sect_count() == 0 and plain.manuals().is_empty()
-	var passed: bool = right and held and region.person_sect(player) == -1 and none
-	print("world_adapter_test: %d sects, first %s of faction %d seated in village %d, members %s, elders %s, master %d, cap %d; manuals %s; player's sect %d; a world from create has %d sects: %s" % [
+	var electing: Array[String] = []
+	for faction in region.faction_names().size():
+		if region.elects(faction):
+			electing.append(region.faction_names()[faction])
+	var plain_electing := 0
+	for faction in plain.faction_count():
+		plain_electing += 1 if plain.elects(faction) else 0
+	var none: bool = plain.sect_count() == 0 and plain.manuals().is_empty() and plain_electing == 0 \
+			and plain.faction_count() > 0
+	var passed: bool = right and held and region.person_sect(player) == -1 and none \
+			and electing == ["Orthodox"]
+	print("world_adapter_test: %d sects, first %s of faction %d seated in village %d, members %s, elders %s, master %d, cap %d; manuals %s; player's sect %d; electing factions %s; a world from create has %d sects and %d of %d factions electing: %s" % [
 		region.sect_count(), region.sect_name(0), region.sect_faction(0), region.sect_seat(0),
 		region.sect_members(0), region.sect_elders(0), region.sect_master(0), region.sect_cap(0),
-		manuals, region.person_sect(player), plain.sect_count(), "pass" if passed else "FAIL"])
+		manuals, region.person_sect(player), electing, plain.sect_count(), plain_electing,
+		plain.faction_count(), "pass" if passed else "FAIL"])
 	return passed
 
 

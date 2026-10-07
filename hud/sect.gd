@@ -1,7 +1,7 @@
 ## The sect panel, drawn as art/mockup/sect_panel.png lays it out: a sect's seat, shown by its
 ## gate in its stage now and whether the seat is held, its faction, master, elders and members
 ## against its cap, and the cards of its master and elders; beside it a column for a faction, with
-## its leader, whether the lead passes by duel, and its sects. Every word comes from hud.csv through
+## its leader, whether the faction elects it or the lead passes by duel, and its sects. Every word comes from hud.csv through
 ## Godot's translations. What it shows is read from the world through the adapter. It holds no
 ## game rule.
 extends "res://hud/panel.gd"
@@ -34,6 +34,7 @@ const FACTION_TEXT: Array[Color] = [Color("5b9ae0"), Color("d63a2f"), Color("e8a
 const CRIMSON := Color("d63a2f")
 const CRIMSON_DARK := Color("9c1f24")
 const JADE_LIGHT := Color("a6f0cf")
+const AZURE_DARK := Color("1f3d7a")
 const INK_PALE := Color("524a5e")
 
 ## The faction whose column is shown.
@@ -48,8 +49,8 @@ var details := {}
 ## The cards shown under the figures, the master's first: each a Dictionary of `person`,
 ## `name`, `line` and `master`.
 var cards: Array[Dictionary] = []
-## The faction's column: `tab` for each faction, `leader` and `leader_sect` as drawn, `duel` when
-## the lead passes by duel, and `sects`, each a Dictionary of `sect`, `name` and `count`, or
+## The faction's column: `tab` for each faction, `leader` and `leader_sect` as drawn, `elects` when
+## the faction elects its leader, `duel` when the lead passes by duel, and `sects`, each a Dictionary of `sect`, `name` and `count`, or
 ## `state` of lost or fallen.
 var column := {}
 
@@ -143,6 +144,7 @@ func _compose() -> void:
 		"tabs": tabs,
 		"leader": PersonName.of(_world, leader, true) if leader >= 0 else tr("HUD_LEADER_NONE"),
 		"leader_sect": _sect_name(leader_sect) if leader_sect >= 0 else "",
+		"elects": _world.elects(faction),
 		"duel": _world.challenge_refusal(_army, faction) != WorldAdapter.CHALLENGE_NO_SUCCESSION,
 		"sects": sects,
 	}
@@ -297,7 +299,9 @@ func _draw_column() -> void:
 	draw_rect(Rect2(COLUMN.position.x + 6, top + 14, COLUMN.size.x - 12, 1), JADE_DARK)
 	var at := COLUMN.position
 	_text(at + Vector2(8, 28), tr("HUD_LEADER"), GOLD)
-	if column.duel:
+	if column.elects:
+		_tag(at + Vector2(COLUMN.size.x - 8, 29), tr("SECT_ELECTED"), AZURE_DARK)
+	elif column.duel:
 		_tag(at + Vector2(COLUMN.size.x - 8, 29), tr("HUD_DUEL"), CRIMSON_DARK)
 	draw_rect(Rect2(at + Vector2(8, 44), Vector2(16, 16)), GRASS)
 	draw_rect(Rect2(at + Vector2(8, 44), Vector2(16, 1)), GRASS_LIGHT)
