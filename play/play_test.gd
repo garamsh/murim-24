@@ -39,7 +39,7 @@ const UNORTHODOX_VILLAGE := 2
 # Ticks a Cult body marched on the nearest Orthodox village has to die there.
 const MARCH_LIMIT := 12000
 # A region whose growth forms an army after the player's within fifteen years of five-tick days.
-const GROWN_SEED := 7
+const GROWN_SEED := 3
 const GROWN_TICKS_PER_DAY := 5
 const GROWN_TICKS := 9000
 const TestSaves := preload("res://extension/test_saves.gd")
