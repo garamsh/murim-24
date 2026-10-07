@@ -594,6 +594,31 @@ godot::PackedInt64Array WorldAdapter::body_strengths(std::int64_t army) const {
   return strengths;
 }
 
+godot::PackedInt64Array WorldAdapter::body_ready(std::int64_t army) const {
+  godot::PackedInt64Array ready;
+  for (const std::size_t member : world().roster(army_index(army))) {
+    ready.push_back(static_cast<std::int64_t>(world().person(member).ready_at));
+  }
+  return ready;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::events(
+    std::int64_t from) const {
+  godot::TypedArray<godot::Dictionary> kept;
+  for (const murim::Event& event : world().events()) {
+    if (static_cast<std::int64_t>(event.sequence) < from) {
+      continue;
+    }
+    godot::Dictionary entry;
+    entry.set("sequence", static_cast<std::int64_t>(event.sequence));
+    entry.set("tick", static_cast<std::int64_t>(event.tick));
+    entry.set("cell", godot::Vector2i{event.cell.x, event.cell.y});
+    entry.set("kind", static_cast<std::int64_t>(event.what.index()));
+    kept.push_back(entry);
+  }
+  return kept;
+}
+
 godot::PackedStringArray WorldAdapter::terrain_names() const {
   godot::PackedStringArray names;
   if (!terrain_.empty()) {
@@ -970,6 +995,10 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::army_strength);
   godot::ClassDB::bind_method(godot::D_METHOD("body_strengths", "army"),
                               &WorldAdapter::body_strengths);
+  godot::ClassDB::bind_method(godot::D_METHOD("body_ready", "army"),
+                              &WorldAdapter::body_ready);
+  godot::ClassDB::bind_method(godot::D_METHOD("events", "from"),
+                              &WorldAdapter::events);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain_names"),
                               &WorldAdapter::terrain_names);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain"),
@@ -1002,6 +1031,20 @@ void WorldAdapter::_bind_methods() {
   for (const auto& [constant, state] : fields) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(state));
+  }
+  // Each kind is its alternative's index in murim::Happening.
+  const std::array<std::pair<const char*, murim::Happening>, 7> kinds{{
+      {"EVENT_FOUNDED", murim::Founded{}},
+      {"EVENT_RAIDED", murim::Raided{}},
+      {"EVENT_RUINED", murim::Ruined{}},
+      {"EVENT_SECT_FELL", murim::SectFell{}},
+      {"EVENT_LEADER_CHANGED", murim::LeaderChanged{}},
+      {"EVENT_BORN", murim::Born{}},
+      {"EVENT_DIED", murim::Died{}},
+  }};
+  for (const auto& [constant, happening] : kinds) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(happening.index()));
   }
   const std::array<std::pair<const char*, murim::ChallengeRefusal>, 7> refusals{
       {

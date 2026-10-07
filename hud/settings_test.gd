@@ -1,6 +1,7 @@
 # Checks that the settings persist: choices changed on the panel are kept in its file under
 # user://, and a panel that reads the file back holds the same choices, its speed among them; a
-# choice F2 made is kept as the language. A value out of range in the file is refused for the
+# choice F2 made is kept as the language. Each volume chosen is applied to its audio bus, and a
+# volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
 # row's default. Controls: a panel reading a file that does not exist holds every default, and the
 # in-range values beside the refused one are read. Every word the panel draws from hud.csv fits
 # the room it is given, in each locale.
@@ -18,11 +19,23 @@ func run() -> bool:
 	_remove(MISSING)
 	var panel := _panel(PATH)
 	# Right twice on the first row, the speed; down and right on the window; down to the
-	# resolution and left; down to the language and right.
-	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT]:
+	# resolution and left; down to the language and right; down and left once on the master
+	# volume, twice on the effects and three times on the music.
+	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
+			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
-	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1}
+	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
+		"music": 0}
+	# The buses as the choices left them: the music muted, the others at their share. Control: the
+	# master and the effects, turned down but not off, are not muted.
+	var master := AudioServer.get_bus_index(&"Master")
+	var effects := AudioServer.get_bus_index(&"Effects")
+	var music := AudioServer.get_bus_index(&"Music")
+	var volumes_applied := effects > 0 and music > 0 and AudioServer.is_bus_mute(music) \
+			and not AudioServer.is_bus_mute(master) and not AudioServer.is_bus_mute(effects) \
+			and is_equal_approx(AudioServer.get_bus_volume_linear(master), 0.75) \
+			and is_equal_approx(AudioServer.get_bus_volume_linear(effects), 0.5)
 	# Setup: the file holds what was chosen, read back without the panel.
 	var file := ConfigFile.new()
 	var on_disk := {}
@@ -33,7 +46,7 @@ func run() -> bool:
 	var read: bool = reread.read()
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
-			and reread.speed() == Settings.SPEEDS[2]
+			and reread.speed() == Settings.SPEEDS[2] and volumes_applied
 
 	# F2 switches the locale outside the panel; noting it keeps it.
 	TranslationServer.set_locale("ko")
@@ -58,8 +71,10 @@ func run() -> bool:
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	_remove(PATH)
 	var passed := kept and locale_kept and defaults and refused
-	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx: %s; F2's Korean kept %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
-		chosen, on_disk, read_back, reread.speed(), kept, locale_kept, defaults, refused,
+	# The defaults restored, so the buses are left as the game starts them.
+	missing.apply()
+	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; F2's Korean kept %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
+		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, locale_kept, defaults, refused,
 		"pass" if passed else "FAIL"])
 	for each: Control in [panel, reread, noted, missing, ranged]:
 		each.free()
@@ -83,9 +98,10 @@ func _fit_pass() -> bool:
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)
 			var label := fit.say(Settings.LABEL_KEYS[row])
-			fit.check(label, dialog.position.x + 10 + 8 + fit.width(label) + 4, Settings.choices_x(choices.size()))
+			var slip := Settings.choice_width(row)
+			fit.check(label, dialog.position.x + 10 + 8 + fit.width(label) + 4, Settings.choices_x(choices.size(), slip))
 			for choice in choices:
-				fit.check(choice, fit.width(choice) + 4, Settings.CHOICE_WIDTH)
+				fit.check(choice, fit.width(choice) + 4, slip)
 			fit.say(Settings.ABOUT_KEYS[row])
 			var about: String = panel.about(row)
 			fit.check(about, 10 + 8 + fit.width(about), dialog.size.x - 10)

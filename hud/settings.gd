@@ -1,31 +1,40 @@
 ## The settings panel, drawn as art/mockup/settings_screen.png lays it out: the speed of the
-## world's time, the window mode, the resolution in whole multiples of the native size and the
-## language, each a row of its choices with the chosen one in jade, and a line saying what the row
-## being changed sets. The choices are the player's preferences, not the world's state: they are
-## kept in a file under user:// and applied to the window, the translations and the play scene's
-## pace. Every word comes from hud.csv through Godot's translations. It holds no game rule.
+## world's time, the window mode, the resolution in whole multiples of the native size, the
+## language and the volume of all sound, of the effects and of the music, each a row of its choices
+## with the chosen one in jade, and a line saying what the row being changed sets. The choices are
+## the player's preferences, not the world's state: they are kept in a file under user:// and
+## applied to the window, the translations, the audio buses and the play scene's pace. Every word comes from hud.csv through Godot's translations. It holds no game rule.
 extends "res://hud/panel.gd"
 
 const PATH := "user://settings.cfg"
 const SECTION := "settings"
 # The mockup's layout, in the native 480x270.
-const DIALOG := Rect2(60, 49, 360, 172)
+const DIALOG := Rect2(60, 10, 360, 250)
 const ROW_STEP := 26
 const CHOICE_WIDTH := 64
+const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
-const ROWS := ["speed", "window", "resolution", "language"]
+const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music"]
 const LABEL_KEYS := {"speed": "SETTINGS_SPEED", "window": "SETTINGS_WINDOW",
-		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE"}
+		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE",
+		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC"}
 const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW_ABOUT",
-		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT"}
+		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
+		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
+		"music": "SETTINGS_MUSIC_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
 const WINDOW_KEYS := ["SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN"]
 ## Whole multiples of the native 480x270.
 const RESOLUTIONS := [Vector2i(960, 540), Vector2i(1440, 810), Vector2i(1920, 1080)]
-## What each row starts at before anything is kept: the native size at 4x is the project's window.
-const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0}
+## The volume rows' audio buses, and the share of full volume each of their choices sets.
+const BUSES := {"master": &"Master", "effects": &"Effects", "music": &"Music"}
+const VOLUMES := [0.0, 0.25, 0.5, 0.75, 1.0]
+## What each row starts at before anything is kept: the native size at 4x is the project's window,
+## and the music sits under the effects.
+const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
+		"effects": 4, "music": 3}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -99,6 +108,9 @@ func choices(name: String) -> Array[String]:
 		"language":
 			for locale: String in locales:
 				words.append(tr("LOCALE_" + locale.to_upper()))
+		_:
+			for volume: float in VOLUMES:
+				words.append("%d%%" % roundi(volume * 100))
 	return words
 
 
@@ -129,9 +141,16 @@ func read() -> bool:
 	return true
 
 
-## Applies every row's choice: the language to the translations and the window mode and
-## resolution to the window. The speed is read by the play scene.
+## Applies every row's choice: the language to the translations, the window mode and resolution
+## to the window and the volumes to their buses, a volume of none muting its bus. The speed is
+## read by the play scene.
 func apply() -> void:
+	for name: String in BUSES:
+		var bus := AudioServer.get_bus_index(BUSES[name])
+		var volume: float = VOLUMES[chosen[name]]
+		AudioServer.set_bus_mute(bus, volume == 0.0)
+		if volume > 0.0:
+			AudioServer.set_bus_volume_linear(bus, volume)
 	if not locales.is_empty():
 		TranslationServer.set_locale(locales[chosen.language])
 	DisplayServer.window_set_mode(WINDOW_MODES[chosen.window])
@@ -147,7 +166,9 @@ func _count(name: String) -> int:
 			return WINDOW_MODES.size()
 		"resolution":
 			return RESOLUTIONS.size()
-	return locales.size()
+		"language":
+			return locales.size()
+	return VOLUMES.size()
 
 
 func _draw() -> void:
@@ -165,10 +186,11 @@ func _draw() -> void:
 			draw_rect(Rect2(left, y - 4, 1, 22), JADE)
 		_text(Vector2(left + 8, y + 3), tr(LABEL_KEYS[name]), GOLD_LIGHT if n == row else GOLD)
 		var words := choices(name)
-		var x := choices_x(words.size())
+		var slip := choice_width(name)
+		var x := choices_x(words.size(), slip)
 		for k in words.size():
-			_slip(Vector2(x, y + 2), CHOICE_WIDTH, words[k], k == chosen[name])
-			x += CHOICE_WIDTH + 4
+			_slip(Vector2(x, y + 2), slip, words[k], k == chosen[name])
+			x += slip + 4
 	var about_y := DIALOG.position.y + 30 + ROWS.size() * ROW_STEP
 	draw_rect(Rect2(left, about_y - 5, width, 1), INK_LIGHT)
 	_text(Vector2(left + 8, about_y + 2), about(ROWS[row]), STONE)
@@ -179,6 +201,12 @@ func about(name: String) -> String:
 	return tr(ABOUT_KEYS[name]) % locale_key if name == "language" else tr(ABOUT_KEYS[name])
 
 
-## Returns where the first of `count` choices starts, so that they end at the row's right.
-static func choices_x(count: int) -> float:
-	return DIALOG.end.x - 10 - 4 - count * (CHOICE_WIDTH + 4) + 4
+## Returns how wide each of row `name`'s choices' slips is.
+static func choice_width(name: String) -> int:
+	return VOLUME_WIDTH if BUSES.has(name) else CHOICE_WIDTH
+
+
+## Returns where the first of `count` choices `width` wide starts, so that they end at the row's
+## right.
+static func choices_x(count: int, width: int) -> float:
+	return DIALOG.end.x - 10 - 4 - count * (width + 4) + 4

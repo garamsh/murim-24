@@ -116,5 +116,11 @@ SETTINGS_SPEED_ABOUT,세상의 시간이 흐르는 빠르기. 일시정지 중�
 SETTINGS_WINDOW_ABOUT,창으로 띄우거나 화면을 가득 채운다.,Run in a window or fill the screen.
 SETTINGS_RESOLUTION_ABOUT,창의 크기. 원래 화면의 정수배로 키운다.,"The window's size, a whole multiple of the screen."
 SETTINGS_LANGUAGE_ABOUT,글자를 보일 언어. %s로도 바꾼다.,The language of every word. %s switches it too.
+SETTINGS_MASTER,전체 음량,Volume
+SETTINGS_EFFECTS,효과음,Effects
+SETTINGS_MUSIC,음악,Music
+SETTINGS_MASTER_ABOUT,모든 소리의 크기.,How loud every sound is.
+SETTINGS_EFFECTS_ABOUT,싸움과 마을과 메뉴의 소리 크기.,"How loud fights, villages and menus are."
+SETTINGS_MUSIC_ABOUT,배경 음악의 크기.,How loud the music is.
 LOCALE_KO,한국어,한국어
 LOCALE_EN,English,English
