@@ -51,7 +51,7 @@ func run() -> bool:
 	var control: bool = swapped[2] == screen.tr("REBIRTH_NONE") and swapped[3] == Attainment.NONE \
 			and swapped[0] == "%s씨 가문" % world.person_name(player).surname
 	var keys := [screen.key(_key(KEY_ENTER)), screen.key(_key(KEY_ESCAPE)), screen.key(_key(KEY_1))]
-	var keys_right := keys == ["continue", "continue", ""]
+	var keys_right := keys == ["go_on", "go_on", ""]
 	screen.free()
 	var passed := set_up and read_right and control and keys_right
 	print("rebirth_test: ended %s against %s, begun %s against %s (setup %s); swapped %s; Enter, Escape and 1 give %s: %s" % [

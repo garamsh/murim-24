@@ -171,7 +171,7 @@ func _take(action: String) -> void:
 				_hud.pause.visible = true
 		"resume":
 			_hud.pause.close()
-		"continue":
+		"go_on":
 			_hud.rebirth.close()
 		"title":
 			get_tree().reload_current_scene()
