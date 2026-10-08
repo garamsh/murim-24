@@ -1235,7 +1235,7 @@ class World {
                                                   std::uint32_t rank) const;
   void train();
   void cultivate();
-  void comprehend(std::size_t person, std::uint32_t rank);
+  void comprehend(std::size_t person);
   void recover(const Cultivation& cultivation);
   void read_manuals();
   void teach();

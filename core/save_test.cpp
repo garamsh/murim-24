@@ -309,22 +309,22 @@ TEST(Save, ASealedSaveNamingARealmNoEventCanNameIsRefused) {
   // first day: the save keeps that event, then the souls, surnames,
   // structures' villages and plans, each an empty list.
   constexpr std::uint32_t DAILY = 10;
-  Life life{{{"sword", {1, 0}, {1, 0}}},
-            1,
-            std::nullopt,
-            0,
-            0,
-            0,
-            std::nullopt,
-            std::nullopt,
-            {},
-            std::nullopt,
-            std::nullopt,
-            std::nullopt,
-            Cultivation{{DAILY, 0}, {DAILY, 0}, 0, 1},
-            {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
-            {},
-            Learning{}};
+  const Life life{{{"sword", {1, 0}, {1, 0}}},
+                  1,
+                  std::nullopt,
+                  0,
+                  0,
+                  0,
+                  std::nullopt,
+                  std::nullopt,
+                  {},
+                  std::nullopt,
+                  std::nullopt,
+                  std::nullopt,
+                  Cultivation{{DAILY, 0}, {DAILY, 0}, 0, 1},
+                  {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
+                  {},
+                  Learning{}};
   Rules rules{0, {{false}}, STAGE_FLOORS};
   rules.ticks_per_day = 1;
   World world{Seed{1},

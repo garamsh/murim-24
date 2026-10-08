@@ -3728,14 +3728,14 @@ TEST(World, ASectTeachesItsArtsWithinItsMembersAndEldersRealms) {
   EXPECT_TRUE(idle.person(1).known.empty());
 }
 
-// The skills person `person` was recorded learning `by`, as (art, skill)
+// The skills person `person` was recorded learning `how`, as (art, skill)
 // pairs oldest first, among the events `world` keeps.
 std::vector<std::pair<std::size_t, std::size_t>> recorded_learning(
-    const World& world, std::size_t person, LearnedBy by) {
+    const World& world, std::size_t person, LearnedBy how) {
   std::vector<std::pair<std::size_t, std::size_t>> learned;
   for (const Event& event : world.events()) {
     const auto* lesson = std::get_if<Learned>(&event.what);
-    if (lesson != nullptr && lesson->person == person && lesson->by == by) {
+    if (lesson != nullptr && lesson->person == person && lesson->by == how) {
       learned.emplace_back(lesson->art, lesson->skill);
     }
   }
@@ -3773,7 +3773,7 @@ TEST(World, EveryRealmGainedAndSkillReadFromAManualIsRecorded) {
   EXPECT_TRUE(recorded_learning(unread, READER, LearnedBy::MANUAL).empty());
 }
 
-TEST(World, ASkillComprehendedOrTaughtIsRecordedHowItWasLearned) {
+TEST(World, ASkillComprehendedIsRecordedAsComprehended) {
   Cultivating slow;
   slow.growth = {4, 0};
   slow.learning.comprehension = PER_MILLE;
@@ -3784,6 +3784,15 @@ TEST(World, ASkillComprehendedOrTaughtIsRecordedHowItWasLearned) {
   EXPECT_EQ(
       recorded_learning(comprehending, READER, LearnedBy::COMPREHENSION),
       (std::vector<std::pair<std::size_t, std::size_t>>{{ORTHODOX_ART, 2}}));
+  // Control: with no chance of comprehension, none is recorded.
+  Cultivating unmoved = slow;
+  unmoved.learning.comprehension = 0;
+  EXPECT_TRUE(
+      recorded_learning(walked_away(unmoved), READER, LearnedBy::COMPREHENSION)
+          .empty());
+}
+
+TEST(World, ASkillTaughtIsRecordedAsTaught) {
   Cultivating taught;
   taught.learning.teaching = PER_MILLE;
   taught.held = {0};
@@ -3794,13 +3803,7 @@ TEST(World, ASkillComprehendedOrTaughtIsRecordedHowItWasLearned) {
     EXPECT_EQ(recorded_learning(teaching, member, LearnedBy::TEACHING),
               known_by(teaching, member));
   }
-  // Controls: with no chance of comprehension or of teaching, none is
-  // recorded.
-  Cultivating unmoved = slow;
-  unmoved.learning.comprehension = 0;
-  EXPECT_TRUE(
-      recorded_learning(walked_away(unmoved), READER, LearnedBy::COMPREHENSION)
-          .empty());
+  // Control: with no chance of teaching, none is recorded.
   World idle = qi_world(Cultivating{});
   run_ticks(idle, DAYS_PER_YEAR);
   EXPECT_TRUE(recorded_learning(idle, 1, LearnedBy::TEACHING).empty());

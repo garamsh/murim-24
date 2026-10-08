@@ -649,6 +649,19 @@ Range range_of(Spread values) {
                values.mean + values.spread};
 }
 
+// Whether `what`, a skill learned or a realm gained, names a person past
+// `people`, an art or skill `life` lacks, or a realm outside its realms;
+// false for any other happening.
+bool stray_lesson(const Happening& what, std::size_t people, const Life& life) {
+  if (const auto* learned = std::get_if<Learned>(&what)) {
+    return learned->person >= people || learned->art >= life.arts.size() ||
+           learned->skill >= life.arts.at(learned->art).skills.size();
+  }
+  const auto* gained = std::get_if<RealmGained>(&what);
+  return gained != nullptr && (gained->person >= people || gained->rank == 0 ||
+                               gained->rank > life.realms.size());
+}
+
 // Whether `person` holds more qi than its store, a store past MAX_TALENT, or
 // a known skill of no art `life` holds.
 bool stray_cultivation(const Person& person, const Life& life) {
@@ -951,16 +964,8 @@ bool World::events_kept() const {
     if (const auto* born = std::get_if<Born>(&what)) {
       return born->person >= people;
     }
-    if (const auto* learned = std::get_if<Learned>(&what)) {
-      return learned->person >= people || learned->art >= life_.arts.size() ||
-             learned->skill >= life_.arts.at(learned->art).skills.size();
-    }
-    if (const auto* gained = std::get_if<RealmGained>(&what)) {
-      return gained->person >= people || gained->rank == 0 ||
-             gained->rank > life_.realms.size();
-    }
     const auto* died = std::get_if<Died>(&what);
-    return died == nullptr || died->person >= people;
+    return died != nullptr && died->person >= people;
   };
   bool bad_events = events_.size() > EVENT_CAPACITY;
   for (std::size_t index = 0; index < events_.size(); ++index) {
@@ -969,7 +974,8 @@ bool World::events_kept() const {
         index > 0 && (event.sequence != events_.at(index - 1).sequence + 1 ||
                       event.tick < events_.at(index - 1).tick);
     bad_events = bad_events || unordered || event.tick > tick_count_ ||
-                 stray_happening(event.what);
+                 stray_happening(event.what) ||
+                 stray_lesson(event.what, people, life_);
   }
   return !bad_events;
 }
@@ -2660,16 +2666,17 @@ void World::cultivate() {
       const std::uint32_t after = rank_of(person);
       for (std::uint32_t gained = before; gained < after; ++gained) {
         record(cell_of(person.position), RealmGained{member, gained + 1});
-        comprehend(member, after);
+        comprehend(member);
       }
     }
   }
 }
 
-// Person `learner`, of realm rank `rank`, rolls for each art it knows, in the
-// order it learned them, to comprehend a skill of it, recording each learned.
-void World::comprehend(std::size_t learner, std::uint32_t rank) {
+// Person `learner` rolls for each art it knows, in the order it learned them,
+// to comprehend a skill of it within its realm, recording each learned.
+void World::comprehend(std::size_t learner) {
   Person& person = people_.at(learner);
+  const std::uint32_t rank = rank_of(person);
   std::vector<std::size_t> practised;
   for (const Known& known : person.known) {
     if (std::find(practised.begin(), practised.end(), known.art) ==
