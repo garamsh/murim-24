@@ -44,6 +44,11 @@ const LATEST_YEAR := 999
 const INSET := 5
 const SCREEN_WIDTH := 480
 const SCREEN_INSET := 4
+const ViewScale := preload("res://view_scale.gd")
+# The PC windows the layout is checked at, and the touch windows, a 16:9 screen and a wider phone.
+const PC_WINDOWS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+const TOUCH_WINDOWS: Array[Vector2i] = [Vector2i(1920, 1080), Vector2i(2400, 1080)]
+const LOCALES_CHECKED := ["ko", "en"]
 
 
 func run() -> bool:
@@ -124,8 +129,90 @@ func run() -> bool:
 	var realm_passed := _realm_pass()
 	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
+	var layout_passed := _layout_pass()
 	return passed and measure_passed and names_passed and fit_passed and rumours_passed and realm_passed \
-			and lessons_passed and cast_words_passed
+			and lessons_passed and cast_words_passed and layout_passed
+
+
+# At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives
+# it; every panel it shows, the duel panel among them, lies within the room and clear of every
+# other; the panels and
+# screens over the HUD stand in the room's middle; and the title, drawn at the least whole multiple
+# covering the room and standing on its foot, takes a tap on its first entry where it draws it. Control: the room gained moves the map, so
+# the 480x270 layout's places are not what is checked. With the touch controls, at each window in
+# TOUCH_WINDOWS, the HUD keeps the world's scale and 480x270, and every panel stands where the touch
+# layout puts it unscaled.
+func _layout_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, world.army_count() - 1)
+	hud.duel_panel.visible = true
+	var faults := []
+	var checks := 0
+	var moved := true
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		for window: Vector2i in PC_WINDOWS:
+			hud.fit(window, false)
+			var at := "%s %s" % [window, locale]
+			var scale := ViewScale.hud_scale(window, false)
+			var room := Rect2(Vector2.ZERO, Vector2(ViewScale.hud_room(window, false).size))
+			if hud.transform.get_scale() != Vector2(scale, scale) or Rect2(Vector2.ZERO, hud.room) != room:
+				faults.append("%s: scale %s, room %s" % [at, hud.transform.get_scale(), hud.room])
+			moved = moved and hud._map_panel.position.x == hud.MAP_AT[false].x + room.size.x - hud.NATIVE.x
+			var shown := _shown_panels(hud)
+			for n in shown.size():
+				checks += 1
+				var rect: Rect2 = shown[n].get_rect()
+				if not room.encloses(rect):
+					faults.append("%s: %s at %s outside %s" % [at, shown[n].name, rect, room])
+				for other: Control in shown.slice(n + 1):
+					if rect.intersects(other.get_rect()):
+						faults.append("%s: %s over %s" % [at, shown[n].name, other.name])
+			# The title's first entry, where the title draws it at the multiple covering the room, is
+			# taken; where the native layout puts it, unscaled, it is not.
+			var times := ceilf(maxf(room.size.x / hud.NATIVE.x, room.size.y / hud.NATIVE.y))
+			var foot: float = hud.NATIVE.y + hud.title_screen.position.y
+			var stage := Transform2D(0.0, Vector2(times, times), 0.0,
+					Vector2(hud.NATIVE.x / 2.0 - hud.NATIVE.x * times / 2.0, foot - hud.NATIVE.y * times).floor())
+			var entry: Vector2 = hud.title_screen.MENU.position + hud.title_screen.MENU_INSET + Vector2(20, 9)
+			hud.title_screen.open(true)
+			checks += 1
+			if hud.title_screen.tap(stage * entry) != "new" or hud.title_screen.tap(entry) == "new":
+				faults.append("%s: the title's first entry not where it is drawn at %dx" % [at, times])
+			hud.title_screen.close()
+			var middle: Vector2 = ((room.size - hud.NATIVE) / 2.0).floor()
+			for over: Control in [hud.arts, hud.genealogy, hud.sect, hud.title_screen, hud.new_game, hud.pause,
+					hud.settings, hud.rebirth]:
+				checks += 1
+				if over.position != middle:
+					faults.append("%s: %s at %s, not %s" % [at, over.get_script().resource_path, over.position, middle])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	# The touch layout's places, unscaled, against those at each touch window.
+	hud.use_touch(true)
+	hud.fit(Vector2i(hud.NATIVE), true)
+	var unscaled := _shown_panels(hud).map(func(panel: Control) -> Rect2: return panel.get_rect())
+	var touch_kept: bool = hud.touch.visible and hud.room == hud.NATIVE and hud.transform == Transform2D.IDENTITY
+	for window: Vector2i in TOUCH_WINDOWS:
+		hud.fit(window, true)
+		var scale := ViewScale.world_scale(window, true)
+		var placed := _shown_panels(hud).map(func(panel: Control) -> Rect2: return panel.get_rect())
+		touch_kept = touch_kept and hud.room == hud.NATIVE and hud.transform.get_scale() == Vector2(scale, scale) \
+				and placed == unscaled
+	hud.free()
+	var passed := faults.is_empty() and moved and touch_kept and checks > 0
+	print("hud_test: PC layouts at %s in %s, %d checks, the map moved by the room gained %s; faults %s; the touch layout kept at %s %s: %s" % [
+		PC_WINDOWS, LOCALES_CHECKED, checks, moved, faults, TOUCH_WINDOWS, touch_kept, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The HUD's own panels that are shown.
+func _shown_panels(hud: CanvasLayer) -> Array[Control]:
+	var shown: Array[Control] = []
+	for child: Node in hud.get_children():
+		if child is Panel and (child as Control).visible:
+			shown.append(child)
+	return shown
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel

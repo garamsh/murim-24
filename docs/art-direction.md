@@ -73,8 +73,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Property | Value |
 |---|---|
 | Native resolution | 480 x 270 pixels (16:9) |
-| Scale | Whole multiples only: 4x fills 1920 x 1080 |
-| Grid | One core cell to one 16 x 16 tile; 30 cells across, 16.875 down |
+| Scale | Whole multiples only, filling the window: on a PC, the largest showing at least 640 x 360 (3x at 1920 x 1080); with the touch controls, at least 480 x 270 (4x at 1920 x 1080). The HUD on a PC is drawn at half the world's multiple, rounded up |
+| Grid | One core cell to one 16 x 16 tile; at least 40 cells across and 22.5 down on a PC, 30 and 16.875 with the touch controls |
 | View | Three-quarter top-down (ADR 0012): ground and roofs seen from above, facades and standing bodies drawn upright; no isometric diamond and no perspective |
 | Draw order | Everything standing is drawn in order of its footprint's bottom edge, back to front |
 | Light | From the upper left; shadows fall to the lower right |
