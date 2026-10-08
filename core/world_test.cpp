@@ -1182,7 +1182,10 @@ constexpr Cell CULT_SEAT{10, 10};
 constexpr std::uint64_t DUEL_TICKS = 2'000;
 
 World cult_world(std::uint64_t challenger_health,
-                 std::optional<std::size_t> cult_leader = 0) {
+                 std::optional<std::size_t> cult_leader = 0,
+                 const Life& life = {},
+                 std::optional<std::size_t> ally_leader = std::nullopt,
+                 std::uint64_t ticks_per_day = TICKS_PER_DAY) {
   constexpr Seed CULT_SEED{9};
   const Skill strike{2 * CELL_SIZE, 0, 50, 0, 10};
   const std::vector<std::string> rows = open_map(ORDERS_SIDE);
@@ -1193,18 +1196,21 @@ World cult_world(std::uint64_t challenger_health,
       ArmySpec{{1, 22}, {Recruit{{1, 22}, 1}}, ORTHODOX, {IDLE}},
       ArmySpec{{22, 22}, {Recruit{{22, 22}, 1}}, ALLY, {IDLE}},
   };
-  const Rules rules{
+  Rules rules{
       SEPARATION,
       {{false, true, false}, {true, false, false}, {false, false, false}},
       STAGE_FLOORS};
-  return World{
-      CULT_SEED,
-      Map{rows},
-      armies,
-      {},
-      rules,
-      {},
-      {{}, {cult_leader, Duel{true, 0, true}, std::nullopt, std::nullopt}, {}}};
+  rules.ticks_per_day = ticks_per_day;
+  return World{CULT_SEED,
+               Map{rows},
+               armies,
+               {},
+               rules,
+               {},
+               {{},
+                {cult_leader, Duel{true, 0, true}, std::nullopt, std::nullopt},
+                {ally_leader, std::nullopt, std::nullopt, std::nullopt}},
+               life};
 }
 
 // Has army `army` challenge the Cult's leader at its seat and runs the duel
@@ -1322,6 +1328,133 @@ TEST(World, ADuelIsReadWhileItIsFoughtAndGoneOnceSettled) {
   EXPECT_FALSE(world.duel(CULT).has_value());
 }
 
+// Whether declare() refuses person `person`'s declaration of `what` toward
+// faction `faction` exactly when declaration_refusal() names a reason, and
+// that reason is `expected`.
+bool declaration_refused_for(World& world, std::size_t person,
+                             std::size_t faction, Declaration what,
+                             DeclarationRefusal expected) {
+  if (world.declaration_refusal(person, faction, what) != expected) {
+    return false;
+  }
+  bool thrown = false;
+  try {
+    world.declare(person, faction, what);
+  } catch (const std::invalid_argument&) {
+    thrown = true;
+  }
+  return thrown == (expected != DeclarationRefusal::NONE);
+}
+
+// Diplomacy that holds every declaration `hold_days` days and, with
+// `chance` per mille a year for each, declares war on a faction no more
+// numerous and makes peace.
+Life diplomatic(std::uint32_t hold_days, std::uint32_t chance = 0) {
+  Life life;
+  life.diplomacy = Diplomacy{PER_MILLE, chance, chance, hold_days};
+  return life;
+}
+
+TEST(World, OnlyAFactionsLeaderDeclaresWarOrMakesPeace) {
+  World world = cult_world(TARGET_HEALTH);
+  EXPECT_TRUE(declaration_refused_for(world, PLAYER, ALLY, Declaration::WAR,
+                                      DeclarationRefusal::NOT_THE_LEADER));
+  EXPECT_TRUE(declaration_refused_for(world, OUTSIDER, CULT, Declaration::WAR,
+                                      DeclarationRefusal::NOT_THE_LEADER));
+  EXPECT_EQ(world.relation(CULT, ALLY), Relation::ALLY);
+  // Control: the Cult's leader, person 0, may, and the war is both
+  // factions'.
+  EXPECT_TRUE(declaration_refused_for(world, 0, ALLY, Declaration::WAR,
+                                      DeclarationRefusal::NONE));
+  EXPECT_EQ(world.relation(CULT, ALLY), Relation::AT_WAR);
+  EXPECT_EQ(world.relation(ALLY, CULT), Relation::AT_WAR);
+  EXPECT_TRUE(world.hostile(ALLY, CULT));
+  EXPECT_TRUE(world.hostile(CULT, ALLY));
+  const std::optional<Declared> made = world.declaration(ALLY, CULT);
+  ASSERT_TRUE(made.has_value());
+  EXPECT_EQ(made.value_or(Declared{}).by, CULT);
+  EXPECT_EQ(made.value_or(Declared{}).tick, world.tick_count());
+}
+
+TEST(World, ADeclarationIsRefusedForEachReasonDeclareRefusesIt) {
+  World world = cult_world(TARGET_HEALTH, 0, diplomatic(1));
+  EXPECT_TRUE(declaration_refused_for(world, 0, CULT, Declaration::WAR,
+                                      DeclarationRefusal::SAME_FACTION));
+  EXPECT_TRUE(declaration_refused_for(world, 0, ALLY, Declaration::PEACE,
+                                      DeclarationRefusal::ALREADY_AT_PEACE));
+  // Control: peace with a faction hostile by the rules is made, and then
+  // neither attacks the other.
+  ASSERT_EQ(world.relation(CULT, ORTHODOX), Relation::HOSTILE);
+  EXPECT_TRUE(declaration_refused_for(world, 0, ORTHODOX, Declaration::PEACE,
+                                      DeclarationRefusal::NONE));
+  EXPECT_EQ(world.relation(ORTHODOX, CULT), Relation::NEUTRAL);
+  EXPECT_FALSE(world.hostile(ORTHODOX, CULT));
+  EXPECT_TRUE(declaration_refused_for(world, 0, ORTHODOX, Declaration::PEACE,
+                                      DeclarationRefusal::ALREADY_AT_PEACE));
+  // A day of one tick must pass before the peace may be broken.
+  EXPECT_TRUE(declaration_refused_for(world, 0, ORTHODOX, Declaration::WAR,
+                                      DeclarationRefusal::TOO_SOON));
+  run_ticks(world, TICKS_PER_DAY);
+  EXPECT_TRUE(declaration_refused_for(world, 0, ORTHODOX, Declaration::WAR,
+                                      DeclarationRefusal::NONE));
+  EXPECT_TRUE(declaration_refused_for(world, 0, ORTHODOX, Declaration::WAR,
+                                      DeclarationRefusal::ALREADY_AT_WAR));
+
+  // A challenger who lost the duel died.
+  World lost = cult_world(1);
+  ASSERT_EQ(after_challenge(lost, PLAYER), std::optional<std::size_t>{0});
+  EXPECT_TRUE(declaration_refused_for(lost, PLAYER, ALLY, Declaration::WAR,
+                                      DeclarationRefusal::DEAD));
+  EXPECT_THROW(
+      static_cast<void>(lost.declaration_refusal(99, ALLY, Declaration::WAR)),
+      std::invalid_argument);
+  EXPECT_THROW(
+      static_cast<void>(lost.declaration_refusal(0, 3, Declaration::WAR)),
+      std::invalid_argument);
+}
+
+TEST(World, ALeaderNoDriverSteersDeclaresByTheDiplomacy) {
+  // The Cult, three living, outnumbers its ally of one, so at a chance of a
+  // thousand per mille a year its leader declares war within ten years of
+  // one-tick days.
+  constexpr std::uint64_t TEN_YEARS = 10 * DAYS_PER_YEAR;
+  World own =
+      cult_world(TARGET_HEALTH, 0, diplomatic(0, PER_MILLE), std::nullopt, 1);
+  ASSERT_FALSE(own.steered(0));
+  run_ticks(own, TEN_YEARS);
+  EXPECT_EQ(own.relation(CULT, ALLY), Relation::AT_WAR);
+  // It leaves its foe by the rules as it is.
+  EXPECT_EQ(own.relation(CULT, ORTHODOX), Relation::HOSTILE);
+  // Control: the same leader, steered, declares nothing.
+  World steered =
+      cult_world(TARGET_HEALTH, 0, diplomatic(0, PER_MILLE), std::nullopt, 1);
+  steered.steer(0, true);
+  ASSERT_TRUE(steered.steered(0));
+  run_ticks(steered, TEN_YEARS);
+  EXPECT_EQ(steered.relation(CULT, ALLY), Relation::ALLY);
+  EXPECT_FALSE(steered.declaration(CULT, ALLY).has_value());
+}
+
+TEST(World, ALeaderOutnumberedInADeclaredWarMakesPeace) {
+  // The Cult's leader, steered, declares war on its ally of one, led by
+  // person 4; outnumbered three to one, the ally's leader makes peace.
+  constexpr std::uint64_t TEN_YEARS = 10 * DAYS_PER_YEAR;
+  World world = cult_world(TARGET_HEALTH, 0, diplomatic(0, PER_MILLE), 4, 1);
+  world.steer(0, true);
+  world.declare(0, ALLY, Declaration::WAR);
+  run_ticks(world, TEN_YEARS);
+  EXPECT_EQ(world.relation(CULT, ALLY), Relation::NEUTRAL);
+  const std::optional<Declared> made = world.declaration(CULT, ALLY);
+  EXPECT_EQ(made.value_or(Declared{}).by, ALLY);
+  // Control: with the ally's leader steered too, the war stands.
+  World both = cult_world(TARGET_HEALTH, 0, diplomatic(0, PER_MILLE), 4, 1);
+  both.steer(0, true);
+  both.steer(4, true);
+  both.declare(0, ALLY, Declaration::WAR);
+  run_ticks(both, TEN_YEARS);
+  EXPECT_EQ(both.relation(CULT, ALLY), Relation::AT_WAR);
+}
+
 constexpr std::uint64_t TICKS_PER_SEASON =
     TICKS_PER_DAY * CALENDAR.days_per_season;
 
@@ -1390,7 +1523,8 @@ Life one_discipline(std::uint32_t limit_spread) {
               std::nullopt,
               {},
               {Art{{"검법", "Sword art"}, 0, Nature{}, {}}},
-              Learning{}};
+              Learning{},
+              std::nullopt};
 }
 
 // The mean and variance of the limits drawn for 400 people born with
@@ -1959,6 +2093,8 @@ struct Growing {
   std::uint64_t neighbour_health = 1;
   std::size_t founders = FOUNDERS;
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
+  // Whether village A's first resident, person 0, leads faction 0.
+  bool led = false;
 };
 
 // Growth of five plans, a granary, a house for four, a field, a smithy and an
@@ -2039,7 +2175,9 @@ World growth_world(const Growing& growing, const std::vector<Cell>& rough = {},
       daily,
       {VillageSpec{{0, 1, 2}, 0, holdings, 0, clearings},
        VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings, 0, {}}},
-      {},
+      growing.led ? std::vector<Leadership>{Leadership{
+                        0, std::nullopt, std::nullopt, std::nullopt}}
+                  : std::vector<Leadership>{},
       life};
 }
 
@@ -2312,6 +2450,26 @@ TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
   Growing far{{Expansion::RAID}};
   far.reach = NEIGHBOUR_SEAT.x - GROWING_SEAT.x - 1;
   EXPECT_EQ(grown_armies(far), 2U);
+}
+
+TEST(World, ADeclaredPeaceStopsARaidAndADeclaredWarSendsOne) {
+  Growing hostile{{Expansion::RAID}};
+  hostile.led = true;
+  World at_peace = growth_world(hostile);
+  at_peace.declare(0, 1, Declaration::PEACE);
+  run_ticks(at_peace, 1);
+  EXPECT_EQ(at_peace.army_count(), 2U);
+  // Control: the same village with no declaration raids (also above).
+  EXPECT_EQ(grown_armies(hostile), 3U);
+
+  Growing friendly{{Expansion::RAID}};
+  friendly.led = true;
+  friendly.hostile = false;
+  EXPECT_EQ(grown_armies(friendly), 2U);
+  World at_war = growth_world(friendly);
+  at_war.declare(0, 1, Declaration::WAR);
+  run_ticks(at_war, 1);
+  EXPECT_EQ(at_war.army_count(), 3U);
 }
 
 // What a check of `growing`'s growth world did: laid a structure, founded a

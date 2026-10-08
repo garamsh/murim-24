@@ -324,7 +324,8 @@ TEST(Save, ASealedSaveNamingARealmNoProgressCanNameIsRefused) {
                   Cultivation{{DAILY, 0}, {DAILY, 0}, 0, 1},
                   {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
                   {},
-                  Learning{}};
+                  Learning{},
+                  std::nullopt};
   Rules rules{0, {{false}}, STAGE_FLOORS};
   rules.ticks_per_day = 1;
   World world{Seed{1},
@@ -425,6 +426,49 @@ TEST(Save, APendingCastLoadsAndLandsAsTheSavedOne) {
   EXPECT_EQ(ticked(restored.world, 1).hash(), ticked(world, 1).hash());
   // Control: a cast at itself is another state.
   EXPECT_NE(casting(Itself{}).hash(), world.hash());
+}
+
+// Two people of factions at peace, the first leading its faction, with
+// diplomacy holding a declaration a day; the first's army steered and at
+// war with the second's when `ordered`.
+World diplomatic(bool ordered) {
+  Life life;
+  life.diplomacy = Diplomacy{PER_MILLE, 0, 0, 1};
+  World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{3, 1}, {Recruit{{3, 1}, 1}}, 1, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      Rules{0, {{false, false}, {false, false}}, STAGE_FLOORS},
+      {},
+      {Leadership{0, std::nullopt, std::nullopt, std::nullopt}},
+      life};
+  if (ordered) {
+    world.steer(0, true);
+    world.declare(0, 1, Declaration::WAR);
+  }
+  return world;
+}
+
+TEST(Save, ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations) {
+  const World world = diplomatic(true);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+
+  EXPECT_TRUE(restored.world.steered(0));
+  EXPECT_FALSE(restored.world.steered(1));
+  EXPECT_EQ(restored.world.relation(1, 0), Relation::AT_WAR);
+  const std::optional<Declared> made = restored.world.declaration(0, 1);
+  ASSERT_TRUE(made.has_value());
+  EXPECT_EQ(made.value_or(Declared{}).by, 0U);
+  // The declaration's hold came through: it may not be undone yet.
+  EXPECT_EQ(restored.world.declaration_refusal(0, 1, Declaration::PEACE),
+            DeclarationRefusal::TOO_SOON);
+  EXPECT_EQ(restored.world.hash(), world.hash());
+  // Control: the same world unsteered and at peace is another state.
+  EXPECT_NE(diplomatic(false).hash(), world.hash());
 }
 
 TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {
