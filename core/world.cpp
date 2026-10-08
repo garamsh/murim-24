@@ -1949,10 +1949,10 @@ std::vector<World::Passing> World::passings() const {
 
 // Each person's pull toward its objective, from where it stood: none
 // within its arrival ring, as many cells from the objective as the square
-// root of its rank in its army, and none while a living foe within its
-// reach lies ahead along it, so it holds and fights rather than walking
-// past. A person within two cells of its ring counts as standing still, so
-// a crowd jostled a little stays standing.
+// root of its rank in its army, and none while a living foe on the move
+// within its reach lies ahead along it, so it holds and fights rather than
+// walking past. A person within two cells of its ring counts as standing
+// still, so a crowd jostled a little stays standing.
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
                   std::vector<Step>& pulls, std::vector<bool>& standing) const {
   for (std::size_t army = 0; army < armies_.size(); ++army) {
@@ -1967,9 +1967,16 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
       const std::uint32_t distance = marching.field.distance(cell);
       const Step pull =
           distance > ring ? marching.field.step(cell) : Step{0, 0};
-      pulls.at(index) =
-          held(member, army, from, pull, crowd) ? Step{0, 0} : pull;
+      pulls.at(index) = pull;
       standing.at(index) = distance <= ring + STANDING_SLACK;
+    }
+  }
+  // Read from the pulls as they were, so the order people are held in
+  // decides nothing.
+  const std::vector<Step> drawn = pulls;
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    if (held(index, drawn.at(index), standing, crowd)) {
+      pulls.at(index) = Step{0, 0};
     }
   }
 }
@@ -2617,24 +2624,28 @@ std::optional<std::size_t> World::lesson(const Person& person, std::size_t art,
   return std::nullopt;
 }
 
-// Whether person `member` of army `army`, at `from` and pulled along `pull`,
-// has a living foe ahead of it along the pull within its reach.
-bool World::held(std::size_t member, std::size_t army, Position from, Step pull,
-                 const Crowd& crowd) const {
+// Whether the person at `index` of `crowd`, pulled along `pull`, has a
+// living foe on the move, not `standing`, ahead of it along the pull within
+// its reach.
+bool World::held(std::size_t index, Step pull,
+                 const std::vector<bool>& standing, const Crowd& crowd) const {
   bool engaged = false;
   if (pull.x == 0 && pull.y == 0) {
     return engaged;
   }
+  const std::size_t member = crowd.people.at(index);
+  const std::size_t army = crowd.armies.at(index);
+  const Position from = crowd.hash.position(index);
   crowd.hash.visit_within(
       from, reach(people_.at(member), armies_.at(army)),
       [&](std::size_t other) {
         const Position there = crowd.hash.position(other);
         const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
                                    ((std::int64_t{there.y} - from.y) * pull.y);
-        engaged = engaged ||
-                  (ahead > 0 && people_.at(crowd.people.at(other)).health > 0 &&
-                   foes(member, army, crowd.people.at(other),
-                        crowd.armies.at(other)));
+        engaged = engaged || (ahead > 0 && !standing.at(other) &&
+                              people_.at(crowd.people.at(other)).health > 0 &&
+                              foes(member, army, crowd.people.at(other),
+                                   crowd.armies.at(other)));
       });
   return engaged;
 }

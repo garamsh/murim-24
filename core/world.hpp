@@ -1398,8 +1398,9 @@ class World {
                           std::size_t other, std::size_t other_army) const;
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
-  [[nodiscard]] bool held(std::size_t member, std::size_t army, Position from,
-                          Step pull, const Crowd& crowd) const;
+  [[nodiscard]] bool held(std::size_t index, Step pull,
+                          const std::vector<bool>& standing,
+                          const Crowd& crowd) const;
   [[nodiscard]] Position landing(const Person& caster, const Skill& skill,
                                  const Target& target) const;
   [[nodiscard]] CastRefusal assess_cast(std::size_t person,
