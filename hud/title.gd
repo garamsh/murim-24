@@ -1,4 +1,5 @@
-## The title screen, drawn as art/mockup/title_screen.png lays it out: the backdrop of mountains
+## The title screen, drawn as art/mockup/title_screen.png lays it out, at the least whole multiple
+## that covers the screen: the backdrop of mountains
 ## and the working title from art/title/backdrop.png, a line under it, and a menu to start a new
 ## game, continue the saved one, which cannot be taken while there is none, open the settings or
 ## quit, with its keys along the foot of the screen; under the menu, a notice of why a save was not
@@ -73,7 +74,8 @@ func key(event: InputEventKey) -> String:
 ## Works the menu with a tap at `at`: an entry that can be taken is chosen and taken. Returns
 ## what taking it does, one of ENTRIES, or "" when the tap took none.
 func tap(at: Vector2) -> String:
-	var row := _menu_row(MENU.position + MENU_INSET, MENU.size.x - 2 * MENU_INSET.x, ENTRIES.size(), at)
+	var row := _menu_row(MENU.position + MENU_INSET, MENU.size.x - 2 * MENU_INSET.x, ENTRIES.size(),
+			_stage().affine_inverse() * at)
 	if row < 0 or unavailable.has(ENTRIES[row]):
 		return ""
 	chosen = row
@@ -91,10 +93,22 @@ func _next(from: int, step: int) -> int:
 	return from
 
 
-func _draw() -> void:
-	_font = get_theme_default_font() if _font == null else _font
+# Where the screen is drawn: the native layout at the least whole multiple at which the backdrop
+# covers the room, centred across it and standing on its foot, so what the room cuts off is sky and
+# the keys along the foot stay in view.
+func _stage() -> Transform2D:
 	if _backdrop == null:
 		_backdrop = load(BACKDROP)
+	var backdrop := _backdrop.get_size()
+	var room := _room()
+	var times := ceilf(maxf(room.size.x / backdrop.x, room.size.y / backdrop.y))
+	var corner := Vector2(room.get_center().x - backdrop.x * times / 2.0, room.end.y - backdrop.y * times)
+	return Transform2D(0.0, Vector2(times, times), 0.0, corner.floor())
+
+
+func _draw() -> void:
+	_font = get_theme_default_font() if _font == null else _font
+	draw_set_transform_matrix(_stage())
 	draw_texture(_backdrop, Vector2.ZERO)
 	_text(LINE, tr("TITLE_LINE"), PAPER_DARK, true)
 	_frame(MENU, INK_DARK)

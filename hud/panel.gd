@@ -9,6 +9,8 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const FONT_SIZE := 10
 # The mockups' layout, in the native 480x270.
 const PANEL := Rect2(20, 12, 440, 246)
+# The native screen a panel is laid out in.
+const SCREEN := Vector2(480, 270)
 const CARD := Vector2(66, 40)
 # Where a card's text starts.
 const CARD_TEXT_X := 23
@@ -45,7 +47,7 @@ var _scrim: ImageTexture
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	size = Vector2(480, 270)
+	size = SCREEN
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	visible = false
 
@@ -60,10 +62,16 @@ func _chrome(keys: String) -> void:
 	_dialog(PANEL, "", "", keys)
 
 
-# The game behind a panel, dimmed by a checker of ink.
+# The game behind a panel, dimmed by a checker of ink over the whole room the panel stands in the
+# middle of.
 func _dim() -> void:
 	_font = get_theme_default_font() if _font == null else _font
-	draw_texture_rect(_scrim_texture(), Rect2(Vector2.ZERO, size), true)
+	draw_texture_rect(_scrim_texture(), _room(), true)
+
+
+# The room the panel stands in the middle of, in its own pixels.
+func _room() -> Rect2:
+	return Rect2(-position, SCREEN + 2.0 * position)
 
 
 # A panel in `rect` with `title` and `close` in its title bar and `keys` along its foot.

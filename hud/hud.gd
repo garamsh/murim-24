@@ -12,13 +12,17 @@
 ## icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
 ## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
 ## as art/mockup/mobile_hud_idle.png lays them out.
-## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
-## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
+## On a PC it is drawn at its own whole-pixel scale, finer than the world's, as ViewScale sets
+## it, its panels anchored to the corners of the room it is given and a settings button under the
+## map; with the touch controls it keeps the native 480x270 at the world's scale.
+## Every word comes from hud.csv through Godot's translations, Korean first, or in the language
+## the settings keep. It reads the world and holds no game rule.
 extends CanvasLayer
 
+## Sent when the settings button is clicked.
+signal settings_asked
+
 const LOCALES := ["ko", "en"]
-## The key that switches the language.
-const LOCALE_KEY := KEY_F2
 const FONT := "res://hud/fonts/Galmuri9.ttf"
 const FONT_SIZE := 10
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
@@ -26,6 +30,10 @@ const ART := "res://art/"
 const PersonName := preload("res://hud/person_name.gd")
 const Arts := preload("res://hud/arts.gd")
 const Loadout := preload("res://hud/loadout.gd")
+const ViewScale := preload("res://view_scale.gd")
+## The room the panels are placed in below, the native size; a larger room moves each panel by the
+## room it gains, as far as its corner of the room.
+const NATIVE := Vector2(480, 270)
 ## How many of the latest rumours the rumour log shows.
 const RUMOUR_LINES := 3
 # docs/art-direction.md §Palette.
@@ -60,6 +68,8 @@ const RUMOUR_RECT := {false: Rect2(4, 184, 220, 52), true: Rect2(176, 4, 166, 42
 const RUMOUR_WIDTH := {false: 209, true: 156}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
+# The settings button, under the map; the touch layout has none, its pause button standing in.
+const SETTINGS_RECT := Rect2(424, 70, 52, 16)
 # The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
 const CHALLENGE_KEYS := {
 	WorldAdapter.CHALLENGE_NONE: "CHALLENGE_NONE",
@@ -110,6 +120,10 @@ var slot_skills: Array[Dictionary] = []
 var touch: Control
 ## How many of the rumour log's lines the layout shows.
 var rumour_lines := RUMOUR_LINES
+## The room the HUD is laid out in, in its own pixels.
+var room := NATIVE
+## The settings button, shown in the keyboard layout.
+var settings_button: Panel
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
@@ -157,20 +171,6 @@ func _set_up() -> void:
 	_theme.default_font_size = FONT_SIZE
 	_theme.set_color("font_color", "Label", PAPER)
 	_build()
-
-
-func _unhandled_key_input(event: InputEvent) -> void:
-	var key := event as InputEventKey
-	if key != null and key.pressed and key.keycode == LOCALE_KEY:
-		switch_locale()
-		settings.note_locale()
-
-
-## Switches the HUD to the next locale in LOCALES, and returns it.
-func switch_locale() -> String:
-	var next: String = LOCALES[(LOCALES.find(TranslationServer.get_locale().left(2)) + 1) % LOCALES.size()]
-	TranslationServer.set_locale(next)
-	return next
 
 
 ## Builds the HUD if it is not yet built, and opens the title screen, with continue taken or not
@@ -324,18 +324,63 @@ func use_touch(on: bool) -> void:
 		touch.release_all()
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
-	labels.locale.visible = not on
+	settings_button.visible = not on
 	labels.challenge_key.visible = not on
-	_map_panel.position = MAP_AT[on]
-	_rumour_panel.position = RUMOUR_RECT[on].position
 	_rumour_panel.size = RUMOUR_RECT[on].size
 	rumour_lines = 2 if on else RUMOUR_LINES
 	for line in RUMOUR_LINES:
 		var label: Label = labels["rumour_%d" % line]
 		label.size.x = RUMOUR_WIDTH[on]
 		label.visible = line < rumour_lines
-	duel_panel.position = DUEL_AT[on]
-	labels.notice.position = NOTICE_AT[on]
+	_place()
+
+
+## Sizes the HUD for a window of `window` pixels, with the touch controls shown or not as `touch`
+## says, as ViewScale scales it and gives it room.
+func fit(window: Vector2i, touch: bool) -> void:
+	_set_up()
+	var scale := ViewScale.hud_scale(window, touch)
+	var placed := ViewScale.hud_room(window, touch)
+	transform = Transform2D(0.0, Vector2(scale, scale), 0.0, Vector2(placed.position))
+	room = Vector2(placed.size)
+	_place()
+
+
+## Returns `event` with its position in the HUD's pixels, from the window's.
+func to_hud(event: InputEvent) -> InputEvent:
+	return event.xformed_by(transform.affine_inverse())
+
+
+## Returns where `at`, a point in the HUD's pixels, lies in the window's.
+func to_window(at: Vector2) -> Vector2:
+	return transform * at
+
+
+## Returns where `at`, a point in the window's pixels, lies in the HUD's.
+func from_window(at: Vector2) -> Vector2:
+	return transform.affine_inverse() * at
+
+
+# Asks for the settings when the settings button is clicked.
+func _on_settings_button(event: InputEvent) -> void:
+	var click := event as InputEventMouseButton
+	if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		settings_asked.emit()
+
+
+# Places the panels of the layout shown in the room: each keeps its place against the corner it
+# stands by, the panels and screens over the HUD in the room's middle.
+func _place() -> void:
+	var on := touch.visible
+	var gained := room - NATIVE
+	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
+	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
+	_rumour_panel.position = RUMOUR_RECT[on].position + Vector2(0, gained.y)
+	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
+	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
+	labels.notice.position = NOTICE_AT[on] + gained / 2.0
+	for over: Control in [arts, touch, genealogy, sect, title_screen, new_game, pause, settings, rebirth]:
+		over.position = (gained / 2.0).floor()
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
@@ -493,6 +538,12 @@ func _build() -> void:
 	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(MAP_AT[false], Vector2(84, 62)))
+	settings_button = _panel(SETTINGS_RECT)
+	var word := _label(settings_button, "SETTINGS_TITLE", Vector2.ZERO, PAPER)
+	word.size = SETTINGS_RECT.size - Vector2(0, 2)
+	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	word.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_button.gui_input.connect(_on_settings_button)
 	_map_panel = map
 	_map.position = Vector2(4, 4)
 	_map.size = Vector2(MAP_SIZE)
@@ -543,8 +594,6 @@ func _build() -> void:
 		number.add_theme_constant_override("outline_size", 2)
 		cell.add_child(number)
 		_slots.append(cell)
-
-	labels.locale = _label(self, "HUD_LOCALE", Vector2(400, 68), STONE)
 
 	# The genealogy panel, closed until G opens it; added after every other panel, below, so it
 	# draws over them all.
@@ -597,7 +646,6 @@ func _build() -> void:
 	settings = preload("res://hud/settings.gd").new()
 	rebirth = preload("res://hud/rebirth.gd").new()
 	settings.locales = LOCALES
-	settings.locale_key = OS.get_keycode_string(LOCALE_KEY)
 	for screen_panel: Control in [title_screen, new_game, pause, settings, rebirth]:
 		screen_panel.use_font(_theme.default_font)
 		screen_panel.visible = false

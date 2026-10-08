@@ -22,10 +22,13 @@
 ## open the genealogy, sect and arts panels, challenge and pause, where on the arts panel a skill
 ## tapped and then a skill button puts it on that button's slot; the screens take taps, and where
 ## the settings ask, a tap on the ground orders the person there.
-## The camera follows the person. It ticks at the core's tick rate times the speed the settings
+## The camera follows the person, at the whole-pixel scale ViewScale gives the window, filling it;
+## the HUD's settings button opens the settings over the paused world. It ticks at the core's tick rate times the speed the settings
 ## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
 ## sounds it through sound.tscn, and holds no game rule.
 extends Node2D
+
+const ViewScale := preload("res://view_scale.gd")
 
 const PIXELS_PER_CELL := 16.0
 # Ticks one frame may run to catch up at the core's own rate, and as many times more at a higher
@@ -93,6 +96,8 @@ var _stick := Vector2i.ZERO
 var _stick_from := Vector2i.ZERO
 # Where the view's top-left corner is in the world, in pixels, for a tap on the ground.
 var _view_origin := Vector2.ZERO
+# Whether the settings were opened from the pause panel, which going back from them returns to.
+var _settings_from_pause := false
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -103,8 +108,38 @@ var _view_origin := Vector2.ZERO
 
 func _ready() -> void:
 	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
+	_hud.settings.applied.connect(fit_view)
+	_hud.settings_asked.connect(open_settings)
+	# Outside a tree, as a test readies it, the scene has no window to fit.
+	if is_inside_tree():
+		get_viewport().size_changed.connect(fit_view)
 	_hud.settings.read()
 	_hud.settings.apply()
+
+
+## Scales the world and the HUD to the window, as ViewScale gives them for its size and for the
+## touch controls shown or not.
+func fit_view() -> void:
+	if not is_inside_tree():
+		return
+	var window := get_viewport().get_visible_rect().size
+	var touch_shown: bool = _hud.settings.touch_shown()
+	var scale := ViewScale.world_scale(Vector2i(window), touch_shown)
+	_camera.zoom = Vector2(scale, scale)
+	_hud.fit(Vector2i(window), touch_shown)
+
+
+## Opens the settings over the world, which stays paused while they are open; going back from
+## them returns to the world.
+func open_settings() -> void:
+	if world == null or _hud.screen() != null:
+		return
+	_moving = false
+	_stick = Vector2i.ZERO
+	_hud.touch.release_all()
+	_settings_from_pause = false
+	_hud.settings.open()
+	_sound.ui("open")
 
 
 ## Starts a world generated from `from_seed`, the player born into `birth_village`, and closes
@@ -164,7 +199,8 @@ func _play(made: WorldAdapter) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not navigate(event) and not touch(event):
+	var on_hud: InputEvent = _hud.to_hud(event)
+	if not navigate(on_hud) and not touch(on_hud):
 		command(make_input_local(event))
 
 
@@ -184,7 +220,7 @@ func navigate(event: InputEvent) -> bool:
 	if key != null and key.pressed:
 		_take(open.key(key))
 	elif tapped != null and tapped.pressed:
-		_take(open.tap(tapped.position))
+		_take(open.tap(tapped.position - open.position))
 	else:
 		return true
 	var now: Control = _hud.screen()
@@ -214,10 +250,11 @@ func _take(action: String) -> void:
 			_hud.pause.note_save(save())
 		"settings":
 			_hud.pause.close()
+			_settings_from_pause = true
 			_hud.settings.open()
 		"back":
-			# Back from the settings to the pause panel they were opened from, in a game.
-			if world != null:
+			# Back from the settings to the pause panel, where they were opened from it in a game.
+			if world != null and _settings_from_pause:
 				_hud.pause.visible = true
 		"resume":
 			_hud.pause.close()
@@ -245,7 +282,6 @@ func controls() -> Array[Dictionary]:
 		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
 		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
-		{"keys": [OS.get_keycode_string(_hud.LOCALE_KEY)], "does": "CONTROLS_LANGUAGE"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows
@@ -266,7 +302,7 @@ func _process(delta: float) -> void:
 		follow(_cursor)
 	_show_aim()
 	_view_origin = view.position
-	_hud.touch.body_at = (_to_pixels(lead()) - view.position).floor()
+	_hud.touch.body_at = _hud.from_window((_to_pixels(lead()) - view.position) * _camera.zoom).floor()
 	_hud.refresh(world, steered, _skills)
 
 
@@ -443,7 +479,8 @@ func touch(event: InputEvent) -> bool:
 					pause()
 		"world":
 			if _hud.settings.tap_to_move():
-				var cell := Vector2i(((_view_origin + action.at) / PIXELS_PER_CELL).floor())
+				var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom
+				var cell := Vector2i(((_view_origin + on_view) / PIXELS_PER_CELL).floor())
 				if world.order(steered, cell, _skills):
 					_objective = cell
 	return true

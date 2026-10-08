@@ -57,10 +57,8 @@ const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "mas
 var chosen := DEFAULTS.duplicate()
 ## The row being changed, an index into ROWS.
 var row := 0
-## The locales the language row chooses among, and the name of the key that switches them outside
-## this panel, set by the HUD.
+## The locales the language row chooses among, set by the HUD.
 var locales: Array = []
-var locale_key := ""
 ## The file the settings are kept in.
 var path := PATH
 
@@ -99,14 +97,6 @@ func choose(name: String, index: int) -> void:
 	chosen[name] = index
 	apply()
 	keep()
-
-
-## Notes the locale the translations are in now as the language chosen, and keeps it: F2 switches
-## the language outside this panel.
-func note_locale() -> void:
-	chosen.language = maxi(locales.find(TranslationServer.get_locale().left(2)), 0)
-	keep()
-	queue_redraw()
 
 
 ## Returns the words of row `name`'s choices, in the current locale.
@@ -270,7 +260,7 @@ func _draw() -> void:
 
 ## Returns what row `name` sets, in the current locale.
 func about(name: String) -> String:
-	return tr(ABOUT_KEYS[name]) % locale_key if name == "language" else tr(ABOUT_KEYS[name])
+	return tr(ABOUT_KEYS[name])
 
 
 ## Returns how wide each of row `name`'s choices' slips is.

@@ -1,8 +1,10 @@
 ## Shows the core's M1 benchmark scenario in the approved art, through world_art.tscn, and sounds
-## it through sound.tscn, with a camera the arrow keys move. It ticks the world at the core's tick rate whatever the frame rate,
+## it through sound.tscn, with a camera the arrow keys move, at the PC's scale ViewScale gives the
+## window. It ticks the world at the core's tick rate whatever the frame rate,
 ## and holds no game rule.
 extends Node2D
 
+const ViewScale := preload("res://view_scale.gd")
 const PIXELS_PER_CELL := 16.0
 const CAMERA_PIXELS_PER_SECOND := 200.0
 # Ticks one frame may run to catch up; beyond it the simulation falls behind instead of stalling.
@@ -23,6 +25,8 @@ var _since_tick := 0.0
 
 
 func _ready() -> void:
+	var scale := ViewScale.world_scale(Vector2i(get_viewport_rect().size), false)
+	_camera.zoom = Vector2(scale, scale)
 	world = WorldAdapter.create_m1()
 	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_centre()))
 	_art.show_world(world, -1)

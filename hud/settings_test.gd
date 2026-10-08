@@ -1,7 +1,6 @@
 # Checks that the settings persist: choices changed on the panel are kept in its file under
 # user://, and a panel that reads the file back holds the same choices, its speed and casting on
-# release among them; a
-# choice F2 made is kept as the language. Each volume chosen is applied to its audio bus, and a
+# release among them. Each volume chosen is applied to its audio bus, and a
 # volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
 # row's default. Controls: a panel reading a file that does not exist holds every default, casting
 # on press among them, and the
@@ -51,13 +50,6 @@ func run() -> bool:
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
 			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied
 
-	# F2 switches the locale outside the panel; noting it keeps it.
-	TranslationServer.set_locale("ko")
-	reread.note_locale()
-	var noted := _panel(PATH)
-	noted.read()
-	var locale_kept: bool = noted.chosen.language == 0
-
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(MISSING)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
@@ -74,13 +66,13 @@ func run() -> bool:
 
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	_remove(PATH)
-	var passed := kept and locale_kept and defaults and refused
+	var passed := kept and defaults and refused
 	# The defaults restored, so the buses are left as the game starts them.
 	missing.apply()
-	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx and casting on release, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; F2's Korean kept %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
-		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, locale_kept, defaults, refused,
+	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx and casting on release, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
+		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, defaults, refused,
 		"pass" if passed else "FAIL"])
-	for each: Control in [panel, reread, noted, missing, ranged]:
+	for each: Control in [panel, reread, missing, ranged]:
 		each.free()
 	return passed and _tap_pass() and _fit_pass()
 
@@ -164,7 +156,6 @@ func _panel(path: String) -> Control:
 	var panel: Control = Settings.new()
 	panel.path = path
 	panel.locales = Hud.LOCALES
-	panel.locale_key = OS.get_keycode_string(Hud.LOCALE_KEY)
 	return panel
 
 
