@@ -14,3 +14,12 @@ Commands, from the project root after `make build` with the code under test in p
     godot --path . --script res://play/motion_probe.gd -- click 60 7 <dir>
 
 The numbers in the PR's table come from the same probe run headless without a capture directory: `godot --headless --path . --script res://play/motion_probe.gd -- <straight|diagonal|click> <60|144> 7`.
+
+## Refreshed after the rebase onto main at 7160303
+
+Since #176 the world fills the window at the whole-pixel zoom `view_scale.gd` gives it, rather than a 480 x 270 viewport scaled up. The probe now saves window-sized frames, halves them on the sheet, and maps each drawn body centre through the camera's zoom for the trail. The same two walks, recorded at fix/smooth-movement a03cf4f, with that branch's movement, drawing between ticks and hold rule over #176's view:
+
+- `joystick_window_*.png`: the joystick held down and to the right. Logged `walked (82.0, 82.0) px`, `furthest off the straight line: 0.00 px`, gaps between pixel moves `2:7, 3:74`, the same as at dd1f46b.
+- `click_window_*.png`: the right button pressed and let go 14 cells down the diagonal. Logged the same numbers.
+
+The 480 x 270 captures above stay as the record of main at 0962bfe and of the branch before the rebase.

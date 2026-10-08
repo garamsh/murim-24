@@ -2,8 +2,8 @@
 ## each frame, at a fixed frame rate, it reads where WorldArt drew the body (from its MultiMesh
 ## bands) and where the camera stands, and prints the counts below. Given a capture directory, it
 ## holds the camera where the walk began, so the walk crosses the screen, and saves there every
-## SHEET_EVERY-th frame, a sheet of them, and the last frame, twice the size, with every frame's
-## drawn body centre marked in red. Capturing needs a display. Arguments after `--`:
+## SHEET_EVERY-th frame, a sheet of them at 1/SHEET_SHRINK of the window, and the last frame with
+## every frame's drawn body centre marked in red. Capturing needs a display. Arguments after `--`:
 ## <way: straight|diagonal|click> <fps> <birth village> [capture_dir]
 ## `click` presses and lets go the right button on the cell RUN cells down a clear diagonal,
 ## instead of the joystick.
@@ -16,6 +16,8 @@ const FRAMES_SECONDS := 4.0
 const WARM_TICKS := 15
 const SHEET_EVERY := 30
 const SHEET_COLUMNS := 4
+# Each frame on the sheet is the window's size over this.
+const SHEET_SHRINK := 2
 
 var _scene: Node2D
 var _fps := 60
@@ -179,19 +181,23 @@ func _report() -> void:
 
 # Saves the frames kept side by side, and the last frame with each frame's body centre in red.
 func _save_sheet() -> void:
-	var size := _frames_saved[0].get_size()
+	var full := _frames_saved[0].get_size()
+	var size := full / SHEET_SHRINK
+	for frame in _frames_saved:
+		frame.resize(size.x, size.y, Image.INTERPOLATE_NEAREST)
 	var rows := ceili(_frames_saved.size() / float(SHEET_COLUMNS))
 	var sheet := Image.create_empty(size.x * SHEET_COLUMNS, size.y * rows, false, _frames_saved[0].get_format())
 	for i in _frames_saved.size():
 		sheet.blit_rect(_frames_saved[i], Rect2i(Vector2i.ZERO, size), Vector2i(i % SHEET_COLUMNS * size.x, i / SHEET_COLUMNS * size.y))
 	sheet.save_png(_capture_dir.path_join("sheet.png"))
 	var trail := _last_image.duplicate()
-	# The camera stops at the region's edge, so its screen centre may differ from its position.
-	var origin: Vector2 = _scene.get_node("Camera").get_screen_center_position() - Vector2(size) / 2.0
+	var camera: Camera2D = _scene.get_node("Camera")
+	# The camera stops at the region's edge, so its screen centre may differ from its position;
+	# its zoom is the scale ViewScale gives the window.
+	var origin: Vector2 = camera.get_screen_center_position() - Vector2(full) / camera.zoom / 2.0
 	for at in _drawn:
-		var pixel := Vector2i((at - origin).round())
-		trail.fill_rect(Rect2i(pixel - Vector2i.ONE, Vector2i(3, 3)).intersection(Rect2i(Vector2i.ZERO, size)), Color.RED)
-	trail.resize(size.x * 2, size.y * 2, Image.INTERPOLATE_NEAREST)
+		var pixel := Vector2i(((at - origin) * camera.zoom).round())
+		trail.fill_rect(Rect2i(pixel - Vector2i(2, 2), Vector2i(5, 5)).intersection(Rect2i(Vector2i.ZERO, full)), Color.RED)
 	trail.save_png(_capture_dir.path_join("trail.png"))
 
 
