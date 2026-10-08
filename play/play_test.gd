@@ -21,7 +21,11 @@
 # casts at the hostile person the core aims at the way the person faces, dragged casts at the point
 # it aims, dropped on the cancel zone casts nothing, and held casts on the person itself, while a
 # tap the core refuses for its cooldown shows why; the screens take taps, and the HUD's buttons
-# open the pause panel and the genealogy panel.
+# open the pause panel and the genealogy panel. K opens the arts panel, where a skill chosen is put
+# on a slot with that slot's key and taken off with Delete; a person who knows an art beyond its
+# army's skills, with it put on T, sees it on T's slot, aims at its range and casts it at that range
+# from the fifth skill button, while an empty slot shows and casts nothing. The loadout is saved
+# with the world, and Continue restores it.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -90,7 +94,8 @@ func run() -> bool:
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
 			and _move_pass() and _cast_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
-			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass()
+			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass() and _arts_pass() \
+			and _art_slot_pass() and _loadout_save_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -776,6 +781,162 @@ func _challenge_pass() -> bool:
 	print("play_test: key C from an Orthodox village refused %s, the HUD saying %s; from a Cult village accepted %s, the duel shown %s; again refused %s, the HUD saying %s: %s" % [
 		refused, reason, accepted, shown, again, again_reason, "pass" if passed else "FAIL"])
 	cult.free()
+	return passed
+
+
+# K opens the arts panel on the steered person, the first of its skills chosen, and while it is
+# open a digit gives no order and Escape pauses nothing; the arrow down chooses the next skill, and
+# Q puts it on the first slot, the HUD's first slot showing it; Delete takes it off, the slot then
+# showing none, and Escape closes the panel. Control: with it closed, the same digit orders.
+func _arts_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var panel: Control = hud.arts
+	var person: int = world.roster(scene.steered)[0]
+	var skills := world.person_skills(person)
+	var opened: bool = scene.command(_key(scene.ARTS_KEY)) and panel.visible \
+			and panel.selected == {"art": -1, "skill": 0}
+	var digit_taken: bool = not scene.command(_key(KEY_1))
+	var not_paused: bool = not scene.navigate(_key(KEY_ESCAPE)) and hud.screen() == null
+	var moved: bool = scene.command(_key(KEY_DOWN)) and panel.selected == {"art": -1, "skill": 1}
+	var assigned: bool = scene.command(_key(KEY_Q)) and hud.loadout.slots[0] == {"art": -1, "skill": 1} \
+			and hud.loadout.slots[1].is_empty() and hud.slot_skills[0] == skills[1]
+	var cleared: bool = scene.command(_key(scene.CLEAR_KEY)) and hud.loadout.slots[0].is_empty() \
+			and hud.slot_skills[0].is_empty() and hud.slot_icons[0].texture == null
+	var closed: bool = scene.command(_key(KEY_ESCAPE)) and not panel.visible
+	var digit_orders: bool = scene.command(_key(KEY_1))
+	var passed := skills.size() == 2 and opened and digit_taken and not_paused and moved and assigned \
+			and cleared and closed and digit_orders
+	print("play_test: K opens the arts panel on the first skill %s, a digit gives no order %s and Escape pauses nothing %s while open; down chooses the second %s, Q puts it on the first slot, leaving its own %s, Delete takes it off %s; Escape closes it %s, then the digit orders %s: %s" % [
+		opened, digit_taken, not_paused, moved, assigned, cleared, closed, digit_orders, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# In a region of five-tick days lived ten years, steering the first person who knows an art skill
+# beyond its army's skills, with that skill put on T from the arts panel: T's slot on the technique
+# bar shows it, its key's cap reads T, T held to aim shows its range, and the fifth skill button
+# dragged to the pad's edge casts it at its full range, and tapped casts it at whom the aim finds
+# within that range or at the point that far the way the person faces. Control: R's slot, empty,
+# shows and casts nothing, from the key and from the button, and Q held aims at its army skill's
+# range, which differs. Setup: the art skill's range differs from the army skill's, and the person
+# may cast it.
+func _art_slot_pass() -> bool:
+	var lived := WorldAdapter.create_region(SEED, 0, GROWN_TICKS_PER_DAY)
+	for i in 10 * 120 * GROWN_TICKS_PER_DAY:
+		lived.tick()
+	var army := -1
+	for each in lived.army_count():
+		var roster := lived.roster(each)
+		if army < 0 and not roster.is_empty() and lived.person_skills(roster[0]).size() > lived.skills(each).size():
+			army = each
+	if army < 0:
+		print("play_test: no person knows an art after ten years: FAIL")
+		return false
+	var scene := _title()
+	var hud: CanvasLayer = scene.get_node("Hud")
+	scene._play(lived)
+	scene.steered = army
+	scene._body = lived.roster(army)[0]
+	hud.show_player(lived, army)
+	hud.settings.chosen.cast = 1
+	var person: int = lived.roster(army)[0]
+	var skills := lived.person_skills(person)
+	var art_skill := lived.skills(army).size()
+	var held := {"art": int(skills[art_skill].art), "skill": int(skills[art_skill].skill)}
+	scene.command(_key(scene.ARTS_KEY))
+	while hud.arts.selected != held and scene.command(_key(KEY_DOWN)):
+		pass
+	scene.command(_key(KEY_T))
+	scene.command(_key(scene.ARTS_KEY))
+	hud.refresh(lived, army, PackedInt64Array([0]))
+	var key: Label = hud.slot_icons[4].get_parent().get_child(1)
+	var shown: bool = hud.slot_skills[4] == skills[art_skill] and hud.slot_icons[4].texture != null \
+			and key.text == OS.get_keycode_string(scene.CAST_KEYS[4])
+	var pixels: float = scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	var art_reach: float = skills[art_skill].range * pixels
+	var army_reach: float = skills[0].range * pixels
+	var aim: Node2D = scene.get_node("Aim")
+	scene.command(_motion(scene.lead() * pixels + CAST_OFFSET, 0))
+	scene.command(_key(KEY_T))
+	var aimed: bool = aim.visible and aim.reach == art_reach
+	scene.command(_key(KEY_T))
+	scene.command(_key(KEY_Q))
+	var army_aimed: bool = aim.visible and aim.reach == army_reach
+	scene.command(_key(KEY_Q))
+	var empty_slot: bool = hud.slot_skills[3].is_empty() and hud.slot_icons[3].texture == null
+	scene.last_cast = {}
+	var r_refused: bool = scene.cast_at(3, scene.lead() * pixels + CAST_OFFSET) == WorldAdapter.CAST_NO_SKILL \
+			and scene.last_cast.is_empty()
+	hud.use_touch(true)
+	var touch: Control = hud.touch
+	var fifth: Vector2 = touch.SKILLS[4].at
+	var at: Vector2 = lived.person_position(person)
+	var ready := lived.cast_refusal(person, art_skill, null) == WorldAdapter.CAST_NONE
+	scene.touch(_finger(1, fifth, true))
+	scene.touch(_slide(1, fifth + Vector2(touch.SLOP + 4, 0)))
+	scene.touch(_slide(1, fifth + Vector2(touch.PAD, 0)))
+	scene.touch(_finger(1, fifth + Vector2(touch.PAD, 0), false))
+	var dragged: Dictionary = scene.last_cast
+	var reached: bool = dragged == {"skill": art_skill, "target": (at + Vector2(skills[art_skill].range, 0)).floor()}
+	# Tapped, it casts at whom the core's aim finds the way the person faces, within the art's range,
+	# or at the point that way at that range.
+	scene.last_cast = {}
+	scene.touch(_finger(1, fifth, true))
+	scene.touch(_finger(1, fifth, false))
+	var tapped: Dictionary = scene.last_cast
+	var reach := float(skills[art_skill].range)
+	var tap_target: Variant = tapped.get("target", null)
+	var tap_reached: bool = tapped.get("skill", -1) == art_skill and (
+			(tap_target is Vector2 and absf(at.distance_to(tap_target) - reach) <= 2.0)
+			or (tap_target is int and lived.person_position(tap_target).distance_to(at) <= reach))
+	reached = reached and tap_reached
+	scene.last_cast = {}
+	scene.touch(_finger(2, touch.SKILLS[3].at, true))
+	scene.touch(_finger(2, touch.SKILLS[3].at, false))
+	var button_empty: bool = scene.last_cast.is_empty() and touch.reach[3].is_empty() and touch.skill_count == 5
+	var set_up: bool = art_reach != army_reach and ready
+	var passed := set_up and shown and aimed and army_aimed and empty_slot and r_refused and reached and button_empty
+	print("play_test: army %d's person %d knows %d skills past its army's %d; the art skill %s on T shown %s; T aims at %.0f px %s, Q at %.0f px %s; R's empty slot shows none %s, casts none %s; the fifth button dragged cast %s and tapped %s at range %d %s; the fourth, empty, cast none %s (setup %s): %s" % [
+		army, person, skills.size() - art_skill, art_skill, held, shown, art_reach, aimed, army_reach, army_aimed,
+		empty_slot, r_refused, dragged, tapped, skills[art_skill].range, reached, button_empty, set_up,
+		"pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# A loadout changed on the arts panel is saved with the world from the pause panel, and Continue on
+# a fresh title restores it. Control: a new game from the same seed starts from the person's first
+# skills.
+func _loadout_save_pass() -> bool:
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
+	var scene := _scene(0)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	scene.command(_key(scene.ARTS_KEY))
+	scene.command(_key(KEY_DOWN))
+	scene.command(_key(KEY_T))
+	scene.command(_key(scene.ARTS_KEY))
+	var changed: Array = hud.loadout.slots.duplicate()
+	var saved: bool = scene.save()
+	scene.free()
+	var resumed := _title()
+	resumed.navigate(_key(KEY_DOWN))
+	resumed.navigate(_key(KEY_ENTER))
+	var restored: Array = resumed.get_node("Hud").loadout.slots.duplicate()
+	var restored_shown: Dictionary = resumed.get_node("Hud").slot_skills[4]
+	resumed.free()
+	var fresh := _scene(0)
+	var first: Array = fresh.get_node("Hud").loadout.slots.duplicate()
+	fresh.free()
+	TestSaves.clear()
+	var untouched := TestSaves.game_slot() == game_slot
+	var passed: bool = saved and changed[4] == {"art": -1, "skill": 1} and changed[1].is_empty() \
+			and restored == changed and not restored_shown.is_empty() and first != changed \
+			and first[1] == {"art": -1, "skill": 1} and untouched
+	print("play_test: the loadout %s saved %s, restored by Continue %s, T showing %s; a new game starts from %s; the game's slot 0 untouched %s: %s" % [
+		changed, saved, restored, not restored_shown.is_empty(), first, untouched, "pass" if passed else "FAIL"])
 	return passed
 
 

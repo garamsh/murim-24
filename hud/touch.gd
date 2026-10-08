@@ -3,11 +3,15 @@
 ## art/mockup/touch.lua: a joystick at the bottom left that a thumb anywhere in its zone puts under
 ## itself; up to SKILLS.size() round skill buttons in an arc at the bottom right, each showing how
 ## long the body has left before it may strike again; the genealogy, sect and duel buttons under the
-## status panel; and the pause button in the top-right corner. A skill button tapped casts at what
-## the facing aims at, dragged shows its range and the area it aims at and casts there on release,
-## dropped on the cancel zone casts nothing, and held casts on the body itself. take() turns each
-## touch into what the play scene does with it; the ranges, the readiness and where the body stands
-## on screen are given to it, read from the core by the play scene. It holds no game rule.
+## status panel, with the arts button as art/mockup/mobile_hud_arts.png adds it; and the pause
+## button in the top-right corner. A skill button tapped casts at what the facing aims at, dragged
+## shows its range and the area it aims at and casts there on release, dropped on the cancel zone
+## casts nothing, and held casts on the body itself; a button whose slot is empty shows a cross and
+## casts nothing. While the arts panel is open, as arts_panel_touch.png shows it, only the arc is
+## drawn, ringed in jade while a skill waits to be placed, and the pause button's place closes the
+## panel. take() turns each touch into what the play scene does with it; the ranges, the readiness
+## and where the body stands on screen are given to it, read from the core by the play scene. It
+## holds no game rule.
 extends Control
 
 ## The skill buttons, the main one first: centre, drawn radius and the radius a touch lands in.
@@ -39,18 +43,25 @@ const BUTTONS := {
 	"genealogy": Rect2(4, 92, 42, 42),
 	"sect": Rect2(50, 92, 42, 42),
 	"challenge": Rect2(96, 92, 42, 42),
+	"arts": Rect2(142, 92, 42, 42),
 }
-const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "challenge": "TOUCH_DUEL"}
+const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "challenge": "TOUCH_DUEL",
+		"arts": "TOUCH_ARTS"}
 const PAUSE := Rect2(434, 4, 42, 42)
 ## The room each word is given, by its hud.csv key.
-const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_DUEL": 36, "TOUCH_CANCEL": 40,
-		"TOUCH_SELF": 50}
+const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_DUEL": 36, "TOUCH_ARTS": 36,
+		"TOUCH_CANCEL": 40, "TOUCH_SELF": 50, "TOUCH_PLACE": 110}
+## Where the slip asking for a button to place a skill on is centred, and its top.
+const PLACE_SLIP := Vector2(404, 136)
+## How far a finger on the arts panel moves up or down before it scrolls the panel's tiles.
+const SCROLL := 20.0
 const FONT_SIZE := 10
 const ART := "res://art/"
 # docs/art-direction.md §Palette, the ramps art/pixel.lua names.
 const INK_1 := Color("14101a")
 const INK_2 := Color("2a2433")
 const INK_3 := Color("3d3647")
+const INK_4 := Color("524a5e")
 const GOLD_2 := Color("8c6a2a")
 const GOLD_3 := Color("c99a3c")
 const GOLD_4 := Color("f0d080")
@@ -66,8 +77,8 @@ const STONE_4 := Color("8a94a0")
 const LACQUER_3 := Color("a83a2c")
 const SHADE := Color(0.08, 0.06, 0.1, 0.45)
 const DIM := Color(0.08, 0.06, 0.1, 0.6)
-# The square buttons' icons, as touch.lua draws them: a tree of three kin, a banner on its pole,
-# crossed swords.
+# The square buttons' icons, as touch.lua and mobile_hud_arts.lua draw them: a tree of three kin, a
+# banner on its pole, crossed swords, a jian upright.
 const BUTTON_ICONS := {
 	"genealogy": ["...###...", "...#.#...", "...###...", "....#....", ".#######.", ".#.....#.",
 			"###...###", "#.#...#.#", "###...###"],
@@ -75,12 +86,19 @@ const BUTTON_ICONS := {
 			"#........", "#........", "##......."],
 	"challenge": ["#.......#", ".#.....#.", "..#...#..", "...#.#...", "....#....", "...#.#...",
 			".##...##.", ".#.....#.", "#.......#"],
+	"arts": ["...#.....", "...#.....", "...#.....", "...#.....", "...#.....", "...#.....", ".#####...",
+			"...l.....", "...l....."],
 }
 
-## How many skill buttons are shown: the body's skills, up to SKILLS.size().
+## How many skill buttons are shown: the slots given, up to SKILLS.size().
 var skill_count := 0
-## Each shown skill's `icon` tag in art/icons/skill_icons, its `range` and its `radius` in pixels.
+## Each shown slot's skill: its `icon` tag in art/icons/skill_icons, its `range` and its `radius` in
+## pixels; an empty Dictionary for an empty slot.
 var reach: Array[Dictionary] = []
+## Whether the arts panel is open over the controls, so only the arc is drawn and touched, and
+## whether a skill chosen on it waits for a button to be placed on.
+var placing := false
+var waiting := false
 ## Where the steered body stands on screen, which the rings on the ground are drawn round.
 var body_at := Vector2(240, 135)
 ## The share of the body's cooldown still to run, and the whole seconds it lasts; 0 when ready.
@@ -120,8 +138,8 @@ func use_font(font: Font) -> void:
 	_font = font
 
 
-## Shows `count` skill buttons, each skill's icon tag, range and radius in pixels as `skills`
-## gives them.
+## Shows a skill button for each of `skills`, its icon tag, range and radius in pixels as `skills`
+## gives them, or a cross for an empty Dictionary.
 func show_skills(skills: Array[Dictionary]) -> void:
 	reach = skills
 	skill_count = mini(skills.size(), SKILLS.size())
@@ -132,11 +150,16 @@ func show_skills(skills: Array[Dictionary]) -> void:
 ## Dictionary of `do`, one of "steer" with the stick's `way`, a Vector2 of length 1 at most;
 ## "cast" with the skill button's `slot` and `how`, "tap", "point" with `aim`, the drag as a share
 ## of PAD, or "self"; "button" with its `button`, a key of BUTTONS or "pause"; "world" with `at`,
-## the place tapped; or "none" when a finger took the event and asks nothing yet. Returns an empty
-## Dictionary for an event that is no touch.
+## the place tapped; or "none" when a finger took the event and asks nothing yet. While `placing`,
+## it is "place" with the `slot` of the skill button pressed, "button" with "close" for the pause
+## button's place, and for a finger lifted elsewhere, "panel" with `at`, where it was pressed, or
+## "scroll" with `way`, 1 for a finger moved up and -1 down. Returns an empty Dictionary for an
+## event that is no touch.
 func take(event: InputEvent) -> Dictionary:
 	var touch := event as InputEventScreenTouch
 	var drag := event as InputEventScreenDrag
+	if placing:
+		return _take_placing(touch, drag)
 	if touch != null and touch.pressed:
 		return _press(touch.index, touch.position)
 	if touch != null:
@@ -171,6 +194,32 @@ func release_all() -> void:
 	queue_redraw()
 
 
+func _take_placing(touch: InputEventScreenTouch, drag: InputEventScreenDrag) -> Dictionary:
+	if touch != null and touch.pressed:
+		queue_redraw()
+		if PAUSE.has_point(touch.position):
+			return {"do": "button", "button": "close"}
+		for slot in skill_count:
+			if touch.position.distance_to(SKILLS[slot].at) <= SKILLS[slot].hit:
+				return {"do": "place", "slot": slot}
+		_fingers[touch.index] = {"kind": "panel", "from": touch.position, "at": touch.position}
+		return {"do": "none"}
+	if drag != null and _fingers.has(drag.index):
+		_fingers[drag.index].at = drag.position
+		return {"do": "none"}
+	if touch == null or not _fingers.has(touch.index):
+		return {}
+	var finger: Dictionary = _fingers[touch.index]
+	_fingers.erase(touch.index)
+	# A finger pressed before the panel opened, such as the one on the arts button, asks nothing.
+	if finger.kind != "panel":
+		return {"do": "none"}
+	var moved: float = finger.at.y - finger.from.y
+	if absf(moved) >= SCROLL:
+		return {"do": "scroll", "way": 1 if moved < 0 else -1}
+	return {"do": "panel", "at": finger.from}
+
+
 func _press(index: int, at: Vector2) -> Dictionary:
 	queue_redraw()
 	if PAUSE.has_point(at):
@@ -181,6 +230,9 @@ func _press(index: int, at: Vector2) -> Dictionary:
 			_fingers[index] = {"kind": "button"}
 			return {"do": "button", "button": button}
 	for slot in skill_count:
+		if at.distance_to(SKILLS[slot].at) <= SKILLS[slot].hit and reach[slot].is_empty():
+			_fingers[index] = {"kind": "button"}
+			return {"do": "none"}
 		if at.distance_to(SKILLS[slot].at) <= SKILLS[slot].hit:
 			_fingers[index] = {"kind": "skill", "slot": slot, "from": at, "since": clock.call(),
 					"aiming": false, "aim": Vector2.ZERO, "over_cancel": false, "self_shown": false}
@@ -241,6 +293,9 @@ func _held_long(finger: Dictionary) -> bool:
 
 func _draw() -> void:
 	_font = get_theme_default_font() if _font == null else _font
+	if placing:
+		_draw_placing()
+		return
 	var aimed := aiming()
 	var on_self := holding_self()
 	if not aimed.is_empty():
@@ -262,6 +317,19 @@ func _draw() -> void:
 		var s: Dictionary = SKILLS[_self_slot()]
 		draw_arc(s.at, s.r + 3, 0, TAU, 48, JADE_4, 2.0)
 		_slip("TOUCH_SELF", Vector2(s.at.x, s.at.y - s.r - 22), JADE_3)
+
+
+# The arc while the arts panel is open: each button ringed in jade while a skill waits to be placed,
+# with a slip asking for one, and the pause button's place closing the panel.
+func _draw_placing() -> void:
+	for slot in skill_count:
+		_skill(slot, "jade" if waiting else "")
+	if waiting:
+		_slip("TOUCH_PLACE", PLACE_SLIP, JADE_3)
+	_frame(PAUSE)
+	for k in range(-6, 7):
+		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 + k), Vector2(2, 2)), PAPER_3)
+		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 - k), Vector2(2, 2)), PAPER_3)
 
 
 func _self_slot() -> int:
@@ -328,13 +396,18 @@ func _draw_stick() -> void:
 func _skill(slot: int, rim: String) -> void:
 	var s: Dictionary = SKILLS[slot]
 	_disc(s.at, s.r, "gold" if rim.is_empty() else rim)
+	if slot < reach.size() and reach[slot].is_empty():
+		var cross := JADE_2 if rim == "jade" else INK_4
+		draw_rect(Rect2(s.at + Vector2(-4, 0), Vector2(9, 1)), cross)
+		draw_rect(Rect2(s.at + Vector2(0, -4), Vector2(1, 9)), cross)
+		return
 	if slot < reach.size():
 		var tag: String = reach[slot].icon
 		var icon := _icon_texture()
 		if _icon_tags.has(tag):
 			draw_texture_rect_region(icon, Rect2(s.at - Vector2(8, 8), Vector2(16, 16)),
 					Rect2(_icon_tags[tag] * 16, 0, 16, 16))
-	if cooling <= 0.0:
+	if cooling <= 0.0 or placing:
 		return
 	draw_circle(s.at, s.r - 2, SHADE)
 	var top := -PI / 2.0
@@ -401,13 +474,14 @@ func _slip(key: String, top: Vector2, rule: Color) -> void:
 func _square(rect: Rect2, button: String) -> void:
 	_frame(rect)
 	var rows: Array = BUTTON_ICONS[button]
-	var colour := PAPER_3 if button == "challenge" else GOLD_3
+	var colour := PAPER_3 if button == "challenge" or button == "arts" else GOLD_3
 	var left := rect.position + Vector2(floorf((rect.size.x - 9) / 2.0), 7)
 	for y in rows.size():
 		var row: String = rows[y]
 		for x in row.length():
 			if row[x] != ".":
-				draw_rect(Rect2(left + Vector2(x, y), Vector2.ONE), LACQUER_3 if row[x] == "p" else colour)
+				var ink := LACQUER_3 if row[x] == "p" else (GOLD_3 if row[x] == "l" else colour)
+				draw_rect(Rect2(left + Vector2(x, y), Vector2.ONE), ink)
 	var text := tr(BUTTON_KEYS[button])
 	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), rect.position.y + 24), text, PAPER_3)
 

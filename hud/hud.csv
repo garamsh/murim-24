@@ -2,7 +2,7 @@ keys,ko,en
 HUD_PLAYER,협객,Wanderer
 HUD_HP,체력,HP
 HUD_QI,내공,QI
-HUD_ATTAINMENT,경지,Art
+HUD_REALM,경지,Realm
 DISCIPLINE_SWORD,검,Sword
 DISCIPLINE_SABER,도,Saber
 DISCIPLINE_FIST,권,Fist
@@ -141,6 +141,7 @@ CONTROLS_ALL_SKILLS,모든 기술,All skills
 CONTROLS_CHALLENGE,수장에게 도전,Challenge leader
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
+CONTROLS_ARTS,무공,Arts
 CONTROLS_LANGUAGE,언어,Language
 CONTROLS_PAUSE_CANCEL,일시정지 · 조준 취소,Pause · Cancel aim
 SETTINGS_TITLE,설정,Settings
@@ -186,6 +187,8 @@ REBIRTH_KEYS,Enter 새 몸으로 이어 살기,Enter Live on in the new body
 TOUCH_GENEALOGY,족보,Family
 TOUCH_SECT,문파,Sects
 TOUCH_DUEL,도전,Duel
+TOUCH_ARTS,무공,Arts
+TOUCH_PLACE,놓을 단추를 누른다,Tap a button
 TOUCH_CANCEL,취소,Cancel
 TOUCH_SELF,자신에게,On self
 SETTINGS_TOUCH,터치,Touch
@@ -194,3 +197,35 @@ SETTINGS_TOUCH_ON,켬,On
 SETTINGS_TOUCH_TAP,탭 이동,Tap move
 SETTINGS_TOUCH_OFF,끔,Off
 SETTINGS_TOUCH_ABOUT,터치 조작. 자동은 폰에서 켠다. 탭 이동은 땅을 눌러 걷는다.,Touch controls. Auto on phones. Tap move: tap ground to walk.
+ARTS_TITLE,무공,Arts
+ARTS_CLOSE,K 닫기,K close
+ARTS_REALM,경지,Realm
+ARTS_NEXT,다음,Next
+ARTS_QI,내공,Qi
+ARTS_HEART,심법,Heart method
+ARTS_HEART_TAG,심법,Heart
+ARTS_WEAKER,약화,Weaker
+ARTS_UNLEARNED,아직 못 익힘,Not yet learned
+ARTS_LOCKED,경지 부족,Realm too low
+ARTS_SKILL,기술,Skill
+ARTS_COST,내공,Qi
+ARTS_REALM_COLUMN,경지,Realm
+ARTS_COOLDOWN,재사용,Recast
+ARTS_SHARED,공용,Shared
+ARTS_LOADOUT,단축키,Loadout
+ARTS_KEYS,방향키 기술 고르기 · Q~T 배정 · Del 비우기 · K 닫기,Arrows choose · Q-T assign · Del clear · K close
+ARTS_TOUCH_KEYS,기술을 누른 뒤 단추를 누른다,"Tap a skill, then a button"
+ARTS_RANGE,사거리,Range
+ARTS_AREA,범위,Area
+ARTS_AREA_ONE,한 명,One
+ARTS_CELLS,%d칸,%d cells
+ARTS_SECONDS,%d초,%ds
+ARTS_FACTION,세력 기술,Faction skills
+ARTS_BASIC,기본기,Basic strike
+ARTS_MEND,보수,Mend
+ARTS_TORCH,방화,Torch
+ARTS_ORTHODOX,정,Orthodox
+ARTS_UNORTHODOX,사,Unorthodox
+ARTS_DEMONIC,마,Demonic
+ARTS_YANG,양강,Yang
+ARTS_YIN,음유,Yin

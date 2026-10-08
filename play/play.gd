@@ -1,23 +1,27 @@
 ## Opens on the title screen, where a new game generates a region from a seed, typed or drawn at
 ## random, and continue resumes the world saved in SAVE_SLOT, and lets the player steer one person
 ## in it, through the same orders every army follows: a right click orders it toward the cell
-## clicked, and while the button is held, toward the cell under the cursor; keys 1 to 9 order it to
-## strike with that skill, and 0 with all its skills. Q, W, E, R and T cast its first five skills
-## at the cursor through the core's cast port, at once or, as the settings choose, on the key's
-## release after aiming while it is held; the same key again or Escape cancels the aim. C
-## challenges its faction's leader to a duel, with the same order, when the core allows it; G
-## opens the genealogy panel on the person, and M the sect panel on its sect, where Enter applies
-## to the sect shown. The person is the one the core says carries the player's soul,
+## clicked, and while the button is held, toward the cell under the cursor; keys 1 to 9 order its
+## automatic strike to use that skill of its army's, and 0 all of them. Q, W, E, R and T cast the
+## skills on the HUD's loadout's five slots at the cursor through the core's cast port, at once or,
+## as the settings choose, on the key's release after aiming while it is held; the same key again
+## or Escape cancels the aim. C challenges its faction's leader to a duel, with the same order,
+## when the core allows it; G opens the genealogy panel on the person, M the sect panel on its
+## sect, where Enter applies to the sect shown, and K the arts panel, where the arrows choose one
+## of its skills, Q to T put it on that slot and Delete takes it off its slot. The loadout is
+## written beside the save whenever the world is saved, and read with it. The person is the one
+## the core says carries the player's soul,
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
 ## screen sums up the life just ended. Escape pauses the world under the pause panel, which saves
 ## it and whose guide shows the controls as bound here; it is also saved every AUTOSAVE_DAYS days.
 ## On a touch screen, or where the settings force it, the HUD's touch controls steer it instead:
-## the joystick orders it the way it points, a skill button tapped casts that skill at the hostile
-## person the core's aim finds the way the person faces, or toward that way at the skill's range,
-## dragged casts at the point it aims, dropped on the cancel zone casts nothing and held casts on
-## the person itself, the HUD naming the core's reason when it refuses; the HUD's buttons open the
-## genealogy and sect panels, challenge and pause, the screens take taps, and where the settings
-## ask, a tap on the ground orders the person there.
+## the joystick orders it the way it points, a skill button tapped casts its slot's skill at the
+## hostile person the core's aim finds the way the person faces, or toward that way at the skill's
+## range, dragged casts at the point it aims, dropped on the cancel zone casts nothing and held
+## casts on the person itself, the HUD naming the core's reason when it refuses; the HUD's buttons
+## open the genealogy, sect and arts panels, challenge and pause, where on the arts panel a skill
+## tapped and then a skill button puts it on that button's slot; the screens take taps, and where
+## the settings ask, a tap on the ground orders the person there.
 ## The camera follows the person. It ticks at the core's tick rate times the speed the settings
 ## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
 ## sounds it through sound.tscn, and holds no game rule.
@@ -32,20 +36,26 @@ const MOVE_BUTTON := MOUSE_BUTTON_RIGHT
 ## How many cells ahead the joystick sets the objective; nearer cells are tried when the core
 ## refuses it.
 const STRIDE := 3
-## The keys that cast one skill each at the cursor, the first skill's first.
+## The keys that cast the skill on one of the loadout's slots each at the cursor, the first slot's
+## first; on the arts panel, they put the skill chosen on that slot.
 const CAST_KEYS := [KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T]
-## The keys that strike with one skill each, the first skill's first, and the key that strikes with
-## all of them.
+## The keys that order the automatic strike to use one of the army's skills each, the first skill's
+## first, and the key that orders all of them.
 const SKILL_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9]
 const ALL_SKILLS_KEY := KEY_0
 const CHALLENGE_KEY := KEY_C
 const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
+const ARTS_KEY := KEY_K
+## The key that takes the skill chosen on the arts panel off its slot.
+const CLEAR_KEY := KEY_DELETE
 const PAUSE_KEY := KEY_ESCAPE
 ## The slot the pause panel saves to, the autosave writes and continue loads.
 const SAVE_SLOT := 0
 ## The in-game days between autosaves.
 const AUTOSAVE_DAYS := 3
+## The file, in the saves' directory, the loadout is kept in beside SAVE_SLOT.
+const LOADOUT_FILE := "loadout_%d.cfg" % SAVE_SLOT
 
 ## The directory SAVE_SLOT is kept in, set before the scene is ready; tests keep their own.
 var save_directory := WorldAdapter.saves_directory()
@@ -107,24 +117,26 @@ func start(from_seed: int) -> bool:
 	return true
 
 
-## Resumes the world saved in SAVE_SLOT and closes the title screen, or shows on it why the save
-## was not loaded. Returns whether it was loaded.
+## Resumes the world saved in SAVE_SLOT, with the loadout kept beside it, and closes the title
+## screen, or shows on it why the save was not loaded. Returns whether it was loaded.
 func resume_saved() -> bool:
 	var loaded := WorldAdapter.load(SAVE_SLOT, save_directory)
 	if loaded == null:
 		_hud.title_screen.refuse(WorldAdapter.load_refusal(SAVE_SLOT, save_directory))
 		return false
+	_hud.loadout.read(save_directory.path_join(LOADOUT_FILE))
 	_play(loaded)
 	return true
 
 
-## Saves the world in SAVE_SLOT, unless no body carries the player's soul, since a world loaded
-## then would have no person to steer. Returns whether it was written.
+## Saves the world in SAVE_SLOT, and the loadout beside it, unless no body carries the player's
+## soul, since a world loaded then would have no person to steer. Returns whether both were
+## written.
 func save() -> bool:
 	if world.player_army() < 0:
 		return false
 	_unsaved_days = 0
-	return world.save(SAVE_SLOT, save_directory)
+	return world.save(SAVE_SLOT, save_directory) and _hud.loadout.write(save_directory.path_join(LOADOUT_FILE))
 
 
 # Plays `made`, steering the person carrying the player's soul, and closes the title screen.
@@ -165,7 +177,7 @@ func navigate(event: InputEvent) -> bool:
 	var open: Control = _hud.screen()
 	if open == null:
 		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
-				or _hud.sect.visible or _aiming != KEY_NONE:
+				or _hud.sect.visible or _hud.arts.visible or _aiming != KEY_NONE:
 			return false
 		pause()
 		return true
@@ -232,6 +244,7 @@ func controls() -> Array[Dictionary]:
 		{"keys": [OS.get_keycode_string(CHALLENGE_KEY)], "does": "CONTROLS_CHALLENGE"},
 		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
+		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
 		{"keys": [OS.get_keycode_string(_hud.LOCALE_KEY)], "does": "CONTROLS_LANGUAGE"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
@@ -286,6 +299,8 @@ func command(event: InputEvent) -> bool:
 		return genealogy(key.keycode)
 	elif key != null and key.pressed and (key.keycode == SECT_KEY or _hud.sect.visible):
 		return sects(key.keycode)
+	elif key != null and key.pressed and (key.keycode == ARTS_KEY or _hud.arts.visible):
+		return arts(key.keycode)
 	elif key != null and key.pressed and key.keycode == CHALLENGE_KEY:
 		return challenge() == WorldAdapter.CHALLENGE_NONE
 	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
@@ -340,20 +355,25 @@ func aiming() -> Key:
 	return _aiming
 
 
-## Has the steered person cast skill `skill` at `at`, a position in this node's pixels, as cast()
-## does. Returns its verdict.
-func cast_at(skill: int, at: Vector2) -> int:
+## Has the steered person cast the skill on the loadout's slot `slot` at `at`, a position in this
+## node's pixels, as cast() does. Returns its verdict, CAST_NO_SKILL for an empty slot.
+func cast_at(slot: int, at: Vector2) -> int:
+	var skill: int = _hud.loadout.skill(world, slot)
+	if skill < 0:
+		_hud.show_cast(WorldAdapter.CAST_NO_SKILL)
+		return WorldAdapter.CAST_NO_SKILL
 	return cast(skill, at / PIXELS_PER_CELL * WorldAdapter.CELL_SIZE)
 
 
 # Shows the aimed skill's range round the person and its area at the cursor while a cast key is held
 # to aim, and hides it otherwise.
 func _show_aim() -> void:
-	var skill := CAST_KEYS.find(_aiming)
-	var skills := world.skills(steered)
-	if skill < 0 or skill >= skills.size():
+	var roster := world.roster(steered)
+	var skill: int = _hud.loadout.skill(world, CAST_KEYS.find(_aiming)) if _aiming != KEY_NONE else -1
+	if skill < 0 or roster.is_empty():
 		_aim.visible = false
 		return
+	var skills := world.person_skills(roster[0])
 	var reach: float = skills[skill]["range"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	var radius: float = skills[skill]["radius"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	_aim.show_aim(_to_pixels(lead()), reach, _cursor, radius)
@@ -379,13 +399,18 @@ func _steer(way: Vector2i) -> bool:
 
 ## Works the HUD's touch controls with `event`, a touch or a drag, while they are shown and a world
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
-## casts as cast_skill() does, the HUD's buttons open the genealogy or sect panel, challenge or
+## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel, challenge or
 ## pause, and where the settings ask, a tap on the ground orders the person to that cell. While the
-## genealogy or sect panel is open, a tap closes it. Returns whether the touch controls took the
-## event.
+## genealogy or sect panel is open, a tap closes it; while the arts panel is, a tap on a tile
+## chooses its skill, a skill button tapped then puts it on that button's slot, a finger moved up or
+## down scrolls the tiles and the close button closes it. Returns whether the touch controls took
+## the event.
 func touch(event: InputEvent) -> bool:
 	if world == null or not _hud.touch.visible or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
 		return false
+	if _hud.arts.visible:
+		_place(_hud.touch.take(event))
+		return true
 	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible else null)
 	if panel != null:
 		var pressed := event as InputEventScreenTouch
@@ -412,6 +437,8 @@ func touch(event: InputEvent) -> bool:
 					sects(SECT_KEY)
 				"challenge":
 					challenge()
+				"arts":
+					arts(ARTS_KEY)
 				"pause":
 					pause()
 		"world":
@@ -422,32 +449,33 @@ func touch(event: InputEvent) -> bool:
 	return true
 
 
-## Has the steered person cast its skill `slot`, as the touch controls ask: `how` "tap" casts at the
-## hostile person the core's aim finds the way the person faces, or with none, at the point that way
-## at the skill's range; "point" at the point `aim`, a share of the skill's range each way, from the
-## person; and "self" at the person itself. The core brings a point past the range within it. When
-## the core refuses, the HUD names its reason. Returns the core's verdict, one of the
-## WorldAdapter.CAST_* constants, of which CAST_NONE means the cast was made; or -1 while the person
-## has no body.
+## Has the steered person cast the skill on the loadout's slot `slot`, as the touch controls ask:
+## `how` "tap" casts at the hostile person the core's aim finds the way the person faces, or with
+## none, at the point that way at the skill's range; "point" at the point `aim`, a share of the
+## skill's range each way, from the person; and "self" at the person itself. The core brings a point
+## past the range within it. When the core refuses, or the slot is empty, the HUD names the reason.
+## Returns the core's verdict, one of the WorldAdapter.CAST_* constants, of which CAST_NONE means
+## the cast was made, and CAST_NO_SKILL for an empty slot; or -1 while the person has no body.
 func cast_skill(slot: int, how: String, aim := Vector2.ZERO) -> int:
 	var roster := world.roster(steered)
 	if roster.is_empty():
 		return -1
 	var person := roster[0]
-	var reach := 0.0
-	var skills := world.skills(steered)
-	if slot < skills.size():
-		reach = float(skills[slot].range)
+	var skill: int = _hud.loadout.skill(world, slot)
+	if skill < 0:
+		_hud.show_cast(WorldAdapter.CAST_NO_SKILL)
+		return WorldAdapter.CAST_NO_SKILL
+	var reach := float(world.person_skills(person)[skill].range)
 	var at := world.person_position(person)
 	var target: Variant = null
 	match how:
 		"tap":
 			# The core reads a facing in whole sub-cell units, so it is given a cell long.
-			var aimed := world.aim(person, slot, (facing.normalized() * WorldAdapter.CELL_SIZE).round())
+			var aimed := world.aim(person, skill, (facing.normalized() * WorldAdapter.CELL_SIZE).round())
 			target = aimed if aimed >= 0 else (at + facing.normalized() * reach).floor()
 		"point":
 			target = (at + aim * reach).floor()
-	return cast(slot, target)
+	return cast(skill, target)
 
 
 ## Has the steered person cast skill `skill` at `target`, a point in sub-cell units, a person or,
@@ -530,6 +558,63 @@ func sects(keycode: Key) -> bool:
 	return false
 
 
+## Works the arts panel with `keycode`: K opens it on the steered person or closes it, up and down
+## choose among its skills, Q to T put the skill chosen on that slot of the loadout, Delete takes it
+## off its slot, Escape closes it. While it is open no key gives an order or casts. Returns whether
+## the key did anything.
+func arts(keycode: Key) -> bool:
+	var panel: Control = _hud.arts
+	if keycode == ARTS_KEY and not panel.visible:
+		if world.roster(steered).is_empty():
+			return false
+		panel.show_arts(world, steered, _hud.loadout, _hud.touch.visible)
+		_hud.touch.placing = true
+		_hud.touch.waiting = not panel.selected.is_empty()
+		_hud.touch.queue_redraw()
+		_sound.ui("open")
+		return true
+	if keycode == ARTS_KEY or keycode == KEY_ESCAPE:
+		_close_arts()
+		return true
+	if keycode == KEY_UP or keycode == KEY_DOWN:
+		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
+	if CAST_KEYS.has(keycode) and panel.assign(CAST_KEYS.find(keycode)):
+		_hud.show_loadout(world)
+		return true
+	if keycode == CLEAR_KEY and panel.clear_selected():
+		_hud.show_loadout(world)
+		return true
+	return false
+
+
+# Closes the arts panel, and gives the touch controls back their whole layout.
+func _close_arts() -> void:
+	_hud.arts.close()
+	_hud.touch.placing = false
+	_hud.touch.waiting = false
+	_hud.touch.queue_redraw()
+
+
+# Does what the touch controls ask while the arts panel is open, `action` as their take() returns
+# it: chooses the skill on a tile tapped, puts the skill chosen on a skill button's slot, scrolls the
+# tiles, or closes the panel.
+func _place(action: Dictionary) -> void:
+	var panel: Control = _hud.arts
+	match action.get("do", ""):
+		"panel":
+			panel.tap(action.at)
+		"scroll":
+			panel.scroll(action.way)
+		"place":
+			if panel.assign(action.slot):
+				_hud.show_loadout(world)
+		"button":
+			_close_arts()
+			return
+	_hud.touch.waiting = not panel.selected.is_empty()
+	_hud.touch.queue_redraw()
+
+
 ## Has the steered person apply to the sect the sect panel shows, and shows the core's verdict on
 ## the panel. Returns the verdict, one of the WorldAdapter.APPLICATION_* constants, of which
 ## APPLICATION_NONE means it joined; or -1 while the panel shows no sect or the person has no body.
@@ -593,6 +678,7 @@ func step() -> void:
 		_show_aim()
 		_stick = Vector2i.ZERO
 		_hud.touch.release_all()
+		_close_arts()
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]
