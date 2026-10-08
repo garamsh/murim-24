@@ -139,6 +139,37 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns whether people of faction `from` attack those of `target`.
   [[nodiscard]] bool hostile(std::int64_t from, std::int64_t target) const;
 
+  /// Returns how faction `faction` stands toward faction `other`, one of the
+  /// RELATION_* constants: the one read of it, which the HUD shows.
+  [[nodiscard]] std::int64_t relation(std::int64_t faction,
+                                      std::int64_t other) const;
+
+  /// Returns the declaration standing between factions `faction` and `other`
+  /// as a Dictionary of `what`, a DECLARATION_* constant, `by`, the faction
+  /// whose leader made it, `tick`, the tick it was made on, and `year` and
+  /// `season`, its date as date() gives one; empty when none stands.
+  [[nodiscard]] godot::Dictionary declaration(std::int64_t faction,
+                                              std::int64_t other) const;
+
+  /// Returns why person `person` may not declare `what`, a DECLARATION_*
+  /// constant, toward faction `faction`, one of the DECLARE_* constants;
+  /// DECLARE_NONE when it may.
+  [[nodiscard]] std::int64_t declaration_refusal(std::int64_t person,
+                                                 std::int64_t faction,
+                                                 std::int64_t what) const;
+
+  /// Has person `person` declare `what`, a DECLARATION_* constant, toward
+  /// faction `faction`, the same order for the player's body as for an NPC.
+  /// Returns false, after push_error, when the core refuses it.
+  bool declare(std::int64_t person, std::int64_t faction, std::int64_t what);
+
+  /// Marks army `army` as steered by a driver, or as its own when `steered`
+  /// is false. create_region() and load() mark the player's.
+  void steer(std::int64_t army, bool steered);
+
+  /// Returns whether a driver steers army `army`.
+  [[nodiscard]] bool steered(std::int64_t army) const;
+
   /// Returns the living members of army `army`, as person indices, its lead
   /// first.
   [[nodiscard]] godot::PackedInt64Array roster(std::int64_t army) const;
@@ -477,6 +508,7 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] std::size_t structure_index(std::int64_t structure) const;
   [[nodiscard]] std::size_t village_index(std::int64_t village) const;
   [[nodiscard]] std::size_t faction_index(std::int64_t faction) const;
+  [[nodiscard]] static murim::Declaration declaration_of(std::int64_t what);
   [[nodiscard]] std::size_t person_index(std::int64_t person) const;
   [[nodiscard]] std::size_t sect_index(std::int64_t sect) const;
 };
