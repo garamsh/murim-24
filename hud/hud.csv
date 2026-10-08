@@ -46,6 +46,7 @@ CHALLENGE_DUEL_IN_PROGRESS,이미 결투가 벌어지고 있다.,A duel is alrea
 CAST_DEAD,쓰러진 몸으로는 기술을 쓸 수 없다.,You cannot cast while fallen.
 CAST_NO_SKILL,그 자리에 익힌 기술이 없다.,No skill is learned in that slot.
 CAST_ON_COOLDOWN,아직 기술을 다시 쓸 수 없다.,That skill is not ready yet.
+CAST_NO_QI,내공이 모자라 기술을 쓸 수 없다.,Not enough inner energy for that skill.
 CAST_NO_TARGET,겨눌 상대가 없다.,There is no one to aim at.
 CAST_OUT_OF_RANGE,상대가 기술이 닿는 거리 밖에 있다.,The target is out of the skill's range.
 GENEALOGY_TITLE,족보,Genealogy

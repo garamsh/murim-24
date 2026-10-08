@@ -66,6 +66,7 @@ const CAST_KEYS := {
 	WorldAdapter.CAST_DEAD: "CAST_DEAD",
 	WorldAdapter.CAST_NO_SKILL: "CAST_NO_SKILL",
 	WorldAdapter.CAST_ON_COOLDOWN: "CAST_ON_COOLDOWN",
+	WorldAdapter.CAST_NO_QI: "CAST_NO_QI",
 	WorldAdapter.CAST_NO_TARGET: "CAST_NO_TARGET",
 	WorldAdapter.CAST_OUT_OF_RANGE: "CAST_OUT_OF_RANGE",
 }
