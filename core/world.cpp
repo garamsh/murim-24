@@ -325,6 +325,23 @@ void fold_event(const Fold& fold, const Event& event) {
       event.what);
 }
 
+// Folds step `step` of progress into `fold`.
+template <typename Fold>
+void fold_progress(const Fold& fold, const Progress& step) {
+  fold(step.sequence);
+  fold(step.tick);
+  fold(step.what.index());
+  if (const auto* learned = std::get_if<Learned>(&step.what)) {
+    fold(learned->person);
+    fold(learned->art);
+    fold(learned->skill);
+    fold(static_cast<std::size_t>(learned->by));
+  } else {
+    fold(std::get<RealmGained>(step.what).person);
+    fold(std::get<RealmGained>(step.what).rank);
+  }
+}
+
 // Folds everything `person` holds into `fold`; `absent` stands for no soul,
 // and its qi is folded where the world's people `cultivates`.
 template <typename Fold>
@@ -1964,18 +1981,7 @@ StateHash World::hash() const {
   }
   // Folded only when held, so a world where no one learns keeps its hash.
   for (const Progress& step : progress_) {
-    fold(step.sequence);
-    fold(step.tick);
-    fold(step.what.index());
-    if (const auto* learned = std::get_if<Learned>(&step.what)) {
-      fold(learned->person);
-      fold(learned->art);
-      fold(learned->skill);
-      fold(static_cast<std::size_t>(learned->by));
-    } else {
-      fold(std::get<RealmGained>(step.what).person);
-      fold(std::get<RealmGained>(step.what).rank);
-    }
+    fold_progress(fold, step);
   }
   return StateHash{digest};
 }

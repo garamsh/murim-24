@@ -3831,26 +3831,34 @@ World climbing(std::uint32_t count) {
   return world;
 }
 
+// The realm ranks from `first` to `last`, ascending.
+std::vector<std::size_t> ranks_from(std::size_t first, std::size_t last) {
+  std::vector<std::size_t> ranks;
+  for (std::size_t rank = first; rank <= last; ++rank) {
+    ranks.push_back(rank);
+  }
+  return ranks;
+}
+
 TEST(World, ProgressKeepsTheLatestStepsApartFromTheEvents) {
   constexpr std::uint32_t CLIMBED = PROGRESS_CAPACITY + 8;
   const World world = climbing(CLIMBED);
   ASSERT_EQ(world.rank(READER), CLIMBED);
   // The latest PROGRESS_CAPACITY realms, numbered on from the first, and no
   // event recorded for any of them.
-  std::vector<std::size_t> latest;
-  for (std::size_t rank = CLIMBED - PROGRESS_CAPACITY + 1; rank <= CLIMBED;
-       ++rank) {
-    latest.push_back(rank);
-  }
-  EXPECT_EQ(recorded_realms(world, READER), latest);
+  EXPECT_EQ(recorded_realms(world, READER),
+            ranks_from(CLIMBED - PROGRESS_CAPACITY + 1, CLIMBED));
   EXPECT_EQ(world.progress().front().sequence, CLIMBED - PROGRESS_CAPACITY);
   EXPECT_TRUE(world.events().empty());
-  // Control: one realm short of the capacity keeps every one.
+}
+
+TEST(World, ProgressShortOfItsCapacityKeepsEveryStep) {
+  // Control for the latest kept: one realm short of the capacity keeps every
+  // one.
   constexpr std::uint32_t FEWER = PROGRESS_CAPACITY - 1;
-  const World short_of = climbing(FEWER);
-  ASSERT_EQ(short_of.rank(READER), FEWER);
-  EXPECT_EQ(recorded_realms(short_of, READER).size(), FEWER);
-  EXPECT_EQ(recorded_realms(short_of, READER).front(), 1U);
+  const World world = climbing(FEWER);
+  ASSERT_EQ(world.rank(READER), FEWER);
+  EXPECT_EQ(recorded_realms(world, READER), ranks_from(1, FEWER));
 }
 
 TEST(World, KnownSkillsAndQiArePartOfTheHash) {
