@@ -16,7 +16,12 @@
 # rebirth screen opens on it and the soul's new body, holding the ticks until Enter goes on.
 # The pause panel's Save writes the world, and back on the title Continue resumes it, steering the
 # same person, while with no save Continue cannot be taken and with a broken one the title names
-# why; the world is saved again every AUTOSAVE_DAYS days.
+# why; the world is saved again every AUTOSAVE_DAYS days. With the touch controls shown, the
+# joystick walks the person the way it is pushed and stops it when let go; a skill button tapped
+# casts at the hostile person the core aims at the way the person faces, dragged casts at the point
+# it aims, dropped on the cancel zone casts nothing, and held casts on the person itself, while a
+# tap the core refuses for its cooldown shows why; the screens take taps, and the HUD's buttons
+# open the pause panel and the genealogy panel.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -47,6 +52,13 @@ const GROWN_SEED := 3
 const GROWN_TICKS_PER_DAY := 5
 const GROWN_TICKS := 9000
 const TestSaves := preload("res://extension/test_saves.gd")
+# Ticks a hostile army marched on the person has to come within its first skill's range, and ticks
+# the person has to be ready to cast again.
+const APPROACH_LIMIT := 4000
+const READY_LIMIT := 120
+# Ticks after the joystick is let go, and the four ways it is pushed to find one passable.
+const STOP_TICKS := 60
+const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
 
 
 func run() -> bool:
@@ -76,7 +88,243 @@ func run() -> bool:
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
 			and _move_pass() and _cast_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
-			and _autosave_pass()
+			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass()
+
+
+# With the touch controls shown, a thumb on the joystick pushed a way passable for STRIDE cells
+# walks the person there, further its way than across it, and let go, stops it. Control: the same
+# scene with the touch controls shown and no touch, ticked as long, leaves the person in place.
+# Setup: the touch controls are shown in both.
+func _stick_pass() -> bool:
+	var scene := _scene(0)
+	var control := _scene(0)
+	scene.get_node("Hud").use_touch(true)
+	control.get_node("Hud").use_touch(true)
+	var touch: Control = scene.get_node("Hud").touch
+	var shown: bool = touch.visible and control.get_node("Hud").touch.visible
+	var way := _clear_way(scene)
+	if way == Vector2i.ZERO:
+		print("play_test: no way is passable for %d cells: FAIL" % scene.STRIDE)
+		return false
+	var direction := Vector2(way)
+	var from: Vector2 = scene.lead()
+	var control_from: Vector2 = control.lead()
+	var thumb: Vector2 = touch.STICK
+	var took: bool = scene.touch(_finger(0, thumb, true)) and scene.touch(_slide(0, thumb + direction * touch.STICK_RADIUS))
+	for i in WALK_TICKS:
+		scene.step()
+		control.step()
+	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE
+	var along := walked.dot(direction)
+	var across := absf(walked.dot(Vector2(direction.y, direction.x)))
+	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
+	var stopped_at: Vector2 = scene.lead()
+	var released: bool = scene.touch(_finger(0, thumb + direction * touch.STICK_RADIUS, false))
+	for i in STOP_TICKS:
+		scene.step()
+	var after_stop: float = (scene.lead() - stopped_at).length() / WorldAdapter.CELL_SIZE
+	var passed := shown and took and along >= 1.0 and along > across and stood < 0.5 and released and after_stop < 1.0
+	print("play_test: touch shown %s; the joystick pushed %s taken %s, walked %.2f cells its way and %.2f across in %d ticks; let go %s, then moved %.2f cells in %d; control with no touch moved %.2f cells: %s" % [
+		shown, way, took, along, across, WALK_TICKS, released, after_stop, STOP_TICKS, stood,
+		"pass" if passed else "FAIL"])
+	scene.free()
+	control.free()
+	return passed
+
+
+# With the touch controls shown and a hostile person marched within the first skill's range: the
+# joystick pushed toward it faces the person that way, and the first skill's button tapped casts
+# at the person the core aims at that way. Once the person may cast again, the button dragged off
+# its pad onto the cancel zone casts nothing, while the same drag let go short of it casts at the
+# point it aims, the skill's range that way. The second skill's button held for a long press casts
+# on the person itself, while held a little less it casts as a tap, at a point. Once the cast has
+# struck, a tap the core refuses for its cooldown shows that reason. Control: the taps before it
+# were accepted and showed none. Setup: a hostile person stands within range and the person is
+# ready before each cast.
+func _touch_cast_pass() -> bool:
+	var scene := _scene(0)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	hud.use_touch(true)
+	var world: WorldAdapter = scene.world
+	var touch: Control = hud.touch
+	var now := [0]
+	touch.clock = func() -> int: return now[0]
+	var person: int = world.roster(scene.steered)[0]
+	var here := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	var foes := _nearest_hostile(world, scene.steered)
+	world.order(foes, here, PackedInt64Array([0]))
+	var waited := 0
+	while world.aim(person, 0, Vector2.ZERO) < 0 and waited < APPROACH_LIMIT:
+		scene.step()
+		waited += 1
+	var foe := world.aim(person, 0, Vector2.ZERO)
+	var in_range := foe >= 0 and _ready_to_cast(scene, person, 0, foe)
+	if not in_range:
+		print("play_test: no hostile person came within range in %d ticks: FAIL" % APPROACH_LIMIT)
+		scene.free()
+		return false
+	var main: Vector2 = touch.SKILLS[0].at
+	var toward := (world.person_position(foe) - world.person_position(person)).normalized()
+	scene.touch(_finger(0, touch.STICK, true))
+	scene.touch(_slide(0, touch.STICK + toward * touch.STICK_RADIUS))
+	scene.touch(_finger(0, touch.STICK + toward * touch.STICK_RADIUS, false))
+	hud.labels.notice.visible = false
+	scene.last_cast = {}
+	_tap(scene, 0, main, true)
+	var aimed := world.aim(person, 0, (scene.facing.normalized() * WorldAdapter.CELL_SIZE).round())
+	var tap_cast: Dictionary = scene.last_cast
+	var tap_right: bool = aimed >= 0 and tap_cast == {"skill": 0, "target": aimed} \
+			and world.hostile(world.army_faction(scene.steered), world.person_faction(aimed)) \
+			and not hud.labels.notice.visible
+	scene.step()
+
+	var ready_again := _ready_to_cast(scene, person, 0, Vector2.ZERO)
+	var reach := float(world.skills(scene.steered)[0].range)
+	scene.last_cast = {}
+	scene.touch(_finger(1, main, true))
+	scene.touch(_slide(1, main + Vector2(touch.SLOP + 4, 0)))
+	scene.touch(_slide(1, touch.CANCEL.at))
+	scene.touch(_finger(1, touch.CANCEL.at, false))
+	var cancelled: Dictionary = scene.last_cast
+	var at: Vector2 = world.person_position(person)
+	scene.touch(_finger(1, main, true))
+	scene.touch(_slide(1, main + Vector2(touch.PAD, 0)))
+	scene.touch(_finger(1, main + Vector2(touch.PAD, 0), false))
+	var dragged: Dictionary = scene.last_cast
+	var drag_right: bool = ready_again and cancelled.is_empty() \
+			and dragged == {"skill": 0, "target": (at + Vector2(reach, 0)).floor()}
+
+	var second: Vector2 = touch.SKILLS[1].at
+	scene.touch(_finger(2, second, true))
+	now[0] += touch.LONG_PRESS_MS - 100
+	scene.touch(_finger(2, second, false))
+	var short: Dictionary = scene.last_cast
+	scene.touch(_finger(2, second, true))
+	now[0] += touch.LONG_PRESS_MS
+	scene.touch(_finger(2, second, false))
+	var held: Dictionary = scene.last_cast
+	var self_right: bool = short.get("skill", -1) == 1 and short.target is Vector2 \
+			and held == {"skill": 1, "target": null} and not hud.labels.notice.visible
+	scene.step()
+
+	scene.last_cast = {}
+	_tap(scene, 0, main, false)
+	var refusal := world.cast_refusal(person, 0, aimed)
+	var refused: bool = refusal == WorldAdapter.CAST_ON_COOLDOWN and scene.last_cast.is_empty() \
+			and hud.labels.notice.visible and hud.labels.notice.text == "CAST_ON_COOLDOWN"
+	var passed := tap_right and drag_right and self_right and refused
+	print("play_test: hostile army %d marched %d ticks, foe %d in range; a tap facing %s cast %s at the aimed %d %s; dragged onto the cancel zone cast %s, short of it %s %s; held %d ms %s, %d ms %s %s; a tap on cooldown refused %d, the notice %s shown %s: %s" % [
+		foes, waited, foe, scene.facing, tap_cast, aimed, tap_right, cancelled, dragged, drag_right,
+		touch.LONG_PRESS_MS - 100, short, touch.LONG_PRESS_MS, held, self_right, refusal, hud.labels.notice.text,
+		refused, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# The title's new game tapped opens the new-game panel, where the random slip tapped draws a seed
+# into the field and start tapped starts the world from it. With the touch controls shown, the
+# pause button tapped pauses the world and resume tapped on the panel goes on; the genealogy
+# button tapped opens that panel on the person, and a tap closes it. Control: with the touch
+# controls hidden, a tap on the pause button's place pauses nothing.
+func _taps_pass() -> bool:
+	var scene := _title()
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var title: Control = hud.title_screen
+	var menu: Vector2 = title.MENU.position + title.MENU_INSET
+	scene.navigate(_finger(0, menu + Vector2(20, 5), true))
+	var new_game_open: bool = hud.screen() == hud.new_game
+	scene.navigate(_finger(0, hud.new_game._random_slip().get_center(), true))
+	var typed: String = hud.new_game.typed
+	scene.navigate(_finger(0, hud.new_game._start_slip().get_center(), true))
+	var started: bool = scene.world != null and typed != "" and scene.world_seed == int(typed) \
+			and hud.screen() == null
+	var pause_at: Vector2 = hud.touch.PAUSE.get_center()
+	var hidden_ignored: bool = not scene.touch(_finger(0, pause_at, true)) and hud.screen() == null
+	hud.use_touch(true)
+	scene.touch(_finger(0, pause_at, true))
+	scene.touch(_finger(0, pause_at, false))
+	var paused: bool = hud.screen() == hud.pause
+	var pause_menu := Vector2(hud.pause.DIALOG.position.x + 10, hud.pause.DIALOG.position.y + 32)
+	scene.navigate(_finger(0, pause_menu + Vector2(20, 5), true))
+	var resumed: bool = hud.screen() == null
+	scene.touch(_finger(0, hud.touch.BUTTONS.genealogy.get_center(), true))
+	scene.touch(_finger(0, hud.touch.BUTTONS.genealogy.get_center(), false))
+	var family_open: bool = hud.genealogy.visible and hud.genealogy.centre == scene.world.roster(scene.steered)[0]
+	scene.touch(_finger(0, Vector2(240, 135), true))
+	scene.touch(_finger(0, Vector2(240, 135), false))
+	var family_closed: bool = not hud.genealogy.visible
+	var passed := new_game_open and started and hidden_ignored and paused and resumed and family_open and family_closed
+	print("play_test: new game tapped %s; random tapped drew %s, start tapped started it %s; the pause button with the touch controls hidden ignored %s, shown paused %s, resume tapped %s; the genealogy button opened the panel %s, a tap closed it %s: %s" % [
+		new_game_open, typed, started, hidden_ignored, paused, resumed, family_open, family_closed,
+		"pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# A way of WAYS passable for STRIDE cells from where the scene's person stands, or none.
+func _clear_way(scene: Node2D) -> Vector2i:
+	var rows: PackedStringArray = scene.world.map_rows()
+	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	for way: Vector2i in WAYS:
+		var clear := true
+		for stride in range(1, scene.STRIDE + 1):
+			var cell := home + way * stride
+			clear = clear and cell.y >= 0 and cell.y < rows.size() and cell.x >= 0 \
+					and cell.x < rows[cell.y].length() and rows[cell.y][cell.x] == "."
+		if clear:
+			return way
+	return Vector2i.ZERO
+
+
+# The army nearest army `army` whose faction its own is hostile to.
+func _nearest_hostile(world: WorldAdapter, army: int) -> int:
+	var here: Vector2 = world.body_positions(army)[0]
+	var nearest := -1
+	var best := INF
+	for other in world.army_count():
+		if other == army or world.roster(other).is_empty() \
+				or not world.hostile(world.army_faction(army), world.army_faction(other)):
+			continue
+		var distance := world.body_positions(other)[0].distance_to(here)
+		if distance < best:
+			best = distance
+			nearest = other
+	return nearest
+
+
+# Ticks the scene until `person` may cast skill `skill` at `target`, for READY_LIMIT ticks at most.
+# Returns whether it may.
+func _ready_to_cast(scene: Node2D, person: int, skill: int, target: Variant) -> bool:
+	for i in READY_LIMIT:
+		if scene.world.cast_refusal(person, skill, target) == WorldAdapter.CAST_NONE:
+			return true
+		scene.step()
+	return scene.world.cast_refusal(person, skill, target) == WorldAdapter.CAST_NONE
+
+
+# A tap on the skill button at `at`; when `wait` is set, the scene is first ticked until the
+# person may cast its first skill at whom its aim finds.
+func _tap(scene: Node2D, slot: int, at: Vector2, wait: bool) -> void:
+	if wait:
+		var person: int = scene.world.roster(scene.steered)[0]
+		_ready_to_cast(scene, person, slot, scene.world.aim(person, slot, Vector2.ZERO))
+	scene.touch(_finger(9, at, true))
+	scene.touch(_finger(9, at, false))
+
+
+func _finger(index: int, at: Vector2, pressed: bool) -> InputEventScreenTouch:
+	var event := InputEventScreenTouch.new()
+	event.index = index
+	event.position = at
+	event.pressed = pressed
+	return event
+
+
+func _slide(index: int, at: Vector2) -> InputEventScreenDrag:
+	var event := InputEventScreenDrag.new()
+	event.index = index
+	event.position = at
+	return event
 
 
 # The right button pressed on a passable cell orders the person toward it, and it walks closer.

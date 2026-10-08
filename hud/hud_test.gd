@@ -27,7 +27,7 @@ const SHOWN := {
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
 # and of the rumours' and arts' words, which _rumours_pass and _attainment_pass measure.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_"]
 const Attainment := preload("res://hud/attainment.gd")
 # Attainment is measured at three digits: a talent limit stays under 1,000.
 const WIDEST_ATTAINMENT := 999
@@ -161,8 +161,8 @@ func _names_pass() -> bool:
 	return passed
 
 
-# In each locale, every text a label can show, measured in the HUD's font, fits the room its panel
-# gives it: within the label where the label has a width of its own, clear of the label after it
+# In each locale and in both layouts, the keyboard's and the touch controls', every text a label
+# the layout shows can show, measured in the HUD's font, fits the room its panel gives it: within the label where the label has a width of its own, clear of the label after it
 # on its line, and clear of its panel's right edge. Every surname crossed with every given name in
 # names(), as the leader and duel panels show it, fits each of their name labels or is cut short
 # with an ellipsis, and in Korean fits whole. Setup: every key in hud.csv outside the panels' and
@@ -176,12 +176,19 @@ func _fit_pass() -> bool:
 	var overruns: Array[String] = []
 	var spans := 0
 	var names := 0
-	for locale: String in locales:
+	for case in locales.size() * 2:
+		var locale: String = locales[case % locales.size()]
+		var touch_layout: bool = case >= locales.size()
+		hud.use_touch(touch_layout)
 		TranslationServer.set_locale(locale)
 		var widest := {}
 		var texts := {}
 		for name: String in hud.labels:
 			var label: Label = hud.labels[name]
+			# The notice is hidden until it has something to say; any other label hidden is not
+			# in this layout.
+			if not label.visible and name != "notice":
+				continue
 			var shown := _texts(hud, name, label, measured)
 			if shown.is_empty():
 				continue
@@ -222,7 +229,8 @@ func _fit_pass() -> bool:
 				spans += 1
 				var limit: float = line_spans[i + 1][0] if i + 1 < line_spans.size() else edge
 				if line_spans[i][1] > limit or line_spans[i][1] <= line_spans[i][0]:
-					overruns.append("%s %s ends at %d past %d" % [locale, line_spans[i][2], line_spans[i][1], limit])
+					overruns.append("%s%s %s ends at %d past %d" % [locale, " touch" if touch_layout else "",
+							line_spans[i][2], line_spans[i][1], limit])
 		for name in _every_name(world):
 			var text := PersonName.shown(name, true)
 			names += 1
@@ -232,6 +240,7 @@ func _fit_pass() -> bool:
 				if not _within(label, text) or (locale == "ko" and whole > label.size.x):
 					overruns.append("%s %s is %d px in the %d px %s" % [locale, text, whole, label.size.x, key])
 	TranslationServer.set_locale(locales[0])
+	hud.use_touch(false)
 	hud.free()
 	var unmeasured: Array[String] = []
 	var csv := FileAccess.open("res://hud/hud.csv", FileAccess.READ)
@@ -242,7 +251,7 @@ func _fit_pass() -> bool:
 				and not measured.has(key):
 			unmeasured.append(key)
 	var passed := unmeasured.is_empty() and overruns.is_empty() and names > 0
-	print("hud_test: %d keys measured on %d label spans and %d names across %s; unmeasured %s; overruns %s: %s" % [
+	print("hud_test: %d keys measured on %d label spans and %d names across %s in both layouts; unmeasured %s; overruns %s: %s" % [
 		measured.size(), spans, names, locales, unmeasured, overruns, "pass" if passed else "FAIL"])
 	return passed
 
@@ -332,7 +341,8 @@ func _measure_pass() -> bool:
 # says none has come. In each locale, every rumour about villages, sects and leads, with every
 # faction and sect name, fits its line whole; one naming a person fits whole in Korean, and in
 # English is cut short with an ellipsis past its line, for every surname crossed with every given
-# name. Setup: every RUMOUR_ key is measured.
+# name. In the touch layout, whose lines are the mockup's 156 pixels, every rumour is whole or cut
+# short with an ellipsis. Setup: every RUMOUR_ key is measured.
 func _rumours_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
 	var steered := world.army_count() - 1
@@ -364,7 +374,11 @@ func _rumours_pass() -> bool:
 	var cut := 0
 	var checks := 0
 	var factions := world.faction_names()
-	for locale: String in hud.LOCALES:
+	var touch_cut := 0
+	for case in hud.LOCALES.size() * 2:
+		var locale: String = hud.LOCALES[case % hud.LOCALES.size()]
+		var touch_layout: bool = case >= hud.LOCALES.size()
+		hud.use_touch(touch_layout)
 		TranslationServer.set_locale(locale)
 		var texts: Array[String] = []
 		for owner in factions.size():
@@ -378,7 +392,9 @@ func _rumours_pass() -> bool:
 					[hud.tr("SECT_" + world.sect_name(sect).to_upper().replace(" ", "_"))]))
 		for text in texts:
 			checks += 1
-			if _width(label, text) > label.size.x:
+			if touch_layout:
+				touch_cut += 0 if _width(label, text) <= label.size.x else 1
+			if not _within(label, text) or (_width(label, text) > label.size.x and not touch_layout):
 				overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
 		for name in _every_name(world):
 			var person := PersonName.shown(name, true)
@@ -388,16 +404,20 @@ func _rumours_pass() -> bool:
 					var text := _said(hud, measured, key, args)
 					checks += 1
 					var whole := _width(label, text) <= label.size.x
-					cut += 0 if whole else 1
-					if not _within(label, text) or (locale == "ko" and not whole):
+					if touch_layout:
+						touch_cut += 0 if whole else 1
+					else:
+						cut += 0 if whole else 1
+					if not _within(label, text) or (locale == "ko" and not whole and not touch_layout):
 						overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
 	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.use_touch(false)
 	hud.free()
 	var unmeasured := ["RUMOUR_FOUNDED", "RUMOUR_RAIDED", "RUMOUR_RUINED", "RUMOUR_SECT_FELL", "RUMOUR_ELECTED",
 			"RUMOUR_DUEL", "RUMOUR_BORN", "RUMOUR_DIED"].filter(func(key: String) -> bool: return not measured.has(key))
 	var passed := none_right and live_right and unmeasured.is_empty() and overruns.is_empty()
-	print("hud_test: a new region shows \"%s\" %s; after %d years %d rumours reach the player, the log showing %s against %s, newest first %s, births and deaths named %s; %d rumours measured, %d cut short in English; unmeasured %s; overruns %s: %s" % [
-		none_shown, none_right, RUMOUR_YEARS, heard.size(), shown, expected, newest_first, named, checks, cut,
+	print("hud_test: a new region shows \"%s\" %s; after %d years %d rumours reach the player, the log showing %s against %s, newest first %s, births and deaths named %s; %d rumours measured in both layouts, %d cut short in English and %d in the touch layout's two lines; unmeasured %s; overruns %s: %s" % [
+		none_shown, none_right, RUMOUR_YEARS, heard.size(), shown, expected, newest_first, named, checks, cut, touch_cut,
 		unmeasured, overruns.slice(0, 3), "pass" if passed else "FAIL"])
 	return passed
 

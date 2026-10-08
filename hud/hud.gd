@@ -6,7 +6,9 @@
 ## fought, and the verdict on a challenge, why a cast was refused, or whether an autosave was
 ## written; a map of the region
 ## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
-## player; and the technique bar, an icon and its number key for each of the player's skills.
+## player; and the technique bar, an icon and its number key for each of the player's skills. On a
+## touch screen, or where the settings force it, the touch controls stand in for the technique bar
+## and the keys, and the panels move as art/mockup/mobile_hud_idle.png lays them out.
 ## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
 ## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
 extends CanvasLayer
@@ -42,6 +44,13 @@ const KIND_COLOURS := {
 const MAP_SIZE := Vector2i(76, 44)
 # How long a notice about a challenge stays on screen.
 const NOTICE_MS := 3000
+# Where the panels the touch layout moves stand, in the keyboard layout and in the touch layout,
+# as art/mockup/touch.lua places them.
+const MAP_AT := {false: Vector2(392, 4), true: Vector2(346, 4)}
+const RUMOUR_RECT := {false: Rect2(4, 184, 220, 52), true: Rect2(176, 4, 166, 42)}
+const RUMOUR_WIDTH := {false: 209, true: 156}
+const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
+const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
 # The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
 const CHALLENGE_KEYS := {
 	WorldAdapter.CHALLENGE_NONE: "CHALLENGE_NONE",
@@ -80,6 +89,10 @@ var duel_panel: Panel
 var duel_bars := {}
 ## The icon in each technique slot, in key order.
 var slot_icons: Array[TextureRect] = []
+## The touch controls, shown in place of the technique bar while the touch layout is on.
+var touch: Control
+## How many of the rumour log's lines the layout shows.
+var rumour_lines := RUMOUR_LINES
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
@@ -97,6 +110,11 @@ var _duel := {}
 var _notice_until := 0
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
+var _map_panel: Panel
+var _rumour_panel: Panel
+# The steered body's ready tick when it last moved, and the ticks it then had to wait.
+var _ready_at := -1
+var _cool_span := 1
 
 
 func _ready() -> void:
@@ -179,6 +197,12 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 			slot_icons[slot].texture = icon
 	_skill_bar.size.x = shown * 22 + 6
 	_skill_bar.position.x = 240 - _skill_bar.size.x / 2.0
+	var reach: Array[Dictionary] = []
+	var pixels := 16.0 / WorldAdapter.CELL_SIZE
+	for skill: Dictionary in skills:
+		reach.append({"icon": "burst" if int(skill.radius) > 0 else "strike",
+				"range": int(skill.range) * pixels, "radius": int(skill.radius) * pixels})
+	touch.show_skills(reach)
 
 
 ## Draws `world`'s region on the map as it stands: its terrain, the territory the core derives
@@ -215,6 +239,56 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = JADE if skills.has(slot) else INK
+	if touch.visible:
+		_refresh_cooling(world, steered)
+
+
+# Shows on the touch controls how long the steered body has left before it may strike again, as
+# the core's ready tick and tick count give it: the share of its wait still to run, and the whole
+# seconds left.
+func _refresh_cooling(world: WorldAdapter, steered: int) -> void:
+	var ready := world.body_ready(steered)
+	if ready.is_empty():
+		touch.cooling = 0.0
+		touch.queue_redraw()
+		return
+	# A body may cast again once its ready tick is no later than the next tick.
+	var left := maxi(int(ready[0]) - world.tick_count() - 1, 0)
+	if ready[0] != _ready_at:
+		_ready_at = ready[0]
+		_cool_span = maxi(left, 1)
+	var cooling := float(left) / _cool_span
+	var seconds := ceili(float(left) / WorldAdapter.TICKS_PER_SECOND)
+	if cooling != touch.cooling or seconds != touch.cooling_seconds:
+		touch.cooling = cooling
+		touch.cooling_seconds = seconds
+		touch.queue_redraw()
+
+
+## Lays the HUD out for touch when `on`, as art/mockup/mobile_hud_idle.png lays it out: the touch
+## controls shown in place of the technique bar, the rumour log of two lines beside the status
+## panel, the map left of the pause button, and no word naming a key; and for the keyboard when
+## not. A mouse then stands in for a finger where the screen takes no touch, so the touch layout
+## can be tried at a desk.
+func use_touch(on: bool) -> void:
+	_set_up()
+	touch.visible = on
+	if not on:
+		touch.release_all()
+	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
+	_skill_bar.visible = not on
+	labels.locale.visible = not on
+	labels.challenge_key.visible = not on
+	_map_panel.position = MAP_AT[on]
+	_rumour_panel.position = RUMOUR_RECT[on].position
+	_rumour_panel.size = RUMOUR_RECT[on].size
+	rumour_lines = 2 if on else RUMOUR_LINES
+	for line in RUMOUR_LINES:
+		var label: Label = labels["rumour_%d" % line]
+		label.size.x = RUMOUR_WIDTH[on]
+		label.visible = line < rumour_lines
+	duel_panel.position = DUEL_AT[on]
+	labels.notice.position = NOTICE_AT[on]
 
 
 ## Shows the latest RUMOUR_LINES rumours that reach `person`, newest first, or that none has come.
@@ -346,7 +420,8 @@ func _build() -> void:
 	qi_bar.value = 0.0
 	labels.qi_value.text = "—"
 
-	var map := _panel(Rect2(392, 4, 84, 62))
+	var map := _panel(Rect2(MAP_AT[false], Vector2(84, 62)))
+	_map_panel = map
 	_map.position = Vector2(4, 4)
 	_map.size = Vector2(MAP_SIZE)
 	_map.stretch_mode = TextureRect.STRETCH_SCALE
@@ -358,10 +433,11 @@ func _build() -> void:
 	labels.season = _trimmed(map, Vector2(5, 48), 74)
 
 	# Above the technique bar's row, so the widest bar never meets it.
-	var rumour := _panel(Rect2(4, 184, 220, 52))
+	var rumour := _panel(RUMOUR_RECT[false])
+	_rumour_panel = rumour
 	labels.rumour = _label(rumour, "HUD_RUMOR", Vector2(5, 2), GOLD_LIGHT)
 	for line in RUMOUR_LINES:
-		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), 209)
+		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), RUMOUR_WIDTH[false])
 	labels.rumour_0.text = tr("HUD_RUMOR_NONE")
 
 	_skill_bar = _panel(Rect2(0, 240, 0, 26))
@@ -408,7 +484,7 @@ func _build() -> void:
 	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
 	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
 
-	duel_panel = _panel(Rect2(176, 4, 128, 44))
+	duel_panel = _panel(Rect2(DUEL_AT[false], Vector2(128, 44)))
 	duel_panel.visible = false
 	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), HP)
 	labels.duel_challenger = _trimmed(duel_panel, Vector2(5, 15), 52)
@@ -420,12 +496,17 @@ func _build() -> void:
 	duel_bars.challenger.size.x = 62
 	duel_bars.leader.size.x = 62
 
-	labels.notice = _label(self, "", Vector2(90, 92), PAPER)
+	labels.notice = _label(self, "", NOTICE_AT[false], PAPER)
 	labels.notice.size = Vector2(300, 12)
 	labels.notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
 	labels.notice.add_theme_constant_override("outline_size", 3)
 	labels.notice.visible = false
+	# The touch controls, hidden until the touch layout is on, under the panels and screens.
+	touch = preload("res://hud/touch.gd").new()
+	touch.use_font(_theme.default_font)
+	touch.visible = false
+	add_child(touch)
 	add_child(genealogy)
 	add_child(sect)
 	# The screens, closed until the play scene opens one, over every panel and each over the last.
@@ -440,6 +521,7 @@ func _build() -> void:
 		screen_panel.use_font(_theme.default_font)
 		screen_panel.visible = false
 		add_child(screen_panel)
+	settings.applied.connect(func() -> void: use_touch(settings.touch_shown()))
 
 func _panel(rect: Rect2) -> Panel:
 	var panel := Panel.new()

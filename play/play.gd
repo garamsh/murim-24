@@ -11,6 +11,13 @@
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
 ## screen sums up the life just ended. Escape pauses the world under the pause panel, which saves
 ## it and whose guide shows the controls as bound here; it is also saved every AUTOSAVE_DAYS days.
+## On a touch screen, or where the settings force it, the HUD's touch controls steer it instead:
+## the joystick orders it the way it points, a skill button tapped casts that skill at the hostile
+## person the core's aim finds the way the person faces, or toward that way at the skill's range,
+## dragged casts at the point it aims, dropped on the cancel zone casts nothing and held casts on
+## the person itself, the HUD naming the core's reason when it refuses; the HUD's buttons open the
+## genealogy and sect panels, challenge and pause, the screens take taps, and where the settings
+## ask, a tap on the ground orders the person there.
 ## The camera follows the person. It ticks at the core's tick rate times the speed the settings
 ## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
 ## sounds it through sound.tscn, and holds no game rule.
@@ -22,6 +29,9 @@ const PIXELS_PER_CELL := 16.0
 const MAX_TICKS_PER_FRAME := 4
 ## The button that orders the person toward the cell under the cursor, and keeps doing so while held.
 const MOVE_BUTTON := MOUSE_BUTTON_RIGHT
+## How many cells ahead the joystick sets the objective; nearer cells are tried when the core
+## refuses it.
+const STRIDE := 3
 ## The keys that cast one skill each at the cursor, the first skill's first.
 const CAST_KEYS := [KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T]
 ## The keys that strike with one skill each, the first skill's first, and the key that strikes with
@@ -64,6 +74,15 @@ var _body := -1
 # The date at the last tick, and the days that have begun since the world was last saved.
 var _date := {}
 var _unsaved_days := 0
+## The way the person last moved, or was last steered, as a facing for a tapped skill's aim.
+var facing := Vector2.DOWN
+## What the last cast the core accepted was: its `skill` and its `target`, as cast() took it.
+var last_cast := {}
+# The way the joystick orders the person, and the cell it was last ordered from that way.
+var _stick := Vector2i.ZERO
+var _stick_from := Vector2i.ZERO
+# Where the view's top-left corner is in the world, in pixels, for a tap on the ground.
+var _view_origin := Vector2.ZERO
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -133,29 +152,41 @@ func _play(made: WorldAdapter) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not navigate(event):
+	if not navigate(event) and not touch(event):
 		command(make_input_local(event))
 
 
-## Works the screens with `event`: the screen open on top takes every key, and while none is
-## open, Escape pauses the world unless a panel is open for it to close. A screen opening sounds,
-## and so does a key a screen takes. Returns whether a screen took the event.
+## Works the screens with `event`: the screen open on top takes every key and every tap, and while
+## none is open, Escape pauses the world unless a panel is open for it to close. A screen opening
+## sounds, and so does a key or a tap a screen takes. Returns whether a screen took the event.
 func navigate(event: InputEvent) -> bool:
 	var key := event as InputEventKey
+	var tapped := event as InputEventScreenTouch
 	var open: Control = _hud.screen()
 	if open == null:
 		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
 				or _hud.sect.visible or _aiming != KEY_NONE:
 			return false
-		_moving = false
-		_hud.pause.open(controls(), world_seed)
-		_sound.ui("open")
+		pause()
 		return true
 	if key != null and key.pressed:
 		_take(open.key(key))
-		var now: Control = _hud.screen()
-		_sound.ui("open" if now != null and now != open else "click")
+	elif tapped != null and tapped.pressed:
+		_take(open.tap(tapped.position))
+	else:
+		return true
+	var now: Control = _hud.screen()
+	_sound.ui("open" if now != null and now != open else "click")
 	return true
+
+
+## Pauses the world under the pause panel, letting go of the move button and every finger held.
+func pause() -> void:
+	_moving = false
+	_stick = Vector2i.ZERO
+	_hud.touch.release_all()
+	_hud.pause.open(controls(), world_seed)
+	_sound.ui("open")
 
 
 # Does what a screen's entry or key asks: one of the actions the screens' key() returns.
@@ -221,6 +252,8 @@ func _process(delta: float) -> void:
 	if _moving:
 		follow(_cursor)
 	_show_aim()
+	_view_origin = view.position
+	_hud.touch.body_at = (_to_pixels(lead()) - view.position).floor()
 	_hud.refresh(world, steered, _skills)
 
 
@@ -235,6 +268,10 @@ func command(event: InputEvent) -> bool:
 	var mouse := event as InputEventMouseButton
 	var motion := event as InputEventMouseMotion
 	var key := event as InputEventKey
+	# While the touch controls are shown, a finger gives the orders, and the click a touch is also
+	# reported as gives none.
+	if mouse != null and _hud.touch.visible:
+		return false
 	if mouse != null:
 		_cursor = mouse.position
 	elif motion != null:
@@ -303,21 +340,10 @@ func aiming() -> Key:
 	return _aiming
 
 
-## Has the steered person cast skill `skill` at `at`, a position in this node's pixels, and shows
-## on the HUD why the core refuses it, if it does. Returns the core's verdict, one of the
-## WorldAdapter.CAST_* constants, of which CAST_NONE means it will cast; or -1 while the person
-## has no body.
+## Has the steered person cast skill `skill` at `at`, a position in this node's pixels, as cast()
+## does. Returns its verdict.
 func cast_at(skill: int, at: Vector2) -> int:
-	var roster := world.roster(steered)
-	if roster.is_empty():
-		return -1
-	var point := at / PIXELS_PER_CELL * WorldAdapter.CELL_SIZE
-	var refusal := world.cast_refusal(roster[0], skill, point)
-	if refusal == WorldAdapter.CAST_NONE:
-		world.cast(roster[0], skill, point)
-	else:
-		_hud.show_cast(refusal)
-	return refusal
+	return cast(skill, at / PIXELS_PER_CELL * WorldAdapter.CELL_SIZE)
 
 
 # Shows the aimed skill's range round the person and its area at the cursor while a cast key is held
@@ -331,6 +357,113 @@ func _show_aim() -> void:
 	var reach: float = skills[skill]["range"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	var radius: float = skills[skill]["radius"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	_aim.show_aim(_to_pixels(lead()), reach, _cursor, radius)
+
+
+# Orders the person STRIDE cells `way`, or as many fewer as the core accepts, or, with no way, to
+# stop where it stands, keeping its skills, and faces it that way. Returns whether the core
+# accepted an order.
+func _steer(way: Vector2i) -> bool:
+	if way != Vector2i.ZERO:
+		facing = Vector2(way).normalized()
+	var here := Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
+	_stick_from = here
+	# With no way, the one objective is where the person stands.
+	var strides: Array = [0] if way == Vector2i.ZERO else range(STRIDE, 0, -1)
+	for stride: int in strides:
+		var objective := here + way * stride
+		if world.order(steered, objective, _skills):
+			_objective = objective
+			return true
+	return false
+
+
+## Works the HUD's touch controls with `event`, a touch or a drag, while they are shown and a world
+## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
+## casts as cast_skill() does, the HUD's buttons open the genealogy or sect panel, challenge or
+## pause, and where the settings ask, a tap on the ground orders the person to that cell. While the
+## genealogy or sect panel is open, a tap closes it. Returns whether the touch controls took the
+## event.
+func touch(event: InputEvent) -> bool:
+	if world == null or not _hud.touch.visible or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
+		return false
+	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible else null)
+	if panel != null:
+		var pressed := event as InputEventScreenTouch
+		if pressed != null and pressed.pressed:
+			panel.close()
+		return true
+	var action: Dictionary = _hud.touch.take(event)
+	match action.get("do", ""):
+		"steer":
+			var way: Vector2 = action.way
+			var nearest := Vector2i(roundi(way.normalized().x), roundi(way.normalized().y)) if way != Vector2.ZERO else Vector2i.ZERO
+			if way != Vector2.ZERO:
+				facing = way.normalized()
+			if nearest != _stick:
+				_stick = nearest
+				_steer(nearest)
+		"cast":
+			cast_skill(action.slot, action.how, action.get("aim", Vector2.ZERO))
+		"button":
+			match action.button:
+				"genealogy":
+					genealogy(GENEALOGY_KEY)
+				"sect":
+					sects(SECT_KEY)
+				"challenge":
+					challenge()
+				"pause":
+					pause()
+		"world":
+			if _hud.settings.tap_to_move():
+				var cell := Vector2i(((_view_origin + action.at) / PIXELS_PER_CELL).floor())
+				if world.order(steered, cell, _skills):
+					_objective = cell
+	return true
+
+
+## Has the steered person cast its skill `slot`, as the touch controls ask: `how` "tap" casts at the
+## hostile person the core's aim finds the way the person faces, or with none, at the point that way
+## at the skill's range; "point" at the point `aim`, a share of the skill's range each way, from the
+## person; and "self" at the person itself. The core brings a point past the range within it. When
+## the core refuses, the HUD names its reason. Returns the core's verdict, one of the
+## WorldAdapter.CAST_* constants, of which CAST_NONE means the cast was made; or -1 while the person
+## has no body.
+func cast_skill(slot: int, how: String, aim := Vector2.ZERO) -> int:
+	var roster := world.roster(steered)
+	if roster.is_empty():
+		return -1
+	var person := roster[0]
+	var reach := 0.0
+	var skills := world.skills(steered)
+	if slot < skills.size():
+		reach = float(skills[slot].range)
+	var at := world.person_position(person)
+	var target: Variant = null
+	match how:
+		"tap":
+			# The core reads a facing in whole sub-cell units, so it is given a cell long.
+			var aimed := world.aim(person, slot, (facing.normalized() * WorldAdapter.CELL_SIZE).round())
+			target = aimed if aimed >= 0 else (at + facing.normalized() * reach).floor()
+		"point":
+			target = (at + aim * reach).floor()
+	return cast(slot, target)
+
+
+## Has the steered person cast skill `skill` at `target`, a point in sub-cell units, a person or,
+## with null, itself, and shows on the HUD why the core refuses it, if it does. Every cast, from a
+## key or a skill button, is given here. Returns the core's verdict, one of the WorldAdapter.CAST_*
+## constants, of which CAST_NONE means the cast was made; or -1 while the person has no body.
+func cast(skill: int, target: Variant) -> int:
+	var roster := world.roster(steered)
+	if roster.is_empty():
+		return -1
+	var refusal := world.cast_refusal(roster[0], skill, target)
+	if refusal != WorldAdapter.CAST_NONE:
+		_hud.show_cast(refusal)
+	elif world.cast(roster[0], skill, target):
+		last_cast = {"skill": skill, "target": target}
+	return refusal
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current
@@ -435,6 +568,10 @@ func step() -> void:
 	_art.note_tick()
 	_sound.note_tick()
 	ticks += 1
+	# While the joystick is held, the person is ordered on its way again from each new cell it
+	# reaches.
+	if _stick != Vector2i.ZERO and Vector2i((lead() / WorldAdapter.CELL_SIZE).floor()) != _stick_from:
+		_steer(_stick)
 	var army := world.player_army()
 	# While no body carries the soul, the camera keeps the army it last served in.
 	if army >= 0 and army != steered:
@@ -454,6 +591,8 @@ func step() -> void:
 		_moving = false
 		_aiming = KEY_NONE
 		_show_aim()
+		_stick = Vector2i.ZERO
+		_hud.touch.release_all()
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]
