@@ -697,6 +697,16 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::events(
     entry.set("tick", static_cast<std::int64_t>(event.tick));
     entry.set("cell", godot::Vector2i{event.cell.x, event.cell.y});
     entry.set("kind", static_cast<std::int64_t>(event.what.index()));
+    if (const auto* learned = std::get_if<murim::Learned>(&event.what)) {
+      entry.set("person", static_cast<std::int64_t>(learned->person));
+      entry.set("art", static_cast<std::int64_t>(learned->art));
+      entry.set("skill", static_cast<std::int64_t>(learned->skill));
+      entry.set("by", static_cast<std::int64_t>(learned->by));
+    } else if (const auto* gained =
+                   std::get_if<murim::RealmGained>(&event.what)) {
+      entry.set("person", static_cast<std::int64_t>(gained->person));
+      entry.set("rank", static_cast<std::int64_t>(gained->rank));
+    }
     kept.push_back(entry);
   }
   return kept;
@@ -1068,6 +1078,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
       const murim::Art& art = core.arts().at(learned.art);
       const murim::ArtSkill& taught = art.skills.at(learned.skill);
       fields.set("art", static_cast<std::int64_t>(learned.art));
+      fields.set("skill", static_cast<std::int64_t>(learned.skill));
       fields.set("rank", taught.rank);
       fields.set("korean", godot::String::utf8(taught.name.korean.c_str()));
       fields.set("romanised",
@@ -1079,6 +1090,37 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
     skills.push_back(fields);
   }
   return skills;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::arts() const {
+  godot::TypedArray<godot::Dictionary> arts;
+  if (!world_) {
+    return arts;
+  }
+  for (const murim::Art& art : world().arts()) {
+    godot::Dictionary fields;
+    fields.set("korean", godot::String::utf8(art.name.korean.c_str()));
+    fields.set("romanised", godot::String::utf8(art.name.romanised.c_str()));
+    fields.set("orientation",
+               static_cast<std::int64_t>(art.nature.orientation));
+    fields.set("polarity", static_cast<std::int64_t>(art.nature.polarity));
+    godot::TypedArray<godot::Dictionary> skills;
+    for (const murim::ArtSkill& taught : art.skills) {
+      godot::Dictionary skill;
+      skill.set("korean", godot::String::utf8(taught.name.korean.c_str()));
+      skill.set("romanised",
+                godot::String::utf8(taught.name.romanised.c_str()));
+      skill.set("rank", taught.rank);
+      skill.set("range", taught.skill.range);
+      skill.set("radius", taught.skill.radius);
+      skill.set("cooldown", static_cast<std::int64_t>(taught.skill.cooldown));
+      skill.set("qi_cost", taught.skill.qi_cost);
+      skills.push_back(skill);
+    }
+    fields.set("skills", skills);
+    arts.push_back(fields);
+  }
+  return arts;
 }
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::realms() const {
@@ -1258,6 +1300,7 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_method(godot::D_METHOD("person_skills", "person"),
                               &WorldAdapter::person_skills);
   godot::ClassDB::bind_method(godot::D_METHOD("realms"), &WorldAdapter::realms);
+  godot::ClassDB::bind_method(godot::D_METHOD("arts"), &WorldAdapter::arts);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_name", "sect"),
                               &WorldAdapter::sect_name);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_faction", "sect"),
@@ -1357,7 +1400,7 @@ void WorldAdapter::_bind_methods() {
                                           static_cast<int>(state));
   }
   // Each kind is its alternative's index in murim::Happening.
-  const std::array<std::pair<const char*, murim::Happening>, 7> kinds{{
+  const std::array<std::pair<const char*, murim::Happening>, 9> kinds{{
       {"EVENT_FOUNDED", murim::Founded{}},
       {"EVENT_RAIDED", murim::Raided{}},
       {"EVENT_RUINED", murim::Ruined{}},
@@ -1365,7 +1408,18 @@ void WorldAdapter::_bind_methods() {
       {"EVENT_LEADER_CHANGED", murim::LeaderChanged{}},
       {"EVENT_BORN", murim::Born{}},
       {"EVENT_DIED", murim::Died{}},
+      {"EVENT_LEARNED", murim::Learned{}},
+      {"EVENT_REALM_GAINED", murim::RealmGained{}},
   }};
+  const std::array<std::pair<const char*, murim::LearnedBy>, 3> lessons{{
+      {"LEARNED_BY_COMPREHENSION", murim::LearnedBy::COMPREHENSION},
+      {"LEARNED_BY_MANUAL", murim::LearnedBy::MANUAL},
+      {"LEARNED_BY_TEACHING", murim::LearnedBy::TEACHING},
+  }};
+  for (const auto& [constant, by] : lessons) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(by));
+  }
   for (const auto& [constant, happening] : kinds) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(happening.index()));
