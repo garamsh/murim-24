@@ -45,6 +45,12 @@ const KIND_COLOURS := {
 	"water": Color("2b5770"), "mountain": Color("8a94a0"),
 }
 const MAP_SIZE := Vector2i(76, 44)
+## A technique slot: its step along the bar, its size, the column its key is centred in, left of
+## its icon, and where the icon stands.
+const SLOT_STEP := 32
+const SLOT_SIZE := Vector2(30, 20)
+const SLOT_KEY := Rect2(1, 3, 10, 12)
+const SLOT_ICON_AT := Vector2(12, 2)
 # How long a notice about a challenge stays on screen.
 const NOTICE_MS := 3000
 # Where the panels the touch layout moves stand, in the keyboard layout and in the touch layout,
@@ -506,7 +512,8 @@ func _build() -> void:
 		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), RUMOUR_WIDTH[false])
 	labels.rumour_0.text = tr("HUD_RUMOR_NONE")
 
-	_skill_bar = _panel(Rect2(240 - (Loadout.SLOTS * 22 + 6) / 2.0, 240, Loadout.SLOTS * 22 + 6, 26))
+	var bar_width := Loadout.SLOTS * SLOT_STEP + 6
+	_skill_bar = _panel(Rect2(240 - bar_width / 2.0, 240, bar_width, 26))
 	var bar := _skill_bar
 	for slot in Loadout.SLOTS:
 		var cell := Panel.new()
@@ -515,19 +522,22 @@ func _build() -> void:
 		style.set_border_width_all(1)
 		style.border_color = INK
 		cell.add_theme_stylebox_override("panel", style)
-		cell.position = Vector2(4 + slot * 22, 3)
-		cell.size = Vector2(20, 20)
+		cell.position = Vector2(4 + slot * SLOT_STEP, 3)
+		cell.size = SLOT_SIZE
 		bar.add_child(cell)
 		var icon := TextureRect.new()
-		icon.position = Vector2(2, 2)
+		icon.position = SLOT_ICON_AT
 		icon.size = Vector2(16, 16)
 		cell.add_child(icon)
 		slot_icons.append(icon)
-		# The slot's key, in its top-left corner over the icon.
+		# The slot's key, in a column of its own left of the icon, so it covers none of it.
 		var number := Label.new()
+		number.theme = _theme
 		number.text = Arts.SLOT_KEYS[slot]
 		number.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		number.position = Vector2(1, -3)
+		number.position = SLOT_KEY.position
+		number.size = SLOT_KEY.size
+		number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		number.add_theme_color_override("font_color", GOLD_LIGHT)
 		number.add_theme_color_override("font_outline_color", INK_DARK)
 		number.add_theme_constant_override("outline_size", 2)

@@ -1,8 +1,9 @@
 # Checks that hud.tscn shows its words from the translations, Korean first, that switching the
 # locale changes them to English, that the faction shown is the steered army's, that health shows
 # its strength as a percentage of its starting strength and qi the person's against its store,
-# that the technique bar shows five slots on Q W E R T, the person's first skills on them with the
-# icon of their shape, and that the season and year are the core's. It also checks that the leader and duel panels name people by
+# that the technique bar shows five slots on Q W E R T, each key clear of its slot's icon, the
+# person's first skills on them with the icon of their shape, and that the season and year are the
+# core's. It also checks that the leader and duel panels name people by
 # the adapter's person_name, Korean first and romanised in English, and that every word the HUD
 # shows from hud.csv, and every name the world's data can make, fits the room its panel gives it, in
 # each locale, measured in the font and size each label draws with.
@@ -87,6 +88,19 @@ func run() -> bool:
 		else:
 			icons_right = icons_right and icon.texture == null and hud.slot_skills[slot].is_empty()
 	icons_right = icons_right and keys == ["Q", "W", "E", "R", "T"]
+	# Each key as drawn, centred across its label from the label's top, one line of the HUD's font
+	# high, keeps clear of its slot's icon and within the slot.
+	var clear := []
+	var line: float = hud._theme.default_font.get_height(hud.FONT_SIZE)
+	for slot in hud.slot_icons.size():
+		var icon: TextureRect = hud.slot_icons[slot]
+		var key: Label = icon.get_parent().get_child(1)
+		var drawn := _width(key, key.text)
+		var left := key.position.x + (key.size.x - drawn) / 2.0
+		var key_rect := Rect2(left, key.position.y, drawn, line)
+		clear.append(key_rect.position.x >= 0 and not key_rect.intersects(Rect2(icon.position, icon.size)) \
+				and Rect2(Vector2.ZERO, icon.get_parent().size).encloses(key_rect))
+	icons_right = icons_right and clear.all(func(fits: bool) -> bool: return fits)
 	# The season and year the core gives, spring of the first year at the start; control: a later
 	# date reads differently, so the label is not fixed text.
 	var season: String = hud.labels.season.text
@@ -97,9 +111,9 @@ func run() -> bool:
 	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
 			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right \
 			and dated
-	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, qi %s, its bar %d; %d skills on the slots %s with their icons, the rest empty %s: %s" % [
+	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, qi %s, its bar %d; %d skills on the slots %s with their icons, each key clear of its icon %s, the rest empty %s: %s" % [
 		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
-		keys, icons_right, "pass" if passed else "FAIL"])
+		keys, clear, icons_right, "pass" if passed else "FAIL"])
 	print("hud_test: date %s shown as \"%s\"; year 3, season 1 as \"%s\": %s" % [
 		date, season, later, "pass" if dated else "FAIL"])
 	hud.free()
