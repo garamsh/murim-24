@@ -376,6 +376,23 @@ struct Learning {
   std::uint32_t polarity_potency = PER_MILLE;
 };
 
+/// How the leaders of factions no driver steers declare war and make peace,
+/// as data, checked once a day, one rule for every such leader. Toward each
+/// other faction with living people, in index order, a leader whose faction
+/// is allied with it or neutral toward it declares war with `war_chance` per
+/// mille a year while its own living people number at least `war_margin`
+/// per mille of the other's; and one whose faction is at a war declared with
+/// it, while its own living people are fewer, makes peace with
+/// `peace_chance` per mille a year. Hostility by the rules alone it leaves
+/// as it is. Every declaration, the driver's included, holds for
+/// `hold_days` days before another may change it.
+struct Diplomacy {
+  std::uint32_t war_margin = 0;
+  std::uint32_t war_chance = 0;
+  std::uint32_t peace_chance = 0;
+  std::uint32_t hold_days = 0;
+};
+
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
 /// age passes its lifespan plus `days_per_attainment` days for every point of
@@ -410,6 +427,7 @@ struct Life {
   std::vector<Realm> realms;
   std::vector<Art> arts;
   Learning learning;
+  std::optional<Diplomacy> diplomacy;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -641,6 +659,45 @@ struct Leadership {
   std::optional<Election> election;
 };
 
+/// What a faction's leader declares toward another faction: war, so that
+/// each attacks the other whatever their stances, or peace, so that neither
+/// does.
+enum class Declaration : std::uint8_t { WAR, PEACE };
+
+/// The declaration standing between two factions: what it is, the faction
+/// whose leader made it, and the tick it was made on.
+struct Declared {
+  Declaration what = Declaration::WAR;
+  std::size_t by = 0;
+  std::uint64_t tick = 0;
+};
+
+/// How one faction stands toward another, the one read of it: its own;
+/// allied, neither hostile to the other by the rules' hostility; neutral,
+/// at a peace declared; hostile, either hostile to the other by the rules'
+/// hostility; or at war declared.
+enum class Relation : std::uint8_t { OWN, ALLY, NEUTRAL, HOSTILE, AT_WAR };
+
+/// Why a person may not declare war on, or make peace with, a faction, the
+/// first that holds in this order; `NONE` when it may.
+enum class DeclarationRefusal : std::uint8_t {
+  NONE,
+  /// The person is dead.
+  DEAD,
+  /// The person does not lead the faction of the army it serves in.
+  NOT_THE_LEADER,
+  /// The faction is the person's own.
+  SAME_FACTION,
+  /// War is declared on a faction already at war with the person's.
+  ALREADY_AT_WAR,
+  /// Peace is made with a faction neither hostile to nor at war with the
+  /// person's.
+  ALREADY_AT_PEACE,
+  /// The two factions' last declaration was made fewer than the diplomacy's
+  /// `hold_days` days ago.
+  TOO_SOON,
+};
+
 /// A member a sect is created with: a person by index, and the attainment its
 /// discipline of highest talent limit starts at, up to that limit.
 struct Founder {
@@ -817,7 +874,8 @@ struct Progress {
 struct Rules {
   /// Sub-cell units people keep apart; 0 lets them overlap.
   std::int32_t separation;
-  /// `hostile[a][b]`: whether bodies of faction `a` attack those of `b`.
+  /// `hostile[a][b]`: whether bodies of faction `a` attack those of `b` by
+  /// their stances, where no declaration stands between the two.
   std::vector<std::vector<bool>> hostile;
   /// The lowest durability of the intact, damaged and destroyed stages; a
   /// structure below all three is rubble.
@@ -1006,6 +1064,9 @@ class World {
   /// Returns the date the world has reached.
   [[nodiscard]] Date date() const;
 
+  /// Returns the date of tick `tick` on the world's calendar.
+  [[nodiscard]] Date date_at(std::uint64_t tick) const;
+
   /// Returns how many ticks the world has run, the tick a person's
   /// `ready_at` is counted against.
   [[nodiscard]] std::uint64_t tick_count() const { return tick_count_; }
@@ -1090,8 +1151,45 @@ class World {
   /// Returns the duel being fought for faction `faction`'s lead, if one is.
   [[nodiscard]] std::optional<Duellists> duel(std::size_t faction) const;
 
-  /// Returns whether people of faction `from` attack those of `target`.
+  /// Returns whether people of faction `from` attack those of `target`: at
+  /// a war declared between them, and not at a peace declared; otherwise as
+  /// the rules' hostility says.
   [[nodiscard]] bool hostile(std::size_t from, std::size_t target) const;
+
+  /// Returns how faction `faction` stands toward faction `other`. Throws
+  /// std::out_of_range when there is no such faction.
+  [[nodiscard]] Relation relation(std::size_t faction, std::size_t other) const;
+
+  /// Returns the declaration standing between factions `faction` and
+  /// `other`, if one does. Throws std::out_of_range when there is no such
+  /// faction.
+  [[nodiscard]] std::optional<Declared> declaration(std::size_t faction,
+                                                    std::size_t other) const;
+
+  /// Returns why person `person` may not declare `what` toward faction
+  /// `faction`, which is why declare() would refuse it, or
+  /// DeclarationRefusal::NONE when it may. Throws std::invalid_argument when
+  /// there is no such person or faction.
+  [[nodiscard]] DeclarationRefusal declaration_refusal(std::size_t person,
+                                                       std::size_t faction,
+                                                       Declaration what) const;
+
+  /// Has person `person`, its faction's leader, declare `what` toward
+  /// faction `faction` at once, for both factions, the same order for the
+  /// player's body as for an NPC. Throws std::invalid_argument when
+  /// declaration_refusal() names a reason, or there is no such person or
+  /// faction.
+  void declare(std::size_t person, std::size_t faction, Declaration what);
+
+  /// Marks army `army` as steered by a driver, or as its own, when `steered`
+  /// is false. The rules that decide for people on their own, such as
+  /// diplomacy, decide nothing for a steered army's members. Throws
+  /// std::out_of_range when there is no such army.
+  void steer(std::size_t army, bool steered);
+
+  /// Returns whether a driver steers army `army`. Throws std::out_of_range
+  /// when there is no such army.
+  [[nodiscard]] bool steered(std::size_t army) const;
 
   /// Returns who last brought village `village` to ruins, if anyone has; it
   /// is kept when the village is rebuilt.
@@ -1213,6 +1311,7 @@ class World {
     Order order;
     FlowField field;
     std::vector<std::size_t> roster;
+    bool steered = false;
   };
 
   /// Every living person as the tick began, indexed together, with the
@@ -1308,6 +1407,20 @@ class World {
   [[nodiscard]] bool heard_by(const Event& event, std::size_t person,
                               std::optional<std::size_t> faction) const;
   void settle_duels();
+  void negotiate(const Diplomacy& diplomacy);
+  /// A declaration a leader seeks, and its chance a year, per mille.
+  struct Sought {
+    Declaration what;
+    std::uint32_t chance;
+  };
+  [[nodiscard]] std::optional<Sought> sought(
+      const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
+      const std::vector<std::uint64_t>& numbers) const;
+  [[nodiscard]] bool declarations_kept() const;
+  /// The index in declarations_ of the pair of factions `faction` and
+  /// `other`. Throws std::out_of_range when there is no such faction.
+  [[nodiscard]] std::size_t pair_of(std::size_t faction,
+                                    std::size_t other) const;
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
   [[nodiscard]] std::uint32_t draw(Range range);
@@ -1411,6 +1524,9 @@ class World {
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
   std::vector<Fight> duels_;
+  /// The declaration standing between each two factions, by the lower's
+  /// index times the factions plus the higher's; the rest stay empty.
+  std::vector<std::optional<Declared>> declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.
   std::vector<Event> events_;
   /// The latest steps of progress, oldest first, at most PROGRESS_CAPACITY.

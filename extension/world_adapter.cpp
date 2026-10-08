@@ -328,8 +328,10 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
       over(region.seed, region.map_rows, region.armies, region.structures,
            region.rules, std::move(villages), region.leadership, region.life,
            region.sects);
-  // The person born last is the player's body, which carries a soul.
+  // The person born last is the player's body, which carries a soul, in the
+  // army the player steers.
   adapter->world().ensoul(adapter->world().population() - 1);
+  adapter->world().steer(adapter->world().army_count() - 1, true);
   adapter->show(region, murim::Origin{region.seed, village});
   return adapter;
 }
@@ -829,6 +831,64 @@ bool WorldAdapter::hostile(std::int64_t from, std::int64_t target) const {
   return world().hostile(faction_index(from), faction_index(target));
 }
 
+std::int64_t WorldAdapter::relation(std::int64_t faction,
+                                    std::int64_t other) const {
+  return static_cast<std::int64_t>(
+      world().relation(faction_index(faction), faction_index(other)));
+}
+
+godot::Dictionary WorldAdapter::declaration(std::int64_t faction,
+                                            std::int64_t other) const {
+  godot::Dictionary fields;
+  const std::optional<murim::Declared> standing =
+      world().declaration(faction_index(faction), faction_index(other));
+  if (standing) {
+    fields.set("what", static_cast<std::int64_t>(standing->what));
+    fields.set("by", static_cast<std::int64_t>(standing->by));
+    fields.set("tick", static_cast<std::int64_t>(standing->tick));
+    const murim::Date made = world().date_at(standing->tick);
+    fields.set("year", static_cast<std::int64_t>(made.year));
+    fields.set("season", static_cast<std::int64_t>(made.season));
+  }
+  return fields;
+}
+
+murim::Declaration WorldAdapter::declaration_of(std::int64_t what) {
+  CRASH_COND_MSG(
+      what != static_cast<std::int64_t>(murim::Declaration::WAR) &&
+          what != static_cast<std::int64_t>(murim::Declaration::PEACE),
+      "no such declaration");
+  return static_cast<murim::Declaration>(what);
+}
+
+std::int64_t WorldAdapter::declaration_refusal(std::int64_t person,
+                                               std::int64_t faction,
+                                               std::int64_t what) const {
+  return static_cast<std::int64_t>(world().declaration_refusal(
+      person_index(person), faction_index(faction), declaration_of(what)));
+}
+
+bool WorldAdapter::declare(std::int64_t person, std::int64_t faction,
+                           std::int64_t what) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    world().declare(person_index(person), faction_index(faction),
+                    declaration_of(what));
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.declare: ", error.what());
+    return false;
+  }
+}
+
+void WorldAdapter::steer(std::int64_t army, bool steered) {
+  world().steer(army_index(army), steered);
+}
+
+bool WorldAdapter::steered(std::int64_t army) const {
+  return world().steered(army_index(army));
+}
+
 godot::PackedInt64Array WorldAdapter::roster(std::int64_t army) const {
   godot::PackedInt64Array members;
   for (const std::size_t member : world().roster(army_index(army))) {
@@ -1261,6 +1321,21 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::duel);
   godot::ClassDB::bind_method(godot::D_METHOD("hostile", "from", "target"),
                               &WorldAdapter::hostile);
+  godot::ClassDB::bind_method(godot::D_METHOD("relation", "faction", "other"),
+                              &WorldAdapter::relation);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("declaration", "faction", "other"),
+      &WorldAdapter::declaration);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("declaration_refusal", "person", "faction", "what"),
+      &WorldAdapter::declaration_refusal);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("declare", "person", "faction", "what"),
+      &WorldAdapter::declare);
+  godot::ClassDB::bind_method(godot::D_METHOD("steer", "army", "steered"),
+                              &WorldAdapter::steer);
+  godot::ClassDB::bind_method(godot::D_METHOD("steered", "army"),
+                              &WorldAdapter::steered);
   godot::ClassDB::bind_method(godot::D_METHOD("roster", "army"),
                               &WorldAdapter::roster);
   godot::ClassDB::bind_method(godot::D_METHOD("person_position", "person"),
@@ -1461,6 +1536,40 @@ void WorldAdapter::_bind_methods() {
            murim::ChallengeRefusal::DUEL_IN_PROGRESS},
       }};
   for (const auto& [constant, refusal] : refusals) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::Relation>, 5> relations{{
+      {"RELATION_OWN", murim::Relation::OWN},
+      {"RELATION_ALLY", murim::Relation::ALLY},
+      {"RELATION_NEUTRAL", murim::Relation::NEUTRAL},
+      {"RELATION_HOSTILE", murim::Relation::HOSTILE},
+      {"RELATION_AT_WAR", murim::Relation::AT_WAR},
+  }};
+  for (const auto& [constant, relation] : relations) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(relation));
+  }
+  const std::array<std::pair<const char*, murim::Declaration>, 2> declared{{
+      {"DECLARATION_WAR", murim::Declaration::WAR},
+      {"DECLARATION_PEACE", murim::Declaration::PEACE},
+  }};
+  for (const auto& [constant, what] : declared) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(what));
+  }
+  const std::array<std::pair<const char*, murim::DeclarationRefusal>, 7>
+      declarations{{
+          {"DECLARE_NONE", murim::DeclarationRefusal::NONE},
+          {"DECLARE_DEAD", murim::DeclarationRefusal::DEAD},
+          {"DECLARE_NOT_THE_LEADER", murim::DeclarationRefusal::NOT_THE_LEADER},
+          {"DECLARE_SAME_FACTION", murim::DeclarationRefusal::SAME_FACTION},
+          {"DECLARE_ALREADY_AT_WAR", murim::DeclarationRefusal::ALREADY_AT_WAR},
+          {"DECLARE_ALREADY_AT_PEACE",
+           murim::DeclarationRefusal::ALREADY_AT_PEACE},
+          {"DECLARE_TOO_SOON", murim::DeclarationRefusal::TOO_SOON},
+      }};
+  for (const auto& [constant, refusal] : declarations) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }

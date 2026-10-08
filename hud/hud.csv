@@ -29,7 +29,6 @@ FACTION_UNORTHODOX,사파,Unorthodox
 HUD_LEADER,수장,Leader
 HUD_LEADER_NONE,없음,None
 HUD_LEADER_YOU,당신,You
-HUD_CHALLENGE_KEY,C 도전,C Challenge
 HUD_DUEL,결투,Duel
 HUD_DUEL_NEW_LEADER,새 수장이 섰다.,A new leader stands.
 HUD_AUTOSAVED,자동 저장했다.,Autosaved.
@@ -137,7 +136,7 @@ CONTROLS_CLICK_MOVE,커서로 이동,Move to cursor
 CONTROLS_CAST,커서에 기술,Cast at cursor
 CONTROLS_SKILL,기술 하나,One skill
 CONTROLS_ALL_SKILLS,모든 기술,All skills
-CONTROLS_CHALLENGE,수장에게 도전,Challenge leader
+CONTROLS_FACTIONS,세력,Factions
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
@@ -184,7 +183,7 @@ REBIRTH_NONE,없음,None
 REBIRTH_KEYS,Enter 새 몸으로 이어 살기,Enter Live on in the new body
 TOUCH_GENEALOGY,족보,Family
 TOUCH_SECT,문파,Sects
-TOUCH_DUEL,도전,Duel
+TOUCH_FACTIONS,세력,Faction
 TOUCH_ARTS,무공,Arts
 TOUCH_PLACE,놓을 단추를 누른다,Tap a button
 TOUCH_CANCEL,취소,Cancel
@@ -231,3 +230,49 @@ ARTS_UNORTHODOX,사,Unorthodox
 ARTS_DEMONIC,마,Demonic
 ARTS_YANG,양강,Yang
 ARTS_YIN,음유,Yin
+FACTION_TITLE,세력,Factions
+FACTION_CLOSE,F 닫기,F Close
+FACTION_CLOSE_TOUCH,닫기,Close
+FACTION_NAME,세력,Faction
+FACTION_RELATION,관계,Relation
+FACTION_PEOPLE,인원,People
+FACTION_VILLAGES,마을,Villages
+FACTION_SINCE,근거,Basis
+FACTION_STRENGTH,%d명 · 마을 %d,%d people · %d villages
+FACTION_OURS,우리 세력,Ours
+FACTION_YOU_LEAD,당신이 수장이다,You lead
+FACTION_ALLY,동맹,Ally
+FACTION_NEUTRAL,중립,Neutral
+FACTION_HOSTILE,적대,Hostile
+FACTION_AT_WAR,전쟁,At war
+FACTION_ABOUT_ALLY,성향이 맞아 서로 공격하지 않는다.,Friends by stance; neither attacks.
+FACTION_ABOUT_NEUTRAL,화평을 맺어 서로 공격하지 않는다.,Peace made; neither attacks.
+FACTION_ABOUT_HOSTILE,성향이 맞서 서로 공격하고 약탈한다.,Foes by stance; both fight and raid.
+FACTION_ABOUT_AT_WAR,전쟁 중이라 서로 공격하고 약탈한다.,At war; both fight and raid.
+FACTION_LEGEND_ALLY,성향이 맞음,friendly stance
+FACTION_LEGEND_NEUTRAL,화평을 맺음,peace made
+FACTION_LEGEND_HOSTILE,성향이 맞섬,hostile stance
+FACTION_LEGEND_AT_WAR,전쟁을 선포함,war declared
+FACTION_BY_STANCE,성향,Stance
+FACTION_DECLARED_BY,%s 수장이 %s에 선포,"Declared by the %s leader, %s"
+FACTION_DECLARE,전쟁 선포,Declare war
+FACTION_PEACE,화평,Make peace
+FACTION_LEADER_ONLY,전쟁과 화평은 수장만 정한다.,Only the leader makes war or peace.
+FACTION_CHALLENGE,C 수장에게 도전,C Challenge the leader
+FACTION_CHALLENGE_TOUCH,수장에게 도전,Challenge the leader
+FACTION_KEYS_LEADER,방향키 고르기 · Enter 명령 · F 닫기,Arrows choose · Enter order · F close
+FACTION_KEYS_MEMBER,방향키 세력 고르기 · C 도전 · F 닫기,Arrows choose · C challenge · F close
+FACTION_CONFIRM_TITLE,전쟁 선포,Declare war
+FACTION_CONFIRM_LINE,%s에 전쟁을 선포한다.,Declare war on the %s.
+FACTION_CONFIRM_ALLY,동맹이 깨지고 서로 공격하고 약탈한다.,The alliance ends; both fight and raid.
+FACTION_CONFIRM_WAR,서로 공격하고 약탈한다.,Both fight and raid.
+FACTION_CONFIRM_YES,Enter 선포,Enter Declare
+FACTION_CONFIRM_NO,Esc 취소,Esc Cancel
+FACTION_CONFIRM_YES_TOUCH,선포,Declare
+FACTION_CONFIRM_NO_TOUCH,취소,Cancel
+DECLARE_DEAD,이미 죽었다.,You are dead.
+DECLARE_NOT_THE_LEADER,수장만 명령한다.,Leader only.
+DECLARE_SAME_FACTION,우리 세력이다.,That is our faction.
+DECLARE_ALREADY_AT_WAR,이미 전쟁 중이다.,Already at war.
+DECLARE_ALREADY_AT_PEACE,이미 싸우지 않는다.,Already at peace.
+DECLARE_TOO_SOON,아직 이르다.,Too soon.

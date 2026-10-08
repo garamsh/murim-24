@@ -464,6 +464,12 @@ void put_life(Writer& out, const Life& life) {
     out.u32(value);
   }
   out.i32(learning.reading_reach);
+  put_maybe(out, life.diplomacy, [&out](const Diplomacy& diplomacy) {
+    out.u32(diplomacy.war_margin);
+    out.u32(diplomacy.war_chance);
+    out.u32(diplomacy.peace_chance);
+    out.u32(diplomacy.hold_days);
+  });
 }
 
 Life get_life(Reader& input) {
@@ -556,6 +562,14 @@ Life get_life(Reader& input) {
     *value = input.u32();
   }
   learning.reading_reach = input.i32();
+  life.diplomacy = get_maybe<Diplomacy>(input, [&input] {
+    Diplomacy diplomacy;
+    diplomacy.war_margin = input.u32();
+    diplomacy.war_chance = input.u32();
+    diplomacy.peace_chance = input.u32();
+    diplomacy.hold_days = input.u32();
+    return diplomacy;
+  });
   return life;
 }
 
@@ -958,6 +972,7 @@ class SaveCodec {
       put_cell(out, army.order.objective);
       put_sizes(out, army.order.skills);
       put_sizes(out, army.roster);
+      out.flag(army.steered);
     });
     put_all(out, world.structures_, [&out](const Structure& structure) {
       put_cell(out, structure.cell);
@@ -993,6 +1008,14 @@ class SaveCodec {
       out.size(fight.leader);
       put_duel(out, fight.rule);
     });
+    put_all(out, world.declarations_,
+            [&out](const std::optional<Declared>& standing) {
+              put_maybe(out, standing, [&out](Declared declared) {
+                out.u8(static_cast<std::uint8_t>(declared.what));
+                out.size(declared.by);
+                out.u64(declared.tick);
+              });
+            });
     put_all(out, world.progress_,
             [&out](const Progress& step) { put_progress(out, step); });
     put_all(out, world.events_,
@@ -1029,9 +1052,13 @@ class SaveCodec {
       if (!world.map_.passable(objective)) {
         throw Refusal{LoadError::CORRUPTED};
       }
-      return World::Army{faction, std::move(skills),
+      std::vector<std::size_t> roster = get_sizes(input);
+      return World::Army{faction,
+                         std::move(skills),
                          Order{objective, std::move(order_skills)},
-                         FlowField{world.map_, objective}, get_sizes(input)};
+                         FlowField{world.map_, objective},
+                         std::move(roster),
+                         input.flag()};
     });
     world.structures_ = get_all<Structure>(input, [&input] {
       Structure structure;
@@ -1077,6 +1104,16 @@ class SaveCodec {
       fight.leader = input.size();
       fight.rule = get_duel(input);
       return fight;
+    });
+    world.declarations_ = get_all<std::optional<Declared>>(input, [&input] {
+      return get_maybe<Declared>(input, [&input] {
+        constexpr std::uint8_t DECLARATIONS = 2;
+        Declared declared;
+        declared.what = static_cast<Declaration>(input.tag(DECLARATIONS));
+        declared.by = input.size();
+        declared.tick = input.u64();
+        return declared;
+      });
     });
     world.progress_ =
         get_all<Progress>(input, [&input] { return get_progress(input); });

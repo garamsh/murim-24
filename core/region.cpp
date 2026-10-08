@@ -110,6 +110,14 @@ constexpr std::uint32_t HALF = 500;
 constexpr std::uint32_t SEVEN_TENTHS = 700;
 constexpr std::uint32_t NINE_TENTHS = 900;
 
+// Diplomacy in region_data(): war on a faction at peace, outnumbering it by
+// half again, at 1 in 10 a year; peace while outnumbered in a declared war at
+// 1 in 5 a year; a declaration holding 5 years.
+constexpr std::uint32_t WAR_MARGIN = 1'500;
+constexpr std::uint32_t WAR_CHANCE = 100;
+constexpr std::uint32_t PEACE_CHANCE = 200;
+constexpr std::uint32_t HOLD_DAYS = 5 * 120;
+
 // The realms of cultivation, from third-rate to life-and-death, each
 // reached at a store of qi and striking a tenth harder than the last.
 std::vector<Realm> realms() {
@@ -808,7 +816,12 @@ RegionData region_data() {
            // the chance and strikes at seven tenths; of another polarity, at
            // seven tenths and with nine tenths.
            Learning{COMPREHENSION, TEACHING, READING_COST, CELL_SIZE, HALF,
-                    SEVEN_TENTHS, SEVEN_TENTHS, NINE_TENTHS}},
+                    SEVEN_TENTHS, SEVEN_TENTHS, NINE_TENTHS},
+           // A leader declares war on a faction at peace with its own,
+           // outnumbering it by half again, at 1 in 10 a year, and one
+           // outnumbered in a declared war makes peace at 1 in 5 a year; a
+           // declaration holds 5 years.
+           Diplomacy{WAR_MARGIN, WAR_CHANCE, PEACE_CHANCE, HOLD_DAYS}},
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village

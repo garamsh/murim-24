@@ -92,7 +92,7 @@ func run() -> bool:
 		aimed, wall_refused, target, target_accepted, before, after, key_one, key_nine_refused,
 		"pass" if passed else "FAIL"])
 	scene.free()
-	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
+	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
 			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass() and _arts_pass() \
 			and _art_slot_pass() and _loadout_save_pass()
@@ -790,32 +790,84 @@ func _sect_pass() -> bool:
 	return passed
 
 
-# Key C from an Orthodox village (the region's first, owned by faction 0) and from a Cult one (its
-# second, owned by faction 1). Control: the Orthodox refusal shows its reason, so the Cult's
-# acceptance is the duel rule's and not the key's.
+# Key C alone challenges no one: the HUD's "C 도전" line is gone. F opens the faction window, where
+# C from an Orthodox village (the region's first, owned by faction 0) is refused with its reason's
+# word in the window, and from a Cult one (its second, owned by faction 1) begins the duel and
+# closes the window; asked again there, it is refused as the duel is fought. Control: the Orthodox
+# refusal shows its reason, so the Cult's acceptance is the duel rule's and not the key's.
 func _challenge_pass() -> bool:
 	var orthodox := _scene(0)
+	var panel: Control = orthodox.get_node("Hud").factions
+	var alone: bool = not orthodox.command(_key(KEY_C)) and orthodox.world.duel(0).is_empty()
+	var opened: bool = orthodox.command(_key(KEY_F)) and panel.visible
 	var refused: bool = not orthodox.command(_key(KEY_C))
-	orthodox.get_node("Hud").refresh(orthodox.world, orthodox.steered, PackedInt64Array([0]))
-	var reason: String = orthodox.get_node("Hud").labels.notice.text
+	var reason: String = panel.verdict
 	orthodox.free()
 
 	var cult := _scene(1)
 	var world: WorldAdapter = cult.world
+	var hud: CanvasLayer = cult.get_node("Hud")
 	var faction := world.army_faction(cult.steered)
 	var leader_before := world.leader(faction)
-	var accepted: bool = cult.command(_key(KEY_C))
-	var hud: CanvasLayer = cult.get_node("Hud")
+	cult.command(_key(KEY_F))
+	var accepted: bool = cult.command(_key(KEY_C)) and not hud.factions.visible
 	hud.refresh(world, cult.steered, PackedInt64Array([0]))
 	var shown: bool = hud.duel_panel.visible and not world.duel(faction).is_empty()
 	cult.step()
+	cult.command(_key(KEY_F))
 	var again: bool = not cult.command(_key(KEY_C))
-	var again_reason: String = hud.labels.notice.text
-	var passed := refused and reason == "CHALLENGE_NO_SUCCESSION" and accepted and shown and again \
-			and again_reason == "CHALLENGE_DUEL_IN_PROGRESS" and world.leader(faction) == leader_before
-	print("play_test: key C from an Orthodox village refused %s, the HUD saying %s; from a Cult village accepted %s, the duel shown %s; again refused %s, the HUD saying %s: %s" % [
-		refused, reason, accepted, shown, again, again_reason, "pass" if passed else "FAIL"])
+	var again_reason: String = hud.factions.verdict
+	var passed := alone and opened and refused and reason == "CHALLENGE_NO_SUCCESSION" and accepted and shown \
+			and again and again_reason == "CHALLENGE_DUEL_IN_PROGRESS" and world.leader(faction) == leader_before
+	print("play_test: key C alone challenges no one %s; F opens the faction window %s, where C from an Orthodox village is refused %s, the window saying %s; from a Cult village accepted, closing it, %s, the duel shown %s; again refused %s, the window saying %s: %s" % [
+		alone, opened, refused, reason, accepted, shown, again, again_reason, "pass" if passed else "FAIL"])
 	cult.free()
+	return passed
+
+
+# In the faction window, a person who does not lead its faction gives no order: Enter declares
+# nothing. Control: steering its faction's leader, Enter asks war on an ally again, Escape takes it
+# back with nothing declared, and Enter twice declares it, the core then holding the war, declared by
+# the leader's faction; while the window is open a digit gives no order, and F closes it.
+func _factions_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var panel: Control = scene.get_node("Hud").factions
+	var own := world.army_faction(scene.steered)
+	scene.command(_key(KEY_F))
+	var ally := -1
+	for n in range(1, panel.rows.size()):
+		if panel.rows[n].relation == WorldAdapter.RELATION_ALLY and ally < 0:
+			ally = n
+	while panel.chosen < ally:
+		scene.command(_key(KEY_DOWN))
+	var target: int = panel.chosen_faction()
+	scene.command(_key(KEY_ENTER))
+	scene.command(_key(KEY_ENTER))
+	var member_none: bool = not panel.leads and world.declaration(own, target).is_empty() and panel.confirming == -1
+	scene.command(_key(KEY_F))
+
+	for army in world.army_count():
+		var roster := world.roster(army)
+		if not roster.is_empty() and roster[0] == world.leader(own):
+			scene.steered = army
+	scene.command(_key(KEY_F))
+	while panel.chosen < ally:
+		scene.command(_key(KEY_DOWN))
+	scene.command(_key(KEY_ENTER))
+	var asked: bool = panel.leads and panel.confirming == WorldAdapter.DECLARATION_WAR
+	scene.command(_key(KEY_ESCAPE))
+	var taken_back: bool = panel.visible and panel.confirming == -1 and world.declaration(own, target).is_empty()
+	var digit_taken: bool = not scene.command(_key(KEY_1))
+	scene.command(_key(KEY_ENTER))
+	scene.command(_key(KEY_ENTER))
+	var made := world.declaration(own, target)
+	var declared: bool = world.relation(own, target) == WorldAdapter.RELATION_AT_WAR and made.get("by", -1) == own
+	var closed: bool = scene.command(_key(KEY_F)) and not panel.visible
+	var passed := ally > 0 and member_none and asked and taken_back and digit_taken and declared and closed
+	print("play_test: in the faction window a member declares nothing %s; its leader is asked war on ally %d again %s, Escape takes it back %s, a digit gives no order %s, Enter twice declares it %s, F closes it %s: %s" % [
+		member_none, target, asked, taken_back, digit_taken, declared, closed, "pass" if passed else "FAIL"])
+	scene.free()
 	return passed
 
 

@@ -522,11 +522,14 @@ std::size_t sect_of_faction(const World& world, std::size_t faction) {
 
 // The region of seed 7, with days of one tick and a person born into village
 // `village`, homed there unless `homeless`, as the last army, lived `days`
-// days. On that seed partners free to marry come of age within 20 years.
+// days. On that seed partners free to marry come of age within 20 years,
+// with no diplomacy, whose wars would change who lives to marry.
 constexpr Seed MARRYING_SEED{7};
 
 World born_and_lived(std::size_t village, bool homeless, std::uint64_t days) {
-  Region region = generate_region(MARRYING_SEED, region_data());
+  RegionData data = region_data();
+  data.life.diplomacy.reset();
+  Region region = generate_region(MARRYING_SEED, data);
   region.rules.ticks_per_day = 1;
   ArmySpec born = born_in(region, village);
   if (homeless) {
@@ -1427,13 +1430,15 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
 constexpr Seed SONLESS{9};
 
 // region_data() with no sects, whose seats would change the region SONLESS
-// was chosen on, and no cultivation, whose draws at birth would change its
-// people; ADR 0027's rule depends on neither.
+// was chosen on, no cultivation, whose draws at birth would change its
+// people, and no diplomacy, whose draws and wars would change its history;
+// ADR 0027's rule depends on none of them.
 RegionData sectless() {
   RegionData data = region_data();
   data.sects.clear();
   data.life.manuals.reset();
   data.life.cultivation.reset();
+  data.life.diplomacy.reset();
   return data;
 }
 
