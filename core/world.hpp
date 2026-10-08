@@ -761,6 +761,25 @@ enum class CastRefusal : std::uint8_t {
   OUT_OF_RANGE,
 };
 
+/// Why a person may not talk to another, the first that holds in this order;
+/// `NONE` when it may.
+enum class TalkRefusal : std::uint8_t {
+  NONE,
+  /// Either person is dead.
+  DEAD,
+  /// The two are the same person.
+  SELF,
+  /// The other stands beyond the rules' talk reach of the person.
+  OUT_OF_REACH,
+  /// The two serve factions hostile to each other or at war, as relation()
+  /// reads them.
+  HOSTILE,
+};
+
+/// What a person offers one who talks to it: the news it has heard, its
+/// rumours().
+enum class Offer : std::uint8_t { NEWS };
+
 /// A manual held by a sect, by index.
 struct HeldBySect {
   std::size_t sect = 0;
@@ -885,6 +904,8 @@ struct Rules {
   /// Cells, along each axis, within which an event reaches a person as a
   /// rumour wherever it concerns.
   std::int32_t rumour_reach = 0;
+  /// Cells, along each axis, within which one person may talk to another.
+  std::int32_t talk_reach = 0;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -895,7 +916,8 @@ class SaveCodec;
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
-  /// Throws std::invalid_argument when the separation, the rumour reach, or a
+  /// Throws std::invalid_argument when the separation, the rumour reach, the
+  /// talk reach, or a
   /// skill's range or radius, lies outside [0, MAX_REACH], `hostile` is not
   /// square, a recruit has no health or more than MAX_HEALTH, the world would
   /// hold more than MAX_PEOPLE people, an army has no skills or a faction
@@ -1269,6 +1291,17 @@ class World {
   /// sect of it fallen, or its lead changing hands. Throws std::out_of_range
   /// when there is no such person.
   [[nodiscard]] std::vector<Event> rumours(std::size_t person) const;
+
+  /// Returns why person `person` may not talk to person `other`, or
+  /// TalkRefusal::NONE when it may. Throws std::invalid_argument when there
+  /// is no such person.
+  [[nodiscard]] TalkRefusal talk_refusal(std::size_t person,
+                                         std::size_t other) const;
+
+  /// Returns what person `person` offers one who talks to it, in the order
+  /// they are offered: nothing once it is dead, and otherwise its news.
+  /// Throws std::out_of_range when there is no such person.
+  [[nodiscard]] std::vector<Offer> offers(std::size_t person) const;
 
  private:
   friend class SaveCodec;

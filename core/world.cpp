@@ -326,6 +326,16 @@ void fold_event(const Fold& fold, const Event& event) {
 }
 
 // Folds step `step` of progress into `fold`.
+// Folds the rules' reaches; the talk reach only when set, so a world where
+// no one talks keeps its hash.
+template <typename Fold>
+void fold_reaches(const Fold& fold, const Rules& rules) {
+  fold(rules.rumour_reach);
+  if (rules.talk_reach != 0) {
+    fold(rules.talk_reach);
+  }
+}
+
 template <typename Fold>
 void fold_progress(const Fold& fold, const Progress& step) {
   fold(step.sequence);
@@ -790,11 +800,11 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     recruits += army.members.size();
   }
   if (!reachable(rules_.separation) || !reachable(rules_.rumour_reach) ||
-      recruits > MAX_PEOPLE ||
+      !reachable(rules_.talk_reach) || recruits > MAX_PEOPLE ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
-        "separation, rumour reach, range and radius must lie in "
+        "separation, rumour and talk reach, range and radius must lie in "
         "[0, MAX_REACH], hostility "
         "must be square, the world must hold at most MAX_PEOPLE people, each "
         "with health up to MAX_HEALTH on a passable cell, every army must "
@@ -874,7 +884,7 @@ void World::restore() {
   };
   const bool bad_rules =
       rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
-      !reachable(rules_.rumour_reach) ||
+      !reachable(rules_.rumour_reach) || !reachable(rules_.talk_reach) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
@@ -1465,6 +1475,38 @@ std::vector<Event> World::rumours(std::size_t person) const {
   return heard;
 }
 
+TalkRefusal World::talk_refusal(std::size_t person, std::size_t other) const {
+  if (person >= people_.size() || other >= people_.size()) {
+    throw std::invalid_argument("no such person talks to no such person");
+  }
+  if (people_.at(person).health == 0 || people_.at(other).health == 0) {
+    return TalkRefusal::DEAD;
+  }
+  if (person == other) {
+    return TalkRefusal::SELF;
+  }
+  if (!within(cell_of(people_.at(person).position),
+              cell_of(people_.at(other).position), rules_.talk_reach)) {
+    return TalkRefusal::OUT_OF_REACH;
+  }
+  const std::optional<std::size_t> own = faction_of(person);
+  const std::optional<std::size_t> theirs = faction_of(other);
+  if (own && theirs) {
+    const Relation standing = relation(*own, *theirs);
+    if (standing == Relation::HOSTILE || standing == Relation::AT_WAR) {
+      return TalkRefusal::HOSTILE;
+    }
+  }
+  return TalkRefusal::NONE;
+}
+
+std::vector<Offer> World::offers(std::size_t person) const {
+  if (people_.at(person).health == 0) {
+    return {};
+  }
+  return {Offer::NEWS};
+}
+
 // Makes the master of faction `faction`'s sects with the most favour its
 // leader, each elder of its sects favouring its own sect's master; ties go to
 // the higher best attainment, then the lower index. A faction whose sects
@@ -2036,7 +2078,7 @@ StateHash World::hash() const {
   for (const Village& village : villages_) {
     fold_village(fold, village);
   }
-  fold(rules_.rumour_reach);
+  fold_reaches(fold, rules_);
   for (const Event& event : events_) {
     fold_event(fold, event);
   }
