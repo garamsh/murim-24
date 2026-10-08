@@ -40,7 +40,7 @@ class FlowField {
   [[nodiscard]] Step straightest(const Map& map, Cell cell,
                                  Cell objective) const;
   [[nodiscard]] std::size_t index(Cell cell) const;
-  [[nodiscard]] Cell cell_at(std::size_t at) const;
+  [[nodiscard]] Cell cell_at(std::size_t slot) const;
 
   std::int32_t width_;
   std::int32_t height_;

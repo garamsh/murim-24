@@ -277,19 +277,19 @@ Walk walk_alone(Cell start, Cell objective) {
               {},
               peaceful(SEPARATION)};
   const Position from = centre_of(start);
-  const Position to = centre_of(objective);
-  const std::int64_t along_x = std::int64_t{to.x} - from.x;
-  const std::int64_t along_y = std::int64_t{to.y} - from.y;
-  const std::int64_t length = static_cast<std::int64_t>(std::sqrt(
+  const Position end = centre_of(objective);
+  const std::int64_t along_x = std::int64_t{end.x} - from.x;
+  const std::int64_t along_y = std::int64_t{end.y} - from.y;
+  const auto length = static_cast<std::int64_t>(std::sqrt(
       static_cast<double>((along_x * along_x) + (along_y * along_y))));
   Walk walk{ARRIVAL_TICKS, 0};
   for (int tick = 1; tick <= ARRIVAL_TICKS; ++tick) {
     world.tick();
-    const Position at = lead(world, 0);
-    const std::int64_t cross =
-        (along_x * (at.y - from.y)) - (along_y * (std::int64_t{at.x} - from.x));
+    const Position here = lead(world, 0);
+    const std::int64_t cross = (along_x * (here.y - from.y)) -
+                               (along_y * (std::int64_t{here.x} - from.x));
     walk.strayed = std::max(walk.strayed, std::abs(cross) / length);
-    if (in(objective, at)) {
+    if (in(objective, here)) {
       walk.ticks = tick;
       break;
     }

@@ -51,12 +51,12 @@ FlowField::FlowField(const Map& map, Cell objective)
   costs_.at(index(objective)) = 0;
   frontier.emplace(0, index(objective));
   while (!frontier.empty()) {
-    const auto [cost, at] = frontier.top();
+    const auto [cost, slot] = frontier.top();
     frontier.pop();
-    if (cost != costs_.at(at)) {
+    if (cost != costs_.at(slot)) {
       continue;
     }
-    const Cell cell = cell_at(at);
+    const Cell cell = cell_at(slot);
     for (const Step direction : DIRECTIONS) {
       const Cell next{cell.x + direction.x, cell.y + direction.y};
       // Every step is open both ways, so a path from `next` may take it back.
@@ -70,9 +70,9 @@ FlowField::FlowField(const Map& map, Cell objective)
       }
     }
   }
-  for (std::size_t at = 0; at < steps_.size(); ++at) {
-    if (costs_.at(at) != UNREACHABLE && costs_.at(at) != 0) {
-      steps_.at(at) = straightest(map, cell_at(at), objective);
+  for (std::size_t slot = 0; slot < steps_.size(); ++slot) {
+    if (costs_.at(slot) != UNREACHABLE && costs_.at(slot) != 0) {
+      steps_.at(slot) = straightest(map, cell_at(slot), objective);
     }
   }
 }
@@ -119,10 +119,10 @@ std::size_t FlowField::index(Cell cell) const {
          static_cast<std::size_t>(cell.x);
 }
 
-Cell FlowField::cell_at(std::size_t at) const {
+Cell FlowField::cell_at(std::size_t slot) const {
   const auto width = static_cast<std::size_t>(width_);
-  return Cell{static_cast<std::int32_t>(at % width),
-              static_cast<std::int32_t>(at / width)};
+  return Cell{static_cast<std::int32_t>(slot % width),
+              static_cast<std::int32_t>(slot / width)};
 }
 
 }  // namespace murim
