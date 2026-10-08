@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -187,7 +188,7 @@ std::vector<ArmySpec> crossing_armies() {
       {{1, 1}, {46, 46}, {12, 10}, 0, {strike, blast}},
       {{46, 1}, {1, 46}, {30, 10}, 1, {strike}},
       {{1, 46}, {46, 1}, {5, 10}, 1, {blast, strike}},
-      {{46, 46}, {1, 1}, {2, 10}, 0, {blast}},
+      {{46, 46}, {1, 1}, {3, 10}, 0, {blast}},
   };
   const std::vector<std::string> rows = crossing_map();
   std::vector<ArmySpec> armies;
@@ -243,7 +244,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x821A3A1023A37426ULL);
+            0x777172169F440DDCULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -260,6 +261,62 @@ TEST(World, PeopleReachTheirObjectiveAroundAWall) {
   EXPECT_TRUE(in(marching.objective, lead(world, 0)));
 }
 
+// How one person ordered from `start` to `objective` on an open map walks
+// there: the ticks it takes to stand on the objective's cell, or
+// ARRIVAL_TICKS when it never does, and the furthest it strays from the
+// line between the two cells' centres, in sub-cell units.
+struct Walk {
+  int ticks;
+  std::int64_t strayed;
+};
+
+Walk walk_alone(Cell start, Cell objective) {
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(start, objective, 1, 1, 0, {IDLE})},
+              {},
+              peaceful(SEPARATION)};
+  const Position from = centre_of(start);
+  const Position to = centre_of(objective);
+  const std::int64_t along_x = std::int64_t{to.x} - from.x;
+  const std::int64_t along_y = std::int64_t{to.y} - from.y;
+  const std::int64_t length = static_cast<std::int64_t>(std::sqrt(
+      static_cast<double>((along_x * along_x) + (along_y * along_y))));
+  Walk walk{ARRIVAL_TICKS, 0};
+  for (int tick = 1; tick <= ARRIVAL_TICKS; ++tick) {
+    world.tick();
+    const Position at = lead(world, 0);
+    const std::int64_t cross =
+        (along_x * (at.y - from.y)) - (along_y * (std::int64_t{at.x} - from.x));
+    walk.strayed = std::max(walk.strayed, std::abs(cross) / length);
+    if (in(objective, at)) {
+      walk.ticks = tick;
+      break;
+    }
+  }
+  return walk;
+}
+
+TEST(World, APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed) {
+  // Ten cells each way: the objective's cell is entered half a cell short of
+  // its centre, 9.5 cells each way from the start's.
+  const Walk diagonal = walk_alone({2, 2}, {12, 12});
+  const Walk straight = walk_alone({2, 2}, {12, 2});
+  // Setup: both arrived.
+  ASSERT_LT(diagonal.ticks, ARRIVAL_TICKS);
+  ASSERT_LT(straight.ticks, ARRIVAL_TICKS);
+
+  // On the line between the centres, where a staircase strays half a cell,
+  // and in its row walked straight.
+  EXPECT_EQ(diagonal.strayed, 0);
+  EXPECT_EQ(straight.strayed, 0);
+  // 9.5 cells, 2,432 units, at SPEED straight; at DIAGONAL_SPEED on each
+  // axis diagonally, 11 times the square root of two, 2.8% short of SPEED
+  // over the square root of two times as far.
+  EXPECT_EQ(straight.ticks, 152);
+  EXPECT_EQ(diagonal.ticks, 222);
+}
+
 // Where an army of nine stands after ARRIVAL_TICKS at its objective, with
 // `separation`.
 std::vector<Position> arrive(std::int32_t separation) {
@@ -271,7 +328,10 @@ std::vector<Position> arrive(std::int32_t separation) {
 }
 
 TEST(World, PeopleAtTheirObjectiveStandTheSeparationApart) {
-  const std::int64_t apart = std::int64_t{SEPARATION} * SEPARATION;
+  // To within a sub-cell unit: two people a diagonal apart and a unit short
+  // of it push each other less than a unit along either axis, which rounds
+  // to none.
+  const std::int64_t apart = std::int64_t{SEPARATION - 1} * (SEPARATION - 1);
   const std::vector<Position> separated = arrive(SEPARATION);
   // Setup: the army arrived, its lead within a cell of the objective.
   ASSERT_LE(distance_squared(separated.front(), centre_of({12, 12})),
@@ -282,14 +342,16 @@ TEST(World, PeopleAtTheirObjectiveStandTheSeparationApart) {
 }
 
 // The closest any two members of a column of nine come while it marches
-// east across a 32-cell map, once it has spread out from its start and
-// before its first members near the objective and stand.
+// across a 48-cell map toward a cell eight rows off its own, so its people
+// close on one another, once it has spread out from its start and
+// before its first members near the objective and stand: its lead stays more
+// than ten cells short of it.
 std::int64_t closest_while_marching(std::int32_t separation) {
-  constexpr std::size_t SIDE = 32;
+  constexpr std::size_t SIDE = 48;
   constexpr int SPREAD_TICKS = 100;
   constexpr int MARCH_TICKS = 300;
   const std::vector<std::string> rows = open_map(SIDE);
-  const ArmySpec column = army(rows, {2, 16}, {29, 16}, 9, 1, 0, {IDLE});
+  const ArmySpec column = army(rows, {2, 16}, {45, 24}, 9, 1, 0, {IDLE});
   World world{Seed{1}, Map{rows}, {column}, {}, peaceful(separation)};
   run_ticks(world, SPREAD_TICKS);
   std::int64_t closest = std::numeric_limits<std::int64_t>::max();
@@ -297,8 +359,10 @@ std::int64_t closest_while_marching(std::int32_t separation) {
     world.tick();
     closest = std::min(closest, closest_pair_squared(positions(world, 0)));
   }
-  // Setup: the column marched, so the distances were measured on the move.
+  // Setup: the column marched, so the distances were measured on the move,
+  // and its lead stayed short of where its first members stand.
   EXPECT_GT(cell_of(lead(world, 0)).x, 10);
+  EXPECT_LT(cell_of(lead(world, 0)).x, 45 - 10);
   return closest;
 }
 
@@ -815,7 +879,7 @@ TEST(World, ReplayingARecordedOrderLogGivesTheSameHash) {
 
   // Control: the same log with one order a tick later is another run.
   std::vector<LoggedOrder> late = recorded;
-  late.at(1).tick += 1;
+  late.at(2).tick += 1;
   World shifted = orders_world(STEERED_HOME);
   drive(shifted, late, ORDER_TICKS);
   EXPECT_NE(live.hash(), shifted.hash());

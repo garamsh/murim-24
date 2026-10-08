@@ -234,14 +234,17 @@ Push aside(Position from, Position there, std::int64_t separation, Step way,
 }
 
 // Moves from `from` one step along `direction`, one axis at a time, into
-// cells the flow field reaches only.
+// cells the flow field reaches only; a diagonal step at DIAGONAL_SPEED on
+// each axis.
 Position stepped(const FlowField& field, Position from, Step direction) {
   const auto reached = [&field](Position position) {
     return field.distance(cell_of(position)) != FlowField::UNREACHABLE;
   };
-  const Position along_x{from.x + (direction.x * SPEED), from.y};
+  const std::int32_t speed =
+      direction.x != 0 && direction.y != 0 ? DIAGONAL_SPEED : SPEED;
+  const Position along_x{from.x + (direction.x * speed), from.y};
   const Position moved_x = reached(along_x) ? along_x : from;
-  const Position along_y{moved_x.x, moved_x.y + (direction.y * SPEED)};
+  const Position along_y{moved_x.x, moved_x.y + (direction.y * speed)};
   return reached(along_y) ? along_y : moved_x;
 }
 

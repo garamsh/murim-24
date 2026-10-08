@@ -911,6 +911,11 @@ struct Rules {
 /// Sub-cell units a person moves per tick.
 constexpr std::int32_t SPEED = 16;
 
+/// Sub-cell units a person moves along each axis per tick on a diagonal step:
+/// the whole number nearest SPEED over the square root of two, so it covers
+/// within 3% of SPEED either way.
+constexpr std::int32_t DIAGONAL_SPEED = 11;
+
 class SaveCodec;
 
 /// The simulated world, advanced one deterministic step at a time.
