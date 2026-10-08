@@ -1,0 +1,5 @@
+terrain side 512 seed 2026 plain 168323 forest 43590 hills 33724 water 12996 mountain 3511 total 262144
+terrain side 512 seed 7 plain 113305 forest 59500 hills 60254 water 7865 mountain 21220 total 262144
+terrain side 512 seed 24 plain 178019 forest 32610 hills 13280 water 4376 mountain 33859 total 262144
+terrain side 512 seed 0 plain 161715 forest 22327 hills 41394 water 25929 mountain 10779 total 262144
+terrain side 512 seed 1 plain 157050 forest 49498 hills 55596 water 0 mountain 0 total 262144

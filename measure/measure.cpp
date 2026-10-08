@@ -285,6 +285,20 @@ int region_run(std::size_t people, std::uint64_t seed) {
   return 0;
 }
 
+// Cells of each terrain kind in the generated region of `seed`.
+int terrain(std::uint64_t seed) {
+  const RegionData data = region_data();
+  const Region region = generate_region(Seed{seed}, data);
+  std::vector<std::size_t> cells(data.terrain.size(), 0);
+  for (const std::size_t kind : region.terrain) ++cells.at(kind);
+  std::cout << "terrain side " << REGION_SIDE << " seed " << seed;
+  for (std::size_t kind = 0; kind < cells.size(); ++kind) {
+    std::cout << " " << data.terrain.at(kind).name << " " << cells.at(kind);
+  }
+  std::cout << " total " << region.terrain.size() << "\n";
+  return 0;
+}
+
 }  // namespace
 }  // namespace murim
 
@@ -297,6 +311,7 @@ int main(int argc, char** argv) {
   if (mode == "region" && argc == 4) {
     return murim::region_run(std::stoul(argv[2]), std::stoull(argv[3]));
   }
+  if (mode == "terrain" && argc == 3) return murim::terrain(std::stoull(argv[2]));
   std::cerr << "usage: measure battle <people> <side> | field <side> | "
                "region <people> <seed>\n";
   return 2;
