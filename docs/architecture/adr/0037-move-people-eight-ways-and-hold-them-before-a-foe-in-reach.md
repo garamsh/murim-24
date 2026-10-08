@@ -1,4 +1,4 @@
-# ADR 0037: Move people eight ways along the straightest shortest path
+# ADR 0037: Move people eight ways, and hold them before a foe in reach
 
 > Status: accepted
 > Date: 2026-10-08
@@ -19,9 +19,16 @@ Options weighed, each to keep ADR 0020's queue through a one-cell gap, ADR 0017'
 - **Eight ways with Chebyshev distance.** Every step costs one, so going straight and going diagonal tie. A walk along a row may zigzag, and the arrival ring becomes a square. Rejected.
 - **Diagonals past one blocked cell.** Paths round a single corner get shorter. A step moves one axis at a time and enters only cells the field reaches, so a body crossing that corner is refused on one axis and slides along the other, a hitch where the field promised a straight diagonal. Rejected.
 
+Eight ways alone let hostile people walk past each other. Two lines of twenty skirmishers bound for each other's starts, the region test's scenario, fought for about 800 ticks on seed 24. Then the last 2 and 5 slipped diagonally through the gaps in each other's thinned lines and stood at their objectives 3.19 cells apart, past the guard strike's 3. On `main` the lines stay pressed together, since a 4-connected step cannot go round the person ahead, and fight until one has no one left. In the crossing scenario, an army of two passes the others unharmed. Striking never depended on the path: a person in range strikes. Only movement carried people out of range. Options weighed:
+
+- **Hold before a foe in reach.** A person on the move feels no pull while a living foe, someone it would strike, lies ahead of it along its pull within its reach. Its reach is the longest range among its order's skills and the art skills it knows. It holds and fights until that foe is dead or no longer ahead, then walks on. A foe behind or beside it holds no one, so a person ordered away from a fight walks off. Chosen.
+- **Bind the scenarios' armies for one meeting cell.** Rejected in review of PR #174: it hides the behaviour rather than fixing it, and two bands marching at each other is play.
+- **Let hostile people always count as ahead.** A person on the move gives way to every foe, ahead or behind. It still goes round a foe through a gap, since the push only steers it aside. Rejected.
+- **Close on the nearest foe.** ADR 0020 rejected a pull toward hostiles as a second steering rule.
+
 ## Decision
 
-The flow field is 8-connected. A straight step costs 5 and a diagonal step 7, and a diagonal step is open only where both cells beside it are passable. Each cell's step is the one, of those beginning a shortest path, whose cell lies nearest the straight line to the objective, a diagonal first among equals. Its distance is the path's cost over 5, in cells rounded down. A diagonal step moves `DIAGONAL_SPEED`, 11 units, along each axis, about `SPEED` over the square root of two, so a person moves at about `SPEED` whichever way it goes. This supersedes ADR 0005's breadth-first search over 4-connected cells; its flow field per army stays, as ADR 0017 keeps it, and so do ADR 0017's and ADR 0020's rules of who gives way.
+The flow field is 8-connected. A straight step costs 5 and a diagonal step 7, and a diagonal step is open only where both cells beside it are passable. Each cell's step is the one, of those beginning a shortest path, whose cell lies nearest the straight line to the objective, a diagonal first among equals. Its distance is the path's cost over 5, in cells rounded down. A diagonal step moves `DIAGONAL_SPEED`, 11 units, along each axis, about `SPEED` over the square root of two, so a person moves at about `SPEED` whichever way it goes. A person on the move feels no pull while a living foe lies ahead of it along its pull within its reach, the longest range of its order's skills and the art skills it knows; pushes still move it. This supersedes ADR 0005's breadth-first search over 4-connected cells. Its flow field per army stays, as ADR 0017 keeps it, and so do ADR 0017's and ADR 0020's rules of who gives way, with one addition: a pull held for a foe.
 
 ## Consequences
 
@@ -29,9 +36,11 @@ The flow field is 8-connected. A straight step costs 5 and a diagonal step 7, an
 - Straight walks keep `SPEED`. A diagonal covers 15.6 units a tick, 2.8% short of it, so 9.5 cells each way take 222 ticks where 9.5 straight take 152.
 - Which cells a person can reach is unchanged: a diagonal step is open only where its two straight steps are.
 - The joystick's eight ways and the right button's cell are walked as given. `play_test` shows both walking a diagonal, along each axis to within a cell.
-- People on the move pass round one another more often. Two lines of skirmishers bound for each other's starts now slip past and stand out of range. The region's skirmish test binds both lines for the cell between them, and they fall within its target time. The crossing scenario's army of two, which now passes the others unharmed, has three.
+- Two people on crossing diagonals, at war, hold 2.95 cells apart, within their 3-cell strike, and strike each other. One ordered back the way it came walks off. At peace the same two close to 0.98 cells. A test shows this. The region's skirmish scenario, unchanged, ends within its target time on its three seeds, and so does the crossing scenario, its army of two losing a member.
+- A raider holds at the first defender within its reach rather than walking on to the village's centre, and the player's body holds as any NPC does. Neither walks past a foe ahead within its reach until that foe falls or is no longer ahead.
+- Two people at peace who meet head-on still hold each other up, as on `main`: the open question in `simulation.md` stands.
 - People closing on an objective from either side of it come within half a cell of each other, which straight paths never did, until they stand and spread out.
-- Building a field costs a priority queue in place of a queue, and a second pass to choose steps. `make bench` holds the tick within its budget.
+- Building a field costs a priority queue in place of a queue, and a second pass to choose steps. Each person on the move also looks for a foe within its reach on every tick. `make bench` holds the tick within its budget.
 - The pinned determinism hash changed.
 
 ## Signs the decision was wrong
@@ -39,3 +48,4 @@ The flow field is 8-connected. A straight step costs 5 and a diagonal step 7, an
 - People closing on an objective stay overlapped after they stand, or a band queuing through a gap jams where it used to queue.
 - A walk on open ground to a cell on no diagonal visibly bends, enough that the owner names it as a staircase again.
 - A field rebuilt for every army when growth lays a blocking structure costs a tick past its budget.
+- A raid stalls at a village's edge, holding at defenders it cannot outfight, where it used to reach the centre. Or the player finds the body stopping short of where it was sent with a foe ahead, and names it as a fault.

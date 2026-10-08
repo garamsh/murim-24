@@ -1884,23 +1884,9 @@ void World::tick() {
                       army.roster.end());
   }
   note_falls(std::move(bereft));
-  // Each person's pull toward its objective, from where it stood: none
-  // within its arrival ring, as many cells from the objective as the square
-  // root of its rank in its army. A person within two cells of its ring
-  // counts as standing still, so a crowd jostled a little stays standing.
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
-  for (const Army& army : armies_) {
-    for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
-      const std::size_t index = slot.at(army.roster.at(rank));
-      const Cell cell = cell_of(crowd.hash.position(index));
-      const auto ring =
-          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
-      const std::uint32_t distance = army.field.distance(cell);
-      pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
-      standing.at(index) = distance <= ring + STANDING_SLACK;
-    }
-  }
+  steer(crowd, slot, pulls, standing);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     march(army, crowd, slot, pulls, standing);
   }
@@ -1959,6 +1945,33 @@ std::vector<World::Passing> World::passings() const {
     }
   }
   return reborn;
+}
+
+// Each person's pull toward its objective, from where it stood: none
+// within its arrival ring, as many cells from the objective as the square
+// root of its rank in its army, and none while a living foe within its
+// reach lies ahead along it, so it holds and fights rather than walking
+// past. A person within two cells of its ring counts as standing still, so
+// a crowd jostled a little stays standing.
+void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
+                  std::vector<Step>& pulls, std::vector<bool>& standing) const {
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    const Army& marching = armies_.at(army);
+    for (std::size_t rank = 0; rank < marching.roster.size(); ++rank) {
+      const std::size_t member = marching.roster.at(rank);
+      const std::size_t index = slot.at(member);
+      const Position from = crowd.hash.position(index);
+      const Cell cell = cell_of(from);
+      const auto ring =
+          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
+      const std::uint32_t distance = marching.field.distance(cell);
+      const Step pull =
+          distance > ring ? marching.field.step(cell) : Step{0, 0};
+      pulls.at(index) =
+          held(member, army, from, pull, crowd) ? Step{0, 0} : pull;
+      standing.at(index) = distance <= ring + STANDING_SLACK;
+    }
+  }
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -2602,6 +2615,42 @@ std::optional<std::size_t> World::lesson(const Person& person, std::size_t art,
     }
   }
   return std::nullopt;
+}
+
+// Whether person `member` of army `army`, at `from` and pulled along `pull`,
+// has a living foe ahead of it along the pull within its reach.
+bool World::held(std::size_t member, std::size_t army, Position from, Step pull,
+                 const Crowd& crowd) const {
+  bool engaged = false;
+  if (pull.x == 0 && pull.y == 0) {
+    return engaged;
+  }
+  crowd.hash.visit_within(
+      from, reach(people_.at(member), armies_.at(army)),
+      [&](std::size_t other) {
+        const Position there = crowd.hash.position(other);
+        const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
+                                   ((std::int64_t{there.y} - from.y) * pull.y);
+        engaged = engaged ||
+                  (ahead > 0 && people_.at(crowd.people.at(other)).health > 0 &&
+                   foes(member, army, crowd.people.at(other),
+                        crowd.armies.at(other)));
+      });
+  return engaged;
+}
+
+// The farthest person `person` of army `army` may strike on its own: the
+// longest range of its order's skills and the art skills it knows.
+std::int32_t World::reach(const Person& person, const Army& army) const {
+  std::int32_t farthest = 0;
+  for (const std::size_t skill : army.order.skills) {
+    farthest = std::max(farthest, army.skills.at(skill).range);
+  }
+  for (const Known& known : person.known) {
+    farthest = std::max(
+        farthest, life_.arts.at(known.art).skills.at(known.skill).skill.range);
+  }
+  return farthest;
 }
 
 // Whether person `person` of army `army` strikes person `other` of army

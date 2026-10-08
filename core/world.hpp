@@ -1396,6 +1396,10 @@ class World {
   void teach();
   [[nodiscard]] bool foes(std::size_t person, std::size_t army,
                           std::size_t other, std::size_t other_army) const;
+  [[nodiscard]] std::int32_t reach(const Person& person,
+                                   const Army& army) const;
+  [[nodiscard]] bool held(std::size_t member, std::size_t army, Position from,
+                          Step pull, const Crowd& crowd) const;
   [[nodiscard]] Position landing(const Person& caster, const Skill& skill,
                                  const Target& target) const;
   [[nodiscard]] CastRefusal assess_cast(std::size_t person,
@@ -1534,6 +1538,8 @@ class World {
   };
   [[nodiscard]] Ground ground() const;
   [[nodiscard]] std::vector<Passing> passings() const;
+  void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
+             std::vector<Step>& pulls, std::vector<bool>& standing) const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
              const std::vector<Step>& pulls, const std::vector<bool>& standing);

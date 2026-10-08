@@ -769,9 +769,10 @@ std::uint64_t skirmish_ticks(const RegionData& data, Seed seed,
   const std::optional<Cell> field = open_field(region);
   EXPECT_TRUE(field.has_value());
   const Cell corner = field.value_or(Cell{0, 0});
-  const Cell between{corner.x + ((APART + LINE) / 2), corner.y + 2};
-  ArmySpec orthodox{between, {}, 0, data.factions.at(0).skills};
-  ArmySpec demonic{between, {}, DEMONIC, data.factions.at(DEMONIC).skills};
+  const Cell west{corner.x + 2, corner.y + 2};
+  const Cell east{corner.x + APART + 2, corner.y + 2};
+  ArmySpec orthodox{east, {}, 0, data.factions.at(0).skills};
+  ArmySpec demonic{west, {}, DEMONIC, data.factions.at(DEMONIC).skills};
   for (const Cell cell : cells_of(corner, Footprint{LINE, 5})) {
     orthodox.members.push_back(Recruit{cell, data.life.newborn_health});
     demonic.members.push_back(

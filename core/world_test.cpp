@@ -188,7 +188,7 @@ std::vector<ArmySpec> crossing_armies() {
       {{1, 1}, {46, 46}, {12, 10}, 0, {strike, blast}},
       {{46, 1}, {1, 46}, {30, 10}, 1, {strike}},
       {{1, 46}, {46, 1}, {5, 10}, 1, {blast, strike}},
-      {{46, 46}, {1, 1}, {3, 10}, 0, {blast}},
+      {{46, 46}, {1, 1}, {2, 10}, 0, {blast}},
   };
   const std::vector<std::string> rows = crossing_map();
   std::vector<ArmySpec> armies;
@@ -244,7 +244,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x777172169F440DDCULL);
+            0x5686CDFB091B3C98ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -419,6 +419,59 @@ std::uint64_t health_lost(const ArmySpec& user, const ArmySpec& target,
 
 // Health each single-person target starts with in the combat tests.
 constexpr std::uint64_t TARGET_HEALTH = 1'000'000;
+
+// Two people crossing an open map on diagonals that meet at its centre, of
+// factions at war or at peace, each with a strike of three cells that
+// never kills in the time given.
+constexpr Cell NORTH_WEST{2, 2};
+constexpr Cell NORTH_EAST{12, 2};
+constexpr Cell SOUTH_WEST{2, 12};
+constexpr Cell SOUTH_EAST{12, 12};
+
+World crossing_diagonals(bool war) {
+  const Skill strike{3 * CELL_SIZE, 0, 1, 0, 10};
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(NORTH_WEST, SOUTH_EAST, 1, TARGET_HEALTH, 0, {strike}),
+                army(NORTH_EAST, SOUTH_WEST, 1, TARGET_HEALTH, 1, {strike})},
+               {},
+               Rules{SEPARATION, {{false, war}, {war, false}}, STAGE_FLOORS}};
+}
+
+// The closest the two people of `world` come in ARRIVAL_TICKS, squared.
+std::int64_t closest_crossing(World& world) {
+  std::int64_t closest = std::numeric_limits<std::int64_t>::max();
+  for (int tick = 0; tick < ARRIVAL_TICKS; ++tick) {
+    world.tick();
+    closest =
+        std::min(closest, distance_squared(lead(world, 0), lead(world, 1)));
+  }
+  return closest;
+}
+
+TEST(World, FoesOnCrossingDiagonalsHoldWithinReachAndFight) {
+  const std::int64_t reach = std::int64_t{3} * CELL_SIZE;
+  const std::int64_t two_cells = std::int64_t{2} * CELL_SIZE;
+  World war = crossing_diagonals(true);
+  const std::int64_t held = closest_crossing(war);
+
+  // Each halted with the other ahead within its reach, short of two cells
+  // apart, held there, and both were struck.
+  EXPECT_GT(held, two_cells * two_cells);
+  EXPECT_LE(distance_squared(lead(war, 0), lead(war, 1)), reach * reach);
+  EXPECT_LT(health_of(war, 0), TARGET_HEALTH);
+  EXPECT_LT(health_of(war, 1), TARGET_HEALTH);
+  // Ordered back the way it came, its foe behind it, one walks off.
+  war.order(0, {NORTH_WEST, {0}});
+  run_ticks(war, ARRIVAL_TICKS);
+  EXPECT_TRUE(in(NORTH_WEST, lead(war, 0)));
+
+  // Control: at peace the same two walk on within two cells of each other,
+  // where foes hold.
+  World peace = crossing_diagonals(false);
+  EXPECT_LT(closest_crossing(peace), two_cells * two_cells);
+  EXPECT_EQ(health_of(peace, 0), TARGET_HEALTH);
+}
 
 TEST(World, OnlyHostilePeopleWithinRangeUseTheirSkills) {
   const Skill reach{2 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN};
