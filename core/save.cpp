@@ -840,6 +840,14 @@ void put_event(Writer& out, const Event& event) {
           out.size(what.faction);
           out.size(what.leader);
           out.u8(static_cast<std::uint8_t>(what.by));
+        } else if constexpr (std::is_same_v<Kind, Learned>) {
+          out.size(what.person);
+          out.size(what.art);
+          out.size(what.skill);
+          out.u8(static_cast<std::uint8_t>(what.by));
+        } else if constexpr (std::is_same_v<Kind, RealmGained>) {
+          out.size(what.person);
+          out.size(what.rank);
         } else {
           out.size(what.person);
         }
@@ -850,6 +858,7 @@ void put_event(Writer& out, const Event& event) {
 Event get_event(Reader& input) {
   constexpr std::uint8_t HAPPENINGS = std::variant_size_v<Happening>;
   constexpr std::uint8_t CHOICES = 2;
+  constexpr std::uint8_t LESSONS = 3;
   // The happenings' tags, as their index in Happening.
   constexpr std::uint8_t FOUNDED = 0;
   constexpr std::uint8_t RAIDED = 1;
@@ -857,6 +866,8 @@ Event get_event(Reader& input) {
   constexpr std::uint8_t SECT_FELL = 3;
   constexpr std::uint8_t LEADER_CHANGED = 4;
   constexpr std::uint8_t BORN = 5;
+  constexpr std::uint8_t DIED = 6;
+  constexpr std::uint8_t LEARNED = 7;
   Event event;
   event.sequence = input.u64();
   event.tick = input.u64();
@@ -895,9 +906,22 @@ Event get_event(Reader& input) {
     case BORN:
       event.what = Born{input.size()};
       break;
-    default:
+    case DIED:
       event.what = Died{input.size()};
       break;
+    case LEARNED: {
+      const std::size_t person = input.size();
+      const std::size_t art = input.size();
+      const std::size_t skill = input.size();
+      event.what = Learned{person, art, skill,
+                           static_cast<LearnedBy>(input.tag(LESSONS))};
+      break;
+    }
+    default: {
+      const std::size_t person = input.size();
+      event.what = RealmGained{person, input.size()};
+      break;
+    }
   }
   return event;
 }

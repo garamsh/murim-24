@@ -3279,6 +3279,7 @@ struct Cultivating {
                     PER_MILLE, PER_MILLE, PER_MILLE, PER_MILLE};
   std::vector<std::size_t> held{0, 1};
   std::uint32_t admission_chance = 0;
+  std::int32_t rumour_reach = 0;
 };
 
 constexpr std::size_t READER = 0;
@@ -3335,6 +3336,7 @@ World qi_world(const Cultivating& cultivating) {
       {{false, false, true}, {false, false, false}, {true, false, false}},
       STAGE_FLOORS};
   rules.ticks_per_day = 1;
+  rules.rumour_reach = cultivating.rumour_reach;
   const Leadership members{
       std::nullopt, std::nullopt,
       Admission{0, 0, 0, OPEN_SIDE, cultivating.admission_chance, PER_MILLE},
@@ -3724,6 +3726,102 @@ TEST(World, ASectTeachesItsArtsWithinItsMembersAndEldersRealms) {
   World idle = qi_world(Cultivating{});
   run_ticks(idle, DAYS_PER_YEAR);
   EXPECT_TRUE(idle.person(1).known.empty());
+}
+
+// The skills person `person` was recorded learning `by`, as (art, skill)
+// pairs oldest first, among the events `world` keeps.
+std::vector<std::pair<std::size_t, std::size_t>> recorded_learning(
+    const World& world, std::size_t person, LearnedBy by) {
+  std::vector<std::pair<std::size_t, std::size_t>> learned;
+  for (const Event& event : world.events()) {
+    const auto* lesson = std::get_if<Learned>(&event.what);
+    if (lesson != nullptr && lesson->person == person && lesson->by == by) {
+      learned.emplace_back(lesson->art, lesson->skill);
+    }
+  }
+  return learned;
+}
+
+// The realm ranks person `person` was recorded reaching, oldest first.
+std::vector<std::size_t> recorded_realms(const World& world,
+                                         std::size_t person) {
+  std::vector<std::size_t> ranks;
+  for (const Event& event : world.events()) {
+    const auto* gained = std::get_if<RealmGained>(&event.what);
+    if (gained != nullptr && gained->person == person) {
+      ranks.push_back(gained->rank);
+    }
+  }
+  return ranks;
+}
+
+TEST(World, EveryRealmGainedAndSkillReadFromAManualIsRecorded) {
+  const World world = read(Cultivating{});
+  ASSERT_EQ(world.rank(READER), 3U);
+  EXPECT_EQ(recorded_realms(world, READER),
+            (std::vector<std::size_t>{1, 2, 3}));
+  EXPECT_EQ(recorded_learning(world, READER, LearnedBy::MANUAL),
+            known_by(world, READER));
+  // Control: a reader short of the reading's qi gains the same realms and
+  // is recorded learning nothing.
+  Cultivating costly;
+  costly.learning.reading_cost = QI_LIMIT + 1;
+  const World unread = read(costly);
+  ASSERT_TRUE(known_by(unread, READER).empty());
+  EXPECT_EQ(recorded_realms(unread, READER),
+            (std::vector<std::size_t>{1, 2, 3}));
+  EXPECT_TRUE(recorded_learning(unread, READER, LearnedBy::MANUAL).empty());
+}
+
+TEST(World, ASkillComprehendedOrTaughtIsRecordedHowItWasLearned) {
+  Cultivating slow;
+  slow.growth = {4, 0};
+  slow.learning.comprehension = PER_MILLE;
+  slow.held = {0};
+  const World comprehending = walked_away(slow);
+  ASSERT_EQ(known_by(comprehending, READER).back(),
+            (std::pair<std::size_t, std::size_t>{ORTHODOX_ART, 2}));
+  EXPECT_EQ(
+      recorded_learning(comprehending, READER, LearnedBy::COMPREHENSION),
+      (std::vector<std::pair<std::size_t, std::size_t>>{{ORTHODOX_ART, 2}}));
+  Cultivating taught;
+  taught.learning.teaching = PER_MILLE;
+  taught.held = {0};
+  World teaching = qi_world(taught);
+  run_ticks(teaching, DAYS_PER_YEAR);
+  for (const std::size_t member : {std::size_t{1}, std::size_t{2}}) {
+    ASSERT_FALSE(teaching.person(member).known.empty());
+    EXPECT_EQ(recorded_learning(teaching, member, LearnedBy::TEACHING),
+              known_by(teaching, member));
+  }
+  // Controls: with no chance of comprehension or of teaching, none is
+  // recorded.
+  Cultivating unmoved = slow;
+  unmoved.learning.comprehension = 0;
+  EXPECT_TRUE(
+      recorded_learning(walked_away(unmoved), READER, LearnedBy::COMPREHENSION)
+          .empty());
+  World idle = qi_world(Cultivating{});
+  run_ticks(idle, DAYS_PER_YEAR);
+  EXPECT_TRUE(recorded_learning(idle, 1, LearnedBy::TEACHING).empty());
+}
+
+TEST(World, ASkillLearnedOrARealmGainedIsNoRumour) {
+  // Every event in the region is within the reader's reach.
+  Cultivating near;
+  near.rumour_reach = OPEN_SIDE;
+  const World world = read(near);
+  ASSERT_FALSE(recorded_realms(world, READER).empty());
+  ASSERT_FALSE(recorded_learning(world, READER, LearnedBy::MANUAL).empty());
+  const std::vector<Event> heard = world.rumours(READER);
+  for (const Event& event : heard) {
+    EXPECT_FALSE(std::holds_alternative<Learned>(event.what));
+    EXPECT_FALSE(std::holds_alternative<RealmGained>(event.what));
+  }
+  // Control: the sect's fall, recorded within the same reach, reaches it.
+  EXPECT_TRUE(std::any_of(heard.begin(), heard.end(), [](const Event& event) {
+    return std::holds_alternative<SectFell>(event.what);
+  }));
 }
 
 TEST(World, KnownSkillsAndQiArePartOfTheHash) {

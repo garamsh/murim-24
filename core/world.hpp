@@ -767,9 +767,27 @@ struct Died {
   std::size_t person = 0;
 };
 
+/// How a person came by a skill: by comprehension on a realm gained, by
+/// reading a manual lying on a cell, or by its sect's teaching.
+enum class LearnedBy : std::uint8_t { COMPREHENSION, MANUAL, TEACHING };
+
+/// Person `person` learned skill `skill` of art `art`, `by`.
+struct Learned {
+  std::size_t person = 0;
+  std::size_t art = 0;
+  std::size_t skill = 0;
+  LearnedBy by = LearnedBy::COMPREHENSION;
+};
+
+/// Person `person` reached the realm of rank `rank`, counted from 1.
+struct RealmGained {
+  std::size_t person = 0;
+  std::size_t rank = 0;
+};
+
 /// What happened in an event.
-using Happening =
-    std::variant<Founded, Raided, Ruined, SectFell, LeaderChanged, Born, Died>;
+using Happening = std::variant<Founded, Raided, Ruined, SectFell, LeaderChanged,
+                               Born, Died, Learned, RealmGained>;
 
 /// Something that happened in the world: the `sequence`-th event recorded,
 /// counted from 0, on tick `tick`, at `cell`.
@@ -1131,8 +1149,9 @@ class World {
   /// and wherever they happened, the births and deaths of its kin (its
   /// family, spouses, parents and children) and what befell its faction: a
   /// village of it founded, raided or ruined, or by it raided or ruined, a
-  /// sect of it fallen, or its lead changing hands. Throws std::out_of_range
-  /// when there is no such person.
+  /// sect of it fallen, or its lead changing hands. A skill learned and a
+  /// realm gained reach no one. Throws std::out_of_range when there is no
+  /// such person.
   [[nodiscard]] std::vector<Event> rumours(std::size_t person) const;
 
  private:
@@ -1216,7 +1235,7 @@ class World {
                                                   std::uint32_t rank) const;
   void train();
   void cultivate();
-  void comprehend(Person& person, std::uint32_t rank);
+  void comprehend(std::size_t person, std::uint32_t rank);
   void recover(const Cultivation& cultivation);
   void read_manuals();
   void teach();

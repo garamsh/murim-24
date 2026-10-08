@@ -304,6 +304,99 @@ TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
+TEST(Save, ASealedSaveNamingARealmNoEventCanNameIsRefused) {
+  // One person cultivating 10 qi a day reaches the one realm, at 10, on the
+  // first day: the save keeps that event, then the souls, surnames,
+  // structures' villages and plans, each an empty list.
+  constexpr std::uint32_t DAILY = 10;
+  Life life{{{"sword", {1, 0}, {1, 0}}},
+            1,
+            std::nullopt,
+            0,
+            0,
+            0,
+            std::nullopt,
+            std::nullopt,
+            {},
+            std::nullopt,
+            std::nullopt,
+            std::nullopt,
+            Cultivation{{DAILY, 0}, {DAILY, 0}, 0, 1},
+            {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
+            {},
+            Learning{}};
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{{"....", "...."}},
+              {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{}}}},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  world.tick();
+  ASSERT_EQ(world.events().size(), 1U);
+  const auto* gained = std::get_if<RealmGained>(&world.events().back().what);
+  ASSERT_NE(gained, nullptr);
+  ASSERT_EQ(gained->rank, 1U);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The event's rank, before four empty lists.
+  constexpr std::size_t EMPTY_LISTS = 4 * sizeof(std::uint64_t);
+  const std::size_t rank = payload.size() - EMPTY_LISTS - sizeof(std::uint64_t);
+  ASSERT_EQ(payload.at(rank), 1);
+  // Control: resealing the same payload loads with its event.
+  store.bytes(SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.hash(), world.hash());
+  ASSERT_EQ(restored.world.events().size(), 1U);
+  const auto* kept =
+      std::get_if<RealmGained>(&restored.world.events().back().what);
+  ASSERT_NE(kept, nullptr);
+  EXPECT_EQ(kept->person, 0U);
+  EXPECT_EQ(kept->rank, 1U);
+  // The event now names a realm past the one the world holds.
+  payload.at(rank) = 2;
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
+TEST(Save, ALoadedRegionKeepsItsLessonsAndRealmsRecorded) {
+  const Saved saved = lived_region(REGION_SEED);
+  const std::vector<Event>& before = saved.world.events();
+  // Ten years in, the ring holds skills learned and realms gained.
+  ASSERT_TRUE(std::any_of(before.begin(), before.end(), [](const Event& each) {
+    return std::holds_alternative<Learned>(each.what);
+  }));
+  ASSERT_TRUE(std::any_of(before.begin(), before.end(), [](const Event& each) {
+    return std::holds_alternative<RealmGained>(each.what);
+  }));
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  const std::vector<Event>& after = restored.world.events();
+  ASSERT_EQ(after.size(), before.size());
+  for (std::size_t event = 0; event < before.size(); ++event) {
+    EXPECT_EQ(after.at(event).sequence, before.at(event).sequence);
+    EXPECT_EQ(after.at(event).what.index(), before.at(event).what.index());
+    const auto* then = std::get_if<Learned>(&before.at(event).what);
+    const auto* now = std::get_if<Learned>(&after.at(event).what);
+    if (then != nullptr && now != nullptr) {
+      EXPECT_EQ(now->person, then->person);
+      EXPECT_EQ(now->art, then->art);
+      EXPECT_EQ(now->skill, then->skill);
+      EXPECT_EQ(now->by, then->by);
+    }
+  }
+}
+
 // Two hostile people a cell apart, the first casting its skill at `target`
 // on the next tick.
 World casting(const Target& target) {

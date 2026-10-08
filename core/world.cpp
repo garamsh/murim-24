@@ -307,6 +307,12 @@ std::vector<std::size_t> named(const LeaderChanged& what) {
 }
 std::vector<std::size_t> named(const Born& what) { return {what.person}; }
 std::vector<std::size_t> named(const Died& what) { return {what.person}; }
+std::vector<std::size_t> named(const Learned& what) {
+  return {what.person, what.art, what.skill, static_cast<std::size_t>(what.by)};
+}
+std::vector<std::size_t> named(const RealmGained& what) {
+  return {what.person, what.rank};
+}
 
 // Folds event `event` into `fold`.
 template <typename Fold>
@@ -945,6 +951,14 @@ bool World::events_kept() const {
     if (const auto* born = std::get_if<Born>(&what)) {
       return born->person >= people;
     }
+    if (const auto* learned = std::get_if<Learned>(&what)) {
+      return learned->person >= people || learned->art >= life_.arts.size() ||
+             learned->skill >= life_.arts.at(learned->art).skills.size();
+    }
+    if (const auto* gained = std::get_if<RealmGained>(&what)) {
+      return gained->person >= people || gained->rank == 0 ||
+             gained->rank > life_.realms.size();
+    }
     const auto* died = std::get_if<Died>(&what);
     return died == nullptr || died->person >= people;
   };
@@ -1308,6 +1322,10 @@ bool World::related(std::size_t one, std::size_t other) const {
 // in an army, as a rumour.
 bool World::heard_by(const Event& event, std::size_t person,
                      std::optional<std::size_t> faction) const {
+  if (std::holds_alternative<Learned>(event.what) ||
+      std::holds_alternative<RealmGained>(event.what)) {
+    return false;
+  }
   if (within(cell_of(people_.at(person).position), event.cell,
              rules_.rumour_reach)) {
     return true;
@@ -2628,7 +2646,8 @@ void World::train() {
 }
 
 // Once a day, every living person's qi capacity grows by its cultivation's
-// growth, up to its limit; on each realm gained it comprehends.
+// growth, up to its limit; each realm gained is recorded, and on each it
+// comprehends.
 void World::cultivate() {
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
@@ -2640,15 +2659,17 @@ void World::cultivate() {
                             person.qi_capacity + person.cultivation.growth));
       const std::uint32_t after = rank_of(person);
       for (std::uint32_t gained = before; gained < after; ++gained) {
-        comprehend(person, after);
+        record(cell_of(person.position), RealmGained{member, gained + 1});
+        comprehend(member, after);
       }
     }
   }
 }
 
-// Person `person`, of realm rank `rank`, rolls for each art it knows, in the
-// order it learned them, to comprehend a skill of it.
-void World::comprehend(Person& person, std::uint32_t rank) {
+// Person `learner`, of realm rank `rank`, rolls for each art it knows, in the
+// order it learned them, to comprehend a skill of it, recording each learned.
+void World::comprehend(std::size_t learner, std::uint32_t rank) {
+  Person& person = people_.at(learner);
   std::vector<std::size_t> practised;
   for (const Known& known : person.known) {
     if (std::find(practised.begin(), practised.end(), known.art) ==
@@ -2671,6 +2692,8 @@ void World::comprehend(Person& person, std::uint32_t rank) {
                                  agreement(person, art, false) / PER_MILLE;
     if (next_random() % PER_MILLE < chance) {
       person.known.push_back(Known{art, *skill, 0});
+      record(cell_of(person.position),
+             Learned{learner, art, *skill, LearnedBy::COMPREHENSION});
     }
   }
 }
@@ -2694,7 +2717,8 @@ void World::recover(const Cultivation& cultivation) {
 // Each manual lying on a cell is read by the nearest living person within
 // the reading reach of the cell's centre, the lower index among equals, who
 // has the rank for a skill of its art it lacks and the qi to read it: it
-// spends the reading's cost and learns every such skill. The manual stays.
+// spends the reading's cost and learns every such skill, each recorded. The
+// manual stays.
 void World::read_manuals() {
   for (const Manual& manual : manuals_) {
     const auto* cell = std::get_if<Cell>(&manual.place);
@@ -2732,6 +2756,8 @@ void World::read_manuals() {
     while (const std::optional<std::size_t> skill =
                lesson(reader, manual.art, Lesson::TAUGHT, rank)) {
       reader.known.push_back(Known{manual.art, *skill, 0});
+      record(cell_of(reader.position),
+             Learned{nearest->second, manual.art, *skill, LearnedBy::MANUAL});
     }
   }
 }
@@ -2739,7 +2765,7 @@ void World::read_manuals() {
 // Once a day, each living member of a standing sect whose seat is held
 // learns, with the teaching's chance a year for each rank of its sect's
 // highest-ranked elder, the first skill it lacks of the first art its sect
-// holds a manual of that has one within both their ranks.
+// holds a manual of that has one within both their ranks, recorded.
 void World::teach() {
   for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
     if (!seat_held(sect)) {
@@ -2771,6 +2797,8 @@ void World::teach() {
         if (next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
             chance) {
           pupil.known.push_back(Known{manual.art, *skill, 0});
+          record(cell_of(pupil.position),
+                 Learned{member, manual.art, *skill, LearnedBy::TEACHING});
         }
         break;
       }
