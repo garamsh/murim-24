@@ -182,3 +182,14 @@ REBIRTH_FACTION,세력,Faction
 REBIRTH_AGE,나이,Age
 REBIRTH_NONE,없음,None
 REBIRTH_KEYS,Enter 새 몸으로 이어 살기,Enter Live on in the new body
+TOUCH_GENEALOGY,족보,Family
+TOUCH_SECT,문파,Sects
+TOUCH_DUEL,도전,Duel
+TOUCH_CANCEL,취소,Cancel
+TOUCH_SELF,자신에게,On self
+SETTINGS_TOUCH,터치,Touch
+SETTINGS_TOUCH_AUTO,자동,Auto
+SETTINGS_TOUCH_ON,켬,On
+SETTINGS_TOUCH_TAP,탭 이동,Tap move
+SETTINGS_TOUCH_OFF,끔,Off
+SETTINGS_TOUCH_ABOUT,터치 조작. 자동은 폰에서 켠다. 탭 이동은 땅을 눌러 걷는다.,Touch controls. Auto on phones. Tap move: tap ground to walk.

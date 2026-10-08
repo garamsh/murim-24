@@ -29,7 +29,7 @@ func run() -> bool:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1}
+		"music": 0, "cast": 1, "touch": 0}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -82,7 +82,41 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	for each: Control in [panel, reread, noted, missing, ranged]:
 		each.free()
-	return passed and _fit_pass()
+	return passed and _tap_pass() and _fit_pass()
+
+
+# A tap on a choice of the touch row chooses it, as the keys do, and sends `applied`: on shows the
+# touch controls, tap-to-move shows them and walks where the ground is tapped, off hides them, and
+# auto shows them only on a phone or a tablet. A tap outside the panel goes back. Control: a
+# tap on the row's label, off every slip, chooses nothing and sends nothing.
+func _tap_pass() -> bool:
+	_remove(PATH)
+	var panel := _panel(PATH)
+	var sent := [0]
+	panel.applied.connect(func() -> void: sent[0] += 1)
+	panel.open()
+	var row := Settings.ROWS.find("touch")
+	var y := Settings.DIALOG.position.y + 30 + row * Settings.ROW_STEP + 2 + Settings.SLIP_HEIGHT / 2.0
+	var slip := Settings.choice_width("touch")
+	var first := Settings.choices_x(Settings.TOUCH_MODES.size(), slip)
+	var shown := {}
+	for mode in Settings.TOUCH_MODES.size():
+		panel.tap(Vector2(first + mode * (slip + 4) + slip / 2.0, y))
+		shown[Settings.TOUCH_MODES[mode]] = [panel.chosen.touch == mode, panel.touch_shown(), panel.tap_to_move()]
+	var after_slips: int = sent[0]
+	var on_label: String = panel.tap(Vector2(Settings.DIALOG.position.x + 20, y))
+	var label_ignored: bool = on_label == "" and panel.chosen.touch == Settings.TOUCH_MODES.find("off") \
+			and sent[0] == after_slips
+	var outside: String = panel.tap(Vector2(4, 4))
+	var mobile := OS.has_feature("mobile")
+	var passed: bool = shown == {"auto": [true, mobile, false], "on": [true, true, false],
+			"tap": [true, true, true], "off": [true, false, false]} and after_slips == 4 and label_ignored \
+			and outside == "back" and not panel.visible
+	print("settings_test: the touch row's choices tapped, each [chosen, shown, tap-to-move]: %s, on a phone or tablet %s; applied sent %d times; a tap on the label chose nothing %s; outside goes %s: %s" % [
+		shown, mobile, after_slips, label_ignored, outside, "pass" if passed else "FAIL"])
+	_remove(PATH)
+	panel.free()
+	return passed
 
 
 # In each locale: the title clear of the close key in the title bar; each row's label clear of its
@@ -98,7 +132,7 @@ func _fit_pass() -> bool:
 		var back := fit.say("SETTINGS_BACK")
 		fit.check(title, 8 + fit.width(title) + 10 + fit.width(back) + 8, dialog.size.x)
 		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "SETTINGS_CAST_PRESS",
-				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"]:
+				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)

@@ -2,7 +2,7 @@
 ## and the working title from art/title/backdrop.png, a line under it, and a menu to start a new
 ## game, continue the saved one, which cannot be taken while there is none, open the settings or
 ## quit, with its keys along the foot of the screen; under the menu, a notice of why a save was not
-## loaded. Every word comes from hud.csv through Godot's translations. It holds no game rule.
+## loaded. An entry is taken by a tap as well as by the keys. Every word comes from hud.csv through Godot's translations. It holds no game rule.
 extends "res://hud/panel.gd"
 
 const BACKDROP := "res://art/title/backdrop.png"
@@ -68,6 +68,17 @@ func key(event: InputEventKey) -> String:
 	elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 		return ENTRIES[chosen]
 	return ""
+
+
+## Works the menu with a tap at `at`: an entry that can be taken is chosen and taken. Returns
+## what taking it does, one of ENTRIES, or "" when the tap took none.
+func tap(at: Vector2) -> String:
+	var row := _menu_row(MENU.position + MENU_INSET, MENU.size.x - 2 * MENU_INSET.x, ENTRIES.size(), at)
+	if row < 0 or unavailable.has(ENTRIES[row]):
+		return ""
+	chosen = row
+	queue_redraw()
+	return ENTRIES[row]
 
 
 # The next entry from `from` in `step`'s direction that can be taken, staying put at either end.

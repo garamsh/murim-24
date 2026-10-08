@@ -1,6 +1,6 @@
 ## The rebirth screen, shown when the steered person dies and its soul is born again: the life just
 ## ended, by the person's card, family, years lived, sect, best attainment and children, beside the
-## life begun, by the new body's card, family, faction and age. Enter goes on into the new body.
+## life begun, by the new body's card, family, faction and age. Enter, or a tap, goes on into the new body.
 ## Every word comes from hud.csv through Godot's translations, and what it shows is read from the
 ## world through the adapter. It holds no game rule.
 extends "res://hud/panel.gd"
@@ -45,6 +45,11 @@ func key(event: InputEventKey) -> String:
 	if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
 		return "go_on"
 	return ""
+
+
+## Works the screen with a tap anywhere: it goes on. Returns "go_on".
+func tap(_at: Vector2) -> String:
+	return "go_on"
 
 
 # Reads what both sides show from the world, in the current locale.

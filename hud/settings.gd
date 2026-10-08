@@ -1,31 +1,38 @@
 ## The settings panel, drawn as art/mockup/settings_screen.png lays it out: the speed of the
 ## world's time, the window mode, the resolution in whole multiples of the native size, the
-## language, the volume of all sound, of the effects and of the music, and whether a cast key
-## casts on its press or on its release, each a row of its choices
+## language, the volume of all sound, of the effects and of the music, whether a cast key casts on
+## its press or on its release, and the touch controls, on a phone or a tablet, forced on, forced
+## on with a tap on the ground walking there, or off, each a row of its choices
 ## with the chosen one in jade, and a line saying what the row being changed sets. The choices are
 ## the player's preferences, not the world's state: they are kept in a file under user:// and
-## applied to the window, the translations, the audio buses and the play scene's pace. Every word comes from hud.csv through Godot's translations. It holds no game rule.
+## applied to the window, the translations, the audio buses, the HUD's layout and the play scene's
+## pace. A row's choice is chosen by a tap as well as by the keys. Every word comes from hud.csv
+## through Godot's translations. It holds no game rule.
 extends "res://hud/panel.gd"
+
+## Sent once every row's choice has been applied.
+signal applied
 
 const PATH := "user://settings.cfg"
 const SECTION := "settings"
 # The mockup's layout, in the native 480x270.
-const DIALOG := Rect2(60, 10, 360, 250)
-# The mockup's rows were 26 pixels apart; a row for casting closes them up to keep the line under
-# them within the panel.
-const ROW_STEP := 22
+const DIALOG := Rect2(60, 4, 360, 256)
+# The mockup's rows were 26 pixels apart; the rows for casting and touch close them up, and the
+# dialog stands 6 pixels higher, to keep the line under them within the panel.
+const ROW_STEP := 21
 const CHOICE_WIDTH := 64
 const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
-const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music", "cast"]
+const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music", "cast",
+		"touch"]
 const LABEL_KEYS := {"speed": "SETTINGS_SPEED", "window": "SETTINGS_WINDOW",
 		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE",
 		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC",
-		"cast": "SETTINGS_CAST"}
+		"cast": "SETTINGS_CAST", "touch": "SETTINGS_TOUCH"}
 const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW_ABOUT",
 		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
 		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
-		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT"}
+		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT", "touch": "SETTINGS_TOUCH_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
@@ -37,11 +44,14 @@ const BUSES := {"master": &"Master", "effects": &"Effects", "music": &"Music"}
 const VOLUMES := [0.0, 0.25, 0.5, 0.75, 1.0]
 ## Whether a cast key casts on its press or on its release.
 const CAST_KEYS := ["SETTINGS_CAST_PRESS", "SETTINGS_CAST_RELEASE"]
+## The touch row's choices: on where the screen takes touch, on, on with tap-to-move, and off.
+const TOUCH_MODES := ["auto", "on", "tap", "off"]
+const TOUCH_KEYS := ["SETTINGS_TOUCH_AUTO", "SETTINGS_TOUCH_ON", "SETTINGS_TOUCH_TAP", "SETTINGS_TOUCH_OFF"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
 ## the music sits under the effects, and a cast key casts on its press, as Albion Online's quick
 ## cast does.
 const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
-		"effects": 4, "music": 3, "cast": 0}
+		"effects": 4, "music": 3, "cast": 0, "touch": 0}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -118,6 +128,9 @@ func choices(name: String) -> Array[String]:
 		"cast":
 			for cast_key: String in CAST_KEYS:
 				words.append(tr(cast_key))
+		"touch":
+			for touch_key: String in TOUCH_KEYS:
+				words.append(tr(touch_key))
 		_:
 			for volume: float in VOLUMES:
 				words.append("%d%%" % roundi(volume * 100))
@@ -133,6 +146,44 @@ func speed() -> int:
 ## its press.
 func cast_on_release() -> bool:
 	return chosen.cast == 1
+
+
+## Returns whether the touch controls are shown: on a phone or a tablet, unless the touch row
+## turns them off, or anywhere it turns them on. A desktop's touch screen is not asked after: Godot
+## 4.7.2 reports one wherever a mouse stands in for a finger, as it does while they are shown.
+func touch_shown() -> bool:
+	match TOUCH_MODES[chosen.touch]:
+		"auto":
+			return OS.has_feature("mobile")
+		"off":
+			return false
+	return true
+
+
+## Returns whether a tap on the ground walks the steered person there.
+func tap_to_move() -> bool:
+	return TOUCH_MODES[chosen.touch] == "tap"
+
+
+## Works the panel with a tap at `at`: a row's choice tapped is chosen, as left and right choose
+## it, and the close word, or anywhere outside the panel, goes back. Returns "back" when the tap
+## does that, and "" otherwise.
+func tap(at: Vector2) -> String:
+	if not DIALOG.has_point(at) or _close_hit(DIALOG, tr("SETTINGS_BACK"), at):
+		close()
+		return "back"
+	for n in ROWS.size():
+		var name: String = ROWS[n]
+		var y := DIALOG.position.y + 30 + n * ROW_STEP
+		var slip := choice_width(name)
+		var x := choices_x(choices(name).size(), slip)
+		for k in choices(name).size():
+			if Rect2(x + k * (slip + 4), y + 2, slip, SLIP_HEIGHT).has_point(at):
+				row = n
+				choose(name, k)
+				queue_redraw()
+				return ""
+	return ""
 
 
 ## Keeps every row's choice in `path`.
@@ -172,6 +223,7 @@ func apply() -> void:
 	DisplayServer.window_set_mode(WINDOW_MODES[chosen.window])
 	if WINDOW_MODES[chosen.window] == DisplayServer.WINDOW_MODE_WINDOWED:
 		DisplayServer.window_set_size(RESOLUTIONS[chosen.resolution])
+	applied.emit()
 
 
 func _count(name: String) -> int:
@@ -186,6 +238,8 @@ func _count(name: String) -> int:
 			return locales.size()
 		"cast":
 			return CAST_KEYS.size()
+		"touch":
+			return TOUCH_MODES.size()
 	return VOLUMES.size()
 
 

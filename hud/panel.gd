@@ -194,6 +194,23 @@ func _scrim_texture() -> ImageTexture:
 	return _scrim
 
 
+# Whether `at` falls on the close word `close` in `rect`'s title bar, or the bar's end beside it, so a
+# finger finds it.
+func _close_hit(rect: Rect2, close: String, at: Vector2) -> bool:
+	_font = get_theme_default_font() if _font == null else _font
+	var w := _width(close) + 16
+	return Rect2(rect.end.x - w, rect.position.y, w, 20).has_point(at)
+
+
+# The row of a menu `count` entries long, drawn by _menu from `top_left` and `width` wide, that
+# `at` falls on, or -1 for none.
+func _menu_row(top_left: Vector2, width: float, count: int, at: Vector2) -> int:
+	var row := floori((at.y - top_left.y + 3) / MENU_STEP)
+	if at.x < top_left.x or at.x >= top_left.x + width or row < 0 or row >= count:
+		return -1
+	return row
+
+
 ## Returns the width of a key's cap bearing `text`.
 func keycap_width(text: String) -> float:
 	return maxf(_width(text) + 6, KEYCAP_HEIGHT)

@@ -1,7 +1,7 @@
 ## The pause panel over the game, drawn as art/mockup/pause_screen.png lays it out: a menu to
 ## resume, save, open the settings, leave for the title or quit, under it whether the save was
 ## written, over the seed the world was opened from; beside it the controls guide, each control's keys on their caps and what it does, as the
-## play scene binds them. Every word comes from hud.csv through Godot's translations. It holds no
+## play scene binds them. An entry is taken by a tap as well as by the keys. Every word comes from hud.csv through Godot's translations. It holds no
 ## game rule.
 extends "res://hud/panel.gd"
 
@@ -61,6 +61,20 @@ func key(event: InputEventKey) -> String:
 	elif event.keycode == KEY_ESCAPE:
 		return "resume"
 	return ""
+
+
+## Works the menu with a tap at `at`: an entry tapped is chosen and taken, and the close word, or
+## anywhere outside the panel, resumes. Returns what taking it does, one of ENTRIES, or "" when the
+## tap took none.
+func tap(at: Vector2) -> String:
+	if not DIALOG.has_point(at) or _close_hit(DIALOG, tr("PAUSE_CLOSE"), at):
+		return "resume"
+	var row := _menu_row(Vector2(DIALOG.position.x + 10, DIALOG.position.y + 32), MENU_WIDTH, ENTRIES.size(), at)
+	if row < 0:
+		return ""
+	chosen = row
+	queue_redraw()
+	return ENTRIES[row]
 
 
 func _draw() -> void:

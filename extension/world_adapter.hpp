@@ -200,6 +200,10 @@ class WorldAdapter : public godot::RefCounted {
   /// from 0, as the core's calendar gives them.
   [[nodiscard]] godot::Dictionary date() const;
 
+  /// Returns how many ticks the world has run, the tick body_ready() counts
+  /// against: a body may strike again once it reaches its ready tick.
+  [[nodiscard]] std::int64_t tick_count() const;
+
   /// Returns how many skills army `army` has now.
   [[nodiscard]] std::int64_t skill_count(std::int64_t army) const;
 

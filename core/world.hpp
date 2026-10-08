@@ -865,6 +865,10 @@ class World {
   /// Returns the date the world has reached.
   [[nodiscard]] Date date() const;
 
+  /// Returns how many ticks the world has run, the tick a person's
+  /// `ready_at` is counted against.
+  [[nodiscard]] std::uint64_t tick_count() const { return tick_count_; }
+
   /// Returns person `person`'s age in whole years of the calendar.
   [[nodiscard]] std::int64_t age_in_years(std::size_t person) const;
 
