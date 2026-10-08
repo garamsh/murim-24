@@ -308,10 +308,10 @@ func _process(delta: float) -> void:
 	advance(delta)
 	if world == null or _hud.screen() != null:
 		return
-	_camera.position = _to_pixels(lead()).floor()
+	_camera.position = drawn_lead().round()
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
-	_art.refresh(view)
+	_art.refresh(view, _between())
 	_sound.hearing = view
 	# The cursor stays on the screen while the camera moves, so it moves over the world.
 	_cursor = get_local_mouse_position()
@@ -319,7 +319,7 @@ func _process(delta: float) -> void:
 		follow(_cursor)
 	_show_aim()
 	_view_origin = view.position
-	_hud.touch.body_at = _hud.from_window((_to_pixels(lead()) - view.position) * _camera.zoom).floor()
+	_hud.touch.body_at = _hud.from_window((drawn_lead() - view.position) * _camera.zoom).round()
 	_hud.refresh(world, steered, _skills)
 	show_talk()
 
@@ -432,7 +432,7 @@ func _show_aim() -> void:
 	var skills := world.person_skills(roster[0])
 	var reach: float = skills[skill]["range"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	var radius: float = skills[skill]["radius"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
-	_aim.show_aim(_to_pixels(lead()), reach, _cursor, radius)
+	_aim.show_aim(drawn_lead(), reach, _cursor, radius)
 
 
 # Orders the person STRIDE cells `way`, or as many fewer as the core accepts, or, with no way, to
@@ -906,6 +906,21 @@ func lead() -> Vector2:
 	if not positions.is_empty():
 		_last_lead = positions[0]
 	return _last_lead
+
+
+## Returns where the steered person is drawn this frame, in pixels: between its last two ticks'
+## positions as WorldArt draws it, or where it last stood while it has no body.
+func drawn_lead() -> Vector2:
+	if world.body_positions(steered).is_empty():
+		return _to_pixels(lead())
+	return _art.body_at(steered, 0, _between())
+
+
+# How far this frame is from the last tick toward the next, as a share of a tick.
+func _between() -> float:
+	var speed: int = _hud.settings.speed()
+	var step_seconds := 1.0 / (WorldAdapter.TICKS_PER_SECOND * speed)
+	return clampf(_since_tick / step_seconds, 0.0, 1.0)
 
 
 func _all_skills() -> PackedInt64Array:

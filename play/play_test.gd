@@ -6,7 +6,8 @@
 # fought is refused for that. When a village's residents march away, its territory follows them,
 # and the world's borders and the HUD's map follow the territory the core derives, redrawn on that
 # tick and not on every frame. Holding the right button keeps ordering the person toward the cursor,
-# and releasing it stops the following. Q casts the first skill at the cursor, on its press or, as
+# and releasing it stops the following; pressed on a cell down a diagonal, it walks the person along
+# the diagonal. Q casts the first skill at the cursor, on its press or, as
 # the settings choose, on its release after showing the aim, which Q again or Escape cancels; a
 # refused cast shows its reason. The scene opens on the title screen with no world; a new game starts the
 # world from the seed typed; Escape pauses it, the pause panel's guide showing the keys the scene
@@ -17,7 +18,8 @@
 # The pause panel's Save writes the world, and back on the title Continue resumes it, steering the
 # same person, while with no save Continue cannot be taken and with a broken one the title names
 # why; the world is saved again every AUTOSAVE_DAYS days. With the touch controls shown, the
-# joystick walks the person the way it is pushed and stops it when let go; a skill button tapped
+# joystick walks the person the way it is pushed, a diagonal included, and stops it when let go; a
+# skill button tapped
 # casts at the hostile person the core aims at the way the person faces, dragged casts at the point
 # it aims, dropped on the cancel zone casts nothing, and held casts on the person itself, while a
 # tap the core refuses for its cooldown shows why; the screens take taps, and the HUD's buttons
@@ -71,6 +73,10 @@ const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
 const STICK_TICKS := 150
 # Ticks the person is given to walk up to a person of an allied faction.
 const TALK_WALK_LIMIT := 6000
+# In the region SEED makes, the person born into village 7 has a diagonal open from where it is
+# born, and the four ways it is walked along.
+const DIAGONAL_VILLAGE := 7
+const DIAGONALS := [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
 
 
 func run() -> bool:
@@ -100,8 +106,9 @@ func run() -> bool:
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
 			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
-			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass() and _arts_pass() \
-			and _art_slot_pass() and _loadout_save_pass() and _talk_pass()
+			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
+			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
+			and _talk_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -144,6 +151,54 @@ func _stick_pass() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	control.free()
+	return passed
+
+
+# With the touch controls shown, the joystick pushed down a diagonal open for three times STRIDE
+# cells walks the person along it, past the STRIDE cells one order reaches along each axis, and as
+# far along one as the other to within a cell. Setup: the touch controls are shown and the
+# diagonal is open.
+func _stick_diagonal_pass() -> bool:
+	var scene := _scene(DIAGONAL_VILLAGE)
+	var stride: int = scene.STRIDE
+	scene.get_node("Hud").use_touch(true)
+	var touch: Control = scene.get_node("Hud").touch
+	var shown := touch.visible
+	var way := _clear_way(scene, 3 * stride, DIAGONALS)
+	var from: Vector2 = scene.lead()
+	var thumb: Vector2 = touch.STICK
+	var took: bool = scene.touch(_finger(0, thumb, true)) \
+			and scene.touch(_slide(0, thumb + Vector2(way).normalized() * touch.STICK_RADIUS))
+	for i in STICK_TICKS:
+		scene.step()
+	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE * Vector2(way)
+	scene.free()
+	var passed: bool = shown and way != Vector2i.ZERO and took and walked.x > stride + 1 \
+			and walked.y > stride + 1 and absf(walked.x - walked.y) < 1.0
+	print("play_test: touch shown %s; the joystick pushed down the diagonal %s taken %s, walked %.2f and %.2f cells along each axis its way in %d ticks: %s" % [
+		shown, way, took, walked.x, walked.y, STICK_TICKS, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The right button pressed on a cell three times STRIDE cells down a diagonal open that far walks
+# the person along the diagonal, more than STRIDE cells along each axis, and as far along one as
+# the other to within a cell. Setup: the diagonal is open and the order accepted.
+func _move_diagonal_pass() -> bool:
+	var scene := _scene(DIAGONAL_VILLAGE)
+	var stride: int = scene.STRIDE
+	var way := _clear_way(scene, 3 * stride, DIAGONALS)
+	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	var target := home + way * 3 * stride
+	var from: Vector2 = scene.lead()
+	var pressed: bool = scene.command(_click(target, scene.PIXELS_PER_CELL))
+	for i in STICK_TICKS:
+		scene.step()
+	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE * Vector2(way)
+	scene.free()
+	var passed: bool = way != Vector2i.ZERO and pressed and walked.x > stride and walked.y > stride \
+			and absf(walked.x - walked.y) < 1.0
+	print("play_test: right button on %s, down the diagonal %s from %s, ordered %s, walked %.2f and %.2f cells along each axis its way in %d ticks: %s" % [
+		target, way, home, pressed, walked.x, walked.y, STICK_TICKS, "pass" if passed else "FAIL"])
 	return passed
 
 
@@ -276,16 +331,18 @@ func _taps_pass() -> bool:
 	return passed
 
 
-# A way of WAYS passable for `cells` cells from where the scene's person stands, or none.
-func _clear_way(scene: Node2D, cells: int) -> Vector2i:
+# The first of `ways` passable for `cells` cells from where the scene's person stands, the cells
+# beside each diagonal step included, or none.
+func _clear_way(scene: Node2D, cells: int, ways := WAYS) -> Vector2i:
 	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	for way: Vector2i in WAYS:
+	for way: Vector2i in ways:
 		var clear := true
 		for stride in range(1, cells + 1):
 			var cell := home + way * stride
-			clear = clear and cell.y >= 0 and cell.y < rows.size() and cell.x >= 0 \
-					and cell.x < rows[cell.y].length() and rows[cell.y][cell.x] == "."
+			for passed: Vector2i in [cell, cell - Vector2i(way.x, 0), cell - Vector2i(0, way.y)]:
+				clear = clear and passed.y >= 0 and passed.y < rows.size() and passed.x >= 0 \
+						and passed.x < rows[passed.y].length() and rows[passed.y][passed.x] == "."
 		if clear:
 			return way
 	return Vector2i.ZERO

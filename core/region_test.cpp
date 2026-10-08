@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <set>
@@ -545,7 +546,7 @@ World born_and_lived(std::size_t village, bool homeless, std::uint64_t days) {
 
 TEST(Region, APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith) {
   constexpr std::size_t VILLAGE = 1;
-  constexpr std::uint64_t YEARS = 20;
+  constexpr std::uint64_t YEARS = 40;
   // The body is the last person the world is created with.
   const World young = born_and_lived(VILLAGE, false, 0);
   const std::size_t body = young.population() - 1;
@@ -1244,28 +1245,129 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_FALSE(unchanged.building_raised);
 }
 
-// Whether `kinds` names `kind`.
-bool includes(const std::vector<std::string>& kinds, const std::string& kind) {
-  return std::find(kinds.begin(), kinds.end(), kind) != kinds.end();
+// The workshops one village raises in the region of seed NEIGHBOURLY within
+// WORKSHOP_YEARS years of GROWTH_TICKS_PER_DAY-tick days, in the order laid.
+// The village is its first Orthodox one, a seat aside. All its housing, food
+// and storage are put in its first structure, enough that its cap is `cap`, and
+// people whose home it is are added until they press against that cap.
+// `set_up` is whether its cap came out as asked, its people pressed against
+// it before it laid a workshop, and it held none.
+struct Workshops {
+  bool set_up;
+  std::vector<std::string> raised;
+};
+
+// The region's first Orthodox village, a seat aside.
+std::size_t first_orthodox(const Region& region, const RegionData& data) {
+  for (std::size_t village = 0; village < region.villages.size(); ++village) {
+    const Village& candidate = region.villages.at(village);
+    if (candidate.faction == 0 && candidate.kind != data.seat.name) {
+      return village;
+    }
+  }
+  return region.villages.size();
+}
+
+// Puts all of village `village`'s housing, food and storage in its first
+// structure, enough for `cap` people, so its cap is exactly `cap`.
+void hold_in_first(Region& region, std::size_t village, const RegionData& data,
+                   std::uint32_t cap) {
+  const std::uint64_t yearly =
+      std::uint64_t{data.life.husbandry.value_or(Husbandry{}).consumption} *
+      DAYS_PER_YEAR;
+  const std::vector<std::size_t>& own = region.villages.at(village).structures;
+  for (const std::size_t structure : own) {
+    Holding& holding = region.holdings.at(structure);
+    const bool first = structure == own.front();
+    holding.housing = first ? cap : 0;
+    holding.harvest = first ? static_cast<std::uint32_t>(cap * yearly) : 0;
+    holding.storage = first ? static_cast<std::uint32_t>(cap * yearly) : 0;
+  }
+}
+
+constexpr std::uint64_t WORKSHOP_YEARS = 40;
+
+Workshops workshops_raised(std::uint32_t cap) {
+  const RegionData data = region_data();
+  Region region = generate_region(NEIGHBOURLY, data);
+  region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
+  const Growth growth = data.life.growth.value_or(Growth{});
+  const std::size_t chosen = first_orthodox(region, data);
+  hold_in_first(region, chosen, data, cap);
+  const std::vector<std::size_t>& own = region.villages.at(chosen).structures;
+  const bool lacks_workshops =
+      std::none_of(own.begin(), own.end(), [&region](std::size_t structure) {
+        return region.holdings.at(structure).arms > 0 ||
+               region.holdings.at(structure).tends > 0;
+      });
+  // Enough people whose home it is, beside its residents, to press a cap of
+  // `cap`: an army of them appended, so no person's index moves.
+  const ArmySpec& residents = region.armies.at(region.villages.at(chosen).army);
+  const auto pressing = static_cast<std::size_t>(
+      ((std::uint64_t{cap} * growth.pressure) + PER_MILLE - 1) / PER_MILLE);
+  ArmySpec homed{
+      residents.objective, {}, residents.faction, residents.skills, chosen};
+  while (residents.members.size() + homed.members.size() < pressing) {
+    homed.members.push_back(residents.members.front());
+  }
+  region.armies.push_back(homed);
+  World world = world_of(region);
+  const bool capped = world.cap(chosen) == cap;
+  // A workshop the village laid: growth lays its buildings within the
+  // vicinity of its seat, its residents' objective, on each axis.
+  const Cell seat = residents.objective;
+  const auto workshop = [&growth, &world, seat](std::size_t structure) {
+    const std::size_t plan =
+        world.plan_of(structure).value_or(growth.plans.size());
+    const Cell cell = world.structure(structure).cell;
+    return plan < growth.plans.size() &&
+           (growth.plans.at(plan).holding.arms > 0 ||
+            growth.plans.at(plan).holding.tends > 0) &&
+           std::abs(cell.x - seat.x) <= growth.vicinity &&
+           std::abs(cell.y - seat.y) <= growth.vicinity;
+  };
+  // Whether its people pressed against its cap before it laid a workshop.
+  bool pressed = false;
+  bool laid = false;
+  for (std::uint64_t tick = 0;
+       tick < WORKSHOP_YEARS * DAYS_PER_YEAR * GROWTH_TICKS_PER_DAY; ++tick) {
+    world.tick();
+    for (std::size_t structure = region.structures.size();
+         structure < world.structure_count() && !laid; ++structure) {
+      laid = workshop(structure);
+    }
+    pressed = pressed ||
+              (!laid && std::uint64_t{world.residents_of(chosen)} * PER_MILLE >=
+                            std::uint64_t{cap} * growth.pressure);
+  }
+  Workshops found{capped && lacks_workshops && pressed, {}};
+  for (std::size_t structure = region.structures.size();
+       structure < world.structure_count(); ++structure) {
+    if (workshop(structure) && world.stage(structure) == Stage::INTACT) {
+      found.raised.push_back(
+          growth.plans.at(world.plan_of(structure).value_or(0)).kind);
+    }
+  }
+  return found;
 }
 
 TEST(Region, VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary) {
-  // A village raises its first workshop in its fourth or fifth decade.
-  constexpr std::uint64_t CENTURY = 100;
-  const Grew region = grew(region_data(), NEIGHBOURLY, CENTURY);
-  EXPECT_TRUE(includes(region.raised, "smithy"));
-  EXPECT_TRUE(includes(region.raised, "apothecary"));
-  // Control: arming and tending any number with no workshop, villages raise
-  // other buildings and no workshop.
-  RegionData reliant = region_data();
-  ASSERT_TRUE(reliant.life.growth.has_value());
-  Growth growth = reliant.life.growth.value_or(Growth{});
-  growth.self_reliance = MAX_PEOPLE;
-  reliant.life.growth = growth;
-  const Grew unarmed = grew(reliant, NEIGHBOURLY, CENTURY);
-  EXPECT_TRUE(unarmed.building_raised);
-  EXPECT_FALSE(includes(unarmed.raised, "smithy"));
-  EXPECT_FALSE(includes(unarmed.raised, "apothecary"));
+  const std::uint32_t reliance =
+      region_data().life.growth.value_or(Growth{}).self_reliance;
+  const Workshops past = workshops_raised(reliance + 4);
+  // Setup: the village's cap is past its self-reliance, its people pressed
+  // against it before it laid a workshop, and it held none.
+  ASSERT_TRUE(past.set_up);
+  // Arms are its scarcest holding, then tends: it raises a smithy, then an
+  // apothecary.
+  ASSERT_GE(past.raised.size(), 2U);
+  EXPECT_EQ(past.raised.at(0), "smithy");
+  EXPECT_EQ(past.raised.at(1), "apothecary");
+  // Control: the same village with a cap of half its self-reliance, pressed
+  // as hard, raises neither in as long.
+  const Workshops short_of = workshops_raised(reliance / 2);
+  ASSERT_TRUE(short_of.set_up);
+  EXPECT_TRUE(short_of.raised.empty());
 }
 
 // The most households any faction of the region `data` generates from

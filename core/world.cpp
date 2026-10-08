@@ -234,14 +234,17 @@ Push aside(Position from, Position there, std::int64_t separation, Step way,
 }
 
 // Moves from `from` one step along `direction`, one axis at a time, into
-// cells the flow field reaches only.
+// cells the flow field reaches only; a diagonal step at DIAGONAL_SPEED on
+// each axis.
 Position stepped(const FlowField& field, Position from, Step direction) {
   const auto reached = [&field](Position position) {
     return field.distance(cell_of(position)) != FlowField::UNREACHABLE;
   };
-  const Position along_x{from.x + (direction.x * SPEED), from.y};
+  const std::int32_t speed =
+      direction.x != 0 && direction.y != 0 ? DIAGONAL_SPEED : SPEED;
+  const Position along_x{from.x + (direction.x * speed), from.y};
   const Position moved_x = reached(along_x) ? along_x : from;
-  const Position along_y{moved_x.x, moved_x.y + (direction.y * SPEED)};
+  const Position along_y{moved_x.x, moved_x.y + (direction.y * speed)};
   return reached(along_y) ? along_y : moved_x;
 }
 
@@ -1881,23 +1884,9 @@ void World::tick() {
                       army.roster.end());
   }
   note_falls(std::move(bereft));
-  // Each person's pull toward its objective, from where it stood: none
-  // within its arrival ring, as many cells from the objective as the square
-  // root of its rank in its army. A person within two cells of its ring
-  // counts as standing still, so a crowd jostled a little stays standing.
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
-  for (const Army& army : armies_) {
-    for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
-      const std::size_t index = slot.at(army.roster.at(rank));
-      const Cell cell = cell_of(crowd.hash.position(index));
-      const auto ring =
-          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
-      const std::uint32_t distance = army.field.distance(cell);
-      pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
-      standing.at(index) = distance <= ring + STANDING_SLACK;
-    }
-  }
+  steer(crowd, slot, pulls, standing);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     march(army, crowd, slot, pulls, standing);
   }
@@ -1956,6 +1945,35 @@ std::vector<World::Passing> World::passings() const {
     }
   }
   return reborn;
+}
+
+// Each person's pull toward its objective, from where it stood: none
+// within its arrival ring, as many cells from the objective as the square
+// root of its rank in its army, and none while a living foe on the move
+// within its reach lies ahead along it, so it holds and fights rather than
+// walking past. A person within two cells of its ring counts as standing
+// still, so a crowd jostled a little stays standing.
+void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
+                  std::vector<Step>& pulls, std::vector<bool>& standing) const {
+  for (const Army& army : armies_) {
+    for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
+      const std::size_t index = slot.at(army.roster.at(rank));
+      const Cell cell = cell_of(crowd.hash.position(index));
+      const auto ring =
+          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
+      const std::uint32_t distance = army.field.distance(cell);
+      pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
+      standing.at(index) = distance <= ring + STANDING_SLACK;
+    }
+  }
+  // Read from the pulls as they were, so the order people are held in
+  // decides nothing.
+  const std::vector<Step> drawn = pulls;
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    if (held(index, drawn.at(index), standing, crowd)) {
+      pulls.at(index) = Step{0, 0};
+    }
+  }
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -2599,6 +2617,46 @@ std::optional<std::size_t> World::lesson(const Person& person, std::size_t art,
     }
   }
   return std::nullopt;
+}
+
+// Whether the person at `index` of `crowd`, pulled along `pull`, has a
+// living foe on the move, not `standing`, ahead of it along the pull within
+// its reach.
+bool World::held(std::size_t index, Step pull,
+                 const std::vector<bool>& standing, const Crowd& crowd) const {
+  bool engaged = false;
+  if (pull.x == 0 && pull.y == 0) {
+    return engaged;
+  }
+  const std::size_t member = crowd.people.at(index);
+  const std::size_t army = crowd.armies.at(index);
+  const Position from = crowd.hash.position(index);
+  crowd.hash.visit_within(
+      from, reach(people_.at(member), armies_.at(army)),
+      [&](std::size_t other) {
+        const Position there = crowd.hash.position(other);
+        const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
+                                   ((std::int64_t{there.y} - from.y) * pull.y);
+        engaged = engaged || (ahead > 0 && !standing.at(other) &&
+                              people_.at(crowd.people.at(other)).health > 0 &&
+                              foes(member, army, crowd.people.at(other),
+                                   crowd.armies.at(other)));
+      });
+  return engaged;
+}
+
+// The farthest person `person` of army `army` may strike on its own: the
+// longest range of its order's skills and the art skills it knows.
+std::int32_t World::reach(const Person& person, const Army& army) const {
+  std::int32_t farthest = 0;
+  for (const std::size_t skill : army.order.skills) {
+    farthest = std::max(farthest, army.skills.at(skill).range);
+  }
+  for (const Known& known : person.known) {
+    farthest = std::max(
+        farthest, life_.arts.at(known.art).skills.at(known.skill).skill.range);
+  }
+  return farthest;
 }
 
 // Whether person `person` of army `army` strikes person `other` of army

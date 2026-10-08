@@ -30,7 +30,7 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)
 
-add_executable(murim_core_test region_test.cpp save_test.cpp spatial_hash_test.cpp world_test.cpp)
+add_executable(murim_core_test flow_field_test.cpp region_test.cpp save_test.cpp spatial_hash_test.cpp world_test.cpp)
 target_link_libraries(murim_core_test PRIVATE murim_core GTest::gtest_main)
 target_compile_options(murim_core_test PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 gtest_discover_tests(murim_core_test)

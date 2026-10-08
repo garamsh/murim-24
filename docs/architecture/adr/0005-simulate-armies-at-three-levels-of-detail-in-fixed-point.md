@@ -1,6 +1,6 @@
 # ADR 0005: Simulate armies at three levels of detail in fixed-point integers
 
-> Status: superseded by ADR-0017
+> Status: superseded by ADR-0017; its breadth-first search over 4-connected cells by ADR-0037
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

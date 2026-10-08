@@ -911,6 +911,11 @@ struct Rules {
 /// Sub-cell units a person moves per tick.
 constexpr std::int32_t SPEED = 16;
 
+/// Sub-cell units a person moves along each axis per tick on a diagonal step:
+/// the whole number nearest SPEED over the square root of two, so it covers
+/// within 3% of SPEED either way.
+constexpr std::int32_t DIAGONAL_SPEED = 11;
+
 class SaveCodec;
 
 /// The simulated world, advanced one deterministic step at a time.
@@ -1391,6 +1396,11 @@ class World {
   void teach();
   [[nodiscard]] bool foes(std::size_t person, std::size_t army,
                           std::size_t other, std::size_t other_army) const;
+  [[nodiscard]] std::int32_t reach(const Person& person,
+                                   const Army& army) const;
+  [[nodiscard]] bool held(std::size_t index, Step pull,
+                          const std::vector<bool>& standing,
+                          const Crowd& crowd) const;
   [[nodiscard]] Position landing(const Person& caster, const Skill& skill,
                                  const Target& target) const;
   [[nodiscard]] CastRefusal assess_cast(std::size_t person,
@@ -1529,6 +1539,8 @@ class World {
   };
   [[nodiscard]] Ground ground() const;
   [[nodiscard]] std::vector<Passing> passings() const;
+  void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
+             std::vector<Step>& pulls, std::vector<bool>& standing) const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
              const std::vector<Step>& pulls, const std::vector<bool>& standing);
