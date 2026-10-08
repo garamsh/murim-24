@@ -4,8 +4,9 @@
 # cost, realm and cooldown as the core gives them; then the army's skills. On PC the first skill
 # the person has is chosen, the arrows move over the skills it has, passing those it lacks, and
 # stop at the ends; a skill put on a slot leaves the slot it was on, and Delete takes it off. On a
-# touch screen none is chosen until a tile of a skill the person has is tapped. Every word and name
-# the panel draws fits the room it gives it, in each locale, in both layouts.
+# touch screen none is chosen until a tile of a skill the person has is tapped. Given an art of
+# another nature, the panel tags it weaker. Every word and name the panel draws fits the room it
+# gives it, in each locale, in both layouts.
 extends RefCounted
 
 const Arts := preload("res://hud/arts.gd")
@@ -121,7 +122,49 @@ func run() -> bool:
 	print("arts_test: touch, none chosen on opening %s; a tile it lacks refused %s; a tile it has chose %s %s; %d groups scroll nowhere %s: %s" % [
 		none_chosen, lacking_refused, had, having_chosen, groups.size(), scroll_refused, "pass" if touch_right else "FAIL"])
 	panel.free()
-	return listed_right and set_up and moved_right and assign_right and touch_right and _fit_pass(world)
+	var weaker_right := _weaker_pass(world, person)
+	return listed_right and set_up and moved_right and assign_right and touch_right and weaker_right \
+			and _fit_pass(world)
+
+
+# The same person's reads, given the first skill of an art of another nature than its heart
+# method's: that art is listed second, tagged weaker, the heart method keeping its own tag. Control:
+# the same art made of the heart method's nature, in orientation and polarity, carries no tag.
+func _weaker_pass(world: WorldAdapter, person: int) -> bool:
+	var reads := Arts.read(world, person)
+	var heart := -1
+	for skill: Dictionary in reads.skills:
+		if skill.art >= 0 and heart < 0:
+			heart = skill.art
+	var other := -1
+	for art in reads.arts.size():
+		if other < 0 and (reads.arts[art].orientation != reads.arts[heart].orientation \
+				or reads.arts[art].polarity != reads.arts[heart].polarity):
+			other = art
+	var given := reads.duplicate(true)
+	var taught: Dictionary = given.arts[other].skills[0]
+	given.skills.append({"range": taught.range, "radius": taught.radius, "body_damage": 0,
+			"structure_damage": 0, "cooldown": taught.cooldown, "qi_cost": taught.qi_cost, "ready_at": 0,
+			"art": other, "skill": 0, "rank": taught.rank, "korean": taught.korean,
+			"romanised": taught.romanised, "orientation": given.arts[other].orientation,
+			"polarity": given.arts[other].polarity})
+	var tags := func(composed: Dictionary) -> Array:
+		return composed.groups.map(func(group: Dictionary) -> Array:
+			return group.tags.map(func(tag: Dictionary) -> String: return tag.text))
+	var weaker: Array = tags.call(Arts.compose(given))
+	var alike := given.duplicate(true)
+	alike.arts[other].orientation = alike.arts[heart].orientation
+	alike.arts[other].polarity = alike.arts[heart].polarity
+	var unmarked: Array = tags.call(Arts.compose(alike))
+	# Setup: the person's nature is its heart method's, and the art given is not yet known to it.
+	var set_up: bool = heart >= 0 and other >= 0 and reads.nature.orientation == reads.arts[heart].orientation \
+			and reads.nature.polarity == reads.arts[heart].polarity \
+			and reads.skills.all(func(skill: Dictionary) -> bool: return skill.art != other)
+	var passed: bool = set_up and weaker.size() == 3 and weaker[0] == ["심법"] and weaker[1] == ["약화"] \
+			and unmarked.size() == 3 and unmarked[0] == ["심법"] and unmarked[1] == []
+	print("arts_test: heart method %d given art %d of another nature, tags %s; made of the heart's nature, %s (setup %s): %s" % [
+		heart, other, weaker, unmarked, set_up, "pass" if passed else "FAIL"])
+	return passed
 
 
 # The army whose first person knows the most art skills, the first among equals, or -1.

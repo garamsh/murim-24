@@ -113,8 +113,7 @@ static func named(entry: Dictionary) -> String:
 ## Returns the name of realm `rank`, counted from 1, of `world`'s realms in the current locale, or
 ## a dash for no realm.
 static func realm_name(world: WorldAdapter, rank: int) -> String:
-	var realms := world.realms()
-	return named(realms[rank - 1]) if rank >= 1 and rank <= realms.size() else "—"
+	return _realm_of(world.realms(), rank)
 
 
 ## Returns `value` with its thousands grouped by commas.
@@ -219,74 +218,92 @@ func _known_skills() -> Array[Dictionary]:
 
 # Reads what the panel shows from the world, in the current locale.
 func _compose() -> void:
-	shown = {"groups": []}
 	var roster := _world.roster(_army)
-	if roster.is_empty():
-		queue_redraw()
-		return
-	var person := roster[0]
-	var realms := _world.realms()
-	var rank := _world.person_realm(person)
-	shown.rank = rank
-	shown.realms = realms.size()
-	shown.realm = realm_name(_world, rank)
-	shown.next = named(realms[rank]) if rank < realms.size() else "—"
-	shown.next_qi = grouped(realms[rank].qi) if rank < realms.size() else ""
-	shown.qi = _world.person_qi(person)
-	shown.capacity = _world.person_qi_capacity(person)
-	var nature := _world.person_nature(person)
-	var skills := _world.person_skills(person)
-	var arts := _world.arts()
+	shown = {"groups": []} if roster.is_empty() else compose(read(_world, roster[0]))
+	_keep_in_view()
+	queue_redraw()
+
+
+## Returns what the panel reads of `person` from `world`: the world's `realms` and `arts`, and the
+## person's realm `rank`, `qi`, `capacity`, `nature` and `skills`, as the adapter gives them.
+static func read(world: WorldAdapter, person: int) -> Dictionary:
+	return {"realms": world.realms(), "arts": world.arts(), "rank": world.person_realm(person),
+			"qi": world.person_qi(person), "capacity": world.person_qi_capacity(person),
+			"nature": world.person_nature(person), "skills": world.person_skills(person)}
+
+
+## Returns what the panel shows of `reads`, as read() gives them, in the current locale: `realm`,
+## `rank`, `realms`, `next` and `next_qi`, `qi` and `capacity`, `heart`, and `groups`, as `shown`
+## holds them. An art of another nature than the person's, in orientation or polarity, carries the
+## weaker tag; the art learned first, the heart method's.
+static func compose(reads: Dictionary) -> Dictionary:
+	var realms: Array = reads.realms
+	var arts: Array = reads.arts
+	var skills: Array = reads.skills
+	var nature: Dictionary = reads.nature
+	var rank: int = reads.rank
+	var composed := {"groups": [], "rank": rank, "realms": realms.size(), "qi": reads.qi,
+			"capacity": reads.capacity, "realm": _realm_of(realms, rank),
+			"next": named(realms[rank]) if rank < realms.size() else "—",
+			"next_qi": grouped(realms[rank].qi) if rank < realms.size() else ""}
 	var order: Array[int] = []
 	for skill: Dictionary in skills:
 		if skill.art >= 0 and not order.has(int(skill.art)):
 			order.append(int(skill.art))
-	shown.heart = {}
+	composed.heart = {}
 	if not order.is_empty():
-		shown.heart = {"name": named(arts[order[0]]), "nature": _nature_words(arts[order[0]]),
+		composed.heart = {"name": named(arts[order[0]]), "nature": _nature_words(arts[order[0]]),
 				"ramp": NATURE_RAMPS[int(arts[order[0]].orientation)]}
 	for art: int in order:
 		var group := {"name": named(arts[art]), "nature": _nature_words(arts[art]),
 				"ramp": NATURE_RAMPS[int(arts[art].orientation)], "tags": [], "skills": []}
 		if art == order[0]:
-			group.tags.append({"text": tr("ARTS_HEART_TAG"), "fill": JADE_DARK})
+			group.tags.append({"text": _tr("ARTS_HEART_TAG"), "fill": JADE_DARK})
 		elif not nature.is_empty() and (arts[art].orientation != nature.orientation \
 				or arts[art].polarity != nature.polarity):
-			group.tags.append({"text": tr("ARTS_WEAKER"), "fill": CRIMSON_DARK})
+			group.tags.append({"text": _tr("ARTS_WEAKER"), "fill": CRIMSON_DARK})
 		for index in arts[art].skills.size():
 			var taught: Dictionary = arts[art].skills[index]
 			var held := {"art": art, "skill": index}
 			group.skills.append({"held": held, "name": named(taught),
 					"icon": _icon(taught), "known": _held_index(skills, held) >= 0,
 					"locked": int(taught.rank) > rank, "cost": grouped(taught.qi_cost),
-					"realm": realm_name(_world, taught.rank),
-					"cooldown": tr("ARTS_SECONDS") % ceili(float(taught.cooldown) / WorldAdapter.TICKS_PER_SECOND),
-					"range": tr("ARTS_CELLS") % (int(taught.range) / WorldAdapter.CELL_SIZE),
+					"realm": _realm_of(realms, taught.rank),
+					"cooldown": _tr("ARTS_SECONDS") % ceili(float(taught.cooldown) / WorldAdapter.TICKS_PER_SECOND),
+					"range": _tr("ARTS_CELLS") % (int(taught.range) / WorldAdapter.CELL_SIZE),
 					"area": _area(taught)})
-		shown.groups.append(group)
-	var drilled := {"name": tr("ARTS_FACTION"), "nature": "", "ramp": [], "tags": [], "faction": true,
+		composed.groups.append(group)
+	var drilled := {"name": _tr("ARTS_FACTION"), "nature": "", "ramp": [], "tags": [], "faction": true,
 			"skills": []}
 	for index in skills.size():
 		if skills[index].art >= 0:
 			continue
 		var skill: Dictionary = skills[index]
-		drilled.skills.append({"held": Loadout.identity(skills, index), "name": tr(_drilled_key(skill)),
+		drilled.skills.append({"held": Loadout.identity(skills, index), "name": _tr(_drilled_key(skill)),
 				"icon": _icon(skill), "known": true, "locked": false, "cost": "-", "realm": "-",
-				"cooldown": tr("ARTS_SHARED"),
-				"range": tr("ARTS_CELLS") % (int(skill.range) / WorldAdapter.CELL_SIZE), "area": _area(skill)})
+				"cooldown": _tr("ARTS_SHARED"),
+				"range": _tr("ARTS_CELLS") % (int(skill.range) / WorldAdapter.CELL_SIZE), "area": _area(skill)})
 	if not drilled.skills.is_empty():
-		shown.groups.append(drilled)
-	_keep_in_view()
-	queue_redraw()
+		composed.groups.append(drilled)
+	return composed
+
+
+static func _tr(key: String) -> String:
+	return TranslationServer.translate(key)
+
+
+# The name of realm `rank`, counted from 1, among `realms`, or a dash for no realm.
+static func _realm_of(realms: Array, rank: int) -> String:
+	return named(realms[rank - 1]) if rank >= 1 and rank <= realms.size() else "—"
 
 
 # The words of `art`'s nature: its orientation and its polarity, joined.
-func _nature_words(art: Dictionary) -> String:
-	return "%s · %s" % [tr(ORIENTATION_KEYS[int(art.orientation)]), tr(POLARITY_KEYS[int(art.polarity)])]
+static func _nature_words(art: Dictionary) -> String:
+	return "%s · %s" % [_tr(ORIENTATION_KEYS[int(art.orientation)]), _tr(POLARITY_KEYS[int(art.polarity)])]
 
 
 # The index among `skills` of the skill `held` names, or -1.
-func _held_index(skills: Array, held: Dictionary) -> int:
+static func _held_index(skills: Array, held: Dictionary) -> int:
 	for index in skills.size():
 		if Loadout.identity(skills, index) == held:
 			return index
@@ -294,7 +311,7 @@ func _held_index(skills: Array, held: Dictionary) -> int:
 
 
 # The hud.csv key naming an army's skill by what it does: mending, burning, or striking.
-func _drilled_key(skill: Dictionary) -> String:
+static func _drilled_key(skill: Dictionary) -> String:
 	if int(skill.structure_damage) < 0:
 		return "ARTS_MEND"
 	if int(skill.body_damage) == 0 and int(skill.structure_damage) > 0:
@@ -303,14 +320,14 @@ func _drilled_key(skill: Dictionary) -> String:
 
 
 # How far a skill's area reaches: one person, or its radius in cells.
-func _area(skill: Dictionary) -> String:
+static func _area(skill: Dictionary) -> String:
 	var cells := int(skill.radius) / WorldAdapter.CELL_SIZE
-	return tr("ARTS_AREA_ONE") if int(skill.radius) <= 0 else tr("ARTS_CELLS") % maxi(cells, 1)
+	return _tr("ARTS_AREA_ONE") if int(skill.radius) <= 0 else _tr("ARTS_CELLS") % maxi(cells, 1)
 
 
 # A skill's icon tag in art/icons/skill_icons: a skill whose radius reaches past its target bursts,
 # any other strikes one body.
-func _icon(skill: Dictionary) -> String:
+static func _icon(skill: Dictionary) -> String:
 	return "burst" if int(skill.radius) > 0 else "strike"
 
 
