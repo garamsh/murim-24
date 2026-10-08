@@ -569,6 +569,10 @@ godot::Dictionary WorldAdapter::date() const {
   return fields;
 }
 
+std::int64_t WorldAdapter::tick_count() const {
+  return static_cast<std::int64_t>(world().tick_count());
+}
+
 godot::PackedVector2Array WorldAdapter::body_positions(
     std::int64_t army) const {
   godot::PackedVector2Array positions;
@@ -1191,6 +1195,8 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_method(godot::D_METHOD("map_rows"),
                               &WorldAdapter::map_rows);
   godot::ClassDB::bind_method(godot::D_METHOD("date"), &WorldAdapter::date);
+  godot::ClassDB::bind_method(godot::D_METHOD("tick_count"),
+                              &WorldAdapter::tick_count);
   godot::ClassDB::bind_method(godot::D_METHOD("skill_count", "army"),
                               &WorldAdapter::skill_count);
   godot::ClassDB::bind_method(godot::D_METHOD("hash"), &WorldAdapter::hash);

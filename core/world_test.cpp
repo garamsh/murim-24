@@ -3063,6 +3063,20 @@ TEST(World, ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt) {
   EXPECT_EQ(short_of.person(CASTER).ready_at, 1 + CAST_COOLDOWN);
 }
 
+TEST(World, TickCountIsTheTickACooldownIsCountedAgainst) {
+  World world = cast_world();
+  EXPECT_EQ(world.tick_count(), 0U);
+  world.cast(CASTER, BOLT, AtPerson{FAR_FOE});
+  world.tick();
+
+  EXPECT_EQ(world.tick_count(), 1U);
+  EXPECT_EQ(world.person(CASTER).ready_at, world.tick_count() + CAST_COOLDOWN);
+  // Control: a tick in which no one strikes still counts.
+  world.tick();
+  EXPECT_EQ(world.tick_count(), 2U);
+  EXPECT_EQ(world.person(CASTER).ready_at, 1 + CAST_COOLDOWN);
+}
+
 TEST(World, ACastAtItselfCentresItsDiscOnTheCaster) {
   World world = cast_world();
   world.cast(CASTER, NOVA, Itself{});

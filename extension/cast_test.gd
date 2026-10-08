@@ -1,7 +1,8 @@
 # Checks that a cast passes through the adapter as the core takes it: a tap's aim favours the
 # facing, a cast at a person lands on it, one at a point past the range lands at the range, and
 # one at itself centres on the caster. Control: a cast on cooldown, out of range or at a target
-# of another type is refused, and the nearer people a cast passes over are untouched.
+# of another type is refused, and the nearer people a cast passes over are untouched. tick_count
+# gives the tick the caster's readiness is counted against.
 extends RefCounted
 
 const CASTER := 0
@@ -27,11 +28,16 @@ func run() -> bool:
 		ahead, behind, skill["range"], skill["cooldown"], "pass" if aim_right else "FAIL"])
 
 	var at_person := _world()
+	var ticks_before := at_person.tick_count()
 	var may := at_person.cast_refusal(CASTER, 1, FAR_FOE)
 	var out_of_range := at_person.cast_refusal(CASTER, 2, FAR_FOE)
 	var wrong_type := not at_person.cast(CASTER, 1, "east")
 	var cast := at_person.cast(CASTER, 1, FAR_FOE)
 	at_person.tick()
+	var counted: bool = ticks_before == 0 and at_person.tick_count() == 1 \
+			and at_person.body_ready(CASTER)[0] == at_person.tick_count() + skill["cooldown"]
+	print("cast_test: tick_count %d before the cast's tick and %d after, the caster ready at %d: %s" % [
+		ticks_before, at_person.tick_count(), at_person.body_ready(CASTER)[0], "pass" if counted else "FAIL"])
 	var cooling := at_person.cast_refusal(CASTER, 1, FAR_FOE)
 	var cooling_refused := not at_person.cast(CASTER, 1, FAR_FOE)
 	var person_right: bool = may == WorldAdapter.CAST_NONE and out_of_range == WorldAdapter.CAST_OUT_OF_RANGE \
@@ -55,7 +61,7 @@ func run() -> bool:
 	print("cast_test: past the range the far foe at %d; at itself the one behind at %d, the caster at %d: %s" % [
 		at_point.person_health(FAR_FOE), at_self.person_health(BEHIND_FOE),
 		at_self.person_health(CASTER), "pass" if area_right else "FAIL"])
-	return aim_right and person_right and area_right
+	return aim_right and counted and person_right and area_right
 
 
 # A caster at (6, 8) striking with IDLE alone, and three foes: two cells east, four cells east and
