@@ -13,10 +13,14 @@
 ## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
 ## as art/mockup/mobile_hud_idle.png lays them out.
 ## On a PC it is drawn at its own whole-pixel scale, finer than the world's, as ViewScale sets
-## it, its panels anchored to the corners of the room it is given; with the touch controls it keeps the native 480x270 at the world's scale.
+## it, its panels anchored to the corners of the room it is given and a settings button under the
+## map; with the touch controls it keeps the native 480x270 at the world's scale.
 ## Every word comes from hud.csv through Godot's translations, Korean first, or in the language
 ## the settings keep. It reads the world and holds no game rule.
 extends CanvasLayer
+
+## Sent when the settings button is clicked.
+signal settings_asked
 
 const LOCALES := ["ko", "en"]
 const FONT := "res://hud/fonts/Galmuri9.ttf"
@@ -64,6 +68,8 @@ const RUMOUR_RECT := {false: Rect2(4, 184, 220, 52), true: Rect2(176, 4, 166, 42
 const RUMOUR_WIDTH := {false: 209, true: 156}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
+# The settings button, under the map; the touch layout has none, its pause button standing in.
+const SETTINGS_RECT := Rect2(424, 70, 52, 16)
 # The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
 const CHALLENGE_KEYS := {
 	WorldAdapter.CHALLENGE_NONE: "CHALLENGE_NONE",
@@ -116,6 +122,8 @@ var touch: Control
 var rumour_lines := RUMOUR_LINES
 ## The room the HUD is laid out in, in its own pixels.
 var room := NATIVE
+## The settings button, shown in the keyboard layout.
+var settings_button: Panel
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
@@ -316,6 +324,7 @@ func use_touch(on: bool) -> void:
 		touch.release_all()
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
+	settings_button.visible = not on
 	labels.challenge_key.visible = not on
 	_rumour_panel.size = RUMOUR_RECT[on].size
 	rumour_lines = 2 if on else RUMOUR_LINES
@@ -352,12 +361,20 @@ func from_window(at: Vector2) -> Vector2:
 	return transform.affine_inverse() * at
 
 
+# Asks for the settings when the settings button is clicked.
+func _on_settings_button(event: InputEvent) -> void:
+	var click := event as InputEventMouseButton
+	if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		settings_asked.emit()
+
+
 # Places the panels of the layout shown in the room: each keeps its place against the corner it
 # stands by, the panels and screens over the HUD in the room's middle.
 func _place() -> void:
 	var on := touch.visible
 	var gained := room - NATIVE
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
+	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
 	_rumour_panel.position = RUMOUR_RECT[on].position + Vector2(0, gained.y)
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
@@ -521,6 +538,12 @@ func _build() -> void:
 	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(MAP_AT[false], Vector2(84, 62)))
+	settings_button = _panel(SETTINGS_RECT)
+	var word := _label(settings_button, "SETTINGS_TITLE", Vector2.ZERO, PAPER)
+	word.size = SETTINGS_RECT.size - Vector2(0, 2)
+	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	word.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	settings_button.gui_input.connect(_on_settings_button)
 	_map_panel = map
 	_map.position = Vector2(4, 4)
 	_map.size = Vector2(MAP_SIZE)

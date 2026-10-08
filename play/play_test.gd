@@ -93,7 +93,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass() and _arts_pass() \
 			and _art_slot_pass() and _loadout_save_pass()
 
@@ -517,6 +517,41 @@ func _screens_pass() -> bool:
 		titled, new_game_open, TYPED_SEED, started, SEED, same_world, paused, caps, guided, held, ran, ran_fast,
 		"pass" if passed else "FAIL"])
 	scene.free()
+	return passed
+
+
+# The HUD's settings button opens the settings over the world, and no tick runs while they are
+# open; Escape goes back to the world, which runs again. Control: the settings opened from the
+# pause panel go back to it, so going back to the world is the button's own. Setup: the world is
+# played and no screen is open before the button is pressed.
+func _settings_button_pass() -> bool:
+	var scene := _scene(0)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var span := 3.5 / WorldAdapter.TICKS_PER_SECOND
+	var set_up: bool = scene.world != null and hud.screen() == null and hud.settings_button.visible
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	hud.settings_button.gui_input.emit(click)
+	var opened: bool = hud.screen() == hud.settings
+	var before: int = scene.ticks
+	scene.advance(span)
+	var held: bool = scene.ticks == before
+	scene.navigate(_key(KEY_ESCAPE))
+	var back_to_world: bool = hud.screen() == null
+	scene.advance(span)
+	var ran: bool = scene.ticks > before
+	scene.navigate(_key(KEY_ESCAPE))
+	for n in hud.pause.ENTRIES.find("settings"):
+		scene.navigate(_key(KEY_DOWN))
+	scene.navigate(_key(KEY_ENTER))
+	var from_pause: bool = hud.screen() == hud.settings
+	scene.navigate(_key(KEY_ESCAPE))
+	var back_to_pause: bool = hud.screen() == hud.pause
+	scene.free()
+	var passed := set_up and opened and held and back_to_world and ran and from_pause and back_to_pause
+	print("play_test: the settings button opens the settings %s, no tick while open %s; Escape goes back to the world %s, which runs %s; control: opened from the pause panel %s, Escape goes back to it %s (setup %s): %s" % [
+		opened, held, back_to_world, ran, from_pause, back_to_pause, set_up, "pass" if passed else "FAIL"])
 	return passed
 
 

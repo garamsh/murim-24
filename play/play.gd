@@ -22,7 +22,8 @@
 ## open the genealogy, sect and arts panels, challenge and pause, where on the arts panel a skill
 ## tapped and then a skill button puts it on that button's slot; the screens take taps, and where
 ## the settings ask, a tap on the ground orders the person there.
-## The camera follows the person, at the whole-pixel scale ViewScale gives the window, filling it. It ticks at the core's tick rate times the speed the settings
+## The camera follows the person, at the whole-pixel scale ViewScale gives the window, filling it;
+## the HUD's settings button opens the settings over the paused world. It ticks at the core's tick rate times the speed the settings
 ## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
 ## sounds it through sound.tscn, and holds no game rule.
 extends Node2D
@@ -95,6 +96,8 @@ var _stick := Vector2i.ZERO
 var _stick_from := Vector2i.ZERO
 # Where the view's top-left corner is in the world, in pixels, for a tap on the ground.
 var _view_origin := Vector2.ZERO
+# Whether the settings were opened from the pause panel, which going back from them returns to.
+var _settings_from_pause := false
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -106,6 +109,7 @@ var _view_origin := Vector2.ZERO
 func _ready() -> void:
 	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.applied.connect(fit_view)
+	_hud.settings_asked.connect(open_settings)
 	# Outside a tree, as a test readies it, the scene has no window to fit.
 	if is_inside_tree():
 		get_viewport().size_changed.connect(fit_view)
@@ -123,6 +127,19 @@ func fit_view() -> void:
 	var scale := ViewScale.world_scale(Vector2i(window), touch_shown)
 	_camera.zoom = Vector2(scale, scale)
 	_hud.fit(Vector2i(window), touch_shown)
+
+
+## Opens the settings over the world, which stays paused while they are open; going back from
+## them returns to the world.
+func open_settings() -> void:
+	if world == null or _hud.screen() != null:
+		return
+	_moving = false
+	_stick = Vector2i.ZERO
+	_hud.touch.release_all()
+	_settings_from_pause = false
+	_hud.settings.open()
+	_sound.ui("open")
 
 
 ## Starts a world generated from `from_seed`, the player born into `birth_village`, and closes
@@ -233,10 +250,11 @@ func _take(action: String) -> void:
 			_hud.pause.note_save(save())
 		"settings":
 			_hud.pause.close()
+			_settings_from_pause = true
 			_hud.settings.open()
 		"back":
-			# Back from the settings to the pause panel they were opened from, in a game.
-			if world != null:
+			# Back from the settings to the pause panel, where they were opened from it in a game.
+			if world != null and _settings_from_pause:
 				_hud.pause.visible = true
 		"resume":
 			_hud.pause.close()

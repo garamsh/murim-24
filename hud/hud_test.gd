@@ -135,8 +135,8 @@ func run() -> bool:
 
 
 # At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives
-# it; every panel it shows, the duel panel among them, lies within the room and clear of every
-# other; the panels and
+# it; every panel it shows, the duel panel and the settings button among them, lies within the room
+# and clear of every other; the settings button's word fits within its frame; the panels and
 # screens over the HUD stand in the room's middle; and the title, drawn at the least whole multiple
 # covering the room and standing on its foot, takes a tap on its first entry where it draws it. Control: the room gained moves the map, so
 # the 480x270 layout's places are not what is checked. With the touch controls, at each window in
@@ -169,6 +169,12 @@ func _layout_pass() -> bool:
 				for other: Control in shown.slice(n + 1):
 					if rect.intersects(other.get_rect()):
 						faults.append("%s: %s over %s" % [at, shown[n].name, other.name])
+			var button: Panel = hud.settings_button
+			var label: Label = button.get_child(0)
+			var said := label.atr(label.text)
+			checks += 1
+			if said == label.text or _width(label, said) > button.size.x - 2:
+				faults.append("%s: \"%s\" %d px in a %d px button" % [at, said, _width(label, said), button.size.x])
 			# The title's first entry, where the title draws it at the multiple covering the room, is
 			# taken; where the native layout puts it, unscaled, it is not.
 			var times := ceilf(maxf(room.size.x / hud.NATIVE.x, room.size.y / hud.NATIVE.y))
@@ -206,7 +212,7 @@ func _layout_pass() -> bool:
 	return passed
 
 
-# The HUD's own panels that are shown.
+# The HUD's own panels that are shown, the settings button among them.
 func _shown_panels(hud: CanvasLayer) -> Array[Control]:
 	var shown: Array[Control] = []
 	for child: Node in hud.get_children():
