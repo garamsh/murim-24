@@ -1035,6 +1035,20 @@ std::int64_t WorldAdapter::aim(std::int64_t person, std::int64_t skill,
   }
 }
 
+std::int64_t WorldAdapter::talk_refusal(std::int64_t person,
+                                        std::int64_t other) const {
+  return static_cast<std::int64_t>(
+      world().talk_refusal(person_index(person), person_index(other)));
+}
+
+godot::PackedInt64Array WorldAdapter::offers(std::int64_t person) const {
+  godot::PackedInt64Array offered;
+  for (const murim::Offer offer : world().offers(person_index(person))) {
+    offered.push_back(static_cast<std::int64_t>(offer));
+  }
+  return offered;
+}
+
 godot::TypedArray<godot::Dictionary> WorldAdapter::rumours(
     std::int64_t person) const {
   godot::TypedArray<godot::Dictionary> heard;
@@ -1374,6 +1388,11 @@ void WorldAdapter::_bind_methods() {
       godot::D_METHOD("aim", "person", "skill", "facing"), &WorldAdapter::aim);
   godot::ClassDB::bind_method(godot::D_METHOD("rumours", "person"),
                               &WorldAdapter::rumours);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("talk_refusal", "person", "other"),
+      &WorldAdapter::talk_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("offers", "person"),
+                              &WorldAdapter::offers);
   godot::ClassDB::bind_method(godot::D_METHOD("person_attainment", "person"),
                               &WorldAdapter::person_attainment);
   godot::ClassDB::bind_method(godot::D_METHOD("discipline_names"),
@@ -1573,6 +1592,19 @@ void WorldAdapter::_bind_methods() {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }
+  const std::array<std::pair<const char*, murim::TalkRefusal>, 5> talks{{
+      {"TALK_NONE", murim::TalkRefusal::NONE},
+      {"TALK_DEAD", murim::TalkRefusal::DEAD},
+      {"TALK_SELF", murim::TalkRefusal::SELF},
+      {"TALK_OUT_OF_REACH", murim::TalkRefusal::OUT_OF_REACH},
+      {"TALK_HOSTILE", murim::TalkRefusal::HOSTILE},
+  }};
+  for (const auto& [constant, refusal] : talks) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  godot::ClassDB::bind_integer_constant(name, "", "OFFER_NEWS",
+                                        static_cast<int>(murim::Offer::NEWS));
   const std::array<std::pair<const char*, murim::ApplicationRefusal>, 11>
       applications{{
           {"APPLICATION_NONE", murim::ApplicationRefusal::NONE},

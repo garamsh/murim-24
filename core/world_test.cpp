@@ -4030,5 +4030,141 @@ TEST(World, KnownSkillsAndQiArePartOfTheHash) {
   EXPECT_EQ(one.hash(), read(Cultivating{}).hash());
 }
 
+constexpr Cell SPEAKER_AT{2, 2};
+constexpr Cell NEIGHBOUR_AT{4, 2};
+constexpr Cell PASSER_BY_AT{5, 2};
+constexpr Cell FOE_AT{2, 4};
+
+// Faction 0's speaker at (2, 2) beside faction 1's neighbour 2 cells east,
+// faction 1's passer-by 3 cells east and faction 2's foe 2 cells south, faction
+// 2 hostile to faction 0 unless `foe_hostile` is false; people talk within 2
+// cells, and the speaker leads its faction.
+World talking(bool foe_hostile = true) {
+  Rules rules{0,
+              {{false, false, foe_hostile},
+               {false, false, false},
+               {false, false, false}},
+              STAGE_FLOORS};
+  rules.talk_reach = 2;
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {ArmySpec{SPEAKER_AT, {Recruit{SPEAKER_AT, 1}}, 0, {IDLE}},
+                ArmySpec{NEIGHBOUR_AT, {Recruit{NEIGHBOUR_AT, 1}}, 1, {IDLE}},
+                ArmySpec{PASSER_BY_AT, {Recruit{PASSER_BY_AT, 1}}, 1, {IDLE}},
+                ArmySpec{FOE_AT, {Recruit{FOE_AT, 1}}, 2, {IDLE}}},
+               {},
+               rules,
+               {},
+               {{0, std::nullopt, std::nullopt, std::nullopt}, {}, {}}};
+}
+
+constexpr std::size_t SPEAKER = 0;
+constexpr std::size_t NEIGHBOUR = 1;
+constexpr std::size_t PASSER_BY = 2;
+constexpr std::size_t FOE = 3;
+
+TEST(World, APersonTalksToAnyoneWithinTheTalkReachWhoIsNotHostile) {
+  const World world = talking();
+  EXPECT_EQ(world.talk_refusal(SPEAKER, NEIGHBOUR), TalkRefusal::NONE);
+  // Control: one cell farther is beyond the reach.
+  EXPECT_EQ(world.talk_refusal(SPEAKER, PASSER_BY), TalkRefusal::OUT_OF_REACH);
+  EXPECT_EQ(world.talk_refusal(SPEAKER, SPEAKER), TalkRefusal::SELF);
+  EXPECT_THROW(static_cast<void>(world.talk_refusal(SPEAKER, 99)),
+               std::invalid_argument);
+}
+
+TEST(World, AHostileFactionsPersonRefusesToTalk) {
+  // Faction 2 is hostile to faction 0 by stance, so its person refuses both
+  // ways.
+  const World world = talking();
+  ASSERT_EQ(world.relation(0, 2), Relation::HOSTILE);
+  EXPECT_EQ(world.talk_refusal(SPEAKER, FOE), TalkRefusal::HOSTILE);
+  EXPECT_EQ(world.talk_refusal(FOE, SPEAKER), TalkRefusal::HOSTILE);
+  // Control: the same person at the same place, its faction allied, talks.
+  const World allied = talking(false);
+  ASSERT_EQ(allied.relation(0, 2), Relation::ALLY);
+  EXPECT_EQ(allied.talk_refusal(SPEAKER, FOE), TalkRefusal::NONE);
+}
+
+TEST(World, APersonOfAFactionAtWarRefusesToTalk) {
+  World world = talking();
+  ASSERT_EQ(world.talk_refusal(SPEAKER, NEIGHBOUR), TalkRefusal::NONE);
+  world.declare(SPEAKER, 1, Declaration::WAR);
+  ASSERT_EQ(world.relation(0, 1), Relation::AT_WAR);
+  EXPECT_EQ(world.talk_refusal(SPEAKER, NEIGHBOUR), TalkRefusal::HOSTILE);
+  // Control: peace made with the foe's faction lets its person talk.
+  World peace = talking();
+  ASSERT_EQ(peace.talk_refusal(SPEAKER, FOE), TalkRefusal::HOSTILE);
+  peace.declare(SPEAKER, 2, Declaration::PEACE);
+  ASSERT_EQ(peace.relation(0, 2), Relation::NEUTRAL);
+  EXPECT_EQ(peace.talk_refusal(SPEAKER, FOE), TalkRefusal::NONE);
+}
+
+// Two people of faction 0 side by side, one of whom faction 1's person beside
+// them strikes dead on the first tick: {world, the dead, the living}.
+struct Struck {
+  World world;
+  std::size_t dead = 0;
+  std::size_t alive = 0;
+};
+
+Struck struck_beside() {
+  const Skill once{2 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN};
+  Rules rules = at_war(0);
+  rules.talk_reach = 2;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {ArmySpec{{2, 2}, {Recruit{{2, 2}, 1}}, 0, {IDLE}},
+               ArmySpec{{2, 3}, {Recruit{{2, 3}, 1}}, 0, {IDLE}},
+               ArmySpec{{3, 2}, {Recruit{{3, 2}, 1}}, 1, {once}}},
+              {},
+              rules};
+  run_ticks(world, 1);
+  const std::size_t dead = world.person(0).health == 0 ? 0U : 1U;
+  return Struck{world, dead, 1U - dead};
+}
+
+TEST(World, TheDeadDoNotTalk) {
+  const Struck struck = struck_beside();
+  ASSERT_EQ(struck.world.person(struck.dead).health, 0U);
+  EXPECT_EQ(struck.world.talk_refusal(struck.alive, struck.dead),
+            TalkRefusal::DEAD);
+  EXPECT_EQ(struck.world.talk_refusal(struck.dead, struck.alive),
+            TalkRefusal::DEAD);
+}
+
+TEST(World, TheDeadOfferNoNews) {
+  const Struck struck = struck_beside();
+  ASSERT_EQ(struck.world.person(struck.dead).health, 0U);
+  EXPECT_TRUE(struck.world.offers(struck.dead).empty());
+  // Control: the living one beside it still offers its news.
+  EXPECT_EQ(struck.world.offers(struck.alive), std::vector<Offer>{Offer::NEWS});
+  EXPECT_THROW(static_cast<void>(struck.world.offers(99)), std::out_of_range);
+}
+
+// Whether a world whose people talk within `reach` cells is created.
+bool talks_within(std::int32_t reach) {
+  Rules rules = peaceful(0);
+  rules.talk_reach = reach;
+  try {
+    const World world{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      rules};
+    return world.living() == 1;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
+TEST(World, ATalkReachOutsideItsLimitsIsRefused) {
+  EXPECT_FALSE(talks_within(-1));
+  EXPECT_FALSE(talks_within(MAX_REACH + 1));
+  // Control: the limits themselves are accepted.
+  EXPECT_TRUE(talks_within(0));
+  EXPECT_TRUE(talks_within(MAX_REACH));
+}
+
 }  // namespace
 }  // namespace murim

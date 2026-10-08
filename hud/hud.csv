@@ -13,8 +13,6 @@ SEASON_0,봄,Spring
 SEASON_1,여름,Summer
 SEASON_2,가을,Autumn
 SEASON_3,겨울,Winter
-HUD_RUMOR,소문,Rumour
-HUD_RUMOR_NONE,아직 들려온 소문이 없다.,No rumour has come yet.
 RUMOUR_FOUNDED,"%s, 새 마을을 세우다",New %s village founded
 RUMOUR_RAIDED,"%s, %s 마을을 습격하다",%s raid on %s village
 RUMOUR_RUINED,"%s 마을, 폐허가 되다",%s village in ruins
@@ -35,7 +33,7 @@ HUD_AUTOSAVED,자동 저장했다.,Autosaved.
 HUD_AUTOSAVE_FAILED,자동 저장하지 못했다.,Could not autosave.
 HUD_DUEL_LEADER_HELD,수장이 자리를 지켰다.,The leader holds the lead.
 CHALLENGE_NONE,수장에게 결투를 신청했다!,You challenge the leader to a duel!
-CHALLENGE_NO_SUCCESSION,이 문파는 결투로 수장을 정하지 않는다.,This faction does not settle its lead by duel.
+CHALLENGE_NO_SUCCESSION,이 세력은 결투로 수장을 정하지 않는다.,This faction does not settle its lead by duel.
 CHALLENGE_NO_LEADER,도전할 수장이 없다.,There is no leader to challenge.
 CHALLENGE_NO_CHALLENGER,도전할 사람이 남지 않았다.,No one is left to challenge.
 CHALLENGE_NOT_A_MEMBER,문파의 일원만 도전할 수 있다.,Only a member may challenge.
@@ -137,6 +135,7 @@ CONTROLS_CAST,커서에 기술,Cast at cursor
 CONTROLS_SKILL,기술 하나,One skill
 CONTROLS_ALL_SKILLS,모든 기술,All skills
 CONTROLS_FACTIONS,세력,Factions
+CONTROLS_TALK,대화,Talk
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
@@ -276,3 +275,15 @@ DECLARE_SAME_FACTION,우리 세력이다.,That is our faction.
 DECLARE_ALREADY_AT_WAR,이미 전쟁 중이다.,Already at war.
 DECLARE_ALREADY_AT_PEACE,이미 싸우지 않는다.,Already at peace.
 DECLARE_TOO_SOON,아직 이르다.,Too soon.
+DIALOGUE_TALK,대화,Talk
+DIALOGUE_HOSTILE,적대 · 말을 섞지 않는다,Hostile · will not talk
+DIALOGUE_CLOSE,Esc 닫기,Esc Close
+DIALOGUE_GREETING,“무슨 일이오?”,“What is it?”
+DIALOGUE_NEWS,요즘 소식이 있소?,Any news?
+DIALOGUE_FAREWELL,잘 있으시오.,Farewell.
+DIALOGUE_HEARD,들은 소문,What I have heard
+DIALOGUE_NONE,“요즘 들려온 소문이 없소.”,“No news has reached me.”
+DIALOGUE_NO_SECT,문파 없음,No sect
+DIALOGUE_AGE,%d세,Age %d
+DIALOGUE_KEYS_MENU,방향키 고르기 · Enter 말하기 · Esc 닫기,Arrows choose · Enter say · Esc close
+DIALOGUE_KEYS_NEWS,방향키 넘기기 · Esc 돌아가기,Arrows scroll · Esc back

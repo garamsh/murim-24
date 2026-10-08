@@ -10,7 +10,11 @@
 ## of its skills, Q to T put it on that slot and Delete takes it off its slot, and F the faction
 ## window, where the arrows choose a faction and an order, Enter gives a leader's order, war asked
 ## again first, through the core's declare port, and C challenges the faction's leader to a duel,
-## with the same order every army follows, when the core allows it. The loadout is
+## with the same order every army follows, when the core allows it. Space talks to the person the
+## HUD's prompt names, the nearest within the core's talk reach, in the dialogue window, where the
+## arrows choose what to ask, Enter asks it and Escape goes back or ends the talk; a person the core
+## says is hostile refuses, as the prompt shows, and the window closes once the core refuses the
+## talk. The loadout is
 ## written beside the save whenever the world is saved, and read with it. The person is the one
 ## the core says carries the player's soul,
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
@@ -53,6 +57,8 @@ const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const ARTS_KEY := KEY_K
 const FACTIONS_KEY := KEY_F
+## The key that talks to the person the prompt names.
+const TALK_KEY := KEY_SPACE
 ## The key that takes the skill chosen on the arts panel off its slot.
 const CLEAR_KEY := KEY_DELETE
 const PAUSE_KEY := KEY_ESCAPE
@@ -101,6 +107,12 @@ var _stick_from := Vector2i.ZERO
 var _view_origin := Vector2.ZERO
 # Whether the settings were opened from the pause panel, which going back from them returns to.
 var _settings_from_pause := false
+## The person the talk prompt names, or -1 for none, and whether the core refuses the talk for
+## hostility, as last read.
+var talk_to := -1
+var talk_hostile := false
+# The tick the person to talk to was last read at.
+var _talk_read_at := -1
 
 @onready var _camera: Camera2D = $Camera
 @onready var _art: Node2D = $WorldArt
@@ -216,7 +228,8 @@ func navigate(event: InputEvent) -> bool:
 	var open: Control = _hud.screen()
 	if open == null:
 		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
-				or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible or _aiming != KEY_NONE:
+				or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible or _hud.dialogue.visible \
+				or _aiming != KEY_NONE:
 			return false
 		pause()
 		return true
@@ -285,6 +298,7 @@ func controls() -> Array[Dictionary]:
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
 		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
 		{"keys": [OS.get_keycode_string(FACTIONS_KEY)], "does": "CONTROLS_FACTIONS"},
+		{"keys": [OS.get_keycode_string(TALK_KEY)], "does": "CONTROLS_TALK"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows
@@ -307,6 +321,7 @@ func _process(delta: float) -> void:
 	_view_origin = view.position
 	_hud.touch.body_at = _hud.from_window((_to_pixels(lead()) - view.position) * _camera.zoom).floor()
 	_hud.refresh(world, steered, _skills)
+	show_talk()
 
 
 ## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
@@ -342,6 +357,8 @@ func command(event: InputEvent) -> bool:
 		return arts(key.keycode)
 	elif key != null and key.pressed and (key.keycode == FACTIONS_KEY or _hud.factions.visible):
 		return factions(key.keycode)
+	elif key != null and key.pressed and (key.keycode == TALK_KEY or _hud.dialogue.visible):
+		return talk(key.keycode)
 	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
 		var cast := quick_cast(key, _cursor)
 		_show_aim()
@@ -440,7 +457,7 @@ func _steer(way: Vector2i) -> bool:
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
 ## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel or the
 ## faction window, or pause, and where the settings ask, a tap on the ground orders the person to
-## that cell. While the genealogy or sect panel is open, a tap closes it; while the faction window
+## that cell. While the genealogy or sect panel or the dialogue window is open, a tap closes it; while the faction window
 ## is, a tap works it as factions_tap() does; while the arts panel is, a tap on a tile
 ## chooses its skill, a skill button tapped then puts it on that button's slot, a finger moved up or
 ## down scrolls the tiles and the close button closes it. Returns whether the touch controls took
@@ -456,7 +473,8 @@ func touch(event: InputEvent) -> bool:
 		if pressed_on != null and pressed_on.pressed:
 			factions_tap(pressed_on.position - _hud.factions.position)
 		return true
-	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible else null)
+	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible \
+			else (_hud.dialogue if _hud.dialogue.visible else null))
 	if panel != null:
 		var pressed := event as InputEventScreenTouch
 		if pressed != null and pressed.pressed:
@@ -538,6 +556,85 @@ func cast(skill: int, target: Variant) -> int:
 	elif world.cast(roster[0], skill, target):
 		last_cast = {"skill": skill, "target": target}
 	return refusal
+
+
+## Returns the person the steered person would talk to, the nearest living one the core lets it
+## talk to or refuses only for hostility, with whether it refuses: {person, hostile}, or a person of
+## -1 for none.
+func talk_target() -> Dictionary:
+	var roster := world.roster(steered)
+	var found := {"person": -1, "hostile": false}
+	if roster.is_empty():
+		return found
+	var speaker := roster[0]
+	var here := world.person_position(speaker)
+	var nearest := INF
+	for army in world.army_count():
+		for person in world.roster(army):
+			var refusal := world.talk_refusal(speaker, person)
+			if refusal != WorldAdapter.TALK_NONE and refusal != WorldAdapter.TALK_HOSTILE:
+				continue
+			var apart := here.distance_squared_to(world.person_position(person))
+			if apart < nearest:
+				nearest = apart
+				found = {"person": person, "hostile": refusal == WorldAdapter.TALK_HOSTILE}
+	return found
+
+
+## Reads whom the steered person may talk to once a tick, closes the dialogue window once the core
+## refuses that talk, and shows the prompt over the person to talk to while no panel is open and the
+## touch controls are not shown, whose talk has no button yet.
+func show_talk() -> void:
+	if world.tick_count() != _talk_read_at:
+		_talk_read_at = world.tick_count()
+		var target := talk_target()
+		talk_to = target.person
+		talk_hostile = target.hostile
+		var roster := world.roster(steered)
+		if _hud.dialogue.visible and (roster.is_empty()
+				or world.talk_refusal(roster[0], _hud.dialogue.person) != WorldAdapter.TALK_NONE):
+			_hud.dialogue.close()
+	var hidden: bool = talk_to < 0 or _hud.touch.visible or _hud.dialogue.visible or _hud.genealogy.visible \
+			or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible
+	if hidden:
+		_hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
+		return
+	# world_art.gd draws a body from 16 pixels above its position.
+	var head := _to_pixels(world.person_position(talk_to)) - Vector2(0, 17)
+	_hud.talk_prompt.key = OS.get_keycode_string(TALK_KEY)
+	_hud.talk_prompt.point_at(world, talk_to, _hud.from_window((head - _view_origin) * _camera.zoom).floor(),
+			talk_hostile)
+
+
+## Works the dialogue window with `keycode`: Space opens it on the person the prompt names, when the
+## core lets the steered person talk to it; up and down choose what to ask or scroll the news, Enter
+## asks it, the news showing the person's news and farewell ending the talk, and Escape goes back
+## from the news or ends the talk. While it is open no key gives an order or casts. Returns whether
+## the key did anything.
+func talk(keycode: Key) -> bool:
+	var panel: Control = _hud.dialogue
+	var roster := world.roster(steered)
+	if not panel.visible:
+		if keycode != TALK_KEY or roster.is_empty() or talk_to < 0 \
+				or world.talk_refusal(roster[0], talk_to) != WorldAdapter.TALK_NONE:
+			return false
+		panel.open(world, talk_to)
+		_sound.ui("open")
+		return true
+	if keycode == KEY_ESCAPE:
+		if not panel.back():
+			panel.close()
+		return true
+	if keycode == KEY_UP or keycode == KEY_DOWN:
+		return panel.move(-1 if keycode == KEY_UP else 1)
+	if (keycode == KEY_ENTER or keycode == KEY_KP_ENTER) and not panel.showing_news:
+		var chosen: int = panel.choice()
+		if chosen == WorldAdapter.OFFER_NEWS:
+			panel.show_news()
+		else:
+			panel.close()
+		return true
+	return false
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current
@@ -796,6 +893,7 @@ func step() -> void:
 		_stick = Vector2i.ZERO
 		_hud.touch.release_all()
 		_close_arts()
+		_hud.dialogue.close()
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]

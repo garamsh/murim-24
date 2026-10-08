@@ -23,20 +23,16 @@ const SHOWN := {
 	"duel_challenger": ["HUD_LEADER_YOU"],
 	"duel_leader": ["HUD_LEADER_YOU"],
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD", "HUD_AUTOSAVED", "HUD_AUTOSAVE_FAILED"],
-	"rumour_0": ["HUD_RUMOR_NONE"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
-# and of the rumours' and the lessons' words, which _rumours_pass and _lessons_pass measure.
+# the dialogue window's and the rumours' among them, and of the lessons' words, which _lessons_pass
+# measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_"]
 const Arts := preload("res://hud/arts.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
 # person.
 const LESSON_TICKS := 6000
-# Years with days of five ticks for rumours to reach the player.
-const RUMOUR_YEARS := 10
-const SHORT_DAY := 5
-const DAYS_PER_YEAR := 120
 # The season label is measured at a three-digit year.
 const LATEST_YEAR := 999
 # Text keeps clear of a panel's right edge by its 1-pixel border and the 4 pixels labels keep from
@@ -125,19 +121,19 @@ func run() -> bool:
 	var measure_passed := _measure_pass()
 	var names_passed := _names_pass()
 	var fit_passed := _fit_pass()
-	var rumours_passed := _rumours_pass()
 	var realm_passed := _realm_pass()
 	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
-	return passed and measure_passed and names_passed and fit_passed and rumours_passed and realm_passed \
+	return passed and measure_passed and names_passed and fit_passed and realm_passed \
 			and lessons_passed and cast_words_passed and layout_passed
 
 
 # At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives
 # it; every panel it shows, the duel panel and the settings button among them, lies within the room
 # and clear of every other; the settings button's word fits within its frame; the panels and
-# screens over the HUD stand in the room's middle; and the title, drawn at the least whole multiple
+# screens over the HUD stand in the room's middle, and the dialogue window centred across its foot,
+# clear of the technique bar; and the title, drawn at the least whole multiple
 # covering the room and standing on its foot, takes a tap on its first entry where it draws it. Control: the room gained moves the map, so
 # the 480x270 layout's places are not what is checked. With the touch controls, at each window in
 # TOUCH_WINDOWS, the HUD keeps the world's scale and 480x270, and every panel stands where the touch
@@ -193,6 +189,13 @@ func _layout_pass() -> bool:
 				checks += 1
 				if over.position != middle:
 					faults.append("%s: %s at %s, not %s" % [at, over.get_script().resource_path, over.position, middle])
+			# The dialogue window stands centred across the room's foot, within it and clear of the
+			# technique bar.
+			checks += 1
+			var on_foot := Vector2(floorf((room.size.x - hud.NATIVE.x) / 2.0), room.size.y - hud.NATIVE.y)
+			var talk: Rect2 = Rect2(hud.dialogue.position + hud.dialogue.RECT.position, hud.dialogue.RECT.size)
+			if hud.dialogue.position != on_foot or not room.encloses(talk) or talk.intersects(hud._skill_bar.get_rect()):
+				faults.append("%s: the dialogue window at %s, not on the foot %s clear of the bar" % [at, talk, on_foot])
 	TranslationServer.set_locale(hud.LOCALES[0])
 	# The touch layout's places, unscaled, against those at each touch window.
 	hud.use_touch(true)
@@ -383,8 +386,6 @@ func _texts(hud: CanvasLayer, name: String, label: Label, measured: Dictionary) 
 			measured["SEASON_%d" % season] = true
 			seasons.append(hud.season_text({"year": LATEST_YEAR, "season": season}))
 		return seasons
-	if name == "rumour_1" or name == "rumour_2":
-		return []
 	var keys: Array = SHOWN.get(name, [])
 	if name == "notice":
 		keys = keys + hud.CHALLENGE_KEYS.values() + hud.CAST_KEYS.values()
@@ -483,93 +484,6 @@ func _cast_words_pass() -> bool:
 	var passed := set_up and unworded.is_empty() and lacking == "CAST_NOT_A_REASON"
 	print("hud_test: %d cast refusals %s; unworded %s; a key hud.csv lacks reads \"%s\" (setup %s): %s" % [
 		refusals.size(), refusals.keys(), unworded, lacking, set_up, "pass" if passed else "FAIL"])
-	return passed
-
-
-# The region lived RUMOUR_YEARS years of five-tick days: the rumour log shows the latest rumours
-# that reach the player, newest first, each worded as rumour_text words it, and a person's birth
-# or death names that person. Control: the same region as it begins has no rumour, and the log
-# says none has come. In each locale, every rumour about villages, sects and leads, with every
-# faction and sect name, fits its line whole; one naming a person fits whole in Korean, and in
-# English is cut short with an ellipsis past its line, for every surname crossed with every given
-# name. In the touch layout, whose lines are the mockup's 156 pixels, every rumour is whole or cut
-# short with an ellipsis. Setup: every RUMOUR_ key is measured.
-func _rumours_pass() -> bool:
-	var world := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
-	var steered := world.army_count() - 1
-	var hud: CanvasLayer = load(SCENE).instantiate()
-	hud.show_player(world, steered)
-	hud.refresh(world, steered, PackedInt64Array([0]))
-	var none_shown: String = hud.labels.rumour_0.text
-	var none_right: bool = world.rumours(world.roster(steered)[0]).is_empty() \
-			and none_shown == hud.tr("HUD_RUMOR_NONE") and hud.labels.rumour_1.text == ""
-	for tick in RUMOUR_YEARS * DAYS_PER_YEAR * SHORT_DAY:
-		world.tick()
-	hud.refresh(world, steered, PackedInt64Array([0]))
-	var heard := world.rumours(world.roster(steered)[0])
-	var shown := []
-	var expected := []
-	for line in hud.RUMOUR_LINES:
-		shown.append(hud.labels["rumour_%d" % line].text)
-		expected.append(hud.rumour_text(world, heard[line]) if line < heard.size() else "")
-	var newest_first: bool = heard.size() >= 2 and heard[0].sequence > heard[1].sequence
-	var named := true
-	for event: Dictionary in heard:
-		if event.kind == "born" or event.kind == "died":
-			named = named and hud.rumour_text(world, event).contains(PersonName.of(world, event.person, true))
-	var live_right: bool = heard.size() >= hud.RUMOUR_LINES and shown == expected and newest_first and named
-	# Fits, in each locale.
-	var label: Label = hud.labels.rumour_0
-	var measured := {}
-	var overruns: Array[String] = []
-	var cut := 0
-	var checks := 0
-	var factions := world.faction_names()
-	var touch_cut := 0
-	for case in hud.LOCALES.size() * 2:
-		var locale: String = hud.LOCALES[case % hud.LOCALES.size()]
-		var touch_layout: bool = case >= hud.LOCALES.size()
-		hud.use_touch(touch_layout)
-		TranslationServer.set_locale(locale)
-		var texts: Array[String] = []
-		for owner in factions.size():
-			texts.append(_said(hud, measured, "RUMOUR_FOUNDED", [_faction(hud, factions, owner)]))
-			texts.append(_said(hud, measured, "RUMOUR_RUINED", [_faction(hud, factions, owner)]))
-			for raider in factions.size():
-				texts.append(_said(hud, measured, "RUMOUR_RAIDED",
-						[_faction(hud, factions, raider), _faction(hud, factions, owner)]))
-		for sect in world.sect_count():
-			texts.append(_said(hud, measured, "RUMOUR_SECT_FELL",
-					[hud.tr("SECT_" + world.sect_name(sect).to_upper().replace(" ", "_"))]))
-		for text in texts:
-			checks += 1
-			if touch_layout:
-				touch_cut += 0 if _width(label, text) <= label.size.x else 1
-			if not _within(label, text) or (_width(label, text) > label.size.x and not touch_layout):
-				overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
-		for name in _every_name(world):
-			var person := PersonName.shown(name, true)
-			for owner in factions.size():
-				for key: String in ["RUMOUR_ELECTED", "RUMOUR_DUEL", "RUMOUR_BORN", "RUMOUR_DIED"]:
-					var args := [person, _faction(hud, factions, owner)] if key in ["RUMOUR_ELECTED", "RUMOUR_DUEL"] else [person]
-					var text := _said(hud, measured, key, args)
-					checks += 1
-					var whole := _width(label, text) <= label.size.x
-					if touch_layout:
-						touch_cut += 0 if whole else 1
-					else:
-						cut += 0 if whole else 1
-					if not _within(label, text) or (locale == "ko" and not whole and not touch_layout):
-						overruns.append("%s \"%s\" is %d px in %d" % [locale, text, _width(label, text), label.size.x])
-	TranslationServer.set_locale(hud.LOCALES[0])
-	hud.use_touch(false)
-	hud.free()
-	var unmeasured := ["RUMOUR_FOUNDED", "RUMOUR_RAIDED", "RUMOUR_RUINED", "RUMOUR_SECT_FELL", "RUMOUR_ELECTED",
-			"RUMOUR_DUEL", "RUMOUR_BORN", "RUMOUR_DIED"].filter(func(key: String) -> bool: return not measured.has(key))
-	var passed := none_right and live_right and unmeasured.is_empty() and overruns.is_empty()
-	print("hud_test: a new region shows \"%s\" %s; after %d years %d rumours reach the player, the log showing %s against %s, newest first %s, births and deaths named %s; %d rumours measured in both layouts, %d cut short in English and %d in the touch layout's two lines; unmeasured %s; overruns %s: %s" % [
-		none_shown, none_right, RUMOUR_YEARS, heard.size(), shown, expected, newest_first, named, checks, cut, touch_cut,
-		unmeasured, overruns.slice(0, 3), "pass" if passed else "FAIL"])
 	return passed
 
 
@@ -711,13 +625,3 @@ func _lessons_pass() -> bool:
 	print("hud_test: army %d's person %d learned within %d ticks; waiting %s against %s; %d lessons and realms of others announced none; %d notices measured, overruns %s: %s" % [
 		army, learner, ticks, waiting, expected, others, checks, overruns, "pass" if passed else "FAIL"])
 	return passed
-
-
-# `key` in the current locale with `args`, noting it measured.
-func _said(hud: CanvasLayer, measured: Dictionary, key: String, args: Array) -> String:
-	measured[key] = true
-	return hud.tr(key) % args
-
-
-func _faction(hud: CanvasLayer, factions: PackedStringArray, index: int) -> String:
-	return hud.tr("FACTION_" + factions[index].to_upper())

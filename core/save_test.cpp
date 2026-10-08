@@ -471,6 +471,32 @@ TEST(Save, ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations) {
   EXPECT_NE(diplomatic(false).hash(), world.hash());
 }
 
+// Two people of one faction 3 cells apart, who talk within `reach` cells.
+World talkers(std::int32_t reach) {
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.talk_reach = reach;
+  return World{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{3, 1}, {Recruit{{3, 1}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      rules};
+}
+
+TEST(Save, ALoadedWorldKeepsItsTalkReach) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, talkers(3)}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.talk_refusal(0, 1), TalkRefusal::NONE);
+  EXPECT_EQ(restored.world.hash(), talkers(3).hash());
+  // Control: a reach of 2 saved and loaded leaves them out of reach.
+  ASSERT_TRUE(save(Saved{std::nullopt, talkers(2)}, store, OTHER_SLOT));
+  EXPECT_EQ(loaded(load(store, OTHER_SLOT)).world.talk_refusal(0, 1),
+            TalkRefusal::OUT_OF_REACH);
+  EXPECT_NE(talkers(2).hash(), talkers(3).hash());
+}
+
 TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {
   MemorySaves store;
   ASSERT_TRUE(save(Saved{std::nullopt, casting(AtPerson{0})}, store, SLOT));

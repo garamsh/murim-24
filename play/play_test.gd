@@ -25,7 +25,11 @@
 # on a slot with that slot's key and taken off with Delete; a person who knows an art beyond its
 # army's skills, with it put on T, sees it on T's slot, aims at its range and casts it at that range
 # from the fifth skill button, while an empty slot shows and casts nothing. The loadout is saved
-# with the world, and Continue restores it.
+# with the world, and Continue restores it. Walked up to a person of an allied faction, the prompt
+# names it and Space opens the dialogue window on it, which takes the keys: Enter lists its news,
+# Escape goes back, then ends the talk. Once its faction is at war with the person's, the prompt
+# shows its refusal, Space opens nothing, and an open window closes; control: until then it stays
+# open.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -65,6 +69,8 @@ const STOP_TICKS := 60
 const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
 # Ticks the joystick is held for: long enough to walk past the STRIDE cells one order reaches.
 const STICK_TICKS := 150
+# Ticks the person is given to walk up to a person of an allied faction.
+const TALK_WALK_LIMIT := 6000
 
 
 func run() -> bool:
@@ -95,7 +101,7 @@ func run() -> bool:
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
 			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass() and _arts_pass() \
-			and _art_slot_pass() and _loadout_save_pass()
+			and _art_slot_pass() and _loadout_save_pass() and _talk_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -700,6 +706,79 @@ func _territory_pass() -> bool:
 		old_stale, frames_kept, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
+
+
+# Walked up to the nearest person of a faction allied to its own, the person is prompted to talk to it
+# and Space opens the dialogue window on it, where a digit gives no order, Enter lists its own news
+# and Escape goes back to the menu and then ends the talk, without pausing. With the window open
+# again, a tick leaves it open; once the person's faction's leader declares war on the other's, the
+# next tick closes it, the prompt shows the refusal and Space opens nothing.
+func _talk_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var player: int = world.roster(scene.steered)[0]
+	var own := world.army_faction(scene.steered)
+	var ally := -1
+	var ally_army := -1
+	for army in world.army_count():
+		var theirs := world.army_faction(army)
+		for person in world.roster(army):
+			if world.relation(own, theirs) == WorldAdapter.RELATION_ALLY and (ally < 0 or _apart(world, player, person)
+					< _apart(world, player, ally)):
+				ally = person
+				ally_army = army
+	if ally < 0:
+		print("play_test: no person of an allied faction: FAIL")
+		scene.free()
+		return false
+	# The ally waits where it stands while the person walks up to it.
+	world.steer(ally_army, true)
+	var waiting_at := Vector2i((world.person_position(ally) / WorldAdapter.CELL_SIZE).floor())
+	world.order(ally_army, waiting_at, PackedInt64Array(range(world.skill_count(ally_army))))
+	var ticks := 0
+	while ticks < TALK_WALK_LIMIT and scene.talk_target().person != ally:
+		if ticks % 20 == 0:
+			world.order(scene.steered, waiting_at, PackedInt64Array(range(world.skill_count(scene.steered))))
+		scene.step()
+		ticks += 1
+	scene.show_talk()
+	var prompt: Control = hud.talk_prompt
+	var dialogue: Control = hud.dialogue
+	var prompted: bool = scene.talk_to == ally and prompt.visible and prompt.person == ally and not prompt.refused
+	var opened: bool = scene.command(_key(scene.TALK_KEY)) and dialogue.visible and dialogue.person == ally
+	var digit_taken: bool = not scene.command(_key(KEY_1))
+	var news_shown: bool = scene.command(_key(KEY_ENTER)) and dialogue.showing_news \
+			and dialogue.news.size() == world.rumours(ally).size()
+	var not_paused: bool = not scene.navigate(_key(KEY_ESCAPE)) and hud.screen() == null
+	var back: bool = scene.command(_key(KEY_ESCAPE)) and dialogue.visible and not dialogue.showing_news
+	var ended: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
+	# Control: a tick with nothing changed leaves the window open.
+	scene.command(_key(scene.TALK_KEY))
+	scene.step()
+	scene.show_talk()
+	var kept: bool = dialogue.visible and dialogue.person == ally
+	var leader := world.leader(own)
+	var declared := leader >= 0 and world.declare(leader, world.army_faction(ally_army), WorldAdapter.DECLARATION_WAR)
+	scene.step()
+	scene.show_talk()
+	var closed: bool = not dialogue.visible and world.talk_refusal(player, ally) == WorldAdapter.TALK_HOSTILE
+	var refused: bool = scene.talk_to == ally and scene.talk_hostile and prompt.visible and prompt.refused
+	var nothing_opened: bool = not scene.command(_key(scene.TALK_KEY)) and not dialogue.visible
+	var passed := prompted and opened and digit_taken and news_shown and not_paused and back and ended and kept \
+			and declared and closed and refused and nothing_opened
+	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; Space opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, Space opened nothing %s: %s" % [
+		ticks, ally, prompted, opened, digit_taken, world.rumours(ally).size(), news_shown, not_paused, back, ended,
+		kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# How many cells apart two people stand, along the farther axis, as the core measures a reach.
+func _apart(world: WorldAdapter, one: int, other: int) -> int:
+	var apart := (Vector2i((world.person_position(one) / WorldAdapter.CELL_SIZE).floor())
+			- Vector2i((world.person_position(other) / WorldAdapter.CELL_SIZE).floor())).abs()
+	return maxi(apart.x, apart.y)
 
 
 # Draws a frame as the scene does after its ticks, over the view around the steered person.

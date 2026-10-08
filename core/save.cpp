@@ -583,6 +583,7 @@ void put_rules(Writer& out, const Rules& rules) {
   }
   out.u64(rules.ticks_per_day);
   out.i32(rules.rumour_reach);
+  out.i32(rules.talk_reach);
 }
 
 Rules get_rules(Reader& input) {
@@ -596,6 +597,7 @@ Rules get_rules(Reader& input) {
   }
   rules.ticks_per_day = input.u64();
   rules.rumour_reach = input.i32();
+  rules.talk_reach = input.i32();
   return rules;
 }
 

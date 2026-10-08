@@ -402,6 +402,15 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::TypedArray<godot::Dictionary> rumours(
       std::int64_t person) const;
 
+  /// Returns why person `person` may not talk to person `other`, one of the
+  /// TALK_* constants; TALK_NONE when it may.
+  [[nodiscard]] std::int64_t talk_refusal(std::int64_t person,
+                                          std::int64_t other) const;
+
+  /// Returns what person `person` offers one who talks to it, as OFFER_*
+  /// constants in the order they are offered; empty once it is dead.
+  [[nodiscard]] godot::PackedInt64Array offers(std::int64_t person) const;
+
   /// Returns person `person`'s attainment in each discipline, in the order
   /// of discipline_names().
   [[nodiscard]] godot::PackedInt64Array person_attainment(
