@@ -57,7 +57,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 | `make build` | After the C++ builds, writes `build/.gdignore`, and `.godot/extension_list.cfg` naming every committed `*.gdextension`, then imports the project's resources into `.godot/` with `godot --headless --path . --import`. |
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 | `make bench` | After the tick benchmark, `godot --path . --script res://world_view/frame_bench.gd` renders `world_view/world_view.tscn` in a window with vsync off. It checks the scenario first, then prints p50, p99 and max frame time over its timed frames, and PASS or FAIL against a 16.7 ms p99. It needs a display, so it runs on a developer's machine only, and says so. `make bench` exits non-zero when either benchmark fails. |
-| `make android` | After the C++ build for Android, `godot --headless --path . --export-debug Android build/android/murim.apk` exports the `Android` preset in `export_presets.cfg`. It needs the prerequisites in §Android export, so it is not part of `make ci`. |
+| `make android` | After the C++ build for Android, `godot --headless --path . --export-debug Android build/android/murim.apk` and `godot --headless --path . --export-debug "Android bench" build/android/murim_bench.apk` export the `Android` and `Android bench` presets in `export_presets.cfg`. It needs the prerequisites in §Android export, so it is not part of `make ci`. |
 | `make export` | After the C++ builds for macOS and Windows, `godot --headless --path . --export-release macOS build/export/macos/Murim24.app` and `godot --headless --path . --export-release Windows build/export/windows/Murim24.exe` export the `macOS` and `Windows` presets in `export_presets.cfg`. It needs the prerequisites in §PC export, so it is not part of `make ci`. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
@@ -94,7 +94,9 @@ What Godot 4.7's "Exporting for Android" (`tutorials/export/exporting_for_androi
 
 - Install the SDK packages with `sdkmanager --sdk_root=<android_sdk_path>` and the package names above, after accepting their licences with `sdkmanager --licenses`.
 - In Editor Settings, `export/android/java_sdk_path` is the JDK and `export/android/android_sdk_path` the SDK. `make android` reads the SDK from `ANDROID_HOME`, by default `~/Library/Android/sdk`, and builds with the NDK at `ndk/28.1.13356709` under it.
-- The `Android` preset exports arm64-v8a only, from the prebuilt template without Gradle, signed with the editor's debug keystore. Its `command_line/extra_args` runs `world_view/frame_bench.gd` at launch.
+- Two presets export the same library. Each exports arm64-v8a only, from the prebuilt template without Gradle, signed with the editor's debug keystore.
+- The `Android` preset, the one marked runnable, is the game: it opens on `run/main_scene`, `play/play.tscn`, under the package name `com.example.murim24` and the app name `Murim24`, and leaves `*_test.gd`, `*_probe.gd` and `run_tests.gd` out of the pack by `exclude_filter`.
+- The `Android bench` preset's `command_line/extra_args` runs `world_view/frame_bench.gd` at launch, under the package name `com.example.murim24.bench` and the app name `Murim24 bench`.
 - `project.godot` sets `rendering/textures/vram_compression/import_etc2_astc`, without which Godot refuses an Android export.
 - A release export needs a release keystore, which is never committed.
 
