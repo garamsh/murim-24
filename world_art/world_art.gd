@@ -1,6 +1,8 @@
 ## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid
 ## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
-## buildings by stage, bodies by faction and the steered person's markers. Bodies are batched:
+## buildings by stage, bodies by faction and the steered person's markers. Bodies are drawn between
+## the positions of the last two ticks, as far between as the caller says the frame is, so they
+## move on every frame; the core's positions stay the only truth. Bodies are batched:
 ## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
 ## edge of what they stand on. It reads the world and holds no game rule.
 extends Node2D
@@ -63,9 +65,12 @@ var _sprite_of_faction := PackedInt64Array()
 var _atlas: ImageTexture
 var _bands: Array[MultiMeshInstance2D] = []
 # Bodies change only on a tick, so they are read once per tick: positions now and a tick ago,
-# and each army's sprite set. Every body is one person.
+# whether each army's roster is the one it had a tick ago, and each army's sprite set. Every body
+# is one person.
 var _tick_positions: Array[PackedVector2Array] = []
 var _last_positions: Array[PackedVector2Array] = []
+var _rosters: Array[PackedInt64Array] = []
+var _same_roster: Array[bool] = []
 var _army_sprites := PackedInt64Array()
 ## The layer of the villages' ground decorations: paving and road.
 var built: TileMapLayer
@@ -147,6 +152,9 @@ func note_tick() -> void:
 	for army in _tick_positions.size():
 		_last_positions[army] = _tick_positions[army]
 		_tick_positions[army] = world.body_positions(army)
+		var roster := world.roster(army)
+		_same_roster[army] = roster == _rosters[army]
+		_rosters[army] = roster
 	_add_armies()
 	var now := world.territory()
 	var villages := world.villages()
@@ -164,11 +172,26 @@ func _add_armies() -> void:
 	for army in range(_tick_positions.size(), world.army_count()):
 		_tick_positions.append(world.body_positions(army))
 		_last_positions.append(_tick_positions[army])
+		_rosters.append(world.roster(army))
+		_same_roster.append(true)
 		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
 
 
-## Updates buildings and bodies within `view`, the part of the world on screen, in pixels.
-func refresh(view: Rect2) -> void:
+## Returns where body `body` of army `army` is drawn, in pixels: `between` of the way from where
+## the tick before last left it to where the last tick did, so a body moves on every frame and not
+## only on a tick. While the army's roster changed on the last tick, the bodies are drawn where it
+## left them, since a body's index may then name another person than a tick before.
+func body_at(army: int, body: int, between: float) -> Vector2:
+	var now := _tick_positions[army][body]
+	var before := _last_positions[army]
+	if _same_roster[army] and body < before.size():
+		now = before[body].lerp(now, clampf(between, 0.0, 1.0))
+	return now * CELL / WorldAdapter.CELL_SIZE
+
+
+## Updates buildings and bodies within `view`, the part of the world on screen, in pixels, the
+## bodies `between` of the way from the tick before last to the last, as body_at() places them.
+func refresh(view: Rect2, between := 1.0) -> void:
 	var now := Time.get_ticks_msec()
 	_tile_fields()
 	_lay_structures()
@@ -188,7 +211,7 @@ func refresh(view: Rect2) -> void:
 		var before := _last_positions[army]
 		var sprite := _army_sprites[army]
 		for body in positions.size():
-			var at := positions[body] * CELL / WorldAdapter.CELL_SIZE
+			var at := body_at(army, body, between)
 			if not shown.has_point(at):
 				continue
 			var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
@@ -209,9 +232,9 @@ func refresh(view: Rect2) -> void:
 	_ring.visible = alive
 	_chevron.visible = alive
 	if alive:
-		var lead := _tick_positions[steered][0] * CELL / WorldAdapter.CELL_SIZE
-		_ring.position = lead.floor()
-		_chevron.position = lead.floor()
+		var lead := body_at(steered, 0, between).round()
+		_ring.position = lead
+		_chevron.position = lead
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
 
 

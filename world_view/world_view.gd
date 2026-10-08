@@ -1,7 +1,7 @@
 ## Shows the core's M1 benchmark scenario in the approved art, through world_art.tscn, and sounds
 ## it through sound.tscn, with a camera the arrow keys move, at the PC's scale ViewScale gives the
-## window. It ticks the world at the core's tick rate whatever the frame rate,
-## and holds no game rule.
+## window. It ticks the world at the core's tick rate whatever the frame rate, draws the bodies
+## between their last two ticks' positions on every frame, and holds no game rule.
 extends Node2D
 
 const ViewScale := preload("res://view_scale.gd")
@@ -46,7 +46,7 @@ func _process(delta: float) -> void:
 		_since_tick -= step
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.position - screen / 2.0, screen)
-	_art.refresh(view)
+	_art.refresh(view, _since_tick / step)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
 	bodies = 0

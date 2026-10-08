@@ -5,8 +5,9 @@
 # ground on the ground; that each field is tiled with its state's tag; that each village's ground
 # decorations cover the cells its template's data names, a village the world founds as it runs
 # included, and its banners stand on the cells it names; that no landform stands on a buildable
-# cell or over a structure; and that after the view jumps across the region, every body a band
-# holds lies inside the bounds the renderer culls that band by.
+# cell or over a structure; that after the view jumps across the region, every body a band
+# holds lies inside the bounds the renderer culls that band by; and that between ticks a body is
+# drawn between the positions of the last two.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -260,7 +261,7 @@ func run() -> bool:
 	var passed := plain_full and masks_right and bodies_right and buildings_right \
 			and banners_right and decorations_right and fields_right and landforms_right
 	art.free()
-	return _bands_pass() and _founded_pass() and passed
+	return _bands_pass() and _between_pass() and _founded_pass() and passed
 
 
 # A village the region founds is drawn as its template is: its structures stand at the offsets a
@@ -383,6 +384,66 @@ func _bands_pass() -> bool:
 	print("world_art_test: %d bodies drawn at the player's village %s, %d at the village at %s; bodies outside their band's bounds: %d refreshed in place, %d after the jump %s: %s" % [
 		home_drawn, home, far_drawn, far, unmoved.size(), jumped.size(), jumped.slice(0, 3), "pass" if passed else "FAIL"])
 	return passed
+
+
+# Between ticks a body is drawn the share of the way refresh() is given from where the tick before
+# last left it to where the last tick did, as body_at() places it, and the ring stands on the
+# steered body drawn so; at a share of 1 it is drawn where the last tick left it. Control: after a
+# tick that changed an army's roster, its bodies are drawn where that tick left them at any share,
+# since a body's index may then name someone else. Setup: the body moved on the last tick, and a
+# tick changed a roster with a body at some index standing elsewhere than that index's a tick
+# before, so drawing between the two would have moved it.
+func _between_pass() -> bool:
+	var world := WorldAdapter.create(42, PackedStringArray(MAP_ROWS), ARMIES, STRUCTURES, RULES)
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(world, 0)
+	var scale := float(art.CELL) / WorldAdapter.CELL_SIZE
+	world.tick()
+	art.note_tick()
+	var before := world.body_positions(0)[0] * scale
+	world.tick()
+	art.note_tick()
+	var after := world.body_positions(0)[0] * scale
+	var halfway := before.lerp(after, 0.5)
+	var view := Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * art.CELL)
+	art.refresh(view, 0.5)
+	var drawn_halfway := _drawn_at(art, halfway.round() + Vector2(0, -4))
+	var ring_halfway: bool = art.get_node("Ring").position == halfway.round()
+	var placed: bool = art.body_at(0, 0, 0.5) == halfway and art.body_at(0, 0, 1.0) == after \
+			and art.body_at(0, 0, 0.0) == before
+	var changed := -1
+	var prior: Array[PackedVector2Array] = []
+	for i in TICKS:
+		prior = [world.body_positions(0), world.body_positions(1)]
+		world.tick()
+		art.note_tick()
+		for army in 2:
+			if world.body_positions(army).size() != prior[army].size() and changed < 0:
+				changed = army
+		if changed >= 0:
+			break
+	var held := changed >= 0
+	var shifted := false
+	if held:
+		var left := world.body_positions(changed)
+		for body in left.size():
+			held = held and art.body_at(changed, body, 0.5) == left[body] * scale
+			shifted = shifted or (body < prior[changed].size() and prior[changed][body] != left[body])
+	art.free()
+	var passed := before != after and placed and drawn_halfway and ring_halfway and held and shifted
+	print("world_art_test: a body moved from %s to %s on the last tick is drawn at %s halfway to the next %s, its ring there %s, and at either end at a share of 0 and 1 %s; army %d's roster changed, an index's body elsewhere than a tick before %s, and its bodies are drawn where that tick left them %s: %s" % [
+		before, after, halfway, drawn_halfway, ring_halfway, placed, changed, shifted, held, "pass" if passed else "FAIL"])
+	return passed
+
+
+# Whether a band holds a body whose centre is at `centre`, in pixels.
+func _drawn_at(art: Node2D, centre: Vector2) -> bool:
+	for band in _bands(art):
+		var buffer := band.multimesh.buffer
+		for i in band.multimesh.visible_instance_count:
+			if Vector2(buffer[i * 12 + 3], buffer[i * 12 + 7]) + band.position == centre:
+				return true
+	return false
 
 
 func _bands(art: Node2D) -> Array[MultiMeshInstance2D]:
