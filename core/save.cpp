@@ -902,6 +902,42 @@ Event get_event(Reader& input) {
   return event;
 }
 
+void put_progress(Writer& out, const Progress& step) {
+  out.u64(step.sequence);
+  out.u64(step.tick);
+  out.u8(static_cast<std::uint8_t>(step.what.index()));
+  if (const auto* learned = std::get_if<Learned>(&step.what)) {
+    out.size(learned->person);
+    out.size(learned->art);
+    out.size(learned->skill);
+    out.u8(static_cast<std::uint8_t>(learned->by));
+  } else {
+    out.size(std::get<RealmGained>(step.what).person);
+    out.size(std::get<RealmGained>(step.what).rank);
+  }
+}
+
+Progress get_progress(Reader& input) {
+  constexpr std::uint8_t ADVANCES = std::variant_size_v<Advance>;
+  constexpr std::uint8_t LESSONS = 3;
+  // The advances' tags, as their index in Advance.
+  constexpr std::uint8_t LEARNED = 0;
+  Progress step;
+  step.sequence = input.u64();
+  step.tick = input.u64();
+  const std::uint8_t tag = input.tag(ADVANCES);
+  const std::size_t person = input.size();
+  if (tag == LEARNED) {
+    const std::size_t art = input.size();
+    const std::size_t skill = input.size();
+    step.what =
+        Learned{person, art, skill, static_cast<LearnedBy>(input.tag(LESSONS))};
+  } else {
+    step.what = RealmGained{person, input.size()};
+  }
+  return step;
+}
+
 }  // namespace
 
 /// Writes a world's state to a save's payload and reads it back.
@@ -957,6 +993,8 @@ class SaveCodec {
       out.size(fight.leader);
       put_duel(out, fight.rule);
     });
+    put_all(out, world.progress_,
+            [&out](const Progress& step) { put_progress(out, step); });
     put_all(out, world.events_,
             [&out](const Event& event) { put_event(out, event); });
     put_all(out, world.souls_, [&out](const Soul& soul) {
@@ -1040,6 +1078,8 @@ class SaveCodec {
       fight.rule = get_duel(input);
       return fight;
     });
+    world.progress_ =
+        get_all<Progress>(input, [&input] { return get_progress(input); });
     world.events_ =
         get_all<Event>(input, [&input] { return get_event(input); });
     world.souls_ = get_all<Soul>(input, [&input] {

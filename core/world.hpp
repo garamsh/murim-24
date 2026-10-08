@@ -780,6 +780,39 @@ struct Event {
   Happening what;
 };
 
+/// The most steps of people's progress a world keeps; the oldest gives way to
+/// the newest.
+constexpr std::size_t PROGRESS_CAPACITY = 32;
+
+/// How a person came by a skill: by comprehension on a realm gained, by
+/// reading a manual lying on a cell, or by its sect's teaching.
+enum class LearnedBy : std::uint8_t { COMPREHENSION, MANUAL, TEACHING };
+
+/// Person `person` learned skill `skill` of art `art`, `by`.
+struct Learned {
+  std::size_t person = 0;
+  std::size_t art = 0;
+  std::size_t skill = 0;
+  LearnedBy by = LearnedBy::COMPREHENSION;
+};
+
+/// Person `person` reached the realm of rank `rank`, counted from 1.
+struct RealmGained {
+  std::size_t person = 0;
+  std::size_t rank = 0;
+};
+
+/// A step a person took in the martial arts.
+using Advance = std::variant<Learned, RealmGained>;
+
+/// A step of progress: the `sequence`-th recorded, counted from 0, on tick
+/// `tick`.
+struct Progress {
+  std::uint64_t sequence = 0;
+  std::uint64_t tick = 0;
+  Advance what;
+};
+
 /// The data a world's rules read.
 struct Rules {
   /// Sub-cell units people keep apart; 0 lets them overlap.
@@ -1126,6 +1159,10 @@ class World {
   /// first.
   [[nodiscard]] const std::vector<Event>& events() const;
 
+  /// Returns the steps of people's progress the world keeps, each skill
+  /// learned and realm reached, at most PROGRESS_CAPACITY, oldest first.
+  [[nodiscard]] const std::vector<Progress>& progress() const;
+
   /// Returns the events kept that reach person `person` as rumours, newest
   /// first: those within the rumour reach of where it stands,
   /// and wherever they happened, the births and deaths of its kin (its
@@ -1216,7 +1253,7 @@ class World {
                                                   std::uint32_t rank) const;
   void train();
   void cultivate();
-  void comprehend(Person& person, std::uint32_t rank);
+  void comprehend(std::size_t learner);
   void recover(const Cultivation& cultivation);
   void read_manuals();
   void teach();
@@ -1262,9 +1299,11 @@ class World {
                                           const Opening& open) const;
   void admit(const Living& living);
   void record(Cell cell, Happening what);
+  void note(Advance what);
   void note_falls(std::vector<std::size_t> sects);
   [[nodiscard]] std::vector<std::size_t> record_deaths();
   [[nodiscard]] bool events_kept() const;
+  [[nodiscard]] bool progress_kept() const;
   [[nodiscard]] bool related(std::size_t one, std::size_t other) const;
   [[nodiscard]] bool heard_by(const Event& event, std::size_t person,
                               std::optional<std::size_t> faction) const;
@@ -1374,6 +1413,8 @@ class World {
   std::vector<Fight> duels_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.
   std::vector<Event> events_;
+  /// The latest steps of progress, oldest first, at most PROGRESS_CAPACITY.
+  std::vector<Progress> progress_;
   Life life_;
   std::vector<Soul> souls_;
   /// Each family's surname, by index among the life's surnames.

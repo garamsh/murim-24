@@ -117,9 +117,10 @@ func run() -> bool:
 	var sects_pass := _sects_pass()
 	var play_loop_pass := _play_loop_pass()
 	var qi_pass := _qi_pass()
+	var lessons_pass := _lessons_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
-			and play_loop_pass and qi_pass
+			and play_loop_pass and qi_pass and lessons_pass
 
 
 # A region lived ten years of five-tick days reads its realms, and a person who knows an art reads its
@@ -158,6 +159,47 @@ func _qi_pass() -> bool:
 		lived.person_qi(learned) if learned != -1 else -1, lived.person_qi_capacity(learned) if learned != -1 else -1,
 		lived.person_realm(learned) if learned != -1 else -1, lived.person_nature(learned) if learned != -1 else {},
 		bare_right, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A region lived ten years of five-tick days reads its arts, each named with its skills, and a person's
+# art skill names its index among its art's skills, the skill arts() names alike. Its progress gives
+# each skill learned with its person, art, skill and how it was learned, and each realm gained with
+# its person and a rank the person has reached, while none of its events names an art. Control: a
+# world from create() has no arts.
+func _lessons_pass() -> bool:
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
+	for i in 10 * 120 * 5:
+		lived.tick()
+	var arts := lived.arts()
+	var right: bool = arts.size() == 3 and arts[0].korean == "매화검법" and arts[0].romanised == "Plum Blossom Sword" \
+			and arts[0].skills.size() == 3 and arts[0].skills[1].korean == "이십사수매화검법" and arts[0].skills[1].rank == 3 \
+			and arts[0].skills[1].qi_cost == 400 and arts[0].skills[1].cooldown == 300
+	var named := 0
+	for army in lived.army_count():
+		for person: int in lived.roster(army):
+			for skill: Dictionary in lived.person_skills(person):
+				if skill.art >= 0:
+					right = right and arts[skill.art].skills[skill.skill].korean == skill.korean
+					named += 1
+	var learned := 0
+	var gained := 0
+	for event: Dictionary in lived.progress(0):
+		if event.kind == WorldAdapter.PROGRESS_LEARNED:
+			learned += 1
+			right = right and lived.person_qi_capacity(event.person) > 0 and event.art < arts.size() \
+					and event.skill < arts[event.art].skills.size() \
+					and [WorldAdapter.LEARNED_BY_COMPREHENSION, WorldAdapter.LEARNED_BY_MANUAL,
+						WorldAdapter.LEARNED_BY_TEACHING].has(event.by)
+		elif event.kind == WorldAdapter.PROGRESS_REALM_GAINED:
+			gained += 1
+			right = right and lived.person_realm(event.person) >= event.rank and event.rank >= 1
+	right = right and named > 0 and learned > 0 and gained > 0
+	var bare_right := _create(SEED, _armies, RULES).arts().is_empty() \
+			and lived.events(0).all(func(event: Dictionary) -> bool: return not event.has("art"))
+	var passed := right and bare_right
+	print("world_adapter_test: %d arts, %d art skills known named alike, %d skills learned and %d realms gained in its progress, none among its events; a world from create() has no arts %s: %s" % [
+		arts.size(), named, learned, gained, bare_right, "pass" if passed else "FAIL"])
 	return passed
 
 

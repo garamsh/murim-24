@@ -1,14 +1,17 @@
 ## The heads-up display over the play scene, in the tone of docs/art-direction.md §Effects and
-## HUD: the player's portrait, faction, health and inner energy with their values, and its art,
-## the discipline of its highest attainment with that attainment; the
-## genealogy panel, which G opens; the sect panel, which M opens; the title, new-game, pause and
+## HUD: the player's portrait, faction, health, and its qi against its store and its realm as
+## art/mockup/mobile_hud_arts.png shows them; the
+## genealogy panel, which G opens; the sect panel, which M opens; the arts panel, which K opens,
+## and the loadout it fills; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
-## fought, and the verdict on a challenge, why a cast was refused, or whether an autosave was
-## written; a map of the region
+## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
+## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
+## a map of the region
 ## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
-## player; and the technique bar, an icon and its number key for each of the player's skills. On a
-## touch screen, or where the settings force it, the touch controls stand in for the technique bar
-## and the keys, and the panels move as art/mockup/mobile_hud_idle.png lays them out.
+## player; and the technique bar, the loadout's five slots, each with its key, Q W E R T, and the
+## icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
+## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
+## as art/mockup/mobile_hud_idle.png lays them out.
 ## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
 ## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
 extends CanvasLayer
@@ -20,9 +23,9 @@ const FONT := "res://hud/fonts/Galmuri9.ttf"
 const FONT_SIZE := 10
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const ART := "res://art/"
-const MAX_SLOTS := 9
 const PersonName := preload("res://hud/person_name.gd")
-const Attainment := preload("res://hud/attainment.gd")
+const Arts := preload("res://hud/arts.gd")
+const Loadout := preload("res://hud/loadout.gd")
 ## How many of the latest rumours the rumour log shows.
 const RUMOUR_LINES := 3
 # docs/art-direction.md §Palette.
@@ -42,6 +45,12 @@ const KIND_COLOURS := {
 	"water": Color("2b5770"), "mountain": Color("8a94a0"),
 }
 const MAP_SIZE := Vector2i(76, 44)
+## A technique slot: its step along the bar, its size, the column its key is centred in, left of
+## its icon, and where the icon stands.
+const SLOT_STEP := 32
+const SLOT_SIZE := Vector2(30, 20)
+const SLOT_KEY := Rect2(1, 3, 10, 12)
+const SLOT_ICON_AT := Vector2(12, 2)
 # How long a notice about a challenge stays on screen.
 const NOTICE_MS := 3000
 # Where the panels the touch layout moves stand, in the keyboard layout and in the touch layout,
@@ -77,6 +86,10 @@ var labels := {}
 var genealogy: Control
 ## The sect panel, open over the HUD while the player reads it.
 var sect: Control
+## The arts panel, open over the HUD while the player reads it or fills the loadout.
+var arts: Control
+## The skills on the technique bar's slots and the touch arc's buttons.
+var loadout := Loadout.new()
 ## The title screen, the new-game panel over it, the pause panel over the game, and the settings
 ## panel over either.
 var title_screen: Control
@@ -90,6 +103,9 @@ var duel_panel: Panel
 var duel_bars := {}
 ## The icon in each technique slot, in key order.
 var slot_icons: Array[TextureRect] = []
+## The skill on each technique slot, as WorldAdapter.person_skills gives it, or an empty
+## Dictionary, so a test can read them.
+var slot_skills: Array[Dictionary] = []
 ## The touch controls, shown in place of the technique bar while the touch layout is on.
 var touch: Control
 ## How many of the rumour log's lines the layout shows.
@@ -116,6 +132,11 @@ var _rumour_panel: Panel
 # The steered body's ready tick when it last moved, and the ticks it then had to wait.
 var _ready_at := -1
 var _cool_span := 1
+# The world whose events the notices follow, the next of its events to read, and the notices of
+# skills learned and realms gained waiting to be shown.
+var _progress_of: WorldAdapter
+var _next_step := 0
+var _waiting: Array[String] = []
 
 
 func _ready() -> void:
@@ -185,24 +206,41 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 	portrait.region = Rect2(0, 6, 16, 16)
 	_portrait.texture = portrait
 	show_map(world)
-	var skills := world.skills(steered)
-	var shown := mini(skills.size(), MAX_SLOTS)
-	for slot in _slots.size():
-		_slots[slot].visible = slot < shown
-		if slot < shown:
-			# A skill whose radius reaches past its target bursts; any other strikes one body.
-			var icon := AtlasTexture.new()
-			icon.atlas = _icons.texture
-			var tag: String = "burst" if int(skills[slot].radius) > 0 else "strike"
-			icon.region = Rect2(_icons.tags[tag] * 16, 0, 16, 16)
-			slot_icons[slot].texture = icon
-	_skill_bar.size.x = shown * 22 + 6
-	_skill_bar.position.x = 240 - _skill_bar.size.x / 2.0
+	if world != _progress_of:
+		_progress_of = world
+		var kept := world.progress(0)
+		_next_step = int(kept.back().sequence) + 1 if not kept.is_empty() else 0
+		_waiting.clear()
+	var roster := world.roster(steered)
+	if not roster.is_empty():
+		loadout.follow(world, roster[0])
+	show_loadout(world)
+
+
+## Shows the loadout's skills on the technique bar's slots and the touch arc's buttons, as
+## `world` gives the person the loadout follows: each skill's icon, and on the arc its range and
+## radius; an empty slot shows none.
+func show_loadout(world: WorldAdapter) -> void:
+	_set_up()
+	var skills := world.person_skills(loadout.person) if loadout.person >= 0 else []
 	var reach: Array[Dictionary] = []
 	var pixels := 16.0 / WorldAdapter.CELL_SIZE
-	for skill: Dictionary in skills:
-		reach.append({"icon": "burst" if int(skill.radius) > 0 else "strike",
-				"range": int(skill.range) * pixels, "radius": int(skill.radius) * pixels})
+	slot_skills.clear()
+	for slot in Loadout.SLOTS:
+		var index := loadout.skill(world, slot)
+		var skill: Dictionary = skills[index] if index >= 0 else {}
+		slot_skills.append(skill)
+		if skill.is_empty():
+			slot_icons[slot].texture = null
+			reach.append({})
+			continue
+		# A skill whose radius reaches past its target bursts; any other strikes one body.
+		var tag: String = "burst" if int(skill.radius) > 0 else "strike"
+		var icon := AtlasTexture.new()
+		icon.atlas = _icons.texture
+		icon.region = Rect2(_icons.tags[tag] * 16, 0, 16, 16)
+		slot_icons[slot].texture = icon
+		reach.append({"icon": tag, "range": int(skill.range) * pixels, "radius": int(skill.radius) * pixels})
 	touch.show_skills(reach)
 
 
@@ -213,8 +251,9 @@ func show_map(world: WorldAdapter) -> void:
 	(_map.texture as AtlasTexture).atlas = map_texture
 
 
-## Updates the bars, the map around the player and the technique bar: `skills` are the skill
-## indices the player's last order chose.
+## Updates the bars, the map around the player, the technique bar and the arts panel while it is
+## open, and announces the skills the player learned and the realms it gained since the last
+## refresh: `skills` are the skill indices the player's last order chose.
 func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> void:
 	var strength := 0
 	for body_strength in world.body_strengths(steered):
@@ -234,12 +273,19 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	_refresh_leadership(world, steered)
 	var roster := world.roster(steered)
 	if not roster.is_empty():
-		labels.attainment_value.text = Attainment.of(world, roster[0])
-		show_rumours(world, roster[0])
+		var person := roster[0]
+		var capacity := world.person_qi_capacity(person)
+		qi_bar.value = 100.0 * world.person_qi(person) / maxi(capacity, 1)
+		labels.qi_value.text = "%s / %s" % [Arts.grouped(world.person_qi(person)), Arts.grouped(capacity)]
+		labels.realm_value.text = Arts.realm_name(world, world.person_realm(person))
+		show_rumours(world, person)
+		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
-		style.border_color = JADE if skills.has(slot) else INK
+		style.border_color = JADE if skills.has(loadout.skill(world, slot)) else INK
+	if arts.visible:
+		arts.reread()
 	if touch.visible:
 		_refresh_cooling(world, steered)
 
@@ -290,6 +336,30 @@ func use_touch(on: bool) -> void:
 		label.visible = line < rumour_lines
 	duel_panel.position = DUEL_AT[on]
 	labels.notice.position = NOTICE_AT[on]
+
+
+# Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
+# since the last read: how it learned the skill, and its name, or the realm's name.
+func _announce_lessons(world: WorldAdapter, person: int) -> void:
+	var lessons := {
+		WorldAdapter.LEARNED_BY_COMPREHENSION: "NOTICE_COMPREHENDED",
+		WorldAdapter.LEARNED_BY_MANUAL: "NOTICE_READ",
+		WorldAdapter.LEARNED_BY_TEACHING: "NOTICE_TAUGHT",
+	}
+	for step: Dictionary in world.progress(_next_step):
+		_next_step = int(step.sequence) + 1
+		if step.person != person:
+			continue
+		if step.kind == WorldAdapter.PROGRESS_LEARNED:
+			var taught: Dictionary = world.arts()[step.art].skills[step.skill]
+			_waiting.append(tr(lessons[int(step.by)]) % Arts.named(taught))
+		else:
+			_waiting.append(tr("NOTICE_REALM") % Arts.realm_name(world, step.rank))
+
+
+## Returns the notices of skills learned and realms gained still waiting to be shown.
+func waiting_notices() -> Array[String]:
+	return _waiting.duplicate()
 
 
 ## Shows the latest RUMOUR_LINES rumours that reach `person`, newest first, or that none has come.
@@ -387,6 +457,8 @@ func _notice(key: String) -> void:
 func _process(_delta: float) -> void:
 	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
 		labels.notice.visible = false
+	if labels.has("notice") and not labels.notice.visible and not _waiting.is_empty():
+		_notice(_waiting.pop_front())
 
 
 ## The season and year of `date`, as the core's calendar gives them, in the current locale.
@@ -412,12 +484,11 @@ func _build() -> void:
 	labels.hp_value = _value(player, Vector2(42, 14), 120)
 	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
 	labels.qi_value = _value(player, Vector2(42, 30), 120)
-	labels.attainment = _label(player, "HUD_ATTAINMENT", Vector2(42, 47), GOLD_LIGHT)
-	labels.attainment_value = _value(player, Vector2(42, 47), 120)
-	labels.attainment_value.text = Attainment.NONE
+	labels.realm = _label(player, "HUD_REALM", Vector2(42, 47), GOLD_LIGHT)
+	labels.realm_value = _value(player, Vector2(42, 47), 120)
+	labels.realm_value.text = "—"
 	_bar(player, hp_bar, Vector2(42, 26), HP)
 	_bar(player, qi_bar, Vector2(42, 42), QI)
-	# Inner energy is not in the core yet: its bar stands empty and its value is a dash.
 	qi_bar.value = 0.0
 	labels.qi_value.text = "—"
 
@@ -441,28 +512,32 @@ func _build() -> void:
 		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), RUMOUR_WIDTH[false])
 	labels.rumour_0.text = tr("HUD_RUMOR_NONE")
 
-	_skill_bar = _panel(Rect2(0, 240, 0, 26))
+	var bar_width := Loadout.SLOTS * SLOT_STEP + 6
+	_skill_bar = _panel(Rect2(240 - bar_width / 2.0, 240, bar_width, 26))
 	var bar := _skill_bar
-	for slot in MAX_SLOTS:
+	for slot in Loadout.SLOTS:
 		var cell := Panel.new()
 		var style := StyleBoxFlat.new()
 		style.bg_color = INK_DARK
 		style.set_border_width_all(1)
 		style.border_color = INK
 		cell.add_theme_stylebox_override("panel", style)
-		cell.position = Vector2(4 + slot * 22, 3)
-		cell.size = Vector2(20, 20)
+		cell.position = Vector2(4 + slot * SLOT_STEP, 3)
+		cell.size = SLOT_SIZE
 		bar.add_child(cell)
 		var icon := TextureRect.new()
-		icon.position = Vector2(2, 2)
+		icon.position = SLOT_ICON_AT
 		icon.size = Vector2(16, 16)
 		cell.add_child(icon)
 		slot_icons.append(icon)
-		# The number key, in the slot's top-left corner over the icon.
+		# The slot's key, in a column of its own left of the icon, so it covers none of it.
 		var number := Label.new()
-		number.text = str(slot + 1)
+		number.theme = _theme
+		number.text = Arts.SLOT_KEYS[slot]
 		number.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		number.position = Vector2(1, -3)
+		number.position = SLOT_KEY.position
+		number.size = SLOT_KEY.size
+		number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		number.add_theme_color_override("font_color", GOLD_LIGHT)
 		number.add_theme_color_override("font_outline_color", INK_DARK)
 		number.add_theme_constant_override("outline_size", 2)
@@ -479,6 +554,9 @@ func _build() -> void:
 	sect = preload("res://hud/sect.gd").new()
 	sect.use_font(_theme.default_font)
 	sect.visible = false
+	arts = Arts.new()
+	arts.use_font(_theme.default_font)
+	arts.visible = false
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
@@ -503,10 +581,12 @@ func _build() -> void:
 	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
 	labels.notice.add_theme_constant_override("outline_size", 3)
 	labels.notice.visible = false
-	# The touch controls, hidden until the touch layout is on, under the panels and screens.
+	# The touch controls, hidden until the touch layout is on, under the panels and screens but over
+	# the arts panel, beside which their arc stays live.
 	touch = preload("res://hud/touch.gd").new()
 	touch.use_font(_theme.default_font)
 	touch.visible = false
+	add_child(arts)
 	add_child(touch)
 	add_child(genealogy)
 	add_child(sect)

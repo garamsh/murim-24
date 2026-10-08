@@ -1,8 +1,9 @@
 # Checks that hud.tscn shows its words from the translations, Korean first, that switching the
 # locale changes them to English, that the faction shown is the steered army's, that health shows
-# its strength as a percentage of its starting strength and inner energy a dash over an empty
-# bar, that the technique bar shows one slot per skill with the icon of its shape, and that the
-# season and year are the core's. It also checks that the leader and duel panels name people by
+# its strength as a percentage of its starting strength and qi the person's against its store,
+# that the technique bar shows five slots on Q W E R T, each key clear of its slot's icon, the
+# person's first skills on them with the icon of their shape, and that the season and year are the
+# core's. It also checks that the leader and duel panels name people by
 # the adapter's person_name, Korean first and romanised in English, and that every word the HUD
 # shows from hud.csv, and every name the world's data can make, fits the room its panel gives it, in
 # each locale, measured in the font and size each label draws with.
@@ -25,12 +26,13 @@ const SHOWN := {
 	"rumour_0": ["HUD_RUMOR_NONE"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
-# and of the rumours' and arts' words, which _rumours_pass and _attainment_pass measure.
+# and of the rumours' and the lessons' words, which _rumours_pass and _lessons_pass measure.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_"]
-const Attainment := preload("res://hud/attainment.gd")
-# Attainment is measured at three digits: a talent limit stays under 1,000.
-const WIDEST_ATTAINMENT := 999
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_"]
+const Arts := preload("res://hud/arts.gd")
+# Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
+# person.
+const LESSON_TICKS := 6000
 # Years with days of five ticks for rumours to reach the player.
 const RUMOUR_YEARS := 10
 const SHORT_DAY := 5
@@ -66,20 +68,39 @@ func run() -> bool:
 	var hp_value: String = hud.labels.hp_value.text
 	var qi_value: String = hud.labels.qi_value.text
 	var percent := floori(100.0 * strength / world.army_strength(steered))
-	var values_right: bool = hp_value == "%d%%" % percent and qi_value == "—" \
-			and hud.qi_bar.value == 0.0 and hud.hp_bar.value == 100.0 * strength / world.army_strength(steered)
-	# One slot per skill, each with the icon of its shape; control: the slots past them are hidden.
-	var skills := world.skills(steered)
-	var icons_right := skills.size() > 0
+	var person := world.roster(steered)[0]
+	var values_right: bool = hp_value == "%d%%" % percent \
+			and qi_value == "%d / %d" % [world.person_qi(person), world.person_qi_capacity(person)] \
+			and hud.hp_bar.value == 100.0 * strength / world.army_strength(steered)
+	# Five slots on Q W E R T, the person's first skills on them, each with the icon of its shape;
+	# control: the slots past its skills show none.
+	var skills := world.person_skills(person)
+	var icons_right: bool = skills.size() > 0 and skills.size() < hud.slot_icons.size() and hud.slot_icons.size() == 5
+	var keys := []
 	for slot in hud.slot_icons.size():
 		var icon: TextureRect = hud.slot_icons[slot]
-		var visible: bool = icon.get_parent().visible
+		var key: Label = icon.get_parent().get_child(1)
+		keys.append(key.text)
 		if slot < skills.size():
 			var burst := int(skills[slot].radius) > 0
 			var region := (icon.texture as AtlasTexture).region
-			icons_right = icons_right and visible and region.position.x == (16 if burst else 0)
+			icons_right = icons_right and region.position.x == (16 if burst else 0) and hud.slot_skills[slot] == skills[slot]
 		else:
-			icons_right = icons_right and not visible
+			icons_right = icons_right and icon.texture == null and hud.slot_skills[slot].is_empty()
+	icons_right = icons_right and keys == ["Q", "W", "E", "R", "T"]
+	# Each key as drawn, centred across its label from the label's top, one line of the HUD's font
+	# high, keeps clear of its slot's icon and within the slot.
+	var clear := []
+	var line: float = hud._theme.default_font.get_height(hud.FONT_SIZE)
+	for slot in hud.slot_icons.size():
+		var icon: TextureRect = hud.slot_icons[slot]
+		var key: Label = icon.get_parent().get_child(1)
+		var drawn := _width(key, key.text)
+		var left := key.position.x + (key.size.x - drawn) / 2.0
+		var key_rect := Rect2(left, key.position.y, drawn, line)
+		clear.append(key_rect.position.x >= 0 and not key_rect.intersects(Rect2(icon.position, icon.size)) \
+				and Rect2(Vector2.ZERO, icon.get_parent().size).encloses(key_rect))
+	icons_right = icons_right and clear.all(func(fits: bool) -> bool: return fits)
 	# The season and year the core gives, spring of the first year at the start; control: a later
 	# date reads differently, so the label is not fixed text.
 	var season: String = hud.labels.season.text
@@ -90,9 +111,9 @@ func run() -> bool:
 	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
 			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right \
 			and dated
-	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, inner energy %s, its bar %d; %d skills shown with their icons %s: %s" % [
+	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, qi %s, its bar %d; %d skills on the slots %s with their icons, each key clear of its icon %s, the rest empty %s: %s" % [
 		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
-		icons_right, "pass" if passed else "FAIL"])
+		keys, clear, icons_right, "pass" if passed else "FAIL"])
 	print("hud_test: date %s shown as \"%s\"; year 3, season 1 as \"%s\": %s" % [
 		date, season, later, "pass" if dated else "FAIL"])
 	hud.free()
@@ -100,10 +121,11 @@ func run() -> bool:
 	var names_passed := _names_pass()
 	var fit_passed := _fit_pass()
 	var rumours_passed := _rumours_pass()
-	var attainment_passed := _attainment_pass()
+	var realm_passed := _realm_pass()
+	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
-	return passed and measure_passed and names_passed and fit_passed and rumours_passed and attainment_passed \
-			and cast_words_passed
+	return passed and measure_passed and names_passed and fit_passed and rumours_passed and realm_passed \
+			and lessons_passed and cast_words_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -458,48 +480,143 @@ func _rumours_pass() -> bool:
 	return passed
 
 
-# A sect's founding master shows the discipline of its highest attainment and that attainment, its
-# founding attainment of 120, and the HUD shows the player's art as Attainment.of gives it.
-# Control: the player, newborn to the world, has attained nothing and shows Attainment.NONE. In each
-# locale, every discipline at three digits, right-aligned on the art's line, keeps 4 pixels clear
-# of the art's label.
-func _attainment_pass() -> bool:
+# A person the world starts with, cultivated for its founding age, shows its realm by name, Korean
+# first and in English as romanised, and its qi against its store with their thousands grouped,
+# its bar the share of the store it holds. Control: the player, newborn to the world, has no realm
+# and shows a dash, and no qi in no store. In each locale, every realm's name and the qi at the
+# highest realm's threshold, right-aligned on their lines, keep 4 pixels clear of their labels.
+func _realm_pass() -> bool:
+	TranslationServer.set_locale("ko")
 	var world := WorldAdapter.create_region(SEED)
-	var steered := world.army_count() - 1
 	var hud: CanvasLayer = load(SCENE).instantiate()
+	var cultivated := -1
+	for army in world.army_count():
+		var roster := world.roster(army)
+		if cultivated < 0 and not roster.is_empty() and world.person_realm(roster[0]) >= 1 \
+				and world.person_qi_capacity(roster[0]) >= 1000:
+			cultivated = army
+	var person := world.roster(cultivated)[0] if cultivated >= 0 else -1
+	var realms := world.realms()
+	var korean := ""
+	var english := ""
+	var qi := ""
+	var bar := -1.0
+	if person >= 0:
+		hud.show_player(world, cultivated)
+		hud.refresh(world, cultivated, PackedInt64Array([0]))
+		korean = hud.labels.realm_value.text
+		qi = hud.labels.qi_value.text
+		bar = hud.qi_bar.value
+		hud.switch_locale()
+		hud.refresh(world, cultivated, PackedInt64Array([0]))
+		english = hud.labels.realm_value.text
+		hud.switch_locale()
+	var rank := world.person_realm(person) if person >= 0 else 0
+	var store := world.person_qi_capacity(person) if person >= 0 else 0
+	var held := world.person_qi(person) if person >= 0 else 0
+	var shown_right: bool = person >= 0 and korean == realms[rank - 1].korean and english == realms[rank - 1].romanised \
+			and qi == "%s / %s" % [Arts.grouped(held), Arts.grouped(store)] and qi.contains(",") \
+			and is_equal_approx(bar, 100.0 * held / store)
+	var steered := world.army_count() - 1
 	hud.show_player(world, steered)
 	hud.refresh(world, steered, PackedInt64Array([0]))
-	var master := world.sect_master(0)
-	var attained := world.person_attainment(master)
-	var best := -1
-	for discipline in attained.size():
-		if best < 0 or attained[discipline] > attained[best]:
-			best = discipline
-	var names := world.discipline_names()
-	var master_shown := Attainment.of(world, master)
-	var master_right := attained[best] == 120 and names.size() == attained.size() \
-			and master_shown == "%s 120" % hud.tr("DISCIPLINE_" + names[best].to_upper().replace(" ", "_"))
-	var player := world.roster(steered)[0]
-	var shown: String = hud.labels.attainment_value.text
-	var player_right := Array(world.person_attainment(player)).all(func(points: int) -> bool: return points == 0) \
-			and shown == Attainment.NONE
-	var label: Label = hud.labels.attainment
-	var value: Label = hud.labels.attainment_value
+	var newborn: String = hud.labels.realm_value.text
+	var newborn_qi: String = hud.labels.qi_value.text
+	var player_right: bool = world.person_realm(world.roster(steered)[0]) == 0 and newborn == "—" and newborn_qi == "0 / 0"
 	var overruns: Array[String] = []
 	var checks := 0
+	var top := Arts.grouped(realms.back().qi)
 	for locale: String in hud.LOCALES:
 		TranslationServer.set_locale(locale)
-		var room := value.size.x - _width(label, hud.tr(label.text)) - 4
-		for discipline: String in names:
-			var text := Attainment.shown(discipline, WIDEST_ATTAINMENT)
-			checks += 1
-			if _width(value, text) > room or hud.tr("DISCIPLINE_" + discipline.to_upper().replace(" ", "_")).begins_with("DISCIPLINE_"):
-				overruns.append("%s %s is %d px in %d" % [locale, text, _width(value, text), room])
+		for line: Array in [[hud.labels.realm, hud.labels.realm_value, range(1, realms.size() + 1).map(
+				func(n: int) -> String: return Arts.realm_name(world, n))],
+				[hud.labels.qi, hud.labels.qi_value, ["%s / %s" % [top, top]]]]:
+			var label: Label = line[0]
+			var value: Label = line[1]
+			var room := value.size.x - _width(label, hud.tr(label.text)) - 4
+			for text: String in line[2]:
+				checks += 1
+				if _width(value, text) > room:
+					overruns.append("%s %s is %d px in %d" % [locale, text, _width(value, text), room])
 	TranslationServer.set_locale(hud.LOCALES[0])
 	hud.free()
-	var passed := master_right and player_right and overruns.is_empty() and checks == 2 * names.size()
-	print("hud_test: master %d attained %s in %s, shown \"%s\"; the player shown \"%s\"; %d arts measured, overruns %s: %s" % [
-		master, attained, names, master_shown, shown, checks, overruns, "pass" if passed else "FAIL"])
+	var passed: bool = shown_right and player_right and overruns.is_empty() and checks == 2 * (realms.size() + 1)
+	print("hud_test: person %d of realm %d shown \"%s\", in English \"%s\", qi \"%s\" with its bar at %.1f; the newborn player shown \"%s\" and \"%s\"; %d values measured, overruns %s: %s" % [
+		person, rank, korean, english, qi, bar, newborn, newborn_qi, checks, overruns, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A region of five-tick days, played through by the HUD steering the first army whose person learns
+# a skill or gains a realm while it does: each of that person's lessons and realms recorded after
+# the HUD began following the world waits as a notice, in order, worded by how the skill was
+# learned with its name, or with the realm's name. Control: the lessons and realms of everyone else
+# recorded meanwhile wait as none. In each locale, every notice any art skill or realm can make fits
+# the notice's width.
+func _lessons_pass() -> bool:
+	TranslationServer.set_locale("ko")
+	var lessons := {
+		WorldAdapter.LEARNED_BY_COMPREHENSION: "NOTICE_COMPREHENDED",
+		WorldAdapter.LEARNED_BY_MANUAL: "NOTICE_READ",
+		WorldAdapter.LEARNED_BY_TEACHING: "NOTICE_TAUGHT",
+	}
+	# A first run finds the army whose first person learns soonest, and runs on until someone else
+	# learns too; the second, from the same seed, plays as long through the HUD.
+	var probe := WorldAdapter.create_region(SEED, 0, 5)
+	var army := -1
+	var learner := -1
+	var other_seen := false
+	var ticks := 0
+	while (army < 0 or not other_seen) and ticks < LESSON_TICKS:
+		probe.tick()
+		ticks += 1
+		for event: Dictionary in probe.progress(0):
+			if event.tick != probe.tick_count() - 1:
+				continue
+			for each in probe.army_count():
+				var roster := probe.roster(each)
+				if army < 0 and not roster.is_empty() and roster[0] == event.person:
+					army = each
+					learner = event.person
+			other_seen = other_seen or (learner >= 0 and event.person != learner)
+	var world := WorldAdapter.create_region(SEED, 0, 5)
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	var expected: Array[String] = []
+	var others := 0
+	if army >= 0:
+		hud.show_player(world, army)
+		for i in ticks:
+			world.tick()
+			hud.refresh(world, army, PackedInt64Array([0]))
+		for event: Dictionary in world.progress(0):
+			if event.person != learner:
+				others += 1
+			elif event.kind == WorldAdapter.PROGRESS_LEARNED:
+				expected.append(hud.tr(lessons[int(event.by)]) % Arts.named(world.arts()[event.art].skills[event.skill]))
+			else:
+				expected.append(hud.tr("NOTICE_REALM") % Arts.realm_name(world, event.rank))
+	var waiting: Array[String] = hud.waiting_notices()
+	var announced := army >= 0 and not expected.is_empty() and waiting == expected
+	var overruns: Array[String] = []
+	var checks := 0
+	var notice: Label = hud.labels.notice
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var texts: Array[String] = []
+		for art: Dictionary in world.arts():
+			for skill: Dictionary in art.skills:
+				for key: String in lessons.values():
+					texts.append(hud.tr(key) % Arts.named(skill))
+		for rank in range(1, world.realms().size() + 1):
+			texts.append(hud.tr("NOTICE_REALM") % Arts.realm_name(world, rank))
+		for text in texts:
+			checks += 1
+			if _width(notice, text) > notice.size.x or text.begins_with("NOTICE_"):
+				overruns.append("%s %s is %d px in %d" % [locale, text, _width(notice, text), notice.size.x])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var passed := announced and others > 0 and overruns.is_empty() and checks > 0
+	print("hud_test: army %d's person %d learned within %d ticks; waiting %s against %s; %d lessons and realms of others announced none; %d notices measured, overruns %s: %s" % [
+		army, learner, ticks, waiting, expected, others, checks, overruns, "pass" if passed else "FAIL"])
 	return passed
 
 

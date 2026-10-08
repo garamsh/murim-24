@@ -5,8 +5,9 @@
 ## game rule.
 extends "res://hud/panel.gd"
 
-# The mockup's layout, in the native 480x270, grown by a row of the guide for the keys 1 to 9 and 0.
-const DIALOG := Rect2(80, 26, 320, 218)
+# The mockup's layout, in the native 480x270, grown by a row of the guide for the keys 1 to 9 and 0
+# and another for K.
+const DIALOG := Rect2(80, 18, 320, 234)
 const MENU_WIDTH := 120
 const GUIDE_X := 230
 const GUIDE_STEP := 16

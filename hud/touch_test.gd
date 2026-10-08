@@ -3,9 +3,12 @@
 # while a drag within the dead zone steers nowhere; a skill button tapped casts as a tap, while one
 # moved past the slop is a drag that casts at the point it aims, as a share of the pad, and one
 # dropped on the cancel zone casts nothing; one held for a long press casts on the body itself,
-# while one held a little less is a tap; the square buttons and the pause button name themselves;
-# a touch elsewhere is on the world, where a button past the body's skills stands. Every word the
-# controls draw from hud.csv fits the room they give it, in each locale.
+# while one held a little less is a tap; the square buttons, the arts button among them, and the
+# pause button name themselves; a touch elsewhere is on the world, where a button past the body's
+# skills stands, and a button whose slot is empty casts nothing. While placing, for the arts panel,
+# a skill button pressed names its slot to place on, the pause button's place closes, a tap
+# elsewhere is the panel's, and a finger moved up or down scrolls it. Every word the controls draw
+# from hud.csv fits the room they give it, in each locale.
 extends RefCounted
 
 const Touch := preload("res://hud/touch.gd")
@@ -84,13 +87,56 @@ func run() -> bool:
 	touch.take(_touch_event(4, Vector2.ZERO, false))
 	var two := _touch(2)
 	var past: Dictionary = two.take(_touch_event(0, two.SKILLS[4].at, true))
-	var buttons_right: bool = named == ["genealogy", "sect", "challenge", "pause"] \
+	var buttons_right: bool = named == ["genealogy", "sect", "challenge", "arts", "pause"] \
 			and ground == {"do": "world", "at": Vector2(240, 60)} and past.do == "world"
 	print("touch_test: buttons %s; the ground %s; the fifth button with two skills %s: %s" % [
 		named, ground, past, "pass" if buttons_right else "FAIL"])
+
+	# An empty slot's button, tapped, casts nothing. Control: its neighbour holding a skill casts.
+	var gapped := _touch(5)
+	var slots: Array[Dictionary] = gapped.reach.duplicate()
+	slots[3] = {}
+	gapped.show_skills(slots)
+	var fourth: Vector2 = gapped.SKILLS[3].at
+	var empty_press: Dictionary = gapped.take(_touch_event(0, fourth, true))
+	var empty_release: Dictionary = gapped.take(_touch_event(0, fourth, false))
+	gapped.take(_touch_event(0, gapped.SKILLS[2].at, true))
+	var neighbour: Dictionary = gapped.take(_touch_event(0, gapped.SKILLS[2].at, false))
+	var empty_right: bool = gapped.skill_count == 5 and empty_press == {"do": "none"} \
+			and empty_release == {"do": "none"} and neighbour == {"do": "cast", "slot": 2, "how": "tap"}
+	print("touch_test: an empty fourth slot pressed %s, released %s; the third, holding a skill, %s: %s" % [
+		empty_press, empty_release, neighbour, "pass" if empty_right else "FAIL"])
+
+	# Placing: the fourth button names its slot, even empty; the pause button's place closes; a tap
+	# on the panel is the panel's; a finger moved up scrolls on, down scrolls back; the finger on the
+	# arts button that opened the panel, lifted once placing, asks nothing. Control: the same press
+	# on the main button while not placing is a skill's, casting on release.
+	gapped.take(_touch_event(5, gapped.BUTTONS.arts.get_center(), true))
+	gapped.placing = true
+	var opener: Dictionary = gapped.take(_touch_event(5, gapped.BUTTONS.arts.get_center(), false))
+	var place: Dictionary = gapped.take(_touch_event(1, fourth, true))
+	var close: Dictionary = gapped.take(_touch_event(1, gapped.PAUSE.get_center(), true))
+	gapped.take(_touch_event(1, Vector2(60, 60), true))
+	var on_panel: Dictionary = gapped.take(_touch_event(1, Vector2(60, 62), false))
+	gapped.take(_touch_event(1, Vector2(60, 200), true))
+	gapped.take(_drag(1, Vector2(60, 200 - gapped.SCROLL - 4)))
+	var up: Dictionary = gapped.take(_touch_event(1, Vector2(60, 200 - gapped.SCROLL - 4), false))
+	gapped.take(_touch_event(1, Vector2(60, 100), true))
+	gapped.take(_drag(1, Vector2(60, 100 + gapped.SCROLL + 4)))
+	var down: Dictionary = gapped.take(_touch_event(1, Vector2(60, 100 + gapped.SCROLL + 4), false))
+	gapped.placing = false
+	gapped.take(_touch_event(1, main, true))
+	var not_placing: Dictionary = gapped.take(_touch_event(1, main, false))
+	var placing_right: bool = opener == {"do": "none"} and place == {"do": "place", "slot": 3} and close == {"do": "button", "button": "close"} \
+			and on_panel == {"do": "panel", "at": Vector2(60, 60)} and up == {"do": "scroll", "way": 1} \
+			and down == {"do": "scroll", "way": -1} and not_placing == {"do": "cast", "slot": 0, "how": "tap"}
+	print("touch_test: placing, the arts button's finger lifted %s, the fourth button %s, the pause button's place %s, the panel %s, moved up %s, down %s; not placing, the main button %s: %s" % [
+		opener, place, close, on_panel, up, down, not_placing, "pass" if placing_right else "FAIL"])
 	touch.free()
 	two.free()
-	return stick_right and casts_right and press_right and buttons_right and _fit_pass()
+	gapped.free()
+	return stick_right and casts_right and press_right and buttons_right and empty_right and placing_right \
+			and _fit_pass()
 
 
 # In each locale, every word the controls draw fits the room they give it. Setup: every TOUCH_ key

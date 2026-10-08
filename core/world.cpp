@@ -325,6 +325,23 @@ void fold_event(const Fold& fold, const Event& event) {
       event.what);
 }
 
+// Folds step `step` of progress into `fold`.
+template <typename Fold>
+void fold_progress(const Fold& fold, const Progress& step) {
+  fold(step.sequence);
+  fold(step.tick);
+  fold(step.what.index());
+  if (const auto* learned = std::get_if<Learned>(&step.what)) {
+    fold(learned->person);
+    fold(learned->art);
+    fold(learned->skill);
+    fold(static_cast<std::size_t>(learned->by));
+  } else {
+    fold(std::get<RealmGained>(step.what).person);
+    fold(std::get<RealmGained>(step.what).rank);
+  }
+}
+
 // Folds everything `person` holds into `fold`; `absent` stands for no soul,
 // and its qi is folded where the world's people `cultivates`.
 template <typename Fold>
@@ -643,6 +660,18 @@ Range range_of(Spread values) {
                values.mean + values.spread};
 }
 
+// Whether `what` names a person past `people`, an art or skill `life` lacks,
+// or a realm outside its realms.
+bool stray_advance(const Advance& what, std::size_t people, const Life& life) {
+  if (const auto* learned = std::get_if<Learned>(&what)) {
+    return learned->person >= people || learned->art >= life.arts.size() ||
+           learned->skill >= life.arts.at(learned->art).skills.size();
+  }
+  const auto& gained = std::get<RealmGained>(what);
+  return gained.person >= people || gained.rank == 0 ||
+         gained.rank > life.realms.size();
+}
+
 // Whether `person` holds more qi than its store, a store past MAX_TALENT, or
 // a known skill of no art `life` holds.
 bool stray_cultivation(const Person& person, const Life& life) {
@@ -893,7 +922,7 @@ void World::restore() {
       manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
       !all_below(surnames_, life_.names.surnames.size());
   if (bad_rules || bad_life || bad_structures || !events_kept() ||
-      !rostered() || living() > MAX_PEOPLE ||
+      !progress_kept() || !rostered() || living() > MAX_PEOPLE ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
       std::any_of(villages_.begin(), villages_.end(), stray_village) ||
       leadership_.size() != factions ||
@@ -1292,6 +1321,36 @@ std::vector<std::size_t> World::record_deaths() {
 }
 
 const std::vector<Event>& World::events() const { return events_; }
+
+const std::vector<Progress>& World::progress() const { return progress_; }
+
+// Notes `what`, a step of progress on this tick, letting the oldest go once
+// PROGRESS_CAPACITY are kept.
+void World::note(Advance what) {
+  const std::uint64_t sequence =
+      progress_.empty() ? 0 : progress_.back().sequence + 1;
+  if (progress_.size() == PROGRESS_CAPACITY) {
+    progress_.erase(progress_.begin());
+  }
+  progress_.push_back(Progress{sequence, tick_count_, what});
+}
+
+// Whether the progress kept is as note() keeps it: at most
+// PROGRESS_CAPACITY, oldest first, numbered one after another, none later
+// than the world's tick, each naming a person, art, skill or realm the world
+// holds.
+bool World::progress_kept() const {
+  bool bad = progress_.size() > PROGRESS_CAPACITY;
+  for (std::size_t index = 0; index < progress_.size(); ++index) {
+    const Progress& step = progress_.at(index);
+    const bool unordered =
+        index > 0 && (step.sequence != progress_.at(index - 1).sequence + 1 ||
+                      step.tick < progress_.at(index - 1).tick);
+    bad = bad || unordered || step.tick > tick_count_ ||
+          stray_advance(step.what, people_.size(), life_);
+  }
+  return !bad;
+}
 
 // Whether `other` is `one`'s kin: itself, of its family, its spouse, parent
 // or child.
@@ -1919,6 +1978,10 @@ StateHash World::hash() const {
   fold(rules_.rumour_reach);
   for (const Event& event : events_) {
     fold_event(fold, event);
+  }
+  // Folded only when held, so a world where no one learns keeps its hash.
+  for (const Progress& step : progress_) {
+    fold_progress(fold, step);
   }
   return StateHash{digest};
 }
@@ -2628,7 +2691,8 @@ void World::train() {
 }
 
 // Once a day, every living person's qi capacity grows by its cultivation's
-// growth, up to its limit; on each realm gained it comprehends.
+// growth, up to its limit; each realm gained is noted, and on each it
+// comprehends.
 void World::cultivate() {
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
@@ -2640,15 +2704,18 @@ void World::cultivate() {
                             person.qi_capacity + person.cultivation.growth));
       const std::uint32_t after = rank_of(person);
       for (std::uint32_t gained = before; gained < after; ++gained) {
-        comprehend(person, after);
+        note(RealmGained{member, gained + 1});
+        comprehend(member);
       }
     }
   }
 }
 
-// Person `person`, of realm rank `rank`, rolls for each art it knows, in the
-// order it learned them, to comprehend a skill of it.
-void World::comprehend(Person& person, std::uint32_t rank) {
+// Person `learner` rolls for each art it knows, in the order it learned them,
+// to comprehend a skill of it within its realm, noting each learned.
+void World::comprehend(std::size_t learner) {
+  Person& person = people_.at(learner);
+  const std::uint32_t rank = rank_of(person);
   std::vector<std::size_t> practised;
   for (const Known& known : person.known) {
     if (std::find(practised.begin(), practised.end(), known.art) ==
@@ -2671,6 +2738,7 @@ void World::comprehend(Person& person, std::uint32_t rank) {
                                  agreement(person, art, false) / PER_MILLE;
     if (next_random() % PER_MILLE < chance) {
       person.known.push_back(Known{art, *skill, 0});
+      note(Learned{learner, art, *skill, LearnedBy::COMPREHENSION});
     }
   }
 }
@@ -2694,7 +2762,8 @@ void World::recover(const Cultivation& cultivation) {
 // Each manual lying on a cell is read by the nearest living person within
 // the reading reach of the cell's centre, the lower index among equals, who
 // has the rank for a skill of its art it lacks and the qi to read it: it
-// spends the reading's cost and learns every such skill. The manual stays.
+// spends the reading's cost and learns every such skill, each noted. The
+// manual stays.
 void World::read_manuals() {
   for (const Manual& manual : manuals_) {
     const auto* cell = std::get_if<Cell>(&manual.place);
@@ -2732,6 +2801,7 @@ void World::read_manuals() {
     while (const std::optional<std::size_t> skill =
                lesson(reader, manual.art, Lesson::TAUGHT, rank)) {
       reader.known.push_back(Known{manual.art, *skill, 0});
+      note(Learned{nearest->second, manual.art, *skill, LearnedBy::MANUAL});
     }
   }
 }
@@ -2739,7 +2809,7 @@ void World::read_manuals() {
 // Once a day, each living member of a standing sect whose seat is held
 // learns, with the teaching's chance a year for each rank of its sect's
 // highest-ranked elder, the first skill it lacks of the first art its sect
-// holds a manual of that has one within both their ranks.
+// holds a manual of that has one within both their ranks, noted.
 void World::teach() {
   for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
     if (!seat_held(sect)) {
@@ -2771,6 +2841,7 @@ void World::teach() {
         if (next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
             chance) {
           pupil.known.push_back(Known{manual.art, *skill, 0});
+          note(Learned{member, manual.art, *skill, LearnedBy::TEACHING});
         }
         break;
       }

@@ -1,4 +1,4 @@
-## A person's martial progress as the HUD and the rebirth screen show it, from
+## A person's martial progress as the rebirth screen shows it, from
 ## WorldAdapter.person_attainment: the discipline of their highest attainment and that attainment.
 ## Talent stays hidden.
 extends RefCounted

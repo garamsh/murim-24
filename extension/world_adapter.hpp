@@ -279,8 +279,9 @@ class WorldAdapter : public godot::RefCounted {
   /// its army's, then the art skills it knows in the order learned; none
   /// once it is dead. Each is a Dictionary keyed as skills() gives one, with
   /// its `qi_cost` and the tick it is `ready_at`, and, for an art skill, its
-  /// `art`, the realm `rank` it needs, its name in `korean` and `romanised`,
-  /// and its art's `orientation` and `polarity`; `art` is -1 for an army's.
+  /// `art`, its index among the art's `skill`s, the realm `rank` it needs,
+  /// its name in `korean` and `romanised`, and its art's `orientation` and
+  /// `polarity`; `art` is -1 for an army's.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> person_skills(
       std::int64_t person) const;
 
@@ -289,6 +290,13 @@ class WorldAdapter : public godot::RefCounted {
   /// its `might` per mille; empty for a world whose people do not
   /// cultivate.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> realms() const;
+
+  /// Returns the arts people learn, by index, each a Dictionary of its name
+  /// in `korean` and `romanised`, its `orientation` and `polarity`, and its
+  /// `skills` in the order they are learned, each its name in `korean` and
+  /// `romanised`, the realm `rank` it needs, its `range`, `radius`,
+  /// `cooldown` and `qi_cost`; empty for a world with no arts.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> arts() const;
 
   /// Returns sect `sect`'s name.
   [[nodiscard]] godot::String sect_name(std::int64_t sect) const;
@@ -391,6 +399,14 @@ class WorldAdapter : public godot::RefCounted {
   /// first, each a Dictionary of its `sequence` and `tick`, its `cell`
   /// (Vector2i) and its `kind`, one of the EVENT_* constants.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> events(
+      std::int64_t from) const;
+  /// Returns the steps of people's progress the core keeps from the
+  /// `from`-th noted on, oldest first, each a Dictionary of its `sequence`,
+  /// `tick`, `kind`, one of the PROGRESS_* constants, and `person`; a skill
+  /// learned also gives its `art`, the `skill`'s index in it and `by`, one of
+  /// the LEARNED_BY_* constants, and a realm gained the realm's `rank`,
+  /// counted from 1.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> progress(
       std::int64_t from) const;
   /// Returns the names of the terrain kinds, by index; empty unless the
   /// world was made by create_region().

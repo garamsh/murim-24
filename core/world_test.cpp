@@ -3279,6 +3279,7 @@ struct Cultivating {
                     PER_MILLE, PER_MILLE, PER_MILLE, PER_MILLE};
   std::vector<std::size_t> held{0, 1};
   std::uint32_t admission_chance = 0;
+  std::int32_t rumour_reach = 0;
 };
 
 constexpr std::size_t READER = 0;
@@ -3335,6 +3336,7 @@ World qi_world(const Cultivating& cultivating) {
       {{false, false, true}, {false, false, false}, {true, false, false}},
       STAGE_FLOORS};
   rules.ticks_per_day = 1;
+  rules.rumour_reach = cultivating.rumour_reach;
   const Leadership members{
       std::nullopt, std::nullopt,
       Admission{0, 0, 0, OPEN_SIDE, cultivating.admission_chance, PER_MILLE},
@@ -3724,6 +3726,139 @@ TEST(World, ASectTeachesItsArtsWithinItsMembersAndEldersRealms) {
   World idle = qi_world(Cultivating{});
   run_ticks(idle, DAYS_PER_YEAR);
   EXPECT_TRUE(idle.person(1).known.empty());
+}
+
+// The skills person `person` was noted learning `how`, as (art, skill)
+// pairs oldest first, among the progress `world` keeps.
+std::vector<std::pair<std::size_t, std::size_t>> recorded_learning(
+    const World& world, std::size_t person, LearnedBy how) {
+  std::vector<std::pair<std::size_t, std::size_t>> learned;
+  for (const Progress& step : world.progress()) {
+    const auto* lesson = std::get_if<Learned>(&step.what);
+    if (lesson != nullptr && lesson->person == person && lesson->by == how) {
+      learned.emplace_back(lesson->art, lesson->skill);
+    }
+  }
+  return learned;
+}
+
+// The realm ranks person `person` was noted reaching, oldest first.
+std::vector<std::size_t> recorded_realms(const World& world,
+                                         std::size_t person) {
+  std::vector<std::size_t> ranks;
+  for (const Progress& step : world.progress()) {
+    const auto* gained = std::get_if<RealmGained>(&step.what);
+    if (gained != nullptr && gained->person == person) {
+      ranks.push_back(gained->rank);
+    }
+  }
+  return ranks;
+}
+
+TEST(World, EveryRealmGainedAndSkillReadFromAManualIsRecorded) {
+  const World world = read(Cultivating{});
+  ASSERT_EQ(world.rank(READER), 3U);
+  EXPECT_EQ(recorded_realms(world, READER),
+            (std::vector<std::size_t>{1, 2, 3}));
+  EXPECT_EQ(recorded_learning(world, READER, LearnedBy::MANUAL),
+            known_by(world, READER));
+  // Control: a reader short of the reading's qi gains the same realms and
+  // is recorded learning nothing.
+  Cultivating costly;
+  costly.learning.reading_cost = QI_LIMIT + 1;
+  const World unread = read(costly);
+  ASSERT_TRUE(known_by(unread, READER).empty());
+  EXPECT_EQ(recorded_realms(unread, READER),
+            (std::vector<std::size_t>{1, 2, 3}));
+  EXPECT_TRUE(recorded_learning(unread, READER, LearnedBy::MANUAL).empty());
+}
+
+TEST(World, ASkillComprehendedIsRecordedAsComprehended) {
+  Cultivating slow;
+  slow.growth = {4, 0};
+  slow.learning.comprehension = PER_MILLE;
+  slow.held = {0};
+  const World comprehending = walked_away(slow);
+  ASSERT_EQ(known_by(comprehending, READER).back(),
+            (std::pair<std::size_t, std::size_t>{ORTHODOX_ART, 2}));
+  EXPECT_EQ(
+      recorded_learning(comprehending, READER, LearnedBy::COMPREHENSION),
+      (std::vector<std::pair<std::size_t, std::size_t>>{{ORTHODOX_ART, 2}}));
+  // Control: with no chance of comprehension, none is recorded.
+  Cultivating unmoved = slow;
+  unmoved.learning.comprehension = 0;
+  EXPECT_TRUE(
+      recorded_learning(walked_away(unmoved), READER, LearnedBy::COMPREHENSION)
+          .empty());
+}
+
+TEST(World, ASkillTaughtIsRecordedAsTaught) {
+  Cultivating taught;
+  taught.learning.teaching = PER_MILLE;
+  taught.held = {0};
+  World teaching = qi_world(taught);
+  run_ticks(teaching, DAYS_PER_YEAR);
+  for (const std::size_t member : {std::size_t{1}, std::size_t{2}}) {
+    ASSERT_FALSE(teaching.person(member).known.empty());
+    EXPECT_EQ(recorded_learning(teaching, member, LearnedBy::TEACHING),
+              known_by(teaching, member));
+  }
+  // Control: with no chance of teaching, none is recorded.
+  World idle = qi_world(Cultivating{});
+  run_ticks(idle, DAYS_PER_YEAR);
+  EXPECT_TRUE(recorded_learning(idle, 1, LearnedBy::TEACHING).empty());
+}
+
+// A person growing a qi a day through `count` realms, one a qi apart, on days
+// of one tick, lived as many ticks.
+World climbing(std::uint32_t count) {
+  Life life = one_discipline(0);
+  life.cultivation = Cultivation{{1, 0}, {count, 0}, 0, 1};
+  for (std::uint32_t rank = 1; rank <= count; ++rank) {
+    life.realms.push_back(Realm{{"경", "Realm"}, rank, PER_MILLE});
+  }
+  Rules rules = peaceful(0);
+  rules.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(READER_CELL, READER_CELL, 1, 1, 0, {IDLE})},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  run_ticks(world, count);
+  return world;
+}
+
+// The realm ranks from `first` to `last`, ascending.
+std::vector<std::size_t> ranks_from(std::size_t first, std::size_t last) {
+  std::vector<std::size_t> ranks;
+  for (std::size_t rank = first; rank <= last; ++rank) {
+    ranks.push_back(rank);
+  }
+  return ranks;
+}
+
+TEST(World, ProgressKeepsTheLatestStepsApartFromTheEvents) {
+  constexpr std::uint32_t CLIMBED = PROGRESS_CAPACITY + 8;
+  const World world = climbing(CLIMBED);
+  ASSERT_EQ(world.rank(READER), CLIMBED);
+  // The latest PROGRESS_CAPACITY realms, numbered on from the first, and no
+  // event recorded for any of them.
+  EXPECT_EQ(recorded_realms(world, READER),
+            ranks_from(CLIMBED - PROGRESS_CAPACITY + 1, CLIMBED));
+  EXPECT_EQ(world.progress().front().sequence, CLIMBED - PROGRESS_CAPACITY);
+  EXPECT_TRUE(world.events().empty());
+}
+
+TEST(World, ProgressShortOfItsCapacityKeepsEveryStep) {
+  // Control for the latest kept: one realm short of the capacity keeps every
+  // one.
+  constexpr std::uint32_t FEWER = PROGRESS_CAPACITY - 1;
+  const World world = climbing(FEWER);
+  ASSERT_EQ(world.rank(READER), FEWER);
+  EXPECT_EQ(recorded_realms(world, READER), ranks_from(1, FEWER));
 }
 
 TEST(World, KnownSkillsAndQiArePartOfTheHash) {
