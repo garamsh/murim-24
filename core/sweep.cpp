@@ -4,7 +4,9 @@
 // the most living at once, whether every faction held a peopled village at
 // the end of every year, the living at each realm rank and those knowing an
 // art at the end, how many people ever learned from a manual lying on a
-// cell, and how many wars leaders declared and how many peaces they made.
+// cell, how many wars leaders declared and how many peaces they made, and
+// how many smithies and apothecaries growth raised; then how many seeds
+// raised at least one of each.
 // `make sweep` builds it optimised and runs it; it is not a test.
 
 #include <algorithm>
@@ -55,7 +57,26 @@ struct Lived {
   std::size_t readers;
   std::size_t wars;
   std::size_t peaces;
+  std::size_t smithies;
+  std::size_t apothecaries;
 };
+
+// Marks, among `raised`, every structure growth laid that now stands intact
+// and arms or tends people: a smithy or an apothecary.
+void note_workshops(const World& world, const Growth& growth,
+                    std::size_t laid_from, std::vector<bool>& raised) {
+  raised.resize(world.structure_count(), false);
+  for (std::size_t structure = laid_from; structure < world.structure_count();
+       ++structure) {
+    const std::optional<std::size_t> plan = world.plan_of(structure);
+    if (plan && *plan < growth.plans.size() &&
+        world.stage(structure) == Stage::INTACT) {
+      const Holding& holding = growth.plans.at(*plan).holding;
+      raised.at(structure) =
+          raised.at(structure) || holding.arms > 0 || holding.tends > 0;
+    }
+  }
+}
 
 // Counts in `lived` each declaration made since `seen`, the tick of the
 // declaration last seen between each two factions, and brings `seen` up to
@@ -118,7 +139,11 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
               0,
               0,
               0,
+              0,
+              0,
               0};
+  const Growth growth = data.life.growth.value_or(Growth{});
+  std::vector<bool> workshops;
   std::vector<std::size_t> known;
   std::vector<std::uint64_t> seen;
   std::vector<bool> read;
@@ -130,6 +155,7 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
       note_readers(world, data.life.learning.reading_reach, known, read);
       note_declarations(world, factions, seen, lived);
     }
+    note_workshops(world, growth, region.structures.size(), workshops);
     const std::vector<std::size_t> held = peopled(world, factions).second;
     lived.every_faction_peopled =
         lived.every_faction_peopled &&
@@ -146,6 +172,14 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   }
   lived.readers =
       static_cast<std::size_t>(std::count(read.begin(), read.end(), true));
+  for (std::size_t structure = 0; structure < workshops.size(); ++structure) {
+    if (workshops.at(structure)) {
+      const Holding& holding =
+          growth.plans.at(world.plan_of(structure).value_or(0)).holding;
+      lived.smithies += holding.arms > 0 ? 1 : 0;
+      lived.apothecaries += holding.tends > 0 ? 1 : 0;
+    }
+  }
   return lived;
 }
 
@@ -173,8 +207,10 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
   std::cout
       << "| Seed | Households | Living | Peopled villages | Peak | "
          "Every faction peopled | Living by rank | Knowing an art | Manual "
-         "readers | Wars declared | Peaces made "
-         "|\n|---|---|---|---|---|---|---|---|---|---|---|\n";
+         "readers | Wars declared | Peaces made | Smithies raised | "
+         "Apothecaries raised "
+         "|\n|---|---|---|---|---|---|---|---|---|---|---|---"
+         "|---|\n";
   std::size_t seeds = 0;
   std::size_t kept = 0;
   std::size_t grew = 0;
@@ -182,6 +218,10 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
   std::size_t readers = 0;
   std::size_t wars = 0;
   std::size_t peaces = 0;
+  std::size_t smithies = 0;
+  std::size_t apothecaries = 0;
+  std::size_t smithy_seeds = 0;
+  std::size_t apothecary_seeds = 0;
   for (std::uint64_t seed = first; seed <= last; ++seed) {
     const Lived lived = live(Seed{seed}, years, data);
     ++seeds;
@@ -196,6 +236,7 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
               << (lived.every_faction_peopled ? "yes" : "no") << " | "
               << listed(lived.ranks) << " | " << lived.artful << " | "
               << lived.readers << " | " << lived.wars << " | " << lived.peaces
+              << " | " << lived.smithies << " | " << lived.apothecaries
               << " |\n"
               << std::flush;
     for (std::size_t rank = 0; rank < ranks.size(); ++rank) {
@@ -204,6 +245,10 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
     readers += lived.readers;
     wars += lived.wars;
     peaces += lived.peaces;
+    smithies += lived.smithies;
+    apothecaries += lived.apothecaries;
+    smithy_seeds += lived.smithies > 0 ? 1 : 0;
+    apothecary_seeds += lived.apothecaries > 0 ? 1 : 0;
   }
   std::cout << "\nEvery faction peopled through " << years << " years on "
             << kept << " of " << seeds << " seeds; the living at least "
@@ -213,7 +258,11 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
             << listed(ranks)
             << "; people who learned from a manual on a cell: " << readers
             << ".\nWars declared: " << wars << ", peaces made: " << peaces
-            << ", over " << seeds << " seeds of " << years << " years.\n";
+            << ", over " << seeds << " seeds of " << years << " years."
+            << "\nSeeds raising a smithy: " << smithy_seeds << " of " << seeds
+            << " (" << smithies
+            << " in all); an apothecary: " << apothecary_seeds << " of "
+            << seeds << " (" << apothecaries << " in all).\n";
   return 0;
 }
 
