@@ -1,0 +1,28 @@
+--- a/core/world.hpp
++++ b/core/world.hpp
+@@ -562,7 +562,10 @@
+ constexpr std::int32_t MAX_REACH = std::int32_t{1} << 26;
+ 
+ /// The most living people a world may hold.
+-constexpr std::size_t MAX_PEOPLE = 500;
++#ifndef MEASURE_MAX_PEOPLE
++#define MEASURE_MAX_PEOPLE 500
++#endif
++constexpr std::size_t MAX_PEOPLE = MEASURE_MAX_PEOPLE;
+ 
+ /// The most health one person may have.
+ constexpr std::uint64_t MAX_HEALTH = std::uint64_t{1} << 43;
+--- a/core/region.hpp
++++ b/core/region.hpp
+@@ -12,7 +12,10 @@
+ namespace murim {
+ 
+ /// Cells along each side of a generated region.
+-constexpr std::int32_t REGION_SIDE = 128;
++#ifndef MEASURE_REGION_SIDE
++#define MEASURE_REGION_SIDE 128
++#endif
++constexpr std::int32_t REGION_SIDE = MEASURE_REGION_SIDE;
+ 
+ /// A kind of ground: its name, what it bears, buildings and bodies, bodies
+ /// only or neither, and how often generation picks it relative to the other

@@ -1,0 +1,14 @@
+# First run, printed to the terminal before field.txt was kept (same binary, measure_128):
+field side 128 build_p50_ms 3.819 build_max_ms 5.705 bytes 196608.000
+field side 256 build_p50_ms 15.912 build_max_ms 41.838 bytes 786432.000
+field side 512 build_p50_ms 127.370 build_max_ms 161.742 bytes 3145728.000
+field side 1024 build_p50_ms 528.077 build_max_ms 600.112 bytes 12582912.000
+field side 64 build_p50_ms 0.672 build_max_ms 0.746 bytes 49152.000
+field side 32 build_p50_ms 0.149 build_max_ms 0.186 bytes 12288.000
+# Repeated after field.txt, with the load average at 7.36:
+field side 512 build_p50_ms 68.290 build_max_ms 80.578 bytes 3145728.000
+field side 32 build_p50_ms 0.304 build_max_ms 0.400 bytes 12288.000
+field side 512 build_p50_ms 60.388 build_max_ms 126.791 bytes 3145728.000
+field side 32 build_p50_ms 0.164 build_max_ms 0.184 bytes 12288.000
+field side 512 build_p50_ms 60.551 build_max_ms 117.768 bytes 3145728.000
+field side 32 build_p50_ms 0.152 build_max_ms 0.185 bytes 12288.000

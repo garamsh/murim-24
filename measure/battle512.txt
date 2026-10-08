@@ -1,0 +1,3 @@
+battle people 500 side 512 armies 20 living_end 498 create_ms 901.543 p50_ms 0.549 p99_ms 0.775 max_ms 0.827 p50_us_per_person 1.098 peak_mb 63
+battle people 2000 side 512 armies 80 living_end 1999 create_ms 3629.500 p50_ms 5.748 p99_ms 18.265 max_ms 44.976 p50_us_per_person 2.874 peak_mb 149
+battle people 5000 side 512 armies 200 living_end 4999 create_ms 10130.369 p50_ms 13.492 p99_ms 17.901 max_ms 29.637 p50_us_per_person 2.698 peak_mb 157

@@ -1,0 +1,5 @@
+field side 32 build_p50_ms 0.291 build_max_ms 0.368 bytes 12288.000
+field side 64 build_p50_ms 0.717 build_max_ms 1.302 bytes 49152.000
+field side 128 build_p50_ms 3.611 build_max_ms 5.339 bytes 196608.000
+field side 256 build_p50_ms 15.031 build_max_ms 21.943 bytes 786432.000
+field side 512 build_p50_ms 61.828 build_max_ms 70.532 bytes 3145728.000

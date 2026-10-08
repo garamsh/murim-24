@@ -1,0 +1,12 @@
+map_cells 16384 row_runs 464
+day 0 ms 47.0562
+day 1 ms 13.3295
+day 2 ms 5.4625
+day 3 ms 2.98637
+day 4 ms 3.27233
+day 5 ms 2.23279
+day 6 ms 2.24225
+day 7 ms 3.082
+day 8 ms 3.71017
+day 9 ms 6.15158
+region side 128 seed 2026 villages 10 armies 20 people_start 20 people 5000 living_end 4961 generate_ms 5.685 create_ms 79.217 p50_ms 5.919 p99_ms 11.805 max_ms 50.644 p50_us_per_person 1.184 daytick_p50_ms 3.710 daytick_max_ms 47.056 otherday_p50_ms 4.925 save_bytes 1062055 save_ms 9.736 peak_mb 22
