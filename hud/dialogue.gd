@@ -1,0 +1,184 @@
+## The dialogue window, drawn as art/mockup/dialogue.gd lays it out (evidence/pr-180), at the foot of
+## the room so the two people talking stay in view above it: the person talked to, its card, name,
+## faction, sect and age, and what it says: its greeting over a menu of what it offers, one row for
+## each of WorldAdapter.offers, then farewell; or the news it has heard, its own
+## WorldAdapter.rumours, newest first, NEWS_LINES at a time. Every word comes from hud.csv through
+## Godot's translations. What it shows is read from the world through the adapter. It holds no game
+## rule.
+extends "res://hud/panel.gd"
+
+const PersonName := preload("res://hud/person_name.gd")
+## The menu row that ends the talk, after what the person offers.
+const FAREWELL := -1
+## The hud.csv key of each offer's row, by WorldAdapter.OFFER_* constant.
+const OFFER_KEYS := {WorldAdapter.OFFER_NEWS: "DIALOGUE_NEWS"}
+## How many lines of news show at once.
+const NEWS_LINES := 5
+# The layout, in the native 480x270, standing on the room's foot.
+const RECT := Rect2(20, 90, 440, 146)
+const CARD_RECT := Rect2(30, 116, 84, 90)
+const SAY_X := 132
+const SAY_Y := 116
+const LINE := 14
+# The text of each faction's name, by its sprite set in FACTIONS, as the sect panel draws it.
+const FACTION_TEXT: Array[Color] = [Color("5b9ae0"), Color("d63a2f"), Color("e8a830")]
+
+## The person talked to, or -1 while the window is closed.
+var person := -1
+## The rows of the menu: what the person offers, as WorldAdapter.OFFER_* constants, then FAREWELL.
+var rows: Array[int] = []
+## The row chosen.
+var chosen := 0
+## The news the person tells, each line as it is drawn, newest first, while the news is shown;
+## empty while the menu is.
+var news: Array[String] = []
+## Whether the news is shown in place of the menu.
+var showing_news := false
+## The first line of news shown.
+var first := 0
+
+
+## Opens the window on `talked_to` in `world`, at its menu.
+func open(world: WorldAdapter, talked_to: int) -> void:
+	_world = world
+	person = talked_to
+	rows.clear()
+	for offer in world.offers(talked_to):
+		rows.append(offer)
+	rows.append(FAREWELL)
+	chosen = 0
+	_show_menu()
+	visible = true
+	queue_redraw()
+
+
+func close() -> void:
+	super.close()
+	person = -1
+
+
+## Returns the row chosen: an offer, as a WorldAdapter.OFFER_* constant, or FAREWELL.
+func choice() -> int:
+	return rows[chosen]
+
+
+## Moves the choice on the menu, or the news, by `way` rows. Returns whether it moved.
+func move(way: int) -> bool:
+	var before := first if showing_news else chosen
+	if showing_news:
+		first = clampi(first + way, 0, maxi(news.size() - NEWS_LINES, 0))
+	else:
+		chosen = clampi(chosen + way, 0, rows.size() - 1)
+	queue_redraw()
+	return (first if showing_news else chosen) != before
+
+
+## Shows the news the person has heard, as WorldAdapter.rumours gives it, in place of the menu.
+func show_news() -> void:
+	news.clear()
+	for event: Dictionary in _world.rumours(person):
+		news.append(rumour_text(_world, event))
+	first = 0
+	showing_news = true
+	queue_redraw()
+
+
+## Goes back from the news to the menu. Returns whether the news was shown.
+func back() -> bool:
+	var was := showing_news
+	_show_menu()
+	queue_redraw()
+	return was
+
+
+func _show_menu() -> void:
+	showing_news = false
+	news.clear()
+	first = 0
+
+
+## Returns `event`, a rumour as WorldAdapter.rumours gives it, worded in the current locale.
+func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
+	var faction := func(index: int) -> String:
+		return tr("FACTION_" + world.faction_names()[index].to_upper())
+	var named := func(index: int) -> String:
+		return PersonName.of(world, index, true)
+	match event.kind:
+		"founded":
+			return tr("RUMOUR_FOUNDED") % faction.call(event.faction)
+		"raided":
+			return tr("RUMOUR_RAIDED") % [faction.call(event.raider), faction.call(event.owner)]
+		"ruined":
+			return tr("RUMOUR_RUINED") % faction.call(event.owner)
+		"sect_fell":
+			return tr("RUMOUR_SECT_FELL") % tr("SECT_" + world.sect_name(event.sect).to_upper().replace(" ", "_"))
+		"leader_changed":
+			var key := "RUMOUR_DUEL" if event.by == "duel" else "RUMOUR_ELECTED"
+			return tr(key) % [named.call(event.leader), faction.call(event.faction)]
+		"born":
+			return tr("RUMOUR_BORN") % named.call(event.person)
+		_:
+			return tr("RUMOUR_DIED") % named.call(event.person)
+
+
+## Returns the room, in pixels, the window gives a line of news or a menu row.
+func line_room() -> float:
+	return RECT.end.x - 12 - SAY_X
+
+
+## Returns the room, in pixels, the card's column gives the person's faction, sect and age.
+func card_room() -> float:
+	return CARD_RECT.size.x
+
+
+## Returns the person's particulars under its card: its faction's name, its sect's or none, and its
+## age, in the current locale.
+func particulars() -> Array[String]:
+	var faction := _world.person_faction(person)
+	var sect := _world.person_sect(person)
+	var faction_name: String = tr("FACTION_" + _world.faction_names()[faction].to_upper()) if faction >= 0 else ""
+	var sect_name: String = tr("DIALOGUE_NO_SECT") if sect < 0 \
+			else tr("SECT_" + _world.sect_name(sect).to_upper().replace(" ", "_"))
+	return [faction_name, sect_name, tr("DIALOGUE_AGE") % _world.person_age(person)]
+
+
+func _draw() -> void:
+	if person < 0:
+		return
+	_font = get_theme_default_font() if _font == null else _font
+	var keys := tr("DIALOGUE_KEYS_NEWS" if showing_news else "DIALOGUE_KEYS_MENU")
+	var title := fit(PersonName.of(_world, person), RECT.size.x - 32 - _width(tr("DIALOGUE_CLOSE")))
+	_dialog(RECT, title, "" if showing_news else tr("DIALOGUE_CLOSE"), keys)
+	# The card: the person standing twice its size on a cell of ground, and its particulars.
+	var card := CARD_RECT
+	var body := Rect2(card.position + Vector2(26, 2), Vector2(32, 48))
+	draw_rect(body, INK_DARK)
+	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 16)), GRASS)
+	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 1)), GRASS_LIGHT)
+	_portrait(person, body, false)
+	var said := particulars()
+	var faction := _world.person_faction(person)
+	var faction_colour := FACTION_TEXT[maxi(FACTIONS.find(_world.faction_names()[faction].to_lower()), 0)] \
+			if faction >= 0 else STONE
+	_text(Vector2(card.position.x, card.position.y + 54), fit(said[0], card.size.x), faction_colour)
+	_text(Vector2(card.position.x, card.position.y + 68), fit(said[1], card.size.x), STONE)
+	_text(Vector2(card.position.x, card.position.y + 82), fit(said[2], card.size.x), STONE)
+	draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), INK_LIGHT)
+	var room := line_room()
+	if not showing_news:
+		_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_GREETING"), room), GOLD_LIGHT)
+		var items: Array[Dictionary] = []
+		for row in rows:
+			items.append({"text": fit(tr("DIALOGUE_FAREWELL" if row == FAREWELL else OFFER_KEYS[row]), room - 16)})
+		_menu(Vector2(SAY_X, SAY_Y + 22), room, items, chosen)
+		return
+	_text(Vector2(SAY_X, SAY_Y), tr("DIALOGUE_HEARD"), GOLD_LIGHT)
+	if news.is_empty():
+		_text(Vector2(SAY_X, SAY_Y + 18), fit(tr("DIALOGUE_NONE"), room), PAPER)
+		return
+	var count := "%d / %d" % [mini(first + NEWS_LINES, news.size()), news.size()]
+	_text(Vector2(RECT.end.x - 12 - _width(count), SAY_Y), count, STONE_DARK)
+	for n in mini(NEWS_LINES, news.size() - first):
+		var y := SAY_Y + 18 + n * LINE
+		draw_rect(Rect2(SAY_X, y + 5, 3, 3), GOLD_DARK)
+		_text(Vector2(SAY_X + 8, y), fit(news[first + n], room - 8), PAPER if first + n == 0 else PAPER_DARK)

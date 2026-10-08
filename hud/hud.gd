@@ -2,14 +2,13 @@
 ## HUD: the player's portrait, faction, health, and its qi against its store and its realm as
 ## art/mockup/mobile_hud_arts.png shows them; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the arts panel, which K opens,
-## and the loadout it fills; the faction window, which F opens; the title, new-game, pause and
+## and the loadout it fills; the faction window, which F opens; the dialogue window, open while the
+## player talks to someone, and the prompt over whom it may talk to; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
 ## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
 ## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
-## a map of the region
-## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
-## player; and the technique bar, the loadout's five slots, each with its key, Q W E R T, and the
-## icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
+## a map of the region around the player with the season and year; and the technique bar, the
+## loadout's five slots, each with its key, Q W E R T, and the icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
 ## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
 ## as art/mockup/mobile_hud_idle.png lays them out.
 ## On a PC it is drawn at its own whole-pixel scale, finer than the world's, as ViewScale sets
@@ -34,8 +33,6 @@ const ViewScale := preload("res://view_scale.gd")
 ## The room the panels are placed in below, the native size; a larger room moves each panel by the
 ## room it gains, as far as its corner of the room.
 const NATIVE := Vector2(480, 270)
-## How many of the latest rumours the rumour log shows.
-const RUMOUR_LINES := 3
 # docs/art-direction.md §Palette.
 const INK := Color("2a2433")
 const INK_DARK := Color("14101a")
@@ -64,8 +61,6 @@ const NOTICE_MS := 3000
 # Where the panels the touch layout moves stand, in the keyboard layout and in the touch layout,
 # as art/mockup/touch.lua places them.
 const MAP_AT := {false: Vector2(392, 4), true: Vector2(346, 4)}
-const RUMOUR_RECT := {false: Rect2(4, 184, 220, 52), true: Rect2(176, 4, 166, 42)}
-const RUMOUR_WIDTH := {false: 209, true: 156}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
 # The settings button, under the map; the touch layout has none, its pause button standing in.
@@ -100,6 +95,10 @@ var sect: Control
 var arts: Control
 ## The faction window, open over the HUD while the player reads it or orders war or peace.
 var factions: Control
+## The dialogue window, open at the foot of the HUD while the player talks to someone.
+var dialogue: Control
+## The prompt over the person the player may talk to.
+var talk_prompt: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
 var loadout := Loadout.new()
 ## The title screen, the new-game panel over it, the pause panel over the game, and the settings
@@ -120,8 +119,6 @@ var slot_icons: Array[TextureRect] = []
 var slot_skills: Array[Dictionary] = []
 ## The touch controls, shown in place of the technique bar while the touch layout is on.
 var touch: Control
-## How many of the rumour log's lines the layout shows.
-var rumour_lines := RUMOUR_LINES
 ## The room the HUD is laid out in, in its own pixels.
 var room := NATIVE
 ## The settings button, shown in the keyboard layout.
@@ -144,7 +141,6 @@ var _notice_until := 0
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
 var _map_panel: Panel
-var _rumour_panel: Panel
 # The steered body's ready tick when it last moved, and the ticks it then had to wait.
 var _ready_at := -1
 var _cool_span := 1
@@ -280,7 +276,6 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		qi_bar.value = 100.0 * world.person_qi(person) / maxi(capacity, 1)
 		labels.qi_value.text = "%s / %s" % [Arts.grouped(world.person_qi(person)), Arts.grouped(capacity)]
 		labels.realm_value.text = Arts.realm_name(world, world.person_realm(person))
-		show_rumours(world, person)
 		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
@@ -315,8 +310,8 @@ func _refresh_cooling(world: WorldAdapter, steered: int) -> void:
 
 
 ## Lays the HUD out for touch when `on`, as art/mockup/mobile_hud_idle.png lays it out: the touch
-## controls shown in place of the technique bar, the rumour log of two lines beside the status
-## panel, the map left of the pause button, and no word naming a key; and for the keyboard when
+## controls shown in place of the technique bar, the map left of the pause button, and no word
+## naming a key; and for the keyboard when
 ## not. A mouse then stands in for a finger where the screen takes no touch, so the touch layout
 ## can be tried at a desk.
 func use_touch(on: bool) -> void:
@@ -327,12 +322,6 @@ func use_touch(on: bool) -> void:
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
 	settings_button.visible = not on
-	_rumour_panel.size = RUMOUR_RECT[on].size
-	rumour_lines = 2 if on else RUMOUR_LINES
-	for line in RUMOUR_LINES:
-		var label: Label = labels["rumour_%d" % line]
-		label.size.x = RUMOUR_WIDTH[on]
-		label.visible = line < rumour_lines
 	_place()
 
 
@@ -370,18 +359,19 @@ func _on_settings_button(event: InputEvent) -> void:
 
 
 # Places the panels of the layout shown in the room: each keeps its place against the corner it
-# stands by, the panels and screens over the HUD in the room's middle.
+# stands by, the panels and screens over the HUD in the room's middle, and the dialogue window
+# centred across its foot.
 func _place() -> void:
 	var on := touch.visible
 	var gained := room - NATIVE
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
 	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
-	_rumour_panel.position = RUMOUR_RECT[on].position + Vector2(0, gained.y)
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
 	labels.notice.position = NOTICE_AT[on] + gained / 2.0
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
+	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
@@ -406,40 +396,6 @@ func _announce_lessons(world: WorldAdapter, person: int) -> void:
 ## Returns the notices of skills learned and realms gained still waiting to be shown.
 func waiting_notices() -> Array[String]:
 	return _waiting.duplicate()
-
-
-## Shows the latest RUMOUR_LINES rumours that reach `person`, newest first, or that none has come.
-func show_rumours(world: WorldAdapter, person: int) -> void:
-	var heard := world.rumours(person)
-	for line in RUMOUR_LINES:
-		var label: Label = labels["rumour_%d" % line]
-		label.text = rumour_text(world, heard[line]) if line < heard.size() else ""
-	if heard.is_empty():
-		labels.rumour_0.text = tr("HUD_RUMOR_NONE")
-
-
-## Returns `event`, a rumour as WorldAdapter.rumours gives it, worded in the current locale.
-func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
-	var faction := func(index: int) -> String:
-		return tr("FACTION_" + world.faction_names()[index].to_upper())
-	var person := func(index: int) -> String:
-		return PersonName.of(world, index, true)
-	match event.kind:
-		"founded":
-			return tr("RUMOUR_FOUNDED") % faction.call(event.faction)
-		"raided":
-			return tr("RUMOUR_RAIDED") % [faction.call(event.raider), faction.call(event.owner)]
-		"ruined":
-			return tr("RUMOUR_RUINED") % faction.call(event.owner)
-		"sect_fell":
-			return tr("RUMOUR_SECT_FELL") % tr("SECT_" + world.sect_name(event.sect).to_upper().replace(" ", "_"))
-		"leader_changed":
-			var key := "RUMOUR_DUEL" if event.by == "duel" else "RUMOUR_ELECTED"
-			return tr(key) % [person.call(event.leader), faction.call(event.faction)]
-		"born":
-			return tr("RUMOUR_BORN") % person.call(event.person)
-		_:
-			return tr("RUMOUR_DIED") % person.call(event.person)
 
 
 ## Shows the core's verdict on the player's challenge, one of the WorldAdapter.CHALLENGE_*
@@ -556,14 +512,6 @@ func _build() -> void:
 	map.add_child(_dot)
 	labels.season = _trimmed(map, Vector2(5, 48), 74)
 
-	# Above the technique bar's row, so the widest bar never meets it.
-	var rumour := _panel(RUMOUR_RECT[false])
-	_rumour_panel = rumour
-	labels.rumour = _label(rumour, "HUD_RUMOR", Vector2(5, 2), GOLD_LIGHT)
-	for line in RUMOUR_LINES:
-		labels["rumour_%d" % line] = _trimmed(rumour, Vector2(5, 14 + line * 12), RUMOUR_WIDTH[false])
-	labels.rumour_0.text = tr("HUD_RUMOR_NONE")
-
 	var bar_width := Loadout.SLOTS * SLOT_STEP + 6
 	_skill_bar = _panel(Rect2(240 - bar_width / 2.0, 240, bar_width, 26))
 	var bar := _skill_bar
@@ -610,6 +558,12 @@ func _build() -> void:
 	factions = preload("res://hud/faction.gd").new()
 	factions.use_font(_theme.default_font)
 	factions.visible = false
+	dialogue = preload("res://hud/dialogue.gd").new()
+	dialogue.use_font(_theme.default_font)
+	dialogue.visible = false
+	talk_prompt = preload("res://hud/talk_prompt.gd").new()
+	talk_prompt.use_font(_theme.default_font)
+	talk_prompt.visible = false
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
@@ -638,11 +592,13 @@ func _build() -> void:
 	touch = preload("res://hud/touch.gd").new()
 	touch.use_font(_theme.default_font)
 	touch.visible = false
+	add_child(talk_prompt)
 	add_child(arts)
 	add_child(touch)
 	add_child(genealogy)
 	add_child(sect)
 	add_child(factions)
+	add_child(dialogue)
 	# The screens, closed until the play scene opens one, over every panel and each over the last.
 	title_screen = preload("res://hud/title.gd").new()
 	new_game = preload("res://hud/new_game.gd").new()
