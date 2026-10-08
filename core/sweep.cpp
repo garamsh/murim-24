@@ -116,7 +116,7 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   for (std::size_t person = 0; person < world.population(); ++person) {
     if (world.person(person).health > 0) {
       ++lived.ranks.at(world.rank(person));
-      lived.artful += world.person(person).known.empty() ? 0 : 1;
+      lived.artful += world.person(person).known.empty() ? 0U : 1U;
     }
   }
   lived.readers =
