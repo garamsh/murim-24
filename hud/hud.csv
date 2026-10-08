@@ -33,7 +33,7 @@ HUD_AUTOSAVED,자동 저장했다.,Autosaved.
 HUD_AUTOSAVE_FAILED,자동 저장하지 못했다.,Could not autosave.
 HUD_DUEL_LEADER_HELD,수장이 자리를 지켰다.,The leader holds the lead.
 CHALLENGE_NONE,수장에게 결투를 신청했다!,You challenge the leader to a duel!
-CHALLENGE_NO_SUCCESSION,이 문파는 결투로 수장을 정하지 않는다.,This faction does not settle its lead by duel.
+CHALLENGE_NO_SUCCESSION,이 세력은 결투로 수장을 정하지 않는다.,This faction does not settle its lead by duel.
 CHALLENGE_NO_LEADER,도전할 수장이 없다.,There is no leader to challenge.
 CHALLENGE_NO_CHALLENGER,도전할 사람이 남지 않았다.,No one is left to challenge.
 CHALLENGE_NOT_A_MEMBER,문파의 일원만 도전할 수 있다.,Only a member may challenge.
