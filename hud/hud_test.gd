@@ -28,7 +28,7 @@ const SHOWN := {
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
 # and of the rumours' and the lessons' words, which _rumours_pass and _lessons_pass measure.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_"]
 const Arts := preload("res://hud/arts.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
 # person.
@@ -253,7 +253,7 @@ func _names_pass() -> bool:
 	var within := shown_labels.all(func(label: Label) -> bool: return _within(label, label.text))
 	var leader_word := _width(hud.labels.leader, hud.labels.leader.atr(hud.labels.leader.text))
 	var clear: bool = hud.labels.leader.position.x + leader_word <= hud.labels.leader_value.position.x \
-			and hud.labels.leader_value.position.x + hud.labels.leader_value.size.x <= hud.labels.challenge_key.position.x
+			and hud.labels.leader_value.position.x + hud.labels.leader_value.size.x <= hud.labels.leader_value.get_parent().size.x
 	TranslationServer.set_locale("ko")
 	hud.free()
 	var full: String = name.surname + name.given

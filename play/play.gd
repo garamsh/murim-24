@@ -5,10 +5,12 @@
 ## automatic strike to use that skill of its army's, and 0 all of them. Q, W, E, R and T cast the
 ## skills on the HUD's loadout's five slots at the cursor through the core's cast port, at once or,
 ## as the settings choose, on the key's release after aiming while it is held; the same key again
-## or Escape cancels the aim. C challenges its faction's leader to a duel, with the same order,
-## when the core allows it; G opens the genealogy panel on the person, M the sect panel on its
-## sect, where Enter applies to the sect shown, and K the arts panel, where the arrows choose one
-## of its skills, Q to T put it on that slot and Delete takes it off its slot. The loadout is
+## or Escape cancels the aim. G opens the genealogy panel on the person, M the sect panel on its
+## sect, where Enter applies to the sect shown, K the arts panel, where the arrows choose one
+## of its skills, Q to T put it on that slot and Delete takes it off its slot, and F the faction
+## window, where the arrows choose a faction and an order, Enter gives a leader's order, war asked
+## again first, through the core's declare port, and C challenges the faction's leader to a duel,
+## with the same order every army follows, when the core allows it. The loadout is
 ## written beside the save whenever the world is saved, and read with it. The person is the one
 ## the core says carries the player's soul,
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
@@ -19,7 +21,7 @@
 ## hostile person the core's aim finds the way the person faces, or toward that way at the skill's
 ## range, dragged casts at the point it aims, dropped on the cancel zone casts nothing and held
 ## casts on the person itself, the HUD naming the core's reason when it refuses; the HUD's buttons
-## open the genealogy, sect and arts panels, challenge and pause, where on the arts panel a skill
+## open the genealogy, sect and arts panels and the faction window, and pause, where on the arts panel a skill
 ## tapped and then a skill button puts it on that button's slot; the screens take taps, and where
 ## the settings ask, a tap on the ground orders the person there.
 ## The camera follows the person, at the whole-pixel scale ViewScale gives the window, filling it;
@@ -50,6 +52,7 @@ const CHALLENGE_KEY := KEY_C
 const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const ARTS_KEY := KEY_K
+const FACTIONS_KEY := KEY_F
 ## The key that takes the skill chosen on the arts panel off its slot.
 const CLEAR_KEY := KEY_DELETE
 const PAUSE_KEY := KEY_ESCAPE
@@ -213,7 +216,7 @@ func navigate(event: InputEvent) -> bool:
 	var open: Control = _hud.screen()
 	if open == null:
 		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
-				or _hud.sect.visible or _hud.arts.visible or _aiming != KEY_NONE:
+				or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible or _aiming != KEY_NONE:
 			return false
 		pause()
 		return true
@@ -278,10 +281,10 @@ func controls() -> Array[Dictionary]:
 		{"keys": [casts], "does": "CONTROLS_CAST"},
 		{"keys": [skills], "does": "CONTROLS_SKILL"},
 		{"keys": [OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_ALL_SKILLS"},
-		{"keys": [OS.get_keycode_string(CHALLENGE_KEY)], "does": "CONTROLS_CHALLENGE"},
 		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
 		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
+		{"keys": [OS.get_keycode_string(FACTIONS_KEY)], "does": "CONTROLS_FACTIONS"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows
@@ -337,8 +340,8 @@ func command(event: InputEvent) -> bool:
 		return sects(key.keycode)
 	elif key != null and key.pressed and (key.keycode == ARTS_KEY or _hud.arts.visible):
 		return arts(key.keycode)
-	elif key != null and key.pressed and key.keycode == CHALLENGE_KEY:
-		return challenge() == WorldAdapter.CHALLENGE_NONE
+	elif key != null and key.pressed and (key.keycode == FACTIONS_KEY or _hud.factions.visible):
+		return factions(key.keycode)
 	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
 		var cast := quick_cast(key, _cursor)
 		_show_aim()
@@ -435,9 +438,10 @@ func _steer(way: Vector2i) -> bool:
 
 ## Works the HUD's touch controls with `event`, a touch or a drag, while they are shown and a world
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
-## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel, challenge or
-## pause, and where the settings ask, a tap on the ground orders the person to that cell. While the
-## genealogy or sect panel is open, a tap closes it; while the arts panel is, a tap on a tile
+## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel or the
+## faction window, or pause, and where the settings ask, a tap on the ground orders the person to
+## that cell. While the genealogy or sect panel is open, a tap closes it; while the faction window
+## is, a tap works it as factions_tap() does; while the arts panel is, a tap on a tile
 ## chooses its skill, a skill button tapped then puts it on that button's slot, a finger moved up or
 ## down scrolls the tiles and the close button closes it. Returns whether the touch controls took
 ## the event.
@@ -446,6 +450,11 @@ func touch(event: InputEvent) -> bool:
 		return false
 	if _hud.arts.visible:
 		_place(_hud.touch.take(event))
+		return true
+	if _hud.factions.visible:
+		var pressed_on := event as InputEventScreenTouch
+		if pressed_on != null and pressed_on.pressed:
+			factions_tap(pressed_on.position - _hud.factions.position)
 		return true
 	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible else null)
 	if panel != null:
@@ -471,8 +480,8 @@ func touch(event: InputEvent) -> bool:
 					genealogy(GENEALOGY_KEY)
 				"sect":
 					sects(SECT_KEY)
-				"challenge":
-					challenge()
+				"factions":
+					factions(FACTIONS_KEY)
 				"arts":
 					arts(ARTS_KEY)
 				"pause":
@@ -532,8 +541,9 @@ func cast(skill: int, target: Variant) -> int:
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current
-## skills, and shows the outcome on the HUD. Returns the core's verdict, one of the
-## WorldAdapter.CHALLENGE_* constants; CHALLENGE_NONE means the duel began.
+## skills. A duel begun closes the faction window and the HUD announces it; a refusal shows its word
+## in the window. Returns the core's verdict, one of the WorldAdapter.CHALLENGE_* constants;
+## CHALLENGE_NONE means the duel began.
 func challenge() -> int:
 	var faction := world.army_faction(steered)
 	var refusal := world.challenge_refusal(steered, faction)
@@ -541,7 +551,77 @@ func challenge() -> int:
 		var seat := Vector2i((world.person_position(world.leader(faction)) / WorldAdapter.CELL_SIZE).floor())
 		if world.order(steered, seat, _skills, faction):
 			_objective = seat
-	_hud.show_challenge(refusal)
+		_hud.factions.close()
+		_hud.show_challenge(refusal)
+	else:
+		_hud.factions.refresh(_hud.CHALLENGE_KEYS[refusal])
+	return refusal
+
+
+## Works the faction window with `keycode`: F opens it on the steered person's faction or closes it,
+## up and down choose a faction, left and right an order, Enter gives the order lit, war being asked
+## again, where Enter declares it and Escape takes it back, C challenges the faction's leader, and
+## Escape closes the window. While it is open no key gives an order or casts. Returns whether the
+## key did anything.
+func factions(keycode: Key) -> bool:
+	var panel: Control = _hud.factions
+	if keycode == FACTIONS_KEY and not panel.visible:
+		if world.roster(steered).is_empty():
+			return false
+		panel.show_factions(world, steered, _hud.touch.visible)
+		_sound.ui("open")
+		return true
+	if panel.confirming >= 0:
+		if keycode == KEY_ENTER or keycode == KEY_KP_ENTER or keycode == KEY_ESCAPE:
+			declare(panel.answer(keycode != KEY_ESCAPE))
+			return true
+		return false
+	if keycode == FACTIONS_KEY or keycode == KEY_ESCAPE:
+		panel.close()
+		return true
+	var directions := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT,
+			KEY_RIGHT: Vector2i.RIGHT}
+	if directions.has(keycode):
+		return panel.move(directions[keycode])
+	if keycode == KEY_ENTER or keycode == KEY_KP_ENTER:
+		declare(panel.ask())
+		return true
+	if keycode == CHALLENGE_KEY:
+		return challenge() == WorldAdapter.CHALLENGE_NONE
+	return false
+
+
+## Works the faction window with a tap at `at`, in the window's pixels, as its tap() reads it: closes
+## it, chooses a faction, challenges, or asks for the order tapped, war being asked again, where yes
+## declares it and no takes it back.
+func factions_tap(at: Vector2) -> void:
+	var panel: Control = _hud.factions
+	match panel.tap(at):
+		"close":
+			panel.close()
+		"challenge":
+			challenge()
+		"order":
+			declare(panel.ask())
+		"yes":
+			declare(panel.answer(true))
+		"no":
+			panel.answer(false)
+
+
+## Has the steered person declare `what`, one of the WorldAdapter.DECLARATION_* constants, toward the
+## faction the faction window has chosen, through the core's declare port, and reads the window
+## again. Returns the core's verdict, one of the WorldAdapter.DECLARE_* constants, of which
+## DECLARE_NONE means the order was given; or -1 for no order.
+func declare(what: int) -> int:
+	var roster := world.roster(steered)
+	var target: int = _hud.factions.chosen_faction()
+	if what < 0 or roster.is_empty() or target < 0:
+		return -1
+	var refusal := world.declaration_refusal(roster[0], target, what)
+	if refusal == WorldAdapter.DECLARE_NONE:
+		world.declare(roster[0], target, what)
+	_hud.factions.refresh()
 	return refusal
 
 

@@ -2,7 +2,7 @@
 ## HUD: the player's portrait, faction, health, and its qi against its store and its realm as
 ## art/mockup/mobile_hud_arts.png shows them; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the arts panel, which K opens,
-## and the loadout it fills; the title, new-game, pause and
+## and the loadout it fills; the faction window, which F opens; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
 ## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
 ## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
@@ -98,6 +98,8 @@ var genealogy: Control
 var sect: Control
 ## The arts panel, open over the HUD while the player reads it or fills the loadout.
 var arts: Control
+## The faction window, open over the HUD while the player reads it or orders war or peace.
+var factions: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
 var loadout := Loadout.new()
 ## The title screen, the new-game panel over it, the pause panel over the game, and the settings
@@ -325,7 +327,6 @@ func use_touch(on: bool) -> void:
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
 	settings_button.visible = not on
-	labels.challenge_key.visible = not on
 	_rumour_panel.size = RUMOUR_RECT[on].size
 	rumour_lines = 2 if on else RUMOUR_LINES
 	for line in RUMOUR_LINES:
@@ -379,7 +380,7 @@ func _place() -> void:
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
 	labels.notice.position = NOTICE_AT[on] + gained / 2.0
-	for over: Control in [arts, touch, genealogy, sect, title_screen, new_game, pause, settings, rebirth]:
+	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
 
 
@@ -606,11 +607,13 @@ func _build() -> void:
 	arts = Arts.new()
 	arts.use_font(_theme.default_font)
 	arts.visible = false
+	factions = preload("res://hud/faction.gd").new()
+	factions.use_font(_theme.default_font)
+	factions.visible = false
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
 	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
-	labels.challenge_key = _label(leadership, "HUD_CHALLENGE_KEY", Vector2(100, 2), STONE)
 
 	duel_panel = _panel(Rect2(DUEL_AT[false], Vector2(128, 44)))
 	duel_panel.visible = false
@@ -639,6 +642,7 @@ func _build() -> void:
 	add_child(touch)
 	add_child(genealogy)
 	add_child(sect)
+	add_child(factions)
 	# The screens, closed until the play scene opens one, over every panel and each over the last.
 	title_screen = preload("res://hud/title.gd").new()
 	new_game = preload("res://hud/new_game.gd").new()

@@ -2,7 +2,7 @@
 ## mobile_hud_aim.png, mobile_hud_cancel.png and mobile_hud_self.png lay them out after
 ## art/mockup/touch.lua: a joystick at the bottom left that a thumb anywhere in its zone puts under
 ## itself; up to SKILLS.size() round skill buttons in an arc at the bottom right, each showing how
-## long the body has left before it may strike again; the genealogy, sect and duel buttons under the
+## long the body has left before it may strike again; the genealogy, sect and faction buttons under the
 ## status panel, with the arts button as art/mockup/mobile_hud_arts.png adds it; and the pause
 ## button in the top-right corner. A skill button tapped casts at what the facing aims at, dragged
 ## shows its range and the area it aims at and casts there on release, dropped on the cancel zone
@@ -42,14 +42,14 @@ const LONG_PRESS_MS := 500
 const BUTTONS := {
 	"genealogy": Rect2(4, 92, 42, 42),
 	"sect": Rect2(50, 92, 42, 42),
-	"challenge": Rect2(96, 92, 42, 42),
+	"factions": Rect2(96, 92, 42, 42),
 	"arts": Rect2(142, 92, 42, 42),
 }
-const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "challenge": "TOUCH_DUEL",
+const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "factions": "TOUCH_FACTIONS",
 		"arts": "TOUCH_ARTS"}
 const PAUSE := Rect2(434, 4, 42, 42)
 ## The room each word is given, by its hud.csv key.
-const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_DUEL": 36, "TOUCH_ARTS": 36,
+const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_FACTIONS": 36, "TOUCH_ARTS": 36,
 		"TOUCH_CANCEL": 40, "TOUCH_SELF": 50, "TOUCH_PLACE": 110}
 ## Where the slip asking for a button to place a skill on is centred, and its top.
 const PLACE_SLIP := Vector2(404, 136)
@@ -84,7 +84,7 @@ const BUTTON_ICONS := {
 			"###...###", "#.#...#.#", "###...###"],
 	"sect": ["#........", "#######..", "#ppppp#..", "#ppppp##.", "#pp#pp#..", "#######..",
 			"#........", "#........", "##......."],
-	"challenge": ["#.......#", ".#.....#.", "..#...#..", "...#.#...", "....#....", "...#.#...",
+	"factions": ["#.......#", ".#.....#.", "..#...#..", "...#.#...", "....#....", "...#.#...",
 			".##...##.", ".#.....#.", "#.......#"],
 	"arts": ["...#.....", "...#.....", "...#.....", "...#.....", "...#.....", "...#.....", ".#####...",
 			"...l.....", "...l....."],
@@ -474,7 +474,7 @@ func _slip(key: String, top: Vector2, rule: Color) -> void:
 func _square(rect: Rect2, button: String) -> void:
 	_frame(rect)
 	var rows: Array = BUTTON_ICONS[button]
-	var colour := PAPER_3 if button == "challenge" or button == "arts" else GOLD_3
+	var colour := PAPER_3 if button == "arts" else GOLD_3
 	var left := rect.position + Vector2(floorf((rect.size.x - 9) / 2.0), 7)
 	for y in rows.size():
 		var row: String = rows[y]
