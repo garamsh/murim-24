@@ -1416,9 +1416,9 @@ void WorldAdapter::_bind_methods() {
       {"LEARNED_BY_MANUAL", murim::LearnedBy::MANUAL},
       {"LEARNED_BY_TEACHING", murim::LearnedBy::TEACHING},
   }};
-  for (const auto& [constant, by] : lessons) {
+  for (const auto& [constant, lesson] : lessons) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
-                                          static_cast<int>(by));
+                                          static_cast<int>(lesson));
   }
   for (const auto& [constant, happening] : kinds) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
