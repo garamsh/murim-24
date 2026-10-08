@@ -59,6 +59,8 @@ const READY_LIMIT := 120
 # Ticks after the joystick is let go, and the four ways it is pushed to find one passable.
 const STOP_TICKS := 60
 const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
+# Ticks the joystick is held for: long enough to walk past the STRIDE cells one order reaches.
+const STICK_TICKS := 150
 
 
 func run() -> bool:
@@ -91,8 +93,9 @@ func run() -> bool:
 			and _autosave_pass() and _stick_pass() and _touch_cast_pass() and _taps_pass()
 
 
-# With the touch controls shown, a thumb on the joystick pushed a way passable for STRIDE cells
-# walks the person there, further its way than across it, and let go, stops it. Control: the same
+# With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
+# STRIDE cells walks the person past the STRIDE cells one order reaches, as it is ordered on from
+# each new cell, further its way than across it, and let go, stops it. Control: the same
 # scene with the touch controls shown and no touch, ticked as long, leaves the person in place.
 # Setup: the touch controls are shown in both.
 func _stick_pass() -> bool:
@@ -102,16 +105,16 @@ func _stick_pass() -> bool:
 	control.get_node("Hud").use_touch(true)
 	var touch: Control = scene.get_node("Hud").touch
 	var shown: bool = touch.visible and control.get_node("Hud").touch.visible
-	var way := _clear_way(scene)
+	var way := _clear_way(scene, 3 * scene.STRIDE)
 	if way == Vector2i.ZERO:
-		print("play_test: no way is passable for %d cells: FAIL" % scene.STRIDE)
+		print("play_test: no way is passable for %d cells: FAIL" % (3 * scene.STRIDE))
 		return false
 	var direction := Vector2(way)
 	var from: Vector2 = scene.lead()
 	var control_from: Vector2 = control.lead()
 	var thumb: Vector2 = touch.STICK
 	var took: bool = scene.touch(_finger(0, thumb, true)) and scene.touch(_slide(0, thumb + direction * touch.STICK_RADIUS))
-	for i in WALK_TICKS:
+	for i in STICK_TICKS:
 		scene.step()
 		control.step()
 	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE
@@ -123,9 +126,10 @@ func _stick_pass() -> bool:
 	for i in STOP_TICKS:
 		scene.step()
 	var after_stop: float = (scene.lead() - stopped_at).length() / WorldAdapter.CELL_SIZE
-	var passed := shown and took and along >= 1.0 and along > across and stood < 0.5 and released and after_stop < 1.0
-	print("play_test: touch shown %s; the joystick pushed %s taken %s, walked %.2f cells its way and %.2f across in %d ticks; let go %s, then moved %.2f cells in %d; control with no touch moved %.2f cells: %s" % [
-		shown, way, took, along, across, WALK_TICKS, released, after_stop, STOP_TICKS, stood,
+	var passed: bool = shown and took and along > scene.STRIDE + 1 and along > across and stood < 0.5 and released \
+			and after_stop < 1.0
+	print("play_test: touch shown %s; the joystick pushed %s taken %s, walked %.2f cells its way, past the %d one order reaches, and %.2f across in %d ticks; let go %s, then moved %.2f cells in %d; control with no touch moved %.2f cells: %s" % [
+		shown, way, took, along, scene.STRIDE, across, STICK_TICKS, released, after_stop, STOP_TICKS, stood,
 		"pass" if passed else "FAIL"])
 	scene.free()
 	control.free()
@@ -261,13 +265,13 @@ func _taps_pass() -> bool:
 	return passed
 
 
-# A way of WAYS passable for STRIDE cells from where the scene's person stands, or none.
-func _clear_way(scene: Node2D) -> Vector2i:
+# A way of WAYS passable for `cells` cells from where the scene's person stands, or none.
+func _clear_way(scene: Node2D, cells: int) -> Vector2i:
 	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
 	for way: Vector2i in WAYS:
 		var clear := true
-		for stride in range(1, scene.STRIDE + 1):
+		for stride in range(1, cells + 1):
 			var cell := home + way * stride
 			clear = clear and cell.y >= 0 and cell.y < rows.size() and cell.x >= 0 \
 					and cell.x < rows[cell.y].length() and rows[cell.y][cell.x] == "."
