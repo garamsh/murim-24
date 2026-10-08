@@ -25,11 +25,13 @@ const SHOWN := {
 	"rumour_0": ["HUD_RUMOR_NONE"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
-# and of the rumours' words, which _rumours_pass measures.
+# and of the rumours' and the lessons' words, which _rumours_pass and _lessons_pass measure.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_"]
 const Arts := preload("res://hud/arts.gd")
-
+# Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
+# person.
+const LESSON_TICKS := 6000
 # Years with days of five ticks for rumours to reach the player.
 const RUMOUR_YEARS := 10
 const SHORT_DAY := 5
@@ -106,9 +108,10 @@ func run() -> bool:
 	var fit_passed := _fit_pass()
 	var rumours_passed := _rumours_pass()
 	var realm_passed := _realm_pass()
+	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
 	return passed and measure_passed and names_passed and fit_passed and rumours_passed and realm_passed \
-			and cast_words_passed
+			and lessons_passed and cast_words_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -526,6 +529,82 @@ func _realm_pass() -> bool:
 	var passed: bool = shown_right and player_right and overruns.is_empty() and checks == 2 * (realms.size() + 1)
 	print("hud_test: person %d of realm %d shown \"%s\", in English \"%s\", qi \"%s\" with its bar at %.1f; the newborn player shown \"%s\" and \"%s\"; %d values measured, overruns %s: %s" % [
 		person, rank, korean, english, qi, bar, newborn, newborn_qi, checks, overruns, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A region of five-tick days, played through by the HUD steering the first army whose person learns
+# a skill or gains a realm while it does: each of that person's lessons and realms recorded after
+# the HUD began following the world waits as a notice, in order, worded by how the skill was
+# learned with its name, or with the realm's name. Control: the lessons and realms of everyone else
+# recorded meanwhile wait as none. In each locale, every notice any art skill or realm can make fits
+# the notice's width.
+func _lessons_pass() -> bool:
+	TranslationServer.set_locale("ko")
+	var lessons := {
+		WorldAdapter.LEARNED_BY_COMPREHENSION: "NOTICE_COMPREHENDED",
+		WorldAdapter.LEARNED_BY_MANUAL: "NOTICE_READ",
+		WorldAdapter.LEARNED_BY_TEACHING: "NOTICE_TAUGHT",
+	}
+	# A first run finds the army whose first person learns soonest, and runs on until someone else
+	# learns too; the second, from the same seed, plays as long through the HUD.
+	var probe := WorldAdapter.create_region(SEED, 0, 5)
+	var army := -1
+	var learner := -1
+	var other_seen := false
+	var ticks := 0
+	while (army < 0 or not other_seen) and ticks < LESSON_TICKS:
+		probe.tick()
+		ticks += 1
+		for event: Dictionary in probe.events(0):
+			if event.tick != probe.tick_count() - 1 or not event.has("person"):
+				continue
+			for each in probe.army_count():
+				var roster := probe.roster(each)
+				if army < 0 and not roster.is_empty() and roster[0] == event.person:
+					army = each
+					learner = event.person
+			other_seen = other_seen or (learner >= 0 and event.person != learner)
+	var world := WorldAdapter.create_region(SEED, 0, 5)
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	var expected: Array[String] = []
+	var others := 0
+	if army >= 0:
+		hud.show_player(world, army)
+		for i in ticks:
+			world.tick()
+			hud.refresh(world, army, PackedInt64Array([0]))
+		for event: Dictionary in world.events(0):
+			if not event.has("person"):
+				continue
+			if event.person != learner:
+				others += 1
+			elif event.kind == WorldAdapter.EVENT_LEARNED:
+				expected.append(hud.tr(lessons[int(event.by)]) % Arts.named(world.arts()[event.art].skills[event.skill]))
+			else:
+				expected.append(hud.tr("NOTICE_REALM") % Arts.realm_name(world, event.rank))
+	var waiting: Array[String] = hud.waiting_notices()
+	var announced := army >= 0 and not expected.is_empty() and waiting == expected
+	var overruns: Array[String] = []
+	var checks := 0
+	var notice: Label = hud.labels.notice
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var texts: Array[String] = []
+		for art: Dictionary in world.arts():
+			for skill: Dictionary in art.skills:
+				for key: String in lessons.values():
+					texts.append(hud.tr(key) % Arts.named(skill))
+		for rank in range(1, world.realms().size() + 1):
+			texts.append(hud.tr("NOTICE_REALM") % Arts.realm_name(world, rank))
+		for text in texts:
+			checks += 1
+			if _width(notice, text) > notice.size.x or text.begins_with("NOTICE_"):
+				overruns.append("%s %s is %d px in %d" % [locale, text, _width(notice, text), notice.size.x])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var passed := announced and others > 0 and overruns.is_empty() and checks > 0
+	print("hud_test: army %d's person %d learned within %d ticks; waiting %s against %s; %d lessons and realms of others announced none; %d notices measured, overruns %s: %s" % [
+		army, learner, ticks, waiting, expected, others, checks, overruns, "pass" if passed else "FAIL"])
 	return passed
 
 

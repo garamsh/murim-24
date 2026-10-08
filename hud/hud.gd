@@ -4,8 +4,9 @@
 ## genealogy panel, which G opens; the sect panel, which M opens; the arts panel, which K opens,
 ## and the loadout it fills; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
-## fought, and the verdict on a challenge, why a cast was refused, or whether an autosave was
-## written; a map of the region
+## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
+## written, or, from the core's events, a skill the player learned and how, or a realm it gained;
+## a map of the region
 ## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
 ## player; and the technique bar, the loadout's five slots, each with its key, Q W E R T, and the
 ## icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
@@ -125,6 +126,11 @@ var _rumour_panel: Panel
 # The steered body's ready tick when it last moved, and the ticks it then had to wait.
 var _ready_at := -1
 var _cool_span := 1
+# The world whose events the notices follow, the next of its events to read, and the notices of
+# skills learned and realms gained waiting to be shown.
+var _events_of: WorldAdapter
+var _next_event := 0
+var _waiting: Array[String] = []
 
 
 func _ready() -> void:
@@ -194,6 +200,11 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 	portrait.region = Rect2(0, 6, 16, 16)
 	_portrait.texture = portrait
 	show_map(world)
+	if world != _events_of:
+		_events_of = world
+		var kept := world.events(0)
+		_next_event = int(kept.back().sequence) + 1 if not kept.is_empty() else 0
+		_waiting.clear()
 	var roster := world.roster(steered)
 	if not roster.is_empty():
 		loadout.follow(world, roster[0])
@@ -235,7 +246,8 @@ func show_map(world: WorldAdapter) -> void:
 
 
 ## Updates the bars, the map around the player, the technique bar and the arts panel while it is
-## open: `skills` are the skill indices the player's last order chose.
+## open, and announces the skills the player learned and the realms it gained since the last
+## refresh: `skills` are the skill indices the player's last order chose.
 func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> void:
 	var strength := 0
 	for body_strength in world.body_strengths(steered):
@@ -261,6 +273,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		labels.qi_value.text = "%s / %s" % [Arts.grouped(world.person_qi(person)), Arts.grouped(capacity)]
 		labels.realm_value.text = Arts.realm_name(world, world.person_realm(person))
 		show_rumours(world, person)
+		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
@@ -317,6 +330,30 @@ func use_touch(on: bool) -> void:
 		label.visible = line < rumour_lines
 	duel_panel.position = DUEL_AT[on]
 	labels.notice.position = NOTICE_AT[on]
+
+
+# Queues a notice for each skill `person` learned and each realm it gained among `world`'s events
+# since the last read: how it learned the skill, and its name, or the realm's name.
+func _announce_lessons(world: WorldAdapter, person: int) -> void:
+	var lessons := {
+		WorldAdapter.LEARNED_BY_COMPREHENSION: "NOTICE_COMPREHENDED",
+		WorldAdapter.LEARNED_BY_MANUAL: "NOTICE_READ",
+		WorldAdapter.LEARNED_BY_TEACHING: "NOTICE_TAUGHT",
+	}
+	for event: Dictionary in world.events(_next_event):
+		_next_event = int(event.sequence) + 1
+		if not event.has("person") or event.person != person:
+			continue
+		if event.kind == WorldAdapter.EVENT_LEARNED:
+			var taught: Dictionary = world.arts()[event.art].skills[event.skill]
+			_waiting.append(tr(lessons[int(event.by)]) % Arts.named(taught))
+		elif event.kind == WorldAdapter.EVENT_REALM_GAINED:
+			_waiting.append(tr("NOTICE_REALM") % Arts.realm_name(world, event.rank))
+
+
+## Returns the notices of skills learned and realms gained still waiting to be shown.
+func waiting_notices() -> Array[String]:
+	return _waiting.duplicate()
 
 
 ## Shows the latest RUMOUR_LINES rumours that reach `person`, newest first, or that none has come.
@@ -414,6 +451,8 @@ func _notice(key: String) -> void:
 func _process(_delta: float) -> void:
 	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
 		labels.notice.visible = false
+	if labels.has("notice") and not labels.notice.visible and not _waiting.is_empty():
+		_notice(_waiting.pop_front())
 
 
 ## The season and year of `date`, as the core's calendar gives them, in the current locale.

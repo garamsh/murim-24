@@ -197,6 +197,10 @@ SETTINGS_TOUCH_ON,켬,On
 SETTINGS_TOUCH_TAP,탭 이동,Tap move
 SETTINGS_TOUCH_OFF,끔,Off
 SETTINGS_TOUCH_ABOUT,터치 조작. 자동은 폰에서 켠다. 탭 이동은 땅을 눌러 걷는다.,Touch controls. Auto on phones. Tap move: tap ground to walk.
+NOTICE_COMPREHENDED,깨달음: %s,Comprehended: %s
+NOTICE_READ,비급 독파: %s,Read from a manual: %s
+NOTICE_TAUGHT,사문 전수: %s,Taught by the sect: %s
+NOTICE_REALM,경지 돌파: %s,Realm reached: %s
 ARTS_TITLE,무공,Arts
 ARTS_CLOSE,K 닫기,K close
 ARTS_REALM,경지,Realm
