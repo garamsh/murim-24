@@ -245,7 +245,6 @@ Position stepped(const FlowField& field, Position from, Step direction) {
   return reached(along_y) ? along_y : moved_x;
 }
 
-// Folds everything `person` holds into `fold`; `absent` stands for no soul.
 // Folds who faction `faction`'s sects admit and how it elects its leader.
 template <typename Fold>
 void fold_selection(const Fold& fold, const Leadership& faction) {
@@ -261,10 +260,24 @@ void fold_selection(const Fold& fold, const Leadership& faction) {
   fold(faction.election.value_or(Election{}).term);
 }
 
-// Folds manual `manual`'s discipline and place.
+// Folds skill `skill` into `fold`; its qi cost only when it has one, so a
+// world of free skills hashes as before.
+template <typename Fold>
+void fold_skill(const Fold& fold, const Skill& skill) {
+  fold(skill.range);
+  fold(skill.radius);
+  fold(skill.body_damage);
+  fold(skill.structure_damage);
+  fold(skill.cooldown);
+  if (skill.qi_cost != 0) {
+    fold(skill.qi_cost);
+  }
+}
+
+// Folds manual `manual`'s art and place.
 template <typename Fold>
 void fold_manual(const Fold& fold, const Manual& manual) {
-  fold(manual.discipline);
+  fold(manual.art);
   fold(manual.place.index());
   if (const auto* held = std::get_if<HeldBySect>(&manual.place)) {
     fold(held->sect);
@@ -312,8 +325,11 @@ void fold_event(const Fold& fold, const Event& event) {
       event.what);
 }
 
+// Folds everything `person` holds into `fold`; `absent` stands for no soul,
+// and its qi is folded where the world's people `cultivates`.
 template <typename Fold>
-void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
+void fold_person(const Fold& fold, const Person& person, std::size_t absent,
+                 bool cultivates) {
   fold(person.position.x);
   fold(person.position.y);
   fold(person.health);
@@ -343,6 +359,22 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent) {
     fold(child);
   }
   fold(person.hunger);
+  // Folded only when held, so a world where no one cultivates or knows an
+  // art hashes as before.
+  if (cultivates) {
+    fold(person.cultivation.growth);
+    fold(person.cultivation.limit);
+    fold(person.qi);
+    fold(person.qi_capacity);
+  }
+  if (!person.known.empty()) {
+    fold(person.known.size());
+    for (const Known& known : person.known) {
+      fold(known.art);
+      fold(known.skill);
+      fold(known.ready_at);
+    }
+  }
   // Folded only when given, so a world no one casts in hashes as before.
   if (person.casting) {
     fold(person.casting->skill);
@@ -510,6 +542,57 @@ bool within(Cell here, Cell there, std::int32_t reach) {
          std::abs(there.y - here.y) <= reach;
 }
 
+// Whether a skill lies outside the limits a world accepts.
+bool invalid_skill(const Skill& skill) {
+  return !reachable(skill.range) || !reachable(skill.radius) ||
+         skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN ||
+         skill.qi_cost > MAX_TALENT;
+}
+
+// Throws std::invalid_argument when `life`'s cultivation, realms, arts or
+// learning lie outside the limits the constructor documents.
+void check_arts(const Life& life) {
+  const auto excessive = [](Spread values) {
+    return std::uint64_t{values.mean} + values.spread > MAX_TALENT;
+  };
+  const bool bad_cultivation =
+      life.cultivation && (excessive(life.cultivation->growth) ||
+                           excessive(life.cultivation->limit) ||
+                           life.cultivation->recovery > PER_MILLE ||
+                           life.cultivation->recovery_ticks == 0);
+  bool unordered = false;
+  for (std::size_t realm = 0; realm < life.realms.size(); ++realm) {
+    unordered =
+        unordered || life.realms.at(realm).might > MAX_MIGHT ||
+        (realm > 0 && life.realms.at(realm).qi < life.realms.at(realm - 1).qi);
+  }
+  const auto stray_art = [&life](const Art& art) {
+    return art.discipline >= life.disciplines.size() ||
+           std::any_of(art.skills.begin(), art.skills.end(),
+                       [&life](const ArtSkill& taught) {
+                         return invalid_skill(taught.skill) ||
+                                taught.rank > life.realms.size();
+                       });
+  };
+  const Learning& learning = life.learning;
+  const bool bad_learning = learning.comprehension > PER_MILLE ||
+                            learning.teaching > PER_MILLE ||
+                            learning.reading_cost > MAX_TALENT ||
+                            !reachable(learning.reading_reach) ||
+                            learning.orientation_ease > PER_MILLE ||
+                            learning.polarity_ease > PER_MILLE ||
+                            learning.orientation_potency > PER_MILLE ||
+                            learning.polarity_potency > PER_MILLE;
+  if (bad_cultivation || unordered || bad_learning ||
+      std::any_of(life.arts.begin(), life.arts.end(), stray_art)) {
+    throw std::invalid_argument(
+        "cultivation must draw within MAX_TALENT and recover within PER_MILLE "
+        "on a tick or more, realms ascend with a might within MAX_MIGHT, arts "
+        "name known disciplines and hold valid skills of known ranks, and "
+        "learning's chances, eases and potencies lie within PER_MILLE");
+  }
+}
+
 // Throws std::invalid_argument when `life` could draw a talent above
 // MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives a newborn no
 // health or more than MAX_HEALTH.
@@ -551,6 +634,7 @@ void check_life(const Life& life) {
   if (life.growth) {
     check_growth(*life.growth);
   }
+  check_arts(life);
 }
 
 // The range a spread draws over.
@@ -559,10 +643,15 @@ Range range_of(Spread values) {
                values.mean + values.spread};
 }
 
-// Whether a skill lies outside the limits a world accepts.
-bool invalid_skill(const Skill& skill) {
-  return !reachable(skill.range) || !reachable(skill.radius) ||
-         skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN;
+// Whether `person` holds more qi than its store, a store past MAX_TALENT, or
+// a known skill of no art `life` holds.
+bool stray_cultivation(const Person& person, const Life& life) {
+  const auto unknown = [&life](const Known& known) {
+    return known.art >= life.arts.size() ||
+           known.skill >= life.arts.at(known.art).skills.size();
+  };
+  return person.qi > person.qi_capacity || person.qi_capacity > MAX_TALENT ||
+         std::any_of(person.known.begin(), person.known.end(), unknown);
 }
 
 // Whether every one of `indices` names one of `count` records.
@@ -747,7 +836,8 @@ void World::restore() {
             (person.health == 0 || !aimed(*person.casting))) ||
            person.talent.size() != disciplines ||
            person.attainment.size() != disciplines ||
-           (!given.empty() && person.given >= given.size());
+           (!given.empty() && person.given >= given.size()) ||
+           stray_cultivation(person, life_);
   };
   const auto stray_village = [&](const Village& village) {
     const VillageSpec& spec = village.spec;
@@ -782,7 +872,7 @@ void World::restore() {
   };
   const auto stray_manual = [&](const Manual& manual) {
     const auto* held = std::get_if<HeldBySect>(&manual.place);
-    return manual.discipline >= disciplines ||
+    return manual.art >= life_.arts.size() ||
            (held != nullptr && held->sect >= sects_.size());
   };
   const auto stray_duel = [&](const Fight& fight) {
@@ -793,8 +883,8 @@ void World::restore() {
     return soul.practised.size() > disciplines;
   };
   const Manuals manuals = life_.manuals.value_or(Manuals{});
-  const auto unknown = [disciplines](const std::vector<std::size_t>& held) {
-    return !all_below(held, disciplines);
+  const auto unknown = [this](const std::vector<std::size_t>& held) {
+    return !all_below(held, life_.arts.size());
   };
   const bool bad_life =
       (life_.growth && life_.growth->stances.size() > factions) ||
@@ -955,9 +1045,7 @@ void World::add_sects(std::vector<SectSpec> sects) {
   };
   const Manuals manuals = life_.manuals.value_or(Manuals{});
   const auto unknown = [this](const std::vector<std::size_t>& held) {
-    return std::any_of(held.begin(), held.end(), [this](std::size_t taught) {
-      return taught >= life_.disciplines.size();
-    });
+    return !all_below(held, life_.arts.size());
   };
   if (std::any_of(leadership_.begin(), leadership_.end(), bad_admission) ||
       std::any_of(sects.begin(), sects.end(), stray) ||
@@ -969,7 +1057,7 @@ void World::add_sects(std::vector<SectSpec> sects) {
         "and a reach within MAX_REACH; a sect must name a known faction, an "
         "existing village and "
         "founders serving in its faction; and the manuals must name known "
-        "disciplines for known sects, a chance within PER_MILLE and a reach "
+        "arts for known sects, a chance within PER_MILLE and a reach "
         "within MAX_REACH");
   }
   for (SectSpec& sect : sects) {
@@ -1537,14 +1625,16 @@ std::optional<std::size_t> World::aim(std::size_t person, std::size_t skill,
         "an aim must be a person's, facing no farther than MAX_REACH");
   }
   // One who could never cast the skill, being dead or without it, aims at
-  // no one.
+  // no one; one short of qi or cooling down aims as it will once it may.
   const std::optional<std::size_t> army = army_of(person);
-  if (!army || assess_cast(person, army, Cast{skill, Itself{}}, UINT64_LIMIT) !=
-                   CastRefusal::NONE) {
+  const CastRefusal never =
+      assess_cast(person, army, Cast{skill, Itself{}}, UINT64_LIMIT);
+  if (!army || never == CastRefusal::DEAD || never == CastRefusal::NO_SKILL) {
     return std::nullopt;
   }
   const Position from = people_.at(person).position;
-  const std::int64_t range = armies_.at(*army).skills.at(skill).range;
+  const std::int64_t range =
+      usable(people_.at(person), armies_.at(*army), skill).range;
   // Offered in the order the tick's strikes visit people.
   Nearest nearest{from, facing};
   std::vector<std::size_t> offered;
@@ -1665,8 +1755,10 @@ void World::tick() {
   if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
     kin(*life_.kinship);
   }
+  train();
   if (!sects_.empty() && tick_count_ % rules_.ticks_per_day == 0) {
     keep_sects();
+    teach();
   }
   if (tick_count_ % rules_.ticks_per_day == 0) {
     tend();
@@ -1775,7 +1867,7 @@ StateHash World::hash() const {
     fold(structure.blocks);
   }
   for (const Person& person : people_) {
-    fold_person(fold, person, people_.size());
+    fold_person(fold, person, people_.size(), life_.cultivation.has_value());
   }
   for (const Soul& soul : souls_) {
     fold_soul(fold, soul);
@@ -1792,11 +1884,7 @@ StateHash World::hash() const {
     }
     fold(army.faction);
     for (const Skill& skill : army.skills) {
-      fold(skill.range);
-      fold(skill.radius);
-      fold(skill.body_damage);
-      fold(skill.structure_damage);
-      fold(skill.cooldown);
+      fold_skill(fold, skill);
     }
     fold(army.roster.size());
     for (const std::size_t member : army.roster) {
@@ -1993,9 +2081,10 @@ std::uint64_t World::next_random() {
   return mix(rng_state_);
 }
 
-// A person's use on this tick: the cast it was given, unless it lapses, or,
-// once its cooldown has passed, one of its order's skills drawn by the seed
-// at the nearest hostile person.
+// A person's use on this tick: the cast it was given, unless it lapses, or
+// one of the skills it may use drawn by the seed at the nearest hostile
+// person: its order's skills once their shared cooldown has passed, and each
+// art skill it knows that is ready and that its qi pays for.
 void World::strike(std::size_t user, const Crowd& crowd,
                    const std::vector<std::uint32_t>& edges,
                    std::vector<std::uint64_t>& damage) {
@@ -2006,20 +2095,46 @@ void World::strike(std::size_t user, const Crowd& crowd,
   const std::optional<Cast> cast = std::exchange(striker.casting, std::nullopt);
   if (cast) {
     if (assess_cast(self, army, *cast, tick_count_) == CastRefusal::NONE) {
-      const Skill& skill = own.skills.at(cast->skill);
-      use(user, crowd, skill, landing(striker, skill, cast->target), edges,
-          damage);
+      use(user, crowd, cast->skill,
+          landing(striker, usable(striker, own, cast->skill), cast->target),
+          edges, damage);
     }
     return;
   }
-  if (striker.ready_at > tick_count_) {
+  const std::vector<std::size_t>& choice = own.order.skills;
+  const bool drilled = striker.ready_at <= tick_count_;
+  const auto affordable = [&](const Known& known) {
+    return known.ready_at <= tick_count_ &&
+           striker.qi >=
+               life_.arts.at(known.art).skills.at(known.skill).skill.qi_cost;
+  };
+  const auto arts = static_cast<std::size_t>(
+      std::count_if(striker.known.begin(), striker.known.end(), affordable));
+  const std::size_t offered = (drilled ? choice.size() : 0) + arts;
+  if (offered == 0) {
     return;
   }
-  const std::vector<std::size_t>& choice = own.order.skills;
-  const Skill& skill = own.skills.at(choice.at(next_random() % choice.size()));
+  // The order's skills first, then the art skills in the order learned.
+  std::size_t drawn = next_random() % offered;
+  std::size_t index = 0;
+  if (drilled && drawn < choice.size()) {
+    index = choice.at(drawn);
+  } else {
+    drawn -= drilled ? choice.size() : 0;
+    for (std::size_t known = 0; known < striker.known.size(); ++known) {
+      if (affordable(striker.known.at(known))) {
+        if (drawn == 0) {
+          index = own.skills.size() + known;
+          break;
+        }
+        --drawn;
+      }
+    }
+  }
+  const Skill& skill = usable(striker, own, index);
   // A skill of range 0 reaches only its user, so it lands where it stands.
   if (skill.range == 0) {
-    use(user, crowd, skill, striker.position, edges, damage);
+    use(user, crowd, index, striker.position, edges, damage);
     return;
   }
   // The crowd's order breaks ties, so the order the query visits people in
@@ -2032,28 +2147,48 @@ void World::strike(std::size_t user, const Crowd& crowd,
         }
       });
   if (const std::optional<std::size_t> target = nearest.found()) {
-    use(user, crowd, skill, crowd.hash.position(*target), edges, damage);
+    use(user, crowd, index, crowd.hash.position(*target), edges, damage);
   }
 }
 
 // The one rule every skill resolves through, whoever uses it and however it
-// was aimed: each use hits every hostile person in the disc around `centre`
-// once, as much harder as the edge `edges` gives the user's home, and every
-// structure its disc reaches.
-void World::use(std::size_t user, const Crowd& crowd, const Skill& skill,
+// was aimed: each use of skill `index`, among the user's, spends its qi and
+// hits every hostile person in the disc around `centre` once, as much harder
+// as the edge `edges` gives the user's home, the might of its realm and, for
+// an art skill, the potency of its nature, and every structure its disc
+// reaches.
+void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
                 Position centre, const std::vector<std::uint32_t>& edges,
                 std::vector<std::uint64_t>& damage) {
   const std::size_t army = crowd.armies.at(user);
   const std::size_t self = crowd.people.at(user);
   Person& striker = people_.at(self);
   const Army& own = armies_.at(army);
-  striker.ready_at = tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
-  // A use that hits anyone or anything practises the striker's best
-  // discipline, its highest limit.
+  const Skill& skill = usable(striker, own, index);
+  const std::optional<std::size_t> known =
+      index >= own.skills.size()
+          ? std::optional<std::size_t>{index - own.skills.size()}
+          : std::nullopt;
+  const std::uint64_t ready =
+      tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
+  std::optional<std::size_t> art;
+  if (known) {
+    striker.known.at(*known).ready_at = ready;
+    art = striker.known.at(*known).art;
+  } else {
+    striker.ready_at = ready;
+  }
+  striker.qi -= skill.qi_cost;
   bool hit = false;
   const std::uint64_t edge = striker.home ? edges.at(*striker.home) : 0;
-  const std::uint64_t body_damage =
-      skill.body_damage * (PER_MILLE + edge) / PER_MILLE;
+  const std::uint32_t rank = rank_of(striker);
+  const std::uint64_t might =
+      rank > 0 ? life_.realms.at(rank - 1).might : PER_MILLE;
+  std::uint64_t body_damage =
+      skill.body_damage * (PER_MILLE + edge) / PER_MILLE * might / PER_MILLE;
+  if (art) {
+    body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
+  }
   crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
     if (foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
       damage.at(other) += body_damage;
@@ -2068,6 +2203,8 @@ void World::use(std::size_t user, const Crowd& crowd, const Skill& skill,
                 hit;
         }
       });
+  // A use that hits anyone or anything practises its art's discipline, or,
+  // for an army's skill, the striker's best discipline, its highest limit.
   if (hit && !striker.talent.empty()) {
     const auto best = static_cast<std::size_t>(
         std::max_element(striker.talent.begin(), striker.talent.end(),
@@ -2075,10 +2212,82 @@ void World::use(std::size_t user, const Crowd& crowd, const Skill& skill,
                            return left.limit < right.limit;
                          }) -
         striker.talent.begin());
-    const Aptitude& aptitude = striker.talent.at(best);
-    striker.attainment.at(best) =
-        std::min(aptitude.limit, striker.attainment.at(best) + aptitude.growth);
+    const std::size_t practised = art ? life_.arts.at(*art).discipline : best;
+    const Aptitude& aptitude = striker.talent.at(practised);
+    striker.attainment.at(practised) = std::min(
+        aptitude.limit, striker.attainment.at(practised) + aptitude.growth);
   }
+}
+
+// Skill `skill` of person `person`, serving in `army`: the army's skills,
+// followed by the art skills it knows.
+const Skill& World::usable(const Person& person, const Army& army,
+                           std::size_t skill) const {
+  if (skill < army.skills.size()) {
+    return army.skills.at(skill);
+  }
+  const Known& known = person.known.at(skill - army.skills.size());
+  return life_.arts.at(known.art).skills.at(known.skill).skill;
+}
+
+// Whether person `person`, serving in `army`, may use its skill `skill` on
+// tick `due`.
+bool World::ready(const Person& person, std::size_t skill, const Army& army,
+                  std::uint64_t due) {
+  const std::uint64_t ready_at =
+      skill < army.skills.size()
+          ? person.ready_at
+          : person.known.at(skill - army.skills.size()).ready_at;
+  return ready_at <= due;
+}
+
+// How many of the realms person `person`'s qi capacity reaches.
+std::uint32_t World::rank_of(const Person& person) const {
+  return static_cast<std::uint32_t>(std::count_if(
+      life_.realms.begin(), life_.realms.end(), [&person](const Realm& realm) {
+        return person.qi_capacity >= realm.qi;
+      }));
+}
+
+std::uint64_t World::agreement(const Person& person, std::size_t art,
+                               bool potency) const {
+  if (person.known.empty()) {
+    return PER_MILLE;
+  }
+  const Nature& heart = life_.arts.at(person.known.front().art).nature;
+  const Nature& nature = life_.arts.at(art).nature;
+  const Learning& learning = life_.learning;
+  std::uint64_t agreed = PER_MILLE;
+  if (heart.orientation != nature.orientation) {
+    agreed =
+        agreed *
+        (potency ? learning.orientation_potency : learning.orientation_ease) /
+        PER_MILLE;
+  }
+  if (heart.polarity != nature.polarity) {
+    agreed = agreed *
+             (potency ? learning.polarity_potency : learning.polarity_ease) /
+             PER_MILLE;
+  }
+  return agreed;
+}
+
+// The first skill of art `art` person `person` lacks, of rank `rank` or below,
+// that it may learn `how`.
+std::optional<std::size_t> World::lesson(const Person& person, std::size_t art,
+                                         Lesson how, std::uint32_t rank) const {
+  const std::vector<ArtSkill>& skills = life_.arts.at(art).skills;
+  for (std::size_t skill = 0; skill < skills.size(); ++skill) {
+    const bool known = std::any_of(
+        person.known.begin(), person.known.end(), [&](const Known& held) {
+          return held.art == art && held.skill == skill;
+        });
+    if (!known && skills.at(skill).rank <= rank &&
+        (how == Lesson::TAUGHT || skills.at(skill).comprehensible)) {
+      return skill;
+    }
+  }
+  return std::nullopt;
 }
 
 // Whether person `person` of army `army` strikes person `other` of army
@@ -2112,19 +2321,23 @@ CastRefusal World::assess_cast(std::size_t person,
   if (caster.health == 0 || !army) {
     return CastRefusal::DEAD;
   }
-  const std::vector<Skill>& skills = armies_.at(*army).skills;
-  if (cast.skill >= skills.size()) {
+  const Army& own = armies_.at(*army);
+  if (cast.skill >= own.skills.size() + caster.known.size()) {
     return CastRefusal::NO_SKILL;
   }
-  if (caster.ready_at > due) {
+  if (!ready(caster, cast.skill, own, due)) {
     return CastRefusal::ON_COOLDOWN;
+  }
+  const Skill& skill = usable(caster, own, cast.skill);
+  if (caster.qi < skill.qi_cost) {
+    return CastRefusal::NO_QI;
   }
   if (const auto* aimed = std::get_if<AtPerson>(&cast.target)) {
     if (aimed->person >= people_.size() ||
         people_.at(aimed->person).health == 0) {
       return CastRefusal::NO_TARGET;
     }
-    const std::int64_t range = skills.at(cast.skill).range;
+    const std::int64_t range = skill.range;
     if (distance_squared(caster.position, people_.at(aimed->person).position) >
         range * range) {
       return CastRefusal::OUT_OF_RANGE;
@@ -2214,6 +2427,14 @@ void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
     person.talent.push_back(Aptitude{growth, limit});
   }
   person.attainment.assign(person.talent.size(), 0);
+  if (life_.cultivation) {
+    const std::uint32_t growth = draw(range_of(life_.cultivation->growth));
+    person.cultivation =
+        Aptitude{growth, draw(range_of(life_.cultivation->limit))};
+  }
+  person.qi = 0;
+  person.qi_capacity = 0;
+  person.known.clear();
   person.lifespan =
       life_.lifespan
           ? std::optional<std::uint64_t>{draw(range_of(*life_.lifespan))}
@@ -2233,9 +2454,12 @@ void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
 void World::found(Person& person, std::optional<Sex> sex) {
   bear(person, Soul{}, sex);
   if (life_.founding_age) {
-    person.born = -static_cast<std::int64_t>(
-        std::uint64_t{draw(range_of(*life_.founding_age))} *
-        rules_.ticks_per_day);
+    const std::uint64_t days = draw(range_of(*life_.founding_age));
+    person.born = -static_cast<std::int64_t>(days * rules_.ticks_per_day);
+    // It cultivated every day it lived before the world began.
+    person.qi_capacity = static_cast<std::uint32_t>(std::min<std::uint64_t>(
+        person.cultivation.limit, person.cultivation.growth * days));
+    person.qi = person.qi_capacity;
   }
 }
 
@@ -2343,6 +2567,215 @@ std::size_t World::faction(std::size_t army) const {
 
 const std::vector<Skill>& World::skills(std::size_t army) const {
   return armies_.at(army).skills;
+}
+
+std::size_t World::skill_count(std::size_t person) const {
+  const Person& caster = people_.at(person);
+  const std::optional<std::size_t> army = army_of(person);
+  return army ? armies_.at(*army).skills.size() + caster.known.size() : 0;
+}
+
+const Skill& World::skill_of(std::size_t person, std::size_t skill) const {
+  return usable(people_.at(person), armies_.at(army_with(person, skill)),
+                skill);
+}
+
+std::uint64_t World::ready_at(std::size_t person, std::size_t skill) const {
+  const std::size_t drilled =
+      armies_.at(army_with(person, skill)).skills.size();
+  const Person& caster = people_.at(person);
+  return skill < drilled ? caster.ready_at
+                         : caster.known.at(skill - drilled).ready_at;
+}
+
+// The army person `person` serves in, when it has skill `skill`. Throws
+// std::out_of_range when it has no such skill.
+std::size_t World::army_with(std::size_t person, std::size_t skill) const {
+  const std::optional<std::size_t> army = army_of(person);
+  if (!army || skill >= armies_.at(*army).skills.size() +
+                            people_.at(person).known.size()) {
+    throw std::out_of_range("the person has no such skill");
+  }
+  return *army;
+}
+
+std::uint32_t World::rank(std::size_t person) const {
+  return rank_of(people_.at(person));
+}
+
+std::optional<Nature> World::nature(std::size_t person) const {
+  const Person& who = people_.at(person);
+  return who.known.empty() ? std::nullopt
+                           : std::optional<Nature>{
+                                 life_.arts.at(who.known.front().art).nature};
+}
+
+const std::vector<Realm>& World::realms() const { return life_.realms; }
+
+const std::vector<Art>& World::arts() const { return life_.arts; }
+
+// What people's qi does on a tick: it recovers when due, manuals lying on a
+// cell are read, and once a day stores grow.
+void World::train() {
+  if (life_.cultivation &&
+      tick_count_ % life_.cultivation->recovery_ticks == 0) {
+    recover(*life_.cultivation);
+  }
+  read_manuals();
+  if (life_.cultivation && tick_count_ % rules_.ticks_per_day == 0) {
+    cultivate();
+  }
+}
+
+// Once a day, every living person's qi capacity grows by its cultivation's
+// growth, up to its limit; on each realm gained it comprehends.
+void World::cultivate() {
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      Person& person = people_.at(member);
+      const std::uint32_t before = rank_of(person);
+      person.qi_capacity =
+          std::max(person.qi_capacity,
+                   std::min(person.cultivation.limit,
+                            person.qi_capacity + person.cultivation.growth));
+      const std::uint32_t after = rank_of(person);
+      for (std::uint32_t gained = before; gained < after; ++gained) {
+        comprehend(person, after);
+      }
+    }
+  }
+}
+
+// Person `person`, of realm rank `rank`, rolls for each art it knows, in the
+// order it learned them, to comprehend a skill of it.
+void World::comprehend(Person& person, std::uint32_t rank) {
+  std::vector<std::size_t> practised;
+  for (const Known& known : person.known) {
+    if (std::find(practised.begin(), practised.end(), known.art) ==
+        practised.end()) {
+      practised.push_back(known.art);
+    }
+  }
+  for (const std::size_t art : practised) {
+    const std::optional<std::size_t> skill =
+        lesson(person, art, Lesson::COMPREHENDED, rank);
+    if (!skill) {
+      continue;
+    }
+    const std::size_t discipline = life_.arts.at(art).discipline;
+    const std::uint64_t mean =
+        std::max<std::uint64_t>(life_.disciplines.at(discipline).limit.mean, 1);
+    const std::uint64_t talent =
+        person.talent.empty() ? mean : person.talent.at(discipline).limit;
+    const std::uint64_t chance = life_.learning.comprehension * talent / mean *
+                                 agreement(person, art, false) / PER_MILLE;
+    if (next_random() % PER_MILLE < chance) {
+      person.known.push_back(Known{art, *skill, 0});
+    }
+  }
+}
+
+// Every living person's qi recovers its cultivation's recovery per mille of
+// its capacity, rounded up, up to its capacity.
+void World::recover(const Cultivation& cultivation) {
+  const std::uint64_t recovery = cultivation.recovery;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      Person& person = people_.at(member);
+      const std::uint64_t regained =
+          ((std::uint64_t{person.qi_capacity} * recovery) + PER_MILLE - 1) /
+          PER_MILLE;
+      person.qi = static_cast<std::uint32_t>(
+          std::min<std::uint64_t>(person.qi_capacity, person.qi + regained));
+    }
+  }
+}
+
+// Each manual lying on a cell is read by the nearest living person within
+// the reading reach of the cell's centre, the lower index among equals, who
+// has the rank for a skill of its art it lacks and the qi to read it: it
+// spends the reading's cost and learns every such skill. The manual stays.
+void World::read_manuals() {
+  for (const Manual& manual : manuals_) {
+    const auto* cell = std::get_if<Cell>(&manual.place);
+    if (cell == nullptr) {
+      continue;
+    }
+    const Position centre = centre_of(*cell);
+    const std::int64_t reach = life_.learning.reading_reach;
+    std::optional<std::pair<std::int64_t, std::size_t>> nearest;
+    for (const Army& army : armies_) {
+      for (const std::size_t member : army.roster) {
+        const Person& reader = people_.at(member);
+        const std::int64_t distance = distance_squared(centre, reader.position);
+        const std::uint64_t ease = agreement(reader, manual.art, false);
+        if (distance > reach * reach || ease == 0 ||
+            !lesson(reader, manual.art, Lesson::TAUGHT, rank_of(reader)) ||
+            std::uint64_t{reader.qi} * ease <
+                std::uint64_t{life_.learning.reading_cost} * PER_MILLE) {
+          continue;
+        }
+        const std::pair<std::int64_t, std::size_t> key{distance, member};
+        if (!nearest || key < *nearest) {
+          nearest = key;
+        }
+      }
+    }
+    if (!nearest) {
+      continue;
+    }
+    Person& reader = people_.at(nearest->second);
+    reader.qi -= static_cast<std::uint32_t>(
+        std::uint64_t{life_.learning.reading_cost} * PER_MILLE /
+        agreement(reader, manual.art, false));
+    const std::uint32_t rank = rank_of(reader);
+    while (const std::optional<std::size_t> skill =
+               lesson(reader, manual.art, Lesson::TAUGHT, rank)) {
+      reader.known.push_back(Known{manual.art, *skill, 0});
+    }
+  }
+}
+
+// Once a day, each living member of a standing sect whose seat is held
+// learns, with the teaching's chance a year for each rank of its sect's
+// highest-ranked elder, the first skill it lacks of the first art its sect
+// holds a manual of that has one within both their ranks.
+void World::teach() {
+  for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
+    if (!seat_held(sect)) {
+      continue;
+    }
+    std::uint32_t teacher = 0;
+    for (const std::size_t elder : sect_elders(sect)) {
+      teacher = std::max(teacher, rank_of(people_.at(elder)));
+    }
+    if (teacher == 0) {
+      continue;
+    }
+    for (const std::size_t member : sect_members(sect)) {
+      Person& pupil = people_.at(member);
+      const std::uint32_t rank = std::min(teacher, rank_of(pupil));
+      for (const Manual& manual : manuals_) {
+        const auto* held = std::get_if<HeldBySect>(&manual.place);
+        if (held == nullptr || held->sect != sect) {
+          continue;
+        }
+        const std::optional<std::size_t> skill =
+            lesson(pupil, manual.art, Lesson::TAUGHT, rank);
+        if (!skill) {
+          continue;
+        }
+        const std::uint64_t chance =
+            std::uint64_t{life_.learning.teaching} * teacher *
+            agreement(pupil, manual.art, false) / PER_MILLE;
+        if (next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
+            chance) {
+          pupil.known.push_back(Known{manual.art, *skill, 0});
+        }
+        break;
+      }
+    }
+  }
 }
 
 std::size_t World::ensoul(std::size_t person) {

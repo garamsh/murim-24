@@ -281,6 +281,7 @@ void put_skill(Writer& out, const Skill& skill) {
   out.u64(skill.body_damage);
   out.i32(skill.structure_damage);
   out.u64(skill.cooldown);
+  out.u32(skill.qi_cost);
 }
 
 Skill get_skill(Reader& input) {
@@ -290,6 +291,7 @@ Skill get_skill(Reader& input) {
   skill.body_damage = input.u64();
   skill.structure_damage = input.i32();
   skill.cooldown = input.u64();
+  skill.qi_cost = input.u32();
   return skill;
 }
 
@@ -307,18 +309,22 @@ Duel get_duel(Reader& input) {
   return duel;
 }
 
+void put_name(Writer& out, const NameEntry& name) {
+  out.text(name.korean);
+  out.text(name.romanised);
+}
+
+NameEntry get_name(Reader& input) {
+  std::string korean = input.text();
+  return NameEntry{std::move(korean), input.text()};
+}
+
 void put_names(Writer& out, const std::vector<NameEntry>& names) {
-  put_all(out, names, [&out](const NameEntry& name) {
-    out.text(name.korean);
-    out.text(name.romanised);
-  });
+  put_all(out, names, [&out](const NameEntry& name) { put_name(out, name); });
 }
 
 std::vector<NameEntry> get_names(Reader& input) {
-  return get_all<NameEntry>(input, [&input] {
-    std::string korean = input.text();
-    return NameEntry{std::move(korean), input.text()};
-  });
+  return get_all<NameEntry>(input, [&input] { return get_name(input); });
 }
 
 void put_growth(Writer& out, const Growth& growth) {
@@ -427,6 +433,37 @@ void put_life(Writer& out, const Life& life) {
     out.u32(manuals.scatter_chance);
     out.i32(manuals.scatter_reach);
   });
+  put_maybe(out, life.cultivation, [&out](const Cultivation& cultivation) {
+    put_spread(out, cultivation.growth);
+    put_spread(out, cultivation.limit);
+    out.u32(cultivation.recovery);
+    out.u64(cultivation.recovery_ticks);
+  });
+  put_all(out, life.realms, [&out](const Realm& realm) {
+    put_name(out, realm.name);
+    out.u32(realm.qi);
+    out.u32(realm.might);
+  });
+  put_all(out, life.arts, [&out](const Art& art) {
+    put_name(out, art.name);
+    out.size(art.discipline);
+    out.u8(static_cast<std::uint8_t>(art.nature.orientation));
+    out.u8(static_cast<std::uint8_t>(art.nature.polarity));
+    put_all(out, art.skills, [&out](const ArtSkill& taught) {
+      put_name(out, taught.name);
+      put_skill(out, taught.skill);
+      out.u32(taught.rank);
+      out.flag(taught.comprehensible);
+    });
+  });
+  const Learning& learning = life.learning;
+  for (const std::uint32_t value :
+       {learning.comprehension, learning.teaching, learning.reading_cost,
+        learning.orientation_ease, learning.polarity_ease,
+        learning.orientation_potency, learning.polarity_potency}) {
+    out.u32(value);
+  }
+  out.i32(learning.reading_reach);
 }
 
 Life get_life(Reader& input) {
@@ -478,6 +515,47 @@ Life get_life(Reader& input) {
     manuals.scatter_reach = input.i32();
     return manuals;
   });
+  life.cultivation = get_maybe<Cultivation>(input, [&input] {
+    Cultivation cultivation;
+    cultivation.growth = get_spread(input);
+    cultivation.limit = get_spread(input);
+    cultivation.recovery = input.u32();
+    cultivation.recovery_ticks = input.u64();
+    return cultivation;
+  });
+  life.realms = get_all<Realm>(input, [&input] {
+    Realm realm;
+    realm.name = get_name(input);
+    realm.qi = input.u32();
+    realm.might = input.u32();
+    return realm;
+  });
+  life.arts = get_all<Art>(input, [&input] {
+    constexpr std::uint8_t ORIENTATIONS = 3;
+    constexpr std::uint8_t POLARITIES = 2;
+    Art art;
+    art.name = get_name(input);
+    art.discipline = input.size();
+    art.nature.orientation = static_cast<Orientation>(input.tag(ORIENTATIONS));
+    art.nature.polarity = static_cast<Polarity>(input.tag(POLARITIES));
+    art.skills = get_all<ArtSkill>(input, [&input] {
+      ArtSkill taught;
+      taught.name = get_name(input);
+      taught.skill = get_skill(input);
+      taught.rank = input.u32();
+      taught.comprehensible = input.flag();
+      return taught;
+    });
+    return art;
+  });
+  Learning& learning = life.learning;
+  for (std::uint32_t* value :
+       {&learning.comprehension, &learning.teaching, &learning.reading_cost,
+        &learning.orientation_ease, &learning.polarity_ease,
+        &learning.orientation_potency, &learning.polarity_potency}) {
+    *value = input.u32();
+  }
+  learning.reading_reach = input.i32();
   return life;
 }
 
@@ -575,6 +653,15 @@ void put_person(Writer& out, const Person& person) {
       out.size(aimed->person);
     }
   });
+  out.u32(person.cultivation.growth);
+  out.u32(person.cultivation.limit);
+  out.u32(person.qi);
+  out.u32(person.qi_capacity);
+  put_all(out, person.known, [&out](const Known& known) {
+    out.size(known.art);
+    out.size(known.skill);
+    out.u64(known.ready_at);
+  });
 }
 
 Person get_person(Reader& input) {
@@ -621,6 +708,17 @@ Person get_person(Reader& input) {
         break;
     }
     return cast;
+  });
+  const std::uint32_t growth = input.u32();
+  person.cultivation = Aptitude{growth, input.u32()};
+  person.qi = input.u32();
+  person.qi_capacity = input.u32();
+  person.known = get_all<Known>(input, [&input] {
+    Known known;
+    known.art = input.size();
+    known.skill = input.size();
+    known.ready_at = input.u64();
+    return known;
   });
   return person;
 }
@@ -688,7 +786,7 @@ Leadership get_leadership(Reader& input) {
 }
 
 void put_manual(Writer& out, const Manual& manual) {
-  out.size(manual.discipline);
+  out.size(manual.art);
   out.u8(static_cast<std::uint8_t>(manual.place.index()));
   if (const auto* held = std::get_if<HeldBySect>(&manual.place)) {
     out.size(held->sect);
@@ -700,7 +798,7 @@ void put_manual(Writer& out, const Manual& manual) {
 Manual get_manual(Reader& input) {
   constexpr std::uint8_t PLACES = 3;
   Manual manual;
-  manual.discipline = input.size();
+  manual.art = input.size();
   switch (input.tag(PLACES)) {
     case 0:
       manual.place = HeldBySect{input.size()};

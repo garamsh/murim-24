@@ -1427,11 +1427,13 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
 constexpr Seed SONLESS{9};
 
 // region_data() with no sects, whose seats would change the region SONLESS
-// was chosen on; ADR 0027's rule does not depend on sects.
+// was chosen on, and no cultivation, whose draws at birth would change its
+// people; ADR 0027's rule depends on neither.
 RegionData sectless() {
   RegionData data = region_data();
   data.sects.clear();
   data.life.manuals.reset();
+  data.life.cultivation.reset();
   return data;
 }
 

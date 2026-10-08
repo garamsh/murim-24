@@ -151,6 +151,48 @@ TEST(Save, ALoadedRegionHashesAndTicksOnAsTheSavedOne) {
             ticked(saved.world, MORE_TICKS).hash());
 }
 
+// Each person's qi, store, cultivation and known art skills in `world`.
+std::vector<Person> cultivated(const World& world) {
+  std::vector<Person> people;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const Person& each = world.person(person);
+    Person kept;
+    kept.cultivation = each.cultivation;
+    kept.qi = each.qi;
+    kept.qi_capacity = each.qi_capacity;
+    kept.known = each.known;
+    people.push_back(kept);
+  }
+  return people;
+}
+
+TEST(Save, ALoadedRegionKeepsEveryonesQiAndArts) {
+  const Saved saved = lived_region(REGION_SEED);
+  const std::vector<Person> before = cultivated(saved.world);
+  // Ten years in, people hold qi and sects have taught their arts.
+  ASSERT_TRUE(std::any_of(before.begin(), before.end(), [](const Person& each) {
+    return !each.known.empty() && each.qi > 0;
+  }));
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+  const std::vector<Person> after = cultivated(loaded(load(store, SLOT)).world);
+  ASSERT_EQ(after.size(), before.size());
+  for (std::size_t person = 0; person < before.size(); ++person) {
+    const Person& then = before.at(person);
+    const Person& now = after.at(person);
+    EXPECT_EQ(now.qi, then.qi);
+    EXPECT_EQ(now.qi_capacity, then.qi_capacity);
+    EXPECT_EQ(now.cultivation.growth, then.cultivation.growth);
+    EXPECT_EQ(now.cultivation.limit, then.cultivation.limit);
+    ASSERT_EQ(now.known.size(), then.known.size());
+    for (std::size_t known = 0; known < then.known.size(); ++known) {
+      EXPECT_EQ(now.known.at(known).art, then.known.at(known).art);
+      EXPECT_EQ(now.known.at(known).skill, then.known.at(known).skill);
+      EXPECT_EQ(now.known.at(known).ready_at, then.known.at(known).ready_at);
+    }
+  }
+}
+
 TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
   const World world{Seed{1},
                     Map{{"....", "...."}},

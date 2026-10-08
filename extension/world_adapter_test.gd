@@ -116,9 +116,49 @@ func run() -> bool:
 	var economy_pass := _economy_pass()
 	var sects_pass := _sects_pass()
 	var play_loop_pass := _play_loop_pass()
+	var qi_pass := _qi_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
-			and play_loop_pass
+			and play_loop_pass and qi_pass
+
+
+# A region lived ten years of five-tick days reads its realms, and a person who knows an art reads its
+# qi within its store, a realm among them, its nature, and its skills: its army's first, priced at no qi,
+# then its art skills, named, with their cost and nature. Control: a world from create() has no realms,
+# and its people hold no qi, know no art and read only their army's skills.
+func _qi_pass() -> bool:
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
+	for i in 10 * 120 * 5:
+		lived.tick()
+	var realms := lived.realms()
+	var learned := -1
+	for army in lived.army_count():
+		for person: int in lived.roster(army):
+			if learned == -1 and lived.person_skills(person).size() > lived.skills(army).size():
+				learned = person
+	var right: bool = realms.size() == 8 and realms[0].korean == "삼류" and learned != -1
+	var skills: Array[Dictionary] = []
+	if learned != -1:
+		skills = lived.person_skills(learned)
+		var nature := lived.person_nature(learned)
+		right = right and lived.person_qi(learned) <= lived.person_qi_capacity(learned) \
+				and lived.person_qi_capacity(learned) > 0 \
+				and lived.person_realm(learned) >= 1 and lived.person_realm(learned) <= realms.size() \
+				and nature.has("orientation") and nature.has("polarity") \
+				and skills[0].art == -1 and skills[0].qi_cost == 0 and skills.back().art >= 0 \
+				and skills.back().qi_cost > 0 and not String(skills.back().korean).is_empty() \
+				and skills.back().orientation == nature.orientation
+	var bare := _create(SEED, _armies, RULES)
+	var bare_right: bool = bare.realms().is_empty() and bare.person_qi(0) == 0 and bare.person_realm(0) == 0 \
+			and bare.person_nature(0).is_empty() and bare.person_skills(0).size() == bare.skills(0).size() \
+			and WorldAdapter.CAST_NO_QI != WorldAdapter.CAST_ON_COOLDOWN
+	var passed: bool = right and bare_right
+	print("world_adapter_test: %d realms, the first %s; person %d knows %d skills, the last %s, qi %d of %d, realm %d, nature %s; a world from create() reads none %s: %s" % [
+		realms.size(), realms[0] if realms.size() > 0 else {}, learned, skills.size(), skills.back() if skills.size() > 0 else {},
+		lived.person_qi(learned) if learned != -1 else -1, lived.person_qi_capacity(learned) if learned != -1 else -1,
+		lived.person_realm(learned) if learned != -1 else -1, lived.person_nature(learned) if learned != -1 else {},
+		bare_right, "pass" if passed else "FAIL"])
+	return passed
 
 
 # Each village of a region starts with people, under its cap, and food in store; a day later its stock has fed every one of them a measure. Control: the stock read

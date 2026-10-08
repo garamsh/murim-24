@@ -1,6 +1,6 @@
 # ADR 0026: Keep sect membership on the person and seat each sect in a village
 
-> Status: accepted; its elders by an attainment threshold superseded by ADR-0028, which makes them a share of a sect's members; its rejection of joining through the port superseded by ADR-0031, which lets a person apply
+> Status: accepted; its elders by an attainment threshold superseded by ADR-0028, which makes them a share of a sect's members; its rejection of joining through the port superseded by ADR-0031, which lets a person apply; its manual of a discipline superseded by ADR-0035, which makes it name an art
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
