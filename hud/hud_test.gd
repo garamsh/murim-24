@@ -337,7 +337,6 @@ func _measure_pass() -> bool:
 	return passed
 
 
-
 # Every reason the core refuses a cast, each WorldAdapter.CAST_* constant but CAST_NONE, is shown
 # on the notice by its own key, which hud.csv words in each locale. Setup: the constants read from
 # the adapter's class include CAST_NO_QI and CAST_OUT_OF_RANGE. Control: a key hud.csv lacks
@@ -370,6 +369,7 @@ func _cast_words_pass() -> bool:
 	print("hud_test: %d cast refusals %s; unworded %s; a key hud.csv lacks reads \"%s\" (setup %s): %s" % [
 		refusals.size(), refusals.keys(), unworded, lacking, set_up, "pass" if passed else "FAIL"])
 	return passed
+
 
 # The region lived RUMOUR_YEARS years of five-tick days: the rumour log shows the latest rumours
 # that reach the player, newest first, each worded as rumour_text words it, and a person's birth
