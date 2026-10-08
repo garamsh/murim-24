@@ -342,6 +342,35 @@ void fold_progress(const Fold& fold, const Progress& step) {
   }
 }
 
+// Folds into `fold` each declaration standing, each army a driver steers
+// among `armies`, and the diplomacy, each only while held, so a world with
+// none keeps its hash.
+template <typename Fold, typename Armies>
+void fold_relations(const Fold& fold,
+                    const std::vector<std::optional<Declared>>& declarations,
+                    const Armies& armies,
+                    const std::optional<Diplomacy>& diplomacy) {
+  for (std::size_t index = 0; index < declarations.size(); ++index) {
+    if (const std::optional<Declared>& standing = declarations.at(index)) {
+      fold(index);
+      fold(standing->what);
+      fold(standing->by);
+      fold(standing->tick);
+    }
+  }
+  for (std::size_t army = 0; army < armies.size(); ++army) {
+    if (armies.at(army).steered) {
+      fold(army);
+    }
+  }
+  if (diplomacy) {
+    fold(diplomacy->war_margin);
+    fold(diplomacy->war_chance);
+    fold(diplomacy->peace_chance);
+    fold(diplomacy->hold_days);
+  }
+}
+
 // Folds everything `person` holds into `fold`; `absent` stands for no soul,
 // and its qi is folded where the world's people `cultivates`.
 template <typename Fold>
@@ -914,21 +943,6 @@ void World::restore() {
     return fight.faction >= factions || fight.challenger >= people ||
            fight.leader >= people;
   };
-  // A declaration stands between two factions, under the lower's row, made
-  // by one of them no later than now.
-  const auto stray_declaration = [&](std::size_t index) {
-    const std::optional<Declared>& standing = declarations_.at(index);
-    const std::size_t one = index / factions;
-    const std::size_t other = index % factions;
-    return standing &&
-           (one >= other || (standing->by != one && standing->by != other) ||
-            standing->tick > tick_count_);
-  };
-  bool bad_declarations = declarations_.size() != factions * factions;
-  for (std::size_t index = 0; !bad_declarations && index < declarations_.size();
-       ++index) {
-    bad_declarations = stray_declaration(index);
-  }
   const auto stray_soul = [disciplines](const Soul& soul) {
     return soul.practised.size() > disciplines;
   };
@@ -942,7 +956,7 @@ void World::restore() {
       std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
       manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
       !all_below(surnames_, life_.names.surnames.size());
-  if (bad_rules || bad_life || bad_structures || bad_declarations ||
+  if (bad_rules || bad_life || bad_structures || !declarations_kept() ||
       !events_kept() || !progress_kept() || !rostered() ||
       living() > MAX_PEOPLE ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
@@ -965,6 +979,27 @@ void World::restore() {
                   structure.footprint.height * CELL_SIZE});
   }
   structure_index_ = SpatialHash{centres_of(structures_)};
+}
+
+// Whether the declarations are as declare() keeps them: one place for each
+// two factions, each standing under the lower's row, made by one of them no
+// later than now.
+bool World::declarations_kept() const {
+  const std::size_t factions = rules_.hostile.size();
+  if (declarations_.size() != factions * factions) {
+    return false;
+  }
+  for (std::size_t index = 0; index < declarations_.size(); ++index) {
+    const std::optional<Declared>& standing = declarations_.at(index);
+    const std::size_t one = index / factions;
+    const std::size_t other = index % factions;
+    if (standing &&
+        (one >= other || (standing->by != one && standing->by != other) ||
+         standing->tick > tick_count_)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // Whether the events kept are as tick() keeps them: at most
@@ -1997,27 +2032,7 @@ StateHash World::hash() const {
     fold(fight.challenger);
     fold(fight.leader);
   }
-  // Folded only when held, so a world with no declaration, no steered army
-  // and no diplomacy keeps its hash.
-  for (std::size_t index = 0; index < declarations_.size(); ++index) {
-    if (const std::optional<Declared>& standing = declarations_.at(index)) {
-      fold(index);
-      fold(standing->what);
-      fold(standing->by);
-      fold(standing->tick);
-    }
-  }
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    if (armies_.at(army).steered) {
-      fold(army);
-    }
-  }
-  if (life_.diplomacy) {
-    fold(life_.diplomacy->war_margin);
-    fold(life_.diplomacy->war_chance);
-    fold(life_.diplomacy->peace_chance);
-    fold(life_.diplomacy->hold_days);
-  }
+  fold_relations(fold, declarations_, armies_, life_.diplomacy);
   for (const Village& village : villages_) {
     fold_village(fold, village);
   }
@@ -2232,14 +2247,40 @@ DeclarationRefusal World::declaration_refusal(std::size_t person,
 }
 
 void World::declare(std::size_t person, std::size_t faction, Declaration what) {
-  if (declaration_refusal(person, faction, what) != DeclarationRefusal::NONE) {
+  const std::optional<std::size_t> own = faction_of(person);
+  if (declaration_refusal(person, faction, what) != DeclarationRefusal::NONE ||
+      !own) {
     throw std::invalid_argument(
         "a declaration must come from a living faction's leader, toward "
         "another faction, change how the two stand and come after the last "
         "has held");
   }
-  const std::size_t own = *faction_of(person);
-  declarations_.at(pair_of(own, faction)) = Declared{what, own, tick_count_};
+  declarations_.at(pair_of(*own, faction)) = Declared{what, *own, tick_count_};
+}
+
+// What faction `faction`'s leader seeks toward faction `other` by the
+// diplomacy, given each faction's living `numbers`, and its chance a year:
+// war on one with living people at peace with it, while its own number at
+// least the margin of the other's, or peace with one at war with it, while
+// its own are fewer; nothing otherwise.
+std::optional<World::Sought> World::sought(
+    const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
+    const std::vector<std::uint64_t>& numbers) const {
+  if (other == faction || numbers.at(other) == 0) {
+    return std::nullopt;
+  }
+  const Relation standing = relation(faction, other);
+  if (standing == Relation::ALLY || standing == Relation::NEUTRAL) {
+    if (numbers.at(faction) * PER_MILLE <
+        numbers.at(other) * diplomacy.war_margin) {
+      return std::nullopt;
+    }
+    return Sought{Declaration::WAR, diplomacy.war_chance};
+  }
+  if (standing == Relation::AT_WAR && numbers.at(faction) < numbers.at(other)) {
+    return Sought{Declaration::PEACE, diplomacy.peace_chance};
+  }
+  return std::nullopt;
 }
 
 void World::steer(std::size_t army, bool steered) {
@@ -2267,24 +2308,14 @@ void World::negotiate(const Diplomacy& diplomacy) {
       continue;
     }
     for (std::size_t other = 0; other < factions; ++other) {
-      if (other == faction || numbers.at(other) == 0) {
-        continue;
-      }
-      const Relation standing = relation(faction, other);
-      const bool at_peace =
-          standing == Relation::ALLY || standing == Relation::NEUTRAL;
-      const bool wants = at_peace ? numbers.at(faction) * PER_MILLE >=
-                                        numbers.at(other) * diplomacy.war_margin
-                                  : standing == Relation::AT_WAR &&
-                                        numbers.at(faction) < numbers.at(other);
-      const Declaration what = at_peace ? Declaration::WAR : Declaration::PEACE;
-      const std::uint32_t chance =
-          at_peace ? diplomacy.war_chance : diplomacy.peace_chance;
-      if (wants &&
-          declaration_refusal(*leader, other, what) ==
+      const std::optional<Sought> wanted =
+          sought(diplomacy, faction, other, numbers);
+      if (wanted &&
+          declaration_refusal(*leader, other, wanted->what) ==
               DeclarationRefusal::NONE &&
-          next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) < chance) {
-        declare(*leader, other, what);
+          next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
+              wanted->chance) {
+        declare(*leader, other, wanted->what);
       }
     }
   }

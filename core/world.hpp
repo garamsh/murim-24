@@ -1408,6 +1408,15 @@ class World {
                               std::optional<std::size_t> faction) const;
   void settle_duels();
   void negotiate(const Diplomacy& diplomacy);
+  /// A declaration a leader seeks, and its chance a year, per mille.
+  struct Sought {
+    Declaration what;
+    std::uint32_t chance;
+  };
+  [[nodiscard]] std::optional<Sought> sought(
+      const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
+      const std::vector<std::uint64_t>& numbers) const;
+  [[nodiscard]] bool declarations_kept() const;
   /// The index in declarations_ of the pair of factions `faction` and
   /// `other`. Throws std::out_of_range when there is no such faction.
   [[nodiscard]] std::size_t pair_of(std::size_t faction,
