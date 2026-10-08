@@ -1,8 +1,10 @@
 # Checks that the settings persist: choices changed on the panel are kept in its file under
-# user://, and a panel that reads the file back holds the same choices, its speed among them; a
+# user://, and a panel that reads the file back holds the same choices, its speed and casting on
+# release among them; a
 # choice F2 made is kept as the language. Each volume chosen is applied to its audio bus, and a
 # volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
-# row's default. Controls: a panel reading a file that does not exist holds every default, and the
+# row's default. Controls: a panel reading a file that does not exist holds every default, casting
+# on press among them, and the
 # in-range values beside the refused one are read. Every word the panel draws from hud.csv fits
 # the room it is given, in each locale.
 extends RefCounted
@@ -20,13 +22,14 @@ func run() -> bool:
 	var panel := _panel(PATH)
 	# Right twice on the first row, the speed; down and right on the window; down to the
 	# resolution and left; down to the language and right; down and left once on the master
-	# volume, twice on the effects and three times on the music.
+	# volume, twice on the effects and three times on the music; down and right on the casting.
 	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
-			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT]:
+			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT,
+			KEY_DOWN, KEY_RIGHT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0}
+		"music": 0, "cast": 1}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -46,7 +49,7 @@ func run() -> bool:
 	var read: bool = reread.read()
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
-			and reread.speed() == Settings.SPEEDS[2] and volumes_applied
+			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied
 
 	# F2 switches the locale outside the panel; noting it keeps it.
 	TranslationServer.set_locale("ko")
@@ -57,7 +60,8 @@ func run() -> bool:
 
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(MISSING)
-	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS
+	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
+			and not missing.cast_on_release()
 
 	# A resolution out of range is refused; the speed beside it in range is read.
 	file = ConfigFile.new()
@@ -73,7 +77,7 @@ func run() -> bool:
 	var passed := kept and locale_kept and defaults and refused
 	# The defaults restored, so the buses are left as the game starts them.
 	missing.apply()
-	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; F2's Korean kept %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
+	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx and casting on release, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; F2's Korean kept %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
 		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, locale_kept, defaults, refused,
 		"pass" if passed else "FAIL"])
 	for each: Control in [panel, reread, noted, missing, ranged]:
@@ -83,7 +87,7 @@ func run() -> bool:
 
 # In each locale: the title clear of the close key in the title bar; each row's label clear of its
 # choices, and each choice within its slip; what each row sets, and the keys along the foot, within
-# the panel. Setup: every SETTINGS_ and LOCALE_ key is measured.
+# the panel, and what each row sets above the foot. Setup: every SETTINGS_ and LOCALE_ key is measured.
 func _fit_pass() -> bool:
 	var fit := WordFit.new()
 	var dialog := Settings.DIALOG
@@ -93,7 +97,8 @@ func _fit_pass() -> bool:
 		var title := fit.say("SETTINGS_TITLE")
 		var back := fit.say("SETTINGS_BACK")
 		fit.check(title, 8 + fit.width(title) + 10 + fit.width(back) + 8, dialog.size.x)
-		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "LOCALE_KO", "LOCALE_EN"]:
+		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "SETTINGS_CAST_PRESS",
+				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"]:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)
@@ -107,6 +112,9 @@ func _fit_pass() -> bool:
 			fit.check(about, 10 + 8 + fit.width(about), dialog.size.x - 10)
 		var keys := fit.say("SETTINGS_KEYS")
 		fit.check(keys, 8 + fit.width(keys), dialog.size.x - 8)
+		# The line under the rows, as tall as the font, ends above the line over the foot.
+		var about_end := 30 + Settings.ROWS.size() * Settings.ROW_STEP + 2 + Hud.FONT_SIZE
+		fit.check("%d rows" % Settings.ROWS.size(), about_end, dialog.size.y - 20)
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	panel.free()
 	var unmeasured := fit.unmeasured(["SETTINGS_", "LOCALE_"])

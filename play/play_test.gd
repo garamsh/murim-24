@@ -1,12 +1,14 @@
-# Checks that play.tscn turns input into orders for the person it steers: a left click on a passable
+# Checks that play.tscn turns input into orders for the person it steers: a right click on a passable
 # cell moves the person toward it, and a click on a blocked cell is refused; key 1 orders the
 # person's first skill, and key 9, a skill it lacks, is refused. Key C challenges the person's
 # faction's leader: born into an Orthodox village, the core refuses it for having no duel and the
 # HUD says so; born into a Cult village, it starts a duel the HUD shows, and a second C while it is
 # fought is refused for that. When a village's residents march away, its territory follows them,
 # and the world's borders and the HUD's map follow the territory the core derives, redrawn on that
-# tick and not on every frame. W, A, S and D move the person their way through the orders port, and
-# releasing them stops it. The scene opens on the title screen with no world; a new game starts the
+# tick and not on every frame. Holding the right button keeps ordering the person toward the cursor,
+# and releasing it stops the following. Q casts the first skill at the cursor, on its press or, as
+# the settings choose, on its release after showing the aim, which Q again or Escape cancels; a
+# refused cast shows its reason. The scene opens on the title screen with no world; a new game starts the
 # world from the seed typed; Escape pauses it, the pause panel's guide showing the keys the scene
 # binds, and no tick runs while it is paused; the speed the settings choose runs that many ticks.
 # Enter in the sect panel applies to the sect shown, joining it where the core admits the person and
@@ -23,9 +25,11 @@ const SEED := 2026
 const TICKS := 600
 # How far from the person's home, in cells, to look for the cells to click.
 const SEARCH := 64
-# Ticks a move key is held for, and ticks after its release.
+# Ticks the person is given to walk toward each cell the cursor is held on.
 const WALK_TICKS := 60
-const STOP_TICKS := 60
+# Pixels east of the person the cursor is put for a cast, and further than any skill reaches.
+const CAST_OFFSET := Vector2(32, 0)
+const FAR_OFFSET := Vector2(400, 0)
 # The seed the new game is typed with.
 const TYPED_SEED := 4817
 # In the region the scene's seed makes, village 5's residents are army 4, of the Cult; ordered on
@@ -71,63 +75,147 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _walk_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass()
 
 
-# A move key pressed orders the person STRIDE cells its way, and it walks there: further its way
-# than across it. Released, the key orders it to stop where it stands, and it moves less than a
-# cell. Control: the same scene with no key pressed, ticked as long, leaves the person in place,
-# so the walk is the key's. Setup: the way chosen is passable for STRIDE cells.
-func _walk_pass() -> bool:
+# The right button pressed on a passable cell orders the person toward it, and it walks closer.
+# Held, the cursor moved to a second cell orders it there, and it walks closer to that. Released,
+# the cursor moved again orders nothing. Control: the same scene with no input, ticked as long,
+# leaves the person in place, so the walking is the button's. Setup: both cells are passable and
+# differ, and the second is not the person's cell when the cursor reaches it.
+func _move_pass() -> bool:
 	var scene := _scene(0)
 	var control := _scene(0)
 	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	var keycode := KEY_NONE
-	for candidate: Key in scene.MOVE_KEYS:
-		var way: Vector2i = scene.MOVE_KEYS[candidate]
-		var clear := true
-		for stride in range(1, scene.STRIDE + 1):
-			var cell := home + way * stride
-			clear = clear and cell.y >= 0 and cell.y < rows.size() and cell.x >= 0 \
-					and cell.x < rows[cell.y].length() and rows[cell.y][cell.x] == "."
-		if keycode == KEY_NONE and clear:
-			keycode = candidate
-	if keycode == KEY_NONE:
-		print("play_test: no way from %s is passable for %d cells: FAIL" % [home, scene.STRIDE])
-		return false
-	var direction := Vector2(scene.MOVE_KEYS[keycode])
-	var from: Vector2 = scene.lead()
+	var first := _cell_near(rows, home, ".")
+	var second := _cell_near(rows, first, ".")
 	var control_from: Vector2 = control.lead()
-	var pressed: bool = scene.command(_key(keycode))
+	var pressed: bool = scene.command(_click(first, scene.PIXELS_PER_CELL))
+	var first_from := _distance(scene.lead(), first)
 	for i in WALK_TICKS:
 		scene.step()
 		control.step()
-	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE
-	var along := walked.dot(direction)
-	var across := absf(walked.dot(Vector2(direction.y, direction.x)))
-	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
-	var release := _key(keycode)
-	release.pressed = false
-	var stopped_at: Vector2 = scene.lead()
-	var released: bool = scene.command(release)
-	for i in STOP_TICKS:
+	var first_to := _distance(scene.lead(), first)
+	var held_on: bool = scene.command(_drag(second, scene.PIXELS_PER_CELL, MOUSE_BUTTON_MASK_RIGHT))
+	var second_from := _distance(scene.lead(), second)
+	for i in WALK_TICKS:
 		scene.step()
-	var after_stop: float = (scene.lead() - stopped_at).length() / WorldAdapter.CELL_SIZE
-	var passed := pressed and along >= 1.0 and along > across and stood < 0.5 and released and after_stop < 1.0
-	print("play_test: %s from %s ordered %s, walked %.2f cells its way and %.2f across in %d ticks; released %s, then moved %.2f cells in %d; control without a key moved %.2f cells: %s" % [
-		OS.get_keycode_string(keycode), home, pressed, along, across, WALK_TICKS, released, after_stop,
-		STOP_TICKS, stood, "pass" if passed else "FAIL"])
+		control.step()
+	var second_to := _distance(scene.lead(), second)
+	var release := _click(second, scene.PIXELS_PER_CELL)
+	release.pressed = false
+	var released: bool = not scene.command(release)
+	var after_release: bool = not scene.command(_drag(home, scene.PIXELS_PER_CELL, 0))
+	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
+	var setup := first != home and second != first and second_from > 0.0
+	var passed := setup and pressed and first_to < first_from and held_on and second_to < second_from \
+			and released and after_release and stood < 0.5
+	print("play_test: right button on %s from %s ordered %s, %.0f to %.0f away in %d ticks; held and moved to %s ordered %s, %.0f to %.0f away; released %s, then moved to %s ordered nothing %s; control without input moved %.2f cells: %s" % [
+		first, home, pressed, first_from, first_to, WALK_TICKS, second, held_on, second_from, second_to,
+		released, home, after_release, stood, "pass" if passed else "FAIL"])
 	scene.free()
 	control.free()
 	return passed
 
 
+# Q casts the first skill, a bolt, at the cursor through the cast port. Setup: key 1 leaves the
+# person striking with the bolt alone, which finds no foe at home, so its ready tick moves only for
+# a cast. Cast on press: Q's press is accepted and the ready tick moves on the next tick; control,
+# the same scene given no Q keeps it. A second Q at once is refused as on cooldown and E, a skill
+# the person lacks, as no such skill, each with its reason on the HUD, where the first Q was
+# accepted. Cast on release: Q's press casts nothing but shows the aim, the bolt's range round the
+# person and its area at the cursor, or at the ring for a cursor beyond it; its release casts.
+# Q pressed again while aiming, or Escape, which then pauses nothing, cancels it, and the release
+# casts nothing.
+func _cast_pass() -> bool:
+	var pressing := _cast_scene(false)
+	var control := _cast_scene(false)
+	var setup: bool = pressing.world.skill_count(pressing.steered) == 2 and _ready(pressing) == _ready(control)
+	var ready_from := _ready(pressing)
+	var cast: bool = pressing.command(_key(KEY_Q))
+	pressing.step()
+	control.step()
+	var cast_moved := _ready(pressing) > ready_from and _ready(control) == ready_from
+	var notice: Label = pressing.get_node("Hud").labels.notice
+	var cooling: bool = not pressing.command(_key(KEY_Q)) and notice.text == "CAST_ON_COOLDOWN" and notice.visible
+	var lacking: bool = not pressing.command(_key(KEY_E)) and notice.text == "CAST_NO_SKILL"
+	var pressed := setup and cast and cast_moved and cooling and lacking
+	print("play_test: cast on press, Q accepted %s and the ready tick moved %d to %d, the control's staying %s; Q again refused as on cooldown with its reason %s; E refused as no skill %s (setup %s): %s" % [
+		cast, ready_from, _ready(pressing), _ready(control) == ready_from, cooling, lacking, setup,
+		"pass" if pressed else "FAIL"])
+
+	var releasing := _cast_scene(true)
+	var aim: Node2D = releasing.get_node("Aim")
+	var person: Vector2 = releasing.lead() * releasing.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	var reach: float = releasing.world.skills(releasing.steered)[0]["range"] * releasing.PIXELS_PER_CELL \
+			/ WorldAdapter.CELL_SIZE
+	var held: bool = not releasing.command(_key(KEY_Q)) and releasing.aiming() == KEY_Q
+	var shown: bool = aim.visible and aim.point == (person + CAST_OFFSET).floor() and aim.reach == reach
+	releasing.command(_motion(person + FAR_OFFSET, 0))
+	# The aim is drawn on whole pixels, so within a pixel of the ring.
+	var at_ring: bool = absf(aim.point.distance_to(person.floor()) - reach) <= 1.0
+	releasing.command(_motion(person + CAST_OFFSET, 0))
+	var before := _ready(releasing)
+	releasing.step()
+	var nothing_on_press := _ready(releasing) == before
+	var let_go := _key(KEY_Q)
+	let_go.pressed = false
+	var released: bool = releasing.command(let_go) and not aim.visible
+	releasing.step()
+	var cast_on_release := _ready(releasing) > before
+
+	var again := _cast_scene(true)
+	again.command(_key(KEY_Q))
+	var cancelled_again: bool = not again.command(_key(KEY_Q)) and again.aiming() == KEY_NONE \
+			and not again.get_node("Aim").visible
+	var again_released: bool = not again.command(let_go)
+	var again_before := _ready(again)
+	again.step()
+	var again_still := _ready(again) == again_before
+
+	var escaped := _cast_scene(true)
+	var escape_hud: CanvasLayer = escaped.get_node("Hud")
+	escaped.command(_key(KEY_Q))
+	var not_paused: bool = not escaped.navigate(_key(KEY_ESCAPE)) and escape_hud.screen() == null
+	escaped.command(_key(KEY_ESCAPE))
+	var escape_cancelled: bool = escaped.aiming() == KEY_NONE and not escaped.get_node("Aim").visible
+	var escape_released: bool = not escaped.command(let_go)
+	var escape_before := _ready(escaped)
+	escaped.step()
+	var escape_still := _ready(escaped) == escape_before
+	var on_release := held and shown and at_ring and nothing_on_press and released and cast_on_release \
+			and cancelled_again and again_released and again_still and not_paused and escape_cancelled \
+			and escape_released and escape_still
+	print("play_test: cast on release, Q's press aims %s, the aim at the cursor with range %.0f px %s and at the ring past it %s, nothing cast while held %s; the release casts %s and the ready tick moved %s; Q again cancels %s, its release casts nothing %s %s; Escape pauses nothing %s, cancels %s, the release casts nothing %s %s: %s" % [
+		held, reach, shown, at_ring, nothing_on_press, released, cast_on_release, cancelled_again,
+		again_released, again_still, not_paused, escape_cancelled, escape_released, escape_still,
+		"pass" if on_release else "FAIL"])
+	for scene: Node2D in [pressing, control, releasing, again, escaped]:
+		scene.free()
+	return pressed and on_release
+
+
+# The scene born into the first village, casting on release or on press as `on_release` says,
+# striking with its first skill alone and the cursor CAST_OFFSET east of the person.
+func _cast_scene(on_release: bool) -> Node2D:
+	var scene := _scene(0)
+	scene.get_node("Hud").settings.chosen.cast = 1 if on_release else 0
+	scene.command(_key(KEY_1))
+	scene.command(_motion(scene.lead() * scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE + CAST_OFFSET, 0))
+	return scene
+
+
+# The tick from which the steered person may strike or cast again.
+func _ready(scene: Node2D) -> int:
+	return scene.world.body_ready(scene.steered)[0]
+
+
 # The scene opens on the title with no world; Enter on a new game opens the new-game panel, and the
 # digits typed and Enter start the world from that seed, closing both. Escape opens the pause
-# panel on that seed, its guide showing the move keys, the first and last skill keys and the key
-# for all skills as the scene binds them, and no tick runs while it is open. Control: once resumed,
+# panel on that seed, its guide showing the move button, the cast keys, the first and last skill
+# keys and the key for all skills as the scene binds them, and no tick runs while it is open. Control: once resumed,
 # the same time runs its ticks, and at the settings' fourfold speed at least four times as many.
 func _screens_pass() -> bool:
 	var scene: Node2D = load(SCENE).instantiate()
@@ -152,8 +240,9 @@ func _screens_pass() -> bool:
 	for control: Dictionary in hud.pause.controls:
 		caps.append_array(control.keys)
 	var skills := "%s-%s" % [OS.get_keycode_string(scene.SKILL_KEYS.front()), OS.get_keycode_string(scene.SKILL_KEYS.back())]
+	var casts := "".join(scene.CAST_KEYS.map(func(keycode: Key) -> String: return OS.get_keycode_string(keycode)))
 	var guided: bool = caps.has(skills) and caps.has(OS.get_keycode_string(scene.ALL_SKILLS_KEY)) \
-			and scene.MOVE_KEYS.keys().all(func(keycode: Key) -> bool: return caps.has(OS.get_keycode_string(keycode)))
+			and caps.has("CONTROLS_CLICK") and caps.has(casts) and casts == "QWERT"
 	# Three and a half ticks' time, so that the half left over is not lost to rounding.
 	var span := 3.5 / WorldAdapter.TICKS_PER_SECOND
 	var before: int = scene.ticks
@@ -469,13 +558,26 @@ func _cell_near(rows: PackedStringArray, home: Vector2i, tile: String) -> Vector
 	return home
 
 
-# A left click at the centre of `cell`, in the scene's pixels of `pixels_per_cell` to a cell.
+# A right click at the centre of `cell`, in the scene's pixels of `pixels_per_cell` to a cell.
 func _click(cell: Vector2i, pixels_per_cell: float) -> InputEventMouseButton:
 	var click := InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
+	click.button_index = MOUSE_BUTTON_RIGHT
 	click.pressed = true
 	click.position = (Vector2(cell) + Vector2.ONE * 0.5) * pixels_per_cell
 	return click
+
+
+# The cursor moved to the centre of `cell`, with the buttons of `mask` held.
+func _drag(cell: Vector2i, pixels_per_cell: float, mask: int) -> InputEventMouseMotion:
+	return _motion((Vector2(cell) + Vector2.ONE * 0.5) * pixels_per_cell, mask)
+
+
+# The cursor moved to `at`, in the scene's pixels, with the buttons of `mask` held.
+func _motion(at: Vector2, mask: int) -> InputEventMouseMotion:
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.button_mask = mask
+	return motion
 
 
 func _key(keycode: Key) -> InputEventKey:
