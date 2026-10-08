@@ -1,8 +1,10 @@
 // Lives the generated region of each seed in a range for a number of years,
 // with days of five ticks, and prints per seed the households each faction
 // starts with, the living and the peopled villages at the start and the end,
-// the most living at once, and whether every faction held a peopled village
-// at the end of every year. `make sweep` builds it optimised and runs it; it
+// the most living at once, whether every faction held a peopled village at
+// the end of every year, the living at each realm rank and those knowing an
+// art at the end, and how many people ever learned from a manual lying on a
+// cell. `make sweep` builds it optimised and runs it; it
 // is not a test.
 
 #include <algorithm>
@@ -13,6 +15,7 @@
 #include <iterator>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "map.hpp"
@@ -46,7 +49,36 @@ struct Lived {
   std::size_t peopled_after;
   std::size_t peak;
   bool every_faction_peopled;
+  std::vector<std::size_t> ranks;
+  std::size_t artful;
+  std::size_t readers;
 };
+
+// Marks, among `read`, everyone who learned a skill on this tick while
+// within the reading reach of a manual lying on a cell; `known` holds how
+// many skills each person knew before the tick, and is brought up to date.
+void note_readers(const World& world, std::int64_t reach,
+                  std::vector<std::size_t>& known, std::vector<bool>& read) {
+  known.resize(world.population(), 0);
+  read.resize(world.population(), false);
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const Person& who = world.person(person);
+    if (who.known.size() > known.at(person)) {
+      for (const Manual& manual : world.manuals()) {
+        const auto* cell = std::get_if<Cell>(&manual.place);
+        if (cell == nullptr) {
+          continue;
+        }
+        const Position centre = centre_of(*cell);
+        const std::int64_t across = std::int64_t{who.position.x} - centre.x;
+        const std::int64_t down = std::int64_t{who.position.y} - centre.y;
+        read.at(person) = read.at(person) ||
+                          (across * across) + (down * down) <= reach * reach;
+      }
+    }
+    known.at(person) = who.known.size();
+  }
+}
 
 Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   Region region = generate_region(seed, data);
@@ -55,13 +87,23 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
               region.structures, region.rules,         village_specs(region),
               region.leadership, region.life,          region.sects};
   const std::size_t factions = data.factions.size();
-  Lived lived{world.living(), 0,   peopled(world, factions).first, 0,
-              world.living(), true};
+  Lived lived{world.living(),
+              0,
+              peopled(world, factions).first,
+              0,
+              world.living(),
+              true,
+              std::vector<std::size_t>(data.life.realms.size() + 1, 0),
+              0,
+              0};
+  std::vector<std::size_t> known;
+  std::vector<bool> read;
   for (std::uint64_t year = 0; year < years; ++year) {
     for (std::uint64_t tick = 0; tick < DAYS_PER_YEAR * TICKS_PER_SWEPT_DAY;
          ++tick) {
       world.tick();
       lived.peak = std::max(lived.peak, world.living());
+      note_readers(world, data.life.learning.reading_reach, known, read);
     }
     const std::vector<std::size_t> held = peopled(world, factions).second;
     lived.every_faction_peopled =
@@ -71,7 +113,25 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   }
   lived.living_after = world.living();
   lived.peopled_after = peopled(world, factions).first;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    if (world.person(person).health > 0) {
+      ++lived.ranks.at(world.rank(person));
+      lived.artful += world.person(person).known.empty() ? 0U : 1U;
+    }
+  }
+  lived.readers =
+      static_cast<std::size_t>(std::count(read.begin(), read.end(), true));
   return lived;
+}
+
+// `counts`, comma-separated.
+template <typename Count>
+std::string listed(const std::vector<Count>& counts) {
+  std::string joined;
+  for (const Count each : counts) {
+    joined += (joined.empty() ? "" : ",") + std::to_string(each);
+  }
+  return joined;
 }
 
 // The households each faction starts with, comma-separated.
@@ -80,20 +140,20 @@ std::string households(const Region& region, std::size_t factions) {
   for (const Village& village : region.villages) {
     count.at(village.faction) += village.households;
   }
-  std::string listed;
-  for (const std::uint32_t each : count) {
-    listed += (listed.empty() ? "" : ",") + std::to_string(each);
-  }
-  return listed;
+  return listed(count);
 }
 
 int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
   const RegionData data = region_data();
-  std::cout << "| Seed | Households | Living | Peopled villages | Peak | "
-               "Every faction peopled |\n|---|---|---|---|---|---|\n";
+  std::cout
+      << "| Seed | Households | Living | Peopled villages | Peak | "
+         "Every faction peopled | Living by rank | Knowing an art | Manual "
+         "readers |\n|---|---|---|---|---|---|---|---|---|\n";
   std::size_t seeds = 0;
   std::size_t kept = 0;
   std::size_t grew = 0;
+  std::vector<std::size_t> ranks(data.life.realms.size() + 1, 0);
+  std::size_t readers = 0;
   for (std::uint64_t seed = first; seed <= last; ++seed) {
     const Lived lived = live(Seed{seed}, years, data);
     ++seeds;
@@ -105,12 +165,23 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
               << " | " << lived.living_before << " -> " << lived.living_after
               << " | " << lived.peopled_before << " -> " << lived.peopled_after
               << " | " << lived.peak << " | "
-              << (lived.every_faction_peopled ? "yes" : "no") << " |\n"
+              << (lived.every_faction_peopled ? "yes" : "no") << " | "
+              << listed(lived.ranks) << " | " << lived.artful << " | "
+              << lived.readers << " |\n"
               << std::flush;
+    for (std::size_t rank = 0; rank < ranks.size(); ++rank) {
+      ranks.at(rank) += lived.ranks.at(rank);
+    }
+    readers += lived.readers;
   }
   std::cout << "\nEvery faction peopled through " << years << " years on "
             << kept << " of " << seeds << " seeds; the living at least "
-            << GROWTH_FACTOR << " times as many on " << grew << ".\n";
+            << GROWTH_FACTOR << " times as many on " << grew
+            << ".\nThe living at the end by realm rank, from none up, over "
+               "every seed: "
+            << listed(ranks)
+            << "; people who learned from a manual on a cell: " << readers
+            << ".\n";
   return 0;
 }
 

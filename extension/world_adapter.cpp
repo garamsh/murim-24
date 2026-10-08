@@ -1021,6 +1021,82 @@ std::int64_t WorldAdapter::person_sect(std::int64_t person) const {
   return sect ? static_cast<std::int64_t>(*sect) : -1;
 }
 
+std::int64_t WorldAdapter::person_qi(std::int64_t person) const {
+  return world().person(person_index(person)).qi;
+}
+
+std::int64_t WorldAdapter::person_qi_capacity(std::int64_t person) const {
+  return world().person(person_index(person)).qi_capacity;
+}
+
+std::int64_t WorldAdapter::person_realm(std::int64_t person) const {
+  return world().rank(person_index(person));
+}
+
+godot::Dictionary WorldAdapter::person_nature(std::int64_t person) const {
+  godot::Dictionary fields;
+  if (const std::optional<murim::Nature> nature =
+          world().nature(person_index(person))) {
+    fields.set("orientation", static_cast<std::int64_t>(nature->orientation));
+    fields.set("polarity", static_cast<std::int64_t>(nature->polarity));
+  }
+  return fields;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
+    std::int64_t person) const {
+  const std::size_t index = person_index(person);
+  const murim::World& core = world();
+  const std::size_t count = core.skill_count(index);
+  const std::vector<murim::Known>& known = core.person(index).known;
+  const std::size_t drilled = count - std::min(count, known.size());
+  godot::TypedArray<godot::Dictionary> skills;
+  for (std::size_t skill = 0; skill < count; ++skill) {
+    const murim::Skill& used = core.skill_of(index, skill);
+    godot::Dictionary fields;
+    fields.set("range", used.range);
+    fields.set("radius", used.radius);
+    fields.set("body_damage", static_cast<std::int64_t>(used.body_damage));
+    fields.set("structure_damage", used.structure_damage);
+    fields.set("cooldown", static_cast<std::int64_t>(used.cooldown));
+    fields.set("qi_cost", used.qi_cost);
+    fields.set("ready_at",
+               static_cast<std::int64_t>(core.ready_at(index, skill)));
+    fields.set("art", -1);
+    if (skill >= drilled) {
+      const murim::Known& learned = known.at(skill - drilled);
+      const murim::Art& art = core.arts().at(learned.art);
+      const murim::ArtSkill& taught = art.skills.at(learned.skill);
+      fields.set("art", static_cast<std::int64_t>(learned.art));
+      fields.set("rank", taught.rank);
+      fields.set("korean", godot::String::utf8(taught.name.korean.c_str()));
+      fields.set("romanised",
+                 godot::String::utf8(taught.name.romanised.c_str()));
+      fields.set("orientation",
+                 static_cast<std::int64_t>(art.nature.orientation));
+      fields.set("polarity", static_cast<std::int64_t>(art.nature.polarity));
+    }
+    skills.push_back(fields);
+  }
+  return skills;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::realms() const {
+  godot::TypedArray<godot::Dictionary> realms;
+  if (!world_) {
+    return realms;
+  }
+  for (const murim::Realm& realm : world().realms()) {
+    godot::Dictionary fields;
+    fields.set("korean", godot::String::utf8(realm.name.korean.c_str()));
+    fields.set("romanised", godot::String::utf8(realm.name.romanised.c_str()));
+    fields.set("qi", realm.qi);
+    fields.set("might", realm.might);
+    realms.push_back(fields);
+  }
+  return realms;
+}
+
 godot::String WorldAdapter::sect_name(std::int64_t sect) const {
   return {world().sect_name(sect_index(sect)).c_str()};
 }
@@ -1066,7 +1142,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::manuals() const {
   }
   for (const murim::Manual& manual : world().manuals()) {
     godot::Dictionary fields;
-    fields.set("discipline", static_cast<std::int64_t>(manual.discipline));
+    fields.set("art", static_cast<std::int64_t>(manual.art));
     if (const auto* held = std::get_if<murim::HeldBySect>(&manual.place)) {
       fields.set("place", "sect");
       fields.set("sect", static_cast<std::int64_t>(held->sect));
@@ -1171,6 +1247,17 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::discipline_names);
   godot::ClassDB::bind_method(godot::D_METHOD("person_sect", "person"),
                               &WorldAdapter::person_sect);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_qi", "person"),
+                              &WorldAdapter::person_qi);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_qi_capacity", "person"),
+                              &WorldAdapter::person_qi_capacity);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_realm", "person"),
+                              &WorldAdapter::person_realm);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_nature", "person"),
+                              &WorldAdapter::person_nature);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_skills", "person"),
+                              &WorldAdapter::person_skills);
+  godot::ClassDB::bind_method(godot::D_METHOD("realms"), &WorldAdapter::realms);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_name", "sect"),
                               &WorldAdapter::sect_name);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_faction", "sect"),
@@ -1317,11 +1404,12 @@ void WorldAdapter::_bind_methods() {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }
-  const std::array<std::pair<const char*, murim::CastRefusal>, 6> casts{{
+  const std::array<std::pair<const char*, murim::CastRefusal>, 7> casts{{
       {"CAST_NONE", murim::CastRefusal::NONE},
       {"CAST_DEAD", murim::CastRefusal::DEAD},
       {"CAST_NO_SKILL", murim::CastRefusal::NO_SKILL},
       {"CAST_ON_COOLDOWN", murim::CastRefusal::ON_COOLDOWN},
+      {"CAST_NO_QI", murim::CastRefusal::NO_QI},
       {"CAST_NO_TARGET", murim::CastRefusal::NO_TARGET},
       {"CAST_OUT_OF_RANGE", murim::CastRefusal::OUT_OF_RANGE},
   }};
@@ -1329,6 +1417,19 @@ void WorldAdapter::_bind_methods() {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }
+  const std::array<std::pair<const char*, murim::Orientation>, 3> orientations{{
+      {"ORIENTATION_ORTHODOX", murim::Orientation::ORTHODOX},
+      {"ORIENTATION_UNORTHODOX", murim::Orientation::UNORTHODOX},
+      {"ORIENTATION_DEMONIC", murim::Orientation::DEMONIC},
+  }};
+  for (const auto& [constant, orientation] : orientations) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(orientation));
+  }
+  godot::ClassDB::bind_integer_constant(
+      name, "", "POLARITY_YANG", static_cast<int>(murim::Polarity::YANG));
+  godot::ClassDB::bind_integer_constant(name, "", "POLARITY_YIN",
+                                        static_cast<int>(murim::Polarity::YIN));
   godot::ClassDB::bind_integer_constant(name, "", "LOAD_NONE", LOAD_NONE);
   const std::array<std::pair<const char*, murim::LoadError>, 5> load_errors{{
       {"LOAD_MISSING", murim::LoadError::MISSING},

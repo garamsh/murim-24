@@ -1370,7 +1370,8 @@ TEST(World, HowManyTicksMakeADayIsTheWorldsData) {
                          daily}));
 }
 
-// One discipline whose limit is drawn over [500 - spread, 500 + spread].
+// One discipline whose limit is drawn over [500 - spread, 500 + spread],
+// and one art of it with no skills, which a manual may name.
 Life one_discipline(std::uint32_t limit_spread) {
   constexpr Spread GROWTH{10, 5};
   constexpr std::uint32_t LIMIT = 500;
@@ -1385,7 +1386,11 @@ Life one_discipline(std::uint32_t limit_spread) {
               {},
               std::nullopt,
               std::nullopt,
-              std::nullopt};
+              std::nullopt,
+              std::nullopt,
+              {},
+              {Art{{"검법", "Sword art"}, 0, Nature{}, {}}},
+              Learning{}};
 }
 
 // The mean and variance of the limits drawn for 400 people born with
@@ -3241,6 +3246,495 @@ TEST(World, AimTakesTheNearestFoeAheadOfTheFacing) {
   EXPECT_THROW(
       static_cast<void>(world.aim(CASTER, BOLT, Step{MAX_REACH + 1, 0})),
       std::invalid_argument);
+}
+
+// The qi tests' world, days of one tick: a reader of faction 0 at
+// READER_CELL; a sect of faction 0 seated at SEAT_HOME, whose two founders
+// are its elders and hold `held` manuals; an outsider of faction 1, at
+// peace with everyone; and a foe of faction 2, hostile to faction 0, at
+// QI_FOE_CELL, beyond any skill's reach of the seat's cell. Everyone's army
+// strikes with IDLE alone. People cultivate
+// `growth` qi a day up to `limit`, recovering `recovery` per mille of it
+// every `recovery_ticks` ticks, over realms at 100, 300 and 800 qi, and
+// learn the arts ORTHODOX_ART and DEMONIC_ART by `learning`.
+constexpr std::uint32_t QI_GROWTH = 10;
+constexpr std::uint32_t QI_LIMIT = 1'000;
+constexpr std::uint32_t THIRD_RATE = 100;
+constexpr std::uint32_t SECOND_RATE = 300;
+constexpr std::uint32_t FIRST_RATE = 800;
+constexpr std::uint32_t HALF = PER_MILLE / 2;
+constexpr Spread FOUNDED_DAYS{100, 0};
+constexpr Seed QI_SEED{5};
+
+struct Cultivating {
+  Spread growth{QI_GROWTH, 0};
+  Spread limit{QI_LIMIT, 0};
+  std::uint32_t recovery = PER_MILLE;
+  std::uint64_t recovery_ticks = 1;
+  std::optional<Spread> founding_age;
+  std::uint32_t might = PER_MILLE;
+  std::uint32_t strike_cost = 50;
+  bool form_comprehensible = true;
+  Learning learning{0,         0,         50,        CELL_SIZE,
+                    PER_MILLE, PER_MILLE, PER_MILLE, PER_MILLE};
+  std::vector<std::size_t> held{0, 1};
+  std::uint32_t admission_chance = 0;
+};
+
+constexpr std::size_t READER = 0;
+constexpr std::size_t READER_ARMY = 0;
+constexpr std::size_t QI_SEAT_ARMY = 1;
+constexpr std::size_t QI_OUTSIDERS = 2;
+constexpr std::size_t QI_FOE = 4;
+constexpr std::size_t QI_FOE_ARMY = 3;
+constexpr Cell READER_CELL{2, 9};
+constexpr Cell QI_FOE_CELL{12, 12};
+// Where the foe comes to fight: four cells east of the seat's cell.
+constexpr Cell QI_FIELD{6, 3};
+constexpr Cell QI_OUTSIDERS_CELL{13, 1};
+constexpr std::uint64_t QI_FOE_HEALTH = 10'000;
+constexpr std::uint64_t ART_DAMAGE = 10;
+constexpr std::size_t ORTHODOX_ART = 0;
+constexpr std::size_t DEMONIC_ART = 1;
+// The reader's skills: IDLE, then those it learns, in the order learned:
+// the strike and the sweep, the cut, and the form once first-rate.
+constexpr std::size_t STRIKE = 1;
+constexpr std::size_t CUT = 3;
+
+World qi_world(const Cultivating& cultivating) {
+  const std::int32_t reach = 5 * CELL_SIZE;
+  const Skill strike{reach, 0, ART_DAMAGE, 0, 30, cultivating.strike_cost};
+  const Skill sweep{reach, CELL_SIZE, ART_DAMAGE, 0, 60, 100};
+  const Skill form{reach, CELL_SIZE, ART_DAMAGE, 0, 90, 100};
+  Life life = one_discipline(0);
+  life.founding_age = cultivating.founding_age;
+  life.cultivation =
+      Cultivation{cultivating.growth, cultivating.limit, cultivating.recovery,
+                  cultivating.recovery_ticks};
+  life.realms = {Realm{{"삼류", "Third-rate"}, THIRD_RATE, PER_MILLE},
+                 Realm{{"이류", "Second-rate"}, SECOND_RATE, cultivating.might},
+                 Realm{{"일류", "First-rate"}, FIRST_RATE, cultivating.might}};
+  life.arts = {
+      Art{{"매화검법", "Plum Blossom Sword"},
+          0,
+          Nature{Orientation::ORTHODOX, Polarity::YANG},
+          {ArtSkill{{"일검", "Strike"}, strike, 1, false},
+           ArtSkill{{"이검", "Sweep"}, sweep, 2, true},
+           ArtSkill{
+               {"삼검", "Form"}, form, 3, cultivating.form_comprehensible}}},
+      Art{{"천마도법", "Heavenly Demon Saber"},
+          0,
+          Nature{Orientation::DEMONIC, Polarity::YIN},
+          {ArtSkill{{"일도", "Cut"}, strike, 1, false}}}};
+  life.learning = cultivating.learning;
+  // Every manual the sect holds scatters onto its seat's own cell when it
+  // falls.
+  life.manuals = Manuals{{cultivating.held}, PER_MILLE, 0};
+  Rules rules{
+      SEPARATION,
+      {{false, false, true}, {false, false, false}, {true, false, false}},
+      STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  const Leadership members{
+      std::nullopt, std::nullopt,
+      Admission{0, 0, 0, OPEN_SIDE, cultivating.admission_chance, PER_MILLE},
+      std::nullopt};
+  constexpr std::uint32_t FOUNDING_ATTAINMENT = 20;
+  return World{
+      QI_SEED,
+      Map{open_map(OPEN_SIDE)},
+      {army(READER_CELL, READER_CELL, 1, 1, 0, {IDLE}),
+       army(SEAT_HOME, SEAT_HOME, 2, 1, 0, {IDLE}),
+       army(QI_OUTSIDERS_CELL, QI_OUTSIDERS_CELL, 1, 1, 1, {IDLE}),
+       army(QI_FOE_CELL, QI_FOE_CELL, 1, QI_FOE_HEALTH, 2, {IDLE})},
+      {Structure{{SEAT_HOME.x, 0}, INTACT, {1, 1}, true}},
+      rules,
+      {VillageSpec{{0}, QI_SEAT_ARMY, {Holding{0, 0, 0, 4}}, 0, {}}},
+      {members, Leadership{}, Leadership{}},
+      life,
+      {SectSpec{
+          "Hwasan", 0, 0, {Founder{1, FOUNDING_ATTAINMENT}, Founder{2, 0}}}}};
+}
+
+// Cultivating `cultivating`'s world after its sect has fallen, its manuals
+// lying on the seat's cell, and the reader has stood there `ticks` ticks
+// after walking to it.
+World read(const Cultivating& cultivating, std::uint64_t ticks = 10) {
+  constexpr int LONGEST_WALK = 1'000;
+  World world = qi_world(cultivating);
+  world.conscript(1, QI_OUTSIDERS);
+  world.conscript(2, QI_OUTSIDERS);
+  world.order(READER_ARMY, {SEAT_HOME, {0}});
+  for (int walked = 0;
+       walked < LONGEST_WALK && !in(SEAT_HOME, world.person(READER).position);
+       ++walked) {
+    world.tick();
+  }
+  EXPECT_TRUE(in(SEAT_HOME, world.person(READER).position));
+  run_ticks(world, ticks);
+  return world;
+}
+
+// The art skills person `person` knows, as (art, skill) pairs in the order
+// learned.
+std::vector<std::pair<std::size_t, std::size_t>> known_by(const World& world,
+                                                          std::size_t person) {
+  std::vector<std::pair<std::size_t, std::size_t>> known;
+  for (const Known& each : world.person(person).known) {
+    known.emplace_back(each.art, each.skill);
+  }
+  return known;
+}
+
+TEST(World, QiCapacityGrowsADayUpToItsLimitAndQiRecovers) {
+  constexpr std::uint32_t LIMIT = 25;
+  constexpr std::uint32_t FOUR_TENTHS = 400;
+  constexpr std::uint64_t FILLING = 10;
+  Cultivating slow;
+  slow.limit = {LIMIT, 0};
+  slow.recovery = FOUR_TENTHS;
+  World world = qi_world(slow);
+  run_ticks(world, 2);
+  // Two days' growth, and the second tick recovered four tenths of the
+  // first day's ten, rounded up.
+  EXPECT_EQ(world.person(READER).qi_capacity, 20U);
+  EXPECT_EQ(world.person(READER).qi, 4U);
+  run_ticks(world, FILLING);
+  EXPECT_EQ(world.person(READER).qi_capacity, LIMIT);
+  EXPECT_EQ(world.person(READER).qi, LIMIT);
+  // Control: a world with no cultivation holds no qi.
+  World uncultivated{QI_SEED,
+                     Map{open_map(OPEN_SIDE)},
+                     {army(READER_CELL, READER_CELL, 1, 1, 0, {IDLE})},
+                     {},
+                     peaceful(0)};
+  run_ticks(uncultivated, 2 + FILLING);
+  EXPECT_EQ(uncultivated.person(READER).qi_capacity, 0U);
+}
+
+TEST(World, ThePeopleAWorldStartsWithCultivatedForTheirFoundingAge) {
+  Cultivating founded;
+  founded.growth = {3, 0};
+  founded.founding_age = FOUNDED_DAYS;
+  const World world = qi_world(founded);
+  EXPECT_EQ(world.person(READER).qi_capacity, 300U);
+  EXPECT_EQ(world.person(READER).qi, 300U);
+  // Control: born as the world begins, they hold none.
+  EXPECT_EQ(qi_world(Cultivating{}).person(READER).qi_capacity, 0U);
+}
+
+TEST(World, ARealmIsHowManyRealmsTheQiCapacityReaches) {
+  World world = qi_world(Cultivating{});
+  EXPECT_EQ(world.rank(READER), 0U);
+  run_ticks(world, THIRD_RATE / QI_GROWTH);
+  ASSERT_EQ(world.person(READER).qi_capacity, THIRD_RATE);
+  EXPECT_EQ(world.rank(READER), 1U);
+  run_ticks(world, (FIRST_RATE - THIRD_RATE) / QI_GROWTH);
+  ASSERT_EQ(world.person(READER).qi_capacity, FIRST_RATE);
+  EXPECT_EQ(world.rank(READER), 3U);
+  // Control: a tick short of a threshold is the realm below.
+  World short_of = qi_world(Cultivating{});
+  run_ticks(short_of, (THIRD_RATE / QI_GROWTH) - 1);
+  EXPECT_EQ(short_of.rank(READER), 0U);
+}
+
+bool cultivates_by(const Life& life) {
+  try {
+    const World world{
+        Seed{1}, Map{open_map(OPEN_SIDE)}, {}, {}, peaceful(0), {}, {}, life};
+    return true;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
+TEST(World, QiDataPastItsLimitsIsRefused) {
+  constexpr std::uint32_t LOWER = 10;
+  constexpr std::uint32_t HIGHER = 20;
+  Life life = one_discipline(0);
+  life.cultivation = Cultivation{{1, 0}, {HIGHER, 0}, LOWER, 1};
+  life.realms = {Realm{{"a", "a"}, LOWER, PER_MILLE},
+                 Realm{{"b", "b"}, HIGHER, PER_MILLE}};
+  ASSERT_TRUE(cultivates_by(life));
+  Life descending = life;
+  std::swap(descending.realms.at(0), descending.realms.at(1));
+  Life mighty = life;
+  mighty.realms.at(1).might = MAX_MIGHT + 1;
+  Life stray = life;
+  stray.arts.at(0).discipline = 1;
+  Life beyond = life;
+  beyond.arts.at(0).skills.push_back(ArtSkill{{"c", "c"}, IDLE, 3, true});
+  Life costly = life;
+  costly.arts.at(0).skills.push_back(
+      ArtSkill{{"c", "c"}, Skill{0, 0, 0, 0, 0, MAX_TALENT + 1}, 0, true});
+  Life never = life;
+  never.cultivation->recovery_ticks = 0;
+  Life easy = life;
+  easy.learning.orientation_ease = PER_MILLE + 1;
+  for (const Life& refused :
+       {descending, mighty, stray, beyond, costly, never, easy}) {
+    EXPECT_FALSE(cultivates_by(refused));
+  }
+}
+
+TEST(World, AManualOnACellTeachesWhatItsReadersRealmAllowsAndStays) {
+  const World world = read(Cultivating{});
+  ASSERT_TRUE(std::holds_alternative<Cell>(world.manuals().front().place));
+  ASSERT_EQ(world.rank(READER), 3U);
+  // Both manuals as second-rate, from a cell away, the orthodox art's
+  // skills first; then the form, read again from the manual still lying
+  // there once first-rate.
+  EXPECT_EQ(
+      known_by(world, READER),
+      (std::vector<std::pair<std::size_t, std::size_t>>{{ORTHODOX_ART, 0},
+                                                        {ORTHODOX_ART, 1},
+                                                        {DEMONIC_ART, 0},
+                                                        {ORTHODOX_ART, 2}}));
+  EXPECT_EQ(world.skill_count(READER), 5U);
+  // The manuals stay where they lie.
+  for (const Manual& manual : world.manuals()) {
+    EXPECT_TRUE(std::holds_alternative<Cell>(manual.place));
+  }
+  // Control: a reader holding less qi than the reading costs learns nothing.
+  Cultivating costly;
+  costly.learning.reading_cost = QI_LIMIT + 1;
+  EXPECT_TRUE(known_by(read(costly), READER).empty());
+}
+
+TEST(World, ReadingSpendsQiAndTeachesOnlyUpToTheReadersRealm) {
+  // Founded with 400 qi, which never recovers, and growing no more: second
+  // rank, and qi for one reading of 150 but not two.
+  Cultivating held;
+  held.growth = {4, 0};
+  constexpr std::uint32_t STORE = 400;
+  constexpr std::uint32_t ONCE = 300;
+  constexpr std::uint32_t TWICE = 200;
+  held.limit = {STORE, 0};
+  held.founding_age = FOUNDED_DAYS;
+  held.recovery_ticks = NEVER_AGAIN;
+  held.learning.reading_cost = ONCE;
+  const World world = read(held);
+  ASSERT_EQ(world.rank(READER), 2U);
+  EXPECT_EQ(known_by(world, READER),
+            (std::vector<std::pair<std::size_t, std::size_t>>{
+                {ORTHODOX_ART, 0}, {ORTHODOX_ART, 1}}));
+  EXPECT_EQ(world.person(READER).qi, STORE - ONCE);
+  // Control: with qi for both readings, the second manual is read too.
+  held.learning.reading_cost = TWICE;
+  EXPECT_EQ(known_by(read(held), READER).size(), 3U);
+}
+
+TEST(World, AnArtOfAnotherNatureCostsMoreToRead) {
+  // Half the ease along each axis: the demonic art, both axes away from the
+  // orthodox heart, costs four times the 50 qi.
+  Cultivating uneasy;
+  uneasy.growth = {4, 0};
+  constexpr std::uint32_t STORE = 400;
+  constexpr std::uint32_t COST = 50;
+  uneasy.limit = {STORE, 0};
+  uneasy.founding_age = FOUNDED_DAYS;
+  uneasy.recovery_ticks = NEVER_AGAIN;
+  uneasy.learning.orientation_ease = HALF;
+  uneasy.learning.polarity_ease = HALF;
+  const World world = read(uneasy);
+  ASSERT_EQ(known_by(world, READER).size(), 3U);
+  EXPECT_EQ(world.person(READER).qi, STORE - COST - (4 * COST));
+  EXPECT_EQ(world.nature(READER)
+                .value_or(Nature{Orientation::DEMONIC, Polarity::YIN})
+                .orientation,
+            Orientation::ORTHODOX);
+  // Control: at full ease it costs 50.
+  Cultivating easy = uneasy;
+  easy.learning.orientation_ease = PER_MILLE;
+  easy.learning.polarity_ease = PER_MILLE;
+  EXPECT_EQ(read(easy).person(READER).qi, STORE - COST - COST);
+}
+
+// Cultivating `cultivating`'s world after the reader has read its manuals
+// and the foe has come within reach of it, once the reader may cast skill
+// `skill` at it.
+World facing(const Cultivating& cultivating, std::size_t skill) {
+  constexpr int LONGEST_WAIT = 1'000;
+  World world = read(cultivating);
+  world.order(QI_FOE_ARMY, {QI_FIELD, {0}});
+  for (int wait = 0;
+       wait < LONGEST_WAIT &&
+       world.cast_refusal(READER, skill, AtPerson{QI_FOE}) != CastRefusal::NONE;
+       ++wait) {
+    world.tick();
+  }
+  return world;
+}
+
+// The health QI_FOE loses on the tick the reader casts skill `skill` at it,
+// once it may, after reading `cultivating`'s manuals.
+std::uint64_t cast_damage(const Cultivating& cultivating, std::size_t skill) {
+  World world = facing(cultivating, skill);
+  const std::uint64_t before = world.person(QI_FOE).health;
+  world.cast(READER, skill, AtPerson{QI_FOE});
+  world.tick();
+  return before - world.person(QI_FOE).health;
+}
+
+TEST(World, ARealmsMightAndAnArtsNatureScaleItsDamage) {
+  EXPECT_EQ(cast_damage(Cultivating{}, STRIKE), ART_DAMAGE);
+  Cultivating mighty;
+  mighty.might = 2 * PER_MILLE;
+  EXPECT_EQ(cast_damage(mighty, STRIKE), 2 * ART_DAMAGE);
+  // The demonic art strikes at half for each axis it differs in from the
+  // orthodox heart; the heart's own art at full.
+  Cultivating weak;
+  weak.learning.orientation_potency = HALF;
+  weak.learning.polarity_potency = HALF;
+  EXPECT_EQ(cast_damage(weak, CUT), ART_DAMAGE / 4);
+  EXPECT_EQ(cast_damage(weak, STRIKE), ART_DAMAGE);
+}
+
+TEST(World, EachArtSkillKeepsItsOwnCooldown) {
+  constexpr int LONGEST_WAIT = 1'000;
+  World world = facing(Cultivating{}, STRIKE);
+  for (int wait = 0;
+       wait < LONGEST_WAIT &&
+       world.cast_refusal(READER, CUT, AtPerson{QI_FOE}) != CastRefusal::NONE;
+       ++wait) {
+    world.tick();
+  }
+  ASSERT_EQ(world.cast_refusal(READER, STRIKE, AtPerson{QI_FOE}),
+            CastRefusal::NONE);
+  world.cast(READER, STRIKE, AtPerson{QI_FOE});
+  world.tick();
+  EXPECT_EQ(world.cast_refusal(READER, STRIKE, AtPerson{QI_FOE}),
+            CastRefusal::ON_COOLDOWN);
+  EXPECT_GT(world.ready_at(READER, STRIKE), world.ready_at(READER, CUT));
+  // Control: its other art skill, and its army's, are ready.
+  EXPECT_EQ(world.cast_refusal(READER, CUT, AtPerson{QI_FOE}),
+            CastRefusal::NONE);
+  EXPECT_EQ(world.cast_refusal(READER, 0, Itself{}), CastRefusal::NONE);
+}
+
+TEST(World, ACastIsRefusedForLackOfQi) {
+  Cultivating dear;
+  dear.strike_cost = QI_LIMIT + 1;
+  World world = read(dear);
+  ASSERT_LT(world.person(READER).qi, dear.strike_cost);
+  EXPECT_EQ(world.cast_refusal(READER, STRIKE, Itself{}), CastRefusal::NO_QI);
+  EXPECT_THROW(world.cast(READER, STRIKE, Itself{}), std::invalid_argument);
+  // Control: a strike within its qi may be cast.
+  dear.strike_cost = THIRD_RATE;
+  const World affordable = read(dear);
+  ASSERT_GE(affordable.person(READER).qi, dear.strike_cost);
+  EXPECT_EQ(affordable.cast_refusal(READER, STRIKE, Itself{}),
+            CastRefusal::NONE);
+}
+
+TEST(World, AUseSpendsItsSkillsQi) {
+  Cultivating held;
+  held.recovery_ticks = NEVER_AGAIN;
+  held.founding_age = FOUNDED_DAYS;
+  World world = facing(held, STRIKE);
+  const std::uint32_t before = world.person(READER).qi;
+  world.cast(READER, STRIKE, AtPerson{QI_FOE});
+  world.tick();
+  EXPECT_EQ(world.person(READER).qi, before - 50U);
+  // Control: with the foe gone beyond reach, a tick spends nothing.
+  World apart = read(held);
+  const std::uint32_t kept = apart.person(READER).qi;
+  apart.tick();
+  EXPECT_EQ(apart.person(READER).qi, kept);
+}
+
+// Cultivating `cultivating`'s world after the reader has read and the foe
+// has stood on the field, within the reader's skills' reach, for 100 ticks.
+World fought(const Cultivating& cultivating) {
+  constexpr int LONGEST_WALK = 1'000;
+  constexpr std::uint64_t FIGHT = 100;
+  World world = read(cultivating);
+  world.order(QI_FOE_ARMY, {QI_FIELD, {0}});
+  for (int walked = 0;
+       walked < LONGEST_WALK && !in(QI_FIELD, world.person(QI_FOE).position);
+       ++walked) {
+    world.tick();
+  }
+  EXPECT_TRUE(in(QI_FIELD, world.person(QI_FOE).position));
+  run_ticks(world, FIGHT);
+  return world;
+}
+
+TEST(World, ThoseWhoKnowAnArtStrikeWithItUnbidden) {
+  EXPECT_LT(fought(Cultivating{}).person(QI_FOE).health, QI_FOE_HEALTH);
+  // Control: a reader who could not afford to read, under the same order of
+  // IDLE alone, hits no one.
+  Cultivating costly;
+  costly.learning.reading_cost = QI_LIMIT + 1;
+  EXPECT_EQ(fought(costly).person(QI_FOE).health, QI_FOE_HEALTH);
+}
+
+// Cultivating `cultivating`'s world after the reader has read as
+// second-rate and walked back to READER_CELL, beyond the manual's reach,
+// and lived 200 more days there.
+World walked_away(const Cultivating& cultivating) {
+  constexpr std::uint64_t DAYS = 200;
+  World world = read(cultivating);
+  EXPECT_EQ(world.rank(READER), 2U);
+  EXPECT_EQ(known_by(world, READER).size(), 2U);
+  world.order(READER_ARMY, {READER_CELL, {0}});
+  run_ticks(world, DAYS);
+  EXPECT_EQ(world.rank(READER), 3U);
+  return world;
+}
+
+TEST(World, ARealmGainedComprehendsASkillOfAnArtItKnows) {
+  // Reading as second-rate, 300 qi of 800: the strike and the sweep. The
+  // form waits for first-rate.
+  Cultivating slow;
+  slow.growth = {4, 0};
+  slow.learning.comprehension = PER_MILLE;
+  slow.held = {0};
+  EXPECT_EQ(known_by(walked_away(slow), READER).back(),
+            (std::pair<std::size_t, std::size_t>{ORTHODOX_ART, 2}));
+  // Controls: with no chance, or a form comprehension cannot unlock, it is
+  // not learned.
+  Cultivating unmoved = slow;
+  unmoved.learning.comprehension = 0;
+  EXPECT_EQ(known_by(walked_away(unmoved), READER).size(), 2U);
+  Cultivating secret = slow;
+  secret.form_comprehensible = false;
+  EXPECT_EQ(known_by(walked_away(secret), READER).size(), 2U);
+}
+
+TEST(World, ASectTeachesItsArtsWithinItsMembersAndEldersRealms) {
+  // Teaching at a thousand per mille a year for each rank of the best elder.
+  Cultivating taught;
+  taught.learning.teaching = PER_MILLE;
+  taught.held = {0};
+  World world = qi_world(taught);
+  run_ticks(world, DAYS_PER_YEAR);
+  ASSERT_GE(world.rank(1), 3U);
+  EXPECT_FALSE(world.person(1).known.empty());
+  EXPECT_FALSE(world.person(2).known.empty());
+  // Its arts only, never the demonic art it holds no manual of.
+  for (const std::size_t member : {std::size_t{1}, std::size_t{2}}) {
+    for (const Known& known : world.person(member).known) {
+      EXPECT_EQ(known.art, ORTHODOX_ART);
+    }
+  }
+  // Control: a sect that teaches at no chance teaches no one, and the reader,
+  // of no sect, learns nothing.
+  EXPECT_TRUE(world.person(READER).known.empty());
+  World idle = qi_world(Cultivating{});
+  run_ticks(idle, DAYS_PER_YEAR);
+  EXPECT_TRUE(idle.person(1).known.empty());
+}
+
+TEST(World, KnownSkillsAndQiArePartOfTheHash) {
+  const World one = read(Cultivating{});
+  Cultivating costly;
+  costly.learning.reading_cost = QI_LIMIT + 1;
+  const World other = read(costly);
+  ASSERT_NE(one.person(READER).known.size(), other.person(READER).known.size());
+  EXPECT_NE(one.hash(), other.hash());
+  // Control: the same reading hashes the same.
+  EXPECT_EQ(one.hash(), read(Cultivating{}).hash());
 }
 
 }  // namespace

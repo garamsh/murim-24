@@ -47,11 +47,20 @@ struct Itself {};
 /// What a cast is aimed at.
 using Target = std::variant<Point, AtPerson, Itself>;
 
-/// A use of one skill, by index among the caster's army's skills, at a
-/// target, made on the next tick in place of the automatic strike.
+/// A use of one skill, by index among the caster's skills, its army's
+/// followed by those it knows, at a target, made on the next tick in place of
+/// the automatic strike.
 struct Cast {
   std::size_t skill = 0;
   Target target;
+};
+
+/// A skill a person knows: skill `skill` of art `art`, which it may use again
+/// from tick `ready_at`.
+struct Known {
+  std::size_t art = 0;
+  std::size_t skill = 0;
+  std::uint64_t ready_at = 0;
 };
 
 /// A person of the world. A person keeps its identity, its index among the
@@ -69,7 +78,10 @@ struct Cast {
 /// born to it. It has gone `hunger` days unfed. A person carrying soul `soul`
 /// is born again when it dies. It belongs to sect `sect`, if any, and keeps it
 /// while it serves in an army of the sect's faction. It casts `casting` on
-/// the next tick, if it was given a cast.
+/// the next tick, if it was given a cast. It cultivates qi by `cultivation`,
+/// a growth a day and a limit, holds `qi` of a store of `qi_capacity`, and
+/// knows the art skills `known`, in the order it learned them, each with a
+/// ready tick of its own; its army's skills share `ready_at`.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -89,6 +101,10 @@ struct Person {
   std::optional<std::size_t> soul;
   std::optional<std::size_t> sect;
   std::optional<Cast> casting;
+  Aptitude cultivation;
+  std::uint32_t qi = 0;
+  std::uint32_t qi_capacity = 0;
+  std::vector<Known> known;
 };
 
 /// A uniform draw over [mean - spread, mean + spread].
@@ -257,16 +273,107 @@ struct Growth {
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
 };
 
+/// An ability as data. A body uses it on the nearest living hostile body
+/// within `range`, or on its own position when `range` is 0; every hostile
+/// body within `radius` of that point takes `body_damage`, and every
+/// structure whose footprint that disc reaches loses `structure_damage` of
+/// durability. A negative `structure_damage` restores durability instead, up
+/// to the intact stage's floor. A village with living residents takes damage
+/// only from factions hostile to its owner, and repair only from the others.
+/// The user waits `cooldown` ticks between uses, and spends `qi_cost` qi on
+/// each.
+struct Skill {
+  std::int32_t range = 0;
+  std::int32_t radius = 0;
+  std::uint64_t body_damage = 0;
+  std::int32_t structure_damage = 0;
+  std::uint64_t cooldown = 0;
+  std::uint32_t qi_cost = 0;
+};
+
+/// The orientation of qi: orthodox, unorthodox or demonic.
+enum class Orientation : std::uint8_t { ORTHODOX, UNORTHODOX, DEMONIC };
+
+/// The polarity of qi: firm yang or soft yin.
+enum class Polarity : std::uint8_t { YANG, YIN };
+
+/// The nature of an art's qi, and of a person's, which is its heart
+/// method's: the art it learned first.
+struct Nature {
+  Orientation orientation = Orientation::ORTHODOX;
+  Polarity polarity = Polarity::YANG;
+};
+
+/// A skill of an art: its `name`, the `skill` itself, the realm `rank` a
+/// person needs to learn it, and whether comprehension can unlock it.
+struct ArtSkill {
+  NameEntry name;
+  Skill skill;
+  std::uint32_t rank = 0;
+  bool comprehensible = true;
+};
+
+/// A martial art: its `name`, the discipline its skills practise, its
+/// `nature` and its `skills`, in the order they are learned.
+struct Art {
+  NameEntry name;
+  std::size_t discipline = 0;
+  Nature nature;
+  std::vector<ArtSkill> skills;
+};
+
 /// The secret manuals the world's sects start with and where a fallen sect's
-/// go, as data: `held` gives, by sect, the discipline of each manual it
-/// holds. When a sect falls, each manual it holds scatters, with
-/// `scatter_chance` per mille, to a passable cell drawn by the seed within
-/// `scatter_reach` cells of its seat's centre along each axis, and is
-/// otherwise lost.
+/// go, as data: `held` gives, by sect, the art of each manual it holds. When
+/// a sect falls, each manual it holds scatters, with `scatter_chance` per
+/// mille, to a passable cell drawn by the seed within `scatter_reach` cells
+/// of its seat's centre along each axis, and is otherwise lost.
 struct Manuals {
   std::vector<std::vector<std::size_t>> held;
   std::uint32_t scatter_chance = 0;
   std::int32_t scatter_reach = 0;
+};
+
+/// A realm of cultivation: its `name`, the qi capacity that reaches it, and
+/// the `might` per mille its people strike with.
+struct Realm {
+  NameEntry name;
+  std::uint32_t qi = 0;
+  std::uint32_t might = PER_MILLE;
+};
+
+/// How people cultivate qi, as data. Each birth draws a growth a day and a
+/// limit; once a day a person's capacity grows by its growth, up to its
+/// limit, and every `recovery_ticks` ticks its qi recovers `recovery` per
+/// mille of its capacity, rounded up, up to its capacity.
+struct Cultivation {
+  Spread growth;
+  Spread limit;
+  std::uint32_t recovery = 0;
+  std::uint64_t recovery_ticks = 1;
+};
+
+/// How people learn arts, as data. On each realm gained, a person rolls, for
+/// each art it knows, `comprehension` per mille scaled by its talent limit in
+/// the art's discipline over that discipline's mean limit, to learn the art's
+/// first comprehensible skill it lacks and has the rank for. A person within
+/// `reading_reach` sub-cell units of a manual lying on a cell, holding
+/// `reading_cost` qi, spends it to learn every skill of the manual's art it
+/// has the rank for. A member of a standing sect whose seat is held learns,
+/// with `teaching` per mille a year for each rank of its highest-ranked
+/// elder, the first skill it lacks of an art its sect holds a manual of,
+/// within both their ranks. An art whose nature differs from a person's in
+/// orientation, or in polarity, multiplies those chances by that axis's
+/// `ease` per mille, divides the reading cost by it, and multiplies the
+/// art's body damage by that axis's `potency` per mille.
+struct Learning {
+  std::uint32_t comprehension = 0;
+  std::uint32_t teaching = 0;
+  std::uint32_t reading_cost = 0;
+  std::int32_t reading_reach = 0;
+  std::uint32_t orientation_ease = PER_MILLE;
+  std::uint32_t polarity_ease = PER_MILLE;
+  std::uint32_t orientation_potency = PER_MILLE;
+  std::uint32_t polarity_potency = PER_MILLE;
 };
 
 /// How people are born, age and are born again, as data. Each birth draws a
@@ -283,7 +390,8 @@ struct Manuals {
 /// children by `kinship`, if given, and bear `names`. Villages feed their
 /// people by `husbandry`, if given, which caps how many a village holds, and
 /// grow by `growth`, if given, as they press against their caps. Sects hold
-/// `manuals`, if given.
+/// `manuals`, if given. People cultivate qi by `cultivation`, if given, into
+/// `realms`, ascending by qi, and learn `arts` by `learning`.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -298,6 +406,10 @@ struct Life {
   std::optional<Growth> growth;
   /// The secret manuals sects start with, and where a fallen sect's go.
   std::optional<Manuals> manuals;
+  std::optional<Cultivation> cultivation;
+  std::vector<Realm> realms;
+  std::vector<Art> arts;
+  Learning learning;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -341,22 +453,6 @@ struct Date {
 struct Recruit {
   Cell cell;
   std::uint64_t health;
-};
-
-/// An ability as data. A body uses it on the nearest living hostile body
-/// within `range`, or on its own position when `range` is 0; every hostile
-/// body within `radius` of that point takes `body_damage`, and every
-/// structure whose footprint that disc reaches loses `structure_damage` of
-/// durability. A negative `structure_damage` restores durability instead, up
-/// to the intact stage's floor. A village with living residents takes damage
-/// only from factions hostile to its owner, and repair only from the others.
-/// The user waits `cooldown` ticks between uses.
-struct Skill {
-  std::int32_t range;
-  std::int32_t radius;
-  std::uint64_t body_damage;
-  std::int32_t structure_damage;
-  std::uint64_t cooldown;
 };
 
 /// An army as a world is created with: its `members`, each a new person,
@@ -462,6 +558,9 @@ constexpr std::uint64_t MAX_COOLDOWN = std::uint64_t{1} << 32;
 /// The most a talent's growth or limit may be drawn as, its widenings
 /// included.
 constexpr std::uint32_t MAX_TALENT = std::uint32_t{1} << 20;
+
+/// The most a realm's might may multiply body damage by, per mille.
+constexpr std::uint32_t MAX_MIGHT = 100 * PER_MILLE;
 
 /// The longest lifespan a birth may draw, in days.
 constexpr std::uint32_t MAX_LIFESPAN_DAYS = std::uint32_t{1} << 20;
@@ -595,8 +694,10 @@ enum class CastRefusal : std::uint8_t {
   DEAD,
   /// The caster's army has no skill of that index.
   NO_SKILL,
-  /// The caster may not use a skill again on the next tick.
+  /// The caster may not use the skill again on the next tick.
   ON_COOLDOWN,
+  /// The caster holds less qi than the skill costs.
+  NO_QI,
   /// The target is a person the world lacks or a dead one.
   NO_TARGET,
   /// The target is a person farther from the caster than the skill's range.
@@ -611,9 +712,9 @@ struct HeldBySect {
 /// A manual no one will find again.
 struct Lost {};
 
-/// A secret manual: the discipline it teaches, and where it is now.
+/// A secret manual: the art it teaches, and where it is now.
 struct Manual {
-  std::size_t discipline = 0;
+  std::size_t art = 0;
   std::variant<HeldBySect, Cell, Lost> place;
 };
 
@@ -734,7 +835,14 @@ class World {
   /// that does not exist, or a founder who is no person the world creates or
   /// who serves in no army of the sect's faction, or `life`'s manuals name a
   /// discipline it does not draw, more sects than there are, a chance above
-  /// PER_MILLE or a reach outside [0, MAX_REACH]. Within these limits no
+  /// PER_MILLE or a reach outside [0, MAX_REACH]; or `life`'s cultivation
+  /// could draw a growth or limit above MAX_TALENT, recovers more than
+  /// PER_MILLE or every 0 ticks, its realms are not ascending by qi or have a
+  /// might above MAX_MIGHT, an art names a discipline it does not draw or has
+  /// a skill outside the limits an army's are within or of a rank beyond the
+  /// realms, a skill costs more than MAX_TALENT qi, or the learning gives a
+  /// chance, an ease or a potency above PER_MILLE or a reading reach outside
+  /// [0, MAX_REACH]. Within these limits no
   /// damage, health, durability or cooldown arithmetic exceeds its type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules,
@@ -754,14 +862,14 @@ class World {
   void order(std::size_t army, Order order,
              std::optional<std::size_t> challenge = std::nullopt);
 
-  /// Has person `person` use skill `skill`, by index among its army's
-  /// skills, at `target` on the next tick, in place of its automatic strike,
-  /// the same cast for the player's body as for an NPC. A point beyond the
-  /// skill's range is brought within it along the line from the caster, and
-  /// the caster itself is the centre of a skill cast at itself. A later cast
-  /// before that tick replaces this one, and a cast that cast_refusal()
-  /// refuses on that tick lapses. Throws std::invalid_argument when
-  /// cast_refusal() names a reason, or there is no such person.
+  /// Has person `person` use skill `skill`, by index among its skills, its
+  /// army's followed by those it knows, at `target` on the next tick, in place
+  /// of its automatic strike, the same cast for the player's body as for an
+  /// NPC. A point beyond the skill's range is brought within it along the line
+  /// from the caster, and the caster itself is the centre of a skill cast at
+  /// itself. A later cast before that tick replaces this one, and a cast that
+  /// cast_refusal() refuses on that tick lapses. Throws std::invalid_argument
+  /// when cast_refusal() names a reason, or there is no such person.
   void cast(std::size_t person, std::size_t skill, const Target& target);
 
   /// Moves living person `person` from the army it serves in to the end of
@@ -881,6 +989,39 @@ class World {
 
   /// Returns the skills army `army` has now.
   [[nodiscard]] const std::vector<Skill>& skills(std::size_t army) const;
+
+  /// Returns how many skills person `person` may cast: its army's, followed
+  /// by the art skills it knows; none once it is dead. Throws
+  /// std::out_of_range when there is no such person.
+  [[nodiscard]] std::size_t skill_count(std::size_t person) const;
+
+  /// Returns person `person`'s skill `skill`, by index among its army's
+  /// followed by those it knows. Throws std::out_of_range when it has no
+  /// such skill.
+  [[nodiscard]] const Skill& skill_of(std::size_t person,
+                                      std::size_t skill) const;
+
+  /// Returns the tick from which person `person` may use its skill `skill`
+  /// again: its army's skills share one, and each art skill it knows has its
+  /// own. Throws std::out_of_range when it has no such skill.
+  [[nodiscard]] std::uint64_t ready_at(std::size_t person,
+                                       std::size_t skill) const;
+
+  /// Returns person `person`'s realm rank: how many of the realms its qi
+  /// capacity reaches, 0 for none. Throws std::out_of_range when there is no
+  /// such person.
+  [[nodiscard]] std::uint32_t rank(std::size_t person) const;
+
+  /// Returns person `person`'s nature, its heart method's, the art it
+  /// learned first, or nothing when it knows no art. Throws std::out_of_range
+  /// when there is no such person.
+  [[nodiscard]] std::optional<Nature> nature(std::size_t person) const;
+
+  /// Returns the realms people cultivate into, ascending.
+  [[nodiscard]] const std::vector<Realm>& realms() const;
+
+  /// Returns the arts people learn.
+  [[nodiscard]] const std::vector<Art>& arts() const;
 
   /// Returns the person leading faction `faction`, if it has a leader.
   [[nodiscard]] std::optional<std::size_t> leader(std::size_t faction) const;
@@ -1052,9 +1193,33 @@ class World {
   void strike(std::size_t user, const Crowd& crowd,
               const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
-  void use(std::size_t user, const Crowd& crowd, const Skill& skill,
+  void use(std::size_t user, const Crowd& crowd, std::size_t index,
            Position centre, const std::vector<std::uint32_t>& edges,
            std::vector<std::uint64_t>& damage);
+  [[nodiscard]] const Skill& usable(const Person& person, const Army& army,
+                                    std::size_t skill) const;
+  [[nodiscard]] std::uint32_t rank_of(const Person& person) const;
+  [[nodiscard]] std::size_t army_with(std::size_t person,
+                                      std::size_t skill) const;
+  [[nodiscard]] static bool ready(const Person& person, std::size_t skill,
+                                  const Army& army, std::uint64_t due);
+  /// How far an art's nature agrees with person `person`'s: the product of
+  /// the learning's ease, or its potency, for each axis that differs, per
+  /// mille.
+  [[nodiscard]] std::uint64_t agreement(const Person& person, std::size_t art,
+                                        bool potency) const;
+  /// How a skill is learned: from a teacher or a manual, or by
+  /// comprehension, which only a comprehensible skill allows.
+  enum class Lesson : std::uint8_t { TAUGHT, COMPREHENDED };
+  [[nodiscard]] std::optional<std::size_t> lesson(const Person& person,
+                                                  std::size_t art, Lesson how,
+                                                  std::uint32_t rank) const;
+  void train();
+  void cultivate();
+  void comprehend(Person& person, std::uint32_t rank);
+  void recover(const Cultivation& cultivation);
+  void read_manuals();
+  void teach();
   [[nodiscard]] bool foes(std::size_t person, std::size_t army,
                           std::size_t other, std::size_t other_army) const;
   [[nodiscard]] Position landing(const Person& caster, const Skill& skill,

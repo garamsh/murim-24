@@ -1,6 +1,6 @@
 # ADR 0034: Let a person cast a skill at a point, a person or itself
 
-> Status: accepted
+> Status: accepted; its cast of one of its army's skills only superseded by ADR-0035, which takes the art skills a person knows too
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

@@ -1,6 +1,7 @@
 #include "region.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -96,6 +97,99 @@ constexpr std::uint32_t MANUAL_HALL_PUPILS = 4;
 constexpr std::uint32_t TRAINING_GROUND_PUPILS = 12;
 constexpr std::uint32_t SCATTER_CHANCE = 500;
 constexpr std::int32_t SCATTER_REACH = 16;
+constexpr std::uint32_t QI_GROWTH = 1;
+constexpr std::uint32_t QI_GROWTH_SPREAD = 1;
+constexpr std::uint32_t QI_LIMIT = 8'000;
+constexpr std::uint32_t QI_LIMIT_SPREAD = 7'000;
+constexpr std::uint32_t QI_RECOVERY = 10;
+constexpr std::uint64_t QI_RECOVERY_TICKS = 30;
+constexpr std::uint32_t COMPREHENSION = 300;
+constexpr std::uint32_t TEACHING = 200;
+constexpr std::uint32_t READING_COST = 500;
+constexpr std::uint32_t HALF = 500;
+constexpr std::uint32_t SEVEN_TENTHS = 700;
+constexpr std::uint32_t NINE_TENTHS = 900;
+
+// The realms of cultivation, from third-rate to life-and-death, each
+// reached at a store of qi and striking a tenth harder than the last.
+std::vector<Realm> realms() {
+  constexpr std::uint32_t STEP = 100;
+  const std::vector<std::pair<NameEntry, std::uint32_t>> ladder{
+      {{"삼류", "Third-rate"}, 1'000},
+      {{"이류", "Second-rate"}, 3'000},
+      {{"일류", "First-rate"}, 6'000},
+      {{"절정", "Peak"}, 10'000},
+      {{"초절정", "Beyond peak"}, 15'000},
+      {{"화경", "Transformation"}, 21'000},
+      {{"현경", "Mystery"}, 28'000},
+      {{"생사경", "Life and death"}, 36'000},
+  };
+  std::vector<Realm> realms;
+  realms.reserve(ladder.size());
+  for (const auto& [name, threshold] : ladder) {
+    realms.push_back(Realm{
+        name, threshold,
+        PER_MILLE + (STEP * static_cast<std::uint32_t>(realms.size() + 1))});
+  }
+  return realms;
+}
+
+// The sects' arts, one for each manual: Hwasan's plum-blossom sword,
+// orthodox and yang; the Heavenly Demon's saber, demonic and yang; and the
+// Black Fang's hidden weapons, unorthodox and yin. Each has a strike at
+// the third-rate realm, taught or read only, a wider one at first-rate and
+// the widest at beyond peak, both of which comprehension unlocks too.
+std::vector<Art> arts() {
+  constexpr std::uint32_t FIRST = 1;
+  constexpr std::uint32_t THIRD = 3;
+  constexpr std::uint32_t FIFTH = 5;
+  constexpr std::uint64_t STRIKE_DAMAGE = 20;
+  constexpr std::uint64_t SWEEP_DAMAGE = 15;
+  constexpr std::uint64_t FORM_DAMAGE = 30;
+  constexpr std::uint64_t STRIKE_COOLDOWN = 90;
+  constexpr std::uint64_t SWEEP_COOLDOWN = 300;
+  constexpr std::uint64_t FORM_COOLDOWN = 600;
+  constexpr std::uint32_t STRIKE_QI = 100;
+  constexpr std::uint32_t SWEEP_QI = 400;
+  constexpr std::uint32_t FORM_QI = 1'200;
+  constexpr std::int32_t NEAR = 3 * CELL_SIZE;
+  constexpr std::int32_t FAR = 8 * CELL_SIZE;
+  constexpr std::int32_t WIDE = 2 * CELL_SIZE;
+  constexpr std::int32_t WIDEST = 3 * CELL_SIZE;
+  const auto art = [&](NameEntry name, std::size_t discipline, Nature nature,
+                       std::int32_t range, std::array<NameEntry, 3> skills) {
+    return Art{
+        std::move(name),
+        discipline,
+        nature,
+        {ArtSkill{std::move(skills.at(0)),
+                  Skill{range, 0, STRIKE_DAMAGE, 0, STRIKE_COOLDOWN, STRIKE_QI},
+                  FIRST, false},
+         ArtSkill{std::move(skills.at(1)),
+                  Skill{range, WIDE, SWEEP_DAMAGE, 0, SWEEP_COOLDOWN, SWEEP_QI},
+                  THIRD, true},
+         ArtSkill{std::move(skills.at(2)),
+                  Skill{range, WIDEST, FORM_DAMAGE, 0, FORM_COOLDOWN, FORM_QI},
+                  FIFTH, true}}};
+  };
+  return {
+      art({"매화검법", "Plum Blossom Sword"}, 0,
+          Nature{Orientation::ORTHODOX, Polarity::YANG}, NEAR,
+          {NameEntry{"매화일검", "Plum Blossom Strike"},
+           NameEntry{"이십사수매화검법", "Twenty-Four Plum Blossoms"},
+           NameEntry{"매화낙영", "Falling Plum Blossoms"}}),
+      art({"천마도법", "Heavenly Demon Saber"}, 1,
+          Nature{Orientation::DEMONIC, Polarity::YANG}, NEAR,
+          {NameEntry{"천마일도", "Heavenly Demon Cut"},
+           NameEntry{"천마혈풍", "Heavenly Demon Blood Wind"},
+           NameEntry{"천마군림", "Heavenly Demon Descends"}}),
+      art({"흑아비도술", "Black Fang Darts"}, 3,
+          Nature{Orientation::UNORTHODOX, Polarity::YIN}, FAR,
+          {NameEntry{"흑아표", "Black Fang Dart"},
+           NameEntry{"만천화우", "Rain of Flowers"},
+           NameEntry{"흑아폭우", "Black Fang Storm"}}),
+  };
+}
 
 // Surnames of the murim's clans, common and of the old houses, and given
 // names for women and men, in Korean with their romanised forms.
@@ -694,11 +788,27 @@ RegionData region_data() {
            // or dies.
            Husbandry{1, HUNGER_DAYS, MIGRATION_REACH},
            std::nullopt,
-           // Each sect holds the manual of its faction's art: Hwasan the
-           // sword, the Heavenly Demon the saber, the Black Fang hidden
-           // weapons. A fallen sect's manuals scatter at even odds within 16
-           // cells of its seat, and are otherwise lost.
-           Manuals{{{0}, {1}, {3}}, SCATTER_CHANCE, SCATTER_REACH}},
+           // Each sect holds the manual of its faction's art (arts()):
+           // Hwasan the sword, the Heavenly Demon the saber, the Black Fang
+           // hidden weapons. A fallen sect's manuals scatter at even odds
+           // within 16 cells of its seat, and are otherwise lost.
+           Manuals{{{0}, {1}, {2}}, SCATTER_CHANCE, SCATTER_REACH},
+           // People cultivate 0 to 2 qi a day, up to a limit of 1,000 to
+           // 15,000, and recover a hundredth of their store a second.
+           Cultivation{{QI_GROWTH, QI_GROWTH_SPREAD},
+                       {QI_LIMIT, QI_LIMIT_SPREAD},
+                       QI_RECOVERY,
+                       QI_RECOVERY_TICKS},
+           realms(),
+           arts(),
+           // A realm gained comprehends a skill at 3 in 10 at a
+           // discipline's mean talent; a sect teaches at 1 in 5 a year for
+           // each rank of its best elder; a manual costs 500 qi to read from
+           // within a cell. An art of another orientation is learned at half
+           // the chance and strikes at seven tenths; of another polarity, at
+           // seven tenths and with nine tenths.
+           Learning{COMPREHENSION, TEACHING, READING_COST, CELL_SIZE, HALF,
+                    SEVEN_TENTHS, SEVEN_TENTHS, NINE_TENTHS}},
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village

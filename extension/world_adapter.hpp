@@ -260,6 +260,36 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the sect person `person` belongs to, or -1 for none.
   [[nodiscard]] std::int64_t person_sect(std::int64_t person) const;
 
+  /// Returns the qi person `person` holds.
+  [[nodiscard]] std::int64_t person_qi(std::int64_t person) const;
+
+  /// Returns the most qi person `person` may hold, its store.
+  [[nodiscard]] std::int64_t person_qi_capacity(std::int64_t person) const;
+
+  /// Returns person `person`'s realm rank: how many of realms() its store
+  /// reaches, 0 for none.
+  [[nodiscard]] std::int64_t person_realm(std::int64_t person) const;
+
+  /// Returns person `person`'s nature, its heart method's, as a Dictionary
+  /// of `orientation`, one of the ORIENTATION_* constants, and `polarity`,
+  /// one of the POLARITY_* constants; empty while it knows no art.
+  [[nodiscard]] godot::Dictionary person_nature(std::int64_t person) const;
+
+  /// Returns the skills person `person` may cast, by the index cast() takes:
+  /// its army's, then the art skills it knows in the order learned; none
+  /// once it is dead. Each is a Dictionary keyed as skills() gives one, with
+  /// its `qi_cost` and the tick it is `ready_at`, and, for an art skill, its
+  /// `art`, the realm `rank` it needs, its name in `korean` and `romanised`,
+  /// and its art's `orientation` and `polarity`; `art` is -1 for an army's.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> person_skills(
+      std::int64_t person) const;
+
+  /// Returns the realms people cultivate into, ascending, each a Dictionary
+  /// of its name in `korean` and `romanised`, the `qi` that reaches it and
+  /// its `might` per mille; empty for a world whose people do not
+  /// cultivate.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> realms() const;
+
   /// Returns sect `sect`'s name.
   [[nodiscard]] godot::String sect_name(std::int64_t sect) const;
 
@@ -287,7 +317,7 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns whether sect `sect` stands, with a living member.
   [[nodiscard]] bool sect_stands(std::int64_t sect) const;
 
-  /// Returns every manual as a Dictionary: its `discipline`, and `place`, one
+  /// Returns every manual as a Dictionary: its `art`, and `place`, one
   /// of "sect", "cell" or "lost", with its `sect` or its `cell` as a
   /// Vector2i.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> manuals() const;
@@ -301,8 +331,8 @@ class WorldAdapter : public godot::RefCounted {
   /// push_error, when the core refuses the application.
   bool apply(std::int64_t person, std::int64_t sect);
 
-  /// Has person `person` cast skill `skill`, by index among its army's
-  /// skills, at `target` on the next tick: a Vector2 point in sub-cell
+  /// Has person `person` cast skill `skill`, by index among
+  /// person_skills(), at `target` on the next tick: a Vector2 point in sub-cell
   /// units, an int person, or null for itself. Returns false, after
   /// push_error, when the core refuses the cast or the target is of another
   /// type.

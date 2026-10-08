@@ -12,7 +12,7 @@ const SCENE := "res://hud/hud.tscn"
 const PersonName := preload("res://hud/person_name.gd")
 const SEED := 2026
 # A seed whose first Cult village's leader has the widest given name, Cheonmyeong.
-const LONG_NAME_SEED := 4
+const LONG_NAME_SEED := 18
 # The keys a label shows besides the text it is built with, by its name in `labels`; the notice
 # also shows every challenge verdict, every reason a cast is refused and whether an autosave was
 # written.
@@ -101,7 +101,9 @@ func run() -> bool:
 	var fit_passed := _fit_pass()
 	var rumours_passed := _rumours_pass()
 	var attainment_passed := _attainment_pass()
-	return passed and measure_passed and names_passed and fit_passed and rumours_passed and attainment_passed
+	var cast_words_passed := _cast_words_pass()
+	return passed and measure_passed and names_passed and fit_passed and rumours_passed and attainment_passed \
+			and cast_words_passed
 
 
 # Born into a Cult village, the player challenges its leader: the leader panel and the duel panel
@@ -332,6 +334,40 @@ func _measure_pass() -> bool:
 	var passed := set_up and narrow_refused and exact_accepted
 	print("hud_test: \"%s\" is %d px in Galmuri9; refused in a %d px untrimmed label %s, accepted in a %d px one %s (setup %s): %s" % [
 		text, drawn, drawn - 1, narrow_refused, drawn, exact_accepted, set_up, "pass" if passed else "FAIL"])
+	return passed
+
+
+# Every reason the core refuses a cast, each WorldAdapter.CAST_* constant but CAST_NONE, is shown
+# on the notice by its own key, which hud.csv words in each locale. Setup: the constants read from
+# the adapter's class include CAST_NO_QI and CAST_OUT_OF_RANGE. Control: a key hud.csv lacks
+# translates to itself, so a key translating to other text was worded by the file.
+func _cast_words_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, world.army_count() - 1)
+	var refusals := {}
+	for constant: String in ClassDB.class_get_integer_constant_list("WorldAdapter", true):
+		if constant.begins_with("CAST_") and constant != "CAST_NONE":
+			refusals[constant] = ClassDB.class_get_integer_constant("WorldAdapter", constant)
+	var set_up: bool = refusals.has("CAST_NO_QI") and refusals.has("CAST_OUT_OF_RANGE")
+	var unworded := []
+	for constant: String in refusals:
+		var refusal: int = refusals[constant]
+		if not hud.CAST_KEYS.has(refusal):
+			unworded.append(constant)
+			continue
+		hud.show_cast(refusal)
+		var key: String = hud.labels.notice.text
+		for locale: String in hud.LOCALES:
+			TranslationServer.set_locale(locale)
+			if key != constant or hud.tr(key) == key or hud.tr(key).is_empty():
+				unworded.append("%s in %s" % [constant, locale])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	var lacking: String = hud.tr("CAST_NOT_A_REASON")
+	hud.free()
+	var passed := set_up and unworded.is_empty() and lacking == "CAST_NOT_A_REASON"
+	print("hud_test: %d cast refusals %s; unworded %s; a key hud.csv lacks reads \"%s\" (setup %s): %s" % [
+		refusals.size(), refusals.keys(), unworded, lacking, set_up, "pass" if passed else "FAIL"])
 	return passed
 
 
