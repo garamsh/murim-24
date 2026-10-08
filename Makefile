@@ -93,12 +93,14 @@ sweep: build
 	$(BENCH_DIR)/murim_core_sweep $(FIRST_SEED) $(LAST_SEED) $(YEARS)
 
 # Not part of ci: CI installs no Android SDK. The NDK's toolchain file selects the target; extension/CMakeLists.txt is the same for every platform.
-# The export runs frame_bench.gd at launch through the preset's command_line/extra_args, and murim_core_bench is pushed to the device separately.
+# murim.apk opens the game on the title screen; murim_bench.apk runs frame_bench.gd at launch through the Android bench preset's
+# command_line/extra_args, and murim_core_bench is pushed to the device separately.
 android: build
 	$(TOOLS)/cmake -S extension -B $(ANDROID_BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24
 	$(TOOLS)/cmake --build $(ANDROID_BUILD_DIR) --target murim_extension murim_core_bench
 	$(GODOT) --headless --path . --export-debug Android $(ANDROID_BUILD_DIR)/murim.apk
-	@echo "built $(ANDROID_BUILD_DIR)/libmurim.android.template_debug.arm64.so and $(ANDROID_BUILD_DIR)/core/murim_core_bench for Android arm64, and exported $(ANDROID_BUILD_DIR)/murim.apk with the Android preset in export_presets.cfg"
+	$(GODOT) --headless --path . --export-debug "Android bench" $(ANDROID_BUILD_DIR)/murim_bench.apk
+	@echo "built $(ANDROID_BUILD_DIR)/libmurim.android.template_debug.arm64.so and $(ANDROID_BUILD_DIR)/core/murim_core_bench for Android arm64, and exported $(ANDROID_BUILD_DIR)/murim.apk and murim_bench.apk with the Android and Android bench presets in export_presets.cfg"
 
 # Not part of ci: it builds the macOS universal library with the host's SDK, so it runs on a Mac, and fetches
 # the Windows cross toolchain mingw-toolchain.sh pins. Both libraries are release builds, which a release export loads.
