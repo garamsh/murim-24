@@ -6,6 +6,12 @@
 # - mobile_hud_cancel_<locale>.png: the same drag carried onto the cancel zone.
 # - mobile_hud_self_<locale>.png: the second skill held past a long press.
 # - mobile_hud_targets_<locale>.png: at rest, with every place a touch lands outlined and sized.
+# - settings_touch_off_<locale>.png: the settings panel with the touch row off, in the desktop's
+#   1920x1080 window, its 4x copy being that window.
+# - settings_touch_on_<locale>.png: the settings panel with the touch row on, in a 2400x1080 window,
+#   a phone's 20:9; settings_touch_on_<locale>_2400x1080.png is that window, composed from the
+#   480x270 frame by the root viewport's final transform, the stretch Godot reports for it, over
+#   black, since a script cannot read the window's own pixels.
 # The world is SEED's region with the player born into village 0, and the nearest hostile army
 # marched on the player until one stands within the first skill's range, so raiders stand about it. The touch row and the language
 # are chosen on the settings panel, kept in KEPT, which is removed at the end. Prints what each
@@ -18,6 +24,7 @@ const SEED := 2026
 const MARCH := 4000
 const LOCALES := ["ko", "en"]
 const KEPT := "user://capture_touch.cfg"
+const PHONE := Vector2i(2400, 1080)
 var _dir := "."
 var _frame := 0
 var _step := 0
@@ -102,6 +109,21 @@ func _process(_delta: float) -> bool:
 		5:
 			_shot("mobile_hud_targets_" + locale, "%d skill circles, the cancel zone, the stick's zone %s, %d buttons and pause" % [
 					touch.skill_count, touch.STICK_ZONE, touch.BUTTONS.size()])
+			_overlay.queue_free()
+			# The touch row lit, so the line under the rows says what it sets.
+			hud.settings.choose("touch", hud.settings.TOUCH_MODES.find("off"))
+			hud.settings.open()
+			hud.settings.row = hud.settings.ROWS.find("touch")
+		6:
+			_shot("settings_touch_off_" + locale, _settings_note(hud))
+			hud.settings.choose("touch", hud.settings.TOUCH_MODES.find("on"))
+			# choose() applies and keeps; the panel's key() and tap() redraw it after.
+			hud.settings.queue_redraw()
+			# Choosing applies the resolution row to the window, so the phone's size is set after.
+			DisplayServer.window_set_size(PHONE)
+		7:
+			_shot("settings_touch_on_" + locale, _settings_note(hud), true)
+			DisplayServer.window_set_size(hud.settings.RESOLUTIONS[hud.settings.chosen.resolution])
 			_locale += 1
 			if _locale == LOCALES.size():
 				_play.queue_free()
@@ -146,7 +168,13 @@ func _slide(index: int, at: Vector2) -> InputEventScreenDrag:
 	return event
 
 
-func _shot(name: String, note: String) -> void:
+func _settings_note(hud: CanvasLayer) -> String:
+	return "settings open %s, %d rows %d px apart in %s, touch %s, touch controls shown %s, window %s, stretch %s" % [
+			hud.settings.visible, hud.settings.ROWS.size(), hud.settings.ROW_STEP, hud.settings.DIALOG,
+			hud.settings.TOUCH_MODES[hud.settings.chosen.touch], hud.touch.visible, DisplayServer.window_get_size(), root.get_final_transform()]
+
+
+func _shot(name: String, note: String, window := false) -> void:
 	var image := root.get_texture().get_image()
 	var sha := image.get_data().hex_encode().sha256_text().left(16)
 	if _saved.has(sha):
@@ -156,6 +184,17 @@ func _shot(name: String, note: String) -> void:
 	var big := image.duplicate()
 	big.resize(image.get_width() * 4, image.get_height() * 4, Image.INTERPOLATE_NEAREST)
 	big.save_png("%s/%s_4x.png" % [_dir, name])
+	if window:
+		var size := DisplayServer.window_get_size()
+		var stretch := root.get_final_transform()
+		var frame := Image.create_empty(size.x, size.y, false, Image.FORMAT_RGBA8)
+		frame.fill(Color.BLACK)
+		var scaled := image.duplicate()
+		scaled.convert(Image.FORMAT_RGBA8)
+		scaled.resize(int(image.get_width() * stretch.x.x), int(image.get_height() * stretch.y.y), Image.INTERPOLATE_NEAREST)
+		frame.blit_rect(scaled, Rect2i(Vector2i.ZERO, scaled.get_size()), Vector2i(stretch.origin))
+		frame.save_png("%s/%s_%dx%d.png" % [_dir, name, size.x, size.y])
+		note += ", composed at %s by %s" % [size, stretch]
 	print("capture_touch: %s.png %dx%d, sha256 %s, locale %s; %s" % [name, image.get_width(),
 			image.get_height(), sha, TranslationServer.get_locale(), note])
 
