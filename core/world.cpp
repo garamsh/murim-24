@@ -1955,19 +1955,14 @@ std::vector<World::Passing> World::passings() const {
 // still, so a crowd jostled a little stays standing.
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
                   std::vector<Step>& pulls, std::vector<bool>& standing) const {
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    const Army& marching = armies_.at(army);
-    for (std::size_t rank = 0; rank < marching.roster.size(); ++rank) {
-      const std::size_t member = marching.roster.at(rank);
-      const std::size_t index = slot.at(member);
-      const Position from = crowd.hash.position(index);
-      const Cell cell = cell_of(from);
+  for (const Army& army : armies_) {
+    for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
+      const std::size_t index = slot.at(army.roster.at(rank));
+      const Cell cell = cell_of(crowd.hash.position(index));
       const auto ring =
           static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
-      const std::uint32_t distance = marching.field.distance(cell);
-      const Step pull =
-          distance > ring ? marching.field.step(cell) : Step{0, 0};
-      pulls.at(index) = pull;
+      const std::uint32_t distance = army.field.distance(cell);
+      pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
       standing.at(index) = distance <= ring + STANDING_SLACK;
     }
   }
