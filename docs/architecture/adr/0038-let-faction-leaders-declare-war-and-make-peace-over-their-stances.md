@@ -50,10 +50,10 @@ Measured with `make sweep`, seeds 0 to 49 for 100 years each at days of five tic
 
 | | Every faction peopled through 100 years | Wars declared | Peaces made |
 |---|---|---|---|
-| `main` at `0e3082a` | see the PR | none | none |
+| `main` at `0e3082a` | 50 of 50 | none | none |
 | with this decision | 48 of 50 | 60 (0 on 12 seeds, 1 on 22, 2 on 11, 3 on 4, 4 on 1) | 33 (0 on 25 seeds, 1 on 18, 2 on 6, 3 on 1) |
 
-So an NPC leader declares war about 1.2 times in a region's century, and peace follows about half as often.
+So an NPC leader declares war about 1.2 times in a region's century, and peace follows about half as often. The wars cost two seeds, 27 and 48, a faction that once held no peopled village at a year's end. That is within the issue's bound of 48.
 
 How #175 builds on this: its standing is another input to `relation` and `hostile`. The declaration stays a separate, small layer, a leader's order alone, which standing never writes. A later ADR may put standing between the declaration and the stance, reading a declaration first, then standing, then the matrix. It may also have the diplomacy rule weigh standing in place of headcounts. Neither changes what a declaration is or how it is stored.
 
@@ -75,4 +75,5 @@ Two factions stand by their stances unless one of their leaders declares war or 
 - #175's standing needs to change a declaration, or to be stored in the same place, so the layers merge after all.
 - Players find that a war fixed over a stance's hostility and the stance alone feel the same, and the four relations collapse to three.
 - NPC wars and peaces flip back and forth every `hold_days` in long runs, or a faction's raids stop, as the first draft's peace with stance enemies stopped them.
+- Wars wipe factions out more often than the two seeds of fifty measured here, and `war_chance` or `war_margin` needs a bound.
 - More rules need to tell the player's armies apart in ways the steered mark cannot express, such as a party the player leads but does not steer.
