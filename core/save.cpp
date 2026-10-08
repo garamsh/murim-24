@@ -840,14 +840,6 @@ void put_event(Writer& out, const Event& event) {
           out.size(what.faction);
           out.size(what.leader);
           out.u8(static_cast<std::uint8_t>(what.by));
-        } else if constexpr (std::is_same_v<Kind, Learned>) {
-          out.size(what.person);
-          out.size(what.art);
-          out.size(what.skill);
-          out.u8(static_cast<std::uint8_t>(what.by));
-        } else if constexpr (std::is_same_v<Kind, RealmGained>) {
-          out.size(what.person);
-          out.size(what.rank);
         } else {
           out.size(what.person);
         }
@@ -858,7 +850,6 @@ void put_event(Writer& out, const Event& event) {
 Event get_event(Reader& input) {
   constexpr std::uint8_t HAPPENINGS = std::variant_size_v<Happening>;
   constexpr std::uint8_t CHOICES = 2;
-  constexpr std::uint8_t LESSONS = 3;
   // The happenings' tags, as their index in Happening.
   constexpr std::uint8_t FOUNDED = 0;
   constexpr std::uint8_t RAIDED = 1;
@@ -866,8 +857,6 @@ Event get_event(Reader& input) {
   constexpr std::uint8_t SECT_FELL = 3;
   constexpr std::uint8_t LEADER_CHANGED = 4;
   constexpr std::uint8_t BORN = 5;
-  constexpr std::uint8_t DIED = 6;
-  constexpr std::uint8_t LEARNED = 7;
   Event event;
   event.sequence = input.u64();
   event.tick = input.u64();
@@ -906,24 +895,47 @@ Event get_event(Reader& input) {
     case BORN:
       event.what = Born{input.size()};
       break;
-    case DIED:
+    default:
       event.what = Died{input.size()};
       break;
-    case LEARNED: {
-      const std::size_t person = input.size();
-      const std::size_t art = input.size();
-      const std::size_t skill = input.size();
-      event.what = Learned{person, art, skill,
-                           static_cast<LearnedBy>(input.tag(LESSONS))};
-      break;
-    }
-    default: {
-      const std::size_t person = input.size();
-      event.what = RealmGained{person, input.size()};
-      break;
-    }
   }
   return event;
+}
+
+void put_progress(Writer& out, const Progress& step) {
+  out.u64(step.sequence);
+  out.u64(step.tick);
+  out.u8(static_cast<std::uint8_t>(step.what.index()));
+  if (const auto* learned = std::get_if<Learned>(&step.what)) {
+    out.size(learned->person);
+    out.size(learned->art);
+    out.size(learned->skill);
+    out.u8(static_cast<std::uint8_t>(learned->by));
+  } else {
+    out.size(std::get<RealmGained>(step.what).person);
+    out.size(std::get<RealmGained>(step.what).rank);
+  }
+}
+
+Progress get_progress(Reader& input) {
+  constexpr std::uint8_t ADVANCES = std::variant_size_v<Advance>;
+  constexpr std::uint8_t LESSONS = 3;
+  // The advances' tags, as their index in Advance.
+  constexpr std::uint8_t LEARNED = 0;
+  Progress step;
+  step.sequence = input.u64();
+  step.tick = input.u64();
+  const std::uint8_t tag = input.tag(ADVANCES);
+  const std::size_t person = input.size();
+  if (tag == LEARNED) {
+    const std::size_t art = input.size();
+    const std::size_t skill = input.size();
+    step.what =
+        Learned{person, art, skill, static_cast<LearnedBy>(input.tag(LESSONS))};
+  } else {
+    step.what = RealmGained{person, input.size()};
+  }
+  return step;
 }
 
 }  // namespace
@@ -981,6 +993,8 @@ class SaveCodec {
       out.size(fight.leader);
       put_duel(out, fight.rule);
     });
+    put_all(out, world.progress_,
+            [&out](const Progress& step) { put_progress(out, step); });
     put_all(out, world.events_,
             [&out](const Event& event) { put_event(out, event); });
     put_all(out, world.souls_, [&out](const Soul& soul) {
@@ -1064,6 +1078,8 @@ class SaveCodec {
       fight.rule = get_duel(input);
       return fight;
     });
+    world.progress_ =
+        get_all<Progress>(input, [&input] { return get_progress(input); });
     world.events_ =
         get_all<Event>(input, [&input] { return get_event(input); });
     world.souls_ = get_all<Soul>(input, [&input] {

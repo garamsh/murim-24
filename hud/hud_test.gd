@@ -555,8 +555,8 @@ func _lessons_pass() -> bool:
 	while (army < 0 or not other_seen) and ticks < LESSON_TICKS:
 		probe.tick()
 		ticks += 1
-		for event: Dictionary in probe.events(0):
-			if event.tick != probe.tick_count() - 1 or not event.has("person"):
+		for event: Dictionary in probe.progress(0):
+			if event.tick != probe.tick_count() - 1:
 				continue
 			for each in probe.army_count():
 				var roster := probe.roster(each)
@@ -573,12 +573,10 @@ func _lessons_pass() -> bool:
 		for i in ticks:
 			world.tick()
 			hud.refresh(world, army, PackedInt64Array([0]))
-		for event: Dictionary in world.events(0):
-			if not event.has("person"):
-				continue
+		for event: Dictionary in world.progress(0):
 			if event.person != learner:
 				others += 1
-			elif event.kind == WorldAdapter.EVENT_LEARNED:
+			elif event.kind == WorldAdapter.PROGRESS_LEARNED:
 				expected.append(hud.tr(lessons[int(event.by)]) % Arts.named(world.arts()[event.art].skills[event.skill]))
 			else:
 				expected.append(hud.tr("NOTICE_REALM") % Arts.realm_name(world, event.rank))

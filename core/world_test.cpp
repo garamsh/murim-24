@@ -3728,13 +3728,13 @@ TEST(World, ASectTeachesItsArtsWithinItsMembersAndEldersRealms) {
   EXPECT_TRUE(idle.person(1).known.empty());
 }
 
-// The skills person `person` was recorded learning `how`, as (art, skill)
-// pairs oldest first, among the events `world` keeps.
+// The skills person `person` was noted learning `how`, as (art, skill)
+// pairs oldest first, among the progress `world` keeps.
 std::vector<std::pair<std::size_t, std::size_t>> recorded_learning(
     const World& world, std::size_t person, LearnedBy how) {
   std::vector<std::pair<std::size_t, std::size_t>> learned;
-  for (const Event& event : world.events()) {
-    const auto* lesson = std::get_if<Learned>(&event.what);
+  for (const Progress& step : world.progress()) {
+    const auto* lesson = std::get_if<Learned>(&step.what);
     if (lesson != nullptr && lesson->person == person && lesson->by == how) {
       learned.emplace_back(lesson->art, lesson->skill);
     }
@@ -3742,12 +3742,12 @@ std::vector<std::pair<std::size_t, std::size_t>> recorded_learning(
   return learned;
 }
 
-// The realm ranks person `person` was recorded reaching, oldest first.
+// The realm ranks person `person` was noted reaching, oldest first.
 std::vector<std::size_t> recorded_realms(const World& world,
                                          std::size_t person) {
   std::vector<std::size_t> ranks;
-  for (const Event& event : world.events()) {
-    const auto* gained = std::get_if<RealmGained>(&event.what);
+  for (const Progress& step : world.progress()) {
+    const auto* gained = std::get_if<RealmGained>(&step.what);
     if (gained != nullptr && gained->person == person) {
       ranks.push_back(gained->rank);
     }
@@ -3809,22 +3809,48 @@ TEST(World, ASkillTaughtIsRecordedAsTaught) {
   EXPECT_TRUE(recorded_learning(idle, 1, LearnedBy::TEACHING).empty());
 }
 
-TEST(World, ASkillLearnedOrARealmGainedIsNoRumour) {
-  // Every event in the region is within the reader's reach.
-  Cultivating near;
-  near.rumour_reach = OPEN_SIDE;
-  const World world = read(near);
-  ASSERT_FALSE(recorded_realms(world, READER).empty());
-  ASSERT_FALSE(recorded_learning(world, READER, LearnedBy::MANUAL).empty());
-  const std::vector<Event> heard = world.rumours(READER);
-  for (const Event& event : heard) {
-    EXPECT_FALSE(std::holds_alternative<Learned>(event.what));
-    EXPECT_FALSE(std::holds_alternative<RealmGained>(event.what));
+// A person growing a qi a day through `count` realms, one a qi apart, on days
+// of one tick, lived as many ticks.
+World climbing(std::uint32_t count) {
+  Life life = one_discipline(0);
+  life.cultivation = Cultivation{{1, 0}, {count, 0}, 0, 1};
+  for (std::uint32_t rank = 1; rank <= count; ++rank) {
+    life.realms.push_back(Realm{{"경", "Realm"}, rank, PER_MILLE});
   }
-  // Control: the sect's fall, recorded within the same reach, reaches it.
-  EXPECT_TRUE(std::any_of(heard.begin(), heard.end(), [](const Event& event) {
-    return std::holds_alternative<SectFell>(event.what);
-  }));
+  Rules rules = peaceful(0);
+  rules.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(READER_CELL, READER_CELL, 1, 1, 0, {IDLE})},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  run_ticks(world, count);
+  return world;
+}
+
+TEST(World, ProgressKeepsTheLatestStepsApartFromTheEvents) {
+  constexpr std::uint32_t CLIMBED = PROGRESS_CAPACITY + 8;
+  const World world = climbing(CLIMBED);
+  ASSERT_EQ(world.rank(READER), CLIMBED);
+  // The latest PROGRESS_CAPACITY realms, numbered on from the first, and no
+  // event recorded for any of them.
+  std::vector<std::size_t> latest;
+  for (std::size_t rank = CLIMBED - PROGRESS_CAPACITY + 1; rank <= CLIMBED;
+       ++rank) {
+    latest.push_back(rank);
+  }
+  EXPECT_EQ(recorded_realms(world, READER), latest);
+  EXPECT_EQ(world.progress().front().sequence, CLIMBED - PROGRESS_CAPACITY);
+  EXPECT_TRUE(world.events().empty());
+  // Control: one realm short of the capacity keeps every one.
+  constexpr std::uint32_t FEWER = PROGRESS_CAPACITY - 1;
+  const World short_of = climbing(FEWER);
+  ASSERT_EQ(short_of.rank(READER), FEWER);
+  EXPECT_EQ(recorded_realms(short_of, READER).size(), FEWER);
+  EXPECT_EQ(recorded_realms(short_of, READER).front(), 1U);
 }
 
 TEST(World, KnownSkillsAndQiArePartOfTheHash) {

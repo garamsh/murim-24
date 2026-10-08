@@ -697,15 +697,31 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::events(
     entry.set("tick", static_cast<std::int64_t>(event.tick));
     entry.set("cell", godot::Vector2i{event.cell.x, event.cell.y});
     entry.set("kind", static_cast<std::int64_t>(event.what.index()));
-    if (const auto* learned = std::get_if<murim::Learned>(&event.what)) {
+    kept.push_back(entry);
+  }
+  return kept;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::progress(
+    std::int64_t from) const {
+  godot::TypedArray<godot::Dictionary> kept;
+  for (const murim::Progress& step : world().progress()) {
+    if (static_cast<std::int64_t>(step.sequence) < from) {
+      continue;
+    }
+    godot::Dictionary entry;
+    entry.set("sequence", static_cast<std::int64_t>(step.sequence));
+    entry.set("tick", static_cast<std::int64_t>(step.tick));
+    entry.set("kind", static_cast<std::int64_t>(step.what.index()));
+    if (const auto* learned = std::get_if<murim::Learned>(&step.what)) {
       entry.set("person", static_cast<std::int64_t>(learned->person));
       entry.set("art", static_cast<std::int64_t>(learned->art));
       entry.set("skill", static_cast<std::int64_t>(learned->skill));
       entry.set("by", static_cast<std::int64_t>(learned->by));
-    } else if (const auto* gained =
-                   std::get_if<murim::RealmGained>(&event.what)) {
-      entry.set("person", static_cast<std::int64_t>(gained->person));
-      entry.set("rank", static_cast<std::int64_t>(gained->rank));
+    } else {
+      const auto& gained = std::get<murim::RealmGained>(step.what);
+      entry.set("person", static_cast<std::int64_t>(gained.person));
+      entry.set("rank", static_cast<std::int64_t>(gained.rank));
     }
     kept.push_back(entry);
   }
@@ -1366,6 +1382,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::body_ready);
   godot::ClassDB::bind_method(godot::D_METHOD("events", "from"),
                               &WorldAdapter::events);
+  godot::ClassDB::bind_method(godot::D_METHOD("progress", "from"),
+                              &WorldAdapter::progress);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain_names"),
                               &WorldAdapter::terrain_names);
   godot::ClassDB::bind_method(godot::D_METHOD("terrain"),
@@ -1400,7 +1418,7 @@ void WorldAdapter::_bind_methods() {
                                           static_cast<int>(state));
   }
   // Each kind is its alternative's index in murim::Happening.
-  const std::array<std::pair<const char*, murim::Happening>, 9> kinds{{
+  const std::array<std::pair<const char*, murim::Happening>, 7> kinds{{
       {"EVENT_FOUNDED", murim::Founded{}},
       {"EVENT_RAIDED", murim::Raided{}},
       {"EVENT_RUINED", murim::Ruined{}},
@@ -1408,8 +1426,6 @@ void WorldAdapter::_bind_methods() {
       {"EVENT_LEADER_CHANGED", murim::LeaderChanged{}},
       {"EVENT_BORN", murim::Born{}},
       {"EVENT_DIED", murim::Died{}},
-      {"EVENT_LEARNED", murim::Learned{}},
-      {"EVENT_REALM_GAINED", murim::RealmGained{}},
   }};
   const std::array<std::pair<const char*, murim::LearnedBy>, 3> lessons{{
       {"LEARNED_BY_COMPREHENSION", murim::LearnedBy::COMPREHENSION},
@@ -1423,6 +1439,15 @@ void WorldAdapter::_bind_methods() {
   for (const auto& [constant, happening] : kinds) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(happening.index()));
+  }
+  // Each kind is its alternative's index in murim::Advance.
+  const std::array<std::pair<const char*, murim::Advance>, 2> advances{{
+      {"PROGRESS_LEARNED", murim::Learned{}},
+      {"PROGRESS_REALM_GAINED", murim::RealmGained{}},
+  }};
+  for (const auto& [constant, advance] : advances) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(advance.index()));
   }
   const std::array<std::pair<const char*, murim::ChallengeRefusal>, 7> refusals{
       {

@@ -304,10 +304,10 @@ TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
-TEST(Save, ASealedSaveNamingARealmNoEventCanNameIsRefused) {
+TEST(Save, ASealedSaveNamingARealmNoProgressCanNameIsRefused) {
   // One person cultivating 10 qi a day reaches the one realm, at 10, on the
-  // first day: the save keeps that event, then the souls, surnames,
-  // structures' villages and plans, each an empty list.
+  // first day: the save keeps that step of progress, then the events, souls,
+  // surnames, structures' villages and plans, each an empty list.
   constexpr std::uint32_t DAILY = 10;
   const Life life{{{"sword", {1, 0}, {1, 0}}},
                   1,
@@ -336,8 +336,9 @@ TEST(Save, ASealedSaveNamingARealmNoEventCanNameIsRefused) {
               {},
               life};
   world.tick();
-  ASSERT_EQ(world.events().size(), 1U);
-  const auto* gained = std::get_if<RealmGained>(&world.events().back().what);
+  ASSERT_EQ(world.progress().size(), 1U);
+  ASSERT_TRUE(world.events().empty());
+  const auto* gained = std::get_if<RealmGained>(&world.progress().back().what);
   ASSERT_NE(gained, nullptr);
   ASSERT_EQ(gained->rank, 1U);
   MemorySaves store;
@@ -348,46 +349,48 @@ TEST(Save, ASealedSaveNamingARealmNoEventCanNameIsRefused) {
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  // The event's rank, before four empty lists.
-  constexpr std::size_t EMPTY_LISTS = 4 * sizeof(std::uint64_t);
+  // The step's rank, before five empty lists.
+  constexpr std::size_t EMPTY_LISTS = 5 * sizeof(std::uint64_t);
   const std::size_t rank = payload.size() - EMPTY_LISTS - sizeof(std::uint64_t);
   ASSERT_EQ(payload.at(rank), 1);
-  // Control: resealing the same payload loads with its event.
+  // Control: resealing the same payload loads with its step.
   store.bytes(SLOT) = resealed(header, payload);
   const Saved restored = loaded(load(store, SLOT));
   EXPECT_EQ(restored.world.hash(), world.hash());
-  ASSERT_EQ(restored.world.events().size(), 1U);
+  ASSERT_EQ(restored.world.progress().size(), 1U);
   const auto* kept =
-      std::get_if<RealmGained>(&restored.world.events().back().what);
+      std::get_if<RealmGained>(&restored.world.progress().back().what);
   ASSERT_NE(kept, nullptr);
   EXPECT_EQ(kept->person, 0U);
   EXPECT_EQ(kept->rank, 1U);
-  // The event now names a realm past the one the world holds.
+  // The step now names a realm past the one the world holds.
   payload.at(rank) = 2;
   store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
-TEST(Save, ALoadedRegionKeepsItsLessonsAndRealmsRecorded) {
+TEST(Save, ALoadedRegionKeepsItsLessonsAndRealmsNoted) {
   const Saved saved = lived_region(REGION_SEED);
-  const std::vector<Event>& before = saved.world.events();
-  // Ten years in, the ring holds skills learned and realms gained.
-  ASSERT_TRUE(std::any_of(before.begin(), before.end(), [](const Event& each) {
-    return std::holds_alternative<Learned>(each.what);
-  }));
-  ASSERT_TRUE(std::any_of(before.begin(), before.end(), [](const Event& each) {
-    return std::holds_alternative<RealmGained>(each.what);
-  }));
+  const std::vector<Progress>& before = saved.world.progress();
+  // Ten years in, the progress kept holds skills learned and realms gained.
+  ASSERT_TRUE(
+      std::any_of(before.begin(), before.end(), [](const Progress& each) {
+        return std::holds_alternative<Learned>(each.what);
+      }));
+  ASSERT_TRUE(
+      std::any_of(before.begin(), before.end(), [](const Progress& each) {
+        return std::holds_alternative<RealmGained>(each.what);
+      }));
   MemorySaves store;
   ASSERT_TRUE(save(saved, store, SLOT));
   const Saved restored = loaded(load(store, SLOT));
-  const std::vector<Event>& after = restored.world.events();
+  const std::vector<Progress>& after = restored.world.progress();
   ASSERT_EQ(after.size(), before.size());
-  for (std::size_t event = 0; event < before.size(); ++event) {
-    EXPECT_EQ(after.at(event).sequence, before.at(event).sequence);
-    EXPECT_EQ(after.at(event).what.index(), before.at(event).what.index());
-    const auto* then = std::get_if<Learned>(&before.at(event).what);
-    const auto* now = std::get_if<Learned>(&after.at(event).what);
+  for (std::size_t step = 0; step < before.size(); ++step) {
+    EXPECT_EQ(after.at(step).sequence, before.at(step).sequence);
+    EXPECT_EQ(after.at(step).what.index(), before.at(step).what.index());
+    const auto* then = std::get_if<Learned>(&before.at(step).what);
+    const auto* now = std::get_if<Learned>(&after.at(step).what);
     if (then != nullptr && now != nullptr) {
       EXPECT_EQ(now->person, then->person);
       EXPECT_EQ(now->art, then->art);

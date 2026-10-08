@@ -163,9 +163,10 @@ func _qi_pass() -> bool:
 
 
 # A region lived ten years of five-tick days reads its arts, each named with its skills, and a person's
-# art skill names its index among its art's skills, the skill arts() names alike. Its events give each
-# skill learned with its person, art, skill and how it was learned, and each realm gained with its
-# person and a rank the person has reached. Control: a world from create() has no arts.
+# art skill names its index among its art's skills, the skill arts() names alike. Its progress gives
+# each skill learned with its person, art, skill and how it was learned, and each realm gained with
+# its person and a rank the person has reached, while none of its events names an art. Control: a
+# world from create() has no arts.
 func _lessons_pass() -> bool:
 	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
 	for i in 10 * 120 * 5:
@@ -183,20 +184,21 @@ func _lessons_pass() -> bool:
 					named += 1
 	var learned := 0
 	var gained := 0
-	for event: Dictionary in lived.events(0):
-		if event.kind == WorldAdapter.EVENT_LEARNED:
+	for event: Dictionary in lived.progress(0):
+		if event.kind == WorldAdapter.PROGRESS_LEARNED:
 			learned += 1
 			right = right and lived.person_qi_capacity(event.person) > 0 and event.art < arts.size() \
 					and event.skill < arts[event.art].skills.size() \
 					and [WorldAdapter.LEARNED_BY_COMPREHENSION, WorldAdapter.LEARNED_BY_MANUAL,
 						WorldAdapter.LEARNED_BY_TEACHING].has(event.by)
-		elif event.kind == WorldAdapter.EVENT_REALM_GAINED:
+		elif event.kind == WorldAdapter.PROGRESS_REALM_GAINED:
 			gained += 1
 			right = right and lived.person_realm(event.person) >= event.rank and event.rank >= 1
 	right = right and named > 0 and learned > 0 and gained > 0
-	var bare_right := _create(SEED, _armies, RULES).arts().is_empty()
+	var bare_right := _create(SEED, _armies, RULES).arts().is_empty() \
+			and lived.events(0).all(func(event: Dictionary) -> bool: return not event.has("art"))
 	var passed := right and bare_right
-	print("world_adapter_test: %d arts, %d art skills known named alike, %d skills learned and %d realms gained among the events; a world from create() has no arts %s: %s" % [
+	print("world_adapter_test: %d arts, %d art skills known named alike, %d skills learned and %d realms gained in its progress, none among its events; a world from create() has no arts %s: %s" % [
 		arts.size(), named, learned, gained, bare_right, "pass" if passed else "FAIL"])
 	return passed
 

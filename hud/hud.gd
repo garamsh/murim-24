@@ -5,7 +5,7 @@
 ## and the loadout it fills; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
 ## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
-## written, or, from the core's events, a skill the player learned and how, or a realm it gained;
+## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
 ## a map of the region
 ## around the player with the season and year; the latest RUMOUR_LINES rumours that reach the
 ## player; and the technique bar, the loadout's five slots, each with its key, Q W E R T, and the
@@ -128,8 +128,8 @@ var _ready_at := -1
 var _cool_span := 1
 # The world whose events the notices follow, the next of its events to read, and the notices of
 # skills learned and realms gained waiting to be shown.
-var _events_of: WorldAdapter
-var _next_event := 0
+var _progress_of: WorldAdapter
+var _next_step := 0
 var _waiting: Array[String] = []
 
 
@@ -200,10 +200,10 @@ func show_player(world: WorldAdapter, steered: int) -> void:
 	portrait.region = Rect2(0, 6, 16, 16)
 	_portrait.texture = portrait
 	show_map(world)
-	if world != _events_of:
-		_events_of = world
-		var kept := world.events(0)
-		_next_event = int(kept.back().sequence) + 1 if not kept.is_empty() else 0
+	if world != _progress_of:
+		_progress_of = world
+		var kept := world.progress(0)
+		_next_step = int(kept.back().sequence) + 1 if not kept.is_empty() else 0
 		_waiting.clear()
 	var roster := world.roster(steered)
 	if not roster.is_empty():
@@ -332,7 +332,7 @@ func use_touch(on: bool) -> void:
 	labels.notice.position = NOTICE_AT[on]
 
 
-# Queues a notice for each skill `person` learned and each realm it gained among `world`'s events
+# Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
 # since the last read: how it learned the skill, and its name, or the realm's name.
 func _announce_lessons(world: WorldAdapter, person: int) -> void:
 	var lessons := {
@@ -340,15 +340,15 @@ func _announce_lessons(world: WorldAdapter, person: int) -> void:
 		WorldAdapter.LEARNED_BY_MANUAL: "NOTICE_READ",
 		WorldAdapter.LEARNED_BY_TEACHING: "NOTICE_TAUGHT",
 	}
-	for event: Dictionary in world.events(_next_event):
-		_next_event = int(event.sequence) + 1
-		if not event.has("person") or event.person != person:
+	for step: Dictionary in world.progress(_next_step):
+		_next_step = int(step.sequence) + 1
+		if step.person != person:
 			continue
-		if event.kind == WorldAdapter.EVENT_LEARNED:
-			var taught: Dictionary = world.arts()[event.art].skills[event.skill]
-			_waiting.append(tr(lessons[int(event.by)]) % Arts.named(taught))
-		elif event.kind == WorldAdapter.EVENT_REALM_GAINED:
-			_waiting.append(tr("NOTICE_REALM") % Arts.realm_name(world, event.rank))
+		if step.kind == WorldAdapter.PROGRESS_LEARNED:
+			var taught: Dictionary = world.arts()[step.art].skills[step.skill]
+			_waiting.append(tr(lessons[int(step.by)]) % Arts.named(taught))
+		else:
+			_waiting.append(tr("NOTICE_REALM") % Arts.realm_name(world, step.rank))
 
 
 ## Returns the notices of skills learned and realms gained still waiting to be shown.

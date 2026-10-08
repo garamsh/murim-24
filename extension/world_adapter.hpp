@@ -397,11 +397,16 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::PackedInt64Array body_ready(std::int64_t army) const;
   /// Returns the events the core keeps from the `from`-th recorded on, oldest
   /// first, each a Dictionary of its `sequence` and `tick`, its `cell`
-  /// (Vector2i) and its `kind`, one of the EVENT_* constants. A skill
-  /// learned also gives the `person`, its `art`, the `skill`'s index in it
-  /// and `by`, one of the LEARNED_BY_* constants; a realm gained, the
-  /// `person` and the realm's `rank`, counted from 1.
+  /// (Vector2i) and its `kind`, one of the EVENT_* constants.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> events(
+      std::int64_t from) const;
+  /// Returns the steps of people's progress the core keeps from the
+  /// `from`-th noted on, oldest first, each a Dictionary of its `sequence`,
+  /// `tick`, `kind`, one of the PROGRESS_* constants, and `person`; a skill
+  /// learned also gives its `art`, the `skill`'s index in it and `by`, one of
+  /// the LEARNED_BY_* constants, and a realm gained the realm's `rank`,
+  /// counted from 1.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> progress(
       std::int64_t from) const;
   /// Returns the names of the terrain kinds, by index; empty unless the
   /// world was made by create_region().
