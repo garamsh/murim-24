@@ -245,7 +245,6 @@ func controls() -> Array[Dictionary]:
 		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
 		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
 		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
-		{"keys": [OS.get_keycode_string(_hud.LOCALE_KEY)], "does": "CONTROLS_LANGUAGE"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows

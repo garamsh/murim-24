@@ -12,13 +12,11 @@
 ## icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
 ## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
 ## as art/mockup/mobile_hud_idle.png lays them out.
-## Every word comes from hud.csv through Godot's translations, Korean first; F2 switches between
-## Korean and English, and the settings keep the choice. It reads the world and holds no game rule.
+## Every word comes from hud.csv through Godot's translations, Korean first, or in the language
+## the settings keep. It reads the world and holds no game rule.
 extends CanvasLayer
 
 const LOCALES := ["ko", "en"]
-## The key that switches the language.
-const LOCALE_KEY := KEY_F2
 const FONT := "res://hud/fonts/Galmuri9.ttf"
 const FONT_SIZE := 10
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
@@ -157,20 +155,6 @@ func _set_up() -> void:
 	_theme.default_font_size = FONT_SIZE
 	_theme.set_color("font_color", "Label", PAPER)
 	_build()
-
-
-func _unhandled_key_input(event: InputEvent) -> void:
-	var key := event as InputEventKey
-	if key != null and key.pressed and key.keycode == LOCALE_KEY:
-		switch_locale()
-		settings.note_locale()
-
-
-## Switches the HUD to the next locale in LOCALES, and returns it.
-func switch_locale() -> String:
-	var next: String = LOCALES[(LOCALES.find(TranslationServer.get_locale().left(2)) + 1) % LOCALES.size()]
-	TranslationServer.set_locale(next)
-	return next
 
 
 ## Builds the HUD if it is not yet built, and opens the title screen, with continue taken or not
@@ -324,7 +308,6 @@ func use_touch(on: bool) -> void:
 		touch.release_all()
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
-	labels.locale.visible = not on
 	labels.challenge_key.visible = not on
 	_map_panel.position = MAP_AT[on]
 	_rumour_panel.position = RUMOUR_RECT[on].position
@@ -544,8 +527,6 @@ func _build() -> void:
 		cell.add_child(number)
 		_slots.append(cell)
 
-	labels.locale = _label(self, "HUD_LOCALE", Vector2(400, 68), STONE)
-
 	# The genealogy panel, closed until G opens it; added after every other panel, below, so it
 	# draws over them all.
 	genealogy = preload("res://hud/genealogy.gd").new()
@@ -597,7 +578,6 @@ func _build() -> void:
 	settings = preload("res://hud/settings.gd").new()
 	rebirth = preload("res://hud/rebirth.gd").new()
 	settings.locales = LOCALES
-	settings.locale_key = OS.get_keycode_string(LOCALE_KEY)
 	for screen_panel: Control in [title_screen, new_game, pause, settings, rebirth]:
 		screen_panel.use_font(_theme.default_font)
 		screen_panel.visible = false

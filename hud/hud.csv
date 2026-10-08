@@ -23,7 +23,6 @@ RUMOUR_ELECTED,"%s, %s 수장에 선출",%s elected %s leader
 RUMOUR_DUEL,"%s, 결투로 %s 수장에 오르다",%s wins %s lead by duel
 RUMOUR_BORN,%s 태어나다,%s born
 RUMOUR_DIED,%s 세상을 떠나다,%s dies
-HUD_LOCALE,F2 English,F2 한국어
 FACTION_ORTHODOX,정파,Orthodox
 FACTION_DEMONIC,마교,Demonic Cult
 FACTION_UNORTHODOX,사파,Unorthodox
@@ -142,7 +141,6 @@ CONTROLS_CHALLENGE,수장에게 도전,Challenge leader
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
-CONTROLS_LANGUAGE,언어,Language
 CONTROLS_PAUSE_CANCEL,일시정지 · 조준 취소,Pause · Cancel aim
 SETTINGS_TITLE,설정,Settings
 SETTINGS_BACK,Esc 뒤로,Esc Back
@@ -157,7 +155,7 @@ SETTINGS_LANGUAGE,언어,Language
 SETTINGS_SPEED_ABOUT,세상의 시간이 흐르는 빠르기. 일시정지 중에는 멈춘다.,How fast the world's time runs. It stops while paused.
 SETTINGS_WINDOW_ABOUT,창으로 띄우거나 화면을 가득 채운다.,Run in a window or fill the screen.
 SETTINGS_RESOLUTION_ABOUT,창의 크기. 원래 화면의 정수배로 키운다.,"The window's size, a whole multiple of the screen."
-SETTINGS_LANGUAGE_ABOUT,글자를 보일 언어. %s로도 바꾼다.,The language of every word. %s switches it too.
+SETTINGS_LANGUAGE_ABOUT,글자를 보일 언어.,The language of every word.
 SETTINGS_MASTER,전체 음량,Volume
 SETTINGS_EFFECTS,효과음,Effects
 SETTINGS_MUSIC,음악,Music

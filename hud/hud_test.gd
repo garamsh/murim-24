@@ -54,9 +54,9 @@ func run() -> bool:
 	var hp: Label = hud.labels.hp
 	var faction: Label = hud.labels.faction
 	var korean := [TranslationServer.get_locale(), hp.atr(hp.text), faction.atr(faction.text)]
-	var switched: String = hud.switch_locale()
+	TranslationServer.set_locale("en")
 	var english := [TranslationServer.get_locale(), hp.atr(hp.text), faction.atr(faction.text)]
-	hud.switch_locale()
+	TranslationServer.set_locale("ko")
 	var back := TranslationServer.get_locale()
 	var expected_faction: String = "FACTION_" + world.faction_names()[world.army_faction(steered)].to_upper()
 	# Setup: the label holds the key, so a translated text differing from it came from a file.
@@ -108,11 +108,11 @@ func run() -> bool:
 	var later: String = hud.season_text({"year": 3, "season": 1, "day": 1})
 	var dated: bool = date.year == 1 and date.season == 0 and season == "봄 · 1년" \
 			and later == "여름 · 3년"
-	var passed := keyed and korean == ["ko", "체력", "정파"] and switched == "en" \
+	var passed := keyed and korean == ["ko", "체력", "정파"] \
 			and english == ["en", "HP", "Orthodox"] and back == "ko" and values_right and icons_right \
 			and dated
-	print("hud_test: keys %s, %s; Korean %s; after switching to %s, %s; back to %s; HP %s, qi %s, its bar %d; %d skills on the slots %s with their icons, each key clear of its icon %s, the rest empty %s: %s" % [
-		hp.text, faction.text, korean, switched, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
+	print("hud_test: keys %s, %s; Korean %s; in English %s; back to %s; HP %s, qi %s, its bar %d; %d skills on the slots %s with their icons, each key clear of its icon %s, the rest empty %s: %s" % [
+		hp.text, faction.text, korean, english, back, hp_value, qi_value, hud.qi_bar.value, skills.size(),
 		keys, clear, icons_right, "pass" if passed else "FAIL"])
 	print("hud_test: date %s shown as \"%s\"; year 3, season 1 as \"%s\": %s" % [
 		date, season, later, "pass" if dated else "FAIL"])
@@ -153,7 +153,7 @@ func _names_pass() -> bool:
 			and given_width > hud.labels.leader_value.size.x and given_width > hud.labels.duel_leader.size.x \
 			and ordered and hud.duel_panel.visible
 	var korean := shown_labels.map(func(label: Label) -> String: return label.text)
-	hud.switch_locale()
+	TranslationServer.set_locale("en")
 	hud.refresh(world, steered, PackedInt64Array([0]))
 	var english := shown_labels.map(func(label: Label) -> String: return label.text)
 	# Within its label, and the leader's clear of the words on either side of it.
@@ -161,7 +161,7 @@ func _names_pass() -> bool:
 	var leader_word := _width(hud.labels.leader, hud.labels.leader.atr(hud.labels.leader.text))
 	var clear: bool = hud.labels.leader.position.x + leader_word <= hud.labels.leader_value.position.x \
 			and hud.labels.leader_value.position.x + hud.labels.leader_value.size.x <= hud.labels.challenge_key.position.x
-	hud.switch_locale()
+	TranslationServer.set_locale("ko")
 	hud.free()
 	var full: String = name.surname + name.given
 	var named := korean == [full, full, "당신"] and english == [name.given_en, name.given_en, "You"]
@@ -507,10 +507,10 @@ func _realm_pass() -> bool:
 		korean = hud.labels.realm_value.text
 		qi = hud.labels.qi_value.text
 		bar = hud.qi_bar.value
-		hud.switch_locale()
+		TranslationServer.set_locale("en")
 		hud.refresh(world, cultivated, PackedInt64Array([0]))
 		english = hud.labels.realm_value.text
-		hud.switch_locale()
+		TranslationServer.set_locale("ko")
 	var rank := world.person_realm(person) if person >= 0 else 0
 	var store := world.person_qi_capacity(person) if person >= 0 else 0
 	var held := world.person_qi(person) if person >= 0 else 0
