@@ -2,7 +2,7 @@
 
 Phase 1 of #200: the world drawn at Albion's 3/4 angle in 2D pixel art, shown to the owner before anything is rebuilt (PR #204). This branch is never merged.
 
-This file covers the first round, a generic village at ba32a9f. Two later rounds of the same PR have their own: `streaming/`, rendering only round the camera by 32-cell chunks, and `levelling/`, one skill levelling a whole village with the camera pulled back.
+This file covers the first round, a generic village at ba32a9f. Later rounds of the same PR have their own: `streaming/`, rendering only round the camera by 32-cell chunks; `levelling/`, one skill levelling a whole village with the camera pulled back; and `revised/`, the look the PR's review asked for, in elevation levels with baked shadows and four villages.
 
 ## How it was made
 
