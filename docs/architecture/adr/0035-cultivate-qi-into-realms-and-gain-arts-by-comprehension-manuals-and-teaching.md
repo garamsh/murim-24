@@ -1,6 +1,6 @@
 # ADR 0035: Cultivate qi into realms, and gain arts by comprehension, manuals and teaching
 
-> Status: accepted
+> Status: accepted; its realms, qi, cultivation and heart method named in the core, and its fixed orientations and polarities, superseded by ADR-0049, which gives them general names and makes the natures' axes pack data
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
