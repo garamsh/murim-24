@@ -1,6 +1,6 @@
 # ADR 0042: Simulate the world in three tiers by distance from the people a driver steers
 
-> Status: proposed
+> Status: proposed; its one set of tier values for every device superseded by ADR-0048
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

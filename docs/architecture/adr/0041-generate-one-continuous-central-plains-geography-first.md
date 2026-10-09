@@ -1,6 +1,6 @@
 # ADR 0041: Generate one continuous Central Plains of 512 cells square, geography first
 
-> Status: proposed
+> Status: superseded by ADR-0047
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

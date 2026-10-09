@@ -46,13 +46,42 @@ Each section carries one of the following statuses.
 
 ## World and scale [agreed]
 
-Decided by the user on 2026-10-08 (issue #173), with the measurement scoped on 2026-10-09.
+Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026-10-09 (issue #201): one hand-made map, physical distances, an offline game. The design is ADR 0047 (`docs/architecture/adr/0047-author-one-continuous-map-of-4096-cells-by-hand-at-a-li-a-cell.md`), with the quality profiles of ADR 0048.
 
-- **One continuous world.** The game's world is one generated map of about 512 x 512 cells, four by four of the first 128-cell region, shaped like the Central Plains (jungwon): a great river, famous mountains, plains, cities and the roads between them.
-- **Natural borders.** The world is closed by the sea, mountain ranges and desert, never by a hard edge.
-- **Sects on famous mountains.** Each sect's seat stands on a famous mountain, such as Hwasan for the Hwasan sect.
+- **One continuous map.** The world is one map of 4,096 x 4,096 cells, with no transitions between regional maps. The regions are named lands on it, and travel between them crosses the land itself: ranges and rivers block the way, and passes, fords and ferries are places one walks through.
+- **Made by hand, the same in every game.** The map is authored, not generated, and every player gets the same one. No seed shapes the terrain; a new game's seed draws only the simulation's randomness: who is born with what talent, and what happens.
+- **Physical distance.** In the heartland a cell is a li, 500 metres between places, so travel takes the time the real distance suggests. At 1x, Luoyang to Chang'an is about 6 minutes on foot, a region about 12, and edge to edge about 36. The outer lands are compressed toward the map's edge. Roads are faster than open ground; horses and river boats are planned.
+- **An offline game.** There is no online play, and none is planned.
+- **The regions.** Ten regions, each with its real basis:
+  - 중원 (Central Plains): Henan and the lower Yellow River. Luoyang, Kaifeng, Song Shan and Shaolin.
+  - 관중 (Guanzhong): the Wei valley. Chang'an, and Hua Shan, where Hwasan sits.
+  - 하북·산서 (Hebei and Shanxi): Taiyuan and Yanjing, and the Taihang, where the Black Fang sits.
+  - 사천 (Sichuan): the Sichuan basin. Chengdu, Chongqing and Emei.
+  - 호광 (Huguang): the middle Yangtze and its lakes. Wuchang, Xiangyang and Wudang.
+  - 강남 (Jiangnan): the Yangtze delta. Nanjing, Yangzhou, Suzhou and Hangzhou.
+  - 서역 (Western Regions): the Hexi Corridor, the deserts and Tianshan, where the Demonic Cult sits.
+  - 운남·남만 (Yunnan and the southern barbarians): Dali, and Lingnan beyond the Nanling.
+  - 새북 (beyond the northern wall): the steppe, a frontier.
+  - 요동 (Liaodong): Liaoyang and Changbai, a frontier.
+- **The gates.** Regions join only through these:
+  - Tong and Hangu passes
+  - Jianmen Pass
+  - Wu Pass
+  - the Mengjin and Pujin ferries
+  - the Three Gorges
+  - the Nanyang gap
+  - the Huai fords and the Grand Canal
+  - Meiling Pass
+  - Yanmen and Juyong passes
+  - Shanhai Pass
+  - Jiayu Pass
+  - the oasis route
+- **Natural borders.** The map is closed by the sea, mountain ranges and desert, never by a hard edge.
+- **Sects on famous mountains.** Each sect's seat stands on a famous mountain: Hwasan on Hua Shan, the Black Fang in the Taihang, and the Demonic Cult on Tianshan in the far west, as Korean wuxia places it. Other famous mountains stand as landmarks until their sects are added.
+- **Villages grow.** The map places only the starting cities, major towns and sect seats. Every other village is founded and grows by the villages' own rules, the same way in every game.
 - **Distance level of detail.** Places near the player are simulated in full; far places are simulated coarsely. Every person stays an individual in every tier (§Growing civilization).
-- **The population bound is measured.** It is raised from about 500 to the largest number between 2,000 and 5,000 that keeps a tick's p99 within its 4 ms budget with the level of detail. It is measured on PC, macOS first and Linux when available. The mobile bound is measured at the mobile port and may be lower.
+- **The same world on every device.** A quality profile, chosen by the device or the player, sets only how much is drawn and how far around the player people are simulated in full. The map, its villages and its people are the same on every profile. Far events may turn out differently on different profiles, which is accepted for an offline game.
+- **The population bound is measured.** The map needs far more people than the first region did to feel lived in. The bound is raised from about 500 to the largest number between 10,000 and 50,000 that keeps a tick's p99 within its 4 ms budget with the level of detail, measured on the lowest quality profile. It is measured on PC, macOS first and Linux when available.
 
 ## Factions and the rules for gaining power [agreed]
 
@@ -159,8 +188,8 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 ## MVP scope [proposed]
 
-- **Scale**: one continuous world (§World and scale), three factions (Orthodox, Demonic, Unorthodox), and the villages its generation places.
-- **Flow**: world generation → travel and combat → one loop of a village being destroyed and rebuilt → succession by duel in the Demonic Cult → death and rebirth.
+- **Scale**: one continuous hand-made map (§World and scale), three factions (Orthodox, Demonic, Unorthodox), and the cities and towns the map places.
+- **Flow**: a new world on the map → travel and combat → one loop of a village being destroyed and rebuilt → succession by duel in the Demonic Cult → death and rebirth.
 
 ## Open questions [open]
 
