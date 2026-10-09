@@ -83,10 +83,11 @@ float bayer(ivec2 p) {
 	return (float(m[(p.y & 3) * 4 + (p.x & 3)]) + 0.5) / 16.0;
 }
 
-ivec3 cell(ivec2 c) {
+// A cell: its kind, its level, its face material, and 1 where its ground rises as a slope.
+ivec4 cell(ivec2 c) {
 	c = clamp(c, ivec2(0), map_size - 1);
 	vec4 t = texelFetch(cells, c, 0);
-	return ivec3(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)));
+	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)), t.a < 0.75 ? 1 : 0);
 }
 
 // Where a point on the ground reads its cells from: warped by noise, so edges wander.
@@ -94,26 +95,38 @@ vec2 warped(vec2 p) {
 	return p + (vec2(fbm(p / 22.0 + vec2(7.0, 0.0), 11), fbm(p / 22.0 + vec2(0.0, 5.0), 12)) - 0.5) * 2.0 * WARP;
 }
 
-// The level of the ground at a point: its cells' levels interpolated, then taken to the nearest
-// level one of those cells has, so the contour curves between levels without a ledge at a level
-// none of them has.
-int level_at(vec2 p) {
+// The height of the ground at a point, in levels: its cells' levels interpolated, then taken to
+// the nearest level one of those cells has, so the contour curves between levels without a
+// ledge at a level none of them has; toward cells that rise as a slope, the interpolated height
+// itself, so the ground climbs without a cliff.
+float height_at(vec2 p) {
 	vec2 q = warped(p);
 	vec2 uv = vec2(q.x / CW, q.y / CD) - 0.5;
 	ivec2 c = ivec2(floor(uv));
 	vec2 f = uv - floor(uv);
-	float corners[4] = float[](float(cell(c).y), float(cell(c + ivec2(1, 0)).y), float(cell(c + ivec2(0, 1)).y),
-			float(cell(c + ivec2(1, 1)).y));
-	float level = mix(mix(corners[0], corners[1], f.x), mix(corners[2], corners[3], f.x), f.y);
-	float best = corners[0];
+	ivec4 cs[4] = ivec4[](cell(c), cell(c + ivec2(1, 0)), cell(c + ivec2(0, 1)), cell(c + ivec2(1, 1)));
+	float level = mix(mix(float(cs[0].y), float(cs[1].y), f.x), mix(float(cs[2].y), float(cs[3].y), f.x), f.y);
+	// How far the point is into a slope: the corners' flags interpolated, so a cliff fades into
+	// the slope it meets instead of breaking off at a cell's edge.
+	float slope = mix(mix(float(cs[0].w), float(cs[1].w), f.x), mix(float(cs[2].w), float(cs[3].w), f.x), f.y);
+	float best = float(cs[0].y);
 	for (int i = 1; i < 4; i++) {
-		float here = abs(corners[i] - level);
+		float here = abs(float(cs[i].y) - level);
 		float there = abs(best - level);
-		if (here < there || (here == there && corners[i] > best)) {
-			best = corners[i];
+		if (here < there || (here == there && float(cs[i].y) > best)) {
+			best = float(cs[i].y);
 		}
 	}
-	return int(best);
+	return mix(best, level, smoothstep(0.0, 0.5, slope));
+}
+
+int level_at(vec2 p) {
+	return int(floor(height_at(p) + 0.5));
+}
+
+// Whether the ground drops by a cliff, not a slope, between `p` and `q` south of it.
+bool drops(vec2 p, vec2 q) {
+	return height_at(p) - height_at(q) > 0.5;
 }
 
 // The kind of ground at a point on level `level`: of the four cells round it, the kind whose
@@ -124,11 +137,13 @@ int kind_at(vec2 p, int level) {
 	vec2 uv = vec2(q.x / CW, q.y / CD) - 0.5;
 	ivec2 c = ivec2(floor(uv));
 	vec2 f = uv - floor(uv);
-	ivec3 cs[4] = ivec3[](cell(c), cell(c + ivec2(1, 0)), cell(c + ivec2(0, 1)), cell(c + ivec2(1, 1)));
+	ivec4 cs[4] = ivec4[](cell(c), cell(c + ivec2(1, 0)), cell(c + ivec2(0, 1)), cell(c + ivec2(1, 1)));
 	float w[4] = float[]((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
 	int best = cs[0].x;
 	float best_score = -1.0;
-	ivec2 px = ivec2(floor(p));
+	// The jitter is per pixel of the image, not of the ground, so a slope facing the viewer does
+	// not stretch it into streaks.
+	ivec2 px = ivec2(floor(vec2(p.x, p.y - height_at(p) * LP)));
 	for (int i = 0; i < 4; i++) {
 		float score = 0.0;
 		for (int j = 0; j < 4; j++) {
@@ -172,10 +187,14 @@ bool near_kind(vec2 p, int level, int other, int r) {
 	return false;
 }
 
-vec3 surface(vec2 p, int level, int kind) {
+// The ground's colour at `p` on the ground, `screen` being where it shows: texture and patches
+// follow the screen, so a slope facing the viewer is not streaked by its stretch; kinds, rims and
+// laid patterns follow the ground.
+vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	ivec2 px = ivec2(floor(p));
-	float tex = 0.62 * vnoise(p / 2.3 + 5.0, 21) + 0.38 * hash01(px.x, px.y, 22);
-	float macro = (fbm(p / 48.0 + vec2(11.0, 3.0), 23) - 0.5) * 0.5;
+	ivec2 sx = ivec2(floor(screen));
+	float tex = 0.62 * vnoise(screen / 2.3 + 5.0, 21) + 0.38 * hash01(sx.x, sx.y, 22);
+	float macro = (fbm(screen / 48.0 + vec2(11.0, 3.0), 23) - 0.5) * 0.5;
 	int step = tex < 0.3 + macro * 0.5 ? 0 : (tex > 0.74 + macro * 0.5 ? 2 : 1);
 	if (kind == WATER) {
 		step = vnoise(p / 9.0, 24) > 0.55 ? 1 : 0;
@@ -207,18 +226,22 @@ vec3 surface(vec2 p, int level, int kind) {
 		step = 0;
 	}
 	// Rock wears moss and lichen in patches.
-	if (kind == ROCK && fbm(p / 18.0 + vec2(3.0, 9.0), 30) > 0.6 && bayer(px) < 0.5) {
+	if (kind == ROCK && fbm(screen / 18.0 + vec2(3.0, 9.0), 30) > 0.58 && vnoise(screen / 1.7, 31) > 0.45) {
 		return ramp(FOREST, step == 2 ? 2 : 1);
 	}
 	vec3 colour = ramp(kind, step);
 	// The lit lip where the ground turns down into a face.
-	if (level_at(p + vec2(0.0, 1.0)) < level) {
+	if (drops(p, p + vec2(0.0, 1.0))) {
 		colour = ramp(kind == ROCK ? ROCK : (kind == WATER ? WATER : MEADOW), 3);
 	}
-	// The foot of a face is in its shadow, thinning away from it.
-	for (int d = 1; d <= 4; d++) {
-		if (level_at(p - vec2(0.0, float(d))) > level) {
-			if (bayer(px) < (1.0 - float(d - 1) / 4.0) * 0.9) {
+	// The foot of a face is in its shadow, thinning away from it, and scree lies there in
+	// clusters, more of it nearer the face.
+	for (int d = 1; d <= 6; d++) {
+		if (drops(p - vec2(0.0, float(d)), p - vec2(0.0, float(d - 1)))) {
+			if (kind != WATER && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
+				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 3 : 1);
+			}
+			if (d <= 4 && hash01(px.x, px.y, 35) < (1.0 - float(d - 1) / 4.0) * 0.9) {
 				colour = mix(colour, SHADE, 0.38);
 			}
 			break;
@@ -243,16 +266,31 @@ vec3 face(vec2 p, int material, float depth, float height) {
 		kind = PAVING;
 		step = int(depth) % 4 == 0 ? 3 : (int(depth) % 4 == 3 ? 0 : 1);
 	} else {
-		// Strata a few pixels thick, wandering along the face, split by vertical cracks.
-		float band = depth + (vnoise(vec2(p.x / 9.0, 0.0), 26) - 0.5) * 4.0;
-		int layer = int(floor(band / 3.0));
-		step = (layer % 3 == 0) ? 3 : ((layer % 3 == 1) ? 2 : 1);
-		if (hash01(px.x / 2, layer, 27) > 0.82) {
+		// Rock: strata of uneven thickness that tilt and wander along the face, each a tone of
+		// its own with a lit top and a dark underside, split by fissures.
+		float thickness = 2.5 + 3.0 * vnoise(vec2(p.x / 27.0, 1.0), 26);
+		float band = (depth + (vnoise(vec2(p.x / 11.0, 0.0), 26) - 0.5) * 6.0 + (vnoise(vec2(p.x / 37.0, 3.0), 36) - 0.5) * 10.0) / thickness;
+		int layer = int(floor(band));
+		float within = fract(band);
+		step = 1 + int(hash01(layer, int(p.x / 40.0), 27) * 2.99);
+		if (within < 0.2) {
+			step = min(step + 1, 3);
+		} else if (within > 0.8) {
 			step = max(step - 1, 0);
 		}
-		if (hash01(px.x, 0, 28) > 0.9 && vnoise(vec2(p.x, depth / 4.0), 29) > 0.4) {
+		if (hash01(px.x / 3, 0, 28) > 0.9 && depth > height * vnoise(vec2(p.x, 7.0), 29)) {
 			step = 0;
 		}
+		// Plants hang over the lip in tufts, and scree piles at the foot to an uneven height.
+		float hang = vnoise(vec2(p.x / 4.0, 9.0), 37) > 0.55 ? 4.0 * vnoise(vec2(p.x / 2.0, 1.0), 38) : 0.0;
+		if (depth < hang) {
+			return ramp(FOREST, depth < 1.0 ? 2 : 1);
+		}
+		float pile = 2.0 + 9.0 * vnoise(vec2(p.x / 13.0, 5.0), 39);
+		if (depth > height - pile) {
+			return ramp(ROCK, hash01(px.x, int(depth), 40) > 0.55 ? 3 : (hash01(px.x / 2, int(depth) / 2, 41) > 0.5 ? 1 : 0));
+		}
+		return ramp(ROCK, depth < 1.0 ? 3 : step);
 	}
 	if (depth < 1.0) {
 		step = 3;
@@ -276,10 +314,20 @@ void fragment() {
 	float shown = 0.0;
 	for (int step_y = 0; step_y <= (TOP - LOW) * int(LP); step_y++) {
 		float y = s + float(TOP) * LP - float(step_y);
-		int l = level_at(vec2(x, y));
-		float at = y - float(l) * LP;
+		float h = height_at(vec2(x, y));
+		float at = y - h * LP;
 		if (at <= s + 0.5) {
-			level = l;
+			// On a slope one step of ground moves the image by several pixels; where the ground
+			// runs on without a drop, the point that shows exactly here lies between the steps.
+			float h_next = height_at(vec2(x, y + 1.0));
+			float at_next = y + 1.0 - h_next * LP;
+			if (at < s - 0.5 && at_next > s && abs(h_next - h) < 0.5) {
+				float t = (s - at) / (at_next - at);
+				y += t;
+				h = mix(h, h_next, t);
+				at = s;
+			}
+			level = int(floor(h + 0.5));
 			ground_y = y;
 			shown = at;
 			break;
@@ -291,11 +339,12 @@ void fragment() {
 	if (shown > s - 0.5) {
 		kind = kind_at(vec2(x, ground_y), level);
 		sort_row = int(floor(ground_y / CD));
-		out_colour = vec4(surface(vec2(x, ground_y), level, kind), 1.0);
+		out_colour = vec4(surface(vec2(x, ground_y), vec2(x, s), level, kind), 1.0);
 	} else {
-		int foot = min(level_at(vec2(x, ground_y + 1.0)), level - 1);
+		float top_h = height_at(vec2(x, ground_y));
+		float foot_h = min(height_at(vec2(x, ground_y + 1.0)), top_h - 0.5);
 		float depth = s - shown;
-		float height = float(level - foot) * LP;
+		float height = (top_h - foot_h) * LP;
 		vec2 q = warped(vec2(x, ground_y));
 		int material = cell(ivec2(floor(vec2(q.x / CW, q.y / CD)))).z;
 		// An earth bank above the first level is rock, so a face keeps one material along its run.

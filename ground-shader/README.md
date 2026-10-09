@@ -1,15 +1,20 @@
 # Ground off the cell grid
 
-Round 3 of the revised look: #212's natural terrain, approved by the owner step by step, prototyped in the valley. Made by `angle.gd` and `ground.gdshader` here, the same files as `art/mockup/angle.gd` and `art/mockup/angle/ground.gdshader` at 25e4fe2. Run with Godot 4.7.2 on macOS arm64 (Apple M1), on AC power.
+Round 3 of the revised look: #212's natural terrain, approved by the owner step by step, prototyped in the valley. Made by `angle.gd` and `ground.gdshader` here, the same files as `art/mockup/angle.gd` and `art/mockup/angle/ground.gdshader` at 53d76c1. Run with Godot 4.7.2 on macOS arm64 (Apple M1), on AC power.
 
 ## Files
 
 - `valley_<locale>.png`: the valley at 2x under the HUD. `village_`, `town_`, `terraces_` and `riverside_<locale>.png`: the four places at 3x. From `stills valley`.
 - `sequence.gif`, `sequence_2x.gif`, `strip.png`, `frames/`, `depth_behind.png`, `depth_front.png`: the village's people walking, from `frames valley`.
-- `crops/before/` and `crops/after/`: 2x crops of `../valley-fixes/` (739d086) and of this round, at the same spots:
+- 2x crops at the same spots, in three folders:
+  - `crops/before/`: `../valley-fixes/` (739d086);
+  - `crops/round3/`: this round as first pushed (25e4fe2);
+  - `crops/after/`: this round after the PM's review (53d76c1).
+- The crops:
   - `cliffs_left` and `cliffs_mid`: the range's tiers;
   - `forest_edge`: the forest below the hill, from the valley still;
-  - `forest_edge_river`: the forest by the river, from the riverside still.
+  - `forest_edge_river`: the forest by the river, from the riverside still;
+  - `rock_ground` and `slope`, in `round3/` and `after/` only: the grey highland, and the mountainside where it rises without a cliff.
 
 ## Step 1: the four uncounted runs
 
@@ -29,8 +34,9 @@ What the shader does, per pixel, from the valley's cells (`ground.gdshader`):
   - shade within 2 px of a forest's edge;
   - a lit lip where ground turns down into a face;
   - a dithered shadow over the 4 px at a face's foot.
-- **Faces**: strata 3 px thick wandering along the face, with cracks and a darker lower part; courses on masonry; treads on stairs. A face above the first level is rock along its whole run.
-- **Texture**: varied per pixel in clusters, with patches of colour 48 px across and moss on rock.
+- **Faces**: on rock, strata 2.5 to 5.5 px thick that tilt and wander along the face, each its own tone with a lit top and a dark underside, split by fissures. Plants hang over the lip in tufts, and scree piles at the foot to a height that varies along the run. Masonry and stairs, which are built, keep courses and treads. A face above the first level is rock along its whole run.
+- **Slopes**: a cell can be flagged as a slope. Toward such cells the height is interpolated rather than snapped to a level, so the ground climbs without a cliff, and a cliff fades out where it meets a slope.
+- **Texture**: varied per pixel of the image in clusters, with patches of colour 48 px across, and moss on rock in clusters.
 - **Ramps**: four steps a kind, shifted toward blue in the dark and yellow in the light, built by #212's rule from a hue, saturation and lightness per kind. Paddy and garden take four colours of the master palette.
 
 What the map build adds to each 32-cell chunk (ADR 0042's area):
@@ -41,9 +47,19 @@ What the map build adds to each 32-cell chunk (ADR 0042's area):
 - Structures cast shadows on their own level, their edges wandering a couple of pixels.
 - The image is cut into the ground (level 0 and below) and a strip per raised row and level, as before, so anyone behind a terrace is still hidden and outlined.
 
+## The PM's review of 25e4fe2
+
+The review on #204 asked for three fixes before the benches count:
+
+1. **Cliffs read as masonry.** Rock faces now have the uneven strata, overhanging plants and scree described under Faces. They end where the contour turns or where a slope begins. Built walls keep their courses.
+2. **Too many parallel ridges.** The range's height is now taken to levels 0, 2, 4 and 5, so the mountainside climbs in three tall steps where it had five or six. About a sixth of its raised cells, in patches, rise as slopes with no cliff.
+3. **Rock ground dithering.** Moss on rock is drawn in clusters where it was a Bayer checker. The per-pixel jitter between kinds follows the image, so a steep slope no longer stretches it into streaks.
+
+`crops/round3/` and `crops/after/` show each fix at the same spots.
+
 ## Step 3: captures and frame cost
 
-- The captures above are at 25e4fe2.
+- The captures above are at 53d76c1.
 - The valley's forest floor has no rectangular patches: the woods and slopes the valley used to set tree by tree are forest ground now, and their trees are scattered.
 - Straight cell-edged runs left on screen:
   - the shrine's terrace and the town's walls, which are built straight;

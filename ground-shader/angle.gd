@@ -274,7 +274,7 @@ class AngleView extends Node2D:
 		# at the first refresh after it; another look's is baked at once.
 		if _shaded():
 			_set_up_baker()
-			_baker_frame = Engine.get_frames_drawn()
+			_baker_frame = Engine.get_process_frames()
 		elif look.baked_shadows():
 			bake_all()
 
@@ -313,7 +313,8 @@ class AngleView extends Node2D:
 	## `between` of the way from the tick before last to the last, at `now_ms`.
 	func refresh(view: Rect2, between: float, now_ms: int) -> void:
 		if _shaded() and _baked.is_empty():
-			if Engine.get_frames_drawn() <= _baker_frame:
+			# Process frames, not frames drawn: a hidden window draws none, and the bake forces its own.
+			if Engine.get_process_frames() <= _baker_frame + 1:
 				return
 			bake_all()
 		_stream(view)
@@ -1618,6 +1619,7 @@ class Valley extends RefCounted:
 	var _blocked := PackedByteArray()
 	var _region := PackedInt32Array()
 	var _built := PackedByteArray()
+	var _slope := PackedByteArray()
 	var _structures: Array[Dictionary] = []
 	var _trees := {}
 	var _lanes := {"village": [], "town": [], "terraces": [], "riverside": []}
@@ -1633,6 +1635,7 @@ class Valley extends RefCounted:
 		_taken.resize(cells)
 		_blocked.resize(cells)
 		_built.resize(cells)
+		_slope.resize(cells)
 		_lay_ground()
 		_lay_range()
 		_lay_river()
@@ -1674,8 +1677,9 @@ class Valley extends RefCounted:
 		return 0
 
 	## The cells as the ground shader reads them, one texel a cell: the ground kind's index in
-	## `kinds` in red, the level plus one in green, and in blue the material of the face the cell
-	## drops by, an index in `faces`, or 3 for a stair.
+	## `kinds` in red, the level plus one in green, in blue the material of the face the cell drops
+	## by, an index in `faces`, or 3 for a stair, and in alpha half where its ground rises as a
+	## slope and not by a cliff.
 	func ground_cells(kinds: Array, faces: Array) -> Image:
 		var image := Image.create_empty(WIDTH, HEIGHT, false, Image.FORMAT_RGBA8)
 		for y in HEIGHT:
@@ -1684,7 +1688,7 @@ class Valley extends RefCounted:
 				if kind < 0:
 					kind = 1
 				var face := 3 if stairs_at(x, y) else maxi(faces.find(face_at(x, y)), 0)
-				image.set_pixel(x, y, Color8(kind, level_at(x, y) + 1, face, 255))
+				image.set_pixel(x, y, Color8(kind, level_at(x, y) + 1, face, 128 if _slope[_i(x, y)] == 1 else 255))
 		return image
 
 	## Whether a decorative tree may stand on the cell: open natural ground, nothing built on it
@@ -1831,7 +1835,8 @@ class Valley extends RefCounted:
 				for floor: Array in [[Vector2(50, 46), Vector2(28, 17)], [Vector2(16, 48), Vector2(16, 16)]]:
 					var reach: float = ((Vector2(x, y) - floor[0]) / floor[1]).length()
 					rise -= clampf((1.35 - reach) * 6.0, 0.0, 99.0)
-				raw[_i(x, y)] = clampi(floori(rise), 0, TOP)
+				# Fewer, taller steps: the range climbs by two levels at a time, then to the top.
+				raw[_i(x, y)] = [0, 0, 2, 2, 4, 5][clampi(floori(rise), 0, TOP)]
 		# Each cell takes the level most of its neighbours have, twice over.
 		for pass_count in 2:
 			var smooth := raw.duplicate()
@@ -1855,6 +1860,9 @@ class Valley extends RefCounted:
 					continue
 				var i := _i(x, y)
 				_level[i] = level
+				# Here and there the mountainside rises as a slope, with no cliff.
+				if level < TOP and _noise(x, y, 9.0, 41) > 0.68:
+					_slope[i] = 1
 				# Ground by noise, not by level, so its kinds meet in blobs and not along the levels'
 				# edges: meadow and forest floor on the lower tiers, forest and rock higher up.
 				var patch := _noise(x, y, 7.0, 4)
