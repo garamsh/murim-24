@@ -186,16 +186,21 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - Polarity: firm yang (yanggang) or soft yin (eumyu).
   - Each art has a nature. An art of another nature than one's own is harder to learn or weaker to use.
 - **Skills need qi.** Each skill has a minimum qi or realm to learn and to use, and costs qi to cast.
-- **Families and tiers.** Decided by the owner on 2026-10-09 (issue #194); the design is ADR 0055 (`docs/architecture/adr/0055-give-arts-a-family-a-tier-and-a-mastery-and-gain-higher-arts-by-synthesis-over-a-lineage-graph.md`).
-  - Every art has a family, such as sword, saber, fist and palm, hidden weapons, footwork or heart method.
-  - Every art has a tier, from a third-rate art up to a peerless one.
+- **Families and tiers.** Decided by the owner on 2026-10-09 (issue #194). ADR 0055 (`docs/architecture/adr/0055-give-arts-a-family-a-tier-and-a-mastery-and-gain-higher-arts-by-synthesis-over-a-lineage-graph.md`), proposed, designs them.
   - An art keeps its skills, its forms.
-- **Growth is the realm and a mastery per art.** The realm still grows with qi. Each art also has a mastery that rises with use, by fighting with its skills, training at a sect's training ground and being taught. Its stages open the art's forms, as the realm allows.
+  - Arts gain a family, such as sword, saber, fist or palm, hidden weapons, footwork or heart method, and a tier, from a third-rate art up to a peerless one, as data.
+- **Growth is the realm and a mastery per art.** The realm, the qi store, stays. Each art also has a mastery that rises with use: casting its skills, fighting and training. Forms open by mastery stage, and mastery feeds the comprehension of higher arts.
+- **Higher arts by synthesis.** Knowing two or more arts that an edge of the arts' lineage graph names, each at enough mastery, gives a chance to comprehend the higher art. The graph is data, and the rule is the same for NPCs.
+- **The lineage window** shows the graph's shape and edges. An unknown higher art's name and content stay hidden, as ???, until it is comprehended, or learned of by rumour or manual.
 - **Three ways to gain an art:**
-  1. **Secret manuals (bigeup).** Manuals are items in the world (`docs/architecture/adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`). Reading one teaches its art's first forms when one's qi suffices.
-  2. **Sect teaching (jeonsu).** A member learns its sect's arts from its master and elders, then masters them by teaching and training.
-  3. **Comprehension (kkaedareum) by synthesis.** Knowing the arts that an edge of the arts' lineage graph names, each at enough mastery, gives a chance to comprehend the higher art. Talent raises the chance. The rule is the same for NPCs, and the highest arts stay rare.
-- **The lineage window.** A window of its own shows the graph of families and tiers and its edges. A higher art one has not learned or heard of stays hidden as ???.
+  1. **Comprehension (kkaedareum).** On each realm gained, a chance to comprehend a skill of an art one practises. Talent raises the chance. Not every skill unlocks this way.
+  2. **Secret manuals (bigeup).** Manuals are items in the world (`docs/architecture/adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`). Reading one teaches its art when one's qi suffices.
+  3. **Sect teaching (jeonsu).** A member learns its sect's arts from its master and elders, as its realm allows.
+- **[proposed]** ADR 0055's changes to these ways:
+  - Comprehension on a realm gained gives way to forms opening by mastery stage, and comprehension becomes synthesis.
+  - A manual teaches only its art's first-stage forms.
+  - Mastery is raised by training at a sect's training ground and by sect teaching.
+  - Tier 3 arts start with no manual.
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
 
 ## Mods and re-theming [agreed]
