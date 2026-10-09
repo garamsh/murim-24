@@ -106,14 +106,14 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 
 ## Reputation and rumors [agreed]
 
-Decided by the owner on 2026-10-08 (issue #175). The design is ADR 0054 (`docs/architecture/adr/0054-keep-each-groups-standing-toward-a-person-changed-by-deeds-seen-or-heard.md`).
+Decided by the owner on 2026-10-08 and 2026-10-10 (issue #175, PR #217). ADR 0054 (`docs/architecture/adr/0054-keep-each-groups-standing-toward-a-person-changed-by-deeds-seen-or-heard.md`), proposed, designs the groups' standing.
 
-- **Groups hold standing toward a person, each separately:** the village, the sect and the faction. A deed counts for or against every group of the person it is done to, more for the village than the sect, and more for the sect than the faction. Extorting a sect disciple who lives in village A drops A a lot, the sect moderately and the faction a little.
-- **Deeds.** Through the dialogue one can attack, extort, threaten, help or give a gift. Kills and fights count too, and defending someone counts as help.
-- **Deeds become known through witnesses and rumour.** The groups of those who saw a deed react at once. Farther groups learn as the rumour spreads with a time delay. A deed no one saw stays hidden.
-- **What standing changes.** Groups that are hostile attack on sight. Unfriendly ones refuse trade, admission and teaching. Friendly and honoured ones admit more readily and charge less. A faction's standing toward another faction's leader makes war likelier, but no faction turns hostile over one person's deed.
-- **Standing heals with time,** and a gift or blood money mends it faster.
-- **The same rules for NPCs and the player.** Raiders and rivals build the world's own grudges and debts.
+- **Groups hold standing toward a person, each separately:** the village, the sect and the faction. A deed counts against or for every group the other person belongs to, with weights. Extorting a sect disciple who lives in village A drops A a lot, the sect moderately and the faction a little.
+- **Individual NPCs hold a personal favor toward a person.** This stays agreed and is implemented later, in a follow-up to ADR 0054, which does not cover it. In outline: favor is held only toward people one has dealt with often, and is bounded per person.
+- **Deeds.** Through the dialogue a person can attack, extort, threaten, help or give a gift, and the groups of the other person remember it.
+- **Deeds become known through witnesses and rumour.** The witnesses' groups react at once. Farther groups learn as the rumour spreads over time. A deed no one saw stays hidden.
+- **Standing belongs to the body.** A reborn body starts with no standing. Warehouses and caves stay with the soul.
+- **The same rules for NPCs and the player.** Bandits raiding a village, or a disciple killing a rival: the world builds its own grudges and debts.
 - An epithet (byeolho) is generated automatically from one's deeds.
 
 ## Village life cycle [agreed]
@@ -243,4 +243,3 @@ The items below are not yet decided.
 - The realm names and thresholds, which are data.
 - How much an art of a mismatched nature costs: how much harder to learn, how much weaker to use.
 - Whether a lost manual can be copied.
-- Whether individual NPCs hold a personal favor toward a person, apart from their village, sect and faction (§Reputation and rumors).
