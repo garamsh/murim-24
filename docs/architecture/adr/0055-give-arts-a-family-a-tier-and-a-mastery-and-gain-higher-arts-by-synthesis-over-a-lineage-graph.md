@@ -144,6 +144,7 @@ Options weighed:
   - **Edges.** Edges are drawn from their arts to the higher art, each labelled with the stage it needs, ticked when met. The core computes whether each condition is met, so the view decides nothing.
   - **Selection.** Selecting a node lists its forms with the stage and rank that open each. An unknown node lists nothing.
   - On a touch screen a tap selects and the window scrolls.
+  - **Display fields.** The window's display fields, a family's colour and icon and a node's seal, are `view/` data, and names are `text/`, per ADR 0049.
   - The implementing pull request presents a mockup in `art/mockup/` for the PM's approval before the window is built, as earlier panels did.
 - **Supersessions.** This ADR supersedes three points of ADR 0035:
   - its comprehension on a realm gained, replaced by forms opening by mastery stage and by synthesis
