@@ -1,6 +1,6 @@
 # ADR 0037: Move people eight ways, and hold them before a foe in reach
 
-> Status: accepted
+> Status: accepted; its rejection of closing on the nearest foe, and its standing foe holding no one, superseded by ADR-0046 for people no driver steers
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

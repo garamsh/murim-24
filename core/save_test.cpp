@@ -539,6 +539,45 @@ TEST(Save, ALoadedWorldKeepsItsSilverWaresAndTrade) {
   EXPECT_NE(traders(1).hash(), traders(2).hash());
 }
 
+// Two hostile people 4 cells apart, each sweeping an arc of `shape` at arm's
+// length, who close on a foe within `sight` cells.
+World engaging(Shape shape, std::int32_t sight) {
+  constexpr std::uint64_t HEALTH = 10;
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.sight = sight;
+  const Skill strike{3 * CELL_SIZE / 2, 0, 1, 0, 1, 0, shape};
+  return World{Seed{1},
+               Map{{"......", "......"}},
+               {ArmySpec{{0, 0}, {Recruit{{0, 0}, HEALTH}}, 0, {strike}},
+                ArmySpec{{4, 0}, {Recruit{{4, 0}, HEALTH}}, 1, {strike}}},
+               {},
+               rules};
+}
+
+constexpr std::int32_t SIGHT = 6;
+
+TEST(Save, ALoadedWorldKeepsItsSkillsShapesAndItsSight) {
+  MemorySaves store;
+  ASSERT_TRUE(
+      save(Saved{std::nullopt, engaging(Shape::ARC, SIGHT)}, store, SLOT));
+  Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.skill_of(0, 0).shape, Shape::ARC);
+  EXPECT_EQ(restored.world.hash(), engaging(Shape::ARC, SIGHT).hash());
+  // It closes on its foe as the saved world does.
+  constexpr int TWO_SECONDS = 60;
+  World lived = engaging(Shape::ARC, SIGHT);
+  for (int tick = 0; tick < TWO_SECONDS; ++tick) {
+    lived.tick();
+    restored.world.tick();
+  }
+  EXPECT_GT(cell_of(lived.person(0).position).x, 0);
+  EXPECT_EQ(restored.world.hash(), lived.hash());
+  // Control: another shape, or no sight, is another state.
+  EXPECT_NE(engaging(Shape::LINE, SIGHT).hash(),
+            engaging(Shape::ARC, SIGHT).hash());
+  EXPECT_NE(engaging(Shape::ARC, 0).hash(), engaging(Shape::ARC, SIGHT).hash());
+}
+
 TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {
   MemorySaves store;
   ASSERT_TRUE(save(Saved{std::nullopt, casting(AtPerson{0})}, store, SLOT));

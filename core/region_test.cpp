@@ -828,10 +828,14 @@ std::size_t first_raided(const Region& region, const std::string& kind) {
 // newborn and with its faction's skills, stands on the passable cells west
 // of the village, column by column, bound for its centre if `bound`, and
 // otherwise for where it stands, until the village is in ruins, or for
-// `limit` ticks if it is not by then.
+// `limit` ticks if it is not by then; people close on foes in sight if
+// `sighted`.
 Raided raided(const RegionData& data, Seed seed, const Raid& raid,
-              std::uint64_t limit, bool bound = true) {
+              std::uint64_t limit, bool bound = true, bool sighted = true) {
   Region region = generate_region(seed, data);
+  if (!sighted) {
+    region.rules.sight = 0;
+  }
   const std::size_t target = first_raided(region, raid.kind);
   const Village& village = region.villages.at(target);
   const std::size_t residents = village.army;
@@ -908,6 +912,40 @@ TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
             SKIRMISH_MOST);
 }
 
+// The health an Orthodox person, newborn, loses over a second to a Demonic
+// one standing `apart` cells west of it on an open field of the region SEED
+// generates, each with its faction's strike alone, where no one closes on a
+// foe in sight.
+std::uint64_t struck_from(std::int32_t apart) {
+  constexpr std::uint64_t SECOND = 30;
+  const RegionData data = region_data();
+  Region region = generate_region(SEED, data);
+  region.rules.sight = 0;
+  const Cell corner = open_field(region).value_or(Cell{0, 0});
+  const Cell west{corner.x + 1, corner.y + 2};
+  const Cell east{west.x + apart, west.y};
+  const std::uint64_t health = data.life.newborn_health;
+  const std::size_t first = region.armies.size();
+  region.armies.push_back(ArmySpec{
+      east, {Recruit{east, health}}, 0, {data.factions.at(0).skills.front()}});
+  region.armies.push_back(ArmySpec{west,
+                                   {Recruit{west, health}},
+                                   DEMONIC,
+                                   {data.factions.at(DEMONIC).skills.front()}});
+  World world = world_of(region);
+  const std::size_t orthodox = world.roster(first).front();
+  for (std::uint64_t tick = 0; tick < SECOND; ++tick) {
+    world.tick();
+  }
+  return health - world.person(orthodox).health;
+}
+
+TEST(Region, AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther) {
+  EXPECT_GT(struck_from(1), 0U);
+  // Control: a foe two cells away stands out of reach.
+  EXPECT_EQ(struck_from(2), 0U);
+}
+
 TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
     EXPECT_TRUE(within(raided(grown(), seed, HAMLET_RAID, RAID_MOST + 1).ticks,
@@ -943,9 +981,11 @@ TEST(Region, ABandTheWalledVillageOutnumbersStillClosesToStrike) {
   ASSERT_EQ(residents, 26U);
   EXPECT_LT(raided(grown(), SEED, OUTNUMBERED, SKIRMISH_MOST).residents,
             residents);
-  // Control: the same band kept where it stands strikes no one.
-  EXPECT_EQ(raided(grown(), SEED, OUTNUMBERED, SKIRMISH_MOST, false).residents,
-            residents);
+  // Control: the same band kept where it stands, where no one closes on a
+  // foe in sight, strikes no one.
+  EXPECT_EQ(
+      raided(grown(), SEED, OUTNUMBERED, SKIRMISH_MOST, false, false).residents,
+      residents);
 }
 
 // Years a generated region lives through in the kinship tests.

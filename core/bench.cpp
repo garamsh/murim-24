@@ -23,6 +23,9 @@ namespace {
 constexpr int WARM_UP_TICKS = 2 * TICKS_PER_SECOND;
 constexpr int TIMED_TICKS = 20 * TICKS_PER_SECOND;
 constexpr double BUDGET_MS = 4.0;
+// The strikes a tick the battle made with its lines striking across the
+// barricade at three cells; fewer and it no longer bounds a battle in play.
+constexpr std::uint64_t LEAST_STRIKES_PER_TICK = 16;
 
 // The cooldown of every person in the world; a person whose cooldown moved
 // between two ticks struck in the second.
@@ -133,6 +136,9 @@ int run() {
   const bool pass = p99 <= BUDGET_MS;
   require(living(world, armies) > people / 2,
           "most of the battle must still be fighting when timing ends");
+  require(timed.all >=
+              LEAST_STRIKES_PER_TICK * static_cast<std::uint64_t>(TIMED_TICKS),
+          "the battle must strike at least 16 times a tick while timed");
 
   std::cout << std::fixed << std::setprecision(3)
             << "scenario: M1 (core/m1_scenario.cpp), seed "
