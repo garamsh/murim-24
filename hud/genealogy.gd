@@ -2,7 +2,7 @@
 ## tree around one person (their parents, them and their spouse, their children), each a card with
 ## a portrait, a name and an age or that they died, and a column with that person's details. Every
 ## word comes from hud.csv through Godot's translations. What it shows is read from the world: names,
-## kin, ages and factions through the adapter; talent and lifespan are hidden, and shown unknown.
+## kin, ages and sects through the adapter; talent and lifespan are hidden, and shown unknown.
 ## It holds no game rule.
 extends "res://hud/panel.gd"
 
@@ -150,8 +150,8 @@ func _surname(name: Dictionary) -> String:
 
 
 func _sect(person: int) -> String:
-	var faction := _world.person_faction(person)
-	return Affiliation.faction_name(_world, faction) if faction >= 0 else tr("GENEALOGY_NONE")
+	var sect := _world.person_sect(person)
+	return Affiliation.sect_name(_world, sect) if sect >= 0 else tr("GENEALOGY_NONE")
 
 
 func _index_of(person: int) -> int:

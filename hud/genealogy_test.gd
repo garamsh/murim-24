@@ -4,8 +4,9 @@
 # pressing Enter centres it on a child, as keypad Enter does through its keys, whose parents then
 # include that parent, and whose generation in the header is one more than its parents'. Control: a
 # person the world began with has no parents, the panel shows none, and its header reads the first
-# generation. Every word the panel draws from hud.csv, and every name the world's data can make, fits
-# the room the panel gives it, in each locale.
+# generation. A person in a sect shows its sect's name, and a sectless person of the same faction
+# shows none. Every word the panel draws from hud.csv, and every name and sect name the world's data
+# can make, fits the room the panel gives it, in each locale.
 extends RefCounted
 
 const SEED := 2026
@@ -54,7 +55,7 @@ func run() -> bool:
 			and panel.details.age == str(world.person_age(parent)) \
 			and panel.details.talent == "알 수 없음" and panel.details.lifespan == "알 수 없음" \
 			and panel.details.children == "%d명" % children.size() \
-			and panel.details.sect == tr("FACTION_" + world.faction_names()[world.person_faction(parent)].to_upper())
+			and panel.details.sect == _sect_shown(world, parent)
 
 	var moved: bool = panel.move(Vector2i.DOWN)
 	var child: int = panel.selected
@@ -83,11 +84,34 @@ func run() -> bool:
 		parents_founders = parents_founders and world.person_parents(p).is_empty()
 	var generations_right: bool = founder_generation == "1대" and parents_founders \
 			and child_generation == "2대"
-	var passed := kin_right and details_right and recentred and control and generations_right
-	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s, keypad Enter %s; the founder %d shows %d parents; generations: founder %s, child %s: %s" % [
+	# A sect member and a sectless person of its faction: the line reads the sect, not the faction.
+	var member := -1
+	var sectless := -1
+	for army in world.army_count():
+		for person in world.roster(army):
+			if member < 0 and world.person_sect(person) >= 0:
+				member = person
+	for army in world.army_count():
+		for person in world.roster(army):
+			if sectless < 0 and member >= 0 and world.person_sect(person) < 0 \
+					and world.person_faction(person) == world.person_faction(member):
+				sectless = person
+	var sect_set_up := member >= 0 and sectless >= 0
+	var member_sect := ""
+	var sectless_sect := ""
+	if sect_set_up:
+		panel.show_person(world, member, member)
+		member_sect = panel.details.sect
+		panel.show_person(world, sectless, sectless)
+		sectless_sect = panel.details.sect
+	var sect_right: bool = sect_set_up and member_sect == _sect_shown(world, member) \
+			and member_sect != tr("GENEALOGY_NONE") and sectless_sect == tr("GENEALOGY_NONE")
+	var passed := kin_right and details_right and recentred and control and generations_right and sect_right
+	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s, keypad Enter %s; the founder %d shows %d parents; generations: founder %s, child %s; person %d of faction %d shows the sect \"%s\" and sectless person %d of it \"%s\" %s (setup %s): %s" % [
 		DAYS, parent, name.surname, name.given, spouse, children, shown, panel.details if not details_right else "match",
-		child, recentred, keypad_centred, founder, founder_parents, founder_generation, child_generation,
-		"pass" if passed else "FAIL"])
+		child, recentred, keypad_centred, founder, founder_parents, founder_generation, child_generation, member,
+		world.person_faction(member) if member >= 0 else -1, member_sect, sectless, sectless_sect, sect_right,
+		sect_set_up, "pass" if passed else "FAIL"])
 	panel.free()
 	return passed and fits
 
@@ -99,13 +123,20 @@ func _key(keycode: Key) -> InputEventKey:
 	return key
 
 
+# The sect line `person`'s details show: its sect's name, or none.
+func _sect_shown(world: WorldAdapter, person: int) -> String:
+	var sect := world.person_sect(person)
+	return tr("SECT_" + world.sect_name(sect).to_upper().replace(" ", "_")) if sect >= 0 else tr("GENEALOGY_NONE")
+
+
 # In each locale, every word the panel draws, in the HUD's font at the panel's size, fits where
 # _draw places it: the header clear of the close key, the row labels clear of the cards, a card's
 # line and the steered person's tag within the card, the details within their column, each detail
 # row's label clear of its value, and the keys along the foot within the panel. Every surname
 # crossed with every given name in names() is measured as a card, the details column and a spouse
-# show it, as the panel fits it: cut short with an ellipsis where it would overrun, and in Korean
-# drawn whole. Setup: every GENEALOGY_ key in hud.csv is measured, and the widths are not zero.
+# show it, and every sect's name as the details column shows it, as the panel fits them: cut short
+# with an ellipsis where they would overrun, and in Korean drawn whole. Setup: every GENEALOGY_ key
+# in hud.csv is measured, and the widths are not zero.
 func _fit_pass() -> bool:
 	var font: Font = load(Hud.FONT)
 	var region := WorldAdapter.create_region(SEED, 0)
@@ -132,8 +163,8 @@ func _fit_pass() -> bool:
 		for surname: Dictionary in table.surnames:
 			families.append(say.call("GENEALOGY_FAMILY") % (surname.korean if locale == "ko" else surname.romanised))
 		var sects: Array[String] = [say.call("GENEALOGY_NONE")]
-		for faction: String in region.faction_names():
-			sects.append(say.call("FACTION_" + faction.to_upper()))
+		for index in region.sect_count():
+			sects.append(tr("SECT_" + region.sect_name(index).to_upper().replace(" ", "_")))
 		# Each check: what is measured, how far it reaches and the room it has.
 		var fits := []
 		var close: float = width.call(say.call("GENEALOGY_CLOSE"))
@@ -148,7 +179,7 @@ func _fit_pass() -> bool:
 			fits.append([line, Genealogy.CARD_TEXT_X + width.call(line), Genealogy.CARD.x - 2])
 		var tag: String = say.call("GENEALOGY_SELF")
 		fits.append([tag, width.call(tag) + 6 + 3, Genealogy.CARD.x])
-		for text in families + sects:
+		for text in families:
 			fits.append([text, Genealogy.DETAILS_TEXT_X + width.call(text), Genealogy.DETAILS.size.x - 8])
 		var unknown: String = say.call("GENEALOGY_UNKNOWN")
 		var rows := [
@@ -160,18 +191,22 @@ func _fit_pass() -> bool:
 			# The label and its value 4 pixels apart at least.
 			fits.append([row, 8 + width.call(say.call(row[0])) + 4 + width.call(row[1]), Genealogy.DETAILS.size.x - 8])
 		var spouse_word: float = width.call(say.call("GENEALOGY_SPOUSE"))
+		var detail_room: float = Genealogy.DETAILS.size.x - 8 - Genealogy.DETAILS_TEXT_X
+		var places: Array = []
+		for sect in sects:
+			places.append([sect, detail_room])
 		for name in names:
 			var card_room: float = Genealogy.CARD.x - 2 - Genealogy.CARD_TEXT_X
-			var detail_room: float = Genealogy.DETAILS.size.x - 8 - Genealogy.DETAILS_TEXT_X
 			var spouse_room: float = Genealogy.DETAILS.size.x - 8 - 8 - spouse_word - 4
-			for place: Array in [[PersonName.shown(name, true), card_room], [PersonName.shown(name), detail_room],
-					[PersonName.shown(name), spouse_room]]:
-				var drawn: String = panel.fit(place[0], place[1])
-				fits.append([drawn, width.call(drawn), place[1]])
-				if drawn != place[0]:
-					cut[locale] = cut.get(locale, 0) + 1
-					if locale == "ko":
-						overruns.append("ko %s drawn as %s" % [place[0], drawn])
+			places.append_array([[PersonName.shown(name, true), card_room], [PersonName.shown(name), detail_room],
+					[PersonName.shown(name), spouse_room]])
+		for place: Array in places:
+			var drawn: String = panel.fit(place[0], place[1])
+			fits.append([drawn, width.call(drawn), place[1]])
+			if drawn != place[0]:
+				cut[locale] = cut.get(locale, 0) + 1
+				if locale == "ko":
+					overruns.append("ko %s drawn as %s" % [place[0], drawn])
 		var keys: String = say.call("GENEALOGY_KEYS")
 		fits.append([keys, 8 + width.call(keys), Genealogy.PANEL.size.x - 8])
 		for fit: Array in fits:
