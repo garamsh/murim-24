@@ -13,7 +13,7 @@
 # world from the seed typed; Escape pauses it, the pause panel's guide showing the keys the scene
 # binds, and no tick runs while it is paused; the speed the settings choose runs that many ticks.
 # Enter in the sect panel applies to the sect shown, joining it where the core admits the person and
-# showing why where it refuses. A Cult body marched on an Orthodox village dies there, and the
+# showing why where it refuses. A Cult body marched on the largest hostile army dies there, and the
 # rebirth screen opens on it and the soul's new body, holding the ticks until Enter goes on.
 # The pause panel's Save writes the world, and back on the title Continue resumes it, steering the
 # same person, while with no save Continue cannot be taken and with a broken one the title names
@@ -42,8 +42,9 @@ const TICKS := 600
 const SEARCH := 64
 # Ticks the person is given to walk toward each cell the cursor is held on.
 const WALK_TICKS := 60
-# Pixels east of the person the cursor is put for a cast, and further than any skill reaches.
-const CAST_OFFSET := Vector2(32, 0)
+# Pixels east of the person the cursor is put for a cast, within arm's length, and further than any skill
+# reaches.
+const CAST_OFFSET := Vector2(16, 0)
 const FAR_OFFSET := Vector2(400, 0)
 # The seed the new game is typed with.
 const TYPED_SEED := 4817
@@ -55,7 +56,7 @@ const MARCHED_ON := 6
 # the Unorthodox, it lacks the proof the Black Fang asks.
 const CULT_VILLAGE := 1
 const UNORTHODOX_VILLAGE := 2
-# Ticks a Cult body marched on the nearest Orthodox village has to die there.
+# Ticks a Cult body marched on the largest hostile army has to die there.
 const MARCH_LIMIT := 12000
 # A region whose growth forms an army after the player's within fifteen years of five-tick days.
 const GROWN_SEED := 3
@@ -1317,7 +1318,7 @@ func _apply_pass() -> bool:
 	return passed
 
 
-# A Cult body ordered on the nearest Orthodox village's residents dies among them and its soul is
+# A Cult body ordered on the largest army hostile to it dies among its people and its soul is
 # born again: on that tick the rebirth screen opens on the body that died and the new one, and no
 # tick runs while it is open; Enter closes it and the ticks run again. Setup: the screen was not
 # open before the death, and the dead body and the new one differ.
@@ -1326,15 +1327,15 @@ func _rebirth_pass() -> bool:
 	var world: WorldAdapter = scene.world
 	var hud: CanvasLayer = scene.get_node("Hud")
 	var body := world.roster(scene.steered)[0]
-	var home := world.person_position(body)
+	# The largest, so that a lone body loses whatever the balance of a fight between equals.
 	var target := Vector2i(-1, -1)
+	var largest := 0
 	for army in world.army_count() - 1:
 		var roster := world.roster(army)
-		if world.army_faction(army) == 0 and not roster.is_empty():
-			var cell := Vector2i((world.person_position(roster[0]) / WorldAdapter.CELL_SIZE).floor())
-			if target.x < 0 or Vector2(cell).distance_to(home / WorldAdapter.CELL_SIZE) \
-					< Vector2(target).distance_to(home / WorldAdapter.CELL_SIZE):
-				target = cell
+		if world.hostile(world.army_faction(scene.steered), world.army_faction(army)) \
+				and roster.size() > largest:
+			largest = roster.size()
+			target = Vector2i((world.person_position(roster[0]) / WorldAdapter.CELL_SIZE).floor())
 	var ordered := target.x >= 0 and world.order(scene.steered, target, PackedInt64Array([0]))
 	var closed_before := true
 	var ticks := 0
