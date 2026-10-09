@@ -3112,7 +3112,7 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   const std::optional<std::size_t> home = people_.at(member).home;
   const bool marching = !home || !claims(*home, army.order.objective);
   const std::optional<std::size_t> foe = crowd.hash.nearest(
-      foe_kinds(member, army), from, rules_.sight * CELL_SIZE,
+      foe_kinds(member, armies_.at(own)), from, rules_.sight * CELL_SIZE,
       [&](std::size_t other) {
         return (marching ||
                 claims(*home, cell_of(crowd.hash.position(other)))) &&
