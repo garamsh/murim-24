@@ -251,6 +251,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Policies.** Each faction holds eight: tax with its kinds, a levy share, corvée, spending priorities above a reserve, trade, diplomacy, its growth order and law. Each is read by an existing rule in place of a constant, so it costs what that rule costs.
   - **NPC leaders.** One daily rule moves a policy a step at most after a year's term, from food per head, the treasury, threat, discontent and war, around defaults its character sets.
   - **Open for the PM.** Roads have no rule that builds or keeps them, so no spending priority funds them.
+- **Personal favor.** ADR 0060 (`adr/0060-keep-each-persons-favor-toward-the-few-it-deals-with-often-beside-its-groups-standing.md`), proposed; nothing above changes until the pull requests that build it land. Each person holds favor toward at most 8 others, kin and those it deals with often, changed by deeds felt first-hand. A person's own conduct follows its favor where it holds one, and its groups' standing otherwise.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.
