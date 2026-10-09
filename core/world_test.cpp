@@ -3432,7 +3432,8 @@ TEST(World, AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind) {
 TEST(World, AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther) {
   // Facing the foe east, the one straight north lies at the half-width and is
   // swept; the one north-west lies half as far again past it and is spared.
-  static_assert(ARC_HALF_WIDTH_DEGREES == 90,
+  constexpr std::int32_t QUARTER_TURN_DEGREES = 90;
+  static_assert(ARC_HALF_WIDTH_DEGREES == QUARTER_TURN_DEGREES,
                 "the foes stand a quarter turn and three eighths of a turn "
                 "from the facing");
   const Cell north{USER_CELL.x, USER_CELL.y - 1};
@@ -3587,10 +3588,10 @@ TEST(World, EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck) {
   EXPECT_TRUE(world.strikes().back().struck.empty());
   // A line's record ends its range along the way it was used, past the foe
   // it faced a cell away.
-  World line = shape_world(Skill{6 * CELL_SIZE, 0, 0, 0, 0, 0, Shape::LINE});
+  constexpr std::int32_t LENGTH = 6 * CELL_SIZE;
+  World line = shape_world(Skill{LENGTH, 0, 0, 0, 0, 0, Shape::LINE});
   line.tick();
-  EXPECT_EQ(line.strikes().front().end.x,
-            centre_of(USER_CELL).x + (6 * CELL_SIZE));
+  EXPECT_EQ(line.strikes().front().end.x, centre_of(USER_CELL).x + LENGTH);
   EXPECT_EQ(line.strikes().front().end.y, centre_of(USER_CELL).y);
   // Control: on the next tick, cooling down, it strikes nothing, and the
   // record holds the foes' uses alone.

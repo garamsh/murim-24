@@ -211,6 +211,9 @@ std::optional<std::size_t> person_aimed_at(const Target& target) {
                           : std::optional<std::size_t>{aimed->person};
 }
 
+// The degrees in a quarter turn.
+constexpr std::int32_t QUARTER_TURN_DEGREES = 90;
+
 // The ground one use of a skill of any shape but TARGETED covers, from its
 // user at `from` toward `toward`: a disc around `toward`, which a SELF skill
 // is always used toward its user's own position for; an arc of the range's
@@ -270,7 +273,7 @@ class Swath {
       case Shape::ARC:
         // A point ahead makes no obtuse angle with the facing: a quarter turn
         // either side.
-        static_assert(ARC_HALF_WIDTH_DEGREES == 90,
+        static_assert(ARC_HALF_WIDTH_DEGREES == QUARTER_TURN_DEGREES,
                       "an arc covers the half-disc ahead of its facing");
         return distance_squared(from_, point) <=
                    std::int64_t{range_} * range_ &&
