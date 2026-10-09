@@ -279,15 +279,16 @@ func refresh(view: Rect2, between := 1.0) -> void:
 					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0, tint,
 					combat.flash(person, now))
 			drawn += 1
-	# The dead fall a quarter turn about their feet and fade where they last stood.
+	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
+	# their killing blow lands.
 	for death: Dictionary in combat.dying(now):
 		var at: Vector2 = death.at
 		if not shown.has_point(at) or buffers.is_empty():
 			continue
 		var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
 		_append(buffers, row - first_row, row, Rect2(Vector2(_army_sprites[death.army] * 80, 0), BODY_FRAME),
-				Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), false, _tint(death.army), 0.0,
-				death.alpha, death.fallen * PI / 2.0)
+				Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), false, _tint(death.army),
+				death.flash, death.alpha, death.fallen * PI / 2.0)
 	_fill_bands(buffers, first_row)
 	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
 	# The markers follow the steered person while it lives.

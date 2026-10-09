@@ -3,11 +3,13 @@
 ## on a tick (WorldAdapter.strikes) flashes its shape, a frontal arc, a line with its projectile, or
 ## a disc, in its user's faction's accent, the steered person's in jade and wherever they are; a
 ## person whose health fell since the tick before flashes in the impact core's colour and is knocked
-## back from the nearest use, its loss floating up while damage numbers are on, in crimson for the
-## steered person's own; a person who died falls and fades where it last stood; and the person the
-## steered person's last use went toward is marked while it lives. world_art.gd draws the bodies
-## with what it gives. It reads the world and holds no game rule: who struck, what, where and whom
-## is the core's.
+## back from the nearest use that struck it, its loss floating up while the damage numbers row
+## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
+## events, falls and fades where it last stood, flashing with its last loss, while one who died
+## struck by nothing, of hunger or age, is not drawn falling; and the person the steered person's
+## last use struck nearest where it went is marked while it lives. Like sound.gd, it keeps what it
+## compares by person in packed arrays. world_art.gd draws the bodies with what it gives. It reads
+## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
 
 const CELL := 16
@@ -23,108 +25,112 @@ const KNOCK_PIXELS := 2.0
 const NUMBER_RISE := 12.0
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
-## How near a use's point a person stands to be the one it went toward, in sub-cell units.
-const TOWARD_REACH := 128.0
 const PAPER := Color("efe3c2")
 const INK := Color("14101a")
 const JADE := Color("4fc49a")
 const CRIMSON := Color("d63a2f")
 const FONT := preload("res://hud/fonts/Galmuri9.ttf")
 const FONT_SIZE := 10
+# When a person not yet struck was last struck, in milliseconds: long enough ago to show nothing.
+const NEVER := -(1 << 40)
 
-## Whether each loss of health floats up as a number; the settings' damage numbers row sets it.
-var damage_numbers := true
+## Whose losses float up as numbers: "off", none; "mine", the steered person's own and those its
+## uses struck; "everyone", every loss. The settings' damage numbers row sets it.
+var damage_numbers := "mine"
 ## Each army's faction accent, by army index; world_art.gd keeps it as armies form.
 var accents: Array[Color] = []
 ## Each use shown, as WorldAdapter.strikes() gives it, with `ms`, when it was recorded, and
 ## `steered`, whether the steered person made it.
 var strikes: Array[Dictionary] = []
-## Each person struck, by person: `ms`, when, `text`, the health it lost as words, and their
-## `width`, `at`, where it stood, and `away`, the way it is knocked, all in pixels.
-var hits := {}
-## Each person who died, in order: `person`, its `army`, `at`, where it last stood in pixels, and
-## `ms`, when.
+## Each loss floating up, in order: `ms`, when, `text`, the health lost as words, and their
+## `width`, `at`, where the person stood, in pixels, `own`, whether it was the steered person's
+## loss, and `mine`, whether it was that or a loss to the steered person's use.
+var numbers: Array[Dictionary] = []
+## Each person who died struck, in order: `person`, its `army`, `at`, where it last stood in
+## pixels, and `ms`, when.
 var deaths: Array[Dictionary] = []
-## The person the steered person's last use went toward, or -1.
+## The person the steered person's last use struck nearest where it went, or -1.
 var target := -1
 ## The view the last refresh showed, in pixels.
 var view := Rect2()
 
 var _now := 0
 var _target_ms := 0
-# The steered person, whose own losses float up in crimson, or -1.
-var _lead := -1
-# Each living person's health on the last tick, and its army and body index, by person.
-var _health := {}
-var _place := {}
-var _positions: Array[PackedVector2Array] = []
 var _target_at := Vector2.ZERO
+# The ticks read since begin(), the sequence of the next event to read, and the tick being read's
+# time in milliseconds and steered person, or -1.
+var _tick := 0
+var _next_event := 0
+var _ms := 0
+var _lead := -1
+# Each army's bodies' positions on the tick last read.
+var _positions: Array[PackedVector2Array] = []
+# By person: the tick it was last read alive, its health, army and body index then, the tick a use
+# last struck it, whether one of the steered person's did, and how near the nearest that did stood,
+# in sub-cell units squared.
+var _seen := PackedInt64Array()
+var _health := PackedInt64Array()
+var _army := PackedInt64Array()
+var _body := PackedInt64Array()
+var _struck_tick := PackedInt64Array()
+var _struck_by_lead := PackedByteArray()
+var _nearest := PackedFloat64Array()
+# By person: when it last lost health, in milliseconds, and the way it is knocked, as a unit.
+var _hit_ms := PackedInt64Array()
+var _away := PackedVector2Array()
 
 
 ## Starts on `world` as it stands, showing nothing: what each person holds is what the first tick
-## is compared with.
+## is compared with, and only the events recorded after now are read.
 func begin(world: WorldAdapter) -> void:
 	accents.clear()
 	strikes.clear()
-	hits.clear()
+	numbers.clear()
 	deaths.clear()
 	target = -1
-	_health.clear()
-	_place.clear()
-	_positions.clear()
+	_tick = 0
+	_resize(0)
+	var events := world.events(0)
+	_next_event = 0 if events.is_empty() else events[-1].sequence + 1
+	var rosters: Array[PackedInt64Array] = []
+	var positions: Array[PackedVector2Array] = []
 	for army in world.army_count():
-		var roster := world.roster(army)
-		var strengths := world.body_strengths(army)
-		_positions.append(world.body_positions(army))
-		for body in roster.size():
-			_place[roster[body]] = Vector2i(army, body)
-			_health[roster[body]] = strengths[body]
+		rosters.append(world.roster(army))
+		positions.append(world.body_positions(army))
+	_read_bodies(world, rosters, positions, false)
 
 
-## Reads what the tick just run did, at `now` in milliseconds: the uses the core recorded, who
-## lost health and who died since the tick before, and, for the lead of `steered_army` (-1 for
-## none), the person its last use went toward. `rosters` and `positions` are each army's roster and
-## its bodies' positions as the tick left them, which world_art.gd has read already.
+## Reads what the tick just run did, at `now` in milliseconds: the uses the core recorded and whom
+## they struck, who lost health since the tick before, and who died, and, for the lead of
+## `steered_army` (-1 for none), the person its last use struck. `rosters` and `positions` are each
+## army's roster and its bodies' positions as the tick left them, which world_art.gd has read
+## already.
 func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[PackedInt64Array],
 		positions: Array[PackedVector2Array]) -> void:
-	var place := {}
-	var health := {}
-	for army in rosters.size():
-		var roster := rosters[army]
-		var strengths := world.body_strengths(army)
-		for body in roster.size():
-			place[roster[body]] = Vector2i(army, body)
-			health[roster[body]] = strengths[body]
-	var lead := -1
+	_tick += 1
+	_ms = now
+	_lead = -1
 	if steered_army >= 0 and steered_army < rosters.size() and not rosters[steered_army].is_empty():
-		lead = rosters[steered_army][0]
-	_lead = lead
+		_lead = rosters[steered_army][0]
 	# A use that strikes only structures, a mend or a torch, shows in the structures' stages alone.
-	var used := world.strikes().filter(func(strike: Dictionary) -> bool: return strike.body_damage > 0)
-	for strike: Dictionary in used:
-		strike.ms = now
-		strike.steered = strike.person == lead
-		strikes.append(strike)
-		if strike.steered:
-			var aimed := _person_near(strike.toward, place, positions, lead)
-			if aimed >= 0:
-				target = aimed
-				_target_ms = now
-	for person: int in health:
-		if _health.has(person) and health[person] < _health[person]:
-			var at := _pixels(positions[place[person].x][place[person].y])
-			var text := str(_health[person] - health[person])
-			hits[person] = {"ms": now, "text": text, "at": at, "away": _away(at, used),
-				"width": FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x}
-	for person: int in _place:
-		if not place.has(person) and world.person_health(person) == 0:
-			var was: Vector2i = _place[person]
-			deaths.append({"person": person, "army": was.x, "at": _pixels(_positions[was.x][was.y]),
-				"ms": now})
-	_health = health
-	_place = place
-	_positions = positions.duplicate()
-	if not place.has(target) or now - _target_ms > TARGET_MS:
+	for strike: Dictionary in world.strikes():
+		if strike.body_damage > 0:
+			strike.ms = now
+			strike.steered = strike.person == _lead
+			strikes.append(strike)
+			_note_struck(strike)
+	# The dead have left their rosters, so each is read as it stood on the tick before; one no use
+	# struck died of hunger or age, and does not fall.
+	for event: Dictionary in world.events(_next_event):
+		_next_event = event.sequence + 1
+		var person: int = event.get("person", -1)
+		if event.kind == WorldAdapter.EVENT_DIED and person < _seen.size() and _seen[person] == _tick - 1 \
+				and _struck_tick[person] == _tick:
+			var at := _pixels(_positions[_army[person]][_body[person]])
+			_hit(person, _health[person], at)
+			deaths.append({"person": person, "army": _army[person], "at": at, "ms": now})
+	_read_bodies(world, rosters, positions, true)
+	if target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
 		target = -1
 	_forget(now)
 
@@ -132,36 +138,38 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 ## Returns the share of person `person`'s pixels drawn in the impact core's colour at `now`, from 1
 ## as it is struck to 0.
 func flash(person: int, now: int) -> float:
-	var hit: Dictionary = hits.get(person, {})
-	if hit.is_empty():
+	if person >= _hit_ms.size():
 		return 0.0
-	return clampf(1.0 - float(now - hit.ms) / FLASH_MS, 0.0, 1.0)
+	return clampf(1.0 - float(now - _hit_ms[person]) / FLASH_MS, 0.0, 1.0)
 
 
 ## Returns how far, in pixels, person `person` is drawn from where it stands at `now`.
 func knock(person: int, now: int) -> Vector2:
-	var hit: Dictionary = hits.get(person, {})
-	if hit.is_empty():
+	var left := flash(person, now)
+	if left == 0.0:
 		return Vector2.ZERO
-	return hit.away * KNOCK_PIXELS * clampf(1.0 - float(now - hit.ms) / FLASH_MS, 0.0, 1.0)
+	return _away[person] * KNOCK_PIXELS * left
 
 
 ## Returns each death still shown at `now`: its `army`, `at`, where it lies in pixels, `fallen`,
-## the share of a quarter turn it has fallen, and `alpha`, how opaque it is.
+## the share of a quarter turn it has fallen, `alpha`, how opaque it is, and `flash`, the share
+## drawn in the impact core's colour as its killing blow lands.
 func dying(now: int) -> Array[Dictionary]:
 	var shown: Array[Dictionary] = []
 	for death: Dictionary in deaths:
 		var age := float(now - death.ms) / DEATH_MS
 		if age >= 0.0 and age < 1.0:
 			shown.append({"army": death.army, "at": death.at, "fallen": minf(age * 3.0, 1.0),
-				"alpha": 1.0 - age})
+				"alpha": 1.0 - age, "flash": flash(death.person, now)})
 	return shown
 
 
 ## Returns the army and body index the person stood at on the last tick, or (-1, -1) once it is
 ## not among the living.
 func place_of(person: int) -> Vector2i:
-	return _place.get(person, Vector2i(-1, -1))
+	if person < 0 or person >= _seen.size() or _seen[person] != _tick:
+		return Vector2i(-1, -1)
+	return Vector2i(_army[person], _body[person])
 
 
 ## Draws what shows at `now` within `shown`, the part of the world on screen in pixels, with the
@@ -194,21 +202,21 @@ func _draw() -> void:
 		draw_string(FONT, number.at, number.text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, number.colour)
 
 
-## Returns the damage numbers shown at `now` within the view, none while damage numbers are off:
-## each its `text`, where its baseline starts, `at`, in pixels, and its `colour`.
+## Returns the damage numbers shown at `now` within the view, those damage_numbers names: each its
+## `text`, where its baseline starts, `at`, in pixels, and its `colour`.
 func shown_numbers(now: int) -> Array[Dictionary]:
 	var shown: Array[Dictionary] = []
-	if not damage_numbers:
+	if damage_numbers == "off":
 		return shown
-	for person: int in hits:
-		var hit: Dictionary = hits[person]
-		var age := float(now - hit.ms) / NUMBER_MS
-		if age < 0.0 or age >= 1.0 or not view.has_point(hit.at):
+	for number: Dictionary in numbers:
+		var age := float(now - number.ms) / NUMBER_MS
+		if age < 0.0 or age >= 1.0 or not view.has_point(number.at) \
+				or (damage_numbers == "mine" and not number.mine):
 			continue
-		var colour := CRIMSON if person == _lead else PAPER
+		var colour := CRIMSON if number.own else PAPER
 		colour.a = 1.0 - age * age
-		shown.append({"text": hit.text, "colour": colour,
-			"at": (hit.at + Vector2(-hit.width / 2.0, -CELL - NUMBER_RISE * age)).round()})
+		shown.append({"text": number.text, "colour": colour,
+			"at": (number.at + Vector2(-number.width / 2.0, -CELL - NUMBER_RISE * age)).round()})
 	return shown
 
 
@@ -258,39 +266,93 @@ func _accent(person: int) -> Color:
 	return accents[army] if army >= 0 and army < accents.size() else PAPER
 
 
-# The living person, other than `except`, standing nearest `point` within TOWARD_REACH, or -1.
-func _person_near(point: Vector2, place: Dictionary, positions: Array[PackedVector2Array],
-		except: int) -> int:
-	var nearest := -1
-	var best := TOWARD_REACH * TOWARD_REACH
-	for person: int in place:
-		if person == except:
+# Notes whom `strike` struck on this tick: the steered person's use marks the one it struck
+# nearest where it went, and each person struck is knocked away from the nearest use that struck
+# it, all as they stood on the tick before.
+func _note_struck(strike: Dictionary) -> void:
+	var best := INF
+	for person: int in strike.struck:
+		if person >= _seen.size() or _seen[person] != _tick - 1:
 			continue
-		var at: Vector2i = place[person]
-		var distance := positions[at.x][at.y].distance_squared_to(point)
-		if distance <= best:
-			best = distance
-			nearest = person
-	return nearest
+		var stood := _positions[_army[person]][_body[person]]
+		var near := stood.distance_squared_to(strike.origin)
+		if _struck_tick[person] != _tick:
+			_struck_tick[person] = _tick
+			_struck_by_lead[person] = 0
+			_nearest[person] = INF
+		if near < _nearest[person]:
+			_nearest[person] = near
+			_away[person] = (stood - strike.origin).normalized()
+		if strike.steered:
+			_struck_by_lead[person] = 1
+			if stood.distance_squared_to(strike.toward) < best:
+				best = stood.distance_squared_to(strike.toward)
+				target = person
+				_target_ms = _ms
 
 
-# The way from the nearest of `used`'s origins to `at`, in pixels, as a unit; none without a use.
-func _away(at: Vector2, used: Array) -> Vector2:
-	var nearest := Vector2.INF
-	for strike: Dictionary in used:
-		var origin := _pixels(strike.origin)
-		if origin != at and at.distance_squared_to(origin) < at.distance_squared_to(nearest):
-			nearest = origin
-	return Vector2.ZERO if nearest == Vector2.INF else (at - nearest).normalized()
+# Reads every living body as `rosters` and `positions` hold it, noting a loss of health since the
+# tick before when `compare` is set.
+func _read_bodies(world: WorldAdapter, rosters: Array[PackedInt64Array],
+		positions: Array[PackedVector2Array], compare: bool) -> void:
+	for army in rosters.size():
+		var roster := rosters[army]
+		var healths := world.body_strengths(army)
+		for body in roster.size():
+			var person := roster[body]
+			if person >= _seen.size():
+				_grow(person + 1)
+			if compare and _seen[person] == _tick - 1 and healths[body] < _health[person]:
+				_hit(person, _health[person] - healths[body], _pixels(positions[army][body]))
+			_seen[person] = _tick
+			_health[person] = healths[body]
+			_army[person] = army
+			_body[person] = body
+	_positions = positions.duplicate()
+
+
+# Notes that `person`, standing at `at` in pixels, lost `lost` health on this tick: it flashes, is
+# knocked away when a use struck it, and its loss floats up when damage_numbers names it.
+func _hit(person: int, lost: int, at: Vector2) -> void:
+	var struck := _struck_tick[person] == _tick
+	_hit_ms[person] = _ms
+	if not struck:
+		_away[person] = Vector2.ZERO
+	var own := person == _lead
+	var mine := own or (struck and _struck_by_lead[person] == 1)
+	if damage_numbers == "everyone" or (damage_numbers == "mine" and mine):
+		var text := str(lost)
+		numbers.append({"ms": _ms, "text": text, "at": at, "own": own, "mine": mine,
+			"width": FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x})
 
 
 # Drops what no longer shows at `now`.
 func _forget(now: int) -> void:
 	strikes = strikes.filter(func(strike: Dictionary) -> bool: return now - strike.ms < STRIKE_MS)
 	deaths = deaths.filter(func(death: Dictionary) -> bool: return now - death.ms < DEATH_MS)
-	for person: int in hits.keys():
-		if now - hits[person].ms >= NUMBER_MS:
-			hits.erase(person)
+	numbers = numbers.filter(func(number: Dictionary) -> bool: return now - number.ms < NUMBER_MS)
+
+
+func _grow(size: int) -> void:
+	var from := _seen.size()
+	var to := maxi(size, from * 2)
+	_resize(to)
+	for person in range(from, to):
+		_seen[person] = -2
+		_struck_tick[person] = -1
+		_hit_ms[person] = NEVER
+
+
+func _resize(to: int) -> void:
+	_seen.resize(to)
+	_health.resize(to)
+	_army.resize(to)
+	_body.resize(to)
+	_struck_tick.resize(to)
+	_struck_by_lead.resize(to)
+	_nearest.resize(to)
+	_hit_ms.resize(to)
+	_away.resize(to)
 
 
 func _pixels(sub_cells: Vector2) -> Vector2:
