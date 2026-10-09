@@ -31,7 +31,7 @@ Facts from `main` at `aff1434`:
   - `hostile` is the one read every rule uses, faction to faction.
   - A duel makes two people hostile to each other alone (ADR 0018).
   - The view rings a body crimson when its faction stands hostile or at war toward the viewer's (`godot-adapter.md`).
-- **Pending designs.** The open PR #215 (ADRs 0050 to 0052) waits on this ADR in three places: its witnesses marking a thief, a higher tax rate lowering reputation, and a leader's bad reputation feeding discontent.
+- **Proposed designs.** ADRs 0050 to 0052, merged in #215 as proposed and not yet built, wait on this ADR in three places: its witnesses marking a thief, a higher tax rate lowering reputation, and a leader's bad reputation feeding discontent.
 - **Scale.** The bound is measured between 10,000 and 50,000 (ADR 0048), so this ADR sizes everything at 50,000.
 
 Options weighed:
@@ -55,7 +55,7 @@ Options weighed:
   | Extort | −300 | 1,000 | 500 | 200 | 100 |
   | Threaten | −100 | 1,000 | 500 | 200 | 0 |
   | Help | +100 | 1,000 | 500 | 200 | 100 |
-  | Gift, per silver given (100 copper once #215's ADR 0052 counts copper), at most 100 a day for each group | +1 | 1,000 | 500 | 200 | 0 |
+  | Gift, per silver given (100 copper once ADR 0052's copper is built), at most 100 a day for each group | +1 | 1,000 | 500 | 200 | 0 |
   | Theft: picking up a pile scattered from a warehouse the picker helped destroy | −200 | 1,000 | 1,000 | 200 | 100 |
 
   - A deed's change to a group is the base times the tier's weight over 1,000, rounded toward zero.
@@ -64,21 +64,21 @@ Options weighed:
   - **Kills in a war.** A kill of a soldier whose faction is at a declared war with the actor's counts at 300 per mille. Grudges build in war, but slower than in peace.
   - **Duels.** A kill in a duel for a faction's lead counts at 0 (ADR 0018).
   - **Blood money.** A gift to the kin of someone the giver killed within the last year counts double, toward the victim's groups.
-  - **Theft**, following #215's ADR 0051: only a person who helped destroy a warehouse is a thief for picking up what it scattered.
+  - **Theft**, following ADR 0051: only a person who helped destroy a warehouse is a thief for picking up what it scattered.
     - **Who helped destroy it.** A warehouse's structure keeps the last 8 people whose strikes damaged it, with the tick, 64 bytes a warehouse. When it is destroyed, those who struck it within the day before are its destroyers.
     - **The scatter's record.** It keeps the warehouse's owner group and its destroyers: a village warehouse's village, a sect vault's sect or a treasury's faction. Each pile it scatters carries the record's index, 4 more bytes a pile. At most 4,096 records are kept, and a record is reused once all its piles are gone.
     - **The deed.** A destroyer picking up such a pile does a theft against the owner group, which is the victim. It takes the theft at its own tier's weight, and the faction of a victim village or sect takes it at 200. A soldier at war looting it counts at the war weight. Anyone else picking it up does no deed, as the owner decided that whoever picks an item up owns it.
     - **Witnesses** are those within sight of the pick-up, as for any deed, and mark it. **The rumour's anchor** is the owner group's anchor (below).
-    - This designs the thief marking #215 deferred, and nothing marks a thief until this lands, as the owner decided there.
+    - This designs the thief marking ADR 0051 deferred, and nothing marks a thief until this is built, as the owner decided there.
   - Rejected: a value per deed with no tiers. The owner's example needs the village to care more than the faction.
 - **The verbs.** The dialogue's actions are orders through the port, the same for the player's body and any NPC. Each is refused by its first reason, as data, as `buy` is:
   - **Attack** makes the two foes of each other alone, a feud held on each person with its end, until one falls or a day passes. The person attacked fights back. Refused when they are already foes.
   - **Extort** takes half the victim's silver, pack data, when the actor's realm rank is above the victim's. Refused otherwise, as `NOT_WEAKER`, with no deed.
   - **Threaten**, against someone of a lower realm rank, makes it stop engaging the actor for a day. Refused like extortion.
   - **Help** uses one of the actor's wares on the other person, as `consume` uses it on oneself.
-  - **Give** moves silver or a ware from the actor to the other person. It is the one transfer between people. When #215's ADR 0051 lands, it becomes that ADR's fifth verb for any stack.
+  - **Give** moves silver or a ware from the actor to the other person. It is the one transfer between people. When ADR 0051 is built, give becomes its fifth verb for any stack.
   - All are refused beyond the talk reach. Give alone is not refused by hostile standing, so a person a group is hostile to can still make amends to its members.
-  - **Gifts to a group directly.** Depositing silver into a group's own account at its warehouse (#215's ADR 0051), at its seat, counts as a gift to that group alone. Giving to anyone of a group, a go-between included, counts for that person's groups. So hostility is undone by gifts and blood money, not only by decay.
+  - **Gifts to a group directly.** Depositing silver into a group's own account at its warehouse (ADR 0051), at its seat, counts as a gift to that group alone. Giving to anyone of a group, a go-between included, counts for that person's groups. So hostility is undone by gifts and blood money, not only by decay.
   - **Help without the dialogue.** Killing someone who attacked a third person within the last day counts as help toward that person's groups. A defender earns standing without a word.
 - **NPCs.** NPCs do deeds by the same rules: every kill and attack a fight makes, and help by defending. NPCs do not yet choose to extort, threaten or give. Those wait for #172's bandits and #170's routines, which will order them through the same port.
 - **Witnesses.** At a deed, its witnesses are every living person within the rules' sight, 6 cells in the region, of the victim, the victim included while it lives, the actor excluded. Each group a witness belongs to, its home village, its sect and its faction, learns the deed at once:
@@ -106,7 +106,7 @@ Options weighed:
   | Standing | Tier | What the group's members do |
   |---|---|---|
   | −1,000 to −600 | Hostile | Treat the person as a foe: strike, engage within sight (ADR 0046), refuse to talk |
-  | −599 to −200 | Unfriendly | Refuse to sell to it. Its sect refuses its application and its teaching. Its village's markets charge a quarter more, once #215's markets land |
+  | −599 to −200 | Unfriendly | Refuse to sell to it. Its sect refuses its application and its teaching. Its village's markets charge a quarter more, once ADR 0052's markets are built |
   | −199 to 199 | Neutral | As today |
   | 200 to 599 | Friendly | Its sect's admission chance doubled. Markets charge a tenth less |
   | 600 to 1,000 | Honoured | Its sect admits it without the chance, by the thresholds alone, as `apply` does. Markets charge a fifth less |
@@ -120,15 +120,15 @@ Options weighed:
   - A leader no driver steers declares war at twice its war chance on a faction whose leader its faction stands hostile toward, and makes peace at half its peace chance with one.
   - A deed counts once, against the person who did it. Its faction is never hostile for it. War comes only by a leader's declaration, which the standing toward the other leader makes likelier.
   - Rejected: standing between factions, raised by their members' deeds. One person's murder would turn a whole faction hostile, which counts the deed a second time.
-- **What waits for #215.**
+- **What waits for ADRs 0051 and 0052 to be built.**
   - **A thief.** The theft deed above, by a destroyer picking up what its warehouse scattered, against the warehouse's owner group, marked by witnesses within sight.
-  - **Tax.** #215's ADR 0052 says a higher rate lowers "the faction's reputation with its households". In this ADR's terms, households are not groups and standing is held toward people, so it is the standing of each of the faction's villages toward the faction's leader.
+  - **Tax.** ADR 0052 says a higher rate lowers "the faction's reputation with its households". In this ADR's terms, households are not groups and standing is held toward people, so it is the standing of each of the faction's villages toward the faction's leader.
     - Each day, a rate above 100 per mille lowers it by 3 for every 100 per mille above, rounded down.
-    - At #215's highest rate of 300 that is 6 a day against the decay of 2, a net 4 a day: unfriendly in 50 days, and hostile in 150.
+    - At ADR 0052's highest rate of 300 that is 6 a day against the decay of 2, a net 4 a day: unfriendly in 50 days, and hostile in 150.
     - At 200 the net is 1 a day, unfriendly in 200 days.
     - At 150 it is 1 a day, which the decay cancels.
 
-    So a sustained high rate visibly lowers it within months, and a modest one never does. #215's ADR 0052 is reworded in its own PR to name the same subject.
+    So a sustained high rate visibly lowers it within months, and a modest one never does. ADR 0052 names the same subject, reworded in #215 before its merge.
   - **Discontent.** A household whose village stands unfriendly or worse toward its faction's leader gains 1 discontent a day.
 - **The view.**
   - The dialogue offers attack, extort, threaten, help and give, with each refusal's reason.
@@ -168,7 +168,7 @@ The implementation, in order, each a pull request with its acceptance:
 3. **The dialogue's verbs.** Attack and its feud, extort, threaten, help and give, each with its refusals, and help by defending.
    - Acceptance: the worked example as a test.
 4. **The view.** Standing in the dialogue's card and the faction window, and the rings by tier.
-5. **#215's hooks,** once its ADRs land: theft, tax and discontent.
+5. **The hooks into ADRs 0051 and 0052,** once they are built: theft, tax and discontent.
 
 ## Decision
 
