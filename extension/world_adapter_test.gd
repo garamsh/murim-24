@@ -118,9 +118,10 @@ func run() -> bool:
 	var play_loop_pass := _play_loop_pass()
 	var qi_pass := _qi_pass()
 	var lessons_pass := _lessons_pass()
+	var event_people_pass := _event_people_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
-			and play_loop_pass and qi_pass and lessons_pass
+			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
 
 # A region lived ten years of five-tick days reads its realms, and a person who knows an art reads its
@@ -159,6 +160,34 @@ func _qi_pass() -> bool:
 		lived.person_qi(learned) if learned != -1 else -1, lived.person_qi_capacity(learned) if learned != -1 else -1,
 		lived.person_realm(learned) if learned != -1 else -1, lived.person_nature(learned) if learned != -1 else {},
 		bare_right, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A region lived 3,200 one-tick days records births and deaths among its events, each naming its
+# person: one born is no older than the days lived, and one who died has no health. Control: the
+# region's other events name no person.
+func _event_people_pass() -> bool:
+	const DAYS := 3200
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 1)
+	for i in DAYS:
+		lived.tick()
+	var born := 0
+	var died := 0
+	var others := 0
+	var right := true
+	for event: Dictionary in lived.events(0):
+		if event.kind == WorldAdapter.EVENT_BORN:
+			born += 1
+			right = right and lived.person_age(event.person) <= DAYS
+		elif event.kind == WorldAdapter.EVENT_DIED:
+			died += 1
+			right = right and lived.person_health(event.person) == 0
+		else:
+			others += 1
+			right = right and not event.has("person")
+	var passed := right and born > 0 and died > 0 and others > 0
+	print("world_adapter_test: of a region's last %d events, %d births and %d deaths name their person and %d others none %s: %s" % [
+		born + died + others, born, died, others, right, "pass" if passed else "FAIL"])
 	return passed
 
 

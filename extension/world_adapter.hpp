@@ -483,7 +483,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::PackedInt64Array body_ready(std::int64_t army) const;
   /// Returns the events the core keeps from the `from`-th recorded on, oldest
   /// first, each a Dictionary of its `sequence` and `tick`, its `cell`
-  /// (Vector2i) and its `kind`, one of the EVENT_* constants.
+  /// (Vector2i) and its `kind`, one of the EVENT_* constants, and for a
+  /// birth or a death the `person` born or who died.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> events(
       std::int64_t from) const;
   /// Returns the steps of people's progress the core keeps from the

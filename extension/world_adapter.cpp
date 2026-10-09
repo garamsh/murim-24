@@ -750,6 +750,11 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::events(
     entry.set("tick", static_cast<std::int64_t>(event.tick));
     entry.set("cell", godot::Vector2i{event.cell.x, event.cell.y});
     entry.set("kind", static_cast<std::int64_t>(event.what.index()));
+    if (const auto* born = std::get_if<murim::Born>(&event.what)) {
+      entry.set("person", static_cast<std::int64_t>(born->person));
+    } else if (const auto* died = std::get_if<murim::Died>(&event.what)) {
+      entry.set("person", static_cast<std::int64_t>(died->person));
+    }
     kept.push_back(entry);
   }
   return kept;
