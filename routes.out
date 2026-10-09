@@ -1,0 +1,36 @@
+Luoyang–Chang'an, by Hangu and Tong                     cells=   647 realkm=   325 km/cell= 0.50 walk_open_min=  5.8
+Luoyang–Kaifeng                                         cells=   342 realkm=   171 km/cell= 0.50 walk_open_min=  3.0
+Luoyang–Song Shan (Shaolin)                             cells=    93 realkm=    48 km/cell= 0.51 walk_open_min=  0.8
+Chang'an–Hua Shan                                       cells=   212 realkm=   106 km/cell= 0.50 walk_open_min=  1.9
+Chang'an–Chengdu, by Jianmen                            cells=  1223 realkm=   616 km/cell= 0.50 walk_open_min= 10.9
+Luoyang–Taiyuan, by Mengjin and a Taihang pass          cells=   720 realkm=   362 km/cell= 0.50 walk_open_min=  6.4
+Taiyuan–Yanjing, by Jingxing                            cells=   870 realkm=   423 km/cell= 0.49 walk_open_min=  7.7
+Yanjing–Liaoyang, by Shanhai                            cells=   825 realkm=   607 km/cell= 0.74 walk_open_min=  7.3
+Luoyang–Wuchang, by Nanyang                             cells=  1098 realkm=   557 km/cell= 0.51 walk_open_min=  9.8
+Xiangyang–Wudang                                        cells=   225 realkm=   114 km/cell= 0.51 walk_open_min=  2.0
+Chongqing–Wuchang, by the Three Gorges                  cells=  1504 realkm=   788 km/cell= 0.52 walk_open_min= 13.4
+Wuchang–Nanjing, down the Yangtze                       cells=   881 realkm=   459 km/cell= 0.52 walk_open_min=  7.8
+Kaifeng–Yangzhou, by the Huai fords                     cells=  1071 realkm=   549 km/cell= 0.51 walk_open_min=  9.5
+Nanjing–Suzhou–Hangzhou                                 cells=   616 realkm=   312 km/cell= 0.51 walk_open_min=  5.5
+Chang'an–Tianshan, by Kongtong, Liangzhou and Jiayu     cells=  2156 realkm=  2085 km/cell= 0.97 walk_open_min= 19.2
+Chengdu–Dali                                            cells=   995 realkm=   678 km/cell= 0.68 walk_open_min=  8.8
+Wuchang–Guangzhou, by Changsha and Meiling              cells=  1366 realkm=   906 km/cell= 0.66 walk_open_min= 12.1
+1.875 34.13333333333333 36.40888888888889
+
+| Luoyang–Chang'an, by Hangu and Tong | 650 | 320 | 5.8 | 4.6 | 2.3 | — |
+| Luoyang–Kaifeng | 340 | 170 | 3.0 | 2.4 | 1.2 | — |
+| Luoyang–Song Shan (Shaolin) | 90 | 50 | 0.8 | 0.6 | 0.3 | — |
+| Chang'an–Hua Shan | 210 | 110 | 1.9 | 1.5 | 0.7 | — |
+| Chang'an–Chengdu, by Jianmen | 1,220 | 620 | 10.8 | 8.7 | 4.3 | — |
+| Luoyang–Taiyuan, by Mengjin and a Taihang pass | 720 | 360 | 6.4 | 5.1 | 2.6 | — |
+| Taiyuan–Yanjing, by Jingxing | 870 | 420 | 7.7 | 6.2 | 3.1 | — |
+| Yanjing–Liaoyang, by Shanhai | 820 | 610 | 7.3 | 5.8 | 2.9 | — |
+| Luoyang–Wuchang, by Nanyang | 1,100 | 560 | 9.8 | 7.8 | 3.9 | — |
+| Xiangyang–Wudang | 220 | 110 | 2.0 | 1.6 | 0.8 | — |
+| Chongqing–Wuchang, by the Three Gorges | 1,500 | 790 | 13.3 | 10.7 | 5.3 | 5.3 down, 16.7 up |
+| Wuchang–Nanjing, down the Yangtze | 880 | 460 | 7.8 | 6.3 | 3.1 | 3.1 down, 9.8 up |
+| Kaifeng–Yangzhou, by the Huai fords | 1,070 | 550 | 9.5 | 7.6 | 3.8 | — |
+| Nanjing–Suzhou–Hangzhou | 620 | 310 | 5.5 | 4.4 | 2.2 | — |
+| Chang'an–Tianshan, by Kongtong, Liangzhou and Jiayu | 2,160 | 2,080 | 19.2 | 15.4 | 7.7 | — |
+| Chengdu–Dali | 1,000 | 680 | 8.9 | 7.1 | 3.6 | — |
+| Wuchang–Guangzhou, by Changsha and Meiling | 1,370 | 910 | 12.2 | 9.7 | 4.9 | — |
