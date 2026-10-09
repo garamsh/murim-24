@@ -37,8 +37,13 @@ Facts from `main` at `aff1434`:
 Options weighed:
 
 - **Standing and its store.** Standing is an integer from −1,000 to 1,000 that a group holds toward a person. A group is a village, a sect or a faction. Zero is the default and is not stored. An entry is the person, the group, the value and the day it was last changed, 16 bytes.
-  - The world holds at most 262,144 entries, 4 MiB. When it is full, the entry nearest zero after decay goes, the oldest among equals, which forgets the least.
-  - Entries are found by a hash of group and person, and each person carries a bit saying whether any group stands hostile toward it, so the rules that run every tick read the store only for those people.
+  - The world holds at most 262,144 entries. When it is full, the entry nearest zero after decay goes, which forgets the least. Ties go to the oldest last change, then the lower entry index.
+  - **Decay is computed, never written by a read.** Every entry decays by the same amount a day, so its value now is its stored value moved toward zero by the decay times the days since its last change. A read computes that and writes nothing.
+  - **Finding the entry to evict.** Since decay is the same for all, the order of entries by nearness to zero never changes between writes. An entry's key, its stored magnitude plus the decay times its last-change day, ranks it for good. A binary min-heap of entry indices by that key, with each entry's place in the heap, finds the entry to evict at its root. An insert or an update costs a logarithm, about 18 steps, never a scan. An entry whose key shows it has decayed to zero is dropped when it reaches the root.
+  - **Finding an entry.** An open-addressed hash table of entry indices keyed by group and person, at twice the entries, finds one in a few probes.
+  - **Finding a person's entries.** Each person heads a list of its entries, linked through the entries, so a dead person's entries are dropped by walking its own list and nothing else.
+  - **The hostile bit.** Each person carries a bit saying whether any group stands hostile toward it, so the rules that run every tick read the store only for those people.
+  - **Memory.** An entry is 20 bytes: the person, the group, the value, the last-change day and the next entry of its person. The hash table's slots and the heap's places are 4 bytes each. At the bound that is 5 MiB of entries, 2 MiB of table and 2 MiB of heap and places.
   - Rejected: a table of every group by every person. At 50,000 people and about 400 villages, sects and factions, it is 20 million values, almost all zero.
   - Rejected: standing on the person, as a short list. A person known to many villages would overflow its list, and finding who is hostile to it would read every person.
 - **Deeds.** A deed is one of a table of kinds, pack data (ADR 0049), each with a base value and a weight per mille for each tier of group. The base pack's table:
@@ -118,7 +123,7 @@ Options weighed:
   - **A deed** reads one spatial query within sight, made only on a kill, an attack or a dialogue action: a few a tick in a battle.
   - **The hostile bit** keeps the strike and engagement rules at today's cost for the many people no group is hostile to. For those it marks, a strike's foe check reads 3 entries.
   - **The daily rumour pass** is at most 12,288 anchor checks.
-  - **Memory** is at most 4 MiB of entries, 128 KB of pending deeds, and a feud and a bit on each person, 450 KB at 50,000.
+  - **Memory** is at most 9 MiB for the store, its table and its heap, and 128 KB of pending deeds. Each person adds a feud, a list head and a bit, 650 KB at 50,000.
 - **Saves, the hash and determinism.** Entries, pending deeds, feuds and the hostile bits are saved and hashed. Everything is an integer. Witnesses and anchors are read in index order, and the lower index wins among equals.
 - **A worked example.** The base pack's numbers, with the player's body P, of realm rank 3 and of no sect. V is a Hwasan disciple of rank 1 whose home is village A, an Orthodox village. P stands at zero with all three groups.
   1. P talks to V within 2 cells and extorts. P's rank is above V's, so V yields half its 40 silver, 20.
@@ -146,7 +151,7 @@ The implementation, in order, each a pull request with its acceptance:
 
 ## Decision
 
-A village, a sect and a faction each hold a standing toward a person, from −1,000 to 1,000. Only non-zero entries are kept, at most 262,144, and each person carries a bit marking whether any group is hostile to it.
+A village, a sect and a faction each hold a standing toward a person's body, from −1,000 to 1,000. Only non-zero entries are kept, at most 262,144. Decay is computed from each entry's last change and never written by a read. A min-heap keyed by magnitude and last-change day evicts the entry nearest zero, and a hash table and a list per person find entries without scanning. Each person carries a bit marking whether any group is hostile to it.
 
 Deeds are pack data: attack, kill, extort, threaten, help and gift, with a base value and weights for the victim's village, sect and faction and for the witnesses' groups. Provoked deeds and duels count nothing, kills at war less, and blood money double. The dialogue's verbs are orders refused for their reasons, the same for every person. Give is the one transfer between people.
 
