@@ -122,12 +122,33 @@ godot::Array array(const godot::Dictionary& fields, const char* key) {
   return field(fields, key, godot::Variant::ARRAY);
 }
 
+// Returns a skill's `shape`, one of the SHAPE_* constants, or AREA where it
+// is left out; throws for a value that names no shape.
+murim::Shape shape(const godot::Dictionary& fields) {
+  if (!fields.has("shape")) {
+    return murim::Shape::AREA;
+  }
+  const auto value = integer<std::int64_t>(fields, "shape");
+  if (value < 0 || value > static_cast<std::int64_t>(murim::Shape::TARGETED)) {
+    throw std::invalid_argument("shape names no shape");
+  }
+  return static_cast<murim::Shape>(value);
+}
+
 murim::Skill skill(const godot::Dictionary& fields) {
-  return murim::Skill{integer<std::int32_t>(fields, "range"),
-                      integer<std::int32_t>(fields, "radius"),
-                      integer<std::uint64_t>(fields, "body_damage"),
-                      integer<std::int32_t>(fields, "structure_damage"),
-                      integer<std::uint64_t>(fields, "cooldown")};
+  murim::Skill skill{integer<std::int32_t>(fields, "range"),
+                     integer<std::int32_t>(fields, "radius"),
+                     integer<std::uint64_t>(fields, "body_damage"),
+                     integer<std::int32_t>(fields, "structure_damage"),
+                     integer<std::uint64_t>(fields, "cooldown")};
+  skill.shape = shape(fields);
+  return skill;
+}
+
+// Returns `position`, in sub-cell units, as a Vector2; exact while it lies
+// within 2^24.
+godot::Vector2 vector(murim::Position position) {
+  return {static_cast<float>(position.x), static_cast<float>(position.y)};
 }
 
 murim::Recruit recruit(const godot::Dictionary& fields) {
@@ -631,9 +652,27 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
     fields.set("body_damage", static_cast<std::int64_t>(skill.body_damage));
     fields.set("structure_damage", skill.structure_damage);
     fields.set("cooldown", static_cast<std::int64_t>(skill.cooldown));
+    fields.set("shape", static_cast<std::int64_t>(skill.shape));
     skills.push_back(fields);
   }
   return skills;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::strikes() const {
+  godot::TypedArray<godot::Dictionary> strikes;
+  for (const murim::Strike& strike : world().strikes()) {
+    godot::Dictionary fields;
+    fields.set("person", static_cast<std::int64_t>(strike.person));
+    fields.set("skill", static_cast<std::int64_t>(strike.skill));
+    fields.set("shape", static_cast<std::int64_t>(strike.shape));
+    fields.set("range", strike.range);
+    fields.set("radius", strike.radius);
+    fields.set("body_damage", static_cast<std::int64_t>(strike.body_damage));
+    fields.set("origin", vector(strike.origin));
+    fields.set("toward", vector(strike.toward));
+    strikes.push_back(fields);
+  }
+  return strikes;
 }
 
 std::int64_t WorldAdapter::structure_field_state(std::int64_t structure) const {
@@ -1232,6 +1271,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
     fields.set("structure_damage", used.structure_damage);
     fields.set("cooldown", static_cast<std::int64_t>(used.cooldown));
     fields.set("qi_cost", used.qi_cost);
+    fields.set("shape", static_cast<std::int64_t>(used.shape));
     fields.set("ready_at",
                static_cast<std::int64_t>(core.ready_at(index, skill)));
     fields.set("art", -1);
@@ -1544,6 +1584,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::structure_kind);
   godot::ClassDB::bind_method(godot::D_METHOD("skills", "army"),
                               &WorldAdapter::skills);
+  godot::ClassDB::bind_method(godot::D_METHOD("strikes"),
+                              &WorldAdapter::strikes);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
   godot::ClassDB::bind_method(
@@ -1748,6 +1790,17 @@ void WorldAdapter::_bind_methods() {
   for (const auto& [constant, refusal] : casts) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::Shape>, 5> shapes{{
+      {"SHAPE_AREA", murim::Shape::AREA},
+      {"SHAPE_ARC", murim::Shape::ARC},
+      {"SHAPE_LINE", murim::Shape::LINE},
+      {"SHAPE_SELF", murim::Shape::SELF},
+      {"SHAPE_TARGETED", murim::Shape::TARGETED},
+  }};
+  for (const auto& [constant, shape] : shapes) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(shape));
   }
   const std::array<std::pair<const char*, murim::Orientation>, 3> orientations{{
       {"ORIENTATION_ORTHODOX", murim::Orientation::ORTHODOX},

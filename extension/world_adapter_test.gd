@@ -400,9 +400,17 @@ func _reads_pass() -> bool:
 	var kinds_read: bool = world.structure_kind(0) == "" and m1.structure_kind(0) == "barrels" \
 			and kinds.has("house") and kinds.has("barrels") and not kinds.has("") \
 			and villages[0].kind in ["hamlet", "village"]
-	# Skills come back as create() took them; control: the second army's differ.
-	var skills_read: bool = world.skills(0) == _armies[0].skills and world.skills(1) == _armies[1].skills \
-			and world.skills(0) != world.skills(1)
+	# Skills come back as create() took them, a shape left out as an area; control: the second
+	# army's differ. A shape given comes back, and one naming no shape is refused.
+	var arc_armies := _armies.duplicate(true)
+	arc_armies[0].skills[0].shape = WorldAdapter.SHAPE_ARC
+	var arc := _create(SEED, arc_armies, RULES)
+	var unshaped := _armies.duplicate(true)
+	unshaped[0].skills[0].shape = WorldAdapter.SHAPE_TARGETED + 1
+	var skills_read: bool = world.skills(0) == _shaped(_armies[0].skills) \
+			and world.skills(1) == _shaped(_armies[1].skills) and world.skills(0) != world.skills(1) \
+			and arc != null and arc.skills(0) == _shaped(arc_armies[0].skills) \
+			and arc.skills(0)[0].shape == WorldAdapter.SHAPE_ARC and _create(SEED, unshaped, RULES) == null
 	var passed: bool = armies_read and no_region and agrees and claimed and villages_read \
 			and footprints_read and kinds_read and skills_read
 	print("world_adapter_test: factions %d, %d; strengths %d, %d, bodies %d; no region from create %s; region of %d cells: terrain %s agrees with blocked cells %s, each village's centre in its owner's territory and some cell in none %s, %d villages, person's faction %d, first village's %d; created footprint %s, region footprints %s, %d of %d structures inside a village: %s" % [
@@ -445,6 +453,18 @@ func _steered_run(give_order: bool) -> Dictionary:
 		world.tick()
 	var camp := world.body_positions(1).size()
 	return {"accepted": accepted, "moved": world.body_positions(0)[0] != home, "camp": camp}
+
+
+
+# `skills` as skills() gives them back: each with its shape, an area where it was left out.
+func _shaped(skills: Array) -> Array:
+	var shaped := []
+	for skill: Dictionary in skills:
+		var full := skill.duplicate()
+		if not full.has("shape"):
+			full.shape = WorldAdapter.SHAPE_AREA
+		shaped.append(full)
+	return shaped
 
 
 func _create(seed: int, armies: Array[Dictionary], rules: Dictionary) -> WorldAdapter:

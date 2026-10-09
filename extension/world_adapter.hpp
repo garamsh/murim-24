@@ -43,7 +43,8 @@ class WorldAdapter : public godot::RefCounted {
   ///   `faction` (int) and `skills` (Array of skills);
   /// - member: `cell` (Vector2i) and `health` (int), a new person;
   /// - skill: `range`, `radius`, `body_damage`, `structure_damage`,
-  ///   `cooldown` (int);
+  ///   `cooldown` (int) and `shape` (int, one of the SHAPE_* constants,
+  ///   SHAPE_AREA where it is left out);
   /// - structure: `cell` (Vector2i) and `durability` (int);
   /// - rules: `separation` (int), `hostile` (Array of Arrays of bool) and
   ///   `stage_floors` (Array of three ints);
@@ -262,9 +263,18 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::String structure_kind(std::int64_t structure) const;
 
   /// Returns army `army`'s skills, each a Dictionary keyed as create() takes
-  /// it: `range`, `radius`, `body_damage`, `structure_damage` and `cooldown`.
+  /// it: `range`, `radius`, `body_damage`, `structure_damage`, `cooldown`
+  /// and `shape`, one of the SHAPE_* constants.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> skills(
       std::int64_t army) const;
+
+  /// Returns every use of a skill on the last tick, in the order people
+  /// struck, as the core records them for a view; none before the first
+  /// tick. Each is a Dictionary of the `person` who used it, its `skill` by
+  /// index among the person's, its `shape`, one of the SHAPE_* constants,
+  /// its `range` and `radius`, the skill's `body_damage`, and the Vector2s
+  /// it went from, `origin`, and `toward`, all in sub-cell units.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> strikes() const;
 
   /// Returns the stage structure `structure` is in, one of the STAGE_*
   /// constants.
