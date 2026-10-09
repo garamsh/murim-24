@@ -54,6 +54,7 @@ Options weighed:
     Footwork and heart method share the talent of fist and medicine, so no new talent axis is drawn at birth. What their arts do beyond mastery and synthesis is out of this ADR's scope, below.
   - A tier is one of five, from 1 to 5: third-rate (삼류), second-rate (이류), first-rate (일류), peak (절정) and peerless (절세). It sets how slowly mastery rises in the art, and where the window places the art.
   - Rejected: families as a fixed list in the core. A re-theme names its own (ADR 0049).
+  - **No theme word in the core.** The core knows a family only as a pack id with its discipline and weapon, and a stage only as an index, 0 to 4, with its threshold. The names above, initiate, major, heart method, footwork and the rest, are the base pack's text. Wherever this ADR says a stage's name, the core reads the stage's index.
 - **Mastery.** Each art a person knows carries a mastery from 0 to 10,000 beside it, in the list of known arts.
   - **What raises it.**
     - Each use of one of the art's skills that hits anyone or anything adds the person's talent growth in the art's discipline, 5 to 15.
@@ -71,8 +72,8 @@ Options weighed:
   - Rejected: mastery as a share of attainment in the discipline. Two arts of one discipline would then rise together, and an unused art would master itself.
 - **Forms open by stage.** Each skill of an art names the stage that opens it, beside ADR 0035's rank. A person learns a skill of an art it knows once its mastery reaches the skill's stage and its realm the skill's rank, checked when either rises. The base pack opens an art's three forms at initiate, major and consummate, with ADR 0035's ranks 1, 3 and 5 kept.
 - **Gaining an art.**
-  - **A manual** teaches the art's forms of the initiate stage that the reader's rank allows. Its later forms open by mastery.
-  - **Sect teaching** now teaches an art the sect holds a manual of, its initiate forms, with ADR 0035's yearly chance. It then raises mastery daily, as above.
+  - **A manual** teaches the art's forms of stage 0, the base pack's initiate, that the reader's rank allows. Its later forms open by mastery.
+  - **Sect teaching** now teaches an art the sect holds a manual of, its forms of stage 0, with ADR 0035's yearly chance. It then raises mastery daily, as above.
   - **Synthesis** comprehends a higher art (below).
   - ADR 0035's comprehension on a realm gained is replaced. Forms open by stage with no roll, and comprehension now means synthesis, which mastery feeds as the owner decided.
 - **The lineage graph.** The graph is pack data:
@@ -81,7 +82,7 @@ Options weighed:
 - **The synthesis rule.**
   - Once a day, with the other daily rules spread over the day (ADR 0048), a person who meets an edge's every condition and lacks its higher art rolls the edge's chance for a day.
   - The roll is scaled by its talent limit in the higher art's discipline over that discipline's mean limit, as ADR 0035 scaled comprehension, and by the nature's ease (ADR 0035).
-  - On success it learns the higher art's initiate forms, and the progress store notes it, with how: by synthesis.
+  - On success it learns the higher art's forms of stage 0, and the progress store notes it, with how: by synthesis.
   - It is one rule for every person, steered or not. A person meets few edges, so the daily check reads at most the edges whose first art it knows.
   - Rejected: synthesis by a quest or an order. The owner made it a chance, the same for NPCs.
 - **The base pack's starting graph.** Six families of three tiers. The existing three arts keep their skills, and the others are new data with three forms each:
