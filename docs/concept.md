@@ -17,6 +17,7 @@ This document is the single reference for the game concept agreed with the user.
 - Martial arts [draft]
 - Qi and martial arts [agreed]
 - Mods and re-theming [agreed]
+- Gear, wealth and livelihoods [agreed]
 - MVP scope [proposed]
 - Open questions [open]
 
@@ -38,7 +39,7 @@ Each section carries one of the following statuses.
   1. **A living gangho**: a simulation in which factions and villages change even without the player.
   2. **A wuxia story of one life**: the starting point and the path differ by origin.
   3. **Reincarnation**: the world is never reset.
-- **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on).
+- **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on). The one exception is caves, which only the player enters (§Gear, wealth and livelihoods).
 - **Genre and engine**: 2D RPG, Godot 4.7.
 - **Perspective and combat**: a three-quarter top-down view, with combat in real time (`docs/architecture/adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`).
 - **Art direction**: pixel art on a 16-pixel tile grid (`docs/art-direction.md`).
@@ -198,6 +199,27 @@ Decided by the owner on 2026-10-09 (issue #202). The design is ADR 0049 (`docs/a
 - **A broken mod is refused whole**, with readable errors in the player's language, never half-loaded.
 - **Saves know their packs.** A save loads only with the same packs that change the simulation, in the same order. A pack of text, art and sound alone, such as a translation or a re-skin, can be added or removed at any time.
 - **Another theme is another base pack.** The rules name no wuxia concept; qi, realms and orthodox and demonic natures are the base pack's words for general rules. The same game can ship in another theme with another base pack.
+
+## Gear, wealth and livelihoods [agreed]
+
+Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 and 0052 (`docs/architecture/adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`, `0051-give-every-item-one-holder-and-scatter-a-destroyed-warehouse-on-the-ground.md`, `0052-run-the-economy-from-households-needs-through-town-markets-taxed-by-the-power-that-holds-the-land.md`).
+
+- **Everyone carries and wears gear.** A weapon, armour, headgear and an accessory, from many kinds, so a crowd does not look alike. A faction shows in its gear's dye.
+  - The weapon decides how one strikes. A spear reaches farther than a sword, and darts fly.
+  - A martial art needs its weapon: a sword art a sword, a fist art bare hands or gauntlets.
+- **Gear wears out and breaks.** A broken weapon or armour leaves the slot empty, and nothing is given for free. One fights bare-handed or unarmoured until one equips something one owns.
+  - People carry spares where they can, and take up better gear they find, buy, loot or are issued.
+- **Every item has one owner:** a person, a warehouse, a faction or the ground. There are four ways to move one: pick it up, deposit or withdraw it, buy it and sell it.
+  - The dead drop what they carried, for anyone to pick up.
+- **Warehouses.** Villages keep warehouses run by keepers, sects keep vaults, and factions keep treasuries. A destroyed warehouse scatters its contents on the ground, and whoever picks an item up owns it. A soldier at war picks it up as loot for its faction, which sells it.
+- **Caves are the player's alone.** Only the player enters a cave, and its hidden cache is the player's. The player's soul keeps its warehouses and caches through rebirth.
+- **People earn to eat and to keep their families.** The household is the unit, with a purse. Earners feed dependants, buy their rations, keep their house and their tools, and buy gear as their roles need.
+  - Failing to earn brings hunger, a debt to kin, selling one's gear, then leaving for a richer town.
+- **Markets from needs.** Each town has a market whose prices move with stock against demand. Merchant houses send caravans to buy where it is cheap and sell where it is dear.
+- **Taxes and treasuries.** The power holding the land taxes trade, households and caravans at its gates, and sects take dues. Treasuries pay for wars. A faction that cannot pay loses soldiers and seeks peace sooner, and a rich one can arm and march more.
+- **The tax rate follows the treasury's needs.** A leader raises it when war or upkeep demands and lowers it on a surplus. A player who leads sets it by hand.
+- **Discontent drives flight.** High tax, hunger and kin lost in war make households discontent. Past a point they flee to another faction's land they have heard of, which keeps rates in check.
+- **Not now:** loans, interest, banks, exchange rates and haggling.
 
 ## MVP scope [proposed]
 

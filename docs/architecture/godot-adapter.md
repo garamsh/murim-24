@@ -112,4 +112,11 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - **Text.** `hud/hud.csv` becomes each pack's `text/` documents per locale, given to the translation server when the packs load, since Godot imports a CSV only in the editor and at export.
   - **Art.** Faction accents and sprite sets, and each nature axis value's colour, come from the packs' `view/` documents, apart from the hashed data, in place of `hud/palette.gd`'s accents, `hud/affiliation.gd`'s list of sprite sets and `hud/arts.gd`'s ramp by orientation.
   - **Mods.** A mods screen lists the mods found, with their order, errors and overlaps, and the new-game screen shows the packs refused.
+- **Gear and the economy's screens.** ADRs 0050 to 0052, proposed. The body is drawn in layers, body, armour, head and weapon, with armour and headgear tinted by the wearer's faction. New screens:
+  - an inventory and equipment window on I
+  - a warehouse window at a keeper or a cave
+  - a prompt and a list for piles on the ground
+  - a market window, replacing the wares screen
+  - a household panel
+  - a treasury window for a leader
 - **Which platforms the library is built for.** It is built for the host, macOS arm64 and Linux x86_64 so far, for Android arm64, and for the PC exports, macOS universal and Windows x86_64; iOS, Linux and Windows arm64 exports are not built.
