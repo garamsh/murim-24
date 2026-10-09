@@ -72,7 +72,7 @@ The first four of #200's in-game screens per region, in the look of `../ground-s
 
 ## Frame cost
 
-To follow: one capped run per region (`bench <region>`) on a quiet machine.
+Not measured: the machine was never quiet (load < 4, no other test or build running) in the hour the capped runs waited, and the port (#200) is to be measured instead.
 
 ## Not done
 
