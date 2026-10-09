@@ -221,7 +221,7 @@ The implementation of ADRs 0050 to 0052, in order, each an issue with its accept
 
 `make sweep` gains, per seed, the money supply by holder at each decade, each treasury, food's lowest and highest price, hungry households and households fled per faction a year. The steps that change money show, over seeds 0 to 49 for 100 years:
 - the money supply staying within half and double its year-10 level from year 10 on
-- every treasury below a bound the pull request states
+- every treasury below four times its 60 days of needs at every decade, since the court sheds 1% a day above twice them
 - hungry households under 5% in every year without a war
 - no faction losing more than a tenth of its households to flight in peace at its starting rate
 - a faction held at its highest rate through a war losing households over two years or more, and less than a tenth within its first 100 days
