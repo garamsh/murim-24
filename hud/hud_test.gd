@@ -127,8 +127,61 @@ func run() -> bool:
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
 	var purse_passed := _purse_pass()
+	var slip_passed := _notice_slip_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed and purse_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed and slip_passed
+
+
+# A notice stands on a slip as wide as its words, within the room, and never over the talk prompt's
+# slip: at each PC window, in each locale, with the prompt over a person at every point of a grid
+# across the room, the notice's line among them, its talk word or its refusal, the notice shown
+# after the prompt is placed and the prompt moved after the notice is shown. Control: with the
+# prompt hidden the notice stands on its own line.
+func _notice_slip_pass() -> bool:
+	const STEP := 12
+	var world := WorldAdapter.create_region(SEED, 0, 5)
+	var steered := world.player_army()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.talk_prompt.key = "Space"
+	var person := world.roster(steered)[0]
+	var faults := []
+	var checks := 0
+	var line_kept := true
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		for window: Vector2i in PC_WINDOWS:
+			hud.fit(window, false)
+			var room := Rect2(Vector2.ZERO, hud.room)
+			hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
+			hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+			var line: Vector2 = hud.NOTICE_AT[false] + (hud.room - hud.NATIVE) / 2.0
+			line_kept = line_kept and hud.labels.notice.position == line
+			var widest: Rect2 = hud.notice_rect()
+			for y in range(0, int(room.size.y) + 1, STEP):
+				for x in range(0, int(room.size.x) + 1, STEP * 4):
+					for hostile: bool in [false, true]:
+						for prompt_first: bool in [true, false]:
+							if prompt_first:
+								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
+								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+							else:
+								hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
+								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
+								hud._process(0.0)
+							checks += 1
+							var slip: Rect2 = hud.notice_rect()
+							var prompt: Rect2 = hud.talk_prompt.slip_rect()
+							if slip.intersects(prompt) or not room.encloses(slip) or slip.size != widest.size \
+									or hud._notice_slip.get_rect() != slip or not hud._notice_slip.visible:
+								faults.append("%s %s: notice %s, prompt %s" % [window, locale, slip, prompt])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var passed := faults.is_empty() and line_kept and checks > 0
+	print("hud_test: the notice's slip against the talk prompt's in %d places; on its line with no prompt %s; faults %s: %s" % [
+		checks, line_kept, faults.slice(0, 3), "pass" if passed else "FAIL"])
+	return passed
 
 
 # The purse shows the steered person's silver and wares as the world holds them, its wage of a day
