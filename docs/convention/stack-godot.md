@@ -11,7 +11,7 @@ Checked against Godot 4.7.2, its documentation for 4.7 (`docs.godotengine.org/en
 - Comments
 - Entry points
 - Asset export
-- Terrain layers
+- Ground
 - Android export
 - PC export
 
@@ -72,15 +72,16 @@ aseprite --batch <name>.aseprite --sheet <name>.png --data <name>.json --format 
 
 The `.png` and `.json` are committed with it, because CI has no Aseprite.
 
-## Terrain layers
+## Ground
 
-The ground is laid from `art/terrain/` on `TileMapLayer`s with 16-pixel tiles:
+The ground is drawn by a shader from the cells' data, not laid from tiles:
 
-- The plain is one layer on the cell grid, a full tile on every cell.
-- Every other kind has a layer of its own above it, offset by half a cell up and left. Its tile at (x, y) has its corners on cells (x - 1, y - 1), (x, y - 1), (x - 1, y) and (x, y), and its corner mask adds 1, 2, 4 and 8 for each of those cells that is of the kind.
-- Mask 0 places no tile. Masks 1 to 14 place frame `from + mask` of the kind's tag in `transitions.json`, as atlas coordinates (`from + mask`, 0) of `transitions.png`. Mask 15 places one of the kind's four frames in `terrain.json`, picked by a seeded hash of the tile's coordinates.
-- Tiles are placed with `set_cell`. `set_cells_terrain_connect` is not used: in `TERRAIN_MODE_MATCH_CORNERS` it gives a painted cell's corner the terrain only when all four cells sharing it are painted, which leaves a lone tile at every convex step of a border.
-- A landform from `landforms.json` is drawn with everything standing, sorted by the bottom edge of its footprint, with its frame's bottom-left corner on its footprint's bottom-left. Its tag names its kind and footprint in cells, `<kind>_<width>x<height>`. It stands only on cells of its kind, and no two landforms share a cell.
+- Each area the view streams in is given to `world_art`'s ground shader as a texture of one texel a cell, holding what the core holds of the cell.
+- The shader decides each pixel from the four nearest cells' values, interpolated and warped by noise, so no edge between kinds runs along a cell's side. Where two kinds are nearly even it dithers them in a narrow band.
+- An area is drawn once into a texture before it is first shown, and the viewport that drew it is freed. Nothing redraws the ground each frame. A map small enough to hold whole is drawn when it loads; a larger one draws each area within the stream's prefetch margin, spread over frames so no frame stalls.
+- Detail (tufts, flowers, pebbles, reeds) and decorative trees are placed per area by Poisson-disc spacing, from a seed derived from the area's index, so an area drawn again shows the same. Anything a rule reads comes from the core, never from this placement.
+- `art/terrain/` holds each kind's materials, exported as §Asset export says: a ramp of four colours, detail sprites and tree variants. Texture grain and face strata may be made by the shader instead of drawn, coloured only from the kind's ramp. What people build in straight lines, such as walls, bridges and paving, is drawn as sprites, not as ground.
+- A test checks what the view gives the shader and where it places detail: the same area and seed give the same texture and the same placements. The drawn pixels are shown by captures in the pull request's evidence.
 
 ## Android export
 
