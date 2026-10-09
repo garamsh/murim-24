@@ -15,10 +15,11 @@
 #   godot --path . --script res://angle.gd -- <dir> stills
 #     The sequence at STILLS' frames under the HUD of play.tscn, 1920x1080, in ko and en:
 #     <dir>/<still>_<locale>.png.
-#   godot --path . --script res://angle.gd -- <dir> bench [m1] [flat] [solid]
+#   godot --path . --script res://angle.gd -- <dir> bench [m1] [pan] [flat] [solid]
 #     Frame time, vsync off, in a 1920x1080 window: the sequence in real time under the HUD, or
-#     with m1 the core's M1 scenario of 500 people without it. flat turns the y-sort off and solid
-#     the outlines, to measure what each costs. Prints p50, p99 and max over TIMED_FRAMES.
+#     with m1 the core's M1 scenario of 500 people without it. pan moves the camera round PAN, so
+#     chunks stream in and out; flat turns the y-sort off and solid the outlines, to measure what
+#     each costs. Prints p50, p99 and max over TIMED_FRAMES, and what streaming held and built.
 extends SceneTree
 
 const ViewScale := preload("res://view_scale.gd")
@@ -40,6 +41,9 @@ const SETTLE_FRAMES := 8
 const DEPTH_ROWS := 12
 const WARM_UP_FRAMES := 120
 const TIMED_FRAMES := 1200
+# The bench's pan: the camera round PAN's corners, in cells, at PAN_SPEED cells a second.
+const PAN := [Vector2(26, 46), Vector2(100, 46), Vector2(100, 100), Vector2(26, 100)]
+const PAN_SPEED := 20.0
 # Waypoints each Demonic army walks in turn, by army, in cells: along the row behind village 5's
 # southern houses and back, out of the seat's gate to village 5 and back, and down from village 2.
 const WALKS := {
@@ -73,12 +77,15 @@ var _times := PackedFloat64Array()
 var _last_usec := 0
 var _since_tick := 0.0
 var _bench_frames := 0
+var _pan_seconds := 0.0
 var _driver: Driver
 
 
-## The world in the 2.5D projection: ground tiles composed into one image, structures, trees and
-## bodies as sprites under one y-sorted node, the hidden parts of bodies outlined over what hides
-## them, each outline clipped to its occluder's pixels.
+## The world in the 2.5D projection, streamed by chunks of CHUNK x CHUNK cells: a chunk's ground
+## is composed into one image and its structures and trees made as sprites when it comes within
+## STREAM_MARGIN of the screen, and all of it freed once it is a chunk further away. Everything
+## standing is a sprite under one y-sorted node; bodies get sprites only on screen, and the hidden
+## parts of those are outlined over what hides them, each outline clipped to its occluder's pixels.
 class AngleView extends Node2D:
 	const ART := "res://art/mockup/angle/"
 	const CELL := Vector2(16, 12)
@@ -86,11 +93,13 @@ class AngleView extends Node2D:
 	# grass 6 and grass 2 of docs/art-direction.md §Palette: the hills' lit lip and dark edge.
 	const LIP := Color("8fae5a")
 	const EDGE := Color("2c4a32")
+	const INK := Color("14101a")
 	const SUB := 256.0
 	const BUILDINGS := ["house", "hall", "storehouse", "manual_hall", "granary", "well", "seat_gate",
 			"barrels", "fence", "training_ground"]
 	const GROUND_KINDS := ["training_ground"]
 	const FIELD_TAGS := ["sown", "growing", "ripe", "fallow", "burnt"]
+	const STAGES := ["intact", "damaged", "destroyed", "rubble"]
 	const FACTIONS := ["orthodox", "demonic"]
 	const BODY := Vector2(16, 24)
 	const FEET := Vector2(8, 22)
@@ -99,8 +108,19 @@ class AngleView extends Node2D:
 	const CHEVRON_MS := 400
 	# Occluders are bucketed by this many pixels, so a body tests only those near it.
 	const BUCKET := 64
+	## Cells a chunk is wide and deep: ADR 0042's areas.
+	const CHUNK := 32
+	## Pixels past the screen within which chunks are streamed in.
+	const STREAM_MARGIN := 64.0
+	## Chunks built in one frame at most, nearest the screen first.
+	const BUILDS_PER_FRAME := 1
+	# Pixels past the screen within which bodies get sprites.
+	const BODY_MARGIN := 32.0
 
 	var world: WorldAdapter
+	## The world whose terrain, villages and structures are drawn; `world` unless show_world is
+	## given another, whose map has the same cells.
+	var look: WorldAdapter
 	var steered := -1
 	var xray := true
 	## Bodies drawn in the last refresh, and how many of them something hid.
@@ -111,7 +131,17 @@ class AngleView extends Node2D:
 	var hidden_list: Array = []
 	## Per body standing in front of a structure it overlaps: [army, person, kind, feet, rows].
 	var front_list: Array = []
+	## Chunks resident now, chunks built and freed so far, the most resident at once, and the
+	## bytes their ground images hold now.
+	var resident := 0
+	var built := 0
+	var freed := 0
+	var most_resident := 0
+	var ground_bytes := 0
+	## How long each chunk took to build, in microseconds.
+	var build_usec := PackedInt64Array()
 
+	var _stage_of := Callable()
 	var _sheets := {}
 	var _kinds := PackedStringArray()
 	var _width := 0
@@ -119,8 +149,13 @@ class AngleView extends Node2D:
 	var _standing := Node2D.new()
 	var _shadows := Node2D.new()
 	var _ground := Node2D.new()
-	var _occluders: Array[Sprite2D] = []
+	var _chunks := {}
 	var _buckets := {}
+	# The cells the villages' decorations and the fields cover, with their tile.
+	var _laid := {}
+	# Structures by the chunk of their footprint's corner: {kind, corner, size, id}.
+	var _structures_in := {}
+	var _cleared: Array[Rect2i] = []
 	var _bodies := {}
 	var _body_shadows := {}
 	var _last := {}
@@ -133,31 +168,34 @@ class AngleView extends Node2D:
 	var _xray_pool := {}
 
 	func _init() -> void:
+		_ground.y_sort_enabled = true
 		add_child(_ground)
 		add_child(_shadows)
 		_standing.y_sort_enabled = true
 		add_child(_standing)
 		add_child(_chevron)
 
-	## Lays out `shown`'s ground, structures and trees, and reads its bodies.
-	func show_world(shown: WorldAdapter, steered_army: int, sorted := true) -> void:
+	## Reads `shown`'s bodies, and `drawn_from`'s terrain, villages and structures (`shown`'s when
+	## null); a structure is drawn at the stage `stage_of` gives its entry, or the world's.
+	func show_world(shown: WorldAdapter, steered_army: int, sorted := true, drawn_from: WorldAdapter = null,
+			stage_of := Callable()) -> void:
 		world = shown
+		look = drawn_from if drawn_from != null else shown
 		steered = steered_army
+		_stage_of = stage_of
 		_standing.y_sort_enabled = sorted
 		for name: String in ["terrain", "faces", "trees", "orthodox", "demonic", "marks"] + BUILDINGS:
 			_sheets[name] = _load(name)
-		var rows := world.map_rows()
+		var rows := look.map_rows()
 		_height = rows.size()
 		_width = rows[0].length()
-		var names := world.terrain_names()
-		var terrain := world.terrain()
+		var names := look.terrain_names()
+		var terrain := look.terrain()
 		_kinds.clear()
 		for i in _width * _height:
 			_kinds.append(names[terrain[i]] if terrain.size() == _width * _height else
 					("plain" if rows[i / _width][i % _width] == "." else "mountain"))
-		_lay_ground()
-		_lay_structures()
-		_lay_trees()
+		_index_layout()
 		_ring.texture = _frame("marks", "ring", 0)
 		_ring.centered = false
 		_ring.offset = Vector2(-8, -4)
@@ -193,29 +231,33 @@ class AngleView extends Node2D:
 					_strike_until[person] = -1
 				_ready_at[person] = ready[n]
 
-	## Draws the bodies `between` of the way from the tick before last to the last, at `now_ms`.
-	func refresh(between: float, now_ms: int) -> void:
+	## Streams the chunks round `view`, the screen in world pixels, and draws the bodies on it
+	## `between` of the way from the tick before last to the last, at `now_ms`.
+	func refresh(view: Rect2, between: float, now_ms: int) -> void:
+		_stream(view)
+		for key: Vector2i in _chunks:
+			for sprite: Sprite2D in _chunks[key].occluders:
+				sprite.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
+				if sprite.has_meta("stages"):
+					sprite.texture = sprite.get_meta("stages")[_stage(sprite.get_meta("entry"))]
+		for pool: Array in _xray_pool.values():
+			for sprite: Sprite2D in pool:
+				sprite.visible = false
 		drawn = 0
 		occluded = 0
 		hidden_list.clear()
 		front_list.clear()
-		for occluder in _occluders:
-			occluder.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
-		for pool: Array in _xray_pool.values():
-			for sprite: Sprite2D in pool:
-				sprite.visible = false
 		var used := {}
-		for person: int in _bodies.keys():
-			if not _now.has(person):
-				_bodies[person].queue_free()
-				_body_shadows[person].queue_free()
-				_bodies.erase(person)
-				_body_shadows.erase(person)
+		var shown := view.grow(BODY_MARGIN)
+		var on_screen := {}
 		for person: int in _now:
 			var army: int = _now[person][0]
 			var now: Vector2 = _now[person][1]
 			var before: Vector2 = _last[person][1] if _last.has(person) else now
 			var at := to_screen(before.lerp(now, clampf(between, 0.0, 1.0))).round()
+			if not shown.has_point(at):
+				continue
+			on_screen[person] = true
 			var sprite: Sprite2D = _bodies.get(person)
 			if sprite == null:
 				sprite = Sprite2D.new()
@@ -249,6 +291,13 @@ class AngleView extends Node2D:
 			if xray:
 				_outline(sprite, faction + "|" + tag + "|" + str(index), army, person, used)
 			_note_front(sprite, army, person)
+		# Bodies off the screen, or no longer in the world, give up their sprites.
+		for person: int in _bodies.keys():
+			if not on_screen.has(person):
+				_bodies[person].queue_free()
+				_body_shadows[person].queue_free()
+				_bodies.erase(person)
+				_body_shadows.erase(person)
 		var lead := world.roster(steered) if steered >= 0 else PackedInt64Array()
 		var alive := not lead.is_empty() and _bodies.has(lead[0])
 		_ring.visible = alive
@@ -257,6 +306,198 @@ class AngleView extends Node2D:
 			_ring.position = _bodies[lead[0]].position
 			_chevron.position = _bodies[lead[0]].position
 			_chevron.texture = _chevron_frames[(now_ms / CHEVRON_MS) % 2]
+
+	## Pixels the chunk at `key` covers in the world.
+	func chunk_rect(key: Vector2i) -> Rect2:
+		return Rect2(Vector2(key) * CHUNK * CELL - Vector2(0, HILL_LIFT), CHUNK * CELL + Vector2(0, HILL_LIFT))
+
+	# Builds the nearest missing chunks round `view`, at most BUILDS_PER_FRAME, and frees those a
+	# chunk past the streamed ring.
+	func _stream(view: Rect2) -> void:
+		var wanted := _chunks_over(view.grow(STREAM_MARGIN))
+		var kept := _chunks_over(view.grow(STREAM_MARGIN + CHUNK * CELL.y))
+		for key: Vector2i in _chunks.keys():
+			if not kept.has(key):
+				_free_chunk(key)
+		var missing: Array = wanted.keys().filter(func(key: Vector2i) -> bool: return not _chunks.has(key))
+		var centre := view.get_center()
+		missing.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+				return chunk_rect(a).get_center().distance_squared_to(centre) \
+						< chunk_rect(b).get_center().distance_squared_to(centre))
+		for key: Vector2i in missing.slice(0, BUILDS_PER_FRAME if not _chunks.is_empty() else missing.size()):
+			_build_chunk(key)
+		resident = _chunks.size()
+		most_resident = maxi(most_resident, resident)
+
+	func _chunks_over(rect: Rect2) -> Dictionary:
+		var keys := {}
+		var size := CHUNK * CELL
+		var last := Vector2i((_width - 1) / CHUNK, (_height - 1) / CHUNK)
+		for cx in range(maxi(floori(rect.position.x / size.x), 0), mini(floori(rect.end.x / size.x), last.x) + 1):
+			for cy in range(maxi(floori(rect.position.y / size.y), 0), mini(floori(rect.end.y / size.y), last.y) + 1):
+				keys[Vector2i(cx, cy)] = true
+		return keys
+
+	# The chunk's ground image: terrain, the villages' road and paving, the fields in the state
+	# they hold when it is built, the hills raised with their front step, and the dithered shadows
+	# of what stands on it; then its structures and trees.
+	func _build_chunk(key: Vector2i) -> void:
+		var started := Time.get_ticks_usec()
+		var origin := key * CHUNK
+		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y) - HILL_LIFT)
+		var image := Image.create_empty(CHUNK * int(CELL.x), CHUNK * int(CELL.y) + HILL_LIFT, false,
+				Image.FORMAT_RGBA8)
+		var sheet: Dictionary = _sheets.terrain
+		var faces: Dictionary = _sheets.faces
+		for y in range(origin.y, mini(origin.y + CHUNK, _height)):
+			for x in range(origin.x, mini(origin.x + CHUNK, _width)):
+				var tag := _tile(x, y)
+				var span: Array = sheet.tags[tag]
+				var frame: Rect2i = sheet.frames[span[0] + _hash(x, y, 1) % (span[1] - span[0] + 1)]
+				var lift := HILL_LIFT if _kind(x, y) == "hills" else 0
+				var at := Vector2i(x * int(CELL.x), y * int(CELL.y) - lift) - top_left
+				image.blit_rect(sheet.image, frame, at)
+				if lift == 0:
+					continue
+				if _kind(x, y + 1) != "hills":
+					var face: Rect2i = faces.frames[faces.tags.hills_face[0] + _hash(x, y, 2) % 2]
+					image.blit_rect(faces.image, face, Vector2i(at.x, at.y + int(CELL.y)))
+				# The raised edge catches the light from the upper left and falls dark to the right.
+				if _kind(x, y - 1) != "hills":
+					image.fill_rect(Rect2i(at, Vector2i(int(CELL.x), 1)), LIP)
+				if _kind(x - 1, y) != "hills":
+					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
+				if _kind(x + 1, y) != "hills":
+					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y) + HILL_LIFT)), EDGE)
+		# Shadows reach a little past a footprint, so the neighbours' structures cast them too.
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				for entry: Dictionary in _structures_in.get(key + Vector2i(dx, dy), []):
+					if entry.kind in GROUND_KINDS:
+						continue
+					var left: int = entry.corner.x * int(CELL.x)
+					var top: int = entry.corner.y * int(CELL.y)
+					var right: int = (entry.corner.x + entry.size.x) * int(CELL.x)
+					var bottom: int = (entry.corner.y + entry.size.y) * int(CELL.y)
+					_dither(image, Rect2i(right, top + 6, 6, bottom - top - 2), top_left)
+					_dither(image, Rect2i(left + 6, bottom, right - left, 3), top_left)
+		var occluders: Array[Sprite2D] = []
+		var trees := _trees(Rect2i(origin - Vector2i.ONE, Vector2i(CHUNK + 2, CHUNK + 2)))
+		for tree: Array in trees:
+			var foot: Vector2 = tree[0]
+			_dither(image, Rect2i(int(foot.x) - 2, int(foot.y) - 2, 12, 4), top_left)
+			if Rect2i(origin, Vector2i(CHUNK, CHUNK)).has_point(Vector2i(tree[2])):
+				var sprite := Sprite2D.new()
+				sprite.texture = tree[1]
+				sprite.centered = false
+				sprite.offset = Vector2(-16, -36)
+				sprite.position = foot
+				_add_occluder(sprite, "tree", _sheets.trees, occluders)
+		var ground := Sprite2D.new()
+		ground.centered = false
+		ground.texture = ImageTexture.create_from_image(image)
+		ground.position = Vector2(top_left)
+		_ground.add_child(ground)
+		var extras: Array[Sprite2D] = []
+		for entry: Dictionary in _structures_in.get(key, []):
+			var sprite := Sprite2D.new()
+			var stages: Array[AtlasTexture] = []
+			for stage: String in STAGES:
+				stages.append(_frame(entry.kind, stage if _sheets[entry.kind].tags.has(stage) else "intact", 0))
+			sprite.set_meta("stages", stages)
+			sprite.set_meta("entry", entry)
+			sprite.texture = stages[_stage(entry)]
+			sprite.centered = false
+			var frame_size := sprite.texture.get_size()
+			sprite.offset = Vector2(-8, -(frame_size.y - 8))
+			sprite.position = Vector2(entry.corner.x * CELL.x, (entry.corner.y + entry.size.y) * CELL.y)
+			if entry.kind in GROUND_KINDS:
+				sprite.position += sprite.offset
+				sprite.offset = Vector2.ZERO
+				_ground.add_child(sprite)
+				extras.append(sprite)
+			else:
+				_add_occluder(sprite, entry.kind, _sheets[entry.kind], occluders)
+		_chunks[key] = {"ground": ground, "extras": extras, "occluders": occluders,
+				"bytes": image.get_data_size()}
+		ground_bytes += image.get_data_size()
+		built += 1
+		build_usec.append(Time.get_ticks_usec() - started)
+
+	func _free_chunk(key: Vector2i) -> void:
+		var chunk: Dictionary = _chunks[key]
+		for sprite: Sprite2D in chunk.occluders:
+			for bucket: Vector2i in sprite.get_meta("buckets"):
+				_buckets[bucket].erase(sprite)
+				if _buckets[bucket].is_empty():
+					_buckets.erase(bucket)
+			_xray_pool.erase(sprite)
+			sprite.queue_free()
+		for sprite: Sprite2D in chunk.extras:
+			sprite.queue_free()
+		chunk.ground.queue_free()
+		ground_bytes -= chunk.bytes
+		_chunks.erase(key)
+		freed += 1
+
+	func _stage(entry: Dictionary) -> int:
+		if _stage_of.is_valid():
+			return _stage_of.call(entry)
+		return clampi(look.structure_stage(entry.id), 0, STAGES.size() - 1)
+
+	# Indexes once what the chunks draw from: the cells decorations and fields cover, the
+	# structures by chunk, and the villages trees keep clear of.
+	func _index_layout() -> void:
+		var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
+		for village: Dictionary in look.villages():
+			_cleared.append(Rect2i(village.corner, village.area).grow(1))
+			for item: Dictionary in layouts.get(village.kind, []):
+				if not item.has("tile"):
+					continue
+				var r: Array = item.rect
+				for dx in int(r[2]):
+					for dy in int(r[3]):
+						_laid[Vector2i(village.corner) + Vector2i(int(r[0]) + dx, int(r[1]) + dy)] = item.tile
+		for structure in look.structure_count():
+			var corner := look.structure_cell(structure)
+			var size := look.structure_footprint(structure)
+			var state := look.structure_field_state(structure)
+			if state >= 0:
+				for dx in size.x:
+					for dy in size.y:
+						_laid[corner + Vector2i(dx, dy)] = FIELD_TAGS[state]
+				continue
+			var kind := look.structure_kind(structure)
+			if not _sheets.has(kind):
+				print("angle: no art for %s at %s" % [kind, corner])
+				continue
+			var key := corner / CHUNK
+			if not _structures_in.has(key):
+				_structures_in[key] = []
+			_structures_in[key].append({"kind": kind, "corner": corner, "size": size, "id": structure})
+
+	func _tile(x: int, y: int) -> String:
+		var laid: String = _laid.get(Vector2i(x, y), "")
+		if not laid.is_empty():
+			return laid
+		var kind := _kind(x, y)
+		return kind if kind in ["hills", "forest"] else "plain"
+
+	# The trees on the forest cells of `cells`: on about half of them outside the villages, the
+	# foot jittered within the cell, broadleaf or pine. Each is [foot, frame, cell].
+	func _trees(cells: Rect2i) -> Array:
+		var trees := []
+		for y in range(maxi(cells.position.y, 0), mini(cells.end.y, _height)):
+			for x in range(maxi(cells.position.x, 0), mini(cells.end.x, _width)):
+				if _kind(x, y) != "forest" or _hash(x, y, 3) % 100 >= 55:
+					continue
+				if _cleared.any(func(rect: Rect2i) -> bool: return rect.has_point(Vector2i(x, y))):
+					continue
+				var pine := _hash(x, y, 4) % 3 == 0
+				trees.append([Vector2(x * CELL.x + 4 + _hash(x, y, 6) % 9, y * CELL.y + 3 + _hash(x, y, 7) % 7),
+						_frame("trees", "pine" if pine else "tree", _hash(x, y, 5) % (2 if pine else 3)),
+						Vector2i(x, y)])
+		return trees
 
 	# Draws the outline of `body` over every occluder sorted after it that its frame overlaps,
 	# clipped to the occluder's pixels.
@@ -305,21 +546,24 @@ class AngleView extends Node2D:
 		return found.keys()
 
 	# Adds `sprite` to the sorted node as something that can hide a body, with the bounds of its
-	# opaque pixels in the world.
-	func _add_occluder(sprite: Sprite2D, kind: String, sheet: Dictionary) -> void:
+	# opaque pixels in the world, and to `occluders`, its chunk's.
+	func _add_occluder(sprite: Sprite2D, kind: String, sheet: Dictionary, occluders: Array[Sprite2D]) -> void:
 		var region := Rect2i((sprite.texture as AtlasTexture).region)
 		var used := (sheet.image as Image).get_region(region).get_used_rect()
 		sprite.set_meta("solid", Rect2(sprite.position + sprite.offset + Vector2(used.position), used.size))
 		sprite.set_meta("kind", kind)
 		_standing.add_child(sprite)
-		_occluders.append(sprite)
+		occluders.append(sprite)
 		var rect := Rect2(sprite.position + sprite.offset, sprite.texture.get_size())
+		var keys: Array[Vector2i] = []
 		for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
 			for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
 				var key := Vector2i(bx, by)
 				if not _buckets.has(key):
 					_buckets[key] = []
 				_buckets[key].append(sprite)
+				keys.append(key)
+		sprite.set_meta("buckets", keys)
 
 	func _kind(x: int, y: int) -> String:
 		return _kinds[clampi(y, 0, _height - 1) * _width + clampi(x, 0, _width - 1)]
@@ -329,126 +573,14 @@ class AngleView extends Node2D:
 		h = (h ^ (h >> 13)) * 1274126177
 		return absi(h ^ (h >> 16))
 
-	# The ground of every cell composed into one image: terrain, the villages' road and paving,
-	# the fields in the state they are in now, the hills raised with their front step, and the
-	# dithered shadows of what stands on it.
-	func _lay_ground() -> void:
-		var image := Image.create_empty(_width * int(CELL.x), _height * int(CELL.y), false, Image.FORMAT_RGBA8)
-		var tiles := {}
-		for x in _width:
-			for y in _height:
-				var kind := _kind(x, y)
-				tiles[Vector2i(x, y)] = kind if kind in ["hills", "forest"] else "plain"
-		var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
-		for village: Dictionary in world.villages():
-			for item: Dictionary in layouts.get(village.kind, []):
-				if not item.has("tile"):
-					continue
-				var r: Array = item.rect
-				for dx in int(r[2]):
-					for dy in int(r[3]):
-						tiles[Vector2i(village.corner) + Vector2i(int(r[0]) + dx, int(r[1]) + dy)] = item.tile
-		for structure in world.structure_count():
-			var state := world.structure_field_state(structure)
-			if state < 0:
-				continue
-			var corner := world.structure_cell(structure)
-			var size := world.structure_footprint(structure)
-			for dx in size.x:
-				for dy in size.y:
-					tiles[corner + Vector2i(dx, dy)] = FIELD_TAGS[state]
-		var sheet: Dictionary = _sheets.terrain
-		var faces: Dictionary = _sheets.faces
-		for y in _height:
-			for x in _width:
-				var tag: String = tiles[Vector2i(x, y)]
-				var span: Array = sheet.tags[tag]
-				var frame: Rect2i = sheet.frames[span[0] + _hash(x, y, 1) % (span[1] - span[0] + 1)]
-				var lift := HILL_LIFT if _kind(x, y) == "hills" else 0
-				var at := Vector2i(x * int(CELL.x), y * int(CELL.y) - lift)
-				image.blit_rect(sheet.image, frame, at)
-				if lift == 0:
-					continue
-				if _kind(x, y + 1) != "hills":
-					var face: Rect2i = faces.frames[faces.tags.hills_face[0] + _hash(x, y, 2) % 2]
-					image.blit_rect(faces.image, face, Vector2i(at.x, (y + 1) * int(CELL.y) - HILL_LIFT))
-				# The raised edge catches the light from the upper left and falls dark to the right.
-				if _kind(x, y - 1) != "hills":
-					image.fill_rect(Rect2i(at, Vector2i(int(CELL.x), 1)), LIP)
-				if _kind(x - 1, y) != "hills":
-					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
-				if _kind(x + 1, y) != "hills":
-					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y) + HILL_LIFT)), EDGE)
-		for structure in world.structure_count():
-			if world.structure_field_state(structure) >= 0:
-				continue
-			var corner := world.structure_cell(structure)
-			var size := world.structure_footprint(structure)
-			var left := corner.x * int(CELL.x)
-			var top := corner.y * int(CELL.y)
-			var right := (corner.x + size.x) * int(CELL.x)
-			var bottom := (corner.y + size.y) * int(CELL.y)
-			_dither(image, Rect2i(right, top + 6, 6, bottom - top - 2))
-			_dither(image, Rect2i(left + 6, bottom, right - left, 3))
-		var sprite := Sprite2D.new()
-		sprite.centered = false
-		sprite.texture = ImageTexture.create_from_image(image)
-		_ground.add_child(sprite)
-		_ground_image = image
-
-	var _ground_image: Image
-
-	func _dither(image: Image, rect: Rect2i) -> void:
-		var ink := Color("14101a")
-		for x in range(rect.position.x, rect.end.x):
-			for y in range(rect.position.y, rect.end.y):
-				if (x + y) % 2 == 0 and x >= 0 and y >= 0 and x < image.get_width() and y < image.get_height():
-					image.set_pixel(x, y, ink)
-
-	func _lay_structures() -> void:
-		for structure in world.structure_count():
-			var kind := world.structure_kind(structure)
-			if world.structure_field_state(structure) >= 0:
-				continue
-			if not _sheets.has(kind):
-				print("angle: no art for %s at %s" % [kind, world.structure_cell(structure)])
-				continue
-			var corner := world.structure_cell(structure)
-			var size := world.structure_footprint(structure)
-			var sprite := Sprite2D.new()
-			sprite.texture = _frame(kind, "intact", 0)
-			sprite.centered = false
-			var frame_size := sprite.texture.get_size()
-			sprite.offset = Vector2(-8, -(frame_size.y - 8))
-			sprite.position = Vector2(corner.x * CELL.x, (corner.y + size.y) * CELL.y)
-			if kind in GROUND_KINDS:
-				sprite.position += sprite.offset
-				sprite.offset = Vector2.ZERO
-				_ground.add_child(sprite)
-			else:
-				_add_occluder(sprite, kind, _sheets[kind])
-
-	# A tree on about half the forest cells outside the villages, its foot jittered within the
-	# cell, broadleaf or pine.
-	func _lay_trees() -> void:
-		var cleared: Array[Rect2i] = []
-		for village: Dictionary in world.villages():
-			cleared.append(Rect2i(village.corner, village.area).grow(1))
-		for y in _height:
-			for x in _width:
-				if _kind(x, y) != "forest" or _hash(x, y, 3) % 100 >= 55:
-					continue
-				if cleared.any(func(rect: Rect2i) -> bool: return rect.has_point(Vector2i(x, y))):
-					continue
-				var sprite := Sprite2D.new()
-				var pine := _hash(x, y, 4) % 3 == 0
-				sprite.texture = _frame("trees", "pine" if pine else "tree", _hash(x, y, 5) % (2 if pine else 3))
-				sprite.centered = false
-				sprite.offset = Vector2(-16, -36)
-				sprite.position = Vector2(x * CELL.x + 4 + _hash(x, y, 6) % 9, y * CELL.y + 3 + _hash(x, y, 7) % 7)
-				_dither(_ground_image, Rect2i(int(sprite.position.x) - 2, int(sprite.position.y) - 2, 12, 4))
-				_add_occluder(sprite, "tree", _sheets.trees)
-		(_ground.get_child(0) as Sprite2D).texture = ImageTexture.create_from_image(_ground_image)
+	# Dithers ink over every other pixel of `rect`, given in the world, on `image`, whose top-left
+	# is `origin` in the world.
+	func _dither(image: Image, rect: Rect2i, origin: Vector2i) -> void:
+		var area := Rect2i(rect.position - origin, rect.size).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+		for x in range(area.position.x, area.end.x):
+			for y in range(area.position.y, area.end.y):
+				if (x + origin.x + y + origin.y) % 2 == 0:
+					image.set_pixel(x, y, INK)
 
 	func _load(name: String) -> Dictionary:
 		return _load_from(ART + name)
@@ -552,7 +684,7 @@ class Driver extends RefCounted:
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() < 2 or not args[1] in ["frames", "stills", "bench"]:
-		printerr("angle: usage: -- <dir> frames|stills|bench [m1] [flat] [solid]")
+		printerr("angle: usage: -- <dir> frames|stills|bench [m1] [pan] [flat] [solid]")
 		quit(2)
 		return
 	_dir = args[0]
@@ -609,6 +741,28 @@ func _add_view(parent: Node, steered: int) -> void:
 		_camera.position = (FOCUS * AngleView.CELL).round()
 
 
+# The point `distance` cells along PAN's loop.
+func _pan_at(distance: float) -> Vector2:
+	var length := 0.0
+	for n in PAN.size():
+		length += PAN[n].distance_to(PAN[(n + 1) % PAN.size()])
+	var left := fmod(distance, length)
+	for n in PAN.size():
+		var from: Vector2 = PAN[n]
+		var to: Vector2 = PAN[(n + 1) % PAN.size()]
+		if left <= from.distance_to(to):
+			return from.move_toward(to, left)
+		left -= from.distance_to(to)
+	return PAN[0]
+
+
+# The part of the world on screen, in world pixels; the camera has no smoothing and its limits
+# lie outside what it shows.
+func _view_rect() -> Rect2:
+	var size := root.get_visible_rect().size / _camera.zoom
+	return Rect2(_camera.position - size / 2.0, size)
+
+
 func _tick() -> void:
 	_driver.step()
 	_world.tick()
@@ -630,10 +784,14 @@ func _process(delta: float) -> bool:
 # One frame of the sequence each process frame, drawn before it is read, so a capture holds it
 # even while the window is hidden and the loop would not draw.
 func _frames() -> bool:
+	# The first frame streams the chunks in; what it adds draws from the next.
+	if _frame == 1:
+		_view.refresh(_view_rect(), 1.0, 0)
+		return false
 	if _sequence_frame > 0:
 		for i in TICKS_PER_FRAME:
 			_tick()
-	_view.refresh(1.0, _sequence_frame * FRAME_MS)
+	_view.refresh(_view_rect(), 1.0, _sequence_frame * FRAME_MS)
 	RenderingServer.force_draw(false)
 	var image := root.get_texture().get_image()
 	image.save_png(_dir.path_join("frames/frame_%03d.png" % _sequence_frame))
@@ -713,7 +871,7 @@ func _stills() -> bool:
 				return false
 		3:
 			_play.fit_view()
-			_view.refresh(1.0, STILLS.get(shot.still, 0) * FRAME_MS)
+			_view.refresh(_view_rect(), 1.0, STILLS.get(shot.still, 0) * FRAME_MS)
 			_hud.refresh(_world, _play.steered, _play._skills)
 			if _frame % SETTLE_FRAMES != 0:
 				return false
@@ -748,7 +906,10 @@ func _bench(delta: float) -> bool:
 			_world.tick()
 			_view.note_tick()
 		_since_tick -= step
-	_view.refresh(_since_tick / step, Time.get_ticks_msec())
+	if "pan" in _flags:
+		_pan_seconds += delta
+		_camera.position = (_pan_at(_pan_seconds * PAN_SPEED) * AngleView.CELL).round()
+	_view.refresh(_view_rect(), _since_tick / step, Time.get_ticks_msec())
 	if _hud != null:
 		_play.fit_view()
 		_hud.refresh(_world, _play.steered, _play._skills)
@@ -766,5 +927,17 @@ func _bench(delta: float) -> bool:
 	print("angle bench: %d bodies drawn, %d hidden behind something in the last frame" % [_view.drawn, _view.occluded])
 	print("angle bench: frame time p50 %.3f ms, p99 %.3f ms, max %.3f ms over %d frames" % [
 		sorted[sorted.size() / 2], sorted[ceili(sorted.size() * 0.99) - 1], sorted[-1], sorted.size()])
+	var builds := Array(_view.build_usec)
+	builds.sort()
+	print("angle bench: chunks of %d cells; %d resident now, %d at most; %d built, %d freed; ground images %d bytes now (%d a chunk)" % [
+		AngleView.CHUNK, _view.resident, _view.most_resident, _view.built, _view.freed, _view.ground_bytes,
+		_view.ground_bytes / maxi(_view.resident, 1)])
+	print("angle bench: chunk build p50 %.3f ms, max %.3f ms; camera travelled %.0f cells" % [
+		builds[builds.size() / 2] / 1000.0, builds[-1] / 1000.0, _pan_seconds * PAN_SPEED])
+	print("angle bench: texture memory %.1f MB, video memory %.1f MB, static memory %.1f MB, %d nodes" % [
+		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0,
+		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
+		Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0,
+		Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
 	quit(0)
 	return true
