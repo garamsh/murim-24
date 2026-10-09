@@ -1,6 +1,6 @@
 # ADR 0036: Keep people's progress in the martial arts in a store of its own
 
-> Status: accepted
+> Status: accepted; its three ways a skill is learned superseded by ADR-0055, which adds synthesis
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
