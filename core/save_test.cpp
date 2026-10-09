@@ -507,6 +507,34 @@ TEST(Save, ALoadedWorldKeepsItsPeopleCapacity) {
   EXPECT_NE(with_capacity(2).hash(), with_capacity(MAX_PEOPLE).hash());
 }
 
+// Two hostile people three cells apart in sight of each other, the first's
+// army, if `intent`, holding an attack intent on the second.
+World facing(bool intent) {
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.sight = 6;
+  World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{3, 0}, {Recruit{{3, 0}, 1}}, 1, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      rules};
+  if (intent) {
+    world.order(0, Order{{0, 0}, {0}, 1});
+  }
+  return world;
+}
+
+TEST(Save, ALoadedWorldKeepsItsAttackIntent) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, facing(true)}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.target(0), std::optional<std::size_t>{1});
+  EXPECT_EQ(restored.world.hash(), facing(true).hash());
+  // Control: the intent is what tells the two apart.
+  EXPECT_NE(facing(true).hash(), facing(false).hash());
+}
+
 TEST(Save, ALoadedWorldKeepsItsTalkReach) {
   MemorySaves store;
   ASSERT_TRUE(save(Saved{std::nullopt, talkers(3)}, store, SLOT));

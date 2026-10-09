@@ -1300,7 +1300,8 @@ bool World::rostered() const {
         std::any_of(army.skills.begin(), army.skills.end(), invalid_skill) ||
         army.order.skills.empty() ||
         !all_below(army.order.skills, army.skills.size()) ||
-        !all_below(army.roster, people)) {
+        !all_below(army.roster, people) ||
+        (army.order.target && *army.order.target >= people)) {
       return false;
     }
     for (const std::size_t member : army.roster) {
@@ -2079,6 +2080,12 @@ void World::order(std::size_t army, Order order,
         "an order must name an army, a passable objective and at least one "
         "of the army's skills");
   }
+  if (order.target &&
+      attack_refusal(army, *order.target) != AttackRefusal::NONE) {
+    throw std::invalid_argument(
+        "an attack intent must name a living foe of the army's lead within "
+        "sight of one of its members");
+  }
   Army& ordered = armies_.at(army);
   FlowField field{map_, order.objective};
   reachable_from(field, ordered.roster);
@@ -2087,6 +2094,92 @@ void World::order(std::size_t army, Order order,
   }
   ordered.field = std::move(field);
   ordered.order = std::move(order);
+}
+
+AttackRefusal World::attack_refusal(std::size_t army,
+                                    std::size_t person) const {
+  if (army >= armies_.size()) {
+    throw std::invalid_argument("no such army");
+  }
+  const std::vector<std::size_t>& roster = armies_.at(army).roster;
+  if (roster.empty()) {
+    return AttackRefusal::NO_MEMBER;
+  }
+  const std::optional<std::size_t> served =
+      person < people_.size() ? army_of(person) : std::nullopt;
+  if (!served || people_.at(person).health == 0) {
+    return AttackRefusal::NO_TARGET;
+  }
+  if (!foes(roster.front(), army, person, *served)) {
+    return AttackRefusal::NOT_A_FOE;
+  }
+  return sighted(roster, people_.at(person).position)
+             ? AttackRefusal::NONE
+             : AttackRefusal::OUT_OF_SIGHT;
+}
+
+std::optional<std::size_t> World::target(std::size_t army) const {
+  return armies_.at(army).order.target;
+}
+
+std::vector<std::size_t> World::foes_in_sight(std::size_t person) const {
+  if (person >= people_.size()) {
+    throw std::invalid_argument("no such person");
+  }
+  const std::optional<std::size_t> army = army_of(person);
+  if (!army || people_.at(person).health == 0) {
+    return {};
+  }
+  const Position from = people_.at(person).position;
+  const std::int64_t sight = std::int64_t{rules_.sight} * CELL_SIZE;
+  std::vector<std::pair<std::int64_t, std::size_t>> seen;
+  for (std::size_t other_army = 0; other_army < armies_.size(); ++other_army) {
+    for (const std::size_t other : armies_.at(other_army).roster) {
+      const std::int64_t distance =
+          distance_squared(from, people_.at(other).position);
+      if (distance <= sight * sight && foes(person, *army, other, other_army)) {
+        seen.emplace_back(distance, other);
+      }
+    }
+  }
+  std::sort(seen.begin(), seen.end());
+  std::vector<std::size_t> nearest_first;
+  nearest_first.reserve(seen.size());
+  for (const auto& [distance, other] : seen) {
+    nearest_first.push_back(other);
+  }
+  return nearest_first;
+}
+
+// Whether a member of `roster` has `point` within the rules' sight.
+bool World::sighted(const std::vector<std::size_t>& roster,
+                    Position point) const {
+  const std::int64_t sight = std::int64_t{rules_.sight} * CELL_SIZE;
+  return std::any_of(roster.begin(), roster.end(), [&](std::size_t member) {
+    return distance_squared(people_.at(member).position, point) <=
+           sight * sight;
+  });
+}
+
+// Ends each attack intent whose target is dead, no foe of its army's lead,
+// or out of every member's sight, positions read as the tick began.
+void World::end_intents(const Crowd& crowd) {
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    Order& order = armies_.at(army).order;
+    if (!order.target) {
+      continue;
+    }
+    const std::size_t aimed = crowd.slot.at(*order.target);
+    const std::vector<std::size_t>& roster = armies_.at(army).roster;
+    const bool held =
+        aimed != ABSENT && people_.at(*order.target).health > 0 &&
+        !roster.empty() &&
+        foes(roster.front(), army, *order.target, crowd.armies.at(aimed)) &&
+        sighted(roster, crowd.hash.position(aimed));
+    if (!held) {
+      order.target.reset();
+    }
+  }
 }
 
 // Starts a duel between army `army`'s lead and faction `faction`'s leader, or
@@ -2236,7 +2329,7 @@ void World::tick() {
   std::vector<std::size_t> people;
   std::vector<std::size_t> owners;
   // Each living person's index in the crowd.
-  std::vector<std::size_t> slot(people_.size());
+  std::vector<std::size_t> slot(people_.size(), ABSENT);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     for (const std::size_t member : armies_.at(army).roster) {
       slot.at(member) = people.size();
@@ -2251,7 +2344,7 @@ void World::tick() {
     }
   }
   const Crowd crowd{SpatialHash{std::move(placed)}, std::move(people),
-                    std::move(owners)};
+                    std::move(owners), std::move(slot)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
   strikes_.clear();
@@ -2283,11 +2376,12 @@ void World::tick() {
                       army.roster.end());
   }
   note_falls(std::move(bereft));
+  end_intents(crowd);
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
-  steer(crowd, slot, pulls, standing);
+  steer(crowd, crowd.slot, pulls, standing);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    march(army, crowd, slot, pulls, standing);
+    march(army, crowd, crowd.slot, pulls, standing);
   }
   // The newborn first act on the next tick.
   for (const Passing& passing : reborn) {
@@ -2468,6 +2562,11 @@ StateHash World::hash() const {
   for (const Army& army : armies_) {
     fold(army.order.objective.x);
     fold(army.order.objective.y);
+    // Only when set, so a world with no attack intent keeps its hash.
+    if (army.order.target) {
+      fold(army.order.target.has_value());
+      fold(*army.order.target);
+    }
     for (const std::size_t skill : army.order.skills) {
       fold(skill);
     }
@@ -2878,13 +2977,26 @@ void World::strike(std::size_t user, const Crowd& crowd,
     use(user, crowd, index, striker.position, std::nullopt, edges, damage);
     return;
   }
-  // It faces the nearest hostile person in range. The crowd's order breaks
-  // ties, so the order the query visits people in does not decide the target.
-  const std::optional<std::size_t> target = crowd.hash.nearest(
-      foe_kinds(self, own), striker.position, skill.range,
-      [&](std::size_t other) {
-        return foes(self, army, crowd.people.at(other), crowd.armies.at(other));
-      });
+  // It faces its army's target, while that lies in range, or else the
+  // nearest hostile person in range. The crowd's order breaks ties, so the
+  // order the query visits people in does not decide the target.
+  std::optional<std::size_t> target;
+  if (own.order.target) {
+    const std::size_t aimed = crowd.slot.at(*own.order.target);
+    const std::int64_t range = skill.range;
+    if (aimed != ABSENT &&
+        distance_squared(striker.position, crowd.hash.position(aimed)) <=
+            range * range) {
+      target = aimed;
+    }
+  } else {
+    target =
+        crowd.hash.nearest(foe_kinds(self, own), striker.position, skill.range,
+                           [&](std::size_t other) {
+                             return foes(self, army, crowd.people.at(other),
+                                         crowd.armies.at(other));
+                           });
+  }
   if (target) {
     use(user, crowd, index, crowd.hash.position(*target),
         crowd.people.at(*target), edges, damage);
@@ -2966,15 +3078,13 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
   const std::size_t self = crowd.people.at(user);
   bool hit = false;
   if (skill.shape == Shape::TARGETED) {
-    // Only the person locked on, wherever its slot in the crowd lies.
-    for (std::size_t other = 0; locked && other < crowd.people.size();
-         ++other) {
-      if (crowd.people.at(other) == *locked &&
-          foes(self, army, *locked, crowd.armies.at(other))) {
-        damage.at(other) += body_damage;
-        strikes_.back().struck.push_back(*locked);
-        hit = true;
-      }
+    // Only the person locked on, through its slot in the crowd.
+    const std::size_t other =
+        locked && *locked < crowd.slot.size() ? crowd.slot.at(*locked) : ABSENT;
+    if (other != ABSENT && foes(self, army, *locked, crowd.armies.at(other))) {
+      damage.at(other) += body_damage;
+      strikes_.back().struck.push_back(*locked);
+      hit = true;
     }
     return hit;
   }
@@ -3111,23 +3221,29 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
                                    const Crowd& crowd) const {
   const std::size_t member = crowd.people.at(index);
   const std::int64_t reached = reach(people_.at(member), army);
-  if (army.steered || rules_.sight == 0 || reached == 0) {
-    return std::nullopt;
-  }
   const Position from = crowd.hash.position(index);
   const std::size_t own = crowd.armies.at(index);
-  // At home, it defends its village's claim; on the march, it fights what it
-  // meets.
-  const std::optional<std::size_t> home = people_.at(member).home;
-  const bool marching = !home || !claims(*home, army.order.objective);
-  const std::optional<std::size_t> foe = crowd.hash.nearest(
-      foe_kinds(member, armies_.at(own)), from, rules_.sight * CELL_SIZE,
-      [&](std::size_t other) {
-        return (marching ||
-                claims(*home, cell_of(crowd.hash.position(other)))) &&
-               foes(member, own, crowd.people.at(other),
-                    crowd.armies.at(other));
-      });
+  std::optional<std::size_t> foe;
+  if (army.order.target) {
+    // An attack intent closes on its target, whoever steers the army.
+    const std::size_t aimed = crowd.slot.at(*army.order.target);
+    foe = aimed == ABSENT ? std::nullopt : std::optional<std::size_t>{aimed};
+  } else if (army.steered || rules_.sight == 0 || reached == 0) {
+    return std::nullopt;
+  } else {
+    // At home, it defends its village's claim; on the march, it fights what
+    // it meets.
+    const std::optional<std::size_t> home = people_.at(member).home;
+    const bool marching = !home || !claims(*home, army.order.objective);
+    foe = crowd.hash.nearest(
+        foe_kinds(member, armies_.at(own)), from, rules_.sight * CELL_SIZE,
+        [&](std::size_t other) {
+          return (marching ||
+                  claims(*home, cell_of(crowd.hash.position(other)))) &&
+                 foes(member, own, crowd.people.at(other),
+                      crowd.armies.at(other));
+        });
+  }
   if (!foe) {
     return std::nullopt;
   }

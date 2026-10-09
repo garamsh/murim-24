@@ -3624,6 +3624,65 @@ TEST(World, ATargetedSkillHitsThePersonItLocksOnAlone) {
   EXPECT_EQ(hit_by(disc), (Hit{BY_EAST, BY_NORTH_EAST}));
 }
 
+// Whether the people at `first` and `second`, a user at USER_CELL casting
+// `skill` at `target`, lose health; `ally` makes the first of its faction.
+std::pair<bool, bool> struck(Skill skill, const Target& target, Cell first,
+                             Cell second, bool ally) {
+  skill.body_damage = SHAPE_DAMAGE;
+  skill.cooldown = NEVER_AGAIN;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(USER_CELL, USER_CELL, 1, TARGET_HEALTH, 0, {IDLE, skill}),
+               army(first, first, 1, TARGET_HEALTH, ally ? 0 : 1, {IDLE}),
+               army(second, second, 1, TARGET_HEALTH, 1, {IDLE})},
+              {},
+              at_war(0)};
+  world.cast(0, 1, target);
+  world.tick();
+  return {lost(world, 1) > 0, lost(world, 2) > 0};
+}
+
+TEST(World, NoShapeStrikesAnAlly) {
+  const Cell east = AROUND.at(0);
+  const Cell north_east = AROUND.at(1);
+  const Cell three_east = AROUND.at(3);
+  const Point at_east{centre_of(east)};
+  const std::int32_t wide = 3 * CELL_SIZE / 2;
+  const std::int32_t far = 6 * CELL_SIZE;
+  struct Case {
+    Skill skill;
+    Target target;
+    Cell first;
+    Cell second;
+  };
+  const std::vector<Case> cases{
+      {Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC}, at_east, east, north_east},
+      {Skill{far, CELL_SIZE / 2, 0, 0, 0, 0, Shape::LINE},
+       Point{centre_of({USER_CELL.x + 6, USER_CELL.y})}, east, three_east},
+      {Skill{ARM, wide, 0, 0, 0, 0, Shape::AREA}, at_east, east, north_east},
+      {Skill{0, wide, 0, 0, 0, 0, Shape::SELF}, Itself{}, east, north_east},
+      {Skill{ARM, 0, 0, 0, 0, 0, Shape::TARGETED}, AtPerson{1}, east,
+       north_east},
+  };
+  for (const Case& shape : cases) {
+    const auto [ally_hit, foe_hit] =
+        struck(shape.skill, shape.target, shape.first, shape.second, true);
+    EXPECT_FALSE(ally_hit) << "shape " << static_cast<int>(shape.skill.shape);
+    // Control: with both hostile, the same use strikes the first, so the
+    // ally stood where the shape reaches.
+    const auto [first_hit, second_hit] =
+        struck(shape.skill, shape.target, shape.first, shape.second, false);
+    EXPECT_TRUE(first_hit) << "shape " << static_cast<int>(shape.skill.shape);
+    // The foe beside the ally is struck by every shape that reaches past the
+    // one it aims at.
+    if (shape.skill.shape != Shape::TARGETED) {
+      EXPECT_TRUE(foe_hit) << "shape " << static_cast<int>(shape.skill.shape);
+      EXPECT_TRUE(second_hit)
+          << "shape " << static_cast<int>(shape.skill.shape);
+    }
+  }
+}
+
 TEST(World, EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck) {
   World world = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
   EXPECT_TRUE(world.strikes().empty());
@@ -3722,6 +3781,135 @@ TEST(World, APersonClosesOnAFoeInSightAndStandsToFightIt) {
   EXPECT_TRUE(in(Cell{STAND.x + SIGHT + 1, STAND.y}, apart.person(1).position));
   EXPECT_EQ(lost(apart, 0), 0U);
   EXPECT_EQ(lost(apart, 1), 0U);
+}
+
+// A steered chaser at STAND striking one foe at arm's length, a foe of
+// INTENT_FOE_HEALTH standing `apart` cells east of it, bound for `bound` cells
+// east, an ally two cells east and two north, and a foe beyond sight to the
+// east; people close on a foe within SIGHT cells. The map is `rows`.
+constexpr std::size_t CHASER = 0;
+constexpr std::size_t INTENT_FOE = 1;
+constexpr std::size_t INTENT_ALLY = 2;
+constexpr std::size_t UNSEEN_FOE = 3;
+constexpr std::uint64_t INTENT_FOE_HEALTH = 30;
+constexpr std::uint64_t INTENT_DAMAGE = 10;
+
+World intent_world(std::int32_t apart, std::int32_t bound,
+                   const std::vector<std::string>& rows) {
+  const Skill strike{ARM, 0, INTENT_DAMAGE, 0, 1, 0, Shape::TARGETED};
+  const Cell foe{STAND.x + apart, STAND.y};
+  const Cell foe_bound{STAND.x + bound, STAND.y};
+  const Cell ally{STAND.x + 2, STAND.y - 2};
+  const Cell far{STAND.x + SIGHT + 4, STAND.y + 4};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  World world{Seed{1},
+              Map{rows},
+              {army(rows, STAND, STAND, 1, TARGET_HEALTH, 0, {strike}),
+               army(rows, foe, foe_bound, 1, INTENT_FOE_HEALTH, 1, {IDLE}),
+               army(rows, ally, ally, 1, TARGET_HEALTH, 0, {IDLE}),
+               army(rows, far, far, 1, TARGET_HEALTH, 1, {IDLE})},
+              {},
+              rules};
+  world.steer(CHASER, true);
+  return world;
+}
+
+World intent_world(std::int32_t apart) {
+  return intent_world(apart, apart, open_map(OPEN_SIDE));
+}
+
+TEST(World, AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies) {
+  constexpr std::int32_t APART = 4;
+  constexpr std::uint64_t CHASE_TICKS = 300;
+  // Control: steered and holding no intent, the chaser stays on its cell and
+  // the foe beyond its reach is unhurt.
+  World idle = intent_world(APART);
+  run_ticks(idle, CHASE_TICKS);
+  EXPECT_TRUE(in(STAND, idle.person(CHASER).position));
+  EXPECT_EQ(idle.person(INTENT_FOE).health, INTENT_FOE_HEALTH);
+
+  World world = intent_world(APART);
+  world.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  ASSERT_EQ(world.target(CHASER), std::optional<std::size_t>{INTENT_FOE});
+  run_ticks(world, CHASE_TICKS);
+  // The foe stood beyond arm's length, so its death shows the chaser closed.
+  EXPECT_EQ(world.person(INTENT_FOE).health, 0U);
+  // Its target dead, the intent ends.
+  EXPECT_EQ(world.target(CHASER), std::nullopt);
+}
+
+TEST(World, AnOrderWithoutATargetEndsTheAttackIntent) {
+  constexpr std::int32_t APART = 4;
+  // Too few ticks to come within arm's length of a foe four cells away.
+  constexpr std::uint64_t APPROACH_TICKS = 10;
+  constexpr std::uint64_t AFTER_TICKS = 200;
+  World world = intent_world(APART);
+  world.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(world, APPROACH_TICKS);
+  ASSERT_FALSE(in(STAND, world.person(CHASER).position));
+  world.order(CHASER, Order{STAND, {0}});
+  EXPECT_EQ(world.target(CHASER), std::nullopt);
+  run_ticks(world, AFTER_TICKS);
+  // It walks back to its objective and never reaches the foe.
+  EXPECT_TRUE(in(STAND, world.person(CHASER).position));
+  EXPECT_EQ(world.person(INTENT_FOE).health, INTENT_FOE_HEALTH);
+}
+
+TEST(World, AnAttackIntentEndsWhenItsTargetLeavesSight) {
+  // The chaser stands walled in, so the foe walking east leaves its sight.
+  std::vector<std::string> rows = open_map(OPEN_SIDE);
+  for (std::int32_t y = STAND.y - 1; y <= STAND.y + 1; ++y) {
+    for (std::int32_t x = STAND.x - 1; x <= STAND.x + 1; ++x) {
+      const bool own = x == STAND.x && y == STAND.y;
+      rows.at(static_cast<std::size_t>(y)).at(static_cast<std::size_t>(x)) =
+          own ? '.' : '#';
+    }
+  }
+  constexpr std::int32_t APART = 3;
+  constexpr std::int32_t AWAY = 12;
+  constexpr std::uint64_t WALK_TICKS = 200;
+  World leaving = intent_world(APART, AWAY, rows);
+  leaving.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(leaving, WALK_TICKS);
+  ASSERT_GT(distance_squared(leaving.person(CHASER).position,
+                             leaving.person(INTENT_FOE).position),
+            std::int64_t{SIGHT} * CELL_SIZE * SIGHT * CELL_SIZE);
+  EXPECT_EQ(leaving.target(CHASER), std::nullopt);
+  // Control: a foe that stays in sight keeps the intent.
+  World staying = intent_world(APART, APART, rows);
+  staying.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(staying, WALK_TICKS);
+  EXPECT_EQ(staying.target(CHASER), std::optional<std::size_t>{INTENT_FOE});
+}
+
+TEST(World, AnArmyMayTargetOnlyALivingFoeInSight) {
+  World world = intent_world(4);
+  EXPECT_EQ(world.attack_refusal(CHASER, INTENT_FOE), AttackRefusal::NONE);
+  EXPECT_EQ(world.attack_refusal(CHASER, INTENT_ALLY),
+            AttackRefusal::NOT_A_FOE);
+  EXPECT_EQ(world.attack_refusal(CHASER, CHASER), AttackRefusal::NOT_A_FOE);
+  EXPECT_EQ(world.attack_refusal(CHASER, UNSEEN_FOE),
+            AttackRefusal::OUT_OF_SIGHT);
+  EXPECT_EQ(world.attack_refusal(CHASER, world.population()),
+            AttackRefusal::NO_TARGET);
+  EXPECT_THROW(world.order(CHASER, Order{STAND, {0}, INTENT_ALLY}),
+               std::invalid_argument);
+  EXPECT_EQ(world.target(CHASER), std::nullopt);
+  // Control: the foe in sight is taken.
+  world.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  EXPECT_EQ(world.target(CHASER), std::optional<std::size_t>{INTENT_FOE});
+}
+
+TEST(World, FoesInSightAreListedNearestFirst) {
+  World world = intent_world(4);
+  // The foe four cells east; the ally and the foe beyond sight are left out.
+  EXPECT_EQ(world.foes_in_sight(CHASER),
+            (std::vector<std::size_t>{INTENT_FOE}));
+  // From the foe, the ally under three cells away comes before the chaser
+  // four, though the chaser serves in an earlier army.
+  EXPECT_EQ(world.foes_in_sight(INTENT_FOE),
+            (std::vector<std::size_t>{INTENT_ALLY, CHASER}));
 }
 
 // A village whose centre is STAND, claiming 3 cells about it, with one
