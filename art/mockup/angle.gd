@@ -36,6 +36,8 @@ const STILLS := {"village": 40, "skirmish": 130}
 const LOCALES := ["ko", "en"]
 const KEPT := "user://angle_mockup.cfg"
 const SETTLE_FRAMES := 8
+# Rows of a body a house must cover, or the body cover of the house, for a depth crop.
+const DEPTH_ROWS := 12
 const WARM_UP_FRAMES := 120
 const TIMED_FRAMES := 1200
 # Waypoints each Demonic army walks in turn, by army, in cells: along the row behind village 5's
@@ -104,9 +106,10 @@ class AngleView extends Node2D:
 	## Bodies drawn in the last refresh, and how many of them something hid.
 	var drawn := 0
 	var occluded := 0
-	## Per hidden body in the last refresh: [army, person, occluder's kind, body's feet].
+	## Per hidden body in the last refresh: [army, person, occluder's kind, body's feet, rows of
+	## the body the occluder's opaque bounds cover].
 	var hidden_list: Array = []
-	## Per body standing in front of a structure it overlaps: [army, person, kind, feet].
+	## Per body standing in front of a structure it overlaps: [army, person, kind, feet, rows].
 	var front_list: Array = []
 
 	var _sheets := {}
@@ -282,14 +285,16 @@ class AngleView extends Node2D:
 			outline.visible = true
 			occluder.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 			occluded += 1
-			hidden_list.append([army, person, occluder.get_meta("kind"), body.position])
+			hidden_list.append([army, person, occluder.get_meta("kind"), body.position,
+					occluder.get_meta("solid").intersection(rect).size.y])
 
 	func _note_front(body: Sprite2D, army: int, person: int) -> void:
 		var rect := Rect2(body.position - FEET, BODY).grow(-2)
 		for occluder: Sprite2D in _near(rect):
 			if occluder.position.y < body.position.y and occluder.get_meta("kind") != "tree" \
 					and occluder.get_meta("solid").intersects(rect):
-				front_list.append([army, person, occluder.get_meta("kind"), body.position])
+				front_list.append([army, person, occluder.get_meta("kind"), body.position,
+						occluder.get_meta("solid").intersection(rect).size.y])
 
 	func _near(rect: Rect2) -> Array:
 		var found := {}
@@ -650,11 +655,11 @@ func _note_depth(image: Image) -> void:
 		if _depth.has(pair[0]):
 			continue
 		for seen: Array in pair[1]:
-			if seen[2] != "house":
+			if seen[2] != "house" or seen[4] < DEPTH_ROWS:
 				continue
 			var feet: Vector2 = seen[3]
 			var on_screen := feet - (_camera.position - Vector2(320, 180))
-			var crop := Rect2i(Vector2i(on_screen) - Vector2i(40, 52), Vector2i(80, 64))
+			var crop := Rect2i(Vector2i(on_screen) - Vector2i(48, 56), Vector2i(96, 72))
 			if not Rect2i(Vector2i.ZERO, image.get_size()).encloses(crop):
 				continue
 			var part := image.get_region(crop)
