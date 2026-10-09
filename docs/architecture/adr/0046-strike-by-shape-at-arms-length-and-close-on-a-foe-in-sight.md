@@ -54,12 +54,12 @@ Measured against `main` at `ca54aca` with the same scratch instrumentation in bo
 | The same skirmish with the Cult throwing darts: mean ticks | 1,270.6 | 271.0 |
 | Hits per dart; striker to struck at a dart's hit | 1.000; 2.81 cells | 2.373; 4.18 cells |
 | M1 scenario before it gave its people sight, 54,000 ticks: alive at the end; half its 500 dead by | 81; tick 8,339 | 342; never |
-| M1 scenario with its people's sight: the tick one side has no one left; half its 500 dead by | none within 54,000; tick 8,339 | 9,927; tick 2,653 |
-| `make sweep`, 50 seeds of 100 years: every faction peopled | 48 | 48 |
-| Wars declared, peaces made | 51, 27 | 50, 25 |
-| Deaths by a wound over the sweep | 2,629 | 2,845 |
+| M1 scenario with its people's sight of 6 cells: alive at tick 54,000; half its 500 dead by | 81; tick 8,339 | 25; tick 2,672 |
+| `make sweep`, 50 seeds of 100 years, against `main` at `b9cbde1` with the narrowed rule: every faction peopled | 48 (fails 29, 48) | 48 (fails 35, 48) |
+| Wars declared, peaces made, the same | 49, 24 | 55, 28 |
+| Deaths by a wound over the sweep, at `ca54aca` before the rule was narrowed | 2,629 | 2,845 |
 
-- At arm's length the M1 scenario's lines stood two cells apart across their barricade and struck 6.6 times a tick, against 16.0 on `main`, so `make bench` no longer timed the worst case. The scenario now gives its people, none of whom has a home, the region's sight of 6 cells, so the lines close through the gaps between the barrels and fight at arm's length while the casters still break the barricade, and the benchmark fails its setup below 16 strikes a tick. Measured with `make bench` on the development Mac on AC power on 2026-10-09: `main` 15.98 strikes a tick, tick p99 0.578 ms, frame p99 9.320 ms, and with the scenario's sight 18.42, 1.642 ms and 11.728 ms, run one after the other; earlier that day, this change before the scenario's sight 6.56, 0.434 ms and 7.524 ms. Engaging costs every person a query within its sight each tick, most of the tick's rise.
+- At arm's length the M1 scenario's lines stood two cells apart across their barricade and struck 6.6 times a tick, against 16.0 on `main`, so `make bench` no longer timed the worst case. The scenario now gives its people, none of whom has a home, the region's sight of 6 cells, so the lines close through the gaps between the barrels and fight at arm's length while the casters still break the barricade, and the benchmark fails its setup below 16 strikes a tick. Measured with `make bench` on the development Mac on AC power on 2026-10-09: before the scenario's sight, this change made 6.56 strikes a tick at a tick p99 of 0.434 ms and a frame p99 of 7.524 ms; with it, at `c83cec7`, 18.06 strikes a tick, 2.007 ms and 10.937 ms, where `main` at `b9cbde1` made 15.98 at 0.584 ms. Engaging costs every person a query within its sight each tick, most of the tick's rise.
 - A dart now pierces everyone along its line, so a band throwing darts ends a skirmish in a quarter of the time. That is a balance question for the arts' data, not the rule.
 - `run_crossing`'s pinned hash is unchanged: its skills are areas and its rules give no sight, and both are folded only when set. The region's hashes change.
 - A save holds each skill's shape and the rules' sight, so `SAVE_VERSION` rises to 9, after ADR 0040's 8, and every earlier save is refused.
