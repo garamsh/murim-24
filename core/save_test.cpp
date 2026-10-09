@@ -485,6 +485,28 @@ World talkers(std::int32_t reach) {
       rules};
 }
 
+// talkers(3) under a bound of `bound` people.
+World bounded(std::size_t bound) {
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.talk_reach = 3;
+  rules.people_bound = bound;
+  return World{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{3, 1}, {Recruit{{3, 1}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      rules};
+}
+
+TEST(Save, ALoadedWorldKeepsItsPeopleBound) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, bounded(2)}, store, SLOT));
+  EXPECT_EQ(loaded(load(store, SLOT)).world.hash(), bounded(2).hash());
+  // Control: the bound is what tells the two apart.
+  EXPECT_NE(bounded(2).hash(), bounded(MAX_PEOPLE).hash());
+}
+
 TEST(Save, ALoadedWorldKeepsItsTalkReach) {
   MemorySaves store;
   ASSERT_TRUE(save(Saved{std::nullopt, talkers(3)}, store, SLOT));
