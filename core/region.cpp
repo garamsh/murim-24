@@ -644,7 +644,7 @@ RegionData region_data() {
   // centre; and a torch that burns them, where they belong to a faction its
   // user is hostile to.
   constexpr std::uint64_t GUARD_COOLDOWN = 15;
-  constexpr std::uint64_t GUARD_DAMAGE = 10;
+  constexpr std::uint64_t GUARD_DAMAGE = 15;
   constexpr Skill GUARD{MELEE,          0, GUARD_DAMAGE,   0,
                         GUARD_COOLDOWN, 0, Shape::TARGETED};
   constexpr std::int32_t MEND_REACH = 10;
