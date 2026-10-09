@@ -33,13 +33,13 @@ Facts from `main` at `aff1434`:
 - **The arts panel** (#161) opens with K. The keys the HUD and play scene bind are C, E, F, G, K, M, Q, R, T, W, X and Z, so L is free.
 - **Pending designs.**
   - ADR 0049 renames realms, qi and the heart method to general words.
-  - The open PR #215's ADR 0050 makes an art's skill need its discipline's weapon family.
+  - An art's skill needs its discipline's weapon family, as the owner decided on #211. The open PR #215's ADR 0050 designs it.
   - ADR 0046 gave each skill a shape. Issue #183 is done.
 
 Options weighed:
 
 - **Family and tier.** Each art gains a `family` and a `tier`, pack data (ADR 0049).
-  - A family names its discipline, the talent axis it practises. It also names the weapon family its skills need, or none, under #215's ADR 0050 when that lands.
+  - A family names its discipline, the talent axis it practises. It also names the weapon family its skills need, or none, as the owner decided on #211.
   - The base pack's families:
 
     | Family | Discipline | Weapon |
