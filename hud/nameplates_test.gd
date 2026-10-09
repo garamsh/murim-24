@@ -53,6 +53,14 @@ const PEOPLE: Array[Dictionary] = [
 	{"cell": Vector2i(19, 12), "faction": HOSTILE},
 ]
 const PAST_REACH := 7
+# The colour each relation is named in, as the PM approved them on PR #199.
+const COLOURS := {
+	WorldAdapter.RELATION_OWN: Palette.JADE_2,
+	WorldAdapter.RELATION_ALLY: Palette.JADE_2,
+	WorldAdapter.RELATION_NEUTRAL: Palette.PAPER_1,
+	WorldAdapter.RELATION_HOSTILE: Palette.CRIMSON_4,
+	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_4,
+}
 
 
 func run() -> bool:
@@ -99,7 +107,7 @@ func _colours_pass() -> bool:
 			faults.append("person %d tinted %s" % [person, _tint(art, art.body_at(person, 0, 1.0))])
 		if person == PAST_REACH:
 			continue
-		if near.get(person, -2) != relation or named.get(person) != Nameplates.COLOURS[relation]:
+		if near.get(person, -2) != relation or named.get(person) != COLOURS[relation]:
 			faults.append("person %d near as %s, named in %s" % [person, near.get(person), named.get(person)])
 	if _tint(art, lead) != Color.WHITE:
 		faults.append("the viewer tinted")
