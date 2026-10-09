@@ -1,5 +1,6 @@
 #!/bin/sh
-# Redraws the mockup sources from their scripts and exports each at native size and at 4x.
+# Redraws the mockup sources from their scripts and exports each at native size and at 4x, then
+# redraws and exports the 2.5D angle's sheets under angle/.
 # Run from anywhere: art/mockup/build.sh [path to aseprite]
 set -eu
 
@@ -12,4 +13,18 @@ for name in target_screen lineup_sheet genealogy_panel sect_panel title_screen n
 	"$aseprite" --batch --script "$name.lua"
 	"$aseprite" --batch "$name.aseprite" --save-as "$name.png"
 	"$aseprite" --batch "$name.aseprite" --scale 4 --save-as "${name}_4x.png"
+done
+
+# The 2.5D angle of #200: sheets with their frames and tags, as the production set is exported.
+for script in terrain structures bodies effects buildings mountains; do
+	"$aseprite" --batch --script "angle/$script.lua"
+done
+for name in terrain faces trees house hall storehouse manual_hall granary well seat_gate barrels fence \
+	training_ground orthodox demonic villager marks qi pillar dust debris tiled_house tiled_house_big ancestral_hall \
+	thatched_house thatched_small inn shrine pavilion guardian village_gate stall_red stall_blue stall_amber watchtower \
+	stilt_house pier boat wall_h wall_v town_gate stone_wall brush_fence well_square crocks laundry cart haystack \
+	firewood lantern bush boulder mountains water_house water_house_big arch_bridge adobe_house adobe_small pagoda \
+	cult_hall; do
+	"$aseprite" --batch "angle/$name.aseprite" --sheet "angle/$name.png" --data "angle/$name.json" --format json-array \
+		--list-tags
 done

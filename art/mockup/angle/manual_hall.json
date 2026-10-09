@@ -1,0 +1,53 @@
+{ "frames": [
+   {
+    "filename": "manual_hall 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 80, "h": 116 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 80, "h": 116 },
+    "sourceSize": { "w": 80, "h": 116 },
+    "duration": 1000
+   },
+   {
+    "filename": "manual_hall 1.aseprite",
+    "frame": { "x": 80, "y": 0, "w": 80, "h": 116 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 80, "h": 116 },
+    "sourceSize": { "w": 80, "h": 116 },
+    "duration": 1000
+   },
+   {
+    "filename": "manual_hall 2.aseprite",
+    "frame": { "x": 160, "y": 0, "w": 80, "h": 116 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 80, "h": 116 },
+    "sourceSize": { "w": 80, "h": 116 },
+    "duration": 1000
+   },
+   {
+    "filename": "manual_hall 3.aseprite",
+    "frame": { "x": 240, "y": 0, "w": 80, "h": 116 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 80, "h": 116 },
+    "sourceSize": { "w": 80, "h": 116 },
+    "duration": 1000
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.18.6-arm64",
+  "image": "manual_hall.png",
+  "format": "RGBA8888",
+  "size": { "w": 320, "h": 116 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "intact", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
+   { "name": "damaged", "from": 1, "to": 1, "direction": "forward", "color": "#000000ff" },
+   { "name": "destroyed", "from": 2, "to": 2, "direction": "forward", "color": "#000000ff" },
+   { "name": "rubble", "from": 3, "to": 3, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}
