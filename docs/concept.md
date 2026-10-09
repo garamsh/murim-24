@@ -214,7 +214,7 @@ Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 a
 - **Warehouses.** Villages keep warehouses run by keepers, sects keep vaults, and factions keep treasuries. A destroyed warehouse scatters its contents on the ground, and whoever picks an item up owns it. A soldier at war picks it up as loot for its faction, which sells it.
 - **Caves are the player's alone.** Only the player finds and enters caves. A cave is hidden until the player searches near it or steps on it, and its cache is the player's. Some caves hold treasure. The player's soul keeps its warehouses and caches through rebirth.
 - **People earn to eat and to keep their families.** The household is the unit, with a purse. Earners feed dependants, buy their rations, keep their house and their tools, and buy gear as their roles need.
-  - Failing to earn brings hunger, a debt to kin, selling one's gear, then leaving for a richer town.
+  - Failing to earn brings, in turn, a debt to kin, selling one's gear, then hunger, then leaving for a richer town. People borrow and sell before they starve.
 - **Markets from needs.** Each town has a market whose prices move with stock against demand. Merchant houses send caravans to buy where it is cheap and sell where it is dear.
 - **Taxes and treasuries.** The power holding the land taxes trade, households and caravans at its gates, and sects take dues. Treasuries pay for wars. A faction that cannot pay loses soldiers and seeks peace sooner, and a rich one can arm and march more.
 - **The tax rate follows the treasury's needs.** A leader raises it when war or upkeep demands and lowers it on a surplus. A player who leads sets it by hand.
