@@ -1,6 +1,6 @@
 # ADR 0045: Set the population bound by measuring a Central Plains scenario on PC
 
-> Status: proposed
+> Status: proposed; its range of 2,000 to 5,000, its 512-cell world and its one tier set for every platform superseded by ADR-0048
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
