@@ -39,6 +39,8 @@ func _process(_delta: float) -> bool:
 		var combat: Node2D = _view.get_node("WorldArt/Combat")
 		_uses_drawn += combat.shown_strikes(Time.get_ticks_msec()).size()
 		_numbers_drawn += combat.shown_numbers(Time.get_ticks_msec()).size()
+		# The next frame is timed from here, so counting what this one drew is not timed.
+		now = Time.get_ticks_usec()
 	_last_usec = now
 	if _times.size() == TIMED_FRAMES:
 		_report()
