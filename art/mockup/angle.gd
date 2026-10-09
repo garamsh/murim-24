@@ -41,6 +41,33 @@ const SETTLE_FRAMES := 8
 const DEPTH_ROWS := 12
 const WARM_UP_FRAMES := 120
 const TIMED_FRAMES := 1200
+# The levelling skill: village 5 of the region, LEVEL_PEOPLE people round it in LEVEL_ARMIES
+# armies, each of LEVEL_HEALTH, and a caster south of it. Each structure cell holds
+# LEVEL_DURABILITY, its stages' floors LEVEL_FLOORS; the skill takes LEVEL_SKILL's damage from
+# every person and structure within its radius, LEVEL_RADIUS cells, so three casts, at
+# LEVEL_CASTS seconds, take the village from intact to rubble and its people from whole to dead.
+const LEVEL_VILLAGE := 4
+const LEVEL_PEOPLE := 60
+const LEVEL_ARMIES := 6
+const LEVEL_HEALTH := 100
+const LEVEL_RADIUS := 11
+const LEVEL_DURABILITY := 100
+const LEVEL_FLOORS := [80, 50, 20]
+const LEVEL_SKILL := {"range": 24 * 256, "radius": LEVEL_RADIUS * 256, "body_damage": 40, "structure_damage": 30,
+		"cooldown": 15}
+const IDLE_SKILL := {"range": 0, "radius": 0, "body_damage": 0, "structure_damage": 0, "cooldown": 0}
+const LEVEL_CASTER := Vector2i(30, 64)
+const LEVEL_CASTS := [2.3, 2.9, 3.5]
+const LEVEL_BLADES := 40
+const BLADE_FALL := 0.3
+const BLADE_DROP := 140.0
+const SHAKE := 4.0
+const SHAKE_SECONDS := 0.35
+# Where the camera centres, in cells, at 3x and pulled back to 2x.
+const LEVEL_FOCUS := Vector2(31.5, 50.0)
+const LEVEL_WIDE := Vector2(31.5, 55.0)
+const LEVEL_FPS := 15
+const LEVEL_SECONDS := 8.0
 # The bench's pan: the camera round PAN's corners, in cells, at PAN_SPEED cells a second.
 const PAN := [Vector2(26, 46), Vector2(100, 46), Vector2(100, 100), Vector2(26, 100)]
 const PAN_SPEED := 20.0
@@ -79,6 +106,9 @@ var _since_tick := 0.0
 var _bench_frames := 0
 var _pan_seconds := 0.0
 var _driver: Driver
+var _level: Leveller
+var _level_ticks := 0
+var _level_window := PackedFloat64Array()
 
 
 ## The world in the 2.5D projection, streamed by chunks of CHUNK x CHUNK cells: a chunk's ground
@@ -138,8 +168,14 @@ class AngleView extends Node2D:
 	var freed := 0
 	var most_resident := 0
 	var ground_bytes := 0
+	## Chunks built again since a structure on them changed stage.
+	var rebuilt := 0
 	## How long each chunk took to build, in microseconds.
 	var build_usec := PackedInt64Array()
+
+	## Effects drawn on the ground under everything standing, and over all of it.
+	var under := Node2D.new()
+	var over := Node2D.new()
 
 	var _stage_of := Callable()
 	var _sheets := {}
@@ -171,9 +207,17 @@ class AngleView extends Node2D:
 		_ground.y_sort_enabled = true
 		add_child(_ground)
 		add_child(_shadows)
+		add_child(under)
 		_standing.y_sort_enabled = true
 		add_child(_standing)
+		add_child(over)
 		add_child(_chevron)
+
+	## A frame of one of EFFECTS' sheets, loaded the first time it is asked for.
+	func effect(sheet: String, tag: String, index: int) -> AtlasTexture:
+		if not _sheets.has(sheet):
+			_sheets[sheet] = _load(sheet)
+		return _frame(sheet, tag, index)
 
 	## Reads `shown`'s bodies, and `drawn_from`'s terrain, villages and structures (`shown`'s when
 	## null); a structure is drawn at the stage `stage_of` gives its entry, or the world's.
@@ -235,11 +279,21 @@ class AngleView extends Node2D:
 	## `between` of the way from the tick before last to the last, at `now_ms`.
 	func refresh(view: Rect2, between: float, now_ms: int) -> void:
 		_stream(view)
+		# A chunk whose structures changed stage is built again, its shadows with them.
+		var restaged := {}
+		for key: Vector2i in _chunks:
+			for sprite: Sprite2D in _chunks[key].occluders:
+				if sprite.has_meta("stages") and _stage(sprite.get_meta("entry")) != sprite.get_meta("stage"):
+					for next: Vector2i in [key, key + Vector2i(1, 0), key + Vector2i(0, 1)]:
+						if _chunks.has(next):
+							restaged[next] = true
+		for key: Vector2i in restaged:
+			_free_chunk(key)
+			_build_chunk(key)
+			rebuilt += 1
 		for key: Vector2i in _chunks:
 			for sprite: Sprite2D in _chunks[key].occluders:
 				sprite.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
-				if sprite.has_meta("stages"):
-					sprite.texture = sprite.get_meta("stages")[_stage(sprite.get_meta("entry"))]
 		for pool: Array in _xray_pool.values():
 			for sprite: Sprite2D in pool:
 				sprite.visible = false
@@ -373,14 +427,16 @@ class AngleView extends Node2D:
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
 				for entry: Dictionary in _structures_in.get(key + Vector2i(dx, dy), []):
-					if entry.kind in GROUND_KINDS:
+					# The shadow shortens as the structure falls, and rubble casts none.
+					var reach: int = [6, 6, 3, 0][_stage(entry)]
+					if entry.kind in GROUND_KINDS or reach == 0:
 						continue
 					var left: int = entry.corner.x * int(CELL.x)
 					var top: int = entry.corner.y * int(CELL.y)
 					var right: int = (entry.corner.x + entry.size.x) * int(CELL.x)
 					var bottom: int = (entry.corner.y + entry.size.y) * int(CELL.y)
-					_dither(image, Rect2i(right, top + 6, 6, bottom - top - 2), top_left)
-					_dither(image, Rect2i(left + 6, bottom, right - left, 3), top_left)
+					_dither(image, Rect2i(right, top + reach, reach, bottom - top - 2), top_left)
+					_dither(image, Rect2i(left + reach, bottom, right - left, reach / 2), top_left)
 		var occluders: Array[Sprite2D] = []
 		var trees := _trees(Rect2i(origin - Vector2i.ONE, Vector2i(CHUNK + 2, CHUNK + 2)))
 		for tree: Array in trees:
@@ -406,7 +462,8 @@ class AngleView extends Node2D:
 				stages.append(_frame(entry.kind, stage if _sheets[entry.kind].tags.has(stage) else "intact", 0))
 			sprite.set_meta("stages", stages)
 			sprite.set_meta("entry", entry)
-			sprite.texture = stages[_stage(entry)]
+			sprite.set_meta("stage", _stage(entry))
+			sprite.texture = stages[sprite.get_meta("stage")]
 			sprite.centered = false
 			var frame_size := sprite.texture.get_size()
 			sprite.offset = Vector2(-8, -(frame_size.y - 8))
@@ -681,10 +738,254 @@ class Driver extends RefCounted:
 		world.order(army, cell, skills)
 
 
+## A high-realm skill levelling a whole village, resolved by the core. The world is made with
+## WorldAdapter.create from SEED's region: its map, a structure on every cell of each building's
+## footprint, LEVEL_PEOPLE Demonic people in LEVEL_ARMIES armies on the free cells round village
+## LEVEL_VILLAGE, and an Orthodox caster at LEVEL_CASTER whose skill reaches LEVEL_RADIUS cells
+## round the village's centre. It casts at each of LEVEL_CASTS, and the core resolves each cast on
+## the next tick: the people it reaches lose health, and each structure durability, its stage
+## following LEVEL_FLOORS. The view draws a building at the stage most of its cells are in, the
+## worse on a tie. Around the casts it pulls the camera back from 3x to 2x, raises a pillar of qi
+## over the village, drops blades of sword qi on it, and at each impact rings the ground, raises
+## dust and throws debris from each building the cast staged down, and shakes the camera.
+class Leveller extends RefCounted:
+	var region: WorldAdapter
+	var world: WorldAdapter
+	var view: AngleView
+	var target := Vector2.ZERO
+	var caster := 0
+	## The people of the village, by id, with their health before the first cast.
+	var villagers := {}
+	var casts_given := 0
+	var _cells_of := {}
+	var _ring: RingFx
+	var _pillar: Sprite2D
+	var _blades: Array = []
+	var _bursts: Array = []
+	var _impacts: Array[float] = []
+	var _stages := {}
+
+	func _init() -> void:
+		region = WorldAdapter.create_region(SEED, 0, TICKS_PER_DAY)
+		var village: Dictionary = region.villages()[LEVEL_VILLAGE]
+		var corner: Vector2i = village.corner
+		var area: Vector2i = village.area
+		target = (Vector2(corner) + Vector2(area) / 2.0) * WorldAdapter.CELL_SIZE
+		var rows := region.map_rows()
+		var taken := {}
+		var structures: Array[Dictionary] = []
+		for structure in region.structure_count():
+			if region.structure_field_state(structure) >= 0:
+				continue
+			var cells: Array[int] = []
+			var at := region.structure_cell(structure)
+			var size := region.structure_footprint(structure)
+			for dx in size.x:
+				for dy in size.y:
+					taken[at + Vector2i(dx, dy)] = true
+					cells.append(structures.size())
+					structures.append({"cell": at + Vector2i(dx, dy), "durability": LEVEL_DURABILITY})
+			_cells_of[structure] = cells
+		var free: Array[Vector2i] = []
+		var around := Rect2i(corner - Vector2i(2, 2), area + Vector2i(4, 4))
+		for y in range(around.position.y, around.end.y):
+			for x in range(around.position.x, around.end.x):
+				if rows[y][x] == "." and not taken.has(Vector2i(x, y)):
+					free.append(Vector2i(x, y))
+		var armies: Array[Dictionary] = [{"objective": LEVEL_CASTER, "faction": 0, "skills": [IDLE_SKILL, LEVEL_SKILL],
+				"members": [{"cell": LEVEL_CASTER, "health": 1000}]}]
+		var stride := maxf(1.0, float(free.size()) / LEVEL_PEOPLE)
+		for n in LEVEL_ARMIES:
+			var members: Array[Dictionary] = []
+			for k in LEVEL_PEOPLE / LEVEL_ARMIES:
+				var cell := free[int((k * LEVEL_ARMIES + n) * stride) % free.size()]
+				members.append({"cell": cell, "health": LEVEL_HEALTH})
+			armies.append({"objective": members[0].cell, "faction": 1, "skills": [IDLE_SKILL], "members": members})
+		world = WorldAdapter.create(SEED, rows, armies, structures, {"separation": 0,
+				"hostile": [[false, true], [true, false]], "stage_floors": LEVEL_FLOORS})
+		caster = world.roster(0)[0]
+		for army in world.army_count():
+			world.order(army, Vector2i(world.body_positions(army)[0] / WorldAdapter.CELL_SIZE), PackedInt64Array([0]))
+		# The village's people go about it before the strike: each army to a cell of its own.
+		for army in range(1, world.army_count()):
+			world.order(army, free[(army * 37) % free.size()], PackedInt64Array([0]))
+		for army in range(1, world.army_count()):
+			for person in world.roster(army):
+				villagers[person] = world.person_health(person)
+
+	## Lays the view out over the region's look, the stages read from this world.
+	func show(on: AngleView) -> void:
+		view = on
+		view.show_world(world, 0, true, region, _stage_of)
+		_ring = RingFx.new()
+		view.under.add_child(_ring)
+		_pillar = Sprite2D.new()
+		_pillar.centered = false
+		_pillar.offset = Vector2(-24, -186)
+		_pillar.position = view.to_screen(target).round()
+		_pillar.visible = false
+		view.over.add_child(_pillar)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = SEED
+		for landing: float in LEVEL_CASTS:
+			for n in LEVEL_BLADES:
+				var angle := rng.randf() * TAU
+				var reach := sqrt(rng.randf()) * LEVEL_RADIUS
+				var at := view.to_screen(target + Vector2(cos(angle), sin(angle)) * reach * WorldAdapter.CELL_SIZE).round()
+				var blade := Sprite2D.new()
+				blade.centered = false
+				blade.offset = Vector2(-8, -44)
+				blade.visible = false
+				view.over.add_child(blade)
+				_blades.append({"sprite": blade, "at": at, "land": landing - rng.randf() * 0.12})
+
+	## Whether a cast should be given before the tick that lands at `seconds`, and gives it.
+	func cast_before(seconds: float) -> void:
+		if casts_given < LEVEL_CASTS.size() and seconds >= LEVEL_CASTS[casts_given]:
+			world.cast(caster, 1, target)
+			casts_given += 1
+
+	## After a tick: an impact for each building the tick staged down, and the shake.
+	func note_tick(seconds: float) -> void:
+		var staged := []
+		for structure: int in _cells_of:
+			var stage := _stage_of({"id": structure})
+			if stage > _stages.get(structure, 0):
+				staged.append(structure)
+			_stages[structure] = stage
+		if staged.is_empty():
+			return
+		_impacts.append(seconds)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = SEED + _impacts.size()
+		for structure: int in staged:
+			var at := region.structure_cell(structure)
+			var size := region.structure_footprint(structure)
+			var foot := Vector2((at.x + size.x / 2.0) * AngleView.CELL.x, (at.y + size.y) * AngleView.CELL.y)
+			var dust := Sprite2D.new()
+			dust.centered = false
+			dust.offset = Vector2(-24, -28)
+			dust.position = foot
+			view.over.add_child(dust)
+			_bursts.append({"sprite": dust, "from": seconds, "kind": "dust"})
+			for n in 2 + size.x:
+				var shard := Sprite2D.new()
+				shard.centered = false
+				shard.offset = Vector2(-4, -4)
+				view.over.add_child(shard)
+				_bursts.append({"sprite": shard, "from": seconds, "kind": "shard",
+						"at": foot - Vector2(rng.randf_range(-size.x, size.x) * 6, 20),
+						"velocity": Vector2(rng.randf_range(-70, 70), rng.randf_range(-150, -80))})
+
+	## Draws the effects at `seconds` into the sequence, and returns the camera: [zoom, centre].
+	func update(seconds: float) -> Array:
+		var rise := 1.2
+		var fall := 4.4
+		_pillar.visible = seconds >= rise and seconds < fall + 0.5
+		if _pillar.visible:
+			var index := mini(int((seconds - rise) / 0.08), 5)
+			if seconds >= fall:
+				index = maxi(5 - int((seconds - fall) / 0.08), 0)
+			elif index == 5:
+				index = 4 + int(seconds / 0.08) % 2
+			_pillar.texture = view.effect("pillar", "rise", index)
+		for blade: Dictionary in _blades:
+			var sprite: Sprite2D = blade.sprite
+			var left: float = blade.land - seconds
+			sprite.visible = left >= 0.0 and left < BLADE_FALL
+			if sprite.visible:
+				sprite.position = blade.at - Vector2(0, round(BLADE_DROP * left / BLADE_FALL))
+				sprite.texture = view.effect("qi", "fall", int(seconds / 0.06) % 4)
+		for burst: Dictionary in _bursts:
+			var sprite: Sprite2D = burst.sprite
+			var age: float = seconds - burst.from
+			if burst.kind == "dust":
+				sprite.visible = age < 0.6
+				if sprite.visible:
+					sprite.texture = view.effect("dust", "puff", mini(int(age / 0.12), 4))
+			else:
+				sprite.visible = age < 0.6
+				if sprite.visible:
+					var v: Vector2 = burst.velocity
+					sprite.position = (burst.at + v * age + Vector2(0, 360) * age * age).round()
+					sprite.texture = view.effect("debris", "shard", int(age / 0.08) % 4)
+		var ring_age := INF
+		var shake := 0.0
+		for impact in _impacts:
+			if seconds >= impact:
+				ring_age = minf(ring_age, seconds - impact)
+				shake = maxf(shake, SHAKE * maxf(0.0, 1.0 - (seconds - impact) / SHAKE_SECONDS))
+		_ring.show_ring(view.to_screen(target).round(), Vector2(LEVEL_RADIUS * AngleView.CELL.x,
+				LEVEL_RADIUS * AngleView.CELL.y), ring_age)
+		var pull := smoothstep(1.0, 1.8, seconds) - smoothstep(5.0, 5.8, seconds)
+		var zoom := lerpf(3.0, 2.0, pull)
+		var centre := LEVEL_FOCUS.lerp(LEVEL_WIDE, pull) * AngleView.CELL
+		var offset := Vector2(round(sin(seconds * 97.0) * shake), round(cos(seconds * 71.0) * shake))
+		return [zoom, centre.round() + offset]
+
+	## People of the village the casts reached, and those of them dead.
+	func hit() -> Array[int]:
+		var reached := 0
+		var dead := 0
+		for person: int in villagers:
+			var health := world.person_health(person)
+			if health < villagers[person]:
+				reached += 1
+			if health <= 0:
+				dead += 1
+		return [reached, dead]
+
+	func stages() -> Dictionary:
+		var counts := {}
+		for structure: int in _cells_of:
+			var key: String = AngleView.STAGES[_stage_of({"id": structure})]
+			counts[key] = counts.get(key, 0) + 1
+		return counts
+
+	func _stage_of(entry: Dictionary) -> int:
+		var count := [0, 0, 0, 0]
+		for cell: int in _cells_of.get(entry.id, []):
+			count[clampi(world.structure_stage(cell), 0, 3)] += 1
+		var best := 0
+		for stage in 4:
+			if count[stage] >= count[best]:
+				best = stage
+		return best
+
+
+## The impact's ring on the ground: an ellipse of azure pixels growing to the skill's reach,
+## thinning by dithering as it ages.
+class RingFx extends Node2D:
+	const COLOURS := [Color("f4f1e6"), Color("a8d0f5"), Color("5b9ae0")]
+	var _centre := Vector2.ZERO
+	var _radii := Vector2.ZERO
+	var _age := INF
+
+	func show_ring(centre: Vector2, radii: Vector2, age: float) -> void:
+		_centre = centre
+		_radii = radii
+		_age = age
+		queue_redraw()
+
+	func _draw() -> void:
+		if _age > 0.5:
+			return
+		var grow := minf(1.0, _age / 0.2)
+		var thin := maxf(0.0, (_age - 0.2) / 0.3)
+		for band in 3:
+			var r := _radii * grow * (1.0 - band * 0.04)
+			var steps := maxi(int(TAU * r.x), 16)
+			for n in steps:
+				var angle := TAU * n / steps
+				var at := (_centre + Vector2(cos(angle) * r.x, sin(angle) * r.y)).floor()
+				if posmod(int(at.x) * 7 + int(at.y) * 3, 10) >= int(thin * 10):
+					draw_rect(Rect2(at, Vector2(2, 1)), COLOURS[band])
+
+
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
-	if args.size() < 2 or not args[1] in ["frames", "stills", "bench"]:
-		printerr("angle: usage: -- <dir> frames|stills|bench [m1] [pan] [flat] [solid]")
+	if args.size() < 2 or not args[1] in ["frames", "stills", "bench", "level"]:
+		printerr("angle: usage: -- <dir> frames|stills|level|bench [m1|level] [pan] [flat] [solid]")
 		quit(2)
 		return
 	_dir = args[0]
@@ -699,6 +1000,18 @@ func _initialize() -> void:
 		for still: String in STILLS:
 			for locale: String in LOCALES:
 				_shots.append({"still": still, "locale": locale})
+	elif _mode == "level" or (_mode == "bench" and "level" in _flags):
+		if _mode == "bench":
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		DisplayServer.window_set_size(Vector2i(1920, 1080))
+		DirAccess.make_dir_recursive_absolute(_dir.path_join("level"))
+		_level = Leveller.new()
+		_view = AngleView.new()
+		root.add_child(_view)
+		_level.show(_view)
+		_camera = Camera2D.new()
+		root.add_child(_camera)
+		_place_camera(_level.update(0.0))
 	elif _mode == "bench":
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		DisplayServer.window_set_size(Vector2i(1920, 1080))
@@ -776,9 +1089,87 @@ func _process(delta: float) -> bool:
 			return _frames()
 		"stills":
 			return _stills()
+		"level":
+			return _level_frames()
 		"bench":
-			return _bench(delta)
+			return _level_bench(delta) if _level != null else _bench(delta)
 	return false
+
+
+func _place_camera(placed: Array) -> void:
+	_camera.zoom = Vector2(placed[0], placed[0])
+	_camera.position = placed[1]
+
+
+# Runs the levelling world's ticks up to `seconds`, a cast given before the tick it lands on.
+func _level_to(seconds: float) -> void:
+	while _level_ticks < int(seconds * WorldAdapter.TICKS_PER_SECOND):
+		var at := float(_level_ticks + 1) / WorldAdapter.TICKS_PER_SECOND
+		_level.cast_before(at + 1.0 / WorldAdapter.TICKS_PER_SECOND)
+		_level.world.tick()
+		_level_ticks += 1
+		_view.note_tick()
+		_level.note_tick(at)
+
+
+# The levelling sequence, LEVEL_FPS frames a second for LEVEL_SECONDS, at 1920x1080 without the
+# HUD: <dir>/level/frame_<n>.png.
+func _level_frames() -> bool:
+	if _frame == 1:
+		_view.refresh(_view_rect(), 1.0, 0)
+		return false
+	var n := _frame - 2
+	var seconds := float(n) / LEVEL_FPS
+	_level_to(seconds)
+	_place_camera(_level.update(seconds))
+	_view.refresh(_view_rect(), 1.0, int(seconds * 1000))
+	RenderingServer.force_draw(false)
+	root.get_texture().get_image().save_png(_dir.path_join("level/frame_%03d.png" % n))
+	if n % 15 == 0:
+		print("angle: level frame %d at %.2f s, zoom %.2f, %d chunks, villagers reached and dead %s, stages %s" % [
+				n, seconds, _camera.zoom.x, _view.resident, _level.hit(), _level.stages()])
+	if seconds >= LEVEL_SECONDS:
+		print("angle: level done, %d casts, villagers reached and dead %s, stages %s" % [_level.casts_given,
+				_level.hit(), _level.stages()])
+		quit(0)
+		return true
+	return false
+
+
+# The levelling sequence in real time, vsync off, every frame timed; the frames from the
+# pull-back to the camera's return are timed again on their own.
+func _level_bench(delta: float) -> bool:
+	var now := Time.get_ticks_usec()
+	_bench_frames += 1
+	if _bench_frames <= 2:
+		_view.refresh(_view_rect(), 1.0, 0)
+		_last_usec = now
+		return false
+	_pan_seconds += delta
+	var seconds := _pan_seconds
+	_level_to(seconds)
+	_place_camera(_level.update(seconds))
+	_view.refresh(_view_rect(), fmod(seconds * WorldAdapter.TICKS_PER_SECOND, 1.0), int(seconds * 1000))
+	var time := (now - _last_usec) / 1000.0
+	_last_usec = now
+	_times.append(time)
+	if seconds >= 1.0 and seconds < 6.0:
+		_level_window.append(time)
+	if seconds < LEVEL_SECONDS:
+		return false
+	for pair: Array in [["whole sequence", _times], ["pull-back to return, 1.0 to 6.0 s", _level_window]]:
+		var sorted: PackedFloat64Array = pair[1].duplicate()
+		sorted.sort()
+		print("angle bench: levelling, %s: %d frames, p50 %.3f ms, p99 %.3f ms, max %.3f ms" % [pair[0],
+				sorted.size(), sorted[sorted.size() / 2], sorted[ceili(sorted.size() * 0.99) - 1], sorted[-1]])
+	print("angle bench: levelling, window %s, vsync off, %s, Godot %s; %d casts; villagers reached and dead %s of %d; stages %s" % [
+			DisplayServer.window_get_size(), RenderingServer.get_video_adapter_name(),
+			Engine.get_version_info().string, _level.casts_given, _level.hit(), _level.villagers.size(),
+			_level.stages()])
+	print("angle bench: levelling, chunks %d resident now, %d at most, %d built, %d of them again on a stage change; ground images %d bytes" % [
+			_view.resident, _view.most_resident, _view.built, _view.rebuilt, _view.ground_bytes])
+	quit(0)
+	return true
 
 
 # One frame of the sequence each process frame, drawn before it is read, so a capture holds it

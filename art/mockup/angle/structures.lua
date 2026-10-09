@@ -1,7 +1,9 @@
 -- Draws the village's and the seat's structures at the 2.5D angle of #200: the ground seen from
 -- above at 12 pixels a cell deep and 16 wide, fronts and roofs standing up from it, light from
--- the upper left. One intact frame each, tagged intact. Every frame holds its footprint's
--- bottom-left corner at (8, height - 8), with what rises above the footprint in the rows above.
+-- the upper left. Four frames each, tagged intact, damaged, destroyed and rubble as the core's
+-- structure stages, the training ground's intact alone, since it is laid with the ground. Every
+-- frame holds its footprint's bottom-left corner at (8, height - 8), with what rises above the
+-- footprint in the rows above.
 -- The cast shadow is not in the frame; the mockup darkens the ground under it.
 -- Run: aseprite --batch --script art/mockup/angle/structures.lua
 
@@ -123,23 +125,138 @@ local function building(cv, left, base, w, d, wall, ridge, windows, opts)
   return eave, ridge_y, back
 end
 
-local function save(name, cv)
-  cv:outline(0, 0, cv.w, cv.h, INK)
-  px.save_frames(cv.w, cv.h, { cv }, { { "intact", 1, 1, 1000 } }, here .. "/" .. name .. ".aseprite")
+-- The damage stages, drawn from the intact frame and the footprint, w x d cells, at (8, H - 8):
+-- damaged holes the roof down to its rafters, scorches the front and drops tiles before it;
+-- destroyed keeps the plinth and ragged stumps of the front over a charred, open inside with
+-- fallen beams and one slab of roof; rubble is a heap on the plinth with weeds coming back.
+local function damaged(intact, w, d, seed)
+  local cv = px.canvas(intact.w, intact.h)
+  cv:stamp(intact, 0, 0)
+  local r = px.rng(seed)
+  local base = cv.h - 8
+  local top = 0
+  while top < cv.h do
+    local any = false
+    for x = 0, cv.w - 1 do if cv:get(x, top) ~= 0 then any = true break end end
+    if any then break end
+    top = top + 1
+  end
+  for _ = 1, 2 + w // 2 do
+    local hw, hh = r.int(5, 9), r.int(3, 6)
+    local hx, hy = r.int(10, math.max(10, cv.w - 10 - hw)), r.int(top + 4, math.max(top + 4, base - d * CD // 2 - hh))
+    for yy = hy, hy + hh - 1 do
+      for xx = hx, hx + hw - 1 do
+        if cv:get(xx, yy) ~= 0 then
+          local edge = xx == hx or xx == hx + hw - 1 or yy == hy or yy == hy + hh - 1
+          if not edge or r.next() > 0.5 then cv.p[yy * cv.w + xx] = ((xx - hx) % 3 == 1) and c("wood", 3) or c("ink", 1) end
+        end
+      end
+    end
+  end
+  for yy = top, base do
+    for xx = cv.w // 2, cv.w - 1 do
+      if cv:get(xx, yy) ~= 0 and px.noise(xx, yy, 4, seed) > 0.55 and (xx + yy) % 2 == 0 then
+        cv.p[yy * cv.w + xx] = c("ink", 2)
+      end
+    end
+  end
+  for _ = 1, 6 + w * 2 do cv:set(r.int(6, cv.w - 6), r.int(base + 1, base + 5), c("stone", r.int(2, 4))) end
+  return cv
+end
+
+local function destroyed(intact, w, d, seed)
+  local cv = px.canvas(intact.w, intact.h)
+  local r = px.rng(seed)
+  local base = cv.h - 8
+  local W, D = w * CW, d * CD
+  -- The plinth and the front's lower part, broken off along a ragged line.
+  for x = 0, cv.w - 1 do
+    local keep = base - 3 - math.floor(px.noise(x, 0, 4, seed) * math.min(12, D // 2))
+    for y = keep, cv.h - 1 do
+      local i = intact:get(x, y)
+      if i ~= 0 then cv:set(x, y, y == keep and c("ink", 3) or i) end
+    end
+  end
+  -- The open inside, charred, behind the stumps.
+  for y = base - 3 - D, base - 6 do
+    for x = 10, 8 + W - 3 do
+      local n = px.noise(x, y, 4, seed)
+      if cv:get(x, y) == 0 and n > 0.3 then
+        cv:set(x, y, n > 0.7 and c("stone", 2) or (n > 0.5 and c("ink", 3) or c("wood", 1)))
+      end
+    end
+  end
+  -- Beams fallen across it, and a slab of roof still leaning on the left.
+  for k = 0, w do
+    local bx = 10 + k * (W - 6) // math.max(1, w)
+    cv:line(bx, base - D - 2 - r.int(0, 6), bx + r.int(-6, 6), base - 6, c("wood", 2))
+  end
+  for y = 0, math.min(D, 14) do
+    for x = 9, 9 + math.max(6, W // 3) - y do
+      local i = intact:get(x, base - D - 12 + y)
+      if i ~= 0 then cv:set(x, base - D - 4 + y, i) end
+    end
+  end
+  for _ = 1, 10 + w * 3 do cv:set(r.int(6, cv.w - 6), r.int(base - 2, base + 5), c("ink", r.int(2, 4))) end
+  return cv
+end
+
+local function rubble(intact, w, d, seed)
+  local cv = px.canvas(intact.w, intact.h)
+  local base = cv.h - 8
+  local W, D = w * CW, d * CD
+  for x = 0, cv.w - 1 do
+    for y = base - 3, cv.h - 1 do
+      local i = intact:get(x, y)
+      if i ~= 0 then cv:set(x, y, i) end
+    end
+  end
+  cv:rect(9, base - 3 - D, W - 2, D, c("stone", 3))
+  local cx, cy = 8 + W / 2, base - 2 - D / 2
+  cv:each_ellipse(cx, cy, W / 2 - 2, math.max(4, D / 2 - 1), function(xx, yy, dist)
+    if dist < 0.7 + px.noise(xx, yy, 3, seed) * 0.35 then
+      local n = px.noise(xx, yy, 2, seed + 1)
+      local col = n > 0.7 and c("stone", 4) or (n > 0.45 and c("stone", 3) or (n > 0.3 and c("stone", 2) or c("wood", 2)))
+      if dist > 0.6 then col = px.shift(col, -1) end
+      cv:set(xx, yy, col)
+    end
+  end)
+  for k = 1, 4 + w do
+    local x, y = math.floor(cx + (px.hash(k, 1, seed) - 0.5) * W * 0.8), math.floor(cy + (px.hash(k, 2, seed) - 0.5) * D * 0.6)
+    cv:set(x, y, c("grass", 5)); cv:set(x, y + 1, c("grass", 3))
+  end
+  return cv
+end
+
+-- Saves the intact frame and, given its footprint, the three damage stages after it.
+local function save(name, cv, w, d)
+  local frames = { cv }
+  if w then
+    local seed = #name * 97 + w * 13 + d
+    frames[2] = damaged(cv, w, d, seed)
+    frames[3] = destroyed(cv, w, d, seed)
+    frames[4] = rubble(cv, w, d, seed)
+  end
+  for _, f in ipairs(frames) do f:outline(0, 0, f.w, f.h, INK) end
+  local tags = { { "intact", 1, 1, 1000 } }
+  if w then
+    tags[2] = { "damaged", 2, 2, 1000 }; tags[3] = { "destroyed", 3, 3, 1000 }; tags[4] = { "rubble", 4, 4, 1000 }
+  end
+  px.save_frames(cv.w, cv.h, frames, tags, here .. "/" .. name .. ".aseprite")
 end
 
 -- The village house, 3 x 3 cells.
 do
   local cv, x, base = frame(3, 3, 40)
   building(cv, x, base, 3, 3, 14, 12, { 5, 36 }, { hip = 10 })
-  save("house", cv)
+  save("house", cv, 3, 3)
 end
 
 -- The village hall, 5 x 3 cells: a longer front with four windows and a taller roof.
 do
   local cv, x, base = frame(5, 3, 46)
   building(cv, x, base, 5, 3, 16, 15, { 6, 18, 55, 67 }, { hip = 14 })
-  save("hall", cv)
+  save("hall", cv, 5, 3)
 end
 
 -- The storehouse, 3 x 2 cells: no windows, studded double doors, a lower roof, a crate.
@@ -152,7 +269,7 @@ do
     cv:rect(x + 6 + k * 30, base - 11, 3, 2, c("ink", 2))
   end
   block(cv, x + 36, base + 1, 8, 4, 6, "wood", 3)
-  save("storehouse", cv)
+  save("storehouse", cv, 3, 2)
 end
 
 -- The manual hall, 4 x 3 cells: two storeys on a high stone platform with steps, a gold-framed
@@ -173,7 +290,7 @@ do
   cv:hline(x + 29, foot2 - 7, 6, c("gold", 4))
   local eave2 = foot2 - 12 + 2
   roof(cv, x + 8, x + W - 9, eave2, eave2 - 16, eave2 - 22, 7)
-  save("manual_hall", cv)
+  save("manual_hall", cv, 4, 3)
 end
 
 -- The granary, 2 x 2 cells: a plank store on stilts over stone footings, a ladder to its door,
@@ -211,7 +328,7 @@ do
   for xx = x - 1, x + W do
     if px.hash(xx, 0, 5) > 0.35 then cv:set(xx, eave + 1, c("earth", 3)) end
   end
-  save("granary", cv)
+  save("granary", cv, 2, 2)
 end
 
 -- The well, 2 x 2 cells: a stone ring round dark water, two posts and a small tiled roof, a
@@ -241,7 +358,7 @@ do
   cv:vline(cx + 3, cy - 14, 9, c("paper", 1))
   cv:rect(cx + 1, cy - 6, 5, 4, c("wood", 3)); cv:hline(cx + 1, cy - 6, 5, c("wood", 4))
   roof(cv, cx - 15, cx + 15, cy - 21, cy - 29, cy - 32, 4)
-  save("well", cv)
+  save("well", cv, 2, 2)
 end
 
 -- The seat gate, 3 x 1 cells: a paifang of two lacquered pillars on stone bases at the end
@@ -260,7 +377,7 @@ do
   cv:hline(x + 18, base - 35, 4, c("gold", 4)); cv:hline(x + 25, base - 35, 4, c("gold", 4))
   cv:vline(x + 20, base - 37, 4, c("gold", 4)); cv:vline(x + 27, base - 37, 4, c("gold", 4))
   roof(cv, x - 1, x + W, base - 46, base - 53, base - 56, 4)
-  save("seat_gate", cv)
+  save("seat_gate", cv, 3, 1)
 end
 
 -- Barrels, 1 x 1 cell: two barrels and one on top.
@@ -274,7 +391,7 @@ do
     cv:ellipse(bx + 4, by - 9, 3, 1, c("wood", 5))
   end
   barrel(x, base); barrel(x + 7, base - 1); barrel(x + 3, base - 9)
-  save("barrels", cv)
+  save("barrels", cv, 1, 1)
 end
 
 -- A fence, 5 x 1 cells: posts every 8 pixels and two rails.
@@ -283,7 +400,7 @@ do
   for xx = x + 1, x + 78, 8 do cv:rect(xx, base - 12, 2, 12, c("wood", 3)); cv:set(xx, base - 12, c("wood", 4)) end
   cv:hline(x, base - 10, 80, c("wood", 4)); cv:hline(x, base - 9, 80, c("wood", 2))
   cv:hline(x, base - 5, 80, c("wood", 4)); cv:hline(x, base - 4, 80, c("wood", 2))
-  save("fence", cv)
+  save("fence", cv, 5, 1)
 end
 
 -- The training ground, 6 x 4 cells, laid with the ground: raked sand in a stone curb, a ring
