@@ -2,11 +2,10 @@
 ## tree around one person (their parents, them and their spouse, their children), each a card with
 ## a portrait, a name and an age or that they died, and a column with that person's details. Every
 ## word comes from hud.csv through Godot's translations. What it shows is read from the world: names,
-## kin, ages and factions through the adapter; talent and lifespan are hidden, and shown unknown.
+## kin, ages and sects through the adapter; talent and lifespan are hidden, and shown unknown.
 ## It holds no game rule.
 extends "res://hud/panel.gd"
 
-const PersonName := preload("res://hud/person_name.gd")
 const MAX_CHILDREN := 3
 # The mockup's layout, in the native 480x270.
 const ROWS := [46, 112, 182]
@@ -116,6 +115,25 @@ func centre_selected() -> void:
 	show_person(_world, selected, own)
 
 
+## Works the panel with `event`: the arrows move the selection, Enter centres the tree on the
+## selected person, and the toggle key or Escape closes it. Returns "close", "done", or "" when the
+## key did nothing.
+func key(event: InputEventKey) -> String:
+	if event.keycode == toggle_key or event.keycode == KEY_ESCAPE:
+		return "close"
+	if DIRECTIONS.has(event.keycode):
+		return _done(move(DIRECTIONS[event.keycode]))
+	if ENTER_KEYS.has(event.keycode):
+		centre_selected()
+		return "done"
+	return ""
+
+
+## Works the panel with a tap anywhere: it closes. Returns "close".
+func tap(_at: Vector2) -> String:
+	return "close"
+
+
 func _card(role: String, person: int) -> Dictionary:
 	var dead := _world.person_health(person) == 0
 	return {
@@ -132,11 +150,8 @@ func _surname(name: Dictionary) -> String:
 
 
 func _sect(person: int) -> String:
-	var faction := _world.person_faction(person)
-	var names := _world.faction_names()
-	if faction < 0 or faction >= names.size():
-		return tr("GENEALOGY_NONE")
-	return tr("FACTION_" + names[faction].to_upper())
+	var sect := _world.person_sect(person)
+	return Affiliation.sect_name(_world, sect) if sect >= 0 else tr("GENEALOGY_NONE")
 
 
 func _index_of(person: int) -> int:
@@ -194,16 +209,16 @@ func _draw() -> void:
 	_chrome(tr("GENEALOGY_KEYS"))
 	var title := tr("GENEALOGY_TITLE")
 	var family_x := 8 + _width(title) + 10
-	_text(PANEL.position + Vector2(8, 4), title, PAPER, true)
-	_text(PANEL.position + Vector2(family_x, 4), details.family, GOLD_LIGHT, true)
-	_text(PANEL.position + Vector2(family_x + _width(details.family) + 14, 4), details.generation, STONE)
+	_text(PANEL.position + Vector2(8, 4), title, Palette.PAPER_3, true)
+	_text(PANEL.position + Vector2(family_x, 4), details.family, Palette.GOLD_4, true)
+	_text(PANEL.position + Vector2(family_x + _width(details.family) + 14, 4), details.generation, Palette.STONE_4)
 	var close_text := tr("GENEALOGY_CLOSE")
-	_text(Vector2(PANEL.end.x - 8 - _width(close_text), PANEL.position.y + 4), close_text, STONE)
+	_text(Vector2(PANEL.end.x - 8 - _width(close_text), PANEL.position.y + 4), close_text, Palette.STONE_4)
 	# Generation labels.
 	for n in 3:
 		var label: String = tr(["GENEALOGY_PARENTS", "GENEALOGY_ROW_SELF", "GENEALOGY_CHILDREN"][n])
-		_text(Vector2(PANEL.position.x + 10, ROWS[n] + 14), label, GOLD)
-		draw_rect(Rect2(PANEL.position.x + 10, ROWS[n] + 28, 26, 1), INK_LIGHT)
+		_text(Vector2(PANEL.position.x + 10, ROWS[n] + 14), label, Palette.GOLD_3)
+		draw_rect(Rect2(PANEL.position.x + 10, ROWS[n] + 28, 26, 1), Palette.INK_3)
 	_kin_lines()
 	for index in cards.size():
 		_draw_card(index)
@@ -249,12 +264,12 @@ func _marriage(x0: float, x1: float, y: float) -> void:
 	_line(Vector2(x0, y - 1), Vector2(x1, y - 1))
 	_line(Vector2(x0, y + 1), Vector2(x1, y + 1))
 	var knot := floorf((x0 + x1) / 2.0)
-	draw_rect(Rect2(knot - 1, y - 2, 3, 5), GOLD_LIGHT)
-	draw_rect(Rect2(knot, y, 1, 1), LACQUER)
+	draw_rect(Rect2(knot - 1, y - 2, 3, 5), Palette.GOLD_4)
+	draw_rect(Rect2(knot, y, 1, 1), Palette.LACQUER_3)
 
 
 func _line(from: Vector2, to: Vector2) -> void:
-	draw_rect(Rect2(from.min(to).floor(), (to - from).abs().floor() + Vector2.ONE), GOLD_DARK)
+	draw_rect(Rect2(from.min(to).floor(), (to - from).abs().floor() + Vector2.ONE), Palette.GOLD_2)
 
 
 func _draw_card(index: int) -> void:
@@ -263,23 +278,23 @@ func _draw_card(index: int) -> void:
 	var own_card: bool = card.person == own
 	var chosen: bool = card.person == selected
 	_person_card(rect, card.person, card.short, card.line, card.dead,
-			JADE if own_card else (GOLD if chosen else INK_DARK),
-			JADE_DARK if own_card else (GOLD_DARK if chosen else INK_LIGHT))
+			Palette.JADE_3 if own_card else (Palette.GOLD_3 if chosen else Palette.INK_1),
+			Palette.JADE_2 if own_card else (Palette.GOLD_2 if chosen else Palette.INK_3))
 	if own_card:
-		_tag(Vector2(rect.end.x - 3, rect.position.y - 5), tr("GENEALOGY_SELF"), JADE_DARK)
+		_tag(Vector2(rect.end.x - 3, rect.position.y - 5), tr("GENEALOGY_SELF"), Palette.JADE_2)
 
 
 func _draw_details() -> void:
-	_frame(DETAILS, INK_DARK)
+	_frame(DETAILS, Palette.INK_1)
 	var at := DETAILS.position
-	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 44)), GRASS)
-	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 1)), GRASS_LIGHT)
+	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 44)), Palette.GRASS_3)
+	draw_rect(Rect2(at + Vector2(8, 8), Vector2(36, 1)), Palette.GRASS_4)
 	_portrait(centre, Rect2(at + Vector2(10, 4), Vector2(32, 48)), _world.person_health(centre) == 0)
 	# Each line keeps the 8 pixels from the column's right edge that the rows keep.
 	var room := DETAILS.size.x - DETAILS_TEXT_X - 8
-	_text(at + Vector2(DETAILS_TEXT_X, 10), fit(details.name, room), PAPER, true)
-	_text(at + Vector2(DETAILS_TEXT_X, 24), fit(details.family, room), GOLD_LIGHT)
-	_text(at + Vector2(DETAILS_TEXT_X, 38), fit(details.sect, room), AZURE_LIGHT)
+	_text(at + Vector2(DETAILS_TEXT_X, 10), fit(details.name, room), Palette.PAPER_3, true)
+	_text(at + Vector2(DETAILS_TEXT_X, 24), fit(details.family, room), Palette.GOLD_4)
+	_text(at + Vector2(DETAILS_TEXT_X, 38), fit(details.sect, room), Palette.AZURE_4)
 	var rows := [
 		["GENEALOGY_AGE_LABEL", details.age], ["GENEALOGY_TALENT", details.talent],
 		["GENEALOGY_LIFESPAN", details.lifespan], ["GENEALOGY_SPOUSE", details.spouse],
@@ -287,11 +302,11 @@ func _draw_details() -> void:
 	]
 	for n in rows.size():
 		var y := at.y + 62 + n * 20
-		draw_rect(Rect2(at.x + 6, y - 4, DETAILS.size.x - 12, 1), INK_LIGHT)
+		draw_rect(Rect2(at.x + 6, y - 4, DETAILS.size.x - 12, 1), Palette.INK_3)
 		var label := tr(rows[n][0])
-		_text(Vector2(at.x + 8, y), label, GOLD)
+		_text(Vector2(at.x + 8, y), label, Palette.GOLD_3)
 		var value: String = rows[n][1]
 		var unknown := value == tr("GENEALOGY_UNKNOWN")
 		# The value, such as a spouse's name, keeps 4 pixels from its label.
 		value = fit(value, DETAILS.size.x - 16 - _width(label) - 4)
-		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, STONE_DARK if unknown else PAPER)
+		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, Palette.STONE_3 if unknown else Palette.PAPER_3)

@@ -47,21 +47,21 @@ func belt_rect() -> Rect2:
 func _draw() -> void:
 	_font = get_theme_default_font() if _font == null else _font
 	var strip := strip_rect()
-	_frame(strip, INK)
+	_frame(strip, Palette.INK_2)
 	_ware_icon("silver", strip.position + Vector2(4, 1))
 	var text := tr("SILVER") % silver
-	_text(Vector2(strip.end.x - 6 - _width(text), strip.position.y + 3), fit(text, strip.size.x - 28), PAPER)
+	_text(Vector2(strip.end.x - 6 - _width(text), strip.position.y + 3), fit(text, strip.size.x - 28), Palette.PAPER_3)
 	if not belt or _wares.is_empty():
 		return
 	var rect := belt_rect()
-	_frame(rect, INK)
+	_frame(rect, Palette.INK_2)
 	for n in mini(_wares.size(), held.size()):
 		var cell := Rect2(rect.position + Vector2(4 + n * BELT_STEP, 3), Vector2(30, 20))
-		draw_rect(cell, INK)
-		draw_rect(cell.grow(-1), INK_DARK)
+		draw_rect(cell, Palette.INK_2)
+		draw_rect(cell.grow(-1), Palette.INK_1)
 		var none := held[n] == 0
 		_ware_icon(_wares[n].name, cell.position + Vector2(12, 2), none)
 		if n < keys.size():
-			_text(cell.position + Vector2(2, 3), keys[n], STONE_DARK if none else GOLD)
+			_text(cell.position + Vector2(2, 3), keys[n], Palette.STONE_3 if none else Palette.GOLD_3)
 		var count := str(held[n])
-		_text(cell.end - Vector2(_width(count) + 1, 12), count, STONE_DARK if none else PAPER, true)
+		_text(cell.end - Vector2(_width(count) + 1, 12), count, Palette.STONE_3 if none else Palette.PAPER_3, true)

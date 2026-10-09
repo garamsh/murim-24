@@ -182,12 +182,6 @@ func ui(name: String) -> void:
 		_ui.play()
 
 
-## Returns the music playing: the battle track while strikes were heard in the last
-## BATTLE_HOLD seconds, the explore track otherwise.
-func music() -> AudioStream:
-	return _music.stream
-
-
 func _process(delta: float) -> void:
 	advance(delta)
 

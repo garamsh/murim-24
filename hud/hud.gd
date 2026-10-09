@@ -24,8 +24,10 @@ signal settings_asked
 const LOCALES := ["ko", "en"]
 const FONT := "res://hud/fonts/Galmuri9.ttf"
 const FONT_SIZE := 10
-const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const ART := "res://art/"
+const Palette := preload("res://hud/palette.gd")
+const Affiliation := preload("res://hud/affiliation.gd")
+const HudPanel := preload("res://hud/panel.gd")
 const PersonName := preload("res://hud/person_name.gd")
 const Arts := preload("res://hud/arts.gd")
 const Loadout := preload("res://hud/loadout.gd")
@@ -33,21 +35,10 @@ const ViewScale := preload("res://view_scale.gd")
 ## The room the panels are placed in below, the native size; a larger room moves each panel by the
 ## room it gains, as far as its corner of the room.
 const NATIVE := Vector2(480, 270)
-# docs/art-direction.md §Palette.
-const INK := Color("2a2433")
-const INK_DARK := Color("14101a")
-const GOLD := Color("8c6a2a")
-const GOLD_LIGHT := Color("c99a3c")
-const PAPER := Color("efe3c2")
-const STONE := Color("8a94a0")
-const JADE := Color("4fc49a")
-const HP := Color("d63a2f")
-const QI := Color("2f63b8")
-const ACCENTS: Array[Color] = [Color("2f63b8"), Color("d63a2f"), Color("e8a830")]
 # Minimap colours by terrain kind name.
 const KIND_COLOURS := {
-	"plain": Color("3b6138"), "forest": Color("1e3328"), "hills": Color("6b9447"),
-	"water": Color("2b5770"), "mountain": Color("8a94a0"),
+	"plain": Palette.GRASS_3, "forest": Palette.LEAF_2, "hills": Palette.GRASS_5,
+	"water": Palette.WATER_3, "mountain": Palette.STONE_4,
 }
 const MAP_SIZE := Vector2i(76, 44)
 ## A technique slot: its step along the bar, its size, the column its key is centred in, left of
@@ -137,7 +128,6 @@ var _map := TextureRect.new()
 var map_texture: ImageTexture
 var _dot := ColorRect.new()
 var _slots: Array[Panel] = []
-var _icons := {}
 # The duel being shown: its challenger and each duellist's health when it began.
 var _duel := {}
 var _notice_until := 0
@@ -171,7 +161,7 @@ func _set_up() -> void:
 	font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	_theme.default_font = font
 	_theme.default_font_size = FONT_SIZE
-	_theme.set_color("font_color", "Label", PAPER)
+	_theme.set_color("font_color", "Label", Palette.PAPER_3)
 	_build()
 
 
@@ -191,16 +181,28 @@ func screen() -> Control:
 	return null
 
 
+## Returns the panel open over the world, the one that takes the keys and taps while no screen is
+## open: the genealogy, sect or arts panel, the faction window or the dialogue window, or null
+## while none is.
+func panel() -> Control:
+	for open: Control in [genealogy, sect, arts, factions, dialogue]:
+		if open.visible:
+			return open
+	return null
+
+
+## Shows on the touch controls whether the arts panel is open over them, so only their arc is drawn
+## and touched, and whether a skill chosen on it waits for a button to be placed on.
+func show_placing() -> void:
+	touch.placing = arts.visible
+	touch.waiting = arts.visible and not arts.selected.is_empty()
+	touch.queue_redraw()
+
+
 ## Shows `world`'s region on the map and army `steered`'s faction on the portrait.
 func show_player(world: WorldAdapter, steered: int) -> void:
 	_set_up()
-	var icons: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "icons/skill_icons.json"))
-	_icons = {"texture": load(ART + "icons/skill_icons.png"), "tags": {}}
-	for tag: Dictionary in icons.meta.frameTags:
-		_icons.tags[tag.name] = int(tag.from)
-	var names := world.faction_names()
-	var faction := world.army_faction(steered)
-	var sprite: String = names[faction].to_lower() if faction < names.size() else FACTIONS[faction % FACTIONS.size()]
+	var sprite: String = Affiliation.SPRITES[Affiliation.sprite(world, world.army_faction(steered))]
 	labels.faction.text = "FACTION_" + sprite.to_upper()
 	var portrait := AtlasTexture.new()
 	portrait.atlas = load(ART + "bodies/" + sprite + ".png")
@@ -238,10 +240,7 @@ func show_loadout(world: WorldAdapter) -> void:
 			continue
 		# A skill whose radius reaches past its target bursts; any other strikes one body.
 		var tag: String = "burst" if int(skill.radius) > 0 else "strike"
-		var icon := AtlasTexture.new()
-		icon.atlas = _icons.texture
-		icon.region = Rect2(_icons.tags[tag] * 16, 0, 16, 16)
-		slot_icons[slot].texture = icon
+		slot_icons[slot].texture = HudPanel.sheet_icon("skill_icons", tag)
 		reach.append({"icon": tag, "range": int(skill.range) * pixels, "radius": int(skill.radius) * pixels})
 	touch.show_skills(reach)
 
@@ -285,7 +284,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
-		style.border_color = JADE if skills.has(loadout.skill(world, slot)) else INK
+		style.border_color = Palette.JADE_3 if skills.has(loadout.skill(world, slot)) else Palette.INK_2
 	if arts.visible:
 		arts.reread()
 	if touch.visible:
@@ -531,24 +530,24 @@ func _build() -> void:
 	title.position = Vector2(42, 3)
 	title.add_theme_constant_override("separation", 6)
 	player.add_child(title)
-	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, PAPER)
-	labels.faction = _label(title, "", Vector2.ZERO, STONE)
+	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, Palette.PAPER_3)
+	labels.faction = _label(title, "", Vector2.ZERO, Palette.STONE_4)
 	# Each value on its label's line, right-aligned, and its bar under the line.
-	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), HP)
+	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), Palette.CRIMSON_4)
 	labels.hp_value = _value(player, Vector2(42, 14), 120)
-	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), QI)
+	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), Palette.AZURE_3)
 	labels.qi_value = _value(player, Vector2(42, 30), 120)
-	labels.realm = _label(player, "HUD_REALM", Vector2(42, 47), GOLD_LIGHT)
+	labels.realm = _label(player, "HUD_REALM", Vector2(42, 47), Palette.GOLD_3)
 	labels.realm_value = _value(player, Vector2(42, 47), 120)
 	labels.realm_value.text = "—"
-	_bar(player, hp_bar, Vector2(42, 26), HP)
-	_bar(player, qi_bar, Vector2(42, 42), QI)
+	_bar(player, hp_bar, Vector2(42, 26), Palette.CRIMSON_4)
+	_bar(player, qi_bar, Vector2(42, 42), Palette.AZURE_3)
 	qi_bar.value = 0.0
 	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(MAP_AT[false], Vector2(84, 62)))
 	settings_button = _panel(SETTINGS_RECT)
-	var word := _label(settings_button, "SETTINGS_TITLE", Vector2.ZERO, PAPER)
+	var word := _label(settings_button, "SETTINGS_TITLE", Vector2.ZERO, Palette.PAPER_3)
 	word.size = SETTINGS_RECT.size - Vector2(0, 2)
 	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	word.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -559,7 +558,7 @@ func _build() -> void:
 	_map.stretch_mode = TextureRect.STRETCH_SCALE
 	_map.texture = AtlasTexture.new()
 	map.add_child(_map)
-	_dot.color = JADE
+	_dot.color = Palette.JADE_3
 	_dot.size = Vector2(2, 2)
 	map.add_child(_dot)
 	labels.season = _trimmed(map, Vector2(5, 48), 74)
@@ -570,9 +569,9 @@ func _build() -> void:
 	for slot in Loadout.SLOTS:
 		var cell := Panel.new()
 		var style := StyleBoxFlat.new()
-		style.bg_color = INK_DARK
+		style.bg_color = Palette.INK_1
 		style.set_border_width_all(1)
-		style.border_color = INK
+		style.border_color = Palette.INK_2
 		cell.add_theme_stylebox_override("panel", style)
 		cell.position = Vector2(4 + slot * SLOT_STEP, 3)
 		cell.size = SLOT_SIZE
@@ -590,8 +589,8 @@ func _build() -> void:
 		number.position = SLOT_KEY.position
 		number.size = SLOT_KEY.size
 		number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		number.add_theme_color_override("font_color", GOLD_LIGHT)
-		number.add_theme_color_override("font_outline_color", INK_DARK)
+		number.add_theme_color_override("font_color", Palette.GOLD_3)
+		number.add_theme_color_override("font_outline_color", Palette.INK_1)
 		number.add_theme_constant_override("outline_size", 2)
 		cell.add_child(number)
 		_slots.append(cell)
@@ -620,31 +619,31 @@ func _build() -> void:
 	purse.use_font(_theme.default_font)
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
-	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
+	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), Palette.GOLD_3)
 	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
 
 	duel_panel = _panel(Rect2(DUEL_AT[false], Vector2(128, 44)))
 	duel_panel.visible = false
-	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), HP)
+	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), Palette.CRIMSON_4)
 	labels.duel_challenger = _trimmed(duel_panel, Vector2(5, 15), 52)
 	labels.duel_leader = _trimmed(duel_panel, Vector2(5, 28), 52)
 	duel_bars.challenger = ProgressBar.new()
 	duel_bars.leader = ProgressBar.new()
-	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), HP)
-	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), HP)
+	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), Palette.CRIMSON_4)
+	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), Palette.CRIMSON_4)
 	duel_bars.challenger.size.x = 62
 	duel_bars.leader.size.x = 62
 
-	labels.notice = _label(self, "", NOTICE_AT[false], PAPER)
+	labels.notice = _label(self, "", NOTICE_AT[false], Palette.PAPER_3)
 	labels.notice.size = Vector2(300, 12)
 	labels.notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
+	labels.notice.add_theme_color_override("font_outline_color", Palette.INK_1)
 	labels.notice.add_theme_constant_override("outline_size", 3)
 	labels.notice.visible = false
 	# The notice's slip, under its words: ink framed in gold, as the talk prompt's.
 	var slip := StyleBoxFlat.new()
-	slip.bg_color = INK
-	slip.border_color = GOLD
+	slip.bg_color = Palette.INK_2
+	slip.border_color = Palette.GOLD_2
 	slip.set_border_width_all(1)
 	_notice_slip.add_theme_stylebox_override("panel", slip)
 	_notice_slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -684,9 +683,9 @@ func _panel(rect: Rect2) -> Panel:
 	panel.position = rect.position
 	panel.size = rect.size
 	var style := StyleBoxFlat.new()
-	style.bg_color = INK
+	style.bg_color = Palette.INK_2
 	style.set_border_width_all(1)
-	style.border_color = GOLD
+	style.border_color = Palette.GOLD_2
 	style.border_width_top = 2
 	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
@@ -711,7 +710,7 @@ func _value(parent: Control, at: Vector2, width: float) -> Label:
 	label.position = at
 	label.size = Vector2(width, 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_color_override("font_color", PAPER)
+	label.add_theme_color_override("font_color", Palette.PAPER_3)
 	parent.add_child(label)
 	return label
 
@@ -729,7 +728,7 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = colour
 	var back := StyleBoxFlat.new()
-	back.bg_color = INK_DARK
+	back.bg_color = Palette.INK_1
 	bar.add_theme_stylebox_override("fill", fill)
 	bar.add_theme_stylebox_override("background", back)
 	bar.show_percentage = false
@@ -749,8 +748,8 @@ func _map_image(world: WorldAdapter) -> Image:
 	var terrain := world.terrain()
 	var owners := world.territory()
 	var sprites := []
-	for name in world.faction_names():
-		sprites.append(maxi(FACTIONS.find(name.to_lower()), 0))
+	for faction in world.faction_names().size():
+		sprites.append(Affiliation.sprite(world, faction))
 	for y in _world_size.y:
 		for x in _world_size.x:
 			var i := y * _world_size.x + x
@@ -764,10 +763,10 @@ func _map_image(world: WorldAdapter) -> Image:
 				var below := i + _world_size.x if y + 1 < _world_size.y else i
 				for next in [right, below]:
 					if owners[next] != owners[i]:
-						colour = ACCENTS[sprites[owners[i] if owners[i] >= 0 else owners[next]]]
+						colour = Palette.ACCENTS[sprites[owners[i] if owners[i] >= 0 else owners[next]]]
 			image.set_pixel(x, y, colour)
 	for village: Dictionary in world.villages():
 		var corner: Vector2i = village.corner
 		var area: Vector2i = village.area
-		image.fill_rect(Rect2i(corner, area), ACCENTS[sprites[village.faction]].lightened(0.3))
+		image.fill_rect(Rect2i(corner, area), Palette.ACCENTS[sprites[village.faction]].lightened(0.3))
 	return image

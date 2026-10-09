@@ -934,7 +934,7 @@ func _map_follows(hud: CanvasLayer, owners: PackedInt64Array, world: WorldAdapte
 	var image: Image = hud.map_texture.get_image()
 	var width := world.map_rows()[0].length()
 	var accents := []
-	for accent: Color in hud.ACCENTS:
+	for accent: Color in preload("res://hud/palette.gd").ACCENTS:
 		accents.append(accent.to_html(false))
 	var squares: Array[Rect2i] = []
 	for village: Dictionary in world.villages():

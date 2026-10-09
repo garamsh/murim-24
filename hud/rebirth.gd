@@ -5,7 +5,6 @@
 ## world through the adapter. It holds no game rule.
 extends "res://hud/panel.gd"
 
-const PersonName := preload("res://hud/person_name.gd")
 const Attainment := preload("res://hud/attainment.gd")
 # The layout, in the native 480x270, in the other screens' frame.
 const DIALOG := Rect2(70, 30, 340, 210)
@@ -42,7 +41,7 @@ func open(world: WorldAdapter, ended: int, begun: int) -> void:
 ## Works the screen with `key`: Enter or Escape goes on. Returns "go_on" when it does, and ""
 ## for any other key.
 func key(event: InputEventKey) -> String:
-	if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+	if ENTER_KEYS.has(event.keycode) or event.keycode == KEY_ESCAPE:
 		return "go_on"
 	return ""
 
@@ -58,7 +57,7 @@ func _compose() -> void:
 	past_rows = [
 		{"label": "REBIRTH_FAMILY", "value": _family(past)},
 		{"label": "REBIRTH_YEARS", "value": tr("REBIRTH_YEARS_VALUE") % _world.person_age(past)},
-		{"label": "REBIRTH_SECT", "value": _sect_name(sect) if sect >= 0 else tr("REBIRTH_NONE")},
+		{"label": "REBIRTH_SECT", "value": Affiliation.sect_name(_world, sect) if sect >= 0 else tr("REBIRTH_NONE")},
 		{"label": "REBIRTH_ATTAINMENT", "value": Attainment.of(_world, past)},
 		{"label": "REBIRTH_CHILDREN", "value": tr("GENEALOGY_COUNT") % _world.person_children(past).size()},
 	]
@@ -66,7 +65,7 @@ func _compose() -> void:
 	next_rows = [
 		{"label": "REBIRTH_FAMILY", "value": _family(next)},
 		{"label": "REBIRTH_FACTION",
-			"value": tr("FACTION_" + _world.faction_names()[faction].to_upper()) if faction >= 0 else tr("REBIRTH_NONE")},
+			"value": Affiliation.faction_name(_world, faction) if faction >= 0 else tr("REBIRTH_NONE")},
 		{"label": "REBIRTH_AGE", "value": tr("GENEALOGY_AGE") % _world.person_age(next)},
 	]
 	queue_redraw()
@@ -80,10 +79,6 @@ func _family(person: int) -> String:
 	return tr("GENEALOGY_FAMILY") % surname
 
 
-func _sect_name(index: int) -> String:
-	return tr("SECT_" + _world.sect_name(index).to_upper().replace(" ", "_"))
-
-
 func _draw() -> void:
 	if _world == null:
 		return
@@ -91,23 +86,23 @@ func _draw() -> void:
 	_dialog(DIALOG, tr("REBIRTH_TITLE"), tr("REBIRTH_CLOSE"), tr("REBIRTH_KEYS"))
 	var left := DIALOG.position.x + 10
 	_side(left, "REBIRTH_PAST", past, past_rows, true)
-	draw_rect(Rect2(left + COLUMN_WIDTH + COLUMN_GAP / 2.0, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), INK_LIGHT)
+	draw_rect(Rect2(left + COLUMN_WIDTH + COLUMN_GAP / 2.0, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), Palette.INK_3)
 	_side(left + COLUMN_WIDTH + COLUMN_GAP, "REBIRTH_NEXT", next, next_rows, false)
 
 
 # One side from `x`: its heading, the person's card, and its rows, each label against the left and
 # its value, cut short where it would reach the label, against the right.
 func _side(x: float, heading: String, person: int, rows: Array[Dictionary], dead: bool) -> void:
-	_text(Vector2(x, DIALOG.position.y + 26), tr(heading), GOLD)
-	draw_rect(Rect2(x, DIALOG.position.y + 39, COLUMN_WIDTH, 1), INK_LIGHT)
+	_text(Vector2(x, DIALOG.position.y + 26), tr(heading), Palette.GOLD_3)
+	draw_rect(Rect2(x, DIALOG.position.y + 39, COLUMN_WIDTH, 1), Palette.INK_3)
 	_person_card(Rect2(Vector2(x, DIALOG.position.y + CARD_Y), CARD), person,
 			PersonName.of(_world, person, true), tr("GENEALOGY_DEAD") if dead else "",
-			dead, GOLD if not dead else INK_DARK, GOLD_DARK if not dead else INK_LIGHT)
+			dead, Palette.GOLD_3 if not dead else Palette.INK_1, Palette.GOLD_2 if not dead else Palette.INK_3)
 	for n in rows.size():
 		var y := DIALOG.position.y + ROWS_Y + n * ROW_STEP
 		if n > 0:
-			draw_rect(Rect2(x, y - 4, COLUMN_WIDTH, 1), INK_LIGHT)
+			draw_rect(Rect2(x, y - 4, COLUMN_WIDTH, 1), Palette.INK_3)
 		var label := tr(rows[n].label)
-		_text(Vector2(x + 2, y), label, GOLD)
+		_text(Vector2(x + 2, y), label, Palette.GOLD_3)
 		var value := fit(rows[n].value, COLUMN_WIDTH - 4 - _width(label) - 4)
-		_text(Vector2(x + COLUMN_WIDTH - 2 - _width(value), y), value, PAPER)
+		_text(Vector2(x + COLUMN_WIDTH - 2 - _width(value), y), value, Palette.PAPER_3)

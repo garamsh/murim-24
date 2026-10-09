@@ -57,7 +57,7 @@ func key(event: InputEventKey) -> String:
 	if event.keycode == KEY_UP or event.keycode == KEY_DOWN:
 		chosen = clampi(chosen + (1 if event.keycode == KEY_DOWN else -1), 0, ENTRIES.size() - 1)
 		queue_redraw()
-	elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+	elif ENTER_KEYS.has(event.keycode):
 		return ENTRIES[chosen]
 	elif event.keycode == KEY_ESCAPE:
 		return "resume"
@@ -89,18 +89,18 @@ func _draw() -> void:
 	if not notice.is_empty():
 		# A row under the menu's last entry.
 		var notice_y := DIALOG.position.y + 32 + ENTRIES.size() * MENU_STEP + 4
-		_text(Vector2(left + 2, notice_y), tr(notice), JADE if notice == "PAUSE_SAVED" else LACQUER)
+		_text(Vector2(left + 2, notice_y), tr(notice), Palette.JADE_3 if notice == "PAUSE_SAVED" else Palette.LACQUER_3)
 	var seed_y := DIALOG.end.y - 40
-	draw_rect(Rect2(left, seed_y - 5, MENU_WIDTH, 1), INK_LIGHT)
-	_text(Vector2(left + 2, seed_y), tr("PAUSE_SEED"), GOLD)
+	draw_rect(Rect2(left, seed_y - 5, MENU_WIDTH, 1), Palette.INK_3)
+	_text(Vector2(left + 2, seed_y), tr("PAUSE_SEED"), Palette.GOLD_3)
 	var value := str(world_seed)
-	_text(Vector2(left + MENU_WIDTH - 4 - _width(value), seed_y), value, STONE)
-	draw_rect(Rect2(GUIDE_X - 10, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), INK_LIGHT)
-	_text(Vector2(GUIDE_X, DIALOG.position.y + 26), tr("CONTROLS_TITLE"), GOLD)
-	draw_rect(Rect2(GUIDE_X, DIALOG.position.y + 39, DIALOG.end.x - 10 - GUIDE_X, 1), INK_LIGHT)
+	_text(Vector2(left + MENU_WIDTH - 4 - _width(value), seed_y), value, Palette.STONE_4)
+	draw_rect(Rect2(GUIDE_X - 10, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), Palette.INK_3)
+	_text(Vector2(GUIDE_X, DIALOG.position.y + 26), tr("CONTROLS_TITLE"), Palette.GOLD_3)
+	draw_rect(Rect2(GUIDE_X, DIALOG.position.y + 39, DIALOG.end.x - 10 - GUIDE_X, 1), Palette.INK_3)
 	for n in controls.size():
 		var y := DIALOG.position.y + 44 + n * GUIDE_STEP
 		var x := GUIDE_X
 		for cap: String in controls[n].keys:
 			x += _keycap(Vector2(x, y), tr(cap)) + 2
-		_text(Vector2(GUIDE_X + GUIDE_TEXT_X, y), tr(controls[n].does), PAPER)
+		_text(Vector2(GUIDE_X + GUIDE_TEXT_X, y), tr(controls[n].does), Palette.PAPER_3)
