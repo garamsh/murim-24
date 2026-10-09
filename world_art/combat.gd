@@ -231,17 +231,16 @@ func _draw_strike(strike: Dictionary, left: float) -> void:
 	var way := toward - origin
 	match strike.shape:
 		WorldAdapter.SHAPE_ARC:
+			# An arc used toward its user's own place sweeps all around.
 			var facing := way.angle() if way != Vector2.ZERO else 0.0
-			var sweep := PI / 2.0 if way != Vector2.ZERO else PI
+			var sweep := deg_to_rad(WorldAdapter.ARC_HALF_WIDTH_DEGREES) if way != Vector2.ZERO else PI
 			var points := PackedVector2Array([origin])
 			for n in 13:
 				points.append(origin + Vector2.from_angle(facing - sweep + 2.0 * sweep * n / 12.0) * reach)
 			draw_colored_polygon(points, fill)
 			draw_arc(origin, reach, facing - sweep, facing + sweep, 13, edge, 1.0)
 		WorldAdapter.SHAPE_LINE, WorldAdapter.SHAPE_TARGETED:
-			var end := toward
-			if strike.shape == WorldAdapter.SHAPE_LINE and way != Vector2.ZERO:
-				end = origin + way.normalized() * reach
+			var end := _pixels(strike.end)
 			draw_line(origin, end, fill, maxf(radius * 2.0, 1.0))
 			draw_circle(origin.lerp(end, 1.0 - left), 1.5, edge)
 		_:
