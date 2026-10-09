@@ -1,9 +1,9 @@
 # Checks that the settings persist: choices changed on the panel are kept in its file under
 # user://, and a panel that reads the file back holds the same choices, its speed, casting on
-# release and damage numbers hidden among them. Each volume chosen is applied to its audio bus, and a
+# release and everyone's damage numbers among them. Each volume chosen is applied to its audio bus, and a
 # volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
 # row's default. Controls: a panel reading a file that does not exist holds every default, casting
-# on press and damage numbers shown among them, and the
+# on press and only the player's own damage numbers among them, and the
 # in-range values beside the refused one are read. Every word the panel draws from hud.csv fits
 # the room it is given, in each locale.
 extends RefCounted
@@ -29,7 +29,7 @@ func run() -> bool:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1, "touch": 0, "numbers": 1}
+		"music": 0, "cast": 1, "touch": 0, "numbers": 2}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -50,12 +50,12 @@ func run() -> bool:
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
 			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied \
-			and not reread.damage_numbers()
+			and reread.damage_numbers() == "everyone"
 
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(MISSING)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
-			and not missing.cast_on_release() and missing.damage_numbers()
+			and not missing.cast_on_release() and missing.damage_numbers() == "mine"
 
 	# A resolution out of range is refused; the speed beside it in range is read.
 	file = ConfigFile.new()
@@ -71,7 +71,7 @@ func run() -> bool:
 	var passed := kept and defaults and refused
 	# The defaults restored, so the buses are left as the game starts them.
 	missing.apply()
-	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, casting on release and damage numbers hidden, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
+	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, casting on release and everyone's damage numbers, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
 		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, defaults, refused,
 		"pass" if passed else "FAIL"])
 	for each: Control in [panel, reread, missing, ranged]:

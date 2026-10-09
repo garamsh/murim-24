@@ -195,9 +195,10 @@ SETTINGS_TOUCH_TAP,탭 이동,Tap move
 SETTINGS_TOUCH_OFF,끔,Off
 SETTINGS_TOUCH_ABOUT,터치 조작. 자동은 폰에서 켠다. 탭 이동은 땅을 눌러 걷는다.,Touch controls. Auto on phones. Tap move: tap ground to walk.
 SETTINGS_NUMBERS,피해 숫자,Damage numbers
-SETTINGS_NUMBERS_ON,보임,Shown
-SETTINGS_NUMBERS_OFF,숨김,Hidden
-SETTINGS_NUMBERS_ABOUT,맞은 이 위로 입은 피해를 숫자로 띄운다.,Float the damage taken up over the struck.
+SETTINGS_NUMBERS_OFF,끔,Off
+SETTINGS_NUMBERS_MINE,내 것,Mine
+SETTINGS_NUMBERS_EVERYONE,모두,Everyone
+SETTINGS_NUMBERS_ABOUT,맞은 이 위로 피해를 숫자로 띄운다. 내 것은 내가 주고 받은 피해만.,Float damage over the struck. Mine: what you deal and take.
 NOTICE_COMPREHENDED,깨달음: %s,Comprehended: %s
 NOTICE_READ,비급 독파: %s,Read from a manual: %s
 NOTICE_TAUGHT,사문 전수: %s,Taught by the sect: %s

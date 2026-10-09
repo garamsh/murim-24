@@ -2,8 +2,8 @@
 ## world's time, the window mode, the resolution in whole multiples of the native size, the
 ## language, the volume of all sound, of the effects and of the music, whether a cast key casts on
 ## its press or on its release, the touch controls, on a phone or a tablet, forced on, forced
-## on with a tap on the ground walking there, or off, and whether damage floats up as numbers over
-## the struck, each a row of its choices with the chosen one in jade, and a line saying what the
+## on with a tap on the ground walking there, or off, and whose damage floats up as numbers over
+## the struck, no one's, the player's own or everyone's, each a row of its choices with the chosen one in jade, and a line saying what the
 ## row being changed sets. The choices are the player's preferences, not the world's state: they
 ## are kept in a file under user:// and applied to the window, the translations, the audio buses,
 ## the HUD's layout, the play scene's pace and the world's drawing. A row's choice is chosen by a
@@ -49,13 +49,16 @@ const CAST_KEYS := ["SETTINGS_CAST_PRESS", "SETTINGS_CAST_RELEASE"]
 ## The touch row's choices: on where the screen takes touch, on, on with tap-to-move, and off.
 const TOUCH_MODES := ["auto", "on", "tap", "off"]
 const TOUCH_KEYS := ["SETTINGS_TOUCH_AUTO", "SETTINGS_TOUCH_ON", "SETTINGS_TOUCH_TAP", "SETTINGS_TOUCH_OFF"]
-## Whether damage floats up as numbers over the struck: shown, or not.
-const NUMBERS_KEYS := ["SETTINGS_NUMBERS_ON", "SETTINGS_NUMBERS_OFF"]
+## Whose damage floats up as numbers over the struck: no one's, the steered person's own losses and
+## hits, or everyone's.
+const NUMBERS_MODES := ["off", "mine", "everyone"]
+const NUMBERS_KEYS := ["SETTINGS_NUMBERS_OFF", "SETTINGS_NUMBERS_MINE", "SETTINGS_NUMBERS_EVERYONE"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
 ## the music sits under the effects, a cast key casts on its press, as Albion Online's quick
-## cast does, and damage numbers show.
+## cast does, and only the player's own damage floats up as numbers, which a battle of hundreds
+## would otherwise bury.
 const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
-		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 0}
+		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 1}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -157,9 +160,9 @@ func touch_shown() -> bool:
 	return true
 
 
-## Returns whether damage floats up as numbers over the struck.
-func damage_numbers() -> bool:
-	return chosen.numbers == 0
+## Returns whose damage floats up as numbers over the struck, one of NUMBERS_MODES.
+func damage_numbers() -> String:
+	return NUMBERS_MODES[chosen.numbers]
 
 
 ## Returns whether a tap on the ground walks the steered person there.
