@@ -34,6 +34,14 @@ const FRAMES := 180
 const TICKS_PER_FRAME := 3
 const FRAME_MS := 100
 const STILLS := {"village": 40, "skirmish": 130}
+# The valley's stills, each at Valley.PLACES' cell, after VALLEY_TICKS ticks of its people
+# walking; the whole valley pulled back to 2x, the rest at the PC's 3x. VALLEY_PEOPLE walk it in
+# armies of VALLEY_ARMY, or CROWD people with crowd.
+const VALLEY_STILLS := ["village", "town", "terraces", "riverside", "valley"]
+const VALLEY_TICKS := 90
+const VALLEY_PEOPLE := 80
+const VALLEY_ARMY := 4
+const CROWD := 500
 const LOCALES := ["ko", "en"]
 const KEPT := "user://angle_mockup.cfg"
 const SETTLE_FRAMES := 8
@@ -106,32 +114,33 @@ var _since_tick := 0.0
 var _bench_frames := 0
 var _pan_seconds := 0.0
 var _driver: Driver
+var _valley: Valley
+var _villagers: Villagers
 var _level: Leveller
 var _level_ticks := 0
 var _level_window := PackedFloat64Array()
 var _worst := [0.0, 0.0]
 
 
-## The world in the 2.5D projection, streamed by chunks of CHUNK x CHUNK cells: a chunk's ground
-## is composed into one image and its structures and trees made as sprites when it comes within
-## STREAM_MARGIN of the screen, and all of it freed once it is a chunk further away. Everything
-## standing is a sprite under one y-sorted node; bodies get sprites only on screen, and the hidden
-## parts of those are outlined over what hides them, each outline clipped to its occluder's pixels.
+## The world in the 2.5D projection, drawn from a look (RegionLook over a generated region, or
+## Valley, composed by hand) and streamed by chunks of CHUNK x CHUNK cells: a chunk is built when
+## it comes within STREAM_MARGIN of the screen and freed once it is a chunk further away. Ground
+## at level 0 and below is composed into one image a chunk; each row of a raised level is a strip,
+## its top and the face where it drops to its south, sorted with everything standing by the
+## row's north edge, so whoever is behind a terrace is drawn behind it. Shadows are baked into
+## the ground as a chunk is built: each structure's, tree's and cliff's, cast to the lower right,
+## two steps darker along the palette's ramps. Bodies get sprites only on screen, and the hidden
+## parts of those are outlined over what hides them, each outline clipped to its occluder.
 class AngleView extends Node2D:
 	const ART := "res://art/mockup/angle/"
 	const CELL := Vector2(16, 12)
-	const HILL_LIFT := 8
-	# grass 6 and grass 2 of docs/art-direction.md §Palette: the hills' lit lip and dark edge.
+	# grass 6 and grass 2 of docs/art-direction.md §Palette: a raised edge's lit lip and dark side.
 	const LIP := Color("8fae5a")
 	const EDGE := Color("2c4a32")
-	const INK := Color("14101a")
 	const SUB := 256.0
-	const BUILDINGS := ["house", "hall", "storehouse", "manual_hall", "granary", "well", "seat_gate",
-			"barrels", "fence", "training_ground"]
 	const GROUND_KINDS := ["training_ground"]
-	const FIELD_TAGS := ["sown", "growing", "ripe", "fallow", "burnt"]
 	const STAGES := ["intact", "damaged", "destroyed", "rubble"]
-	const FACTIONS := ["orthodox", "demonic"]
+	const FACTIONS := ["orthodox", "demonic", "villager"]
 	const BODY := Vector2(16, 24)
 	const FEET := Vector2(8, 22)
 	const WALK_MS := 150
@@ -147,11 +156,14 @@ class AngleView extends Node2D:
 	const BUILDS_PER_FRAME := 1
 	# Pixels past the screen within which bodies get sprites.
 	const BODY_MARGIN := 32.0
+	# Rows below a chunk's ground image for ground lower than level 0 and its faces.
+	const LOW_PAD := 40
+	# Where a shadow falls for each pixel of height: right and down, light being upper left.
+	const SHADOW := Vector2(0.55, 0.25)
 
 	var world: WorldAdapter
-	## The world whose terrain, villages and structures are drawn; `world` unless show_world is
-	## given another, whose map has the same cells.
-	var look: WorldAdapter
+	## What is drawn: terrain, levels, structures and trees, by the calls RegionLook makes.
+	var look: Object
 	var steered := -1
 	var xray := true
 	## Bodies drawn in the last refresh, and how many of them something hid.
@@ -163,7 +175,7 @@ class AngleView extends Node2D:
 	## Per body standing in front of a structure it overlaps: [army, person, kind, feet, rows].
 	var front_list: Array = []
 	## Chunks resident now, chunks built and freed so far, the most resident at once, and the
-	## bytes their ground images hold now.
+	## bytes their ground images and strips hold now.
 	var resident := 0
 	var built := 0
 	var freed := 0
@@ -171,27 +183,23 @@ class AngleView extends Node2D:
 	var ground_bytes := 0
 	## How long each chunk took to build, in microseconds.
 	var build_usec := PackedInt64Array()
-
 	## Effects drawn on the ground under everything standing, and over all of it.
 	var under := Node2D.new()
 	var over := Node2D.new()
 
 	var _stage_of := Callable()
 	var _sheets := {}
-	var _kinds := PackedStringArray()
-	var _width := 0
-	var _height := 0
+	var _size := Vector2i.ZERO
+	var _px := 16
+	var _shade := {}
 	var _standing := Node2D.new()
 	var _shadows := Node2D.new()
 	var _ground := Node2D.new()
 	var _chunks := {}
 	var _shadow_cache := {}
 	var _buckets := {}
-	# The cells the villages' decorations and the fields cover, with their tile.
-	var _laid := {}
 	# Structures by the chunk of their footprint's corner: {kind, corner, size, id}.
 	var _structures_in := {}
-	var _cleared: Array[Rect2i] = []
 	var _bodies := {}
 	var _body_shadows := {}
 	var _last := {}
@@ -213,33 +221,34 @@ class AngleView extends Node2D:
 		add_child(over)
 		add_child(_chevron)
 
-	## A frame of one of EFFECTS' sheets, loaded the first time it is asked for.
+	## A frame of an effect's sheet, loaded the first time it is asked for.
 	func effect(sheet: String, tag: String, index: int) -> AtlasTexture:
-		if not _sheets.has(sheet):
-			_sheets[sheet] = _load(sheet)
 		return _frame(sheet, tag, index)
 
-	## Reads `shown`'s bodies, and `drawn_from`'s terrain, villages and structures (`shown`'s when
-	## null); a structure is drawn at the stage `stage_of` gives its entry, or the world's.
-	func show_world(shown: WorldAdapter, steered_army: int, sorted := true, drawn_from: WorldAdapter = null,
+	## Reads `shown`'s bodies, and draws `drawn_from`: a WorldAdapter's region (`shown`'s when null)
+	## or a look of its own; a structure is drawn at the stage `stage_of` gives its entry, or the
+	## look's.
+	func show_world(shown: WorldAdapter, steered_army: int, sorted := true, drawn_from: Object = null,
 			stage_of := Callable()) -> void:
 		world = shown
-		look = drawn_from if drawn_from != null else shown
+		var source: Object = drawn_from if drawn_from != null else shown
+		look = RegionLook.new(source) if source is WorldAdapter else source
 		steered = steered_army
 		_stage_of = stage_of
 		_standing.y_sort_enabled = sorted
-		for name: String in ["terrain", "faces", "trees", "orthodox", "demonic", "marks"] + BUILDINGS:
-			_sheets[name] = _load(name)
-		var rows := look.map_rows()
-		_height = rows.size()
-		_width = rows[0].length()
-		var names := look.terrain_names()
-		var terrain := look.terrain()
-		_kinds.clear()
-		for i in _width * _height:
-			_kinds.append(names[terrain[i]] if terrain.size() == _width * _height else
-					("plain" if rows[i / _width][i % _width] == "." else "mountain"))
-		_index_layout()
+		_size = look.size()
+		_px = look.level_px()
+		var table: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "shade.json"))
+		for hex: String in table:
+			_shade[Color(hex).to_rgba32()] = Color(table[hex][1])
+		for entry: Dictionary in look.structures():
+			if not _has_sheet(entry.kind):
+				print("angle: no art for %s at %s" % [entry.kind, entry.corner])
+				continue
+			var key: Vector2i = entry.corner / CHUNK
+			if not _structures_in.has(key):
+				_structures_in[key] = []
+			_structures_in[key].append(entry)
 		_ring.texture = _frame("marks", "ring", 0)
 		_ring.centered = false
 		_ring.offset = Vector2(-8, -4)
@@ -252,13 +261,21 @@ class AngleView extends Node2D:
 		note_tick()
 		note_tick()
 
-	## Where a point in sub-cell units is drawn: x by CELL.x, y by CELL.y, raised on hills.
+	## Where a point in sub-cell units is drawn: x by CELL.x, y by CELL.y, raised by its level.
 	func to_screen(sub: Vector2) -> Vector2:
+		return _ground_point(sub) - Vector2(0, _lift(sub))
+
+	func _ground_point(sub: Vector2) -> Vector2:
+		return Vector2(sub.x / SUB * CELL.x, sub.y / SUB * CELL.y)
+
+	# How far a point is raised: its cell's level, and on stairs, part way down to the level
+	# below them as it nears their foot.
+	func _lift(sub: Vector2) -> float:
 		var cell := Vector2i((sub / SUB).floor())
-		var at := Vector2(sub.x / SUB * CELL.x, sub.y / SUB * CELL.y)
-		if _kind(cell.x, cell.y) == "hills":
-			at.y -= HILL_LIFT
-		return at
+		var level: float = look.level_at(cell.x, cell.y)
+		if look.stairs_at(cell.x, cell.y):
+			level -= fposmod(sub.y / SUB, 1.0)
+		return level * _px
 
 	## Reads the bodies as the last tick left them.
 	func note_tick() -> void:
@@ -282,16 +299,14 @@ class AngleView extends Node2D:
 		# A structure that changed stage shows it at once, its shadow with it.
 		for key: Vector2i in _chunks:
 			for sprite: Sprite2D in _chunks[key].occluders:
+				sprite.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
 				if sprite.has_meta("stages"):
 					var stage := _stage(sprite.get_meta("entry"))
 					if stage != sprite.get_meta("stage"):
 						sprite.set_meta("stage", stage)
 						sprite.texture = sprite.get_meta("stages")[stage]
 						var shadow: Sprite2D = sprite.get_meta("shadow")
-						shadow.texture = _shadow(sprite.get_meta("entry").size, stage)
-		for key: Vector2i in _chunks:
-			for sprite: Sprite2D in _chunks[key].occluders:
-				sprite.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
+						shadow.texture = _stage_shadow(sprite.get_meta("entry").size, stage)
 		for pool: Array in _xray_pool.values():
 			for sprite: Sprite2D in pool:
 				sprite.visible = false
@@ -306,15 +321,16 @@ class AngleView extends Node2D:
 			var army: int = _now[person][0]
 			var now: Vector2 = _now[person][1]
 			var before: Vector2 = _last[person][1] if _last.has(person) else now
-			var at := to_screen(before.lerp(now, clampf(between, 0.0, 1.0))).round()
-			if not shown.has_point(at):
+			var sub := before.lerp(now, clampf(between, 0.0, 1.0))
+			var foot := _ground_point(sub).round()
+			var lift := roundf(_lift(sub))
+			if not shown.has_point(foot - Vector2(0, lift)):
 				continue
 			on_screen[person] = true
 			var sprite: Sprite2D = _bodies.get(person)
 			if sprite == null:
 				sprite = Sprite2D.new()
 				sprite.centered = false
-				sprite.offset = -FEET
 				_standing.add_child(sprite)
 				_bodies[person] = sprite
 				var shadow := Sprite2D.new()
@@ -337,8 +353,10 @@ class AngleView extends Node2D:
 			if heading.x != 0:
 				sprite.flip_h = heading.x < 0
 			sprite.texture = _frame(faction, tag, index)
-			sprite.position = at
-			_body_shadows[person].position = at
+			# Sorted by where its feet are on the ground, drawn raised by its level.
+			sprite.position = foot + Vector2(0, 0.25)
+			sprite.offset = -FEET - Vector2(0, lift)
+			_body_shadows[person].position = foot - Vector2(0, lift)
 			drawn += 1
 			if xray:
 				_outline(sprite, faction + "|" + tag + "|" + str(index), army, person, used)
@@ -355,19 +373,23 @@ class AngleView extends Node2D:
 		_ring.visible = alive
 		_chevron.visible = alive
 		if alive:
-			_ring.position = _bodies[lead[0]].position
-			_chevron.position = _bodies[lead[0]].position
+			var body: Sprite2D = _bodies[lead[0]]
+			var at := body.position + body.offset + FEET
+			_ring.position = at
+			_chevron.position = at
 			_chevron.texture = _chevron_frames[(now_ms / CHEVRON_MS) % 2]
 
-	## Pixels the chunk at `key` covers in the world.
+	## Pixels the chunk at `key` covers on the ground, before raising.
 	func chunk_rect(key: Vector2i) -> Rect2:
-		return Rect2(Vector2(key) * CHUNK * CELL - Vector2(0, HILL_LIFT), CHUNK * CELL + Vector2(0, HILL_LIFT))
+		return Rect2(Vector2(key) * CHUNK * CELL, CHUNK * CELL)
 
 	# Builds the nearest missing chunks round `view`, at most BUILDS_PER_FRAME, and frees those a
 	# chunk past the streamed ring.
 	func _stream(view: Rect2) -> void:
-		var wanted := _chunks_over(view.grow(STREAM_MARGIN))
-		var kept := _chunks_over(view.grow(STREAM_MARGIN + CHUNK * CELL.y))
+		# Raised ground draws above its cells, so the ring reaches further down the screen.
+		var reach := view.grow(STREAM_MARGIN).grow_individual(0, 0, 0, look.max_level() * _px)
+		var wanted := _chunks_over(reach)
+		var kept := _chunks_over(reach.grow(CHUNK * CELL.y))
 		for key: Vector2i in _chunks.keys():
 			if not kept.has(key):
 				_free_chunk(key)
@@ -384,94 +406,200 @@ class AngleView extends Node2D:
 	func _chunks_over(rect: Rect2) -> Dictionary:
 		var keys := {}
 		var size := CHUNK * CELL
-		var last := Vector2i((_width - 1) / CHUNK, (_height - 1) / CHUNK)
+		var last := Vector2i((_size.x - 1) / CHUNK, (_size.y - 1) / CHUNK)
 		for cx in range(maxi(floori(rect.position.x / size.x), 0), mini(floori(rect.end.x / size.x), last.x) + 1):
 			for cy in range(maxi(floori(rect.position.y / size.y), 0), mini(floori(rect.end.y / size.y), last.y) + 1):
 				keys[Vector2i(cx, cy)] = true
 		return keys
 
-	# The chunk's ground image: terrain, the villages' road and paving, the fields in the state
-	# they hold when it is built, the hills raised with their front step, and the dithered shadows
-	# of what stands on it; then its structures and trees.
+	func _level(x: int, y: int) -> int:
+		return look.level_at(clampi(x, 0, _size.x - 1), clampi(y, 0, _size.y - 1))
+
+	# The chunk: its ground at level 0 and below in one image, each raised row a strip, shadows
+	# baked into both, then its structures and trees.
 	func _build_chunk(key: Vector2i) -> void:
 		var started := Time.get_ticks_usec()
 		var origin := key * CHUNK
-		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y) - HILL_LIFT)
-		var image := Image.create_empty(CHUNK * int(CELL.x), CHUNK * int(CELL.y) + HILL_LIFT, false,
-				Image.FORMAT_RGBA8)
-		var sheet: Dictionary = _sheets.terrain
-		var faces: Dictionary = _sheets.faces
-		for y in range(origin.y, mini(origin.y + CHUNK, _height)):
-			for x in range(origin.x, mini(origin.x + CHUNK, _width)):
-				var tag := _tile(x, y)
-				var span: Array = sheet.tags[tag]
-				var frame: Rect2i = sheet.frames[span[0] + _hash(x, y, 1) % (span[1] - span[0] + 1)]
-				var lift := HILL_LIFT if _kind(x, y) == "hills" else 0
-				var at := Vector2i(x * int(CELL.x), y * int(CELL.y) - lift) - top_left
-				image.blit_rect(sheet.image, frame, at)
-				if lift == 0:
-					continue
-				if _kind(x, y + 1) != "hills":
-					var face: Rect2i = faces.frames[faces.tags.hills_face[0] + _hash(x, y, 2) % 2]
-					image.blit_rect(faces.image, face, Vector2i(at.x, at.y + int(CELL.y)))
-				# The raised edge catches the light from the upper left and falls dark to the right.
-				if _kind(x, y - 1) != "hills":
+		var cells := Rect2i(origin, Vector2i(CHUNK, CHUNK)).intersection(Rect2i(Vector2i.ZERO, _size))
+		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y))
+		var ground := Image.create_empty(CHUNK * int(CELL.x), CHUNK * int(CELL.y) + LOW_PAD, false, Image.FORMAT_RGBA8)
+		var strips := {}
+		for y in range(cells.position.y, cells.end.y):
+			for x in range(cells.position.x, cells.end.x):
+				var level := _level(x, y)
+				var drop := maxi(level - _level(x, y + 1), 0) * _px
+				var image := ground
+				var at := Vector2i(x * int(CELL.x), y * int(CELL.y) - level * _px) - top_left
+				if level > 0:
+					var strip_key := Vector2i(y, level)
+					if not strips.has(strip_key):
+						strips[strip_key] = Image.create_empty(CHUNK * int(CELL.x), int(CELL.y) + _strip_drop(y, level, cells),
+								false, Image.FORMAT_RGBA8)
+					image = strips[strip_key]
+					at = Vector2i(x * int(CELL.x) - top_left.x, 0)
+				_blit_tile(image, "terrain", look.tile_at(x, y), x, y, at)
+				if drop > 0:
+					var face: String = "steps_face" if look.stairs_at(x, y) else look.face_at(x, y)
+					for row in range(0, drop, 8):
+						_blit_tile(image, "faces", face, x, y + row, at + Vector2i(0, int(CELL.y) + row))
+				if level > _level(x, y - 1):
 					image.fill_rect(Rect2i(at, Vector2i(int(CELL.x), 1)), LIP)
-				if _kind(x - 1, y) != "hills":
+				if level > _level(x - 1, y):
 					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
-				if _kind(x + 1, y) != "hills":
-					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y) + HILL_LIFT)), EDGE)
+				if level > _level(x + 1, y):
+					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y))), EDGE)
+		var trees: Array = look.trees_in(cells.grow(4))
+		_bake_shadows(key, cells, top_left, ground, strips, trees)
 		var occluders: Array[Sprite2D] = []
-		var trees := _trees(Rect2i(origin - Vector2i.ONE, Vector2i(CHUNK + 2, CHUNK + 2)))
-		for tree: Array in trees:
-			var foot: Vector2 = tree[0]
-			_dither(image, Rect2i(int(foot.x) - 2, int(foot.y) - 2, 12, 4), top_left)
-			if Rect2i(origin, Vector2i(CHUNK, CHUNK)).has_point(Vector2i(tree[2])):
-				var sprite := Sprite2D.new()
-				sprite.texture = tree[1]
-				sprite.centered = false
-				sprite.offset = Vector2(-16, -36)
-				sprite.position = foot
-				_add_occluder(sprite, "tree", _sheets.trees, occluders)
-		var ground := Sprite2D.new()
-		ground.centered = false
-		ground.texture = ImageTexture.create_from_image(image)
-		ground.position = Vector2(top_left)
-		_ground.add_child(ground)
 		var extras: Array[Sprite2D] = []
+		var bytes := ground.get_data_size()
+		var ground_sprite := Sprite2D.new()
+		ground_sprite.centered = false
+		ground_sprite.texture = ImageTexture.create_from_image(ground)
+		ground_sprite.position = Vector2(top_left)
+		_ground.add_child(ground_sprite)
+		for strip_key: Vector2i in strips:
+			var image: Image = strips[strip_key]
+			bytes += image.get_data_size()
+			var strip := Sprite2D.new()
+			strip.centered = false
+			strip.texture = ImageTexture.create_from_image(image)
+			# Sorted by its row's north edge, so the row's own people stand on it.
+			strip.position = Vector2(top_left.x, strip_key.x * CELL.y - 0.5)
+			strip.offset = Vector2(0, 0.5 - strip_key.y * _px)
+			_add_occluder(strip, "terrain", image.get_used_rect(), occluders)
+		for tree: Dictionary in trees:
+			if not cells.has_point(tree.cell):
+				continue
+			var sprite := Sprite2D.new()
+			sprite.texture = _frame("trees", tree.kind, tree.variant)
+			sprite.centered = false
+			sprite.position = tree.foot
+			sprite.offset = Vector2(-16, -36 - tree.level * _px)
+			_add_occluder(sprite, "tree", _used(sprite.texture), occluders)
 		for entry: Dictionary in _structures_in.get(key, []):
 			var sprite := Sprite2D.new()
 			var stages: Array[AtlasTexture] = []
 			for stage: String in STAGES:
-				stages.append(_frame(entry.kind, stage if _sheets[entry.kind].tags.has(stage) else "intact", 0))
+				stages.append(_entry_frame(entry, stage))
 			sprite.set_meta("stages", stages)
 			sprite.set_meta("entry", entry)
 			sprite.set_meta("stage", _stage(entry))
 			sprite.texture = stages[sprite.get_meta("stage")]
-			if not entry.kind in GROUND_KINDS:
-				var shadow := Sprite2D.new()
-				shadow.centered = false
-				shadow.texture = _shadow(entry.size, sprite.get_meta("stage"))
-				shadow.position = Vector2(entry.corner) * CELL
-				_shadows.add_child(shadow)
-				sprite.set_meta("shadow", shadow)
-				extras.append(shadow)
 			sprite.centered = false
+			var lift: int = _level(entry.corner.x, entry.corner.y + entry.size.y - 1) * _px
 			var frame_size := sprite.texture.get_size()
-			sprite.offset = Vector2(-8, -(frame_size.y - 8))
+			sprite.offset = Vector2(-8, -(frame_size.y - 8) - lift)
 			sprite.position = Vector2(entry.corner.x * CELL.x, (entry.corner.y + entry.size.y) * CELL.y)
+			var shadow := Sprite2D.new()
+			shadow.centered = false
+			shadow.texture = _stage_shadow(entry.size, sprite.get_meta("stage"))
+			shadow.position = Vector2(entry.corner) * CELL - Vector2(0, lift)
+			sprite.set_meta("shadow", shadow)
+			extras.append(shadow)
+			_shadows.add_child(shadow)
 			if entry.kind in GROUND_KINDS:
 				sprite.position += sprite.offset
 				sprite.offset = Vector2.ZERO
 				_ground.add_child(sprite)
 				extras.append(sprite)
 			else:
-				_add_occluder(sprite, entry.kind, _sheets[entry.kind], occluders)
-		_chunks[key] = {"ground": ground, "extras": extras, "occluders": occluders,
-				"bytes": image.get_data_size()}
-		ground_bytes += image.get_data_size()
+				_add_occluder(sprite, entry.kind, _used(sprite.texture), occluders)
+		_chunks[key] = {"ground": ground_sprite, "extras": extras, "occluders": occluders, "bytes": bytes}
+		ground_bytes += bytes
 		built += 1
 		build_usec.append(Time.get_ticks_usec() - started)
+
+	# A structure's frame at `stage`: its sheet's tag for the stage, intact where the sheet has
+	# none, or the one frame its entry names by `tag` and `variant`.
+	func _entry_frame(entry: Dictionary, stage: String) -> AtlasTexture:
+		if entry.has("tag"):
+			return _frame(entry.kind, entry.tag, entry.variant)
+		return _frame(entry.kind, stage if _sheet(entry.kind).tags.has(stage) else "intact", 0)
+
+	# The deepest face a strip of `level` in row `y` drops to its south.
+	func _strip_drop(y: int, level: int, cells: Rect2i) -> int:
+		var drop := 0
+		for x in range(cells.position.x, cells.end.x):
+			if _level(x, y) == level:
+				drop = maxi(drop, (level - _level(x, y + 1)) * _px)
+		return drop
+
+	func _blit_tile(image: Image, sheet_name: String, tag: String, x: int, y: int, at: Vector2i) -> void:
+		var sheet := _sheet(sheet_name)
+		var span: Array = sheet.tags[tag]
+		var frame: Rect2i = sheet.frames[span[0] + _hash(x, y, 1) % (span[1] - span[0] + 1)]
+		image.blit_rect(sheet.image, frame, at)
+
+	# Shadows cast to the lower right onto this chunk's ground: each structure's and tree's on the
+	# level it stands on, and each raised cell's on the lower ground beside it. A pixel is
+	# darkened two steps along its ramp once, however many shadows cover it.
+	func _bake_shadows(key: Vector2i, cells: Rect2i, top_left: Vector2i, ground: Image, strips: Dictionary,
+			trees: Array) -> void:
+		var done := {}
+		var area := Rect2i(top_left, Vector2i(cells.size) * Vector2i(CELL))
+		var shade := func(wx: int, gy: int, highest: int, lowest: int) -> void:
+			if not area.has_point(Vector2i(wx, gy)):
+				return
+			var cell := Vector2i(wx / int(CELL.x), gy / int(CELL.y))
+			var level := _level(cell.x, cell.y)
+			if level > highest or level < lowest:
+				return
+			var image := ground
+			var at := Vector2i(wx, gy - level * _px) - top_left
+			if level > 0:
+				image = strips.get(Vector2i(cell.y, level))
+				at = Vector2i(wx - top_left.x, gy - cell.y * int(CELL.y))
+			var mark := Vector3i(at.x, at.y, level)
+			if done.has(mark) or image == null:
+				return
+			done[mark] = true
+			var colour := image.get_pixel(at.x, at.y)
+			if colour.a > 0.0:
+				image.set_pixel(at.x, at.y, _shade.get(colour.to_rgba32(), colour))
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				for entry: Dictionary in _structures_in.get(key + Vector2i(dx, dy), []):
+					if not look.baked_shadows() or entry.kind in GROUND_KINDS or _stage(entry) == 3:
+						continue
+					var level := _level(entry.corner.x, entry.corner.y + entry.size.y - 1)
+					var rise: float = (_used(_entry_frame(entry, "intact")).size.y - entry.size.y * CELL.y) * (0.5 if _stage(entry) == 2 else 1.0)
+					_sweep(Rect2(Vector2(entry.corner) * CELL, Vector2(entry.size) * CELL), rise, area,
+							func(wx: int, gy: int) -> void: shade.call(wx, gy, level, level))
+		for tree: Dictionary in trees:
+			var foot: Vector2 = tree.foot
+			var centre := foot + SHADOW * 26.0
+			var level: int = tree.level
+			for wx in range(int(centre.x) - 11, int(centre.x) + 12):
+				for gy in range(int(centre.y) - 5, int(centre.y) + 6):
+					if Vector2((wx - centre.x) / 11.0, (gy - centre.y) / 5.0).length() <= 1.0:
+						shade.call(wx, gy, level, level)
+		for y in range(cells.position.y - 3, cells.end.y):
+			for x in range(cells.position.x - 3, cells.end.x):
+				var level := _level(x, y)
+				var below := mini(_level(x + 1, y), mini(_level(x, y + 1), _level(x + 1, y + 1)))
+				if level <= below:
+					continue
+				_sweep(Rect2(Vector2(x, y) * CELL, CELL), (level - below) * _px, area,
+						func(wx: int, gy: int) -> void: shade.call(wx, gy, level - 1, -99))
+
+	# Calls `paint` for each ground pixel within `area` that `rect`, raised `rise` pixels, shades:
+	# the rect swept along SHADOW times the rise.
+	func _sweep(rect: Rect2, rise: float, area: Rect2i, paint: Callable) -> void:
+		var v := SHADOW * rise
+		var bound := Rect2i(rect.merge(Rect2(rect.position + v, rect.size))).intersection(area)
+		for wx in range(bound.position.x, bound.end.x):
+			for gy in range(bound.position.y, bound.end.y):
+				var lo := 0.0
+				var hi := 1.0
+				if v.x > 0.0:
+					lo = maxf(lo, (wx - rect.end.x) / v.x)
+					hi = minf(hi, (wx - rect.position.x) / v.x)
+				if v.y > 0.0:
+					lo = maxf(lo, (gy - rect.end.y) / v.y)
+					hi = minf(hi, (gy - rect.position.y) / v.y)
+				if lo <= hi and not rect.has_point(Vector2(wx, gy)):
+					paint.call(wx, gy)
 
 	func _free_chunk(key: Vector2i) -> void:
 		var chunk: Dictionary = _chunks[key]
@@ -489,84 +617,34 @@ class AngleView extends Node2D:
 		_chunks.erase(key)
 		freed += 1
 
-	# The shadow a structure of `size` cells casts at `stage`, from its footprint's top-left: a
-	# dithered band past its right and bottom edges, shorter as it falls, none from rubble.
-	func _shadow(size: Vector2i, stage: int) -> ImageTexture:
+	# Where a look's structures change stage as the core runs (RegionLook), a structure's shadow is
+	# a sprite of its own, so a stage change swaps it without building the chunk again: a dithered
+	# band past its right and bottom edges, shorter as it falls, none from rubble. A look that
+	# bakes structure shadows (Valley) gets an empty one.
+	func _stage_shadow(size: Vector2i, stage: int) -> ImageTexture:
 		var key := "%d,%d,%d" % [size.x, size.y, stage]
 		if not _shadow_cache.has(key):
-			var reach: int = [6, 6, 3, 0][stage]
+			var reach: int = [6, 6, 3, 0][stage] if not look.baked_shadows() else 0
 			var right := size.x * int(CELL.x)
 			var bottom := size.y * int(CELL.y)
 			var image := Image.create_empty(right + 6, bottom + 3, false, Image.FORMAT_RGBA8)
-			if reach > 0:
-				_dither(image, Rect2i(right, reach, reach, bottom - 2), Vector2i.ZERO)
-				_dither(image, Rect2i(reach, bottom, right, reach / 2), Vector2i.ZERO)
+			for rect: Rect2i in [Rect2i(right, reach, reach, bottom - 2), Rect2i(reach, bottom, right, reach / 2)]:
+				for x in range(rect.position.x, mini(rect.end.x, image.get_width())):
+					for y in range(rect.position.y, mini(rect.end.y, image.get_height())):
+						if reach > 0 and (x + y) % 2 == 0:
+							image.set_pixel(x, y, Color("14101a"))
 			_shadow_cache[key] = ImageTexture.create_from_image(image)
 		return _shadow_cache[key]
 
 	func _stage(entry: Dictionary) -> int:
 		if _stage_of.is_valid():
 			return _stage_of.call(entry)
-		return clampi(look.structure_stage(entry.id), 0, STAGES.size() - 1)
-
-	# Indexes once what the chunks draw from: the cells decorations and fields cover, the
-	# structures by chunk, and the villages trees keep clear of.
-	func _index_layout() -> void:
-		var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
-		for village: Dictionary in look.villages():
-			_cleared.append(Rect2i(village.corner, village.area).grow(1))
-			for item: Dictionary in layouts.get(village.kind, []):
-				if not item.has("tile"):
-					continue
-				var r: Array = item.rect
-				for dx in int(r[2]):
-					for dy in int(r[3]):
-						_laid[Vector2i(village.corner) + Vector2i(int(r[0]) + dx, int(r[1]) + dy)] = item.tile
-		for structure in look.structure_count():
-			var corner := look.structure_cell(structure)
-			var size := look.structure_footprint(structure)
-			var state := look.structure_field_state(structure)
-			if state >= 0:
-				for dx in size.x:
-					for dy in size.y:
-						_laid[corner + Vector2i(dx, dy)] = FIELD_TAGS[state]
-				continue
-			var kind := look.structure_kind(structure)
-			if not _sheets.has(kind):
-				print("angle: no art for %s at %s" % [kind, corner])
-				continue
-			var key := corner / CHUNK
-			if not _structures_in.has(key):
-				_structures_in[key] = []
-			_structures_in[key].append({"kind": kind, "corner": corner, "size": size, "id": structure})
-
-	func _tile(x: int, y: int) -> String:
-		var laid: String = _laid.get(Vector2i(x, y), "")
-		if not laid.is_empty():
-			return laid
-		var kind := _kind(x, y)
-		return kind if kind in ["hills", "forest"] else "plain"
-
-	# The trees on the forest cells of `cells`: on about half of them outside the villages, the
-	# foot jittered within the cell, broadleaf or pine. Each is [foot, frame, cell].
-	func _trees(cells: Rect2i) -> Array:
-		var trees := []
-		for y in range(maxi(cells.position.y, 0), mini(cells.end.y, _height)):
-			for x in range(maxi(cells.position.x, 0), mini(cells.end.x, _width)):
-				if _kind(x, y) != "forest" or _hash(x, y, 3) % 100 >= 55:
-					continue
-				if _cleared.any(func(rect: Rect2i) -> bool: return rect.has_point(Vector2i(x, y))):
-					continue
-				var pine := _hash(x, y, 4) % 3 == 0
-				trees.append([Vector2(x * CELL.x + 4 + _hash(x, y, 6) % 9, y * CELL.y + 3 + _hash(x, y, 7) % 7),
-						_frame("trees", "pine" if pine else "tree", _hash(x, y, 5) % (2 if pine else 3)),
-						Vector2i(x, y)])
-		return trees
+		return look.stage(entry)
 
 	# Draws the outline of `body` over every occluder sorted after it that its frame overlaps,
 	# clipped to the occluder's pixels.
 	func _outline(body: Sprite2D, key: String, army: int, person: int, used: Dictionary) -> void:
-		var rect := Rect2(body.position - FEET, BODY).grow(-2)
+		var rect := Rect2(body.position + body.offset, BODY).grow(-2)
 		var parts := key.split("|")
 		for occluder: Sprite2D in _near(rect):
 			if occluder.position.y <= body.position.y:
@@ -580,25 +658,25 @@ class AngleView extends Node2D:
 			if n >= pool.size():
 				var made := Sprite2D.new()
 				made.centered = false
-				made.offset = -FEET
 				occluder.add_child(made)
 				pool.append(made)
 			var outline: Sprite2D = pool[n]
 			outline.texture = _frame(parts[0], parts[1] + "_xray", int(parts[2]))
 			outline.flip_h = body.flip_h
 			outline.position = body.position - occluder.position
+			outline.offset = body.offset
 			outline.visible = true
 			occluder.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 			occluded += 1
-			hidden_list.append([army, person, occluder.get_meta("kind"), body.position,
+			hidden_list.append([army, person, occluder.get_meta("kind"), body.position + body.offset + FEET,
 					occluder.get_meta("solid").intersection(rect).size.y])
 
 	func _note_front(body: Sprite2D, army: int, person: int) -> void:
-		var rect := Rect2(body.position - FEET, BODY).grow(-2)
+		var rect := Rect2(body.position + body.offset, BODY).grow(-2)
 		for occluder: Sprite2D in _near(rect):
-			if occluder.position.y < body.position.y and occluder.get_meta("kind") != "tree" \
+			if occluder.position.y < body.position.y and not occluder.get_meta("kind") in ["tree", "terrain"] \
 					and occluder.get_meta("solid").intersects(rect):
-				front_list.append([army, person, occluder.get_meta("kind"), body.position,
+				front_list.append([army, person, occluder.get_meta("kind"), body.position + body.offset + FEET,
 						occluder.get_meta("solid").intersection(rect).size.y])
 
 	func _near(rect: Rect2) -> Array:
@@ -609,16 +687,15 @@ class AngleView extends Node2D:
 					found[occluder] = true
 		return found.keys()
 
-	# Adds `sprite` to the sorted node as something that can hide a body, with the bounds of its
-	# opaque pixels in the world, and to `occluders`, its chunk's.
-	func _add_occluder(sprite: Sprite2D, kind: String, sheet: Dictionary, occluders: Array[Sprite2D]) -> void:
-		var region := Rect2i((sprite.texture as AtlasTexture).region)
-		var used := (sheet.image as Image).get_region(region).get_used_rect()
-		sprite.set_meta("solid", Rect2(sprite.position + sprite.offset + Vector2(used.position), used.size))
+	# Adds `sprite` to the sorted node as something that can hide a body, `used` being the
+	# opaque part of its texture, and to `occluders`, its chunk's.
+	func _add_occluder(sprite: Sprite2D, kind: String, used: Rect2i, occluders: Array[Sprite2D]) -> void:
+		var drawn_at := sprite.position + sprite.offset
+		sprite.set_meta("solid", Rect2(drawn_at + Vector2(used.position), used.size))
 		sprite.set_meta("kind", kind)
 		_standing.add_child(sprite)
 		occluders.append(sprite)
-		var rect := Rect2(sprite.position + sprite.offset, sprite.texture.get_size())
+		var rect := Rect2(drawn_at, sprite.texture.get_size())
 		var keys: Array[Vector2i] = []
 		for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
 			for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
@@ -629,25 +706,26 @@ class AngleView extends Node2D:
 				keys.append(key)
 		sprite.set_meta("buckets", keys)
 
-	func _kind(x: int, y: int) -> String:
-		return _kinds[clampi(y, 0, _height - 1) * _width + clampi(x, 0, _width - 1)]
+	# The opaque part of an atlas frame, in the frame's pixels.
+	func _used(texture: AtlasTexture) -> Rect2i:
+		if not texture.has_meta("used"):
+			var region := Rect2i(texture.region)
+			var image: Image = texture.atlas.get_meta("image")
+			texture.set_meta("used", image.get_region(region).get_used_rect())
+		return texture.get_meta("used")
 
 	func _hash(x: int, y: int, salt: int) -> int:
 		var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
 		h = (h ^ (h >> 13)) * 1274126177
 		return absi(h ^ (h >> 16))
 
-	# Dithers ink over every other pixel of `rect`, given in the world, on `image`, whose top-left
-	# is `origin` in the world.
-	func _dither(image: Image, rect: Rect2i, origin: Vector2i) -> void:
-		var area := Rect2i(rect.position - origin, rect.size).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
-		for x in range(area.position.x, area.end.x):
-			for y in range(area.position.y, area.end.y):
-				if (x + origin.x + y + origin.y) % 2 == 0:
-					image.set_pixel(x, y, INK)
+	func _has_sheet(name: String) -> bool:
+		return _sheets.has(name) or FileAccess.file_exists(ART + name + ".json")
 
-	func _load(name: String) -> Dictionary:
-		return _load_from(ART + name)
+	func _sheet(name: String) -> Dictionary:
+		if not _sheets.has(name):
+			_sheets[name] = _load_from(ART + name)
+		return _sheets[name]
 
 	func _load_from(path: String) -> Dictionary:
 		var image := Image.load_from_file(ProjectSettings.globalize_path(path + ".png"))
@@ -659,11 +737,12 @@ class AngleView extends Node2D:
 		var tags := {}
 		for t: Dictionary in data.meta.frameTags:
 			tags[t.name] = [int(t.from), int(t.to)]
-		return {"image": image, "texture": ImageTexture.create_from_image(image), "frames": frames,
-				"tags": tags, "atlas": {}}
+		var texture := ImageTexture.create_from_image(image)
+		texture.set_meta("image", image)
+		return {"image": image, "texture": texture, "frames": frames, "tags": tags, "atlas": {}}
 
 	func _frame(sheet: String, tag: String, index: int) -> AtlasTexture:
-		return _frame_of(_sheets[sheet], tag, index)
+		return _frame_of(_sheet(sheet), tag, index)
 
 	func _frame_of(sheet: Dictionary, tag: String, index: int) -> AtlasTexture:
 		var key := "%s/%d" % [tag, index]
@@ -674,6 +753,106 @@ class AngleView extends Node2D:
 			texture.region = Rect2(sheet.frames[sheet.tags[tag][0] + index])
 			atlas[key] = texture
 		return atlas[key]
+
+
+## The look of a region the core generated: its terrain kinds (hills raised one level of 8
+## pixels, plain where the kind has no tile at the angle), the villages' road and paving from
+## world_art/villages.json, its fields in the state they are in when read, its structures, and a
+## tree on about half the forest cells outside the villages.
+class RegionLook extends RefCounted:
+	const HILLS_PX := 8
+	var world: WorldAdapter
+	var _size := Vector2i.ZERO
+	var _kinds := PackedStringArray()
+	var _laid := {}
+	var _cleared: Array[Rect2i] = []
+	var _structures: Array[Dictionary] = []
+
+	func _init(source: WorldAdapter) -> void:
+		world = source
+		var rows := world.map_rows()
+		_size = Vector2i(rows[0].length(), rows.size())
+		var names := world.terrain_names()
+		var terrain := world.terrain()
+		for i in _size.x * _size.y:
+			_kinds.append(names[terrain[i]] if terrain.size() == _size.x * _size.y else
+					("plain" if rows[i / _size.x][i % _size.x] == "." else "mountain"))
+		var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/villages.json"))
+		for village: Dictionary in world.villages():
+			_cleared.append(Rect2i(village.corner, village.area).grow(1))
+			for item: Dictionary in layouts.get(village.kind, []):
+				if not item.has("tile"):
+					continue
+				var r: Array = item.rect
+				for dx in int(r[2]):
+					for dy in int(r[3]):
+						_laid[Vector2i(village.corner) + Vector2i(int(r[0]) + dx, int(r[1]) + dy)] = item.tile
+		for structure in world.structure_count():
+			var corner := world.structure_cell(structure)
+			var size := world.structure_footprint(structure)
+			var state := world.structure_field_state(structure)
+			if state >= 0:
+				for dx in size.x:
+					for dy in size.y:
+						_laid[corner + Vector2i(dx, dy)] = ["sown", "growing", "ripe", "fallow", "burnt"][state]
+				continue
+			_structures.append({"kind": world.structure_kind(structure), "corner": corner, "size": size, "id": structure})
+
+	func size() -> Vector2i:
+		return _size
+
+	func baked_shadows() -> bool:
+		return false
+
+	func level_px() -> int:
+		return HILLS_PX
+
+	func max_level() -> int:
+		return 1
+
+	func level_at(x: int, y: int) -> int:
+		return 1 if _kind(x, y) == "hills" else 0
+
+	func stairs_at(_x: int, _y: int) -> bool:
+		return false
+
+	func tile_at(x: int, y: int) -> String:
+		var laid: String = _laid.get(Vector2i(x, y), "")
+		if not laid.is_empty():
+			return laid
+		var kind := _kind(x, y)
+		return kind if kind in ["hills", "forest"] else "plain"
+
+	func face_at(_x: int, _y: int) -> String:
+		return "hills_face"
+
+	func structures() -> Array[Dictionary]:
+		return _structures
+
+	func stage(entry: Dictionary) -> int:
+		return clampi(world.structure_stage(entry.id), 0, 3)
+
+	func trees_in(cells: Rect2i) -> Array:
+		var trees := []
+		for y in range(maxi(cells.position.y, 0), mini(cells.end.y, _size.y)):
+			for x in range(maxi(cells.position.x, 0), mini(cells.end.x, _size.x)):
+				if _kind(x, y) != "forest" or _hash(x, y, 3) % 100 >= 55:
+					continue
+				if _cleared.any(func(rect: Rect2i) -> bool: return rect.has_point(Vector2i(x, y))):
+					continue
+				var pine := _hash(x, y, 4) % 3 == 0
+				trees.append({"foot": Vector2(x * 16 + 4 + _hash(x, y, 6) % 9, y * 12 + 3 + _hash(x, y, 7) % 7),
+						"kind": "pine" if pine else "tree", "variant": _hash(x, y, 5) % (2 if pine else 3),
+						"cell": Vector2i(x, y), "level": level_at(x, y)})
+		return trees
+
+	func _kind(x: int, y: int) -> String:
+		return _kinds[clampi(y, 0, _size.y - 1) * _size.x + clampi(x, 0, _size.x - 1)]
+
+	func _hash(x: int, y: int, salt: int) -> int:
+		var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
+		h = (h ^ (h >> 13)) * 1274126177
+		return absi(h ^ (h >> 16))
 
 
 ## Gives the staged orders: each walking Demonic army its next waypoint when it reaches one, the
@@ -989,20 +1168,641 @@ class RingFx extends Node2D:
 					draw_rect(Rect2(at, Vector2(2, 1)), COLOURS[band])
 
 
+## A valley composed by hand for the revised look (PR #204's review), WIDTH x HEIGHT cells, in
+## levels of LEVEL_PX: a range to the north in tiers up to level 5, capped by peaks; the main
+## village on the valley floor, entered from the south through a gate and a guardian pavilion,
+## lanes winding to a square with a well, its ancestral hall, a shrine up stairs on a terrace, an
+## inn, stalls, tiled houses in the core and thatched ones at the edges; a walled market town to
+## the west; a village of terraces climbing the hillside to the east; a riverside village on
+## stilts along the river to the south. Every choice is seeded, so it is the same each run.
+## It answers the calls AngleView reads a look with, and gives the core the cells people can
+## walk (map_rows) and the cells each village's people walk between (lanes).
+class Valley extends RefCounted:
+	const WIDTH := 128
+	const HEIGHT := 96
+	const LEVEL_PX := 16
+	const TOP := 5
+	## The cells each still centres on.
+	const PLACES := {"village": Vector2(50, 48), "town": Vector2(19, 48), "terraces": Vector2(100, 40),
+			"riverside": Vector2(80, 70), "valley": Vector2(64, 24)}
+	const VILLAGE := Rect2i(24, 32, 50, 32)
+	const TOWN := Rect2i(4, 36, 25, 25)
+	const TERRACES := Rect2i(86, 22, 36, 34)
+	const RIVERSIDE := Rect2i(60, 60, 40, 18)
+	const SQUARE := Rect2i(45, 42, 11, 7)
+
+	var _level := PackedInt32Array()
+	var _tile := PackedStringArray()
+	var _face := PackedStringArray()
+	var _stairs := PackedByteArray()
+	var _taken := PackedByteArray()
+	var _blocked := PackedByteArray()
+	var _region := PackedInt32Array()
+	var _built := PackedByteArray()
+	var _structures: Array[Dictionary] = []
+	var _trees := {}
+	var _lanes := {"village": [], "town": [], "terraces": [], "riverside": []}
+	var _rng := RandomNumberGenerator.new()
+
+	func _init() -> void:
+		_rng.seed = 2026
+		var cells := WIDTH * HEIGHT
+		_level.resize(cells)
+		_tile.resize(cells)
+		_face.resize(cells)
+		_stairs.resize(cells)
+		_taken.resize(cells)
+		_blocked.resize(cells)
+		_built.resize(cells)
+		_lay_ground()
+		_lay_range()
+		_lay_river()
+		_lay_terraces()
+		_lay_town()
+		_lay_village()
+		_lay_riverside()
+		_lay_woods()
+		_block_cliffs()
+
+	func size() -> Vector2i:
+		return Vector2i(WIDTH, HEIGHT)
+
+	func baked_shadows() -> bool:
+		return true
+
+	func level_px() -> int:
+		return LEVEL_PX
+
+	func max_level() -> int:
+		return TOP
+
+	func level_at(x: int, y: int) -> int:
+		return _level[_i(x, y)]
+
+	func stairs_at(x: int, y: int) -> bool:
+		return _stairs[_i(x, y)] == 1
+
+	func tile_at(x: int, y: int) -> String:
+		return _tile[_i(x, y)]
+
+	func face_at(x: int, y: int) -> String:
+		return _face[_i(x, y)]
+
+	func structures() -> Array[Dictionary]:
+		return _structures
+
+	func stage(_entry: Dictionary) -> int:
+		return 0
+
+	func trees_in(cells: Rect2i) -> Array:
+		var found := []
+		for y in range(maxi(cells.position.y, 0), mini(cells.end.y, HEIGHT)):
+			for x in range(maxi(cells.position.x, 0), mini(cells.end.x, WIDTH)):
+				if _trees.has(Vector2i(x, y)):
+					found.append(_trees[Vector2i(x, y)])
+		return found
+
+	## The map the core walks people on: "." where they may stand.
+	func map_rows() -> PackedStringArray:
+		var rows := PackedStringArray()
+		for y in HEIGHT:
+			var row := ""
+			for x in WIDTH:
+				row += "#" if _blocked[_i(x, y)] == 1 else "."
+			rows.append(row)
+		return rows
+
+	## The lane cells of `place` its people walk between: those the core lets them stand on, in
+	## the one stretch of open ground holding most of them, so every one reaches every other.
+	func lanes(place: String) -> Array[Vector2i]:
+		if _region.is_empty():
+			_find_regions()
+		var count := {}
+		for cell: Vector2i in _lanes[place]:
+			var region: int = _region[_i(cell.x, cell.y)]
+			if region >= 0:
+				count[region] = count.get(region, 0) + 1
+		var best := -1
+		for region: int in count:
+			if best < 0 or count[region] > count[best]:
+				best = region
+		var out: Array[Vector2i] = []
+		for cell: Vector2i in _lanes[place]:
+			if _region[_i(cell.x, cell.y)] == best and not out.has(cell):
+				out.append(cell)
+		return out
+
+	# Numbers each stretch of open ground the core's people can cross, four ways.
+	func _find_regions() -> void:
+		_region.resize(WIDTH * HEIGHT)
+		_region.fill(-1)
+		var next := 0
+		for start in WIDTH * HEIGHT:
+			if _blocked[start] == 1 or _region[start] >= 0:
+				continue
+			var queue: Array[int] = [start]
+			_region[start] = next
+			while not queue.is_empty():
+				var i: int = queue.pop_back()
+				var x := i % WIDTH
+				var y := i / WIDTH
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var other := Vector2i(x, y) + d
+					if not _inside(other):
+						continue
+					var j := _i(other.x, other.y)
+					if _blocked[j] == 0 and _region[j] < 0:
+						_region[j] = next
+						queue.append(j)
+			next += 1
+
+	func _i(x: int, y: int) -> int:
+		return clampi(y, 0, HEIGHT - 1) * WIDTH + clampi(x, 0, WIDTH - 1)
+
+	func _inside(cell: Vector2i) -> bool:
+		return cell.x >= 0 and cell.y >= 0 and cell.x < WIDTH and cell.y < HEIGHT
+
+	func _noise(x: float, y: float, scale: float, salt: int) -> float:
+		var fx := x / scale
+		var fy := y / scale
+		var x0 := floori(fx)
+		var y0 := floori(fy)
+		var tx := fx - x0
+		var ty := fy - y0
+		tx = tx * tx * (3.0 - 2.0 * tx)
+		ty = ty * ty * (3.0 - 2.0 * ty)
+		var a := _hash(x0, y0, salt)
+		var b := _hash(x0 + 1, y0, salt)
+		var c := _hash(x0, y0 + 1, salt)
+		var d := _hash(x0 + 1, y0 + 1, salt)
+		return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), ty)
+
+	func _hash(x: int, y: int, salt: int) -> float:
+		var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
+		h = (h ^ (h >> 13)) * 1274126177
+		return float(absi(h ^ (h >> 16)) % 100003) / 100003.0
+
+	func _lay_tile(cell: Vector2i, tile: String) -> void:
+		if _inside(cell):
+			_tile[_i(cell.x, cell.y)] = tile
+
+	# Grass in patches of two tones, meadow lighter than the plain.
+	func _lay_ground() -> void:
+		for y in HEIGHT:
+			for x in WIDTH:
+				_tile[_i(x, y)] = "hills" if _noise(x, y, 9.0, 1) > 0.62 else "plain"
+				_face[_i(x, y)] = "bank_face"
+
+	# The range: levels rising northward in tiers whose edges wander, smoothed so no tier is a
+	# lone cell; grass and forest floor on the lower tops, rock above, rock faces from the second
+	# level up, peaks on the top tier, and pines on the slopes.
+	func _lay_range() -> void:
+		var raw := PackedInt32Array()
+		raw.resize(WIDTH * HEIGHT)
+		for y in HEIGHT:
+			for x in WIDTH:
+				var rise := (38.0 - y) / 4.0 + (_noise(x, y, 12.0, 2) - 0.5) * 2.0 + (_noise(x, y, 30.0, 3) - 0.5) * 3.0
+				# The village's valley stays low, and the village and the town lie on the floor.
+				if x > 30 and x < 70:
+					rise -= 1.0
+				if Rect2i(VILLAGE.position + Vector2i(0, 2), VILLAGE.size).has_point(Vector2i(x, y)) \
+						or TOWN.grow(2).has_point(Vector2i(x, y)):
+					rise = 0.0
+				raw[_i(x, y)] = clampi(floori(rise), 0, TOP)
+		# Each cell takes the level most of its neighbours have, twice over.
+		for pass_count in 2:
+			var smooth := raw.duplicate()
+			for y in range(1, HEIGHT - 1):
+				for x in range(1, WIDTH - 1):
+					var count := {}
+					for dy in range(-1, 2):
+						for dx in range(-1, 2):
+							var l: int = raw[_i(x + dx, y + dy)]
+							count[l] = count.get(l, 0) + 1
+					var best: int = raw[_i(x, y)]
+					for l: int in count:
+						if count[l] > count.get(best, 0):
+							best = l
+					smooth[_i(x, y)] = best
+			raw = smooth
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level: int = raw[_i(x, y)]
+				if level <= 0:
+					continue
+				var i := _i(x, y)
+				_level[i] = level
+				var rocky := _noise(x, y, 5.0, 4)
+				_tile[i] = ["plain", "hills", "plain", "forest", "rock" if rocky > 0.4 else "forest", "rock"][level]
+				_face[i] = "rock_face" if level >= 2 else "bank_face"
+				_taken[i] = 1
+		# Peaks stand on the front of the top tier, as far south as it reaches.
+		var peaks := 0
+		for x in range(4, WIDTH - 8, 11):
+			for y in range(HEIGHT / 3, -1, -1):
+				if level_at(x, y) == TOP and level_at(x + 6, y) == TOP and peaks < 12:
+					_structures.append({"kind": "mountains", "tag": "peak", "variant": peaks % 3,
+							"corner": Vector2i(x, y - 2), "size": Vector2i(7, 1), "id": -1})
+					peaks += 1
+					break
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level := level_at(x, y)
+				var dense := _noise(x, y, 6.0, 12) > 0.5
+				if level >= 1 and level <= 4 and _hash(x, y, 5) > (0.45 if dense else 0.85) and level_at(x, y + 1) == level \
+						and _taken[_i(x, y)] == 1 and not TERRACES.has_point(Vector2i(x, y)):
+					_taken[_i(x, y)] = 0
+					_add_tree(Vector2i(x, y), "pine" if level >= 2 or _hash(x, y, 13) > 0.5 else "tree", 2)
+					_taken[_i(x, y)] = 1
+
+	# The river: five cells wide, a level below the plain, winding west along the valley's foot;
+	# its north bank drops into it in earth.
+	func _lay_river() -> void:
+		for x in WIDTH:
+			var centre := 74.0 + sin(x / 14.0) * 4.0 + (_noise(x, 0, 20.0, 6) - 0.5) * 3.0
+			for y in range(int(centre) - 2, int(centre) + 3):
+				var i := _i(x, y)
+				_level[i] = -1
+				_tile[i] = "river" if x < 20 else "water"
+				_taken[i] = 1
+				_blocked[i] = 1
+
+	# Terraces climbing the eastern hillside, a level each six rows, faced in stone, planted with
+	# paddies and gardens, houses on their lips, and a stair winding up through them.
+	func _lay_terraces() -> void:
+		var r := TERRACES
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				var wobble := (_noise(x, 0, 11.0, 8) - 0.5) * 7.0
+				var level := clampi(1 + floori((r.end.y - y + wobble) / 6.0), 1, 5)
+				var i := _i(x, y)
+				if _level[i] > level:
+					continue
+				_level[i] = level
+				_face[i] = "stone_face"
+				_tile[i] = "paddy" if level <= 2 else ("garden" if _noise(x, y, 5.0, 10) > 0.45 else "hills")
+				_taken[i] = 0
+		# The stair: up the middle, a cell to the side at each landing.
+		var x := r.position.x + 16
+		for y in range(r.end.y + 1, r.position.y, -1):
+			var cell := Vector2i(x, y)
+			if level_at(x, y) > level_at(x, y + 1):
+				_stairs[_i(x, y)] = 1
+				_tile[_i(x, y)] = "steps"
+			else:
+				_lay_tile(cell, "lane")
+			_lanes.terraces.append(cell)
+			_taken[_i(x, y)] = 1
+			if y % 6 == 0:
+				for k in range(-8, 9):
+					var along := Vector2i(x + k, y - 1)
+					if level_at(along.x, along.y) == level_at(x, y - 1) and not stairs_at(along.x, along.y):
+						_lay_tile(along, "lane")
+						_lanes.terraces.append(along)
+						_taken[_i(along.x, along.y)] = 1
+		# Houses along every terrace, thatched and small, each on a run of one level, a haystack
+		# or crocks beside some.
+		var k := 0
+		for hx in range(r.position.x + 1, r.end.x - 3, 5):
+			for y in range(r.position.y + 1, r.end.y - 2):
+				var kind: String = ["thatched_house", "thatched_small", "tiled_house"][k % 3]
+				var size := Vector2i(2, 2) if kind == "thatched_small" else Vector2i(3, 2)
+				if level_at(hx, y - 1) > level_at(hx, y) and _place(kind, Vector2i(hx, y), size, false, true):
+					_place(["haystack", "crocks", "firewood"][k % 3], Vector2i(hx + size.x, y + 1), Vector2i.ONE, false)
+					k += 1
+		for y in range(r.position.y, r.end.y):
+			for xx in range(r.position.x, r.end.x):
+				if _taken[_i(xx, y)] == 0 and _tile[_i(xx, y)] == "hills" and _hash(xx, y, 9) > 0.8:
+					_add_tree(Vector2i(xx, y), "bamboo", 2)
+
+	# The walled market town: a wall round it, its gate tower on the south, a street up from the
+	# gate to an east-west market street lined with stalls, shops, an inn and watchtowers.
+	func _lay_town() -> void:
+		var r := TOWN
+		for x in range(r.position.x, r.end.x):
+			for y in range(r.position.y, r.end.y):
+				_lay_tile(Vector2i(x, y), "paving" if (y == r.position.y + 11 or y == r.position.y + 12 or x == r.position.x + 12) else "lane")
+		for x in range(r.position.x, r.end.x):
+			_place("wall_h", Vector2i(x, r.position.y), Vector2i.ONE, false)
+			if x < r.position.x + 10 or x > r.position.x + 13:
+				_place("wall_h", Vector2i(x, r.end.y - 1), Vector2i.ONE, false)
+		for y in range(r.position.y + 1, r.end.y - 1):
+			_place("wall_v", Vector2i(r.position.x, y), Vector2i.ONE, false)
+			if y < r.position.y + 10 or y > r.position.y + 13:
+				_place("wall_v", Vector2i(r.end.x - 1, y), Vector2i.ONE, false)
+		_place("town_gate", Vector2i(r.position.x + 10, r.end.y - 2), Vector2i(4, 2), false)
+		_place("watchtower", Vector2i(r.position.x + 1, r.position.y + 1), Vector2i(2, 2), false)
+		_place("watchtower", Vector2i(r.end.x - 3, r.position.y + 1), Vector2i(2, 2), false)
+		var street := r.position.y + 11
+		for x in range(r.position.x + 1, r.end.x + 6):
+			_lanes.town.append(Vector2i(x, street + 1))
+			if x >= r.end.x - 1:
+				_lay_tile(Vector2i(x, street + 1), "lane")
+				_lay_tile(Vector2i(x, street), "lane")
+		for y in range(street, r.end.y + 2):
+			_lanes.town.append(Vector2i(r.position.x + 12, y))
+		_place("inn", Vector2i(r.position.x + 14, street - 4), Vector2i(4, 3), false)
+		var shops := ["tiled_house_big", "tiled_house", "tiled_house", "tiled_house_big", "tiled_house"]
+		var x := r.position.x + 2
+		for kind: String in shops:
+			var size := Vector2i(4, 3) if kind == "tiled_house_big" else Vector2i(3, 2)
+			if x + size.x <= r.position.x + 12:
+				_place(kind, Vector2i(x, street - size.y - 1), size, false)
+			x += size.x + 1
+		x = r.position.x + 2
+		for kind: String in ["tiled_house", "tiled_house_big", "tiled_house"]:
+			var size := Vector2i(4, 3) if kind == "tiled_house_big" else Vector2i(3, 2)
+			_place(kind, Vector2i(x, street + 3), size, false)
+			_place(kind, Vector2i(x + 13, street + 3), size, false)
+			x += size.x + 1
+		var stalls := ["stall_red", "stall_blue", "stall_amber"]
+		for k in 6:
+			_place(stalls[k % 3], Vector2i(r.position.x + 2 + k * 4, street - 1), Vector2i(2, 1), false)
+			_place(stalls[(k + 1) % 3], Vector2i(r.position.x + 2 + k * 4, street + 2), Vector2i(2, 1), false)
+		_place("cart", Vector2i(r.position.x + 14, street + 2), Vector2i(2, 1), false)
+		for y in range(r.position.y + 2, r.end.y - 2, 3):
+			_place("lantern", Vector2i(r.position.x + 11, y), Vector2i.ONE, false)
+
+	# The main village: the gate and guardians at the south, the main lane up to the square and on
+	# to the shrine's stairs, a cross lane winding east and west, lanes off them, and houses,
+	# gardens and the things of daily life along them.
+	func _lay_village() -> void:
+		# The shrine's terrace, a level up at the village's head, and its stairs.
+		for y in range(31, 36):
+			for x in range(44, 57):
+				_level[_i(x, y)] = 1
+				_face[_i(x, y)] = "stone_face"
+				_tile[_i(x, y)] = "paving"
+		for y in range(28, 31):
+			for x in range(42, 59):
+				_level[_i(x, y)] = maxi(_level[_i(x, y)], 2)
+		_stairs[_i(50, 35)] = 1
+		_tile[_i(50, 35)] = "steps"
+		_stairs[_i(51, 35)] = 1
+		_tile[_i(51, 35)] = "steps"
+		_place("shrine", Vector2i(49, 31), Vector2i(2, 2), false)
+		_place("lantern", Vector2i(47, 33), Vector2i.ONE, false)
+		_place("lantern", Vector2i(54, 33), Vector2i.ONE, false)
+		for y in range(SQUARE.position.y, SQUARE.end.y):
+			for x in range(SQUARE.position.x, SQUARE.end.x):
+				_lay_tile(Vector2i(x, y), "paving")
+		var main := [Vector2i(50, 66), Vector2i(51, 60), Vector2i(50, 54), Vector2i(50, 48), Vector2i(50, 41), Vector2i(50, 36)]
+		var cross := [Vector2i(26, 52), Vector2i(32, 49), Vector2i(39, 47), Vector2i(45, 45), Vector2i(56, 45),
+				Vector2i(62, 43), Vector2i(68, 45), Vector2i(76, 44)]
+		var side := [[Vector2i(36, 48), Vector2i(35, 54), Vector2i(40, 59), Vector2i(46, 61)],
+				[Vector2i(62, 44), Vector2i(64, 51), Vector2i(60, 57), Vector2i(54, 60)],
+				[Vector2i(41, 46), Vector2i(41, 39), Vector2i(46, 36)],
+				[Vector2i(60, 43), Vector2i(61, 37), Vector2i(55, 36)]]
+		for lane: Array in [main, cross] + side:
+			_lay_lane(lane, "village")
+		_place("well_square", Vector2i(49, 44), Vector2i(2, 2), false)
+		_place("ancestral_hall", Vector2i(47, 37), Vector2i(5, 3), false)
+		_place("inn", Vector2i(56, 38), Vector2i(4, 3), false)
+		_place("village_gate", Vector2i(49, 63), Vector2i(3, 1), false)
+		_place("guardian", Vector2i(47, 64), Vector2i.ONE, false)
+		_place("guardian", Vector2i(53, 64), Vector2i.ONE, false)
+		_place("pavilion", Vector2i(54, 61), Vector2i(2, 2), false)
+		for k in 3:
+			_place(["stall_red", "stall_blue", "stall_amber"][k], Vector2i(46 + k * 3, 49), Vector2i(2, 1), false)
+		_place("cart", Vector2i(56, 49), Vector2i(2, 1), false)
+		_place("laundry", Vector2i(42, 49), Vector2i(2, 1), false)
+		# Houses along every lane: tiled and larger toward the square, thatched and smaller
+		# toward the edges, each with a garden behind it and something of daily life beside it.
+		var centre := Vector2(SQUARE.get_center())
+		for lane: Array in [main, cross] + side:
+			for n in lane.size() - 1:
+				var a: Vector2 = lane[n]
+				var b: Vector2 = lane[n + 1]
+				var steps := int(a.distance_to(b) / 4.0) + 1
+				for t in steps:
+					var at := a.lerp(b, float(t) / steps)
+					var across := (b - a).normalized().orthogonal()
+					for sign: int in [-1, 1]:
+						var spot: Vector2 = at + across * sign * _rng.randf_range(2.5, 4.0)
+						var far := spot.distance_to(centre) / 24.0
+						var kind := _village_kind(far)
+						var size := _size_of(kind)
+						var corner := Vector2i(int(spot.x) - size.x / 2, int(spot.y) - size.y / 2)
+						if _place(kind, corner, size, false, true):
+							_dress(corner, size, far)
+		# Brush fences and field-stone walls along parts of the edge.
+		for x in range(VILLAGE.position.x + 2, VILLAGE.end.x - 2):
+			if _hash(x, 0, 21) > 0.4:
+				_place("brush_fence" if x < 50 else "stone_wall", Vector2i(x, VILLAGE.position.y + 1), Vector2i.ONE, false)
+
+	func _village_kind(far: float) -> String:
+		var roll := _rng.randf()
+		if far < 0.6:
+			return "tiled_house_big" if roll < 0.4 else "tiled_house"
+		if far < 1.0:
+			return "tiled_house" if roll < 0.5 else ("thatched_house" if roll < 0.85 else "tiled_house_big")
+		return "thatched_house" if roll < 0.6 else "thatched_small"
+
+	func _size_of(kind: String) -> Vector2i:
+		return {"tiled_house_big": Vector2i(4, 3), "tiled_house": Vector2i(3, 2), "thatched_house": Vector2i(3, 2),
+				"thatched_small": Vector2i(2, 2)}[kind]
+
+	# A kitchen garden behind a house and things of daily life beside it.
+	func _dress(corner: Vector2i, size: Vector2i, far: float) -> void:
+		for x in range(corner.x, corner.x + size.x):
+			for y in range(corner.y - 2, corner.y):
+				var cell := Vector2i(x, y)
+				if _inside(cell) and _taken[_i(x, y)] == 0 and level_at(x, y) == 0 and far > 0.5:
+					_lay_tile(cell, "garden")
+					_taken[_i(x, y)] = 1
+		var props := ["crocks", "firewood", "haystack", "crocks", "laundry", "bush"]
+		var kind: String = props[_rng.randi_range(0, props.size() - 1)]
+		var at := corner + Vector2i(size.x if _rng.randf() < 0.5 else -1, size.y - 1)
+		_place(kind, at, Vector2i(2, 1) if kind == "laundry" else Vector2i.ONE, false)
+		if _rng.randf() < 0.5:
+			_add_tree(corner + Vector2i(-1 if _rng.randf() < 0.5 else size.x, -1), "tree", 3)
+
+	# The riverside village: stilt houses standing in the water off the north bank, piers and
+	# boats between them, willows and nets along the bank, a lane behind.
+	func _lay_riverside() -> void:
+		var r := RIVERSIDE
+		for x in range(r.position.x, r.end.x):
+			var bank := 0
+			for y in range(r.position.y, r.end.y):
+				if level_at(x, y) < 0:
+					bank = y
+					break
+			if bank == 0:
+				continue
+			_lay_tile(Vector2i(x, bank - 2), "lane")
+			_lanes.riverside.append(Vector2i(x, bank - 2))
+			if x % 6 == 0 and x + 3 < r.end.x:
+				_place("stilt_house", Vector2i(x, bank), Vector2i(3, 2), true)
+			elif x % 6 == 4:
+				for y in range(bank, bank + 3):
+					_place("pier", Vector2i(x, y), Vector2i.ONE, true)
+				_place("boat", Vector2i(x + 1, bank + 3), Vector2i(2, 1), true)
+			if x % 5 == 2:
+				_add_tree(Vector2i(x, bank - 1), "willow", 2)
+			if x % 9 == 1:
+				_place(["laundry", "crocks", "firewood"][x % 3], Vector2i(x, bank - 4), Vector2i(2, 1) if x % 3 == 0 else Vector2i.ONE, false)
+
+	# Woods round the valley: broadleaf and pine on the floor and the lower slopes where nothing
+	# is built, in clumps by noise, and lone trees and bushes in the open.
+	func _lay_woods() -> void:
+		for y in HEIGHT:
+			for x in WIDTH:
+				var cell := Vector2i(x, y)
+				if _taken[_i(x, y)] == 1 or level_at(x, y) < 0 or level_at(x, y) > 2:
+					continue
+				if VILLAGE.has_point(cell) or TOWN.grow(1).has_point(cell) or TERRACES.has_point(cell):
+					continue
+				var wood := _noise(x, y, 8.0, 31)
+				if wood > 0.6 and _hash(x, y, 32) > 0.45:
+					_add_tree(cell, "pine" if _hash(x, y, 33) > 0.7 else "tree", 3 if _hash(x, y, 33) <= 0.7 else 2)
+				elif _hash(x, y, 34) > 0.985:
+					_place("bush" if _hash(x, y, 35) > 0.4 else "boulder", cell, Vector2i.ONE, false)
+
+	# A cliff's top cell blocks the core's people unless a stair leads down from it, so nobody
+	# walks off a level; a stair's foot and head stay open.
+	func _block_cliffs() -> void:
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level := level_at(x, y)
+				if stairs_at(x, y):
+					continue
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var other := Vector2i(x, y) + d
+					if not _inside(other):
+						continue
+					var down := level_at(other.x, other.y) != level
+					var by_stair := stairs_at(other.x, other.y) and d.y != 0
+					if down and not by_stair:
+						_blocked[_i(x, y)] = 1
+
+	func _lay_lane(points: Array, place: String) -> void:
+		for n in points.size() - 1:
+			var a: Vector2 = points[n]
+			var b: Vector2 = points[n + 1]
+			var steps := int(a.distance_to(b) * 2.0) + 1
+			for t in steps + 1:
+				var at := a.lerp(b, float(t) / steps)
+				var wobble := Vector2((_noise(at.x, at.y, 3.0, 41) - 0.5) * 1.2, 0)
+				var cell := Vector2i((at + wobble).floor())
+				for c: Vector2i in [cell, cell + Vector2i(1, 0)]:
+					if _inside(c) and level_at(c.x, c.y) >= 0 and not SQUARE.has_point(c) and not stairs_at(c.x, c.y):
+						_lay_tile(c, "lane")
+						_taken[_i(c.x, c.y)] = 1
+				_lanes[place].append(cell)
+
+	# Places a structure on a free run of one level, every cell of it untaken, or none at all;
+	# over water when `wet`; with `apart`, a cell clear of any other building all round. Returns
+	# whether it was placed.
+	func _place(kind: String, corner: Vector2i, size: Vector2i, wet: bool, apart := false) -> bool:
+		var level := level_at(corner.x, corner.y + size.y - 1)
+		if apart:
+			for x in range(corner.x - 1, corner.x + size.x + 1):
+				for y in range(corner.y - 1, corner.y + size.y + 1):
+					if _inside(Vector2i(x, y)) and _built[_i(x, y)] == 1:
+						return false
+		for x in range(corner.x, corner.x + size.x):
+			for y in range(corner.y, corner.y + size.y):
+				var cell := Vector2i(x, y)
+				if not _inside(cell) or _taken[_i(x, y)] == 1 and not wet or level_at(x, y) != level:
+					return false
+				if (level < 0) != wet and kind != "stilt_house":
+					return false
+		for x in range(corner.x, corner.x + size.x):
+			for y in range(corner.y, corner.y + size.y):
+				_taken[_i(x, y)] = 1
+				if size.x > 1 or size.y > 1:
+					_built[_i(x, y)] = 1
+					# A building stands on dry ground, not in a paddy or a garden.
+					if _tile[_i(x, y)] in ["paddy", "garden"]:
+						_tile[_i(x, y)] = "plain"
+				if kind != "pier":
+					_blocked[_i(x, y)] = 1
+				else:
+					_blocked[_i(x, y)] = 0
+		_structures.append({"kind": kind, "corner": corner, "size": size, "id": _structures.size()})
+		return true
+
+	func _add_tree(cell: Vector2i, kind: String, variants: int) -> void:
+		if not _inside(cell) or _taken[_i(cell.x, cell.y)] == 1 or _trees.has(cell) or level_at(cell.x, cell.y) < 0:
+			return
+		_trees[cell] = {"foot": Vector2(cell.x * 16 + 4 + int(_hash(cell.x, cell.y, 6) * 9),
+				cell.y * 12 + 3 + int(_hash(cell.x, cell.y, 7) * 7)), "kind": kind,
+				"variant": int(_hash(cell.x, cell.y, 5) * variants) % variants, "cell": cell, "level": level_at(cell.x, cell.y)}
+
+
+## Walks the valley's people: each army goes to a lane cell of its place, and on arriving, to
+## another, picked by a seeded draw, so a run replays exactly.
+class Villagers extends RefCounted:
+	var world: WorldAdapter
+	var valley: Valley
+	var _place := {}
+	var _goal := {}
+	var _rng := RandomNumberGenerator.new()
+
+	## A world of `people` people in armies of `per_army`, spread over the places by their lanes.
+	func _init(on: Valley, people: int, per_army: int) -> void:
+		valley = on
+		_rng.seed = 7
+		var places := ["village", "village", "town", "terraces", "riverside"]
+		var armies: Array[Dictionary] = []
+		var used := {}
+		for n in people / per_army:
+			var place: String = places[n % places.size()]
+			var lanes := valley.lanes(place)
+			var members: Array[Dictionary] = []
+			for k in per_army:
+				var cell: Vector2i = lanes[_rng.randi_range(0, lanes.size() - 1)]
+				while used.has(cell):
+					cell = lanes[_rng.randi_range(0, lanes.size() - 1)]
+				used[cell] = true
+				members.append({"cell": cell, "health": 100})
+			armies.append({"objective": members[0].cell, "faction": [2, 2, 0, 2, 1][n % 5],
+					"skills": [IDLE_SKILL], "members": members})
+			_place[n] = place
+		world = WorldAdapter.create(SEED, valley.map_rows(), armies, [], {"separation": 0,
+				"hostile": [[false, false, false], [false, false, false], [false, false, false]],
+				"stage_floors": [75, 25, 1]})
+		assert(world != null, "the core refused the valley's world")
+		for army in world.army_count():
+			_walk(army)
+
+	func step() -> void:
+		for army in world.army_count():
+			var positions := world.body_positions(army)
+			if positions.is_empty():
+				continue
+			if (positions[0] / float(WorldAdapter.CELL_SIZE)).distance_to(Vector2(_goal[army]) + Vector2(0.5, 0.5)) <= 1.5:
+				_walk(army)
+
+	func _walk(army: int) -> void:
+		var lanes := valley.lanes(_place[army])
+		_goal[army] = lanes[_rng.randi_range(0, lanes.size() - 1)]
+		world.order(army, _goal[army], PackedInt64Array([0]))
+
+
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() < 2 or not args[1] in ["frames", "stills", "bench", "level"]:
-		printerr("angle: usage: -- <dir> frames|stills|level|bench [m1|level] [pan] [flat] [solid]")
+		printerr("angle: usage: -- <dir> frames|stills|level|bench [valley] [crowd] [m1|level] [pan] [flat] [solid]")
 		quit(2)
 		return
 	_dir = args[0]
 	_mode = args[1]
 	_flags = args.slice(2)
 	DirAccess.make_dir_recursive_absolute(_dir.path_join("frames"))
-	if _mode == "frames":
+	if _mode == "frames" and "valley" in _flags:
+		DisplayServer.window_set_size(Vector2i(640, 360))
+		_start_valley()
+		_add_view(root, -1)
+		_camera.position = (Valley.PLACES.village * AngleView.CELL).round()
+	elif _mode == "frames":
 		DisplayServer.window_set_size(Vector2i(640, 360))
 		_start_world()
 		_add_view(root, _world.player_army())
+	elif _mode == "stills" and "valley" in _flags:
+		for still: String in VALLEY_STILLS:
+			for locale: String in LOCALES:
+				_shots.append({"still": still, "locale": locale})
 	elif _mode == "stills":
 		for still: String in STILLS:
 			for locale: String in LOCALES:
@@ -1033,6 +1833,19 @@ func _initialize() -> void:
 			_shots.append({"still": "bench", "locale": "ko"})
 
 
+# The valley and its people, VALLEY_PEOPLE or with crowd CROWD.
+func _start_valley() -> void:
+	_valley = Valley.new()
+	var crowd := "crowd" in _flags
+	_villagers = Villagers.new(_valley, CROWD if crowd else VALLEY_PEOPLE, 10 if crowd else VALLEY_ARMY)
+	_world = _villagers.world
+	var people := 0
+	for army in _world.army_count():
+		people += _world.roster(army).size()
+	print("angle: valley %dx%d cells, %d structures, %d people in %d armies" % [Valley.WIDTH, Valley.HEIGHT,
+			_valley.structures().size(), people, _world.army_count()])
+
+
 # The region lived YEARS years, the orders given, and run up to the raiders' march.
 func _start_world() -> void:
 	_world = WorldAdapter.create_region(SEED, 0, TICKS_PER_DAY)
@@ -1054,11 +1867,16 @@ func _add_view(parent: Node, steered: int) -> void:
 	_view = AngleView.new()
 	_view.xray = not "solid" in _flags
 	parent.add_child(_view)
-	_view.show_world(_world, steered, not "flat" in _flags)
+	_view.show_world(_world, steered, not "flat" in _flags, _valley)
 	if parent == root:
 		_camera = Camera2D.new()
 		root.add_child(_camera)
 		_camera.position = (FOCUS * AngleView.CELL).round()
+
+
+# The cell a still centres on.
+func _still_focus(still: String) -> Vector2:
+	return Valley.PLACES.get(still, FOCUS) if _valley != null else FOCUS
 
 
 # The point `distance` cells along PAN's loop.
@@ -1084,7 +1902,10 @@ func _view_rect() -> Rect2:
 
 
 func _tick() -> void:
-	_driver.step()
+	if _villagers != null:
+		_villagers.step()
+	else:
+		_driver.step()
 	_world.tick()
 	_view.note_tick()
 
@@ -1207,14 +2028,14 @@ func _frames() -> bool:
 	return false
 
 
-# Saves, the first time it happens, a 4x crop round a person hidden by a house and round a
+# Saves, the first time it happens, a 4x crop round a person hidden by a building and round a
 # person standing in front of one.
 func _note_depth(image: Image) -> void:
 	for pair: Array in [["depth_behind", _view.hidden_list], ["depth_front", _view.front_list]]:
 		if _depth.has(pair[0]):
 			continue
 		for seen: Array in pair[1]:
-			if seen[2] != "house" or seen[4] < DEPTH_ROWS:
+			if seen[2] in ["tree", "terrain"] or seen[4] < DEPTH_ROWS:
 				continue
 			var feet: Vector2 = seen[3]
 			var on_screen := feet - (_camera.position - Vector2(320, 180))
@@ -1249,8 +2070,13 @@ func _stills() -> bool:
 			_hud.settings.choose("touch", _hud.settings.TOUCH_MODES.find("off"))
 			DisplayServer.window_set_size(Vector2i(1920, 1080))
 		2:
-			_start_world()
-			_play._play(_world)
+			if "valley" in _flags:
+				# The HUD is the generated region's player's; the valley is drawn in its place.
+				_play._play(WorldAdapter.create_region(SEED, 0, TICKS_PER_DAY))
+				_start_valley()
+			else:
+				_start_world()
+				_play._play(_world)
 			_play.set_process(false)
 			_play.get_node("WorldArt").visible = false
 			_play.get_node("Sound").process_mode = Node.PROCESS_MODE_DISABLED
@@ -1258,12 +2084,14 @@ func _stills() -> bool:
 			_view.xray = not "solid" in _flags
 			_play.add_child(_view)
 			_play.move_child(_view, 1)
-			_view.show_world(_world, _world.player_army(), not "flat" in _flags)
+			_view.show_world(_world, _world.player_army() if _valley == null else -1, not "flat" in _flags, _valley)
 			_camera = _play.get_node("Camera")
+			_camera.limit_left = -100000
+			_camera.limit_top = -100000
 			_camera.limit_right = 100000
 			_camera.limit_bottom = 100000
-			_camera.position = (FOCUS * AngleView.CELL).round()
-			var target: int = STILLS.get(shot.still, 0) * TICKS_PER_FRAME
+			_camera.position = (_still_focus(shot.still) * AngleView.CELL).round()
+			var target: int = VALLEY_TICKS if _valley != null else STILLS.get(shot.still, 0) * TICKS_PER_FRAME
 			for i in target:
 				_tick()
 			if shot.still == "bench":
@@ -1272,17 +2100,23 @@ func _stills() -> bool:
 				return false
 		3:
 			_play.fit_view()
+			if shot.still == "valley":
+				_camera.zoom = Vector2(2, 2)
 			_view.refresh(_view_rect(), 1.0, STILLS.get(shot.still, 0) * FRAME_MS)
-			_hud.refresh(_world, _play.steered, _play._skills)
+			_hud.refresh(_play.world, _play.steered, _play._skills)
 			if _frame % SETTLE_FRAMES != 0:
 				return false
 		4:
 			var name := "%s_%s" % [shot.still, shot.locale]
+			if shot.still == "valley":
+				_camera.zoom = Vector2(2, 2)
+				_view.refresh(_view_rect(), 1.0, 0)
+				RenderingServer.force_draw(false)
 			RenderingServer.force_draw(false)
 			var image := root.get_texture().get_image()
 			image.save_png(_dir.path_join(name + ".png"))
 			print("angle: %s.png %dx%d at frame %d, tick %d, %d bodies drawn, %d hidden" % [name,
-					image.get_width(), image.get_height(), STILLS[shot.still], _world.tick_count(), _view.drawn,
+					image.get_width(), image.get_height(), STILLS.get(shot.still, 0), _world.tick_count(), _view.drawn,
 					_view.occluded])
 			_shot_at += 1
 			_step = 0
@@ -1313,7 +2147,7 @@ func _bench(delta: float) -> bool:
 	_view.refresh(_view_rect(), _since_tick / step, Time.get_ticks_msec())
 	if _hud != null:
 		_play.fit_view()
-		_hud.refresh(_world, _play.steered, _play._skills)
+		_hud.refresh(_play.world, _play.steered, _play._skills)
 	_bench_frames += 1
 	if _bench_frames > WARM_UP_FRAMES:
 		_times.append((now - _last_usec) / 1000.0)

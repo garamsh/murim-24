@@ -1,10 +1,13 @@
 -- Draws the ground at the 2.5D angle of #200, where a cell is 16 pixels wide and 12 deep:
 --   terrain.aseprite: 16x12 tiles tagged plain (four), hills, forest, road, paving (two each),
---     and one per field state the core gives, sown, growing, ripe, fallow and burnt.
---   faces.aseprite: 16x8 tiles tagged hills_face (two), the step where hills, raised 8 pixels,
---     drop to the plain along their front edge.
---   trees.aseprite: 32x40 frames tagged tree (three) and pine (two), each trunk's foot at
---     (16, 36), the point the tree is sorted by.
+--     one per field state the core gives, sown, growing, ripe, fallow and burnt, and for the
+--     revised valley's water, river, rock, paddy, lane, garden and steps (two each).
+--   faces.aseprite: 16x8 tiles, two each, tagged hills_face, the step where hills, raised 8
+--     pixels, drop to the plain along their front edge, and stone_face, rock_face, bank_face and
+--     steps_face, tiled downward wherever the valley's ground drops to its south.
+--   trees.aseprite: 32x40 frames tagged tree (three), pine, bamboo and willow (two each),
+--     each foot at (16, 36), the point the tree is sorted by.
+--   shade.json: each palette colour with the colours one and two steps darker on its ramp.
 -- Ground tiles carry no outline, so tiles of one kind join into one surface.
 -- Run: aseprite --batch --script art/mockup/angle/terrain.lua
 
@@ -123,7 +126,87 @@ add("paving", 2, paving)
 for _, state in ipairs({ "sown", "growing", "ripe", "fallow", "burnt" }) do
   add(state, 1, function(cv) field(cv, state) end)
 end
+-- The revised valley's ground (PR #204's review), two variants each, after the first round's
+-- tags so those keep their frames.
+-- Water: clear blue with ripples; river: the Yellow River's silt-laden brown with light streaks.
+local function waters(cv, v, ramp, seed)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local n = px.tile_noise(x, y * 4 // 3, 4, W, seed + v)
+      local col = ramp[2]
+      if n > 0.62 then col = ramp[3] elseif n < 0.3 then col = ramp[1] end
+      if (y + v * 3) % 6 == 0 and (x + y * 3) % 8 < 3 then col = ramp[4] end
+      cv:set(x, y, col)
+    end
+  end
+end
+add("water", 2, function(cv, v) waters(cv, v, { c("water", 2), c("water", 3), c("water", 4), c("water", 5) }, 100) end)
+add("river", 2, function(cv, v) waters(cv, v, { c("earth", 3), c("earth", 4), c("earth", 5), c("paper", 1) }, 110) end)
+-- Rock: fractured stone.
+add("rock", 2, function(cv, v)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local n = px.tile_noise(x, y * 4 // 3, 4, W, 150 + v)
+      local col = n > 0.6 and c("stone", 4) or (n > 0.35 and c("stone", 3) or c("stone", 2))
+      if px.hash(x, y, 151 + v) > 0.9 then col = c("stone", 5) end
+      cv:set(x, y, col)
+    end
+  end
+end)
+-- Paddy: water between rows of young rice.
+add("paddy", 2, function(cv, v)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local col = ((x + y % 2) % 4 == 0) and c("grass", 5) or c("water", 4)
+      if (x + y % 2) % 4 == 1 and y % 3 == 0 then col = c("grass", 4) end
+      if px.hash(x, y, 160 + v) > 0.93 then col = c("water", 6) end
+      cv:set(x, y, col)
+    end
+  end
+end)
+-- A lane of packed earth, lighter where feet wear it; a kitchen garden of vegetable rows; and
+-- stone steps, where a path climbs from one level to the next.
+add("lane", 2, function(cv, v)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local n = px.tile_noise(x, y * 4 // 3, 4, W, 230 + v) + (px.hash(x, y, 231 + v) - 0.5) * 0.3
+      cv:set(x, y, n > 0.68 and c("earth", 6) or (n > 0.3 and c("earth", 5) or c("earth", 4)))
+    end
+  end
+end)
+add("garden", 2, function(cv, v)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local row = y % 4
+      local col = row < 2 and c("earth", 3) or (((x + v) % 3 == 0) and c("grass", 6) or c("leaf", 4))
+      if row == 3 and px.hash(x, y, 240 + v) > 0.8 then col = c("crimson", 4) end
+      cv:set(x, y, col)
+    end
+  end
+end)
+add("steps", 2, function(cv, v)
+  for y = 0, D - 1 do
+    for x = 0, W - 1 do
+      local tread = y % 4
+      local col = tread == 0 and c("stone", 5) or (tread == 3 and c("stone", 2) or c("stone", 4))
+      if x == 0 or x == W - 1 then col = c("stone", 2) end
+      cv:set(x, y, col)
+    end
+  end
+end)
 px.save_frames(W, D, frames, tags, here .. "/terrain.aseprite")
+
+-- The palette darkened along its ramps, one step and two, for shadows baked into the ground:
+-- shade.json maps each colour, as rrggbb, to [one step darker, two steps darker].
+do
+  local f = io.open(here .. "/shade.json", "w")
+  local parts = {}
+  for i, hex in ipairs(px.colours) do
+    parts[#parts + 1] = string.format('"%s": ["%s", "%s"]', hex, px.colours[px.shift(i, -1)], px.colours[px.shift(i, -2)])
+  end
+  f:write("{\n  " .. table.concat(parts, ",\n  ") .. "\n}\n")
+  f:close()
+end
 
 -- The hills' front step: a grass lip, then earth and stone in strata, darker toward the foot.
 local faces = {}
@@ -139,7 +222,37 @@ for v = 1, 2 do
   end
   faces[v] = cv
 end
-px.save_frames(W, 8, faces, { { "hills_face", 1, 2, 100 } }, here .. "/faces.aseprite")
+-- Faces for the levels, each tiling downward: masonry for terraces' walls, rock for cliffs,
+-- earth under a grass lip for banks, and stone steps where a stair climbs.
+local face_tags = { { "hills_face", 1, 2, 100 } }
+local function face(name, draw)
+  local first = #faces + 1
+  for v = 1, 2 do
+    local cv = px.canvas(W, 8)
+    for y = 0, 7 do for x = 0, W - 1 do cv:set(x, y, draw(x, y, v)) end end
+    faces[#faces + 1] = cv
+  end
+  face_tags[#face_tags + 1] = { name, first, #faces, 100 }
+end
+face("stone_face", function(x, y, v)
+  local course = y // 4
+  local joint = (x + course * 4 + v) % 8 == 0 or y % 4 == 3
+  return joint and c("stone", 2) or (y % 4 == 0 and c("stone", 4) or c("stone", 3))
+end)
+face("rock_face", function(x, y, v)
+  local n = px.tile_noise(x, y, 4, W, 190 + v)
+  return n > 0.6 and c("stone", 3) or (n > 0.3 and c("stone", 2) or c("ink", 3))
+end)
+face("bank_face", function(x, y, v)
+  if y == 0 then return c("grass", 4) end
+  return (px.hash(x, y, 210 + v) > 0.8) and c("earth", 2) or c("earth", 3)
+end)
+face("steps_face", function(x, y, v)
+  if x == 0 or x == W - 1 then return c("stone", 2) end
+  local tread = y % 4
+  return tread == 0 and c("stone", 5) or (tread == 1 and c("stone", 4) or c("stone", 3))
+end)
+px.save_frames(W, 8, faces, face_tags, here .. "/faces.aseprite")
 
 -- Trees standing at the angle: a trunk on its foot, a crown of leaf lit from the upper left
 -- with a dark rim; pines a stack of tiers.
@@ -187,4 +300,46 @@ trees[2] = broadleaf(81, 9)
 trees[3] = broadleaf(82, 12.5)
 trees[4] = pine(83)
 trees[5] = pine(84)
-px.save_frames(32, 40, trees, { { "tree", 1, 3, 100 }, { "pine", 4, 5, 100 } }, here .. "/trees.aseprite")
+
+-- Bamboo: a clump of jointed jade stems with sprays of leaf.
+local function bamboo(seed)
+  local cv = px.canvas(32, 40)
+  local r = px.rng(seed)
+  for k = 0, 4 do
+    local sx = 6 + k * 5 + r.int(0, 1)
+    local top = r.int(1, 10)
+    cv:vline(sx, top, 37 - top, c("jade", 2))
+    for y = top + 3, 34, 5 do cv:set(sx, y, c("leaf", 2)) end
+    for j = 1, 3 do
+      local ly = top + r.int(0, 16)
+      local dir = (j % 2 == 0) and -1 or 1
+      for t = 1, 4 do cv:set(sx + dir * t, ly + (t + 1) // 2, (t < 3) and c("grass", 5) or c("leaf", 4)) end
+    end
+  end
+  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  return cv
+end
+-- Willow: a short trunk and long hanging strands of pale green.
+local function willow(seed)
+  local cv = px.canvas(32, 40)
+  cv:rect(15, 22, 3, 15, c("wood", 2)); cv:vline(15, 22, 15, c("wood", 3))
+  cv:each_ellipse(16, 10, 8, 5, function(x, y)
+    local n = px.noise(x, y, 3, seed)
+    cv:set(x, y, n > 0.55 and c("grass", 6) or (n > 0.3 and c("grass", 5) or c("grass", 4)))
+  end)
+  for x = 4, 28, 3 do
+    local start = 10 + math.floor(math.abs(x - 16) / 3)
+    local len = 12 + math.floor(px.hash(x, 0, seed) * 12)
+    for y = start, math.min(start + len, 34) do
+      cv:set(x + ((y // 4) % 2), y, (y % 3 == 0) and c("grass", 6) or c("grass", 4))
+    end
+  end
+  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  return cv
+end
+trees[6] = bamboo(85)
+trees[7] = bamboo(86)
+trees[8] = willow(87)
+trees[9] = willow(88)
+px.save_frames(32, 40, trees, { { "tree", 1, 3, 100 }, { "pine", 4, 5, 100 }, { "bamboo", 6, 7, 100 },
+  { "willow", 8, 9, 100 } }, here .. "/trees.aseprite")

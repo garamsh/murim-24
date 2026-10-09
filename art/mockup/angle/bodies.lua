@@ -1,6 +1,6 @@
--- Draws the people of two factions at the 2.5D angle of #200, <faction>.aseprite for orthodox
--- and demonic: 16x24 frames from the production body template (art/sprites.lua), their feet on
--- row 22, tagged
+-- Draws people at the 2.5D angle of #200, <set>.aseprite for orthodox, demonic and villager
+-- (the cloth-clad villagers of docs/art-direction.md, unarmed): 16x24 frames from the production
+-- body template (art/sprites.lua), their feet on row 22, tagged
 --   idle (one frame), walk (four: step, pass, other step, pass) facing the viewer turned right,
 --   back (four) walking away from the viewer, the head seen from behind,
 --   strike (two): the weapon swung, then the standing frame,
@@ -23,6 +23,7 @@ local HEAD_BOTTOM = 15
 local factions = {
   orthodox = { spec = { faction = "orthodox", head = "topknot", weapon = "sword" }, xray = c("azure", 4) },
   demonic = { spec = { faction = "demonic", head = "spiky", body = "tunic", weapon = "saber" }, xray = c("crimson", 4) },
+  villager = { spec = { faction = "villager", head = "bun", body = "tunic" }, xray = c("paper", 3) },
 }
 
 local function copy(spec, over)
@@ -83,7 +84,7 @@ for name, f in pairs(factions) do
     { "idle", { frame(spec) } },
     { "walk", walk },
     { "back", { back(walk[1]), back(walk[2]), back(walk[3]), back(walk[4]) } },
-    { "strike", { frame(copy(spec, { body = "run", weapon = spec.weapon .. "_strike" })), frame(spec) } },
+    { "strike", { frame(copy(spec, { body = "run", weapon = spec.weapon and spec.weapon .. "_strike" })), frame(spec) } },
   }
   local frames, tags = {}, {}
   for _, suffix in ipairs({ "", "_xray" }) do

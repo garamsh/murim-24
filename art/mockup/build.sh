@@ -16,11 +16,14 @@ for name in target_screen lineup_sheet genealogy_panel sect_panel title_screen n
 done
 
 # The 2.5D angle of #200: sheets with their frames and tags, as the production set is exported.
-for script in terrain structures bodies effects; do
+for script in terrain structures bodies effects buildings mountains; do
 	"$aseprite" --batch --script "angle/$script.lua"
 done
 for name in terrain faces trees house hall storehouse manual_hall granary well seat_gate barrels fence \
-	training_ground orthodox demonic marks qi pillar dust debris; do
+	training_ground orthodox demonic villager marks qi pillar dust debris tiled_house tiled_house_big ancestral_hall \
+	thatched_house thatched_small inn shrine pavilion guardian village_gate stall_red stall_blue stall_amber watchtower \
+	stilt_house pier boat wall_h wall_v town_gate stone_wall brush_fence well_square crocks laundry cart haystack \
+	firewood lantern bush boulder mountains; do
 	"$aseprite" --batch "angle/$name.aseprite" --sheet "angle/$name.png" --data "angle/$name.json" --format json-array \
 		--list-tags
 done
