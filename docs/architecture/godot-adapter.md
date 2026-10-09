@@ -115,6 +115,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Gear and the economy's screens.** ADRs 0050 to 0052, proposed. The body is drawn in layers, body, armour, head and weapon, with armour and headgear tinted by the wearer's faction. New screens:
   - an inventory and equipment window on I
   - a warehouse window at a keeper or a cave
+  - a cave's entrance drawn on the ground and the maps only once the player's soul has found it, by a search order or by stepping on it
   - a prompt and a list for piles on the ground
   - a market window, replacing the wares screen
   - a household panel
