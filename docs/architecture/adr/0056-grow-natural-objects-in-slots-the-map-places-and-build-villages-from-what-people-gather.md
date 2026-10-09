@@ -115,7 +115,7 @@ Options weighed:
   - at most 8 stacks in a kind's yield
   - at most 8 materials in a structure kind's cost
 - **At the bound and the live tier.** At 50,000 people with #216's live tier of 5,000:
-  - Gatherers are at most a third of a village's earners, so at most about 1,000 of the live tier walk to slots at once. A walk costs what any mover's step costs, on fields shared by area and target.
+  - Gatherers are at most a third of a village's earners. About three fifths of the people are earners, adults from 16 to 60, so the live tier's 5,000 hold about 3,000 earners and at most about 1,000 gatherers walking to slots at once. A walk costs what any mover's step costs, on fields shared by area and target.
   - A gathering is one order and one slot write.
   - The daily assignment passes over every village's earners once a day, about 28 people a tick spread over 1,800 ticks.
   - A far village's aggregate scans at most 9 areas of 64 slots for each gatherer, once a day.
