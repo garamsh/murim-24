@@ -1874,9 +1874,9 @@ func _add_view(parent: Node, steered: int) -> void:
 		_camera.position = (FOCUS * AngleView.CELL).round()
 
 
-# The cell a still centres on.
+# The cell a still centres on; in the valley the bench's is the village's.
 func _still_focus(still: String) -> Vector2:
-	return Valley.PLACES.get(still, FOCUS) if _valley != null else FOCUS
+	return Valley.PLACES.get(still, Valley.PLACES.village) if _valley != null else FOCUS
 
 
 # The point `distance` cells along PAN's loop.
