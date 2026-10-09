@@ -120,6 +120,15 @@ constexpr std::uint32_t WAR_MARGIN = 1'500;
 constexpr std::uint32_t WAR_CHANCE = 100;
 constexpr std::uint32_t PEACE_CHANCE = 200;
 constexpr std::uint32_t HOLD_DAYS = 5 * 120;
+constexpr std::uint64_t HERB_PRICE = 10;
+constexpr std::uint64_t HERB_HEALTH = 30;
+constexpr std::uint64_t ELIXIR_PRICE = 60;
+constexpr std::uint32_t ELIXIR_QI = 2'000;
+constexpr std::uint64_t PURSE = 30;
+constexpr std::uint64_t WAGE = 1;
+constexpr std::uint32_t QUARTER = 250;
+// The discipline of medicine, the fifth drawn.
+constexpr std::size_t MEDICINE = 4;
 
 // The realms of cultivation, from third-rate to life-and-death, each
 // reached at a store of qi and striking a tenth harder than the last.
@@ -824,7 +833,18 @@ RegionData region_data() {
            // outnumbering it by half again, at 1 in 10 a year, and one
            // outnumbered in a declared war makes peace at 1 in 5 a year; a
            // declaration holds 5 years.
-           Diplomacy{WAR_MARGIN, WAR_CHANCE, PEACE_CHANCE, HOLD_DAYS}},
+           Diplomacy{WAR_MARGIN, WAR_CHANCE, PEACE_CHANCE, HOLD_DAYS},
+           // People whose best discipline is medicine sell a healing herb
+           // for 10 silver, restoring 30 health, a quarter of a newborn's,
+           // and the Lesser Return Pill for 60, restoring 2,000 qi. Everyone
+           // is born with 30 silver and earns 1 a day at home; people use a
+           // herb at half health and a pill at a quarter of their store.
+           Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, MEDICINE},
+                  Ware{"elixir", ELIXIR_PRICE, 0, ELIXIR_QI, MEDICINE}},
+                 PURSE,
+                 WAGE,
+                 HALF,
+                 QUARTER}},
       // What each kind of structure holds: a house shelters 8 and a hall 12,
       // a granary stores 2,400 measures and a storehouse 3,600, and each
       // cell of a field yields 600 a harvest. A field never blocks. A village

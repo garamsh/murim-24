@@ -1,6 +1,6 @@
 # Checks that talking passes through the adapter as the core decides it: in a region made by
 # create_region(), whose people talk within 2 cells, the player walked up to the nearest person may
-# talk to it, and it offers its news; it may not talk to a person beyond the reach, nor to itself.
+# talk to it, and it offers its news first; it may not talk to a person beyond the reach, nor to itself.
 extends RefCounted
 
 const REACH := 2
@@ -34,7 +34,7 @@ func run() -> bool:
 	var self_refusal := world.talk_refusal(player, player)
 	var offered := world.offers(near)
 	var passed := near_refusal == WorldAdapter.TALK_NONE and far_refusal == WorldAdapter.TALK_OUT_OF_REACH \
-			and self_refusal == WorldAdapter.TALK_SELF and offered == PackedInt64Array([WorldAdapter.OFFER_NEWS])
+			and self_refusal == WorldAdapter.TALK_SELF and offered[0] == WorldAdapter.OFFER_NEWS
 	print("talk_test: person %d within the reach %d, person %d beyond it %d, the player itself %d; person %d offers %s: %s" % [
 		near, near_refusal, far, far_refusal, self_refusal, near, offered, "pass" if passed else "FAIL"])
 	return passed

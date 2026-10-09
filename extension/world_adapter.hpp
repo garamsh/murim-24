@@ -411,6 +411,41 @@ class WorldAdapter : public godot::RefCounted {
   /// constants in the order they are offered; empty once it is dead.
   [[nodiscard]] godot::PackedInt64Array offers(std::int64_t person) const;
 
+  /// Returns the trade's wares, in order, each a Dictionary of its `name`,
+  /// `price` in silver, the `health` and `qi` it restores, and the
+  /// `discipline` whose people sell it, by its index in discipline_names();
+  /// empty without a trade.
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> wares() const;
+
+  /// Returns the silver person `person` holds.
+  [[nodiscard]] std::int64_t person_silver(std::int64_t person) const;
+
+  /// Returns how many of each ware person `person` holds, in the order of
+  /// wares().
+  [[nodiscard]] godot::PackedInt64Array person_held(std::int64_t person) const;
+
+  /// Returns whether person `person` sells ware `ware`.
+  [[nodiscard]] bool sells(std::int64_t person, std::int64_t ware) const;
+
+  /// Returns why person `buyer` may not buy ware `ware` from person
+  /// `seller`, one of the BUY_* constants; BUY_NONE when it may.
+  [[nodiscard]] std::int64_t buy_refusal(std::int64_t buyer,
+                                         std::int64_t seller,
+                                         std::int64_t ware) const;
+
+  /// Person `buyer` buys one of ware `ware` from person `seller`. Returns
+  /// false, buying nothing, when buy_refusal() names a reason.
+  bool buy(std::int64_t buyer, std::int64_t seller, std::int64_t ware);
+
+  /// Returns why person `person` may not consume ware `ware`, one of the
+  /// CONSUME_* constants; CONSUME_NONE when it may.
+  [[nodiscard]] std::int64_t consume_refusal(std::int64_t person,
+                                             std::int64_t ware) const;
+
+  /// Person `person` consumes one of ware `ware`. Returns false, consuming
+  /// nothing, when consume_refusal() names a reason.
+  bool consume(std::int64_t person, std::int64_t ware);
+
   /// Returns person `person`'s attainment in each discipline, in the order
   /// of discipline_names().
   [[nodiscard]] godot::PackedInt64Array person_attainment(
@@ -515,6 +550,7 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] const murim::World& world() const;
   [[nodiscard]] std::size_t army_index(std::int64_t army) const;
   [[nodiscard]] std::size_t structure_index(std::int64_t structure) const;
+  [[nodiscard]] std::size_t ware_index(std::int64_t ware) const;
   [[nodiscard]] std::size_t village_index(std::int64_t village) const;
   [[nodiscard]] std::size_t faction_index(std::int64_t faction) const;
   [[nodiscard]] static murim::Declaration declaration_of(std::int64_t what);

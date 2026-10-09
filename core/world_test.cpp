@@ -1641,6 +1641,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               {},
               {Art{{"검법", "Sword art"}, 0, Nature{}, {}}},
               Learning{},
+              std::nullopt,
               std::nullopt};
 }
 
@@ -4281,6 +4282,309 @@ TEST(World, ATalkReachOutsideItsLimitsIsRefused) {
   // Control: the limits themselves are accepted.
   EXPECT_TRUE(talks_within(0));
   EXPECT_TRUE(talks_within(MAX_REACH));
+}
+
+constexpr std::uint64_t WHOLE = 100;
+constexpr std::uint64_t HURT = 50;
+constexpr std::uint64_t PURSE = 30;
+constexpr std::uint64_t HERB_PRICE = 10;
+constexpr std::uint64_t HERB_HEALTH = 30;
+constexpr std::uint64_t PILL_PRICE = 60;
+constexpr std::uint32_t PILL_QI = 500;
+constexpr std::uint32_t STORE = 1'000;
+constexpr std::uint32_t DRAIN = 800;
+constexpr std::size_t MEDICINE = 1;
+constexpr std::size_t HERB = 0;
+constexpr std::size_t PILL = 1;
+// Sold by those whose best discipline is the sword, which no one's is.
+constexpr std::size_t SALVE = 2;
+constexpr std::size_t BUYER = 0;
+constexpr std::size_t SELLER = 1;
+constexpr std::size_t AWAY = 2;
+constexpr std::size_t DRAINING = 1;
+constexpr Cell BUYER_AT{2, 2};
+constexpr Cell SELLER_AT{4, 2};
+constexpr Cell AWAY_AT{8, 2};
+// Beside the seller, a cell east of it.
+constexpr Cell BESIDE_SELLER{5, 2};
+
+// How the market below is set up.
+struct Stall {
+  std::uint64_t health = WHOLE;
+  std::uint64_t purse = PURSE;
+  bool steered = true;
+  bool homed = false;
+  bool foe = false;
+};
+
+// Faction 0's buyer at (2, 2), whose second skill drains 800 qi, a seller 2
+// cells east and a person away 6 cells east, each with a store of 1,000 qi,
+// full, and a talent limit higher in medicine than the sword. The trade sells
+// a herb restoring 30 health and a pill restoring 500 qi, both by medicine,
+// and a salve by the sword; people use them at half health or a quarter of
+// their store. With `homed` the buyer's army are a village's residents; with
+// `foe`, faction 1's person beside the seller strikes it dead on the first
+// tick. Days last a tick, and only the buyer may go unsteered.
+World market(const Stall& stall) {
+  Life life;
+  life.disciplines = {{"sword", {0, 0}, {WHOLE, 0}},
+                      {"medicine", {0, 0}, {2 * WHOLE, 0}}};
+  life.newborn_health = WHOLE;
+  life.founding_age = Spread{DAYS_PER_YEAR, 0};
+  life.cultivation = Cultivation{{STORE, 0}, {STORE, 0}, 0, 1};
+  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, MEDICINE},
+                      Ware{"pill", PILL_PRICE, 0, PILL_QI, MEDICINE},
+                      Ware{"salve", HERB_PRICE, HERB_HEALTH, 0, 0}},
+                     stall.purse,
+                     1,
+                     PER_MILLE / 2,
+                     PER_MILLE / 4};
+  Rules rules = stall.foe ? at_war(0) : peaceful(0);
+  rules.talk_reach = 2;
+  rules.ticks_per_day = 1;
+  const Skill drain{0, 0, 0, 0, NEVER_AGAIN, DRAIN};
+  std::vector<ArmySpec> armies{
+      ArmySpec{BUYER_AT, {Recruit{BUYER_AT, stall.health}}, 0, {IDLE, drain}},
+      ArmySpec{SELLER_AT, {Recruit{SELLER_AT, WHOLE}}, 0, {IDLE}},
+      ArmySpec{AWAY_AT, {Recruit{AWAY_AT, WHOLE}}, 0, {IDLE}}};
+  if (stall.foe) {
+    const Skill once{2 * CELL_SIZE, 0, WHOLE, 0, NEVER_AGAIN};
+    armies.push_back(
+        ArmySpec{BESIDE_SELLER, {Recruit{BESIDE_SELLER, WHOLE}}, 1, {once}});
+  }
+  std::vector<VillageSpec> villages;
+  if (stall.homed) {
+    villages.push_back(VillageSpec{{}, 0, {}, 0, {}});
+  }
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              std::move(armies),
+              {},
+              rules,
+              std::move(villages),
+              {},
+              life};
+  world.order(0, {BUYER_AT, {0}});
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    world.steer(army, army != 0 || stall.steered);
+  }
+  return world;
+}
+
+// The stall's buyer wounded below half its health.
+Stall hurt_stall() {
+  Stall stall;
+  stall.health = HURT;
+  return stall;
+}
+
+// The stall's wounded buyer steered by no driver.
+Stall unsteered_stall() {
+  Stall stall = hurt_stall();
+  stall.steered = false;
+  return stall;
+}
+
+// The stall with a purse that pays for the pill.
+Stall richer_stall() {
+  Stall stall;
+  stall.purse = PILL_PRICE;
+  return stall;
+}
+
+// The stall with the buyer's army at home.
+Stall homed_stall() {
+  Stall stall;
+  stall.homed = true;
+  return stall;
+}
+
+// The stall with a foe beside the seller.
+Stall beset_stall() {
+  Stall stall;
+  stall.foe = true;
+  return stall;
+}
+
+TEST(World, APersonSellsTheWaresOfItsBestDiscipline) {
+  const World world = market({});
+  ASSERT_EQ(world.wares().size(), 3U);
+  EXPECT_TRUE(world.sells(SELLER, HERB));
+  EXPECT_TRUE(world.sells(SELLER, PILL));
+  // Control: the salve is the sword's, which is not the seller's best.
+  EXPECT_FALSE(world.sells(SELLER, SALVE));
+  EXPECT_EQ(world.offers(SELLER),
+            (std::vector<Offer>{Offer::NEWS, Offer::TRADE}));
+  EXPECT_THROW(static_cast<void>(world.sells(SELLER, 3)), std::out_of_range);
+}
+
+TEST(World, NoOneSellsWithoutATrade) {
+  const World world = talking();
+  EXPECT_TRUE(world.wares().empty());
+  EXPECT_EQ(world.offers(NEIGHBOUR), std::vector<Offer>{Offer::NEWS});
+}
+
+TEST(World, ABuyerPaysTheSellerForTheWareItHolds) {
+  World world = market({});
+  ASSERT_EQ(world.person(BUYER).silver, PURSE);
+  ASSERT_EQ(world.buy_refusal(BUYER, SELLER, HERB), BuyRefusal::NONE);
+  world.buy(BUYER, SELLER, HERB);
+  EXPECT_EQ(world.person(BUYER).silver, PURSE - HERB_PRICE);
+  EXPECT_EQ(world.person(SELLER).silver, PURSE + HERB_PRICE);
+  EXPECT_EQ(world.person(BUYER).held, (std::vector<std::uint64_t>{1, 0, 0}));
+}
+
+TEST(World, APurchaseIsRefusedForItsFirstReason) {
+  World world = market({});
+  // Control: the herb from the seller within reach is sold.
+  ASSERT_EQ(world.buy_refusal(BUYER, SELLER, HERB), BuyRefusal::NONE);
+  EXPECT_EQ(world.buy_refusal(BUYER, AWAY, HERB), BuyRefusal::CANNOT_TALK);
+  EXPECT_EQ(world.buy_refusal(BUYER, BUYER, HERB), BuyRefusal::CANNOT_TALK);
+  EXPECT_EQ(world.buy_refusal(BUYER, SELLER, SALVE), BuyRefusal::NOT_SOLD);
+  EXPECT_EQ(world.buy_refusal(BUYER, SELLER, PILL), BuyRefusal::NO_SILVER);
+  EXPECT_THROW(world.buy(BUYER, SELLER, PILL), std::invalid_argument);
+  EXPECT_EQ(world.person(BUYER).silver, PURSE);
+  EXPECT_THROW(static_cast<void>(world.buy_refusal(BUYER, SELLER, 3)),
+               std::invalid_argument);
+  // The same pill sells to a buyer with its price.
+  const World richer = market(richer_stall());
+  EXPECT_EQ(richer.buy_refusal(BUYER, SELLER, PILL), BuyRefusal::NONE);
+}
+
+TEST(World, TheDeadNeitherSellNorBuy) {
+  World world = market(beset_stall());
+  run_ticks(world, 1);
+  ASSERT_EQ(world.person(SELLER).health, 0U);
+  ASSERT_GT(world.person(BUYER).health, 0U);
+  EXPECT_FALSE(world.sells(SELLER, HERB));
+  EXPECT_EQ(world.buy_refusal(BUYER, SELLER, HERB), BuyRefusal::DEAD);
+  EXPECT_EQ(world.consume_refusal(SELLER, HERB), ConsumeRefusal::DEAD);
+  EXPECT_TRUE(world.offers(SELLER).empty());
+}
+
+TEST(World, AHerbRestoresHealthUpToANewbornsAndNoFurther) {
+  World world = market(hurt_stall());
+  EXPECT_EQ(world.consume_refusal(BUYER, HERB), ConsumeRefusal::NONE_HELD);
+  world.buy(BUYER, SELLER, HERB);
+  world.buy(BUYER, SELLER, HERB);
+  ASSERT_EQ(world.consume_refusal(BUYER, HERB), ConsumeRefusal::NONE);
+  world.consume(BUYER, HERB);
+  EXPECT_EQ(world.person(BUYER).health, HURT + HERB_HEALTH);
+  // The second herb would pass a newborn's health, and stops there.
+  ASSERT_GT(HURT + (2 * HERB_HEALTH), WHOLE);
+  world.consume(BUYER, HERB);
+  EXPECT_EQ(world.person(BUYER).health, WHOLE);
+  EXPECT_EQ(world.person(BUYER).held.at(HERB), 0U);
+}
+
+TEST(World, AHerbIsRefusedAtFullHealth) {
+  World world = market({});
+  world.buy(BUYER, SELLER, HERB);
+  EXPECT_EQ(world.consume_refusal(BUYER, HERB), ConsumeRefusal::FULL);
+  EXPECT_THROW(world.consume(BUYER, HERB), std::invalid_argument);
+  EXPECT_EQ(world.person(BUYER).held.at(HERB), 1U);
+  // Control: the same herb held while wounded is consumed.
+  World hurt = market(hurt_stall());
+  hurt.buy(BUYER, SELLER, HERB);
+  EXPECT_EQ(hurt.consume_refusal(BUYER, HERB), ConsumeRefusal::NONE);
+}
+
+TEST(World, APillRestoresQiUpToTheStoreAndIsRefusedWhenFull) {
+  World world = market(richer_stall());
+  world.buy(BUYER, SELLER, PILL);
+  ASSERT_EQ(world.person(BUYER).qi, STORE);
+  EXPECT_EQ(world.consume_refusal(BUYER, PILL), ConsumeRefusal::FULL);
+  world.cast(BUYER, DRAINING, Itself{});
+  run_ticks(world, 1);
+  ASSERT_EQ(world.person(BUYER).qi, STORE - DRAIN);
+  ASSERT_EQ(world.consume_refusal(BUYER, PILL), ConsumeRefusal::NONE);
+  world.consume(BUYER, PILL);
+  EXPECT_EQ(world.person(BUYER).qi, STORE - DRAIN + PILL_QI);
+}
+
+TEST(World, ThoseNoDriverSteersBuyADayAndConsumeWhenWounded) {
+  World world = market(unsteered_stall());
+  // The first day's shopping buys a herb; the next tick the buyer, below half
+  // its health, consumes it.
+  run_ticks(world, 1);
+  EXPECT_EQ(world.person(BUYER).held, (std::vector<std::uint64_t>{1, 0, 0}));
+  EXPECT_EQ(world.person(BUYER).silver, PURSE - HERB_PRICE);
+  run_ticks(world, 1);
+  EXPECT_EQ(world.person(BUYER).health, HURT + HERB_HEALTH);
+  // Above half its health it keeps the next herb it buys.
+  EXPECT_EQ(world.person(BUYER).held.at(HERB), 1U);
+  // Control: steered, the same buyer buys nothing, and a herb bought for it
+  // stays unconsumed.
+  World steered = market(hurt_stall());
+  run_ticks(steered, 1);
+  EXPECT_EQ(steered.person(BUYER).held, (std::vector<std::uint64_t>{0, 0, 0}));
+  steered.buy(BUYER, SELLER, HERB);
+  run_ticks(steered, 1);
+  EXPECT_EQ(steered.person(BUYER).held, (std::vector<std::uint64_t>{1, 0, 0}));
+  EXPECT_EQ(steered.person(BUYER).health, HURT);
+}
+
+TEST(World, ThoseWithAHomeEarnAWageADay) {
+  World world = market(homed_stall());
+  ASSERT_TRUE(world.person(BUYER).home.has_value());
+  run_ticks(world, 2);
+  EXPECT_EQ(world.person(BUYER).silver, PURSE + 2);
+  // Control: the person away, with no home, earns nothing.
+  ASSERT_FALSE(world.person(AWAY).home.has_value());
+  EXPECT_EQ(world.person(AWAY).silver, PURSE);
+}
+
+TEST(World, SilverAndWaresHeldArePartOfTheHash) {
+  const World one = market({});
+  World other = market({});
+  ASSERT_EQ(one.hash(), other.hash());
+  other.buy(BUYER, SELLER, HERB);
+  EXPECT_NE(one.hash(), other.hash());
+}
+
+// Whether a world given `trade` is created.
+bool trades(const Trade& trade) {
+  Life life;
+  life.disciplines = {{"medicine", {0, 0}, {WHOLE, 0}}};
+  life.trade = trade;
+  try {
+    const World world{Seed{1},
+                      Map{open_map(OPEN_SIDE)},
+                      {army({1, 1}, {1, 1}, 1, 1, 0, {IDLE})},
+                      {},
+                      peaceful(0),
+                      {},
+                      {},
+                      life};
+    return world.person(0).silver == trade.purse;
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+}
+
+TEST(World, ATradeOutsideItsLimitsIsRefused) {
+  const Ware herb{"herb", HERB_PRICE, HERB_HEALTH, 0, 0};
+  const Trade sound{{herb}, PURSE, 1, PER_MILLE, PER_MILLE};
+  // Control: the limits themselves are accepted.
+  EXPECT_TRUE(trades(sound));
+  EXPECT_TRUE(
+      trades(Trade{{Ware{"herb", MAX_TALENT, MAX_HEALTH, MAX_TALENT, 0}},
+                   MAX_TALENT,
+                   MAX_TALENT,
+                   PER_MILLE,
+                   PER_MILLE}));
+  Trade free = sound;
+  free.wares.at(0).price = 0;
+  EXPECT_FALSE(trades(free));
+  Trade stray = sound;
+  stray.wares.at(0).discipline = 1;
+  EXPECT_FALSE(trades(stray));
+  Trade lavish = sound;
+  lavish.wage = MAX_TALENT + 1;
+  EXPECT_FALSE(trades(lavish));
+  Trade eager = sound;
+  eager.wounded = PER_MILLE + 1;
+  EXPECT_FALSE(trades(eager));
 }
 
 }  // namespace
