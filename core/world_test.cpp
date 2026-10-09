@@ -3654,22 +3654,24 @@ World defending(std::int32_t apart, Cell objective, bool homed) {
 
 TEST(World, AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets) {
   constexpr std::uint64_t TICKS = 30;
+  // Cells east of the centre, beyond its claim of 3 and within sight.
+  constexpr std::int32_t BEYOND = 5;
   // A foe inside the claim is closed on.
   World inside = defending(3, BESIDE, true);
   ASSERT_EQ(inside.person(DEFENDER).home, std::optional<std::size_t>{0});
   run_ticks(inside, TICKS);
   EXPECT_FALSE(in(BESIDE, inside.person(DEFENDER).position));
   // A foe in sight beyond the claim is left alone at home.
-  World beyond = defending(5, BESIDE, true);
+  World beyond = defending(BEYOND, BESIDE, true);
   run_ticks(beyond, TICKS);
   EXPECT_TRUE(in(BESIDE, beyond.person(DEFENDER).position));
   // Control: with no home the same person closes on it.
-  World homeless = defending(5, BESIDE, false);
+  World homeless = defending(BEYOND, BESIDE, false);
   ASSERT_FALSE(homeless.person(DEFENDER).home.has_value());
   run_ticks(homeless, TICKS);
   EXPECT_GT(homeless.person(DEFENDER).position.x, centre_of(BESIDE).x);
   // Marching south past its claim, it turns on the foe east of it.
-  World marching = defending(5, {BESIDE.x, BESIDE.y + 5}, true);
+  World marching = defending(BEYOND, {BESIDE.x, BESIDE.y + BEYOND}, true);
   run_ticks(marching, TICKS);
   EXPECT_GT(marching.person(DEFENDER).position.x, centre_of(BESIDE).x);
 }
