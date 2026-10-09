@@ -196,6 +196,7 @@ func note_tick() -> void:
 		_rosters[army] = roster
 	_add_armies()
 	_read_relations()
+	combat.note_tick(world, steered, Time.get_ticks_msec(), _rosters, _tick_positions)
 	var now := world.territory()
 	var villages := world.villages()
 	if now == owners and villages.size() == _decorated:
