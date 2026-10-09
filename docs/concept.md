@@ -41,6 +41,12 @@ Each section carries one of the following statuses.
   2. **A wuxia story of one life**: the starting point and the path differ by origin.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on). The one exception is caves, which only the player enters (§Gear, wealth and livelihoods).
+- **Principle: realistic scale.** Decided by the owner on 2026-10-10 (issue #227, from #200 and #169). Places, buildings and land follow real proportions, measured against a person, who fills a cell.
+  - **Settlements.** A walled town encloses a real town: at least about 40 × 30 cells inside thick, tall walls, with corner towers, a gate tower over each gate and 2 to 4 gates, around streets, wards, a market square, a hall or yamen, temples and courtyard houses. A major city is larger again, about 80 × 60 cells or more, with inner wards. A village stays unwalled and smaller.
+  - **What the principle covers.** It covers the size of villages, towns and cities and their walls, fields per household, roads by class, river widths, bridges and ferries, sect seats as compounds rather than a hall, and a household's house against a hall.
+  - **Exaggeration** is allowed only where a rule needs it, and is stated where it is made.
+  - **Two scales.** The li of ADR 0047 measures the distance between places. A place's layout patch carries the size of what stands there, at a person's scale. A town of 40 × 30 cells does not move its neighbours 40 li away.
+  - **[proposed]** The reference sizes in `docs/art-direction.md` §Scale, the base pack's proposals in pack data.
 - **Principle: simple rules, complex consequences.** Decided by the owner on 2026-10-10 (issue #229). The world runs on simple rules whose consequences combine into complex cause and effect, the way money shapes villages' forms, their growth and each person's life. Our job is to tune the balance, not to script outcomes.
   - **Population has no separate limit: it is bounded by the food that can be had.** Fruit, game and fish regrow, fields yield, and how fast they regrow is what governs how many people the world feeds.
 - **Genre and engine**: 2D RPG, Godot 4.7.
