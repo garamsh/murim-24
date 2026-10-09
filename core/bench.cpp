@@ -110,11 +110,14 @@ struct TickTimes {
 
 // The median, 99th percentile and longest of `durations`, in milliseconds.
 TickTimes times_of(std::vector<std::chrono::steady_clock::duration> durations) {
+  constexpr std::size_t PERCENTILE = 99;
+  constexpr std::size_t PERCENT = 100;
   std::sort(durations.begin(), durations.end());
-  return TickTimes{
-      milliseconds(durations.at(durations.size() / 2)),
-      milliseconds(durations.at((((durations.size() * 99) + 99) / 100) - 1)),
-      milliseconds(durations.back())};
+  const std::size_t rank =
+      ((durations.size() * PERCENTILE) + PERCENTILE) / PERCENT;
+  return TickTimes{milliseconds(durations.at(durations.size() / 2)),
+                   milliseconds(durations.at(rank - 1)),
+                   milliseconds(durations.back())};
 }
 
 // The people still alive in the world's armies.
@@ -261,9 +264,9 @@ bool run_live() {
 
 // Runs both scenarios, each reporting before either decides the exit status.
 int run() {
-  const bool m1 = run_m1();
-  const bool live = run_live();
-  return m1 && live ? EXIT_SUCCESS : EXIT_FAILURE;
+  const bool m1_passed = run_m1();
+  const bool live_passed = run_live();
+  return m1_passed && live_passed ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 }  // namespace

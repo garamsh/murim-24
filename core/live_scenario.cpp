@@ -47,7 +47,7 @@ constexpr std::int32_t FIRST_VILLAGE_ROW = 16;
 constexpr std::int32_t VILLAGE_INSET = 40;
 constexpr std::int32_t VILLAGE_ROWS = 64;
 constexpr Footprint VILLAGE_BLOCK{25, 10};
-constexpr std::int32_t ROAD_INSET = 60;
+constexpr std::int32_t ROAD_OFFSET = 20;
 constexpr std::int32_t BANDS = 5;
 constexpr Footprint BAND_BLOCK{5, 10};
 
@@ -93,12 +93,14 @@ void battle(std::vector<ArmySpec>& armies, Cell centre,
   }
 }
 
-// Faction `faction`'s two villages on column `column` from row `north`, and
-// the bands on its road on column `road`.
-void homeland(std::vector<ArmySpec>& armies, std::size_t faction,
-              std::int32_t column, std::int32_t road, std::int32_t north) {
-  const std::array<Cell, 2> centres{Cell{column, north},
-                                    Cell{column, north + VILLAGE_ROWS}};
+// Faction `faction`'s two villages, the first centred on `first` and the
+// second VILLAGE_ROWS south of it, and the bands on its road, ROAD_OFFSET
+// columns nearer the map's middle.
+void homeland(std::vector<ArmySpec>& armies, std::size_t faction, Cell first) {
+  const std::int32_t north = first.y;
+  const std::int32_t road =
+      first.x + (first.x < MAP_SIDE / 2 ? ROAD_OFFSET : -ROAD_OFFSET);
+  const std::array<Cell, 2> centres{first, Cell{first.x, north + VILLAGE_ROWS}};
   for (const Cell centre : centres) {
     armies.push_back(ArmySpec{centre,
                               block({centre.x - (VILLAGE_BLOCK.width / 2),
@@ -138,9 +140,9 @@ LiveScenario live_scenario() {
   scenario.battle_armies = scenario.armies.size();
   for (const std::array<std::size_t, 2>& pair : {NORTH, SOUTH}) {
     const std::int32_t north = FIRST_VILLAGE_ROW + (pair == NORTH ? 0 : MIDDLE);
-    homeland(scenario.armies, pair.at(0), VILLAGE_INSET, ROAD_INSET, north);
-    homeland(scenario.armies, pair.at(1), MAP_SIDE - VILLAGE_INSET,
-             MAP_SIDE - ROAD_INSET, north);
+    homeland(scenario.armies, pair.at(0), Cell{VILLAGE_INSET, north});
+    homeland(scenario.armies, pair.at(1),
+             Cell{MAP_SIDE - VILLAGE_INSET, north});
   }
   return scenario;
 }

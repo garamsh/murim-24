@@ -686,11 +686,9 @@ TEST(World, InputJustPastALimitIsRefused) {
 }
 
 // Whether a world of `people` people, standing on a map twice as wide as
-// the open one, is created under a bound of `bound` people.
-bool populated(std::size_t people, std::size_t bound = MAX_PEOPLE) {
+// the open one, is created under `rules`.
+bool populated(std::size_t people, const Rules& rules = peaceful(0)) {
   const std::vector<std::string> rows = open_map(OPEN_SIDE * 2);
-  Rules rules = peaceful(0);
-  rules.people_bound = bound;
   try {
     const World world{Seed{1},
                       Map{rows},
@@ -709,27 +707,32 @@ TEST(World, AWorldHoldsNoMoreThanMaxPeople) {
   EXPECT_TRUE(populated(MAX_PEOPLE));
 }
 
+// peaceful(0) under a bound of `bound` people.
+Rules bounded(std::size_t bound) {
+  Rules rules = peaceful(0);
+  rules.people_bound = bound;
+  return rules;
+}
+
 TEST(World, AWorldHoldsNoMoreThanTheBoundItsRulesSet) {
   constexpr std::size_t BOUND = MAX_PEOPLE + 10;
-  EXPECT_FALSE(populated(BOUND + 1, BOUND));
+  EXPECT_FALSE(populated(BOUND + 1, bounded(BOUND)));
   // Control: as many as the bound are accepted, past MAX_PEOPLE.
-  EXPECT_TRUE(populated(BOUND, BOUND));
+  EXPECT_TRUE(populated(BOUND, bounded(BOUND)));
   // A bound past the ceiling is refused, however few live.
-  EXPECT_FALSE(populated(1, PEOPLE_CEILING + 1));
+  EXPECT_FALSE(populated(1, bounded(PEOPLE_CEILING + 1)));
   // Control: the ceiling itself is accepted.
-  EXPECT_TRUE(populated(1, PEOPLE_CEILING));
+  EXPECT_TRUE(populated(1, bounded(PEOPLE_CEILING)));
 }
 
 TEST(World, ABoundOtherThanMaxPeopleChangesTheHash) {
   const std::vector<std::string> rows = open_map(OPEN_SIDE);
   const auto hashed = [&rows](std::size_t bound) {
-    Rules rules = peaceful(0);
-    rules.people_bound = bound;
     return World{Seed{1},
                  Map{rows},
                  {army(rows, {0, 0}, {0, 0}, 1, 1, 0, {IDLE})},
                  {},
-                 rules}
+                 bounded(bound)}
         .hash();
   };
   EXPECT_NE(hashed(MAX_PEOPLE + 1), hashed(MAX_PEOPLE));
