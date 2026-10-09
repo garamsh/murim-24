@@ -192,14 +192,14 @@ Options weighed:
 The implementation of ADRs 0050 to 0052, in order, each an issue with its acceptance:
 1. **Items and equipment** (ADR 0050). Acceptance: kinds, slots, the weapon's strike, bare hands, arts by family, wear and breaking, the gear rule and loadouts, with ADR 0046's targets measured again, `make bench` on loadouts and `make sweep` rerun.
 2. **Inventories, the ground and death** (ADR 0051). Acceptance: drops, piles, expiry and the pick-up rule, with the inventory window.
-3. **The view's gear layers and faction dye** (ADR 0050).
+3. **The view's gear layers and faction dye** (ADR 0050). Acceptance: a body draws its four layers, an empty slot draws bare, and a person changing faction changes its tint on the next frame, with the core's hash unchanged.
 4. **Households and food** (this ADR). Acceptance: purses, pockets, the granary selling, field wages, the needs order, kin debt and migration as a household. ADR 0040's purse and wage are retired, and the sweep shows no starvation in peace.
 5. **Markets** (this ADR). Acceptance: price, buy, sell, making, repair by sale, imports and exports, and the market window.
 6. **Warehouses and loot** (ADR 0051). Acceptance: keepers, accounts, fees, vaults, treasuries, scattering, spoils, estates, loot routing, souls' accounts, caves for the steered body, and the warehouse window.
 7. **Taxes and treasuries** (this ADR). Acceptance: the rate, the three taxes, dues, wages, desertion, issue, the diplomacy reading the treasury, and the treasury window.
-8. **Discontent and flight** (this ADR).
-9. **Merchant houses and caravans** (this ADR), with the tolls.
-10. **Far-tier aggregation**, with ADR 0042's far tier.
+8. **Discontent and flight** (this ADR). Acceptance: each input and the decay with a test and its control, a household fleeing at 800 to the lowest-rate known village, one stopped at its own faction's gate, and the sweep's flight targets.
+9. **Merchant houses and caravans** (this ADR), with the tolls. Acceptance: a caravan carrying the largest-margin cargo and selling it, a toll paid at a gate, a destroyed caravan scattering its cargo, and the money supply target held in the sweep.
+10. **Far-tier aggregation**, with ADR 0042's far tier. Acceptance: a far village's gear purchases settled as one order per kind, far fights' expected wear applied, and the sweep's targets held with tiers on the standard profile.
 
 `make sweep` gains, per seed, the money supply by holder at each decade, each treasury, food's lowest and highest price, hungry households and households fled per faction a year. The steps that change money show, over seeds 0 to 49 for 100 years:
 - the money supply staying within half and double its year-10 level from year 10 on
