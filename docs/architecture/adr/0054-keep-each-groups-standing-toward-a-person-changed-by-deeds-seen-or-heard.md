@@ -189,7 +189,7 @@ This supersedes these:
 
 ## Consequences
 
-- The world remembers. A village that was raided stands hostile toward the raiders who killed its people, and attacks them on sight until decay brings it from −1,000 to −600: 200 days, about a year and two thirds of 120 days.
+- The world remembers. A village that was raided stands hostile toward the raiders who killed its people, and attacks them on sight until decay brings it from −1,000 to −600: 200 days, which is about a year and two thirds, at 120 days a year.
 - The player's choices in the dialogue have lasting weight, and a gift can mend them.
 - Raids leave grudges with individuals and not only with factions. That may change ADR 0023's raids in the sweep, which the implementing pull request reruns.
 - The strike rule gains a per-person check for the few people some group is hostile to.
