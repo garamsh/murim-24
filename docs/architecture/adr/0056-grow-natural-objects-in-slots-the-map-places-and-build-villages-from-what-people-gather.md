@@ -50,11 +50,13 @@ Options weighed:
 
   | Kind | Biomes | Grows in | Yield | Stump regrows in |
   |---|---|---|---|---|
-  | Tree | forest 10, plain 2, hills 3 | 360 days | 4 wood | 360 days |
-  | Fruit tree | plain 3, forest 2 | 480 days | 6 fruit, each season but winter, tree kept | never felled |
-  | Bush | plain 4, hills 2 | 120 days | 3 berries, tree kept | never felled |
-  | Rock | hills 6, mountain foot 8 | at the map's build | 3 stone | 720 days |
-  | Herb patch | forest 3, hills 2 | 60 days | 1 herb, ADR 0040's ware | 60 days |
+  | Tree | forest 10, plain 2, hills 3 | 240 days, 2 years | 4 wood | 120 days, a year |
+  | Fruit tree | plain 3, forest 2 | 360 days, 3 years | 6 fruit, each season but winter, tree kept | never felled |
+  | Bush | plain 4, hills 2 | 120 days, a year | 3 berries, bush kept | never felled |
+  | Rock | hills 6 | at the map's build | 3 stone | 240 days, 2 years |
+  | Herb patch | forest 3, hills 2 | 30 days, a season | 1 herb, ADR 0040's ware | 30 days, a season |
+
+  A year is 4 seasons of 30 days, 120 days (ADR 0019). Rocks lie on hills only. The map's mountains are blocked footing (ADR 0047), so no slot lies on them.
 
   Fruit and berries are food, measures of it, sold to the granary. Herbs go to the apothecary as its material.
 - **Growth and spread.** Once a day, by ADR 0048's spread, each area's slots advance:
