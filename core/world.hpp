@@ -1553,6 +1553,8 @@ class World {
   void teach();
   [[nodiscard]] bool foes(std::size_t person, std::size_t army,
                           std::size_t other, std::size_t other_army) const;
+  [[nodiscard]] std::uint64_t foe_kinds(std::size_t person,
+                                        std::size_t army) const;
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
   [[nodiscard]] bool claims(std::size_t village, Cell cell) const;

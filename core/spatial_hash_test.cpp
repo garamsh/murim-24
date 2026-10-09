@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "map.hpp"
@@ -15,6 +16,7 @@ namespace {
 constexpr std::size_t POPULATION = 400;
 constexpr std::uint64_t FIELD = std::uint64_t{64} * CELL_SIZE;
 constexpr std::int32_t RADIUS = CELL_SIZE;
+constexpr std::uint64_t EVERY_KIND = ~std::uint64_t{0};
 // Knuth's MMIX linear congruential generator; the high bits are the output.
 constexpr std::uint64_t LCG_MULTIPLIER = 6364136223846793005ULL;
 constexpr std::uint64_t LCG_INCREMENT = 1442695040888963407ULL;
@@ -71,6 +73,97 @@ TEST(SpatialHash, VisitWithinMatchesABruteForceScan) {
   // The population must hold both cases, or one of them went untested.
   EXPECT_GT(with_neighbours, 0U);
   EXPECT_GT(without_neighbours, 0U);
+}
+
+// The position nearest `index`'s within `radius`, other than itself, among
+// those `accepted`, the lowest index among equals, by checking every position.
+std::optional<std::size_t> nearest_by_force(
+    const std::vector<Position>& positions, std::size_t index,
+    std::int32_t radius, const std::vector<bool>& accepted) {
+  const Position centre = positions.at(index);
+  std::optional<std::size_t> best;
+  std::int64_t best_distance = std::int64_t{radius} * radius;
+  for (std::size_t other = 0; other < positions.size(); ++other) {
+    const std::int64_t offset_x =
+        std::int64_t{positions.at(other).x} - centre.x;
+    const std::int64_t offset_y =
+        std::int64_t{positions.at(other).y} - centre.y;
+    const std::int64_t distance = (offset_x * offset_x) + (offset_y * offset_y);
+    if (other != index && accepted.at(other) &&
+        (distance < best_distance || (distance == best_distance && !best))) {
+      best = other;
+      best_distance = distance;
+    }
+  }
+  return best;
+}
+
+TEST(SpatialHash, NearestMatchesABruteForceScan) {
+  const std::vector<Position> positions = random_population(11);
+  // Each position is of one of four kinds and the search asks for two of
+  // them; of those, it accepts the indices not divisible by three.
+  constexpr std::uint64_t SOUGHT = 0b0110U;
+  std::vector<std::uint64_t> kinds(positions.size());
+  std::vector<bool> accepted(positions.size());
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    kinds.at(index) = std::uint64_t{1} << (index % 4);
+    accepted.at(index) = (kinds.at(index) & SOUGHT) != 0 && index % 3 != 0;
+  }
+  const SpatialHash hash{positions, kinds};
+  constexpr std::int32_t SIGHT = 3 * CELL_SIZE;
+
+  std::size_t found = 0;
+  std::size_t none = 0;
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    const std::optional<std::size_t> expected =
+        nearest_by_force(positions, index, SIGHT, accepted);
+    const std::optional<std::size_t> nearest = hash.nearest(
+        positions.at(index), SIGHT, SOUGHT, [index](std::size_t other) {
+          return other != index && other % 3 != 0;
+        });
+    EXPECT_EQ(nearest, expected) << "agent " << index;
+    ++(expected ? found : none);
+  }
+  // Both cases must occur, or one of them went untested.
+  EXPECT_GT(found, 0U);
+  EXPECT_GT(none, 0U);
+}
+
+TEST(SpatialHash, NearestTakesTheLowerIndexAmongEquals) {
+  const Position centre = centre_of(Cell{10, 10});
+  // Two cells below and two above: the walk meets the one above first.
+  const std::vector<Position> positions{
+      centre, Position{centre.x, centre.y + (2 * CELL_SIZE)},
+      Position{centre.x, centre.y - (2 * CELL_SIZE)}};
+  const SpatialHash hash{positions};
+  constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
+
+  EXPECT_EQ(hash.nearest(centre, SIGHT, EVERY_KIND,
+                         [](std::size_t other) { return other != 0; }),
+            std::optional<std::size_t>{1});
+  // The control: the one above is found when the one below is not offered.
+  EXPECT_EQ(hash.nearest(centre, SIGHT, EVERY_KIND,
+                         [](std::size_t other) { return other == 2; }),
+            std::optional<std::size_t>{2});
+}
+
+TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
+  const Position centre = centre_of(Cell{10, 10});
+  constexpr std::uint64_t NEAR_KIND = 0b01U;
+  constexpr std::uint64_t FAR_KIND = 0b10U;
+  // One of each kind, the near one a cell away and the far one three.
+  const std::vector<Position> positions{
+      Position{centre.x + CELL_SIZE, centre.y},
+      Position{centre.x + (3 * CELL_SIZE), centre.y}};
+  const SpatialHash hash{positions, {NEAR_KIND, FAR_KIND}};
+  constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
+  const auto any = [](std::size_t /*other*/) { return true; };
+
+  EXPECT_EQ(hash.nearest(centre, SIGHT, FAR_KIND, any),
+            std::optional<std::size_t>{1});
+  // The control: asked for either kind, it finds the near one.
+  EXPECT_EQ(hash.nearest(centre, SIGHT, NEAR_KIND | FAR_KIND, any),
+            std::optional<std::size_t>{0});
 }
 
 }  // namespace
