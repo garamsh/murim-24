@@ -1,0 +1,109 @@
+== run 1 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 14 hidden behind something in the last frame
+angle bench: frame time p50 3.544 ms, p99 10.499 ms, max 13.623 ms over 1200 frames
+== run 1 flags [flat]
+angle bench: village sequence under the HUD, flags ["flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 16 hidden behind something in the last frame
+angle bench: frame time p50 3.378 ms, p99 10.344 ms, max 14.166 ms over 1200 frames
+== run 1 flags [solid]
+angle bench: village sequence under the HUD, flags ["solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 3.206 ms, p99 11.025 ms, max 13.466 ms over 1200 frames
+== run 1 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 30 hidden behind something in the last frame
+angle bench: frame time p50 6.982 ms, p99 10.838 ms, max 15.409 ms over 1200 frames
+== run 1 flags [m1 flat]
+angle bench: M1 scenario, flags ["m1", "flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 31 hidden behind something in the last frame
+angle bench: frame time p50 6.752 ms, p99 10.597 ms, max 15.060 ms over 1200 frames
+== run 1 flags [m1 solid]
+angle bench: M1 scenario, flags ["m1", "solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 5.230 ms, p99 8.104 ms, max 10.004 ms over 1200 frames
+== run 1 today's frame bench
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+bodies: 500 in the world, 304 on screen drawn as sprites through MultiMesh bands
+frame time: p50 2.471 ms, p99 5.910 ms, max 9.290 ms
+PASS: p99 5.910 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+== run 2 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 13 hidden behind something in the last frame
+angle bench: frame time p50 3.623 ms, p99 13.186 ms, max 14.200 ms over 1200 frames
+== run 2 flags [flat]
+angle bench: village sequence under the HUD, flags ["flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 16 hidden behind something in the last frame
+angle bench: frame time p50 3.401 ms, p99 10.919 ms, max 13.500 ms over 1200 frames
+== run 2 flags [solid]
+angle bench: village sequence under the HUD, flags ["solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 3.265 ms, p99 10.747 ms, max 13.766 ms over 1200 frames
+== run 2 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 31 hidden behind something in the last frame
+angle bench: frame time p50 7.282 ms, p99 10.844 ms, max 15.174 ms over 1200 frames
+== run 2 flags [m1 flat]
+angle bench: M1 scenario, flags ["m1", "flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 31 hidden behind something in the last frame
+angle bench: frame time p50 7.075 ms, p99 12.564 ms, max 13.567 ms over 1200 frames
+== run 2 flags [m1 solid]
+angle bench: M1 scenario, flags ["m1", "solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 5.336 ms, p99 8.532 ms, max 10.539 ms over 1200 frames
+== run 2 today's frame bench
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+bodies: 500 in the world, 305 on screen drawn as sprites through MultiMesh bands
+frame time: p50 2.528 ms, p99 7.290 ms, max 9.374 ms
+PASS: p99 7.290 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+== run 3 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 13 hidden behind something in the last frame
+angle bench: frame time p50 3.634 ms, p99 13.059 ms, max 13.944 ms over 1200 frames
+== run 3 flags [flat]
+angle bench: village sequence under the HUD, flags ["flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 16 hidden behind something in the last frame
+angle bench: frame time p50 3.479 ms, p99 10.663 ms, max 14.583 ms over 1200 frames
+== run 3 flags [solid]
+angle bench: village sequence under the HUD, flags ["solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 50 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 3.232 ms, p99 11.111 ms, max 13.590 ms over 1200 frames
+== run 3 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 30 hidden behind something in the last frame
+angle bench: frame time p50 8.154 ms, p99 10.963 ms, max 17.620 ms over 1200 frames
+== run 3 flags [m1 flat]
+angle bench: M1 scenario, flags ["m1", "flat"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 31 hidden behind something in the last frame
+angle bench: frame time p50 7.083 ms, p99 10.784 ms, max 15.634 ms over 1200 frames
+== run 3 flags [m1 solid]
+angle bench: M1 scenario, flags ["m1", "solid"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 500 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 5.367 ms, p99 7.730 ms, max 11.425 ms over 1200 frames
+== run 3 today's frame bench
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+bodies: 500 in the world, 304 on screen drawn as sprites through MultiMesh bands
+frame time: p50 2.475 ms, p99 5.872 ms, max 8.927 ms
+PASS: p99 5.872 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+ALLDONE
+== final flags []
+angle bench: 50 bodies drawn, 16 hidden behind something in the last frame
+angle bench: frame time p50 3.439 ms, p99 10.514 ms, max 14.955 ms over 1200 frames
+== final flags [flat]
+angle bench: 50 bodies drawn, 16 hidden behind something in the last frame
+angle bench: frame time p50 3.374 ms, p99 11.013 ms, max 13.284 ms over 1200 frames
+== final flags [solid]
+angle bench: 50 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 3.154 ms, p99 10.869 ms, max 11.906 ms over 1200 frames
+== final flags [m1]
+angle bench: 500 bodies drawn, 32 hidden behind something in the last frame
+angle bench: frame time p50 7.593 ms, p99 10.960 ms, max 18.947 ms over 1200 frames
+== final flags [m1 flat]
+angle bench: 50 bodies drawn, 13 hidden behind something in the last frame
+angle bench: frame time p50 3.642 ms, p99 10.557 ms, max 13.078 ms over 1200 frames
+== final flags [m1 solid]
+angle bench: 50 bodies drawn, 13 hidden behind something in the last frame
+angle bench: frame time p50 3.606 ms, p99 13.313 ms, max 18.748 ms over 1200 frames
