@@ -63,6 +63,7 @@ const NOTICE_MS := 3000
 const MAP_AT := {false: Vector2(392, 4), true: Vector2(346, 4)}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
+const NOTICE_SLIP_HEIGHT := 16
 # The settings button, under the map; the touch layout has none, its pause button standing in.
 const SETTINGS_RECT := Rect2(424, 70, 52, 16)
 # The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
@@ -99,6 +100,8 @@ var factions: Control
 var dialogue: Control
 ## The prompt over the person the player may talk to.
 var talk_prompt: Control
+## The player's silver on a strip, and the wares it holds on a belt beside the technique bar.
+var purse: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
 var loadout := Loadout.new()
 ## The title screen, the new-game panel over it, the pause panel over the game, and the settings
@@ -138,6 +141,7 @@ var _icons := {}
 # The duel being shown: its challenger and each duellist's health when it began.
 var _duel := {}
 var _notice_until := 0
+var _notice_slip := Panel.new()
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
 var _map_panel: Panel
@@ -276,6 +280,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		qi_bar.value = 100.0 * world.person_qi(person) / maxi(capacity, 1)
 		labels.qi_value.text = "%s / %s" % [Arts.grouped(world.person_qi(person)), Arts.grouped(capacity)]
 		labels.realm_value.text = Arts.realm_name(world, world.person_realm(person))
+		purse.read(world, person)
 		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
@@ -367,8 +372,11 @@ func _place() -> void:
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
 	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
+	purse.belt_at = _skill_bar.position + Vector2(_skill_bar.size.x + 4, 0)
+	purse.belt = not on
+	purse.queue_redraw()
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
-	labels.notice.position = NOTICE_AT[on] + gained / 2.0
+	_place_notice()
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
@@ -412,6 +420,23 @@ func show_cast(refusal: int) -> void:
 	_notice(CAST_KEYS[refusal])
 
 
+## Shows for NOTICE_MS what came of consuming ware `ware` of `world`: `refusal`, one of the
+## WorldAdapter.CONSUME_* constants, CONSUME_NONE for consumed, the ware and what it restored.
+func show_consume(world: WorldAdapter, ware: int, refusal: int) -> void:
+	_set_up()
+	var shown: Dictionary = world.wares()[ware]
+	var named: String = dialogue.ware_name(shown)
+	match refusal:
+		WorldAdapter.CONSUME_NONE:
+			_notice(tr("CONSUME_USED") % [named, dialogue.ware_effect(shown)])
+		WorldAdapter.CONSUME_DEAD:
+			_notice("CONSUME_DEAD")
+		WorldAdapter.CONSUME_NONE_HELD:
+			_notice(tr("CONSUME_NONE_HELD") % named)
+		_:
+			_notice("CONSUME_FULL_HEALTH" if int(shown.health) > 0 else "CONSUME_FULL_QI")
+
+
 ## Shows for NOTICE_MS whether the autosave was written, as `written` says.
 func show_autosave(written: bool) -> void:
 	_set_up()
@@ -453,14 +478,41 @@ func _who(world: WorldAdapter, person: int, own: PackedInt64Array) -> String:
 func _notice(key: String) -> void:
 	labels.notice.text = key
 	labels.notice.visible = true
+	_place_notice()
 	_notice_until = Time.get_ticks_msec() + NOTICE_MS
 
 
 func _process(_delta: float) -> void:
 	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
 		labels.notice.visible = false
+	if labels.has("notice"):
+		_place_notice()
 	if labels.has("notice") and not labels.notice.visible and not _waiting.is_empty():
 		_notice(_waiting.pop_front())
+
+
+## Returns the notice's slip, as wide as its words and a margin, in the HUD's pixels.
+func notice_rect() -> Rect2:
+	var notice: Label = labels.notice
+	var width := _theme.default_font.get_string_size(notice.atr(notice.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
+			FONT_SIZE).x + 10
+	return Rect2(Vector2(floorf(notice.position.x + (notice.size.x - width) / 2.0), notice.position.y - 2),
+			Vector2(width, NOTICE_SLIP_HEIGHT))
+
+
+# Places the notice on its line, or, where its slip would meet the talk prompt's, just above the
+# prompt's slip, or just below it where above would leave the room; and its slip under it.
+func _place_notice() -> void:
+	var notice: Label = labels.notice
+	notice.position = NOTICE_AT[touch.visible] + (room - NATIVE) / 2.0
+	var prompt: Rect2 = talk_prompt.slip_rect() if talk_prompt.visible else Rect2()
+	var slip := notice_rect()
+	if prompt.has_area() and slip.grow(1).intersects(prompt):
+		var above := prompt.position.y - 2 - slip.size.y
+		notice.position.y += (above if above >= 0 else prompt.end.y + 2) - slip.position.y
+	_notice_slip.position = notice_rect().position
+	_notice_slip.size = notice_rect().size
+	_notice_slip.visible = notice.visible
 
 
 ## The season and year of `date`, as the core's calendar gives them, in the current locale.
@@ -564,6 +616,8 @@ func _build() -> void:
 	talk_prompt = preload("res://hud/talk_prompt.gd").new()
 	talk_prompt.use_font(_theme.default_font)
 	talk_prompt.visible = false
+	purse = preload("res://hud/purse.gd").new()
+	purse.use_font(_theme.default_font)
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
@@ -587,11 +641,23 @@ func _build() -> void:
 	labels.notice.add_theme_color_override("font_outline_color", INK_DARK)
 	labels.notice.add_theme_constant_override("outline_size", 3)
 	labels.notice.visible = false
+	# The notice's slip, under its words: ink framed in gold, as the talk prompt's.
+	var slip := StyleBoxFlat.new()
+	slip.bg_color = INK
+	slip.border_color = GOLD
+	slip.set_border_width_all(1)
+	_notice_slip.add_theme_stylebox_override("panel", slip)
+	_notice_slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_notice_slip.visible = false
+	add_child(_notice_slip)
+	move_child(_notice_slip, labels.notice.get_index())
 	# The touch controls, hidden until the touch layout is on, under the panels and screens but over
 	# the arts panel, beside which their arc stays live.
 	touch = preload("res://hud/touch.gd").new()
 	touch.use_font(_theme.default_font)
 	touch.visible = false
+	add_child(purse)
+	purse.visible = true
 	add_child(talk_prompt)
 	add_child(arts)
 	add_child(touch)

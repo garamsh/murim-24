@@ -25,10 +25,11 @@ const SHOWN := {
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD", "HUD_AUTOSAVED", "HUD_AUTOSAVE_FAILED"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
-# the dialogue window's and the rumours' among them, and of the lessons' words, which _lessons_pass
-# measures.
+# the dialogue window's, its wares' and the rumours' among them, of the lessons' words, which
+# _lessons_pass measures, and of the purse's silver and its notices, which _purse_pass measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
+		"BUY_", "WARE_", "SILVER", "CONSUME_"]
 const Arts := preload("res://hud/arts.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
 # person.
@@ -125,8 +126,125 @@ func run() -> bool:
 	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
+	var purse_passed := _purse_pass()
+	var slip_passed := _notice_slip_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed and slip_passed
+
+
+# A notice stands on a slip as wide as its words, within the room, and never over the talk prompt's
+# slip: at each PC window, in each locale, with the prompt over a person at every point of a grid
+# across the room, the notice's line among them, its talk word or its refusal, the notice shown
+# after the prompt is placed and the prompt moved after the notice is shown. Control: with the
+# prompt hidden the notice stands on its own line.
+func _notice_slip_pass() -> bool:
+	const STEP := 12
+	var world := WorldAdapter.create_region(SEED, 0, 5)
+	var steered := world.player_army()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.talk_prompt.key = "Space"
+	var person := world.roster(steered)[0]
+	var faults := []
+	var checks := 0
+	var line_kept := true
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		for window: Vector2i in PC_WINDOWS:
+			hud.fit(window, false)
+			var room := Rect2(Vector2.ZERO, hud.room)
+			hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
+			hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+			var line: Vector2 = hud.NOTICE_AT[false] + (hud.room - hud.NATIVE) / 2.0
+			line_kept = line_kept and hud.labels.notice.position == line
+			var widest: Rect2 = hud.notice_rect()
+			for y in range(0, int(room.size.y) + 1, STEP):
+				for x in range(0, int(room.size.x) + 1, STEP * 4):
+					for hostile: bool in [false, true]:
+						for prompt_first: bool in [true, false]:
+							if prompt_first:
+								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
+								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+							else:
+								hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
+								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
+								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
+								hud._process(0.0)
+							checks += 1
+							var slip: Rect2 = hud.notice_rect()
+							var prompt: Rect2 = hud.talk_prompt.slip_rect()
+							if slip.intersects(prompt) or not room.encloses(slip) or slip.size != widest.size \
+									or hud._notice_slip.get_rect() != slip or not hud._notice_slip.visible:
+								faults.append("%s %s: notice %s, prompt %s" % [window, locale, slip, prompt])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.free()
+	var passed := faults.is_empty() and line_kept and checks > 0
+	print("hud_test: the notice's slip against the talk prompt's in %d places; on its line with no prompt %s; faults %s: %s" % [
+		checks, line_kept, faults.slice(0, 3), "pass" if passed else "FAIL"])
+	return passed
+
+
+# The purse shows the steered person's silver and wares as the world holds them, its wage of a day
+# included; control: before the day it showed the silver it was born with. At each PC window in each
+# locale the silver strip and the ware belt lie within the room, clear of each other and of every
+# panel the HUD shows, the belt right of the technique bar, and the silver's widest amount fits its
+# strip; with the touch controls the belt is hidden and the strip stands within the room, clear of
+# the square buttons, the pause button and the stick. Each notice of consuming each ware, consumed or
+# refused for each reason, fits the notice's label.
+func _purse_pass() -> bool:
+	const DAY := 5
+	var world := WorldAdapter.create_region(SEED, 0, DAY)
+	var steered := world.player_army()
+	world.steer(steered, true)
+	var person := world.roster(steered)[0]
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.refresh(world, steered, PackedInt64Array())
+	var born: int = hud.purse.silver
+	var born_right := born == world.person_silver(person) and born > 0
+	for tick in DAY:
+		world.tick()
+	hud.refresh(world, steered, PackedInt64Array())
+	var paid: bool = hud.purse.silver == world.person_silver(person) and hud.purse.silver > born \
+			and hud.purse.held == world.person_held(person) and hud.purse.held.size() == world.wares().size()
+	var faults := []
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var widest := hud.tr("SILVER") % 99999
+		if _width(hud.labels.notice, widest) > hud.purse.STRIP_SIZE.x - 28:
+			faults.append("%s: %s past its strip" % [locale, widest])
+		for window: Vector2i in PC_WINDOWS:
+			hud.fit(window, false)
+			var room := Rect2(Vector2.ZERO, hud.room)
+			var strip: Rect2 = hud.purse.strip_rect()
+			var belt: Rect2 = hud.purse.belt_rect()
+			var bar: Rect2 = hud._skill_bar.get_rect()
+			if not hud.purse.belt or not room.encloses(strip) or not room.encloses(belt) or strip.intersects(belt) \
+					or belt.position.x < bar.end.x or belt.position.y != bar.position.y:
+				faults.append("%s %s: strip %s, belt %s beside the bar %s" % [window, locale, strip, belt, bar])
+			for shown: Control in _shown_panels(hud):
+				if strip.intersects(shown.get_rect()) or belt.intersects(shown.get_rect()):
+					faults.append("%s %s: the purse over %s" % [window, locale, shown.name])
+		for ware in world.wares().size():
+			for refusal: int in [WorldAdapter.CONSUME_NONE, WorldAdapter.CONSUME_DEAD, WorldAdapter.CONSUME_NONE_HELD,
+					WorldAdapter.CONSUME_FULL]:
+				hud.show_consume(world, ware, refusal)
+				var notice: Label = hud.labels.notice
+				var said := notice.atr(notice.text)
+				if said.contains("%") or said.begins_with("CONSUME_") or _width(notice, said) > notice.size.x:
+					faults.append("%s: notice \"%s\" in %d px" % [locale, said, notice.size.x])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.use_touch(true)
+	var touch_strip: Rect2 = hud.purse.strip_rect()
+	var touch_hidden: bool = not hud.purse.belt and Rect2(Vector2.ZERO, hud.NATIVE).encloses(touch_strip)
+	var stick := Rect2(hud.touch.STICK - Vector2.ONE * hud.touch.STICK_RADIUS, Vector2.ONE * 2 * hud.touch.STICK_RADIUS)
+	for button: Rect2 in hud.touch.BUTTONS.values() + [hud.touch.PAUSE, stick]:
+		touch_hidden = touch_hidden and not touch_strip.intersects(button)
+	hud.free()
+	var passed := born_right and paid and faults.is_empty() and touch_hidden
+	print("hud_test: the purse showed %d silver at birth %s, after a day %s with the wares held; faults %s; on touch the belt hidden and the strip clear of the buttons and the stick %s: %s" % [
+		born, born_right, paid, faults, touch_hidden, "pass" if passed else "FAIL"])
+	return passed
 
 
 # At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives

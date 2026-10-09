@@ -470,6 +470,19 @@ void put_life(Writer& out, const Life& life) {
     out.u32(diplomacy.peace_chance);
     out.u32(diplomacy.hold_days);
   });
+  put_maybe(out, life.trade, [&out](const Trade& trade) {
+    put_all(out, trade.wares, [&out](const Ware& ware) {
+      out.text(ware.name);
+      out.u64(ware.price);
+      out.u64(ware.health);
+      out.u32(ware.qi);
+      out.size(ware.discipline);
+    });
+    out.u64(trade.purse);
+    out.u64(trade.wage);
+    out.u32(trade.wounded);
+    out.u32(trade.drained);
+  });
 }
 
 Life get_life(Reader& input) {
@@ -569,6 +582,23 @@ Life get_life(Reader& input) {
     diplomacy.peace_chance = input.u32();
     diplomacy.hold_days = input.u32();
     return diplomacy;
+  });
+  life.trade = get_maybe<Trade>(input, [&input] {
+    Trade trade;
+    trade.wares = get_all<Ware>(input, [&input] {
+      Ware ware;
+      ware.name = input.text();
+      ware.price = input.u64();
+      ware.health = input.u64();
+      ware.qi = input.u32();
+      ware.discipline = input.size();
+      return ware;
+    });
+    trade.purse = input.u64();
+    trade.wage = input.u64();
+    trade.wounded = input.u32();
+    trade.drained = input.u32();
+    return trade;
   });
   return life;
 }
@@ -678,6 +708,8 @@ void put_person(Writer& out, const Person& person) {
     out.size(known.skill);
     out.u64(known.ready_at);
   });
+  out.u64(person.silver);
+  put_all(out, person.held, [&out](std::uint64_t held) { out.u64(held); });
 }
 
 Person get_person(Reader& input) {
@@ -736,6 +768,8 @@ Person get_person(Reader& input) {
     known.ready_at = input.u64();
     return known;
   });
+  person.silver = input.u64();
+  person.held = get_all<std::uint64_t>(input, [&input] { return input.u64(); });
   return person;
 }
 

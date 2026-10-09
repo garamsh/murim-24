@@ -506,6 +506,13 @@ std::size_t WorldAdapter::person_index(std::int64_t person) const {
   return static_cast<std::size_t>(person);
 }
 
+std::size_t WorldAdapter::ware_index(std::int64_t ware) const {
+  CRASH_COND_MSG(
+      ware < 0 || static_cast<std::uint64_t>(ware) >= world().wares().size(),
+      "ware index out of range");
+  return static_cast<std::size_t>(ware);
+}
+
 std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
   CRASH_COND_MSG(structure < 0 || static_cast<std::uint64_t>(structure) >=
                                       world().structure_count(),
@@ -1049,6 +1056,71 @@ godot::PackedInt64Array WorldAdapter::offers(std::int64_t person) const {
   return offered;
 }
 
+godot::TypedArray<godot::Dictionary> WorldAdapter::wares() const {
+  godot::TypedArray<godot::Dictionary> wares;
+  for (const murim::Ware& ware : world().wares()) {
+    godot::Dictionary fields;
+    fields.set("name", godot::String(ware.name.c_str()));
+    fields.set("price", static_cast<std::int64_t>(ware.price));
+    fields.set("health", static_cast<std::int64_t>(ware.health));
+    fields.set("qi", static_cast<std::int64_t>(ware.qi));
+    fields.set("discipline", static_cast<std::int64_t>(ware.discipline));
+    wares.push_back(fields);
+  }
+  return wares;
+}
+
+std::int64_t WorldAdapter::person_silver(std::int64_t person) const {
+  return static_cast<std::int64_t>(world().person(person_index(person)).silver);
+}
+
+godot::PackedInt64Array WorldAdapter::person_held(std::int64_t person) const {
+  godot::PackedInt64Array held;
+  for (const std::uint64_t count : world().person(person_index(person)).held) {
+    held.push_back(static_cast<std::int64_t>(count));
+  }
+  return held;
+}
+
+bool WorldAdapter::sells(std::int64_t person, std::int64_t ware) const {
+  return world().sells(person_index(person), ware_index(ware));
+}
+
+std::int64_t WorldAdapter::buy_refusal(std::int64_t buyer, std::int64_t seller,
+                                       std::int64_t ware) const {
+  return static_cast<std::int64_t>(world().buy_refusal(
+      person_index(buyer), person_index(seller), ware_index(ware)));
+}
+
+bool WorldAdapter::buy(std::int64_t buyer, std::int64_t seller,
+                       std::int64_t ware) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    world().buy(person_index(buyer), person_index(seller), ware_index(ware));
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.buy: ", error.what());
+    return false;
+  }
+}
+
+std::int64_t WorldAdapter::consume_refusal(std::int64_t person,
+                                           std::int64_t ware) const {
+  return static_cast<std::int64_t>(
+      world().consume_refusal(person_index(person), ware_index(ware)));
+}
+
+bool WorldAdapter::consume(std::int64_t person, std::int64_t ware) {
+  // The one handler for the core's refusal: it must not cross into Godot.
+  try {
+    world().consume(person_index(person), ware_index(ware));
+    return true;
+  } catch (const std::invalid_argument& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.consume: ", error.what());
+    return false;
+  }
+}
+
 godot::TypedArray<godot::Dictionary> WorldAdapter::rumours(
     std::int64_t person) const {
   godot::TypedArray<godot::Dictionary> heard;
@@ -1393,6 +1465,23 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::talk_refusal);
   godot::ClassDB::bind_method(godot::D_METHOD("offers", "person"),
                               &WorldAdapter::offers);
+  godot::ClassDB::bind_method(godot::D_METHOD("wares"), &WorldAdapter::wares);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_silver", "person"),
+                              &WorldAdapter::person_silver);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_held", "person"),
+                              &WorldAdapter::person_held);
+  godot::ClassDB::bind_method(godot::D_METHOD("sells", "person", "ware"),
+                              &WorldAdapter::sells);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("buy_refusal", "buyer", "seller", "ware"),
+      &WorldAdapter::buy_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("buy", "buyer", "seller", "ware"),
+                              &WorldAdapter::buy);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("consume_refusal", "person", "ware"),
+      &WorldAdapter::consume_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("consume", "person", "ware"),
+                              &WorldAdapter::consume);
   godot::ClassDB::bind_method(godot::D_METHOD("person_attainment", "person"),
                               &WorldAdapter::person_attainment);
   godot::ClassDB::bind_method(godot::D_METHOD("discipline_names"),
@@ -1605,6 +1694,29 @@ void WorldAdapter::_bind_methods() {
   }
   godot::ClassDB::bind_integer_constant(name, "", "OFFER_NEWS",
                                         static_cast<int>(murim::Offer::NEWS));
+  godot::ClassDB::bind_integer_constant(name, "", "OFFER_TRADE",
+                                        static_cast<int>(murim::Offer::TRADE));
+  const std::array<std::pair<const char*, murim::BuyRefusal>, 5> buys{{
+      {"BUY_NONE", murim::BuyRefusal::NONE},
+      {"BUY_DEAD", murim::BuyRefusal::DEAD},
+      {"BUY_CANNOT_TALK", murim::BuyRefusal::CANNOT_TALK},
+      {"BUY_NOT_SOLD", murim::BuyRefusal::NOT_SOLD},
+      {"BUY_NO_SILVER", murim::BuyRefusal::NO_SILVER},
+  }};
+  for (const auto& [constant, refusal] : buys) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::ConsumeRefusal>, 4> consumed{{
+      {"CONSUME_NONE", murim::ConsumeRefusal::NONE},
+      {"CONSUME_DEAD", murim::ConsumeRefusal::DEAD},
+      {"CONSUME_NONE_HELD", murim::ConsumeRefusal::NONE_HELD},
+      {"CONSUME_FULL", murim::ConsumeRefusal::FULL},
+  }};
+  for (const auto& [constant, refusal] : consumed) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
   const std::array<std::pair<const char*, murim::ApplicationRefusal>, 11>
       applications{{
           {"APPLICATION_NONE", murim::ApplicationRefusal::NONE},

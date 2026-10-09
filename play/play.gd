@@ -59,6 +59,8 @@ const ARTS_KEY := KEY_K
 const FACTIONS_KEY := KEY_F
 ## The key that talks to the person the prompt names.
 const TALK_KEY := KEY_SPACE
+## The keys that consume the wares, by their index in WorldAdapter.wares.
+const WARE_KEYS := [KEY_Z, KEY_X]
 ## The key that takes the skill chosen on the arts panel off its slot.
 const CLEAR_KEY := KEY_DELETE
 const PAUSE_KEY := KEY_ESCAPE
@@ -201,6 +203,9 @@ func _play(made: WorldAdapter) -> void:
 	_art.show_world(world, steered)
 	_sound.show_world(world)
 	_hud.show_player(world, steered)
+	_hud.purse.keys.clear()
+	for keycode: Key in WARE_KEYS:
+		_hud.purse.keys.append(OS.get_keycode_string(keycode))
 	_body = world.roster(steered)[0]
 	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
@@ -289,6 +294,9 @@ func controls() -> Array[Dictionary]:
 	for keycode: Key in CAST_KEYS:
 		casts += OS.get_keycode_string(keycode)
 	var skills := "%s-%s" % [OS.get_keycode_string(SKILL_KEYS.front()), OS.get_keycode_string(SKILL_KEYS.back())]
+	var wares := ""
+	for keycode: Key in WARE_KEYS:
+		wares += OS.get_keycode_string(keycode)
 	var rows: Array[Dictionary] = [
 		{"keys": ["CONTROLS_CLICK"], "does": "CONTROLS_CLICK_MOVE"},
 		{"keys": [casts], "does": "CONTROLS_CAST"},
@@ -299,6 +307,7 @@ func controls() -> Array[Dictionary]:
 		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
 		{"keys": [OS.get_keycode_string(FACTIONS_KEY)], "does": "CONTROLS_FACTIONS"},
 		{"keys": [OS.get_keycode_string(TALK_KEY)], "does": "CONTROLS_TALK"},
+		{"keys": [wares], "does": "CONTROLS_WARES"},
 		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
 	return rows
@@ -359,6 +368,8 @@ func command(event: InputEvent) -> bool:
 		return factions(key.keycode)
 	elif key != null and key.pressed and (key.keycode == TALK_KEY or _hud.dialogue.visible):
 		return talk(key.keycode)
+	elif key != null and key.pressed and not key.echo and WARE_KEYS.has(key.keycode):
+		return consume(WARE_KEYS.find(key.keycode))
 	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
 		var cast := quick_cast(key, _cursor)
 		_show_aim()
@@ -608,8 +619,9 @@ func show_talk() -> void:
 
 ## Works the dialogue window with `keycode`: Space opens it on the person the prompt names, when the
 ## core lets the steered person talk to it; up and down choose what to ask or scroll the news, Enter
-## asks it, the news showing the person's news and farewell ending the talk, and Escape goes back
-## from the news or ends the talk. While it is open no key gives an order or casts. Returns whether
+## asks it, the news showing the person's news, its wares showing what it sells, where up and down
+## choose a ware and Enter buys it, and farewell ending the talk, and Escape goes back from the news
+## or the wares or ends the talk. While it is open no key gives an order or casts. Returns whether
 ## the key did anything.
 func talk(keycode: Key) -> bool:
 	var panel: Control = _hud.dialogue
@@ -627,14 +639,44 @@ func talk(keycode: Key) -> bool:
 		return true
 	if keycode == KEY_UP or keycode == KEY_DOWN:
 		return panel.move(-1 if keycode == KEY_UP else 1)
+	if (keycode == KEY_ENTER or keycode == KEY_KP_ENTER) and panel.trading:
+		return buy()
 	if (keycode == KEY_ENTER or keycode == KEY_KP_ENTER) and not panel.showing_news:
 		var chosen: int = panel.choice()
 		if chosen == WorldAdapter.OFFER_NEWS:
 			panel.show_news()
+		elif chosen == WorldAdapter.OFFER_TRADE and not roster.is_empty():
+			panel.show_wares(roster[0])
 		else:
 			panel.close()
 		return true
 	return false
+
+
+## Has the steered person buy the ware chosen in the dialogue window from the person it talks to,
+## as the core allows, and shows in the window what came of it. Returns whether it bought.
+func buy() -> bool:
+	var panel: Control = _hud.dialogue
+	var refusal := world.buy_refusal(panel.buyer, panel.person, panel.ware)
+	if refusal == WorldAdapter.BUY_NONE:
+		world.buy(panel.buyer, panel.person, panel.ware)
+		_hud.purse.read(world, panel.buyer)
+	panel.show_bought(refusal)
+	return refusal == WorldAdapter.BUY_NONE
+
+
+## Has the steered person consume one of ware `ware`, by its index in WorldAdapter.wares, as the
+## core allows, and notices what came of it. Returns whether it consumed one.
+func consume(ware: int) -> bool:
+	var roster := world.roster(steered)
+	if roster.is_empty() or ware >= world.wares().size():
+		return false
+	var refusal := world.consume_refusal(roster[0], ware)
+	if refusal == WorldAdapter.CONSUME_NONE:
+		world.consume(roster[0], ware)
+		_hud.purse.read(world, roster[0])
+	_hud.show_consume(world, ware, refusal)
+	return refusal == WorldAdapter.CONSUME_NONE
 
 
 ## Has the steered person challenge its faction's leader, marching on the leader with its current

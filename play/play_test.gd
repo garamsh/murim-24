@@ -108,7 +108,7 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass()
+			and _talk_pass() and _trade_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -827,6 +827,69 @@ func _talk_pass() -> bool:
 	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; Space opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, Space opened nothing %s: %s" % [
 		ticks, ally, prompted, opened, digit_taken, world.rumours(ally).size(), news_shown, not_paused, back, ended,
 		kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# Walked up to the nearest person of a faction not hostile to its own who sells the herb, the steered
+# person opens the dialogue on it with Space, chooses its wares, and buys a herb with Enter, paying
+# its price, the purse following; Enter on the pill it cannot pay for is refused, nothing paid; Escape
+# goes back to the menu and then ends the talk. Z at full health is refused as full and X, holding no
+# pill, as none held, each noticed, nothing consumed; control: a digit, the window closed, orders.
+func _trade_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var player: int = world.roster(scene.steered)[0]
+	var own := world.army_faction(scene.steered)
+	var seller := -1
+	var seller_army := -1
+	for army in world.army_count():
+		var relation := world.relation(own, world.army_faction(army))
+		if relation == WorldAdapter.RELATION_HOSTILE or relation == WorldAdapter.RELATION_AT_WAR:
+			continue
+		for person in world.roster(army):
+			if person != player and world.sells(person, 0) \
+					and (seller < 0 or _apart(world, player, person) < _apart(world, player, seller)):
+				seller = person
+				seller_army = army
+	if seller < 0:
+		print("play_test: no seller of a faction not hostile: FAIL")
+		scene.free()
+		return false
+	world.steer(seller_army, true)
+	var waiting_at := Vector2i((world.person_position(seller) / WorldAdapter.CELL_SIZE).floor())
+	world.order(seller_army, waiting_at, PackedInt64Array(range(world.skill_count(seller_army))))
+	var ticks := 0
+	while ticks < TALK_WALK_LIMIT and world.talk_refusal(player, seller) != WorldAdapter.TALK_NONE:
+		if ticks % 20 == 0:
+			world.order(scene.steered, waiting_at, PackedInt64Array(range(world.skill_count(scene.steered))))
+		scene.step()
+		ticks += 1
+	# The prompt names the nearest person; the seller is named here, within the reach.
+	scene.talk_to = seller
+	var dialogue: Control = hud.dialogue
+	var silver := world.person_silver(player)
+	var opened: bool = scene.command(_key(scene.TALK_KEY)) and dialogue.rows.has(WorldAdapter.OFFER_TRADE)
+	scene.command(_key(KEY_DOWN))
+	var wares_shown: bool = scene.command(_key(KEY_ENTER)) and dialogue.trading and dialogue.buyer == player
+	var bought: bool = scene.command(_key(KEY_ENTER)) and world.person_silver(player) == silver - world.wares()[0].price \
+			and world.person_held(player) == PackedInt64Array([1, 0]) and not dialogue.refused \
+			and hud.purse.silver == world.person_silver(player)
+	scene.command(_key(KEY_DOWN))
+	var dear: bool = not scene.command(_key(KEY_ENTER)) and dialogue.refused and dialogue.line == hud.tr("BUY_NO_SILVER") \
+			and world.person_silver(player) == silver - world.wares()[0].price
+	var back: bool = scene.command(_key(KEY_ESCAPE)) and dialogue.visible and not dialogue.trading
+	var ended: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
+	var full: bool = not scene.command(_key(KEY_Z)) and world.person_held(player)[0] == 1 \
+			and hud.labels.notice.text == "CONSUME_FULL_HEALTH"
+	var none_held: bool = not scene.command(_key(KEY_X)) \
+			and hud.labels.notice.text == hud.tr("CONSUME_NONE_HELD") % hud.dialogue.ware_name(world.wares()[1])
+	var digit: bool = scene.command(_key(KEY_1))
+	var passed := opened and wares_shown and bought and dear and back and ended and full and none_held and digit
+	print("play_test: walked %d ticks up to seller %d; Space opened its menu with wares %s; Enter showed them %s; bought a herb %s, %d silver left; the pill refused %s; back %s, ended %s; Z at full health refused %s, X with no pill %s; a digit then ordered %s: %s" % [
+		ticks, seller, opened, wares_shown, bought, world.person_silver(player), dear, back, ended, full, none_held,
+		digit, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 

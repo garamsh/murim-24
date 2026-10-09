@@ -38,14 +38,25 @@ func words() -> String:
 	return tr("DIALOGUE_TALK") + " · " + PersonName.of(_world, person, true)
 
 
+## Returns the slip and the tick under it, in the HUD's pixels, or an empty Rect2 while the prompt
+## names no one.
+func slip_rect() -> Rect2:
+	if person < 0:
+		return Rect2()
+	_font = get_theme_default_font() if _font == null else _font
+	var cap := 0.0 if refused else keycap_width(key) + 4
+	var width := cap + _width(words()) + 8
+	return Rect2((head - Vector2(width / 2.0, 18)).floor(), Vector2(width, 19))
+
+
 func _draw() -> void:
 	if person < 0:
 		return
-	_font = get_theme_default_font() if _font == null else _font
 	var word := words()
 	var cap := 0.0 if refused else keycap_width(key) + 4
-	var width := cap + _width(word) + 8
-	var at := (head - Vector2(width / 2.0, 18)).floor()
+	var slip := slip_rect()
+	var width := slip.size.x
+	var at := slip.position
 	var edge := CRIMSON if refused else GOLD_DARK
 	draw_rect(Rect2(at, Vector2(width, 17)), edge)
 	draw_rect(Rect2(at + Vector2.ONE, Vector2(width - 2, 15)), INK)

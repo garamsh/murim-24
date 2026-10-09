@@ -60,6 +60,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/decorations/sect_banner` | 16 x 32 | `orthodox`, `demonic`, `unorthodox` |
 | `art/icons/skill_icons` | 16 x 16 | `strike`, `burst` |
 | `art/icons/economy_icons` | 16 x 16 | `food`, `stock`, `housing` |
+| `art/icons/ware_icons` | 16 x 16 | `herb`, `elixir`, `silver` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
 | `art/title/backdrop` | 480 x 270 | none: one frame, the title screen's mountains and working title |
@@ -232,8 +233,9 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI, each under its label and its value.
-- The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the technique bar with cooldowns, and the current target. Rumours are heard by talking to people, not shown on the HUD.
+- The HUD holds the player (portrait, name, sect, age, HP, QI), the map and season, the technique bar with cooldowns, the player's silver and, on PC, a belt of the wares it holds, and the current target. Rumours are heard by talking to people, not shown on the HUD.
 - The economy icons, at the technique icons' scale: food is a lacquered bowl of rice with chopsticks, stock a tied sack of grain, housing a house under its slate roof.
+- The ware icons, at the same scale: herb is a sprig of three jade leaves on a pale root, elixir a round crimson pill lit at its top left, silver an ingot with its two ends raised.
 - A technique slot shows its key, Q, W, E, R or T, in a column of its own left of an icon of the skill's shape: a blade with an arc of sword qi for a strike at one body, an open palm in a ring of force for a burst that reaches the bodies round its target.
 - UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 

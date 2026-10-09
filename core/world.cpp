@@ -426,6 +426,13 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent,
     fold(person.qi);
     fold(person.qi_capacity);
   }
+  // Folded only when held, so a world without trade hashes as before.
+  if (person.silver != 0 || !person.held.empty()) {
+    fold(person.silver);
+    for (const std::uint64_t held : person.held) {
+      fold(held);
+    }
+  }
   if (!person.known.empty()) {
     fold(person.known.size());
     for (const Known& known : person.known) {
@@ -652,6 +659,25 @@ void check_arts(const Life& life) {
   }
 }
 
+// Throws std::invalid_argument when `trade` lies outside the limits the
+// constructor documents, given `disciplines` drawn.
+void check_trade(const Trade& trade, std::size_t disciplines) {
+  const auto stray_ware = [disciplines](const Ware& ware) {
+    return ware.price == 0 || ware.price > MAX_TALENT ||
+           ware.health > MAX_HEALTH || ware.qi > MAX_TALENT ||
+           ware.discipline >= disciplines;
+  };
+  if (std::any_of(trade.wares.begin(), trade.wares.end(), stray_ware) ||
+      trade.purse > MAX_TALENT || trade.wage > MAX_TALENT ||
+      trade.wounded > PER_MILLE || trade.drained > PER_MILLE) {
+    throw std::invalid_argument(
+        "a ware must cost 1 to MAX_TALENT silver, restore health within "
+        "MAX_HEALTH and qi within MAX_TALENT, and name a discipline drawn; a "
+        "purse and wage lie within MAX_TALENT and the shares within "
+        "PER_MILLE");
+  }
+}
+
 // Throws std::invalid_argument when `life` could draw a talent above
 // MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives a newborn no
 // health or more than MAX_HEALTH.
@@ -699,6 +725,9 @@ void check_life(const Life& life) {
     throw std::invalid_argument(
         "diplomacy's chances must lie within a thousand per mille");
   }
+  if (life.trade) {
+    check_trade(*life.trade, life.disciplines.size());
+  }
 }
 
 // The range a spread draws over.
@@ -728,6 +757,41 @@ bool stray_cultivation(const Person& person, const Life& life) {
   };
   return person.qi > person.qi_capacity || person.qi_capacity > MAX_TALENT ||
          std::any_of(person.known.begin(), person.known.end(), unknown);
+}
+
+// Whether `person` holds a count for other than each of `life`'s wares.
+bool stray_purse(const Person& person, const Life& life) {
+  return person.held.size() != (life.trade ? life.trade->wares.size() : 0);
+}
+
+// The discipline of `person`'s highest talent limit, the first among equals;
+// 0 when it draws no talent.
+std::size_t best_discipline(const Person& person) {
+  return static_cast<std::size_t>(
+      std::max_element(person.talent.begin(), person.talent.end(),
+                       [](const Aptitude& left, const Aptitude& right) {
+                         return left.limit < right.limit;
+                       }) -
+      person.talent.begin());
+}
+
+// Folds the trade's data into `fold`, only when given, so a world without
+// one keeps its hash.
+template <typename Fold>
+void fold_trade(const Fold& fold, const std::optional<Trade>& trade) {
+  if (!trade) {
+    return;
+  }
+  for (const Ware& ware : trade->wares) {
+    fold(ware.price);
+    fold(ware.health);
+    fold(ware.qi);
+    fold(ware.discipline);
+  }
+  fold(trade->purse);
+  fold(trade->wage);
+  fold(trade->wounded);
+  fold(trade->drained);
 }
 
 // Whether every one of `indices` names one of `count` records.
@@ -914,7 +978,7 @@ void World::restore() {
            person.talent.size() != disciplines ||
            person.attainment.size() != disciplines ||
            (!given.empty() && person.given >= given.size()) ||
-           stray_cultivation(person, life_);
+           stray_cultivation(person, life_) || stray_purse(person, life_);
   };
   const auto stray_village = [&](const Village& village) {
     const VillageSpec& spec = village.spec;
@@ -1164,12 +1228,7 @@ void World::add_sects(std::vector<SectSpec> sects) {
       Person& person = people_.at(founder.person);
       person.sect = sects_.size();
       if (!person.talent.empty()) {
-        const auto best = static_cast<std::size_t>(
-            std::max_element(person.talent.begin(), person.talent.end(),
-                             [](const Aptitude& left, const Aptitude& right) {
-                               return left.limit < right.limit;
-                             }) -
-            person.talent.begin());
+        const std::size_t best = best_discipline(person);
         person.attainment.at(best) =
             std::min(founder.attainment, person.talent.at(best).limit);
       }
@@ -1507,7 +1566,172 @@ std::vector<Offer> World::offers(std::size_t person) const {
   if (people_.at(person).health == 0) {
     return {};
   }
-  return {Offer::NEWS};
+  std::vector<Offer> offered{Offer::NEWS};
+  for (std::size_t ware = 0; ware < wares().size(); ++ware) {
+    if (sells(person, ware)) {
+      offered.push_back(Offer::TRADE);
+      break;
+    }
+  }
+  return offered;
+}
+
+const std::vector<Ware>& World::wares() const {
+  static const std::vector<Ware> none;
+  return life_.trade ? life_.trade->wares : none;
+}
+
+bool World::sells(std::size_t person, std::size_t ware) const {
+  if (person >= people_.size() || ware >= wares().size()) {
+    throw std::out_of_range("no such person sells no such ware");
+  }
+  const Person& seller = people_.at(person);
+  const Ware& sold = wares().at(ware);
+  return seller.health > 0 && !seller.talent.empty() &&
+         best_discipline(seller) == sold.discipline;
+}
+
+BuyRefusal World::buy_refusal(std::size_t buyer, std::size_t seller,
+                              std::size_t ware) const {
+  if (buyer >= people_.size() || seller >= people_.size() ||
+      ware >= wares().size()) {
+    throw std::invalid_argument("no such person buys no such ware");
+  }
+  const TalkRefusal talk = talk_refusal(buyer, seller);
+  if (talk == TalkRefusal::DEAD) {
+    return BuyRefusal::DEAD;
+  }
+  if (talk != TalkRefusal::NONE) {
+    return BuyRefusal::CANNOT_TALK;
+  }
+  if (!sells(seller, ware)) {
+    return BuyRefusal::NOT_SOLD;
+  }
+  if (people_.at(buyer).silver < wares().at(ware).price) {
+    return BuyRefusal::NO_SILVER;
+  }
+  return BuyRefusal::NONE;
+}
+
+void World::buy(std::size_t buyer, std::size_t seller, std::size_t ware) {
+  if (buy_refusal(buyer, seller, ware) != BuyRefusal::NONE) {
+    throw std::invalid_argument(
+        "a buyer must be able to talk to a seller of the ware and pay for it");
+  }
+  const std::uint64_t price = wares().at(ware).price;
+  people_.at(buyer).silver -= price;
+  people_.at(seller).silver += price;
+  ++people_.at(buyer).held.at(ware);
+}
+
+ConsumeRefusal World::consume_refusal(std::size_t person,
+                                      std::size_t ware) const {
+  if (person >= people_.size() || ware >= wares().size()) {
+    throw std::invalid_argument("no such person consumes no such ware");
+  }
+  const Person& consumer = people_.at(person);
+  if (consumer.health == 0) {
+    return ConsumeRefusal::DEAD;
+  }
+  if (consumer.held.at(ware) == 0) {
+    return ConsumeRefusal::NONE_HELD;
+  }
+  const Ware& taken = wares().at(ware);
+  const bool heals = taken.health > 0 && consumer.health < life_.newborn_health;
+  const bool restores = taken.qi > 0 && consumer.qi < consumer.qi_capacity;
+  return heals || restores ? ConsumeRefusal::NONE : ConsumeRefusal::FULL;
+}
+
+void World::consume(std::size_t person, std::size_t ware) {
+  if (consume_refusal(person, ware) != ConsumeRefusal::NONE) {
+    throw std::invalid_argument(
+        "a consumer must live, hold the ware and gain from it");
+  }
+  Person& consumer = people_.at(person);
+  const Ware& taken = wares().at(ware);
+  --consumer.held.at(ware);
+  if (consumer.health < life_.newborn_health) {
+    consumer.health =
+        std::min(life_.newborn_health, consumer.health + taken.health);
+  }
+  consumer.qi = static_cast<std::uint32_t>(std::min<std::uint64_t>(
+      consumer.qi_capacity, std::uint64_t{consumer.qi} + taken.qi));
+}
+
+// Once a day, every living person with a home earns the trade's wage.
+void World::pay(const Trade& trade) {
+  for (Person& person : people_) {
+    if (person.health > 0 && person.home) {
+      person.silver += trade.wage;
+    }
+  }
+}
+
+// Once a day, every living person no driver steers buys one of each ware it
+// holds none of from the first seller, by index, it may buy it from.
+void World::shop(const Trade& trade) {
+  for (std::size_t ware = 0; ware < trade.wares.size(); ++ware) {
+    std::vector<std::size_t> sellers;
+    for (std::size_t person = 0; person < people_.size(); ++person) {
+      if (sells(person, ware)) {
+        sellers.push_back(person);
+      }
+    }
+    for (const Army& army : armies_) {
+      if (army.steered) {
+        continue;
+      }
+      for (const std::size_t buyer : army.roster) {
+        if (people_.at(buyer).held.at(ware) > 0) {
+          continue;
+        }
+        const auto seller = std::find_if(
+            sellers.begin(), sellers.end(), [&](std::size_t candidate) {
+              return buy_refusal(buyer, candidate, ware) == BuyRefusal::NONE;
+            });
+        if (seller != sellers.end()) {
+          buy(buyer, *seller, ware);
+        }
+      }
+    }
+  }
+}
+
+// Each tick, every living person no driver steers consumes the first ware it
+// may that restores health while it is wounded, and the first that restores
+// qi while it is drained, by the trade's shares.
+void World::dose(const Trade& trade) {
+  const auto take_first = [this, &trade](std::size_t member, auto restores) {
+    for (std::size_t ware = 0; ware < trade.wares.size(); ++ware) {
+      if (restores(trade.wares.at(ware)) &&
+          consume_refusal(member, ware) == ConsumeRefusal::NONE) {
+        consume(member, ware);
+        return;
+      }
+    }
+  };
+  for (const Army& army : armies_) {
+    if (army.steered) {
+      continue;
+    }
+    for (const std::size_t member : army.roster) {
+      const Person& person = people_.at(member);
+      const bool wounded =
+          person.health * PER_MILLE <= life_.newborn_health * trade.wounded;
+      const bool drained = std::uint64_t{person.qi} * PER_MILLE <=
+                           std::uint64_t{person.qi_capacity} * trade.drained;
+      const auto restores_health = [](const Ware& ware) {
+        return ware.health > 0;
+      };
+      const auto restores_qi = [](const Ware& ware) { return ware.qi > 0; };
+      if (wounded) {
+        take_first(member, restores_health);
+      }
+      if (drained) {
+        take_first(member, restores_qi);
+      }
+    }
+  }
 }
 
 // Makes the master of faction `faction`'s sects with the most favour its
@@ -1868,6 +2092,9 @@ void World::tick() {
     Person& struck = people_.at(crowd.people.at(index));
     struck.health -= std::min(damage.at(index), struck.health);
   }
+  if (life_.trade) {
+    dose(*life_.trade);
+  }
   settle_duels();
   age();
   if (life_.husbandry && tick_count_ % rules_.ticks_per_day == 0) {
@@ -1909,6 +2136,10 @@ void World::tick() {
   }
   if (tick_count_ % rules_.ticks_per_day == 0) {
     tend();
+    if (life_.trade) {
+      pay(*life_.trade);
+      shop(*life_.trade);
+    }
     hold_elections(day);
     if (life_.diplomacy) {
       negotiate(*life_.diplomacy);
@@ -2097,6 +2328,7 @@ StateHash World::hash() const {
     fold_village(fold, village);
   }
   fold_reaches(fold, rules_);
+  fold_trade(fold, life_.trade);
   for (const Event& event : events_) {
     fold_event(fold, event);
   }
@@ -2535,13 +2767,8 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   // A use that hits anyone or anything practises its art's discipline, or,
   // for an army's skill, the striker's best discipline, its highest limit.
   if (hit && !striker.talent.empty()) {
-    const auto best = static_cast<std::size_t>(
-        std::max_element(striker.talent.begin(), striker.talent.end(),
-                         [](const Aptitude& left, const Aptitude& right) {
-                           return left.limit < right.limit;
-                         }) -
-        striker.talent.begin());
-    const std::size_t practised = art ? life_.arts.at(*art).discipline : best;
+    const std::size_t practised =
+        art ? life_.arts.at(*art).discipline : best_discipline(striker);
     const Aptitude& aptitude = striker.talent.at(practised);
     striker.attainment.at(practised) = std::min(
         aptitude.limit, striker.attainment.at(practised) + aptitude.growth);
@@ -2802,6 +3029,8 @@ void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
   person.qi = 0;
   person.qi_capacity = 0;
   person.known.clear();
+  person.silver = life_.trade ? life_.trade->purse : 0;
+  person.held.assign(life_.trade ? life_.trade->wares.size() : 0, 0);
   person.lifespan =
       life_.lifespan
           ? std::optional<std::uint64_t>{draw(range_of(*life_.lifespan))}

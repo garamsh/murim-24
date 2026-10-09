@@ -325,6 +325,7 @@ TEST(Save, ASealedSaveNamingARealmNoProgressCanNameIsRefused) {
                   {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
                   {},
                   Learning{},
+                  std::nullopt,
                   std::nullopt};
   Rules rules{0, {{false}}, STAGE_FLOORS};
   rules.ticks_per_day = 1;
@@ -495,6 +496,47 @@ TEST(Save, ALoadedWorldKeepsItsTalkReach) {
   EXPECT_EQ(loaded(load(store, OTHER_SLOT)).world.talk_refusal(0, 1),
             TalkRefusal::OUT_OF_REACH);
   EXPECT_NE(talkers(2).hash(), talkers(3).hash());
+}
+
+// Two people of one faction side by side, whose best discipline sells a
+// herb for 10 silver, the first having bought `bought` of them from the
+// second.
+World traders(std::uint64_t bought) {
+  constexpr std::uint64_t PRICE = 10;
+  constexpr std::uint64_t PURSE = 50;
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.talk_reach = 2;
+  Life life;
+  life.disciplines = {{"medicine", {0, 0}, {1, 0}}};
+  life.trade = Trade{{Ware{"herb", PRICE, 1, 0, 0}}, PURSE, 1, 0, 0};
+  World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{1, 0}, {Recruit{{1, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      rules,
+      {},
+      {},
+      life};
+  for (std::uint64_t each = 0; each < bought; ++each) {
+    world.buy(0, 1, 0);
+  }
+  return world;
+}
+
+TEST(Save, ALoadedWorldKeepsItsSilverWaresAndTrade) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, traders(2)}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.person(0).silver, traders(2).person(0).silver);
+  EXPECT_EQ(restored.world.person(0).held, std::vector<std::uint64_t>{2});
+  ASSERT_EQ(restored.world.wares().size(), 1U);
+  EXPECT_EQ(restored.world.wares().at(0).name, "herb");
+  EXPECT_TRUE(restored.world.sells(1, 0));
+  EXPECT_EQ(restored.world.hash(), traders(2).hash());
+  // Control: one herb fewer bought is another state.
+  EXPECT_NE(traders(1).hash(), traders(2).hash());
 }
 
 TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {

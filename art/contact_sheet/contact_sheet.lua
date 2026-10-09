@@ -321,7 +321,7 @@ for k, tag in ipairs({ "strike", "burst" }) do
 end
 
 -- The economy: the granary and the storehouse in their stages; fields in each state, in summer
--- and under snow; the economy icons; then all of it assembled in a village.
+-- and under snow; the economy icons and the ware icons; then all of it assembled in a village.
 local granary = load("structures/granary.aseprite")
 local storehouse = load("structures/storehouse.aseprite")
 local fields = load("decorations/fields.aseprite")
@@ -352,6 +352,14 @@ for k, tag in ipairs({ "food", "stock", "housing" }) do
   sheet:rect(x, 1120, 20, 20, c("ink", 1))
   sheet:stamp(frame(economy_icons, tag), x + 2, 1122)
   label(x, 1144, tag:upper(), c("paper", 2))
+end
+local ware_icons = load("icons/ware_icons.aseprite")
+label(300, 1158, "WARE ICONS", c("paper", 3))
+for k, tag in ipairs({ "herb", "elixir", "silver" }) do
+  local x = 300 + (k - 1) * 48
+  sheet:rect(x, 1168, 20, 20, c("ink", 1))
+  sheet:stamp(frame(ware_icons, tag), x + 2, 1170)
+  label(x, 1192, tag:upper(), c("paper", 2))
 end
 
 -- A village of 30 x 10 cells: houses, the granary and the storehouse north of the road, a well

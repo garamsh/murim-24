@@ -4,6 +4,9 @@
 -- whose radius reaches the bodies round its target, drawn as an open palm in a ring of force.
 -- economy_icons.aseprite: icons for a faction's economy, tagged food (a bowl of rice), stock (a
 -- tied sack of grain) and housing (a house under its slate roof).
+-- ware_icons.aseprite: icons for the wares merchants sell and the silver they cost, tagged herb (a
+-- sprig of three leaves on a pale root), elixir (a round crimson pill, lit at its top left) and silver
+-- (an ingot of silver, its two ends raised).
 -- Run: aseprite --batch --script art/icons/icons.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -68,3 +71,26 @@ housing:outline(0, 0, 16, 16, c("ink", 1))
 
 px.save_frames(16, 16, { food, stock, housing }, { { "food", 1, 1, 100 }, { "stock", 2, 2, 100 }, { "housing", 3, 3, 100 } },
   here .. "/economy_icons.aseprite")
+
+local herb = px.canvas(16, 16)
+herb:sprite(0, 0, { "................", "......gg........", ".....gGGg..gg...", ".....gGGg.gGGg..",
+  "......gg..gGGg..", ".......s...gg...", ".gg....s..s.....", "gGGg...s.s......", "gGGg....ss......",
+  ".gg.s...s.......", ".....s..s.......", "......s.s.......", ".......ss.......", "........r.......",
+  ".......rrr......", "......r.r.r....." },
+  { g = c("jade", 2), G = c("jade", 3), s = c("grass", 4), r = c("earth", 5) })
+
+local elixir = px.canvas(16, 16)
+elixir:sprite(0, 0, { "................", "................", "................", ".....kkkkkk.....",
+  "....kRRRRRRk....", "...kRYYRRRRRk...", "...kRYRRRRRRk...", "...kRRRRRRRRk...", "...kRRRRRRRrk...",
+  "...kRRRRRRrrk...", "....kRRRrrrk....", ".....kkkkkk....." },
+  { k = c("ink", 1), R = c("crimson", 4), Y = c("gold", 4), r = c("lacquer", 3) })
+
+local silver = px.canvas(16, 16)
+silver:sprite(0, 0, { "................", "................", "................", ".....kkkkk......",
+  ".kk.kSWWWSk.kk..", "kSSkkSSSSSkkSSk.", "kSWSSSSSSSSSSSk.", ".kSSSSSSSSSSSk..", "..kSSSSSSSSSk...",
+  "...kkkkkkkkk...." },
+  { k = c("ink", 1), S = c("stone", 4), W = c("robe", 3) })
+
+px.save_frames(16, 16, { herb, elixir, silver },
+  { { "herb", 1, 1, 100 }, { "elixir", 2, 2, 100 }, { "silver", 3, 3, 100 } },
+  here .. "/ware_icons.aseprite")

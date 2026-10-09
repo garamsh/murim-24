@@ -81,7 +81,8 @@ struct Known {
 /// the next tick, if it was given a cast. It cultivates qi by `cultivation`,
 /// a growth a day and a limit, holds `qi` of a store of `qi_capacity`, and
 /// knows the art skills `known`, in the order it learned them, each with a
-/// ready tick of its own; its army's skills share `ready_at`.
+/// ready tick of its own; its army's skills share `ready_at`. It holds
+/// `silver`, and `held` of each of the trade's wares, by index.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -105,6 +106,8 @@ struct Person {
   std::uint32_t qi = 0;
   std::uint32_t qi_capacity = 0;
   std::vector<Known> known;
+  std::uint64_t silver = 0;
+  std::vector<std::uint64_t> held;
 };
 
 /// A uniform draw over [mean - spread, mean + spread].
@@ -393,6 +396,35 @@ struct Diplomacy {
   std::uint32_t hold_days = 0;
 };
 
+/// A ware people buy and consume, as data: its `name`, its `price` in
+/// silver, the `health` it restores, up to `newborn_health`, and the `qi` it
+/// restores, up to the consumer's store. It is sold by people whose best
+/// discipline, their highest talent limit, is `discipline`.
+struct Ware {
+  std::string name;
+  std::uint64_t price = 0;
+  std::uint64_t health = 0;
+  std::uint32_t qi = 0;
+  std::size_t discipline = 0;
+};
+
+/// How silver and wares go round, as data, one rule for every person. Each
+/// person is born holding `purse` silver and none of the `wares`, and once a
+/// day every living person with a home earns `wage` silver. A buyer's silver
+/// goes to the seller. Every person no driver steers, once a day, buys one
+/// of each ware it holds none of from the first person it may talk to who
+/// sells it, while it has the price; and each tick consumes a ware that
+/// restores health while its health is at most `wounded` per mille of
+/// `newborn_health`, and one that restores qi while its qi is at most
+/// `drained` per mille of its store.
+struct Trade {
+  std::vector<Ware> wares;
+  std::uint64_t purse = 0;
+  std::uint64_t wage = 0;
+  std::uint32_t wounded = 0;
+  std::uint32_t drained = 0;
+};
+
 /// How people are born, age and are born again, as data. Each birth draws a
 /// talent per discipline and a lifespan in days. A person ages out when its
 /// age passes its lifespan plus `days_per_attainment` days for every point of
@@ -408,7 +440,8 @@ struct Diplomacy {
 /// people by `husbandry`, if given, which caps how many a village holds, and
 /// grow by `growth`, if given, as they press against their caps. Sects hold
 /// `manuals`, if given. People cultivate qi by `cultivation`, if given, into
-/// `realms`, ascending by qi, and learn `arts` by `learning`.
+/// `realms`, ascending by qi, and learn `arts` by `learning`. Silver and
+/// wares go round by `trade`, if given.
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -428,6 +461,7 @@ struct Life {
   std::vector<Art> arts;
   Learning learning;
   std::optional<Diplomacy> diplomacy;
+  std::optional<Trade> trade;
 };
 
 /// What a soul carries between bodies: the lives it has lived, and whether
@@ -777,8 +811,36 @@ enum class TalkRefusal : std::uint8_t {
 };
 
 /// What a person offers one who talks to it: the news it has heard, its
-/// rumours().
-enum class Offer : std::uint8_t { NEWS };
+/// rumours(), and the wares it sells.
+enum class Offer : std::uint8_t { NEWS, TRADE };
+
+/// Why a person may not buy a ware from another, the first that holds in
+/// this order; `NONE` when it may.
+enum class BuyRefusal : std::uint8_t {
+  NONE,
+  /// Either person is dead.
+  DEAD,
+  /// The buyer may not talk to the seller, as talk_refusal() says.
+  CANNOT_TALK,
+  /// The seller does not sell the ware, as sells() says.
+  NOT_SOLD,
+  /// The buyer holds less silver than the ware's price.
+  NO_SILVER,
+};
+
+/// Why a person may not consume a ware, the first that holds in this order;
+/// `NONE` when it may.
+enum class ConsumeRefusal : std::uint8_t {
+  NONE,
+  /// The person is dead.
+  DEAD,
+  /// The person holds none of the ware.
+  NONE_HELD,
+  /// Nothing the ware restores would rise: its health is at newborn_health
+  /// or the ware restores none, and its qi is at its store or the ware
+  /// restores none.
+  FULL,
+};
 
 /// A manual held by a sect, by index.
 struct HeldBySect {
@@ -960,7 +1022,10 @@ class World {
   /// a skill outside the limits an army's are within or of a rank beyond the
   /// realms, a skill costs more than MAX_TALENT qi, or the learning gives a
   /// chance, an ease or a potency above PER_MILLE or a reading reach outside
-  /// [0, MAX_REACH]. Within these limits no
+  /// [0, MAX_REACH]; or the trade gives a ware a price outside
+  /// [1, MAX_TALENT], health above MAX_HEALTH, qi above MAX_TALENT or a
+  /// discipline it does not draw, a purse or wage above MAX_TALENT, or a
+  /// wounded or drained share above PER_MILLE. Within these limits no
   /// damage, health, durability or cooldown arithmetic exceeds its type.
   World(Seed seed, Map map, std::vector<ArmySpec> armies,
         std::vector<Structure> structures, Rules rules,
@@ -1304,9 +1369,43 @@ class World {
                                          std::size_t other) const;
 
   /// Returns what person `person` offers one who talks to it, in the order
-  /// they are offered: nothing once it is dead, and otherwise its news.
-  /// Throws std::out_of_range when there is no such person.
+  /// they are offered: nothing once it is dead, and otherwise its news, then
+  /// its wares while it sells any. Throws std::out_of_range when there is no
+  /// such person.
   [[nodiscard]] std::vector<Offer> offers(std::size_t person) const;
+
+  /// Returns the trade's wares, in order, or none without a trade.
+  [[nodiscard]] const std::vector<Ware>& wares() const;
+
+  /// Returns whether person `person` sells ware `ware`: while it lives and
+  /// its best discipline, its highest talent limit, is the ware's. This is
+  /// the one rule of who sells what. Throws std::out_of_range when there is
+  /// no such person or ware.
+  [[nodiscard]] bool sells(std::size_t person, std::size_t ware) const;
+
+  /// Returns why person `buyer` may not buy one of ware `ware` from person
+  /// `seller`, or BuyRefusal::NONE when it may. Throws std::invalid_argument
+  /// when there is no such person or ware.
+  [[nodiscard]] BuyRefusal buy_refusal(std::size_t buyer, std::size_t seller,
+                                       std::size_t ware) const;
+
+  /// Person `buyer` buys one of ware `ware` from person `seller` at once,
+  /// its price in silver going to the seller, the same for the player's
+  /// body as for an NPC. Throws std::invalid_argument when buy_refusal()
+  /// names a reason.
+  void buy(std::size_t buyer, std::size_t seller, std::size_t ware);
+
+  /// Returns why person `person` may not consume ware `ware`, or
+  /// ConsumeRefusal::NONE when it may. Throws std::invalid_argument when
+  /// there is no such person or ware.
+  [[nodiscard]] ConsumeRefusal consume_refusal(std::size_t person,
+                                               std::size_t ware) const;
+
+  /// Person `person` consumes one of ware `ware` at once, its health rising
+  /// by the ware's up to newborn_health and its qi by the ware's up to its
+  /// store, the same for the player's body as for an NPC. Throws
+  /// std::invalid_argument when consume_refusal() names a reason.
+  void consume(std::size_t person, std::size_t ware);
 
  private:
   friend class SaveCodec;
@@ -1451,6 +1550,9 @@ class World {
                               std::optional<std::size_t> faction) const;
   void settle_duels();
   void negotiate(const Diplomacy& diplomacy);
+  void pay(const Trade& trade);
+  void shop(const Trade& trade);
+  void dose(const Trade& trade);
   /// A declaration a leader seeks, and its chance a year, per mille.
   struct Sought {
     Declaration what;
