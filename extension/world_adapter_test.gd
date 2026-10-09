@@ -484,7 +484,6 @@ func _steered_run(give_order: bool) -> Dictionary:
 	return {"accepted": accepted, "moved": world.body_positions(0)[0] != home, "camp": camp}
 
 
-
 # `skills` as skills() gives them back: each with its shape, an area where it was left out.
 func _shaped(skills: Array) -> Array:
 	var shaped := []

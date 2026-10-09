@@ -1,14 +1,14 @@
-## The settings panel, drawn as art/mockup/settings_screen.png lays it out: the speed of the
-## world's time, the window mode, the resolution in whole multiples of the native size, the
-## language, the volume of all sound, of the effects and of the music, whether a cast key casts on
-## its press or on its release, the touch controls, on a phone or a tablet, forced on, forced
-## on with a tap on the ground walking there, or off, and whose damage floats up as numbers over
-## the struck, no one's, the player's own or everyone's, each a row of its choices with the chosen one in jade, and a line saying what the
-## row being changed sets. The choices are the player's preferences, not the world's state: they
-## are kept in a file under user:// and applied to the window, the translations, the audio buses,
-## the HUD's layout, the play scene's pace and the world's drawing. A row's choice is chosen by a
-## tap as well as by the keys. Every word comes from hud.csv through Godot's translations. It holds
-## no game rule.
+## The settings panel, drawn as art/mockup/settings_screen.png lays it out: the speed of the world's
+## time, the window mode, the resolution in whole multiples of the native size, the language, the
+## volume of all sound, of the effects and of the music, whether a cast key casts on its press or on
+## its release, the touch controls, on a phone or a tablet, forced on, forced on with a tap on the
+## ground walking there, or off, and whose damage floats up as numbers over the struck, no one's,
+## the player's own or everyone's, each a row of its choices with the chosen one in jade, and a line
+## saying what the row being changed sets. The choices are the player's preferences, not the world's
+## state: they are kept in a file under user:// and applied to the window, the translations, the
+## audio buses, the HUD's layout, the play scene's pace and the world's drawing. A row's choice is
+## chosen by a tap as well as by the keys. Every word comes from hud.csv through Godot's
+## translations. It holds no game rule.
 extends "res://hud/panel.gd"
 
 ## Sent once every row's choice has been applied.

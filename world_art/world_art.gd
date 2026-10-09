@@ -1,14 +1,14 @@
-## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid
-## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
-## buildings by stage, bodies by faction, the steered person's markers, a crimson ring round each
-## body hostile to the person names are read around, as WorldAdapter.relation says, and what the
-## fighting did through combat.gd, the struck drawn in the impact colour and knocked back and the dead
-## falling and fading. Bodies are drawn
-## between the positions of the last two ticks, as far between as the caller says the frame is, so
-## they move on every frame; the core's positions stay the only truth. Each refresh also lists the
-## people within NAME_REACH of that person, for their names to be drawn over them. Bodies are batched:
-## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
-## edge of what they stand on. It reads the world and holds no game rule.
+## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid as
+## docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms, buildings
+## by stage, bodies by faction, the steered person's markers, a crimson ring round each body hostile
+## to the person names are read around, as WorldAdapter.relation says, and what the fighting did
+## through combat.gd, the struck drawn in the impact colour and knocked back and the dead falling
+## and fading. Bodies are drawn between the positions of the last two ticks, as far between as the
+## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
+## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
+## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings
+## and landforms by the bottom edge of what they stand on. It reads the world and holds no game
+## rule.
 extends Node2D
 
 ## Emitted after a tick changed the territory or the villages, once both are drawn anew.
