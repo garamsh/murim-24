@@ -79,6 +79,12 @@ const LEVEL_SECONDS := 8.0
 # The bench's pan: the camera round PAN's corners, in cells, at PAN_SPEED cells a second.
 const PAN := [Vector2(26, 46), Vector2(100, 46), Vector2(100, 100), Vector2(26, 100)]
 const PAN_SPEED := 20.0
+# The valley's pan: round its places, in this order.
+const VALLEY_PAN := ["village", "terraces", "riverside", "town"]
+# A bench reports on what it has once its timed frames run this long, and any run quits after
+# DEADLINES' seconds for its mode whatever it is doing, so no window is left open.
+const BENCH_SECONDS := 40.0
+const DEADLINES := {"frames": 300.0, "stills": 600.0, "level": 240.0, "bench": 150.0}
 # Waypoints each Demonic army walks in turn, by army, in cells: along the row behind village 5's
 # southern houses and back, out of the seat's gate to village 5 and back, and down from village 2.
 const WALKS := {
@@ -113,6 +119,7 @@ var _last_usec := 0
 var _since_tick := 0.0
 var _bench_frames := 0
 var _pan_seconds := 0.0
+var _bench_started := 0
 var _driver: Driver
 var _valley: Valley
 var _villagers: Villagers
@@ -181,8 +188,9 @@ class AngleView extends Node2D:
 	var freed := 0
 	var most_resident := 0
 	var ground_bytes := 0
-	## How long each chunk took to build, in microseconds.
+	## How long each chunk took to build as it streamed in, and to bake, in microseconds.
 	var build_usec := PackedInt64Array()
+	var bake_usec := PackedInt64Array()
 	## Effects drawn on the ground under everything standing, and over all of it.
 	var under := Node2D.new()
 	var over := Node2D.new()
@@ -196,6 +204,7 @@ class AngleView extends Node2D:
 	var _shadows := Node2D.new()
 	var _ground := Node2D.new()
 	var _chunks := {}
+	var _baked := {}
 	var _shadow_cache := {}
 	var _buckets := {}
 	# Structures by the chunk of their footprint's corner: {kind, corner, size, id}.
@@ -260,6 +269,8 @@ class AngleView extends Node2D:
 		_chevron.offset = Vector2(-8, -38)
 		note_tick()
 		note_tick()
+		if look.baked_shadows():
+			bake_all()
 
 	## Where a point in sub-cell units is drawn: x by CELL.x, y by CELL.y, raised by its level.
 	func to_screen(sub: Vector2) -> Vector2:
@@ -417,8 +428,10 @@ class AngleView extends Node2D:
 
 	# The chunk: its ground at level 0 and below in one image, each raised row a strip, shadows
 	# baked into both, then its structures and trees.
-	func _build_chunk(key: Vector2i) -> void:
-		var started := Time.get_ticks_usec()
+	# The chunk's images, as a map build bakes them: its ground at level 0 and below, a strip per
+	# raised row, the edges between kinds of ground roughened, shadows baked in, and the trees
+	# standing on it and round it.
+	func _compose(key: Vector2i) -> Dictionary:
 		var origin := key * CHUNK
 		var cells := Rect2i(origin, Vector2i(CHUNK, CHUNK)).intersection(Rect2i(Vector2i.ZERO, _size))
 		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y))
@@ -448,8 +461,31 @@ class AngleView extends Node2D:
 					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
 				if level > _level(x + 1, y):
 					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y))), EDGE)
+		if look.baked_shadows():
+			_roughen(cells, top_left, ground, strips)
 		var trees: Array = look.trees_in(cells.grow(4))
 		_bake_shadows(key, cells, top_left, ground, strips, trees)
+		return {"ground": ground, "strips": strips, "trees": trees}
+
+	## Bakes every chunk's images once, as a map build would, so streaming a chunk in only
+	## uploads them; `bake_usec` holds what each took. A look that bakes no structure shadows
+	## (RegionLook) is composed as it streams instead.
+	func bake_all() -> void:
+		for cx in range((_size.x + CHUNK - 1) / CHUNK):
+			for cy in range((_size.y + CHUNK - 1) / CHUNK):
+				var started := Time.get_ticks_usec()
+				_baked[Vector2i(cx, cy)] = _compose(Vector2i(cx, cy))
+				bake_usec.append(Time.get_ticks_usec() - started)
+
+	func _build_chunk(key: Vector2i) -> void:
+		var started := Time.get_ticks_usec()
+		var origin := key * CHUNK
+		var cells := Rect2i(origin, Vector2i(CHUNK, CHUNK)).intersection(Rect2i(Vector2i.ZERO, _size))
+		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y))
+		var composed: Dictionary = _baked[key] if _baked.has(key) else _compose(key)
+		var ground: Image = composed.ground
+		var strips: Dictionary = composed.strips
+		var trees: Array = composed.trees
 		var occluders: Array[Sprite2D] = []
 		var extras: Array[Sprite2D] = []
 		var bytes := ground.get_data_size()
@@ -516,6 +552,37 @@ class AngleView extends Node2D:
 		if entry.has("tag"):
 			return _frame(entry.kind, entry.tag, entry.variant)
 		return _frame(entry.kind, stage if _sheet(entry.kind).tags.has(stage) else "intact", 0)
+
+	# Where two kinds of ground meet on one level, each takes a ragged few pixels of the other,
+	# by a seeded hash, so lanes, meadows and gardens have organic edges rather than cell edges.
+	func _roughen(cells: Rect2i, top_left: Vector2i, ground: Image, strips: Dictionary) -> void:
+		var sheet := _sheet("terrain")
+		var band := 3
+		for y in range(cells.position.y, cells.end.y):
+			for x in range(cells.position.x, cells.end.x):
+				var level := _level(x, y)
+				var image: Image = ground if level <= 0 else strips.get(Vector2i(y, level))
+				var at := Vector2i(x * int(CELL.x), y * int(CELL.y) - level * _px) - top_left
+				if level > 0:
+					at = Vector2i(x * int(CELL.x) - top_left.x, 0)
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]:
+					var other := Vector2i(x, y) + d
+					if not Rect2i(Vector2i.ZERO, _size).has_point(other) or _level(other.x, other.y) != level:
+						continue
+					var tag: String = look.tile_at(other.x, other.y)
+					if tag == look.tile_at(x, y) or look.stairs_at(x, y) or look.stairs_at(other.x, other.y):
+						continue
+					var span: Array = sheet.tags[tag]
+					var from: Rect2i = sheet.frames[span[0] + _hash(other.x, other.y, 1) % (span[1] - span[0] + 1)]
+					for py in int(CELL.y):
+						for px in int(CELL.x):
+							var depth: int = [int(CELL.x) - 1 - px, int(CELL.y) - 1 - py, px, py][[Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)].find(d)]
+							if depth >= band:
+								continue
+							var wx := x * int(CELL.x) + px
+							var wy := y * int(CELL.y) + py
+							if float(_hash(wx, wy, 77) % 100) / 100.0 < float(band - depth) / (band + 1.0) * 0.8:
+								image.set_pixel(at.x + px, at.y + py, sheet.image.get_pixel(from.position.x + px, from.position.y + py))
 
 	# The deepest face a strip of `level` in row `y` drops to its south.
 	func _strip_drop(y: int, level: int, cells: Rect2i) -> int:
@@ -1292,6 +1359,28 @@ class Valley extends RefCounted:
 				out.append(cell)
 		return out
 
+	## The cells people of `place` may start on, each once: its lanes first, then every other open
+	## cell of the same stretch of ground within ten cells of them.
+	func room(place: String) -> Array:
+		var lanes := lanes(place)
+		var cells: Array = lanes.duplicate()
+		if lanes.is_empty():
+			return cells
+		var stretch: int = _region[_i(lanes[0].x, lanes[0].y)]
+		var near := Rect2i(lanes[0], Vector2i.ONE)
+		for cell: Vector2i in lanes:
+			near = near.expand(cell)
+		near = near.grow(10)
+		var seen := {}
+		for cell: Vector2i in lanes:
+			seen[cell] = true
+		for y in range(near.position.y, near.end.y):
+			for x in range(near.position.x, near.end.x):
+				var cell := Vector2i(x, y)
+				if _inside(cell) and not seen.has(cell) and _blocked[_i(x, y)] == 0 and _region[_i(x, y)] == stretch:
+					cells.append(cell)
+		return cells
+
 	# Numbers each stretch of open ground the core's people can cross, four ways.
 	func _find_regions() -> void:
 		_region.resize(WIDTH * HEIGHT)
@@ -1745,16 +1834,17 @@ class Villagers extends RefCounted:
 		_rng.seed = 7
 		var places := ["village", "village", "town", "terraces", "riverside"]
 		var armies: Array[Dictionary] = []
-		var used := {}
+		var room := {}
+		for place: String in places:
+			room[place] = valley.room(place)
 		for n in people / per_army:
 			var place: String = places[n % places.size()]
-			var lanes := valley.lanes(place)
 			var members: Array[Dictionary] = []
 			for k in per_army:
-				var cell: Vector2i = lanes[_rng.randi_range(0, lanes.size() - 1)]
-				while used.has(cell):
-					cell = lanes[_rng.randi_range(0, lanes.size() - 1)]
-				used[cell] = true
+				# Each person on a cell of its own: lane cells first, then the open ground round them.
+				var free: Array = room[place]
+				assert(not free.is_empty(), "no open cell left in %s for person %d" % [place, n * per_army + k])
+				var cell: Vector2i = free.pop_at(_rng.randi_range(0, free.size() - 1))
 				members.append({"cell": cell, "health": 100})
 			armies.append({"objective": members[0].cell, "faction": [2, 2, 0, 2, 1][n % 5],
 					"skills": [IDLE_SKILL], "members": members})
@@ -1789,6 +1879,9 @@ func _initialize() -> void:
 	_dir = args[0]
 	_mode = args[1]
 	_flags = args.slice(2)
+	create_timer(DEADLINES[_mode]).timeout.connect(func() -> void:
+		printerr("angle: %s ran past its %.0f s deadline; quitting" % [args[1], DEADLINES[args[1]]])
+		quit(3))
 	DirAccess.make_dir_recursive_absolute(_dir.path_join("frames"))
 	if _mode == "frames" and "valley" in _flags:
 		DisplayServer.window_set_size(Vector2i(640, 360))
@@ -1881,17 +1974,18 @@ func _still_focus(still: String) -> Vector2:
 
 # The point `distance` cells along PAN's loop.
 func _pan_at(distance: float) -> Vector2:
+	var path: Array = PAN if _valley == null else VALLEY_PAN.map(func(place: String) -> Vector2: return Valley.PLACES[place])
 	var length := 0.0
-	for n in PAN.size():
-		length += PAN[n].distance_to(PAN[(n + 1) % PAN.size()])
+	for n in path.size():
+		length += (path[n] as Vector2).distance_to(path[(n + 1) % path.size()])
 	var left := fmod(distance, length)
-	for n in PAN.size():
-		var from: Vector2 = PAN[n]
-		var to: Vector2 = PAN[(n + 1) % PAN.size()]
+	for n in path.size():
+		var from: Vector2 = path[n]
+		var to: Vector2 = path[(n + 1) % path.size()]
 		if left <= from.distance_to(to):
 			return from.move_toward(to, left)
 		left -= from.distance_to(to)
-	return PAN[0]
+	return path[0]
 
 
 # The part of the world on screen, in world pixels; the camera has no smoothing and its limits
@@ -2135,7 +2229,7 @@ func _bench(delta: float) -> bool:
 	var step := 1.0 / WorldAdapter.TICKS_PER_SECOND
 	_since_tick = minf(_since_tick + delta, step * 4)
 	while _since_tick >= step:
-		if _driver != null:
+		if _driver != null or _villagers != null:
 			_tick()
 		else:
 			_world.tick()
@@ -2149,15 +2243,18 @@ func _bench(delta: float) -> bool:
 		_play.fit_view()
 		_hud.refresh(_play.world, _play.steered, _play._skills)
 	_bench_frames += 1
+	if _bench_frames == WARM_UP_FRAMES:
+		_bench_started = Time.get_ticks_msec()
 	if _bench_frames > WARM_UP_FRAMES:
 		_times.append((now - _last_usec) / 1000.0)
 	_last_usec = now
-	if _times.size() < TIMED_FRAMES:
+	var out_of_time := _bench_started > 0 and Time.get_ticks_msec() - _bench_started > BENCH_SECONDS * 1000.0
+	if _times.size() < TIMED_FRAMES and not (out_of_time and not _times.is_empty()):
 		return false
 	var sorted := _times.duplicate()
 	sorted.sort()
-	print("angle bench: %s, flags %s, window %s, vsync off, %s, Godot %s" % [
-		"M1 scenario" if "m1" in _flags else "village sequence under the HUD", _flags,
+	var scene := "M1 scenario" if "m1" in _flags else ("valley under the HUD" if _valley != null else "village sequence under the HUD")
+	print("angle bench: %s, flags %s, window %s, vsync off, %s, Godot %s" % [scene, _flags,
 		DisplayServer.window_get_size(), RenderingServer.get_video_adapter_name(), Engine.get_version_info().string])
 	print("angle bench: %d bodies drawn, %d hidden behind something in the last frame" % [_view.drawn, _view.occluded])
 	print("angle bench: frame time p50 %.3f ms, p99 %.3f ms, max %.3f ms over %d frames" % [
@@ -2169,6 +2266,14 @@ func _bench(delta: float) -> bool:
 		_view.ground_bytes / maxi(_view.resident, 1)])
 	print("angle bench: chunk build p50 %.3f ms, max %.3f ms; camera travelled %.0f cells" % [
 		builds[builds.size() / 2] / 1000.0, builds[-1] / 1000.0, _pan_seconds * PAN_SPEED])
+	if not _view.bake_usec.is_empty():
+		var bakes := Array(_view.bake_usec)
+		bakes.sort()
+		var total := 0
+		for usec: int in bakes:
+			total += usec
+		print("angle bench: map build baked %d chunks in %.0f ms, p50 %.1f ms, max %.1f ms a chunk" % [bakes.size(),
+				total / 1000.0, bakes[bakes.size() / 2] / 1000.0, bakes[-1] / 1000.0])
 	print("angle bench: texture memory %.1f MB, video memory %.1f MB, static memory %.1f MB, %d nodes" % [
 		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0,
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
