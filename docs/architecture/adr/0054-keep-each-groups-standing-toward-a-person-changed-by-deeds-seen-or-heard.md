@@ -125,7 +125,13 @@ Options weighed:
   - Rejected: standing between factions, raised by their members' deeds. One person's murder would turn a whole faction hostile, which counts the deed a second time.
 - **What waits for #215.**
   - **A thief.** Witnesses of a pick-up from a warehouse the picker helped destroy record a theft deed, base −200, against the warehouse's village's groups.
-  - **Tax.** A leader's tax rate above 100 per mille lowers its standing with each of its faction's villages by 1 a day for every 100 per mille above.
+  - **Tax.** #215's ADR 0052 says a higher rate lowers "the faction's reputation with its households". In this ADR's terms, households are not groups and standing is held toward people, so it is the standing of each of the faction's villages toward the faction's leader.
+    - Each day, a rate above 100 per mille lowers it by 3 for every 100 per mille above, rounded down.
+    - At #215's highest rate of 300 that is 6 a day against the decay of 2, a net 4 a day: unfriendly in 50 days, and hostile in 150.
+    - At 200 the net is 1 a day, unfriendly in 200 days.
+    - At 150 it is 1 a day, which the decay cancels.
+
+    So a sustained high rate visibly lowers it within months, and a modest one never does. #215's ADR 0052 is reworded in its own PR to name the same subject.
   - **Discontent.** A household whose village stands unfriendly or worse toward its faction's leader gains 1 discontent a day.
 - **The view.**
   - The dialogue offers attack, extort, threaten, help and give, with each refusal's reason.
@@ -175,7 +181,7 @@ Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a 
 
 The witnesses within sight teach their groups at once, and a deed no one saw stays hidden. A witnessed deed spreads from its cell at 64 cells a day to the anchors of the victim's groups, kept in a store of 4,096 apart from ADR 0032's ring.
 
-Standing decays toward zero by 2 a day. Its tiers decide hostility, sales, admission, teaching and prices. A member acts on its village's and sect's tier, and on its faction's below neutral only while the faction stands hostile or at war with the person's own. Standing toward a faction's leader doubles war chances and halves peace chances in ADR 0038's diplomacy, so no faction turns hostile for one person's deed.
+Standing decays toward zero by 2 a day. Its tiers decide hostility, sales, admission, teaching and prices. A member acts on its village's and sect's tier, and on its faction's below neutral only while the faction stands hostile or at war with the person's own. A tax rate above 100 per mille lowers the faction's villages' standing toward its leader by 3 a day for each 100 above. Standing toward a faction's leader doubles war chances and halves peace chances in ADR 0038's diplomacy, so no faction turns hostile for one person's deed.
 
 This supersedes these:
 - ADR 0038's `hostile` as a reading of factions and duels alone, now also feuds and hostile standing; and its diplomacy reading no standing
