@@ -298,6 +298,10 @@ void fragment() {
 		float height = float(level - foot) * LP;
 		vec2 q = warped(vec2(x, ground_y));
 		int material = cell(ivec2(floor(vec2(q.x / CW, q.y / CD)))).z;
+		// An earth bank above the first level is rock, so a face keeps one material along its run.
+		if (material == 1 && level >= 2) {
+			material = 0;
+		}
 		kind = 20 + material;
 		sort_row = int(floor(ground_y / CD));
 		out_colour = vec4(face(vec2(x, s), material, depth, height), 1.0);
