@@ -118,7 +118,7 @@ Options weighed:
   - Gatherers are at most a third of a village's earners. About three fifths of the people are earners, adults from 16 to 60, so the live tier's 5,000 hold about 3,000 earners and at most about 1,000 gatherers walking to slots at once. A walk costs what any mover's step costs, on fields shared by area and target.
   - A gathering is one order and one slot write.
   - The daily assignment passes over every village's earners once a day, about 28 people a tick spread over 1,800 ticks.
-  - A far village's aggregate scans at most 9 areas of 64 slots for each gatherer, once a day.
+  - A far village's aggregate scans at most 9 areas of 64 slots, 576, for each gatherer, once a day. Each village settles on its own tick of the day, by index. At about 400 villages, nearly all far, with at most about 10 gatherers each, that is about 2.3 million slot reads a day, about 1,300 a tick spread over 1,800 ticks.
 - **Memory and saves.** 2 MiB of slots on disk with the map, 2 MiB of stages and timers in each save, and a few lots for each village's account: 4 MiB, within the 8 MiB ADR 0047 set.
 - **Money.** Gathering and building wages move silver from treasuries to households, and surplus materials sold or exported bring it back. Imports of materials a village cannot gather, such as stone on a plain, are a sink under ADR 0052's balance.
 - **A worked example.** One base-pack village's first 10 years: a starting town of 4 households, 14 people, with 2 houses and 4 field cells, on plain beside a forest and a rocky hill within 32 cells.
