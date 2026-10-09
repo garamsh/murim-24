@@ -113,7 +113,7 @@ Options weighed:
 - **Supersessions.**
   - ADR 0023's plans raised by the repair rule alone, which now raise only as far as their materials are delivered, and its founding with nothing carried.
   - ADR 0047's bound of 256 objects an area, as ADR 0041 set it, now 64 slots an area placed by the build tool.
-  - In the stacked #215: ADR 0051's kinds of account, which gain the village's, and ADR 0052's earning order, which gains gathering and building paid from the treasury.
+- **Extensions of the stacked #215.** ADR 0051's kinds of account gain the village's, and ADR 0052's earning order gains gathering and building paid from the treasury, which ADR 0052 defers to #187.
 
 The implementation, in order, each a pull request with its acceptance:
 1. **Slots and kinds.** The build tool places slots on the test map, with stages, growth, spread and regrowth.

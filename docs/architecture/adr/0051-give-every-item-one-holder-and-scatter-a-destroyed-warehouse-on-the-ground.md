@@ -1,6 +1,6 @@
 # ADR 0051: Give every item one holder, and scatter a destroyed warehouse on the ground
 
-> Status: proposed; its kinds of account superseded by ADR-0056, which adds a village's materials account
+> Status: proposed
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

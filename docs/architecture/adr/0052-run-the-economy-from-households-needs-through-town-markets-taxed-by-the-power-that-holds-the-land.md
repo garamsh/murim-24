@@ -1,6 +1,6 @@
 # ADR 0052: Run the economy from households' needs through town markets, taxed by the power that holds the land
 
-> Status: proposed; its earning order superseded by ADR-0056, which adds gathering and building paid from the treasury
+> Status: proposed
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
