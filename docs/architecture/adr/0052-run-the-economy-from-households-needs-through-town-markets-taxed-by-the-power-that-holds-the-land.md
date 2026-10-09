@@ -109,6 +109,7 @@ Options weighed:
   - it stays within a floor and a ceiling, half and double the kind's base price in the base pack
   - **Buying** takes the price from the buyer to the till, and the faction's share of trade from the till to its treasury.
   - **Selling** pays a quarter below the price, scaled by the durability left, from the till, refused when the till cannot pay. A worn item goes to the worn pool.
+  - **A kind the market does not list,** such as loot from afar sold at a capital, is bought at the kind's floor, scaled by its durability, and exported the next day at the floor, so it passes through to the world beyond the map. The market keeps no stock or price for it, so its 64 kinds stay its bound. Selling is refused only when the till cannot pay.
   - Rejected: a price set by matching each buyer to a seller. It is haggling, out of scope, and costs a search per trade.
 - **Making.** A workshop's holding lists the kinds it makes and the materials each needs, as pack data. Each day each standing workshop makes up to its workers' output, adding to its market's stock and taking materials from it, and pays each worker's household a share of the price as wages.
   - A smithy also turns its worn pool into whole items at a material cost, which is ADR 0050's repair by sale.
