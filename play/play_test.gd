@@ -106,7 +106,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _settings_button_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass()
@@ -584,19 +584,53 @@ func _screens_pass() -> bool:
 	return passed
 
 
-# The HUD's settings button opens the settings over the world, and no tick runs while they are
-# open; Escape goes back to the world, which runs again. Control: the settings opened from the
-# pause panel go back to it, so going back to the world is the button's own. Setup: the world is
-# played and no screen is open before the button is pressed.
-func _settings_button_pass() -> bool:
+# A click on each row of the HUD's shortcut rail does what its key does: from the world with no
+# panel open, the panel or screen a click on a row of SHORTCUTS leaves open is the row's own, and the
+# one its key, pressed in the same state, leaves open; with the genealogy panel open, each row's
+# click leaves open what its key does, so the genealogy row closes the panel and the sect row leaves
+# it open. The settings, which no key opens, open as open_settings() opens them, no tick runs while
+# they are open, and Escape goes back to the world, which runs again; opened from the pause panel,
+# they go back to it. The cursor over a row marks it, and off the rail marks none. Control: a left
+# click on the room's centre and one just left of the rail open nothing and give no order, and with
+# the touch controls shown, the rail hidden, a click on a row opens nothing. Setup: the world is
+# played, the rail shown with every row of SHORTCUTS, and nothing open before each click and key.
+# The rail lights the row whose panel or screen is open, and shows each row's key and word as the
+# pause panel's guide lists it, Esc for Escape, the settings' row, which has no key, unlisted.
+func _shortcuts_pass() -> bool:
 	var scene := _scene(0)
 	var hud: CanvasLayer = scene.get_node("Hud")
+	var rail: Control = hud.shortcuts
+	var set_up: bool = scene.world != null and rail.visible and rail.rows.size() == scene.SHORTCUTS.size()
+	var faults: Array[String] = []
+	for state: String in ["", "genealogy"]:
+		for n in scene.SHORTCUTS.size():
+			var row: Dictionary = scene.SHORTCUTS[n]
+			set_up = set_up and _open_from(scene, state) == state
+			scene.click(_left(rail.row_rect(n).get_center()))
+			var clicked := _open_now(scene)
+			if rail.lit != clicked:
+				faults.append("from \"%s\", %s's row clicked lit \"%s\" over \"%s\" open" % [state, row.action, rail.lit, clicked])
+			set_up = set_up and _open_from(scene, state) == state
+			if row.key == KEY_NONE:
+				scene.open_settings()
+			elif not scene.navigate(_key(row.key)):
+				scene.command(_key(row.key))
+			var keyed := _open_now(scene)
+			if clicked != keyed or (state == "" and clicked != row.action):
+				faults.append("from \"%s\", %s's row left \"%s\" open, its key \"%s\"" % [state, row.action, clicked, keyed])
+	var guide: Array[Dictionary] = scene.controls()
+	for n in scene.SHORTCUTS.size():
+		var row: Dictionary = scene.SHORTCUTS[n]
+		var word: String = hud.key_word(row.key) if row.key != KEY_NONE else ""
+		var listed := guide.has({"keys": [word], "does": row.label})
+		if rail.rows[n].key != word or rail.rows[n].label != row.label or listed != (row.key != KEY_NONE):
+			faults.append("%s: the rail shows %s, the guide lists it %s" % [row.action, rail.rows[n], listed])
+		if row.key == KEY_ESCAPE and word != "Esc":
+			faults.append("%s: the rail and the guide show %s, not Esc" % [row.action, word])
+	_open_from(scene, "")
 	var span := 3.5 / WorldAdapter.TICKS_PER_SECOND
-	var set_up: bool = scene.world != null and hud.screen() == null and hud.settings_button.visible
-	var click := InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
-	click.pressed = true
-	hud.settings_button.gui_input.emit(click)
+	scene.click(_left(rail.row_rect(scene.SHORTCUTS.find_custom(func(row: Dictionary) -> bool:
+			return row.action == "settings")).get_center()))
 	var opened: bool = hud.screen() == hud.settings
 	var before: int = scene.ticks
 	scene.advance(span)
@@ -612,11 +646,59 @@ func _settings_button_pass() -> bool:
 	var from_pause: bool = hud.screen() == hud.settings
 	scene.navigate(_key(KEY_ESCAPE))
 	var back_to_pause: bool = hud.screen() == hud.pause
+	_open_from(scene, "")
+	scene.click(_motion(rail.row_rect(2).get_center(), 0))
+	var marked: bool = rail.hovered == 2
+	scene.click(_motion(hud.room / 2.0, 0))
+	var unmarked: bool = rail.hovered == -1
+	var objective: Vector2i = scene._objective
+	var elsewhere := []
+	for at: Vector2 in [hud.room / 2.0, rail.rect().position + Vector2(-2, 8)]:
+		elsewhere.append(scene.click(_left(at)) or scene.command(_left(at)) or _open_now(scene) != "")
+	var no_order: bool = scene._objective == objective
+	hud.use_touch(true)
+	var hidden_taken: bool = scene.click(_left(rail.row_rect(0).get_center())) or _open_now(scene) != ""
 	scene.free()
-	var passed := set_up and opened and held and back_to_world and ran and from_pause and back_to_pause
-	print("play_test: the settings button opens the settings %s, no tick while open %s; Escape goes back to the world %s, which runs %s; control: opened from the pause panel %s, Escape goes back to it %s (setup %s): %s" % [
-		opened, held, back_to_world, ran, from_pause, back_to_pause, set_up, "pass" if passed else "FAIL"])
+	var passed := set_up and faults.is_empty() and opened and held and back_to_world and ran and from_pause \
+			and back_to_pause and marked and unmarked and elsewhere == [false, false] and no_order and not hidden_taken
+	print("play_test: each shortcut row clicked against its key, from the world and from the genealogy panel: faults %s; the settings row opens them %s, no tick while open %s, Escape back to the world %s, which runs %s; from the pause panel %s, back to it %s; the cursor marks a row %s, off it none %s; control: clicks on the centre and beside the rail took %s, no order %s, a row with the rail hidden taken %s (setup %s): %s" % [
+		faults, opened, held, back_to_world, ran, from_pause, back_to_pause, marked, unmarked, elsewhere, no_order,
+		hidden_taken, set_up, "pass" if passed else "FAIL"])
 	return passed
+
+
+# Closes every panel and screen over `scene`'s world, then opens the panel `state` names by its key,
+# or none for "". Returns what is open then, as _open_now names it.
+func _open_from(scene: Node2D, state: String) -> String:
+	var hud: CanvasLayer = scene.get_node("Hud")
+	for over: Control in [hud.genealogy, hud.sect, hud.factions, hud.arts, hud.dialogue, hud.settings, hud.pause]:
+		over.visible = false
+	for row: Dictionary in scene.SHORTCUTS:
+		if row.action == state:
+			scene.command(_key(row.key))
+	return _open_now(scene)
+
+
+# The action of the row of SHORTCUTS whose panel or screen is open over `scene`'s world, the screen
+# first, or "" while none is, or the open one's script where no row names it.
+func _open_now(scene: Node2D) -> String:
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var open: Control = hud.screen() if hud.screen() != null else hud.panel()
+	if open == null:
+		return ""
+	for row: Dictionary in scene.SHORTCUTS:
+		if hud.get(row.action) == open:
+			return row.action
+	return open.get_script().resource_path
+
+
+# A left click at `at`, in the HUD's pixels.
+func _left(at: Vector2) -> InputEventMouseButton:
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = at
+	return click
 
 
 # A new game saved from the pause panel, which says so, is resumed by Continue on a fresh title, as
