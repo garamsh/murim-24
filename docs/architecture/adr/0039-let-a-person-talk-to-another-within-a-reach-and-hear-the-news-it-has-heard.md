@@ -1,6 +1,6 @@
 # ADR 0039: Let a person talk to another within a reach and hear the news it has heard
 
-> Status: accepted
+> Status: accepted; its talk refused only between hostile factions superseded by ADR-0054, which also refuses talk under hostile standing
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

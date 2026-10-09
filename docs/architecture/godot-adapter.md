@@ -126,4 +126,5 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - a market window, replacing the wares screen
   - a household panel
   - a treasury window for a leader
+- **Standing in the view.** ADR 0054, proposed. The dialogue offers attack, extort, threaten, help and give, with their refusals. Its card and the faction window show the player's standing with the village, sect and faction by tier. A body whose groups stand hostile toward the player is ringed crimson like a hostile faction's, and an unfriendly one in a paler ring.
 - **Which platforms the library is built for.** It is built for the host, macOS arm64 and Linux x86_64 so far, for Android arm64, and for the PC exports, macOS universal and Windows x86_64; iOS, Linux and Windows arm64 exports are not built.
