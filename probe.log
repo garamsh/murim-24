@@ -1,0 +1,9 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+ground_probe: after the bake the grounds hold 0 viewports: pass
+ground_probe: 6 of 6 chunks baked to the same ground, strips and trees twice, the mountain's chunk holding 8 strips: pass
+ground_probe: the forest's edge runs within 3 pixels of the cells' side at x 384 on 0.28 of rows (100, 360) warped, from x 372 to 423, and on 0.82 without warp, 257 and 255 rows read: pass
+ground_probe: at (1024.0, 384.0) the first chunk is shown false: pass
+ground_probe: back at the start the first chunk is shown with its 162 trees where they were true; at most 1 new chunks a frame: pass
+ground_probe: 5 of 5 checks passed
