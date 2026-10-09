@@ -108,7 +108,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass()
@@ -1432,6 +1432,26 @@ func _key(keycode: Key) -> InputEventKey:
 
 func _distance(position: Vector2, cell: Vector2i) -> float:
 	return position.distance_to((Vector2(cell) + Vector2.ONE * 0.5) * WorldAdapter.CELL_SIZE)
+
+
+# The settings' damage numbers row reaches the world's drawing: hidden, the world art floats no
+# number; shown again, it does. Setup: they are shown as the scene starts.
+func _numbers_pass() -> bool:
+	var scene := _scene(CULT_VILLAGE)
+	var settings: Control = scene.get_node("Hud").settings
+	var combat: Node2D = scene.get_node("WorldArt/Combat")
+	var at_start: bool = combat.damage_numbers
+	settings.chosen.numbers = settings.NUMBERS_KEYS.find("SETTINGS_NUMBERS_OFF")
+	settings.apply()
+	var hidden: bool = not combat.damage_numbers
+	settings.chosen.numbers = settings.NUMBERS_KEYS.find("SETTINGS_NUMBERS_ON")
+	settings.apply()
+	var shown: bool = combat.damage_numbers
+	scene.free()
+	var passed := at_start and hidden and shown
+	print("play_test: damage numbers shown as the scene starts %s, hidden by the settings %s, shown again %s: %s" % [
+		at_start, hidden, shown, "pass" if passed else "FAIL"])
+	return passed
 
 
 # M opens the sect panel on the Cult person's sect, and Enter makes it a member, the panel saying it
