@@ -12,7 +12,10 @@
 ## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
 
-const CELL := 16
+## A cell's width and depth on the ground, in pixels, as world_art.gd draws it.
+const CELL := Vector2(16, 12)
+## How far above where a person stands the top of its body is drawn, in pixels.
+const BODY_HEIGHT := 24.0
 ## How long each thing shows, in milliseconds.
 const STRIKE_MS := 160
 const FLASH_MS := 120
@@ -47,12 +50,15 @@ var strikes: Array[Dictionary] = []
 ## loss, and `mine`, whether it was that or a loss to the steered person's use.
 var numbers: Array[Dictionary] = []
 ## Each person who died struck, in order: `person`, its `army`, `at`, where it last stood in
-## pixels, and `ms`, when.
+## pixels, `ground`, that place on the unraised ground, and `ms`, when.
 var deaths: Array[Dictionary] = []
 ## The person the steered person's last use struck nearest where it went, or -1.
 var target := -1
 ## The view the last refresh showed, in pixels.
 var view := Rect2()
+## Where a point in sub-cell units is drawn, in pixels: world_art.gd's projection, raised with the
+## ground; without one, on the unraised ground.
+var to_screen := Callable()
 
 var _now := 0
 var _target_ms := 0
@@ -126,9 +132,11 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 		var person: int = event.get("person", -1)
 		if event.kind == WorldAdapter.EVENT_DIED and person < _seen.size() and _seen[person] == _tick - 1 \
 				and _struck_tick[person] == _tick:
-			var at := _pixels(_positions[_army[person]][_body[person]])
+			var stood := _positions[_army[person]][_body[person]]
+			var at := _pixels(stood)
 			_hit(person, _health[person], at)
-			deaths.append({"person": person, "army": _army[person], "at": at, "ms": now})
+			deaths.append({"person": person, "army": _army[person], "at": at,
+				"ground": stood * CELL / WorldAdapter.CELL_SIZE, "ms": now})
 	_read_bodies(world, rosters, positions, true)
 	if target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
 		target = -1
@@ -151,7 +159,8 @@ func knock(person: int, now: int) -> Vector2:
 	return _away[person] * KNOCK_PIXELS * left
 
 
-## Returns each death still shown at `now`: its `army`, `at`, where it lies in pixels, `fallen`,
+## Returns each death still shown at `now`: its `army`, `at`, where it lies in pixels, `ground`,
+## that place on the unraised ground, `fallen`,
 ## the share of a quarter turn it has fallen, `alpha`, how opaque it is, and `flash`, the share
 ## drawn in the impact core's colour as its killing blow lands.
 func dying(now: int) -> Array[Dictionary]:
@@ -159,7 +168,7 @@ func dying(now: int) -> Array[Dictionary]:
 	for death: Dictionary in deaths:
 		var age := float(now - death.ms) / DEATH_MS
 		if age >= 0.0 and age < 1.0:
-			shown.append({"army": death.army, "at": death.at, "fallen": minf(age * 3.0, 1.0),
+			shown.append({"army": death.army, "at": death.at, "ground": death.ground, "fallen": minf(age * 3.0, 1.0),
 				"alpha": 1.0 - age, "flash": flash(death.person, now)})
 	return shown
 
@@ -216,7 +225,7 @@ func shown_numbers(now: int) -> Array[Dictionary]:
 		var colour := CRIMSON if number.own else PAPER
 		colour.a = 1.0 - age * age
 		shown.append({"text": number.text, "colour": colour,
-			"at": (number.at + Vector2(-number.width / 2.0, -CELL - NUMBER_RISE * age)).round()})
+			"at": (number.at + Vector2(-number.width / 2.0, -BODY_HEIGHT - NUMBER_RISE * age)).round()})
 	return shown
 
 
@@ -226,31 +235,37 @@ func _draw_strike(strike: Dictionary, left: float) -> void:
 	var edge := Color(colour, 0.9 * left)
 	var origin := _pixels(strike.origin)
 	var toward := _pixels(strike.toward)
-	var reach: float = strike.range * CELL / float(WorldAdapter.CELL_SIZE)
-	var radius := maxf(strike.radius * CELL / float(WorldAdapter.CELL_SIZE), LEAST_RADIUS)
-	var way := toward - origin
+	var reach: float = strike.range * CELL.x / float(WorldAdapter.CELL_SIZE)
+	var radius := maxf(strike.radius * CELL.x / float(WorldAdapter.CELL_SIZE), LEAST_RADIUS)
+	# Distances on the ground are foreshortened down the screen: a disc on it is drawn as an ellipse.
+	var flat := Vector2(1.0, CELL.y / CELL.x)
 	match strike.shape:
 		WorldAdapter.SHAPE_ARC:
 			# An arc used toward its user's own place sweeps all around.
+			var way: Vector2 = strike.toward - strike.origin
 			var facing := way.angle() if way != Vector2.ZERO else 0.0
 			var sweep := deg_to_rad(WorldAdapter.ARC_HALF_WIDTH_DEGREES) if way != Vector2.ZERO else PI
 			var points := PackedVector2Array([origin])
 			for n in 13:
-				points.append(origin + Vector2.from_angle(facing - sweep + 2.0 * sweep * n / 12.0) * reach)
+				points.append(origin + Vector2.from_angle(facing - sweep + 2.0 * sweep * n / 12.0) * reach * flat)
 			draw_colored_polygon(points, fill)
-			draw_arc(origin, reach, facing - sweep, facing + sweep, 13, edge, 1.0)
+			draw_set_transform(origin, 0.0, flat)
+			draw_arc(Vector2.ZERO, reach, facing - sweep, facing + sweep, 13, edge, 1.0)
+			draw_set_transform(Vector2.ZERO)
 		WorldAdapter.SHAPE_LINE, WorldAdapter.SHAPE_TARGETED:
 			var end := _pixels(strike.end)
-			draw_line(origin, end, fill, maxf(radius * 2.0, 1.0))
+			draw_line(origin, end, fill, maxf(radius * 2.0 * flat.y, 1.0))
 			draw_circle(origin.lerp(end, 1.0 - left), 1.5, edge)
 		_:
-			draw_circle(toward, radius, fill)
-			draw_arc(toward, radius, 0.0, TAU, 16, edge, 1.0)
+			draw_set_transform(toward, 0.0, flat)
+			draw_circle(Vector2.ZERO, radius, fill)
+			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 16, edge, 1.0)
+			draw_set_transform(Vector2.ZERO)
 
 
-# Corner brackets round the target's body, which stands 24 pixels tall on its cell's middle.
+# Corner brackets round the target's body, which stands BODY_HEIGHT pixels tall on `at`.
 func _draw_target(at: Vector2) -> void:
-	var box := Rect2(at + Vector2(-9, -13), Vector2(18, 21))
+	var box := Rect2(at + Vector2(-9, 3 - BODY_HEIGHT), Vector2(18, 21))
 	var arm := 4.0
 	for corner: Vector2 in [box.position, Vector2(box.end.x, box.position.y),
 			Vector2(box.position.x, box.end.y), box.end]:
@@ -355,4 +370,6 @@ func _resize(to: int) -> void:
 
 
 func _pixels(sub_cells: Vector2) -> Vector2:
+	if to_screen.is_valid():
+		return to_screen.call(sub_cells)
 	return sub_cells * CELL / WorldAdapter.CELL_SIZE

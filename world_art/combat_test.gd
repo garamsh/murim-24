@@ -140,7 +140,7 @@ func _mine_pass() -> bool:
 	var numbers := combat.shown_numbers(now)
 	var victim_at := _drawn_at(fight.art, fight.victim)
 	var passed: bool = setup and numbers.size() == 1 and numbers[0].text == str(SWEEP.body_damage) \
-			and absf(numbers[0].at.x - victim_at.x) <= WorldArt.CELL
+			and absf(numbers[0].at.x - victim_at.x) <= WorldArt.CELL.x
 	print("combat_test: in \"mine\", the steered person's sweep and two bystanders' sweeps on tick %d, each losing %d %s, gave numbers %s, the foe at x %.0f: %s" % [
 		fight.tick, SWEEP.body_damage, setup, numbers.map(func(number: Dictionary) -> Vector2: return number.at),
 		victim_at.x, "pass" if passed else "FAIL"])

@@ -78,7 +78,7 @@ func _bell_pass() -> bool:
 	var world := WorldAdapter.create_region(REGION_SEED, 0, RAID_TICKS_PER_DAY)
 	var sound: Node2D = load(SCENE).instantiate()
 	sound.hearing = EVERYWHERE
-	sound.show_world(world)
+	sound.show_world(world, func(sub: Vector2) -> Vector2: return sub)
 	var next := 0
 	var raids := 0
 	var others := 0
@@ -113,7 +113,7 @@ func _cap_pass() -> bool:
 	var sound: Node2D = load(SCENE).instantiate()
 	sound.hearing = EVERYWHERE
 	var world: WorldAdapter = WorldAdapter.create_m1()
-	sound.show_world(world)
+	sound.show_world(world, func(sub: Vector2) -> Vector2: return sub)
 	var most := 0
 	for i in CAP_TICKS:
 		world.tick()
@@ -196,7 +196,7 @@ func _world(at_war: bool) -> WorldAdapter:
 func _listen(world: WorldAdapter, ticks: int, until_bell := false) -> Dictionary:
 	var sound: Node2D = load(SCENE).instantiate()
 	sound.hearing = EVERYWHERE
-	sound.show_world(world)
+	sound.show_world(world, func(sub: Vector2) -> Vector2: return sub)
 	var streams := {}
 	var ran := 0
 	for i in ticks:

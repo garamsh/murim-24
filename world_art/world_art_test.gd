@@ -1,12 +1,10 @@
-# Checks that world_art.tscn lays a world as docs/convention/stack-godot.md §Terrain layers sets
-# out: the plain on every cell, and a kind's dual-grid tile carrying the corner mask of the four
-# cells around it; that it draws every body on screen and none off it; that every structure of a
-# region is drawn over its footprint with its stage's frame of its kind's art, a seat's training
-# ground on the ground; that each field is tiled with its state's tag; that each village's ground
-# decorations cover the cells its template's data names, a village the world founds as it runs
-# included, and its banners stand on the cells it names; that no landform stands on a buildable
-# cell or over a structure; that after the view jumps across the region, every body a band
-# holds lies inside the bounds the renderer culls that band by; and that between ticks a body is
+# Checks that world_art.tscn lays a world at the 2.5D angle: the relief it draws the ground with
+# raises the cells the map blocks as rock and leaves the rest plain at level 0; it draws every body
+# on screen and none off it; every structure of a region is drawn over its footprint with its
+# stage's frame of its kind's art, a seat's training ground on the ground; each field is tiled with
+# its state's tag; each village's ground decorations cover the cells its template's data names, a
+# village the world founds as it runs included, and its banners stand on the cells it names; after the view jumps across the region, every body a
+# band holds lies inside the bounds the renderer culls that band by; and between ticks a body is
 # drawn between the positions of the last two.
 extends RefCounted
 
@@ -56,25 +54,25 @@ func run() -> bool:
 	var world := WorldAdapter.create(42, PackedStringArray(MAP_ROWS), ARMIES, STRUCTURES, RULES)
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(world, -1)
-	var ground: Array[Node] = art.get_node("Ground").get_children()
-	var plain: TileMapLayer = ground[0]
+	# The wall down column 8 is rock above the plain, dropping by a rock face; every other cell is
+	# plain at level 0. Control: a cell beside the wall is not raised, so the check tells them apart.
+	var relief: Relief = art.relief
+	var wall := 0
+	var flat := 0
+	for y in MAP_ROWS.size():
+		for x in MAP_ROWS[y].length():
+			var at := Vector2i(x, y)
+			if MAP_ROWS[y][x] == "#":
+				if relief.kind_at(at) == "rock" and relief.level_at(at) >= 2 and relief.face_at(at) == "rock_face" \
+						and not relief.slope_at(at):
+					wall += 1
+			elif relief.kind_at(at) == "plain" and relief.level_at(at) == 0 and not relief.slope_at(at):
+				flat += 1
+	var walls: int = MAP_ROWS.reduce(func(count: int, row: String) -> int: return count + row.count("#"), 0)
 	var cells := MAP_ROWS.size() * MAP_ROWS[0].length()
-	var plain_full := plain.get_used_cells().size() == cells
-	var mountain := _layer_with_tiles(ground)
-	var transitions := _tags("res://art/terrain/transitions.json")
-	var from: int = transitions.mountain[0]
-	# Dual-grid tile (8, 1) has the wall on its right corners (2 + 8); (9, 4) on its left (1 + 4);
-	# (2, 2) touches no wall and is empty.
-	var masks_right := mountain != null \
-			and mountain.get_cell_atlas_coords(Vector2i(8, 1)) == Vector2i(from + 10, 0) \
-			and mountain.get_cell_atlas_coords(Vector2i(9, 4)) == Vector2i(from + 5, 0) \
-			and mountain.get_cell_source_id(Vector2i(2, 2)) == -1
-	print("world_art_test: plain on %d of %d cells; mountain tiles at (8, 1) %s, (9, 4) %s, (2, 2) source %d: %s" % [
-		plain.get_used_cells().size(), cells,
-		mountain.get_cell_atlas_coords(Vector2i(8, 1)) if mountain else "none",
-		mountain.get_cell_atlas_coords(Vector2i(9, 4)) if mountain else "none",
-		mountain.get_cell_source_id(Vector2i(2, 2)) if mountain else -2,
-		"pass" if plain_full and masks_right else "FAIL"])
+	var relief_right: bool = wall == walls and flat == cells - walls and relief.level_at(Vector2i(7, 0)) == 0
+	print("world_art_test: %d of %d blocked cells raised as rock, %d of %d others plain at level 0: %s" % [
+		wall, walls, flat, cells - walls, "pass" if relief_right else "FAIL"])
 
 	for i in TICKS:
 		world.tick()
@@ -82,7 +80,7 @@ func run() -> bool:
 	var bodies := 0
 	for army in world.army_count():
 		bodies += world.body_positions(army).size()
-	art.refresh(Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * 16))
+	art.refresh(Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * WorldArt.CELL))
 	var on_screen: int = art.drawn
 	# Control: a view beside the map, over the same rows, draws nothing, so the count above is the
 	# culling's.
@@ -95,7 +93,8 @@ func run() -> bool:
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
 	# Buildings: every region structure but a field is drawn as its kind's art, its footprint's
-	# bottom-left on the sprite's position and its top-left on the frame's anchor, holding each
+	# bottom-left on the ground on the sprite's position and the frame's anchor on its top-left as
+	# the art draws a footprint, STRUCTURE_ROWS rows a cell, raised with the ground, holding each
 	# stage's frame and showing its stage's; a training ground lies on the ground, under every
 	# body, and every other kind stands. Setup: the region holds a seat's training ground, manual
 	# hall and gate. Control: the structures above, made by create() with no kind, are counted
@@ -122,13 +121,18 @@ func run() -> bool:
 		var frame := (sprite.texture as AtlasTexture).region
 		var stage: String = stages[region.structure_stage(structure)]
 		var anchor := GATE_ANCHOR if kind == "seat_gate" else ANCHOR
-		var layer := "Ground" if kind == "training_ground" else "Standing"
+		var layer := "Laid" if kind == "training_ground" else "Standing"
 		var staged := true
 		for index in stages.size():
 			var held: AtlasTexture = sprite.get_meta("frames")[index]
 			staged = staged and held.region.position.x == sheet.tags[stages[index]][0] * sheet.width
-		if sprite.position == Vector2(corner.x, corner.y + footprint.y) * 16 \
-				and sprite.position + sprite.offset + anchor == Vector2(corner) * 16 \
+		var bottom := Vector2(corner.x, corner.y + footprint.y) * WorldArt.CELL
+		var lift: float = region_art.relief.lift_at(bottom + Vector2(footprint.x * WorldArt.CELL.x / 2.0,
+				-WorldArt.CELL.y / 2.0))
+		var standing := sprite.position if kind != "training_ground" else bottom
+		if standing == bottom \
+				and sprite.position + sprite.offset + anchor \
+						== bottom - Vector2(0, footprint.y * WorldArt.STRUCTURE_ROWS + lift) \
 				and sprite.get_parent().name == layer and staged \
 				and frame.position.x == sheet.tags[stage][0] * sheet.width \
 				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
@@ -166,7 +170,7 @@ func run() -> bool:
 			var tag: Array = sheet.tags[factions[int(village.faction)]]
 			banners_named += 1
 			for sprite: Sprite2D in banner_sprites:
-				if sprite.texture.atlas == texture and sprite.position == Vector2(cell.x, cell.y + 1) * 16 \
+				if sprite.texture.atlas == texture and sprite.position == Vector2(cell.x, cell.y + 1) * WorldArt.CELL \
 						and sprite.texture.region.position.x == tag[0] * sheet.width:
 					banners_placed += 1
 					if village.kind == "seat" and banner == "sect_banner":
@@ -221,46 +225,9 @@ func run() -> bool:
 	print("world_art_test: %d of %d decorated cells carry their template's tile, %d of them a seat's; cells beside the villages bare %s: %s" % [
 		tiled, expected, seat_tiled, outside_bare, "pass" if decorations_right else "FAIL"])
 
-	# Landforms: each stands only on cells the map marks rough or blocked, which nothing is built
-	# on, so none covers a structure. Control: every structure stands on buildable cells, marked
-	# ".", so the check tells the two apart.
-	var landform_path := "res://art/terrain/landforms.json"
-	var landform_tags := _tags(landform_path)
-	var landform_width: int = _sheet(landform_path).width
-	var landform_texture: Texture2D = load("res://art/terrain/landforms.png")
-	var rows := region.map_rows()
-	var built_on := {}
-	var structures_buildable := true
-	for structure in region.structure_count():
-		for cell in _cells(region.structure_cell(structure), region.structure_footprint(structure)):
-			built_on[cell] = true
-			structures_buildable = structures_buildable and rows[cell.y][cell.x] == "."
-	var landforms := 0
-	var landforms_unbuildable := true
-	var landforms_clear := true
-	for sprite in region_art.get_node("Standing").get_children():
-		if not (sprite is Sprite2D and sprite.texture is AtlasTexture \
-				and sprite.texture.atlas == landform_texture):
-			continue
-		landforms += 1
-		var frame := int(sprite.texture.region.position.x) / landform_width
-		var size := Vector2i.ZERO
-		for tag: String in landform_tags:
-			if frame >= landform_tags[tag][0] and frame <= landform_tags[tag][1]:
-				var parts := tag.split("_")[1].split("x")
-				size = Vector2i(int(parts[0]), int(parts[1]))
-		var corner := Vector2i(int(sprite.position.x) / 16, int(sprite.position.y) / 16 - size.y)
-		for cell in _cells(corner, size):
-			landforms_unbuildable = landforms_unbuildable and rows[cell.y][cell.x] != "."
-			landforms_clear = landforms_clear and not built_on.has(cell)
-	var landforms_right := landforms > 0 and landforms_unbuildable and landforms_clear \
-			and structures_buildable
-	print("world_art_test: %d landforms, all on unbuildable cells %s, none over a structure %s; every structure on buildable cells %s: %s" % [
-		landforms, landforms_unbuildable, landforms_clear, structures_buildable,
-		"pass" if landforms_right else "FAIL"])
 	region_art.free()
-	var passed := plain_full and masks_right and bodies_right and buildings_right \
-			and banners_right and decorations_right and fields_right and landforms_right
+	var passed := relief_right and bodies_right and buildings_right and banners_right and decorations_right \
+			and fields_right
 	art.free()
 	return _bands_pass() and _between_pass() and _founded_pass() and passed
 
@@ -363,10 +330,10 @@ func _bands_pass() -> bool:
 	var art: Node2D = load(SCENE).instantiate()
 	var steered := region.army_count() - 1
 	art.show_world(region, steered)
-	var home := region.body_positions(steered)[0] * 16 / WorldAdapter.CELL_SIZE
+	var home: Vector2 = art.ground_point(region.body_positions(steered)[0])
 	var far := home
 	for village: Dictionary in region.villages():
-		var corner := Vector2(village.corner) * 16
+		var corner := Vector2(village.corner) * WorldArt.CELL
 		if corner.distance_to(home) > far.distance_to(home):
 			far = corner
 	art.refresh(Rect2(home - VIEW / 2, VIEW))
@@ -398,7 +365,7 @@ func _between_pass() -> bool:
 	var world := WorldAdapter.create(42, PackedStringArray(MAP_ROWS), ARMIES, STRUCTURES, RULES)
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(world, 0)
-	var scale := float(art.CELL) / WorldAdapter.CELL_SIZE
+	var scale := WorldArt.CELL / WorldAdapter.CELL_SIZE
 	world.tick()
 	art.note_tick()
 	var before := world.body_positions(0)[0] * scale
@@ -406,9 +373,9 @@ func _between_pass() -> bool:
 	art.note_tick()
 	var after := world.body_positions(0)[0] * scale
 	var halfway := before.lerp(after, 0.5)
-	var view := Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * art.CELL)
+	var view := Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * WorldArt.CELL)
 	art.refresh(view, 0.5)
-	var drawn_halfway := _drawn_at(art, halfway.round() + Vector2(0, -4))
+	var drawn_halfway := _drawn_at(art, halfway.round() - Vector2(0, WorldArt.BODY_FRAME.y / 2.0))
 	var ring_halfway: bool = art.get_node("Ring").position == halfway.round()
 	var placed: bool = art.body_at(0, 0, 0.5) == halfway and art.body_at(0, 0, 1.0) == after \
 			and art.body_at(0, 0, 0.0) == before
@@ -484,14 +451,6 @@ func _outside(art: Node2D, first: Dictionary) -> Array[String]:
 	return outside
 
 
-# The first kind layer with any tile: here, the only kind beside the plain is mountain.
-func _layer_with_tiles(ground: Array[Node]) -> TileMapLayer:
-	for layer: TileMapLayer in ground.slice(1):
-		if not layer.get_used_cells().is_empty():
-			return layer
-	return null
-
-
 # Whether every cell of field `structure` of `world` carries a frame within `tag` on `layer`.
 func _field_tagged(layer: TileMapLayer, world: WorldAdapter, structure: int, tag: Array) -> bool:
 	var corner := world.structure_cell(structure)
@@ -502,15 +461,6 @@ func _field_tagged(layer: TileMapLayer, world: WorldAdapter, structure: int, tag
 			if at < tag[0] or at > tag[1]:
 				return false
 	return true
-
-
-# The cells of a `size` footprint from `corner`, row by row.
-func _cells(corner: Vector2i, size: Vector2i) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for y in size.y:
-		for x in size.x:
-			cells.append(corner + Vector2i(x, y))
-	return cells
 
 
 # The last tile a layout lays on `cell`, which is the one left showing.

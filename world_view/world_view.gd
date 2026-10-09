@@ -9,7 +9,6 @@ extends Node2D
 const ViewScale := preload("res://view_scale.gd")
 const Hud := preload("res://hud/hud.gd")
 const Nameplates := preload("res://hud/nameplates.gd")
-const PIXELS_PER_CELL := 16.0
 const CAMERA_PIXELS_PER_SECOND := 200.0
 # Ticks one frame may run to catch up; beyond it the simulation falls behind instead of stalling.
 const MAX_TICKS_PER_FRAME := 4
@@ -37,10 +36,10 @@ func _ready() -> void:
 	var scale := ViewScale.world_scale(Vector2i(get_viewport_rect().size), false)
 	_camera.zoom = Vector2(scale, scale)
 	world = WorldAdapter.create_m1()
-	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_centre()))
 	_art.show_world(world, -1)
+	_camera.position = _art.to_screen(Vector2(WorldAdapter.m1_centre()))
 	_art.name_around(_nearest_army(Vector2(WorldAdapter.m1_centre())))
-	_sound.show_world(world)
+	_sound.show_world(world, _art.to_screen)
 	var window := Vector2i(get_viewport_rect().size)
 	_hud_scale = ViewScale.hud_scale(window, false)
 	var layer := CanvasLayer.new()
@@ -92,7 +91,3 @@ func _nearest_army(at: Vector2) -> int:
 			least = apart
 			nearest = army
 	return nearest
-
-
-func _to_pixels(sub_cells: Vector2) -> Vector2:
-	return sub_cells * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
