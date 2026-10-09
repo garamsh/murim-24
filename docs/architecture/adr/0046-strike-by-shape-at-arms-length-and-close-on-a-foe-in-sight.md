@@ -52,12 +52,13 @@ Measured against `main` at `ca54aca` with the same scratch instrumentation in bo
 | Striker to struck at a melee hit | 2.04 cells | 1.21 cells |
 | The same skirmish with the Cult throwing darts: mean ticks | 1,270.6 | 271.0 |
 | Hits per dart; striker to struck at a dart's hit | 1.000; 2.81 cells | 2.373; 4.18 cells |
-| M1 scenario, 54,000 ticks: alive at the end; half its 500 dead by | 81; tick 8,339 | 342; never |
+| M1 scenario before it gave its people sight, 54,000 ticks: alive at the end; half its 500 dead by | 81; tick 8,339 | 342; never |
+| M1 scenario with its people's sight: the tick one side has no one left; half its 500 dead by | none within 54,000; tick 8,339 | 9,927; tick 2,653 |
 | `make sweep`, 50 seeds of 100 years: every faction peopled | 48 | 48 |
 | Wars declared, peaces made | 51, 27 | 50, 25 |
 | Deaths by a wound over the sweep | 2,629 | 2,845 |
 
-- The M1 scenario's lines stand two cells apart across their barricade, out of arm's length, until the casters break it, so its battle no longer ends within half an hour of play. Its scenario is unchanged apart from the jab's range and shape; it gives no sight. `make bench` on the development Mac on 2026-10-09 timed a tick p99 of 0.427 ms against `main`'s 0.632 ms the same day, at 6.6 strikes a tick against 16.0, so the scenario no longer strikes as often as the worst case it is meant to be.
+- At arm's length the M1 scenario's lines stood two cells apart across their barricade and struck 6.6 times a tick, against 16.0 on `main`, so `make bench` no longer timed the worst case. The scenario now gives its people the region's sight of 8 cells, so the lines close through the gaps between the barrels and fight at arm's length while the casters still break the barricade, and the benchmark fails its setup below 16 strikes a tick. Measured with `make bench` on the development Mac on AC power on 2026-10-09: `main` 15.98 strikes a tick, tick p99 0.578 ms, frame p99 9.320 ms, and with the scenario's sight 18.42, 1.642 ms and 11.728 ms, run one after the other; earlier that day, this change before the scenario's sight 6.56, 0.434 ms and 7.524 ms. Engaging costs every person a query within its sight each tick, most of the tick's rise.
 - A dart now pierces everyone along its line, so a band throwing darts ends a skirmish in a quarter of the time. That is a balance question for the arts' data, not the rule.
 - `run_crossing`'s pinned hash is unchanged: its skills are areas and its rules give no sight, and both are folded only when set. The region's hashes change.
 - A save holds each skill's shape and the rules' sight, so `SAVE_VERSION` rises to 8 and every earlier save is refused.
@@ -69,6 +70,6 @@ Measured against `main` at `ca54aca` with the same scratch instrumentation in bo
 
 - Fights near villages draw in people who should have kept to their work, such as settlers on the march or residents chasing a lone passer-by away from their homes, enough that the owner names it.
 - A chaser jams against a wall with its foe in sight beyond it, where a field would have found the way, often enough to show in play.
-- The M1 scenario, striking less, stops bounding the tick: a battle in play costs more than it.
+- A battle in play, engaging more widely than the M1 scenario's two lines, costs a tick more than the scenario does.
 - A skill needs an arc narrower or wider than a half turn, or a projectile that stops at the first body, and the shapes grow a parameter per case.
 - The player asks for the automatic strike to face where the body faces rather than the nearest foe.
