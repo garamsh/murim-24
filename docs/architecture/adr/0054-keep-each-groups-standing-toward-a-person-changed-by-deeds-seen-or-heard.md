@@ -12,6 +12,17 @@ Issue #175 asks that what a person does to others changes how villages, sects an
 - **Deeds become known through witnesses and rumour.** The witnesses' groups react at once, and farther groups learn as the rumour spreads over time. A deed no one saw stays hidden.
 - **The same rules for NPCs and the player.** Bandits raiding a village, or a disciple killing a rival: the world builds its own grudges and debts.
 
+Decided on PR #217's review, 2026-10-10:
+- **By the owner.**
+  - Standing belongs to the body. A reborn body starts with no standing, and warehouses and caves stay with the soul.
+  - Individual NPCs' personal favor stays agreed and is implemented later. This ADR does not cover it.
+- **By the PM.**
+  - Hostility can be undone by giving and blood money, not only by decay.
+  - A faction's negative standing turns its members against a person only when the faction stands hostile or at war with the person's side.
+  - Extortion and the feel numbers, the war weight, the decay and the diplomacy's factors, stand as proposals in pack data, which the sweep checks.
+
+The number 0053 is reserved for #205's ADR, so this ADR is 0054.
+
 Facts from `main` at `aff1434`:
 - **Reaches.** The region's rules give people a sight of 6 cells (ADR 0046), a talk reach of 2 (ADR 0039) and a rumour reach of 32 (ADR 0032), in `core/region.cpp`.
 - **Events.** ADR 0032's ring keeps the latest 64 events, and `rumours` derives from it the ones reaching a person. ADR 0036 moved progress in the arts to a store of its own so the ring keeps its history.
