@@ -3,7 +3,8 @@
 # knocked back away from it, its loss floats up as a number, and it is marked as the target; once a
 # second sweep kills it, it flashes, its last loss floats up, and it falls and fades where it stood
 # and is gone after. Control: the same foe standing out of reach is never swept, flashed, numbered
-# or marked, and nothing dies. In a region living its days, those a use struck as they died fall,
+# or marked, and nothing dies. In the default "mine", a sweep between two people no one steers
+# floats no number on the tick the steered person's does. In a region living its days, those a use struck as they died fall,
 # and those who died of hunger or age do not.
 extends RefCounted
 
@@ -27,6 +28,8 @@ const HEALTH := 100
 const STRIKER_CELL := Vector2i(2, 2)
 const BESIDE := Vector2i(3, 2)
 const OUT_OF_REACH := Vector2i(12, 2)
+# Two people no one steers, hostile to each other, far from the steered person and its foe.
+const BYSTANDER_CELLS: Array[Vector2i] = [Vector2i(12, 4), Vector2i(13, 4)]
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const TICKS := 90
 const REGION_SEED := 2026
@@ -34,7 +37,7 @@ const REGION_TICKS := 8000
 
 
 func run() -> bool:
-	return _hit_pass() and _death_pass() and _cause_pass()
+	return _hit_pass() and _death_pass() and _cause_pass() and _mine_pass()
 
 
 # The tick the steered person first sweeps a foe beside it shows the arc, the foe's flash, its
@@ -117,6 +120,34 @@ func _death_pass() -> bool:
 	return died
 
 
+# In the default "mine", on the tick the steered person sweeps the foe beside it while two people
+# no one steers sweep each other, the foe's loss floats up and theirs do not. Setup: all three lost
+# the sweep's damage on that tick, and the view holds all of them.
+func _mine_pass() -> bool:
+	var armies := _armies(BESIDE)
+	for i in BYSTANDER_CELLS.size():
+		armies.append({"objective": BYSTANDER_CELLS[i], "faction": i, "skills": [SWEEP],
+			"members": [{"cell": BYSTANDER_CELLS[i], "health": HEALTH}]})
+	var fight := _run(WorldAdapter.create(7, PackedStringArray(MAP_ROWS), armies, [], RULES))
+	var world: WorldAdapter = fight.world
+	var combat: Combat = fight.art.combat
+	var now := Time.get_ticks_msec()
+	var bystanders := [world.roster(2)[0], world.roster(3)[0]]
+	var lost := [fight.victim] + bystanders
+	var setup := combat.damage_numbers == "mine" and fight.tick >= 0 and lost.all(func(person: int) -> bool:
+		return world.person_health(person) == HEALTH - SWEEP.body_damage) and bystanders.all(
+		func(person: int) -> bool: return combat.view.has_point(_drawn_at(fight.art, person)))
+	var numbers := combat.shown_numbers(now)
+	var victim_at := _drawn_at(fight.art, fight.victim)
+	var passed: bool = setup and numbers.size() == 1 and numbers[0].text == str(SWEEP.body_damage) \
+			and absf(numbers[0].at.x - victim_at.x) <= WorldArt.CELL
+	print("combat_test: in \"mine\", the steered person's sweep and two bystanders' sweeps on tick %d, each losing %d %s, gave numbers %s, the foe at x %.0f: %s" % [
+		fight.tick, SWEEP.body_damage, setup, numbers.map(func(number: Dictionary) -> Vector2: return number.at),
+		victim_at.x, "pass" if passed else "FAIL"])
+	fight.art.free()
+	return passed
+
+
 # A region whose days are a tick long lives until someone a use struck has died and someone no use
 # struck has, of hunger or age, at most REGION_TICKS: on each tick, those the core records dying
 # that a use struck fall, their killing blow numbered for everyone, and the others do not.
@@ -171,13 +202,22 @@ func _cause_pass() -> bool:
 # ticked until the first use the core records, at most TICKS: the world, the art, the striker and
 # the victim, and the tick of the first use, -1 for none.
 func _fight(foe_cell: Vector2i) -> Dictionary:
-	var armies: Array[Dictionary] = [
+	return _run(WorldAdapter.create(7, PackedStringArray(MAP_ROWS), _armies(foe_cell), [], RULES))
+
+
+# The steered person with SWEEP and the foe of HEALTH at `foe_cell`, as create() takes them.
+func _armies(foe_cell: Vector2i) -> Array[Dictionary]:
+	return [
 		{"objective": STRIKER_CELL, "faction": 0, "skills": [SWEEP],
 			"members": [{"cell": STRIKER_CELL, "health": HEALTH}]},
 		{"objective": foe_cell, "faction": 1, "skills": [NO_REACH],
 			"members": [{"cell": foe_cell, "health": HEALTH}]},
 	]
-	var world := WorldAdapter.create(7, PackedStringArray(MAP_ROWS), armies, [], RULES)
+
+
+# `world` drawn by world_art, its first army steered, and ticked until the first use the core
+# records, at most TICKS, as _fight() gives it.
+func _run(world: WorldAdapter) -> Dictionary:
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(world, 0)
 	var striker := world.roster(0)[0]
@@ -192,6 +232,12 @@ func _fight(foe_cell: Vector2i) -> Dictionary:
 			first = i
 			break
 	return {"world": world, "art": art, "striker": striker, "victim": victim, "tick": first}
+
+
+# Where person `person` is drawn by `art`, in pixels.
+func _drawn_at(art: Node2D, person: int) -> Vector2:
+	var place: Vector2i = art.combat.place_of(person)
+	return art.body_at(place.x, place.y, 1.0)
 
 
 func _view() -> Rect2:
