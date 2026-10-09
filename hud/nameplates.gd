@@ -52,7 +52,8 @@ func show_names(world: WorldAdapter, people: Array[Dictionary], clear: Array[Rec
 			break
 		var text := _name(person.person)
 		var rect := plate_rect(text, person.head)
-		if not room.encloses(rect) or taken.any(func(other: Rect2) -> bool: return other.intersects(rect)):
+		# A pixel's gap, so two names never read as one.
+		if not room.encloses(rect) or taken.any(func(other: Rect2) -> bool: return other.intersects(rect.grow(1))):
 			continue
 		taken.append(rect)
 		plates.append({"person": person.person, "text": text, "colour": COLOURS[person.relation], "rect": rect})
