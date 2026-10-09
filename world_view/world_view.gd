@@ -20,6 +20,9 @@ var ticks := 0
 var bodies := 0
 ## Bodies drawn in the last frame, the ones on screen.
 var bodies_drawn := 0
+## People within the names' reach in the last frame, and the names shown over them.
+var named_near := 0
+var names_shown := 0
 
 var _since_tick := 0.0
 var _names := Nameplates.new()
@@ -36,7 +39,7 @@ func _ready() -> void:
 	world = WorldAdapter.create_m1()
 	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_centre()))
 	_art.show_world(world, -1)
-	_art.name_around(_nearest_army(WorldAdapter.m1_centre()))
+	_art.name_around(_nearest_army(Vector2(WorldAdapter.m1_centre())))
 	_sound.show_world(world)
 	var window := Vector2i(get_viewport_rect().size)
 	_hud_scale = ViewScale.hud_scale(window, false)
@@ -69,20 +72,22 @@ func _process(delta: float) -> void:
 		people.append({"person": person.person, "relation": person.relation,
 			"head": ((person.head - view.position) * _camera.zoom / _hud_scale).floor()})
 	_names.show_names(world, people, [])
+	named_near = people.size()
+	names_shown = _names.plates.size()
 	bodies = 0
 	for army in world.army_count():
 		bodies += world.body_positions(army).size()
 
 
-# The army whose lead stands nearest `cell`.
-func _nearest_army(cell: Vector2i) -> int:
+# The army whose lead stands nearest `at`, in sub-cell units.
+func _nearest_army(at: Vector2) -> int:
 	var nearest := -1
 	var least := INF
 	for army in world.army_count():
 		var roster := world.roster(army)
 		if roster.is_empty():
 			continue
-		var apart := _to_pixels(world.person_position(roster[0])).distance_to(_to_pixels(Vector2(cell) * WorldAdapter.CELL_SIZE))
+		var apart := world.person_position(roster[0]).distance_to(at)
 		if apart < least:
 			least = apart
 			nearest = army
