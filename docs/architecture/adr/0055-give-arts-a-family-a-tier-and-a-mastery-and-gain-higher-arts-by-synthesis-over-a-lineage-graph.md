@@ -178,7 +178,7 @@ This supersedes ADR 0035's comprehension on a realm gained, its manual teaching 
 
 - Fighting and training now raise a person's arts, so veterans hold stronger forms than recruits of the same realm.
 - The arts' balance moves to data: the tiers' rates, the stages and the edges' chances.
-- Saves grow by about 200 KB at the bound, and the pinned hash changes.
+- Saves grow by about 800 KB at 50,000 people knowing 2 arts each, and by at most 6.4 MB at the bound of 16 arts each. The pinned hash changes.
 - The K panel stays the loadout. The arts' depth moves to the L window.
 
 ## Signs the decision was wrong
