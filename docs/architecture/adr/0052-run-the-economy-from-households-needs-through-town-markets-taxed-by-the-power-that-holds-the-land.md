@@ -158,7 +158,12 @@ Options weighed:
 
   The other two of the owner's inputs wait for what they read. A leader's bad reputation is #175's. Looting by a household's own side cannot happen under ADR 0051, since a soldier loots only from foes, so it waits for a rule that lets a faction take from its own, such as requisition.
 - **Flight.**
-  - At 800, a household flees. It chooses, among the villages it knows, the one of another faction, at peace or allied by `relation`, with room and food, whose faction's rate is lowest, the lower index among equals. It knows a village within ADR 0022's migration reach, or one a rumour its members heard names (ADR 0039).
+  - At 800, a household flees. It chooses among the villages it knows that are of another faction, at peace or allied by `relation`, with room and food. As the owner said, it weighs three things, each scored from −1,000 to 1,000 against its own village:
+    - richer: the mean purse of the place's households against its own village's, in per mille, clamped
+    - safer: 1,000 when its own faction is at a declared war and the place's is not, −1,000 for the reverse, 0 otherwise, less 500 when the place is raided now
+    - lower tax: the difference between the two factions' rates, times 1,000 over the highest rate the pack allows
+
+    It goes to the place with the highest sum of the three, each weighted by pack data, equal in the base pack, the lower index among equals. If no place scores above 0, it stays, and its discontent stays. It knows a village within ADR 0022's migration reach, or one a rumour its members heard names (ADR 0039).
   - It leaves as an army, as settlers do, carrying what its members carry and its purse.
   - Passing a gate held by its own faction, where a village of that faction stands with living residents within its claim, it is stopped and sent home, with a chance of one in two, rolled from the seed, and keeps its discontent. Patrols wait for #172.
   - Arriving, its members become the village's residents and take its faction. Their discontent halves.
@@ -207,7 +212,7 @@ The implementation of ADRs 0050 to 0052, in order, each an issue with its accept
 5. **Markets** (this ADR). Acceptance: price, buy, sell, making, repair by sale, imports and exports, and the market window.
 6. **Warehouses and loot** (ADR 0051). Acceptance: keepers, accounts, fees, vaults, treasuries, scattering, spoils, estates, loot routing, souls' accounts, caves for the steered body, and the warehouse window.
 7. **Taxes and treasuries** (this ADR). Acceptance: the rate, the three taxes, dues, wages, desertion, issue, the diplomacy reading the treasury, and the treasury window.
-8. **Discontent and flight** (this ADR). Acceptance: each input and the decay with a test and its control, a household fleeing at 800 to the lowest-rate known village, one stopped at its own faction's gate, and the sweep's flight targets.
+8. **Discontent and flight** (this ADR). Acceptance: each input and the decay with a test and its control, a household fleeing at 800 to the known village scoring highest on wealth, safety and rate, one staying when none scores above 0, one stopped at its own faction's gate, and the sweep's flight targets.
 9. **Merchant houses and caravans** (this ADR), with the tolls. Acceptance: a caravan carrying the largest-margin cargo and selling it, a toll paid at a gate, a destroyed caravan scattering its cargo, and the money supply target held in the sweep.
 10. **Far-tier aggregation**, with ADR 0042's far tier. Acceptance: a far village's gear purchases settled as one order per kind, far fights' expected wear applied, and the sweep's targets held with tiers on the standard profile.
 
@@ -226,7 +231,7 @@ The village granary sells food, and a village's food cap counts four fifths of i
 
 The faction owning a village taxes trade, households and caravans at gates by one rate. An NPC leader moves the rate by its treasury against 60 days of needs, at most 10 per mille a month. War needs a war chest, peace comes sooner on an empty treasury, unpaid soldiers desert, and recruits without issue march with empty slots. A player leader sets the rate and orders purchases.
 
-Households accumulate discontent from tax, hunger and kin killed, decaying in good times. At 800 a household flees to a known village of another faction with a lower rate, unless its own faction's gate stops it. Every holder of silver sheds a share of its excess, so the money supply is bounded by the population bound. Loans, interest, banks, exchange rates and haggling are out of scope.
+Households accumulate discontent from tax, hunger and kin killed, decaying in good times. At 800 a household flees to the known village of another faction that scores best on wealth, safety and rate, unless its own faction's gate stops it at one in two, and stays when none scores better than its own. Every holder of silver sheds a share of its excess, so the money supply is bounded by the population bound. Loans, interest, banks, exchange rates and haggling are out of scope.
 
 This supersedes these:
 - ADR 0040's sellers by best discipline, its fixed prices, its purse at birth, its wage from nowhere and its NPC daily purchase of each ware

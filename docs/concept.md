@@ -218,7 +218,7 @@ Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 a
 - **Markets from needs.** Each town has a market whose prices move with stock against demand. Merchant houses send caravans to buy where it is cheap and sell where it is dear.
 - **Taxes and treasuries.** The power holding the land taxes trade, households and caravans at its gates, and sects take dues. Treasuries pay for wars. A faction that cannot pay loses soldiers and seeks peace sooner, and a rich one can arm and march more.
 - **The tax rate follows the treasury's needs.** A leader raises it when war or upkeep demands and lowers it on a surplus. A player who leads sets it by hand.
-- **Discontent drives flight.** High tax, hunger and kin lost in war make households discontent. Past a point they flee to another faction's land they have heard of, which keeps rates in check.
+- **Discontent drives flight.** High tax, hunger and kin lost in war make households discontent. Past a point they flee to another faction's land they have heard of, the richer, safer and lower-taxed the better, which keeps rates in check.
 - **Not now:** loans, interest, banks, exchange rates and haggling.
 
 ## MVP scope [proposed]
