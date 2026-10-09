@@ -16,6 +16,13 @@ The owner's feedback and decisions of 2026-10-09, in issue #194, are binding. Th
 - **Higher arts by synthesis.** Knowing two or more arts that an edge of the lineage graph names, each at enough mastery, gives a chance to comprehend the higher art. The graph is data, and the rule is the same for NPCs.
 - **The lineage window** shows the graph's shape and edges. An unknown higher art's name and content stay hidden, as ???, until it is comprehended, or learned of by rumour or manual.
 
+Decided on PR #218's review, 2026-10-10:
+- **The owner's earlier decisions bind here.** An art's skill needs its discipline's weapon family, as the owner decided on #211, and darts are used up, as #215 records.
+- **By the PM.**
+  - The mastery cap and rates, the five stages, manuals giving only the first stage's forms, no manual for tier 3, and the rarity of 1 in 200 are proposals in pack data, which the sweep checks.
+  - The window's key, L, and its mockup go to the PM in step 4.
+  - **Teaching** here is ADR 0035's existing sect teaching, which this ADR lets raise mastery. It is not the feature the owner holds, a player asking a master for a lesson, which this ADR does not design.
+
 Facts from `main` at `aff1434`:
 - **Arts today** (ADR 0035, `core/region.cpp`). There are three arts: Plum Blossom Sword (sword), Heavenly Demon Saber (saber) and Black Fang Darts (hidden weapons), each with three skills of ranks 1, 3 and 5.
   - Skills are learned three ways: comprehension, a roll on each realm gained for the art's first comprehensible skill lacked; reading a manual, every skill the rank allows; and sect teaching, a yearly chance for the first skill lacked.
