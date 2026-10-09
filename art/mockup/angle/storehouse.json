@@ -1,0 +1,23 @@
+{ "frames": [
+   {
+    "filename": "storehouse.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 64, "h": 72 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 72 },
+    "sourceSize": { "w": 64, "h": 72 },
+    "duration": 1000
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.18.6-arm64",
+  "image": "storehouse.png",
+  "format": "RGBA8888",
+  "size": { "w": 64, "h": 72 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "intact", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}

@@ -1,0 +1,176 @@
+{ "frames": [
+   {
+    "filename": "terrain 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 1.aseprite",
+    "frame": { "x": 16, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 2.aseprite",
+    "frame": { "x": 32, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 3.aseprite",
+    "frame": { "x": 48, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 4.aseprite",
+    "frame": { "x": 64, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 5.aseprite",
+    "frame": { "x": 80, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 6.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 7.aseprite",
+    "frame": { "x": 112, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 8.aseprite",
+    "frame": { "x": 128, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 9.aseprite",
+    "frame": { "x": 144, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 10.aseprite",
+    "frame": { "x": 160, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 11.aseprite",
+    "frame": { "x": 176, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 12.aseprite",
+    "frame": { "x": 192, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 13.aseprite",
+    "frame": { "x": 208, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 14.aseprite",
+    "frame": { "x": 224, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 15.aseprite",
+    "frame": { "x": 240, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   },
+   {
+    "filename": "terrain 16.aseprite",
+    "frame": { "x": 256, "y": 0, "w": 16, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 12 },
+    "sourceSize": { "w": 16, "h": 12 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.18.6-arm64",
+  "image": "terrain.png",
+  "format": "RGBA8888",
+  "size": { "w": 272, "h": 12 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "plain", "from": 0, "to": 3, "direction": "forward", "color": "#000000ff" },
+   { "name": "hills", "from": 4, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "forest", "from": 6, "to": 7, "direction": "forward", "color": "#000000ff" },
+   { "name": "road", "from": 8, "to": 9, "direction": "forward", "color": "#000000ff" },
+   { "name": "paving", "from": 10, "to": 11, "direction": "forward", "color": "#000000ff" },
+   { "name": "sown", "from": 12, "to": 12, "direction": "forward", "color": "#000000ff" },
+   { "name": "growing", "from": 13, "to": 13, "direction": "forward", "color": "#000000ff" },
+   { "name": "ripe", "from": 14, "to": 14, "direction": "forward", "color": "#000000ff" },
+   { "name": "fallow", "from": 15, "to": 15, "direction": "forward", "color": "#000000ff" },
+   { "name": "burnt", "from": 16, "to": 16, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}
