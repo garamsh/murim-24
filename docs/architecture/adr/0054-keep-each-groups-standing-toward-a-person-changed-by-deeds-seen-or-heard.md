@@ -56,7 +56,7 @@ Options weighed:
   | Threaten | −100 | 1,000 | 500 | 200 | 0 |
   | Help | +100 | 1,000 | 500 | 200 | 100 |
   | Gift, per silver given (100 copper once #215's ADR 0052 counts copper), at most 100 a day for each group | +1 | 1,000 | 500 | 200 | 0 |
-  | Theft: picking up a pile scattered from a group's warehouse | −200 | 1,000 | 1,000 | 200 | 100 |
+  | Theft: picking up a pile scattered from a warehouse the picker helped destroy | −200 | 1,000 | 1,000 | 200 | 100 |
 
   - A deed's change to a group is the base times the tier's weight over 1,000, rounded toward zero.
   - A person who is the victim's kin, or of a group the victim belongs to, counts the deed against its own group's tiers, never twice: each group takes the largest weight it has in the deed.
@@ -64,14 +64,11 @@ Options weighed:
   - **Kills in a war.** A kill of a soldier whose faction is at a declared war with the actor's counts at 300 per mille. Grudges build in war, but slower than in peace.
   - **Duels.** A kill in a duel for a faction's lead counts at 0 (ADR 0018).
   - **Blood money.** A gift to the kin of someone the giver killed within the last year counts double, toward the victim's groups.
-  - **Theft.** A pile scattered from a destroyed warehouse (#215's ADR 0051) carries the group that owned the warehouse, 4 more bytes a pile:
-    - a village warehouse's village
-    - a sect vault's sect
-    - a treasury's faction
-
-    Picking it up is a theft against that group, by anyone not of it, so that group is the victim. It takes the theft at its own tier's weight, and the faction of a victim village or sect takes it at 200. A soldier at war looting it counts at the war weight.
-    - **Witnesses** are those within sight of the pick-up, as for any deed.
-    - **The rumour's anchor** is the owner group's anchor (below).
+  - **Theft**, following #215's ADR 0051: only a person who helped destroy a warehouse is a thief for picking up what it scattered.
+    - **Who helped destroy it.** A warehouse's structure keeps the last 8 people whose strikes damaged it, with the tick, 64 bytes a warehouse. When it is destroyed, those who struck it within the day before are its destroyers.
+    - **The scatter's record.** It keeps the warehouse's owner group and its destroyers: a village warehouse's village, a sect vault's sect or a treasury's faction. Each pile it scatters carries the record's index, 4 more bytes a pile. At most 4,096 records are kept, and a record is reused once all its piles are gone.
+    - **The deed.** A destroyer picking up such a pile does a theft against the owner group, which is the victim. It takes the theft at its own tier's weight, and the faction of a victim village or sect takes it at 200. A soldier at war looting it counts at the war weight. Anyone else picking it up does no deed, as the owner decided that whoever picks an item up owns it.
+    - **Witnesses** are those within sight of the pick-up, as for any deed, and mark it. **The rumour's anchor** is the owner group's anchor (below).
     - This designs the thief marking #215 deferred, and nothing marks a thief until this lands, as the owner decided there.
   - Rejected: a value per deed with no tiers. The owner's example needs the village to care more than the faction.
 - **The verbs.** The dialogue's actions are orders through the port, the same for the player's body and any NPC. Each is refused by its first reason, as data, as `buy` is:
@@ -124,7 +121,7 @@ Options weighed:
   - A deed counts once, against the person who did it. Its faction is never hostile for it. War comes only by a leader's declaration, which the standing toward the other leader makes likelier.
   - Rejected: standing between factions, raised by their members' deeds. One person's murder would turn a whole faction hostile, which counts the deed a second time.
 - **What waits for #215.**
-  - **A thief.** Witnesses of a pick-up from a warehouse the picker helped destroy record a theft deed, base −200, against the warehouse's village's groups.
+  - **A thief.** The theft deed above, by a destroyer picking up what its warehouse scattered, against the warehouse's owner group, marked by witnesses within sight.
   - **Tax.** #215's ADR 0052 says a higher rate lowers "the faction's reputation with its households". In this ADR's terms, households are not groups and standing is held toward people, so it is the standing of each of the faction's villages toward the faction's leader.
     - Each day, a rate above 100 per mille lowers it by 3 for every 100 per mille above, rounded down.
     - At #215's highest rate of 300 that is 6 a day against the decay of 2, a net 4 a day: unfriendly in 50 days, and hostile in 150.
@@ -177,7 +174,7 @@ The implementation, in order, each a pull request with its acceptance:
 
 A village, a sect and a faction each hold a standing toward a person's body, from −1,000 to 1,000. Only non-zero entries are kept, at most 262,144. Decay is computed from each entry's last change and never written by a read. A min-heap keyed by magnitude and last-change day evicts the entry nearest zero, and a hash table and a list per person find entries without scanning. Each person carries a bit marking whether any group is hostile to it.
 
-Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a pile scattered from a group's warehouse, with a base value and weights for the victim's village, sect and faction and for the witnesses' groups. Provoked deeds and duels count nothing, kills at war less, and blood money double. The dialogue's verbs are orders refused for their reasons, the same for every person. Give is the one transfer between people, open even under hostile standing, and a deposit into a group's own account is a gift to it.
+Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a pile scattered from a warehouse the picker helped destroy, with a base value and weights for the victim's village, sect and faction and for the witnesses' groups. Provoked deeds and duels count nothing, kills at war less, and blood money double. The dialogue's verbs are orders refused for their reasons, the same for every person. Give is the one transfer between people, open even under hostile standing, and a deposit into a group's own account is a gift to it.
 
 The witnesses within sight teach their groups at once, and a deed no one saw stays hidden. A witnessed deed spreads from its cell at 64 cells a day to the anchors of the victim's groups, kept in a store of 4,096 apart from ADR 0032's ring.
 
