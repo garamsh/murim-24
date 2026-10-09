@@ -141,7 +141,7 @@ Options weighed:
     - An art the person knows shows its name, its stage on five pips, and its mastery as a bar.
     - An art its soul knows of but has not learned shows its name dimmed.
     - Any other art shows ??? on a blank seal.
-  - **Edges.** Edges are drawn from their arts to the higher art, each labelled with the stage it needs, ticked when met.
+  - **Edges.** Edges are drawn from their arts to the higher art, each labelled with the stage it needs, ticked when met. The core computes whether each condition is met, so the view decides nothing.
   - **Selection.** Selecting a node lists its forms with the stage and rank that open each. An unknown node lists nothing.
   - On a touch screen a tap selects and the window scrolls.
   - The implementing pull request presents a mockup in `art/mockup/` for the PM's approval before the window is built, as earlier panels did.
