@@ -17,7 +17,7 @@ Before/after captures of every HUD panel and screen for PR #197. This branch is 
 ## Sect line (#192)
 
 - `sect_line_ko.png` and `sect_line_en.png` show the genealogy details column, before on the left and after on the right.
-- Person 2's line read "마교" / "Demonic Cult", its faction. It now reads its sect, "천마신교" / "Heavenly Demon".
+- Han Doyun (한도윤), army 1's person, used to read "마교" / "Demonic Cult", his faction. It now reads his sect, "천마신교" / "Heavenly Demon".
 - The full screens are `before/genealogy_*.png` and `after/genealogy_*.png`.
 
 ## Keypad Enter (#191)
