@@ -1,17 +1,20 @@
-## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid
-## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
-## buildings by stage, bodies by faction, the steered person's markers and a crimson ring round each
-## body hostile to the person names are read around, as WorldAdapter.relation says. Bodies are drawn
-## between the positions of the last two ticks, as far between as the caller says the frame is, so
-## they move on every frame; the core's positions stay the only truth. Each refresh also lists the
-## people within NAME_REACH of that person, for their names to be drawn over them. Bodies are batched:
-## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
-## edge of what they stand on. It reads the world and holds no game rule.
+## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid as
+## docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms, buildings
+## by stage, bodies by faction, the steered person's markers, a crimson ring round each body hostile
+## to the person names are read around, as WorldAdapter.relation says, and what the fighting did
+## through combat.gd, the struck drawn in the impact colour and knocked back and the dead falling
+## and fading. Bodies are drawn between the positions of the last two ticks, as far between as the
+## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
+## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
+## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings
+## and landforms by the bottom edge of what they stand on. It reads the world and holds no game
+## rule.
 extends Node2D
 
 ## Emitted after a tick changed the territory or the villages, once both are drawn anew.
 signal region_changed
 
+const Combat := preload("res://world_art/combat.gd")
 const CELL := 16
 const ART := "res://art/"
 # Sprite sets by faction name; a world without faction names takes them in this order.
@@ -112,6 +115,8 @@ var _material: ShaderMaterial
 var _ground: Node2D
 var _territory: Territory
 var _standing: Node2D
+## What the fighting of the last ticks did: uses, hits, deaths and the steered person's target.
+var combat: Combat
 var _ring: Sprite2D
 var _chevron: Sprite2D
 
@@ -125,6 +130,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_standing = $Standing
 	_ring = $Ring
 	_chevron = $Chevron
+	combat = $Combat
 	world = shown
 	steered = steered_army
 	var rows := world.map_rows()
@@ -159,6 +165,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_chevron_frames.append(_region(player, "chevron", 1))
 	_ring.visible = steered >= 0
 	_chevron.visible = steered >= 0
+	combat.begin(world)
 	_add_armies()
 	name_around(steered)
 
@@ -189,6 +196,7 @@ func note_tick() -> void:
 		_rosters[army] = roster
 	_add_armies()
 	_read_relations()
+	combat.note_tick(world, steered, Time.get_ticks_msec(), _rosters, _tick_positions)
 	var now := world.territory()
 	var villages := world.villages()
 	if now == owners and villages.size() == _decorated:
@@ -208,6 +216,7 @@ func _add_armies() -> void:
 		_rosters.append(world.roster(army))
 		_same_roster.append(true)
 		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
+		combat.accents.append(ACCENTS[_army_sprites[army]])
 
 
 ## Returns where body `body` of army `army` is drawn, in pixels: `between` of the way from where
@@ -245,16 +254,18 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	for army in _tick_positions.size():
 		var positions := _tick_positions[army]
 		var before := _last_positions[army]
+		var roster := _rosters[army]
 		var sprite := _army_sprites[army]
-		var tint := RING if _relations[army] in HOSTILE_RELATIONS else Color.WHITE
+		var tint := _tint(army)
 		for body in positions.size():
-			var at := body_at(army, body, between)
+			var person := roster[body]
+			var at := body_at(army, body, between) + combat.knock(person, now)
 			if not shown.has_point(at):
 				continue
 			var cells := at.distance_to(named_from) / CELL
 			if named and cells <= NAME_REACH and (army != viewer or body > 0):
 				# A body is drawn from 16 pixels above its position.
-				near.append({"person": _rosters[army][body], "head": at - Vector2(0, 17),
+				near.append({"person": person, "head": at - Vector2(0, 17),
 					"relation": _relations[army], "cells": cells})
 			var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
 			if buffers.is_empty():
@@ -266,8 +277,19 @@ func refresh(view: Rect2, between := 1.0) -> void:
 					heading = NAN
 			var frame := 0 if is_nan(heading) else 1 + walk
 			_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
-					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0, tint)
+					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0, tint,
+					combat.flash(person, now))
 			drawn += 1
+	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
+	# their killing blow lands.
+	for death: Dictionary in combat.dying(now):
+		var at: Vector2 = death.at
+		if not shown.has_point(at) or buffers.is_empty():
+			continue
+		var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
+		_append(buffers, row - first_row, row, Rect2(Vector2(_army_sprites[death.army] * 80, 0), BODY_FRAME),
+				Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), false, _tint(death.army),
+				death.flash, death.alpha, death.fallen * PI / 2.0)
 	_fill_bands(buffers, first_row)
 	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
 	# The markers follow the steered person while it lives.
@@ -279,6 +301,14 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		_ring.position = lead
 		_chevron.position = lead
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
+	var aimed: Vector2i = combat.place_of(combat.target)
+	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
+
+
+# The ring army `army`'s bodies are drawn in: RING while it is hostile to the person names are read
+# around, and otherwise white, no ring.
+func _tint(army: int) -> Color:
+	return RING if _relations[army] in HOSTILE_RELATIONS else Color.WHITE
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map
@@ -537,18 +567,26 @@ func _build_body_atlas() -> void:
 
 
 # Adds one sprite to band `band`, the row of cells whose bottom edge is at `row`: `frame` is its
-# rectangle in the atlas, `centre` its centre in world pixels, `flip` mirrors it, and a `tint` other
-# than white rings it in that colour.
+# rectangle in the atlas, BODY_FRAME in size, `centre` its centre in world pixels, `flip` mirrors it,
+# and a `tint` other than white rings it in that colour; it is drawn `white` of the way to white,
+# `alpha` opaque, and turned `turn` radians about its bottom edge's middle.
 func _append(buffers: Array[PackedFloat32Array], band: int, row: int, frame: Rect2, centre: Vector2,
-		flip: bool, tint: Color) -> void:
+		flip: bool, tint: Color, white := 0.0, alpha := 1.0, turn := 0.0) -> void:
 	var size := _atlas.get_size()
-	var local := centre.round() - Vector2(0, row * CELL)
-	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y.
+	var width := frame.size.x * (-1.0 if flip else 1.0)
+	var height := frame.size.y
+	var cos_turn := cos(turn)
+	var sin_turn := sin(turn)
+	var local := centre.round() - Vector2(0, row * CELL) \
+			+ Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
+	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
+	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
+	# of the body shown.
 	buffers[band].append_array(PackedFloat32Array([
-		frame.size.x * (-1.0 if flip else 1.0), 0.0, 0.0, local.x,
-		0.0, -frame.size.y, 0.0, local.y,
+		width * cos_turn, height * sin_turn, 0.0, local.x,
+		width * sin_turn, -height * cos_turn, 0.0, local.y,
 		tint.r, tint.g, tint.b, tint.a,
-		frame.position.x / size.x, frame.position.y / size.y, frame.size.x / size.x, frame.size.y / size.y]))
+		frame.position.x / size.x, frame.position.y / size.y, white, alpha]))
 
 
 func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
@@ -587,6 +625,7 @@ func _band_material() -> ShaderMaterial:
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = preload("res://world_art/body_band.gdshader")
+		_material.set_shader_parameter("frame_size", Vector2(BODY_FRAME) / _atlas.get_size())
 	return _material
 
 

@@ -211,6 +211,9 @@ std::optional<std::size_t> person_aimed_at(const Target& target) {
                           : std::optional<std::size_t>{aimed->person};
 }
 
+// The degrees in a quarter turn.
+constexpr std::int32_t QUARTER_TURN_DEGREES = 90;
+
 // The ground one use of a skill of any shape but TARGETED covers, from its
 // user at `from` toward `toward`: a disc around `toward`, which a SELF skill
 // is always used toward its user's own position for; an arc of the range's
@@ -239,6 +242,12 @@ class Swath {
     }
   }
 
+  // The point its shape reaches as far as: a line's far end, and for any
+  // other shape the point it was used toward.
+  [[nodiscard]] Position end() const {
+    return shape_ == Shape::LINE ? end_ : centre_;
+  }
+
   // The centre and reach of a query that finds every point it covers.
   [[nodiscard]] Position centre() const {
     return shape_ == Shape::ARC || shape_ == Shape::LINE ? from_ : centre_;
@@ -262,6 +271,10 @@ class Swath {
     const std::int64_t offset_y = std::int64_t{point.y} - from_.y;
     switch (shape_) {
       case Shape::ARC:
+        // A point ahead makes no obtuse angle with the facing: a quarter turn
+        // either side.
+        static_assert(ARC_HALF_WIDTH_DEGREES == QUARTER_TURN_DEGREES,
+                      "an arc covers the half-disc ahead of its facing");
         return distance_squared(from_, point) <=
                    std::int64_t{range_} * range_ &&
                (offset_x * facing_.x) + (offset_y * facing_.y) >= 0;
@@ -2899,8 +2912,16 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   if (art) {
     body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
   }
-  strikes_.push_back(
-      Strike{self, index, skill.shape, striker.position, toward});
+  strikes_.push_back(Strike{self,
+                            index,
+                            skill.shape,
+                            skill.range,
+                            skill.radius,
+                            skill.body_damage,
+                            striker.position,
+                            toward,
+                            toward,
+                            {}});
   const bool hit =
       cover(user, crowd, skill, toward, locked, body_damage, damage);
   // A use that hits anyone or anything practises its art's discipline, or,
@@ -2917,7 +2938,9 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
 // Whether one use of `skill` by the person at `user` of `crowd` toward
 // `toward` hits anyone or anything: every hostile person its shape covers
 // takes `body_damage` into `damage`, or for a targeted skill the person
-// `locked` alone, and every structure its shape reaches its structure damage.
+// `locked` alone, noted among the people the use's record struck, and every
+// structure its shape reaches its structure damage. The record also notes how
+// far the shape reaches.
 bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
                   Position toward, std::optional<std::size_t> locked,
                   std::uint64_t body_damage,
@@ -2932,17 +2955,20 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
       if (crowd.people.at(other) == *locked &&
           foes(self, army, *locked, crowd.armies.at(other))) {
         damage.at(other) += body_damage;
+        strikes_.back().struck.push_back(*locked);
         hit = true;
       }
     }
     return hit;
   }
   const Swath swath{skill, crowd.hash.position(user), toward};
+  strikes_.back().end = swath.end();
   crowd.hash.visit_within(
       swath.centre(), swath.extent(), [&](std::size_t other) {
         if (swath.covers(crowd.hash.position(other)) &&
             foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
           damage.at(other) += body_damage;
+          strikes_.back().struck.push_back(crowd.people.at(other));
           hit = true;
         }
       });

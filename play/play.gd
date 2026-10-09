@@ -145,6 +145,7 @@ var _talk_read_at := -1
 func _ready() -> void:
 	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.applied.connect(fit_view)
+	_hud.settings.applied.connect(show_numbers)
 	_hud.show_shortcuts(SHORTCUTS)
 	for keycode: Key in PANEL_KEYS:
 		_hud.get(PANEL_KEYS[keycode]).toggle_key = keycode
@@ -168,6 +169,11 @@ func fit_view() -> void:
 	var scale := ViewScale.world_scale(Vector2i(window), touch_shown)
 	_camera.zoom = Vector2(scale, scale)
 	_hud.fit(Vector2i(window), touch_shown)
+
+
+## Shows the damage the struck take as numbers over them, or not, as the settings choose.
+func show_numbers() -> void:
+	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from

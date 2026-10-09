@@ -1,7 +1,12 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://world_art/world_art.gd" id="1"]
 [ext_resource type="Script" path="res://world_art/territory.gd" id="2"]
+[ext_resource type="Script" path="res://world_art/combat.gd" id="3"]
+[ext_resource type="Shader" path="res://world_art/combat.gdshader" id="4"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_combat"]
+shader = ExtResource("4")
 
 [node name="WorldArt" type="Node2D"]
 script = ExtResource("1")
@@ -17,6 +22,10 @@ offset = Vector2(-8, -16)
 
 [node name="Standing" type="Node2D" parent="."]
 y_sort_enabled = true
+
+[node name="Combat" type="Node2D" parent="."]
+material = SubResource("ShaderMaterial_combat")
+script = ExtResource("3")
 
 [node name="Chevron" type="Sprite2D" parent="."]
 centered = false

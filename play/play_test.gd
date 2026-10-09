@@ -108,7 +108,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass()
@@ -1432,6 +1432,34 @@ func _key(keycode: Key) -> InputEventKey:
 
 func _distance(position: Vector2, cell: Vector2i) -> float:
 	return position.distance_to((Vector2(cell) + Vector2.ONE * 0.5) * WorldAdapter.CELL_SIZE)
+
+
+# The settings' damage numbers row reaches the world's drawing: as the scene starts, the world art
+# floats the player's own number and not another fight's; set to everyone, both; set off, neither.
+# Setup: both numbers lie within the view the art shows.
+func _numbers_pass() -> bool:
+	var scene := _scene(CULT_VILLAGE)
+	var settings: Control = scene.get_node("Hud").settings
+	var combat: Node2D = scene.get_node("WorldArt/Combat")
+	var now := Time.get_ticks_msec()
+	combat.show_at(Rect2(0, 0, 64, 64), now, Vector2.ZERO)
+	for mine: bool in [true, false]:
+		combat.numbers.append({"ms": now, "text": "7" if mine else "9", "at": Vector2(32, 32),
+			"own": mine, "mine": mine, "width": 4.0})
+	var texts := func() -> Array: return combat.shown_numbers(now).map(
+			func(number: Dictionary) -> String: return number.text)
+	var at_start: Array = texts.call()
+	settings.chosen.numbers = settings.NUMBERS_MODES.find("everyone")
+	settings.apply()
+	var everyone: Array = texts.call()
+	settings.chosen.numbers = settings.NUMBERS_MODES.find("off")
+	settings.apply()
+	var off: Array = texts.call()
+	scene.free()
+	var passed := at_start == ["7"] and everyone == ["7", "9"] and off.is_empty()
+	print("play_test: damage numbers shown as the scene starts %s, for everyone %s, off %s: %s" % [
+		at_start, everyone, off, "pass" if passed else "FAIL"])
+	return passed
 
 
 # M opens the sect panel on the Cult person's sect, and Enter makes it a member, the panel saying it

@@ -3429,6 +3429,31 @@ TEST(World, AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind) {
   EXPECT_EQ(hit_by(around), (Hit{BY_EAST, BY_NORTH_EAST, BY_WEST}));
 }
 
+TEST(World, AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther) {
+  // Facing the foe east, the one straight north lies at the half-width and is
+  // swept; the one north-west lies half as far again past it and is spared.
+  constexpr std::int32_t QUARTER_TURN_DEGREES = 90;
+  static_assert(ARC_HALF_WIDTH_DEGREES == QUARTER_TURN_DEGREES,
+                "the foes stand a quarter turn and three eighths of a turn "
+                "from the facing");
+  const Cell north{USER_CELL.x, USER_CELL.y - 1};
+  const Cell north_west{USER_CELL.x - 1, USER_CELL.y - 1};
+  World world{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(USER_CELL, USER_CELL, 1, TARGET_HEALTH, 0,
+            {Skill{ARM, 0, SHAPE_DAMAGE, 0, NEVER_AGAIN, 0, Shape::ARC}}),
+       army(AROUND.front(), AROUND.front(), 1, TARGET_HEALTH, 1, {IDLE}),
+       army(north, north, 1, TARGET_HEALTH, 1, {IDLE}),
+       army(north_west, north_west, 1, TARGET_HEALTH, 1, {IDLE})},
+      {},
+      at_war(0)};
+  world.tick();
+  EXPECT_EQ(lost(world, 1), SHAPE_DAMAGE);
+  EXPECT_EQ(lost(world, 2), SHAPE_DAMAGE);
+  EXPECT_EQ(lost(world, 3), 0U);
+}
+
 TEST(World, ALineHitsEveryFoeAlongItWithinItsLength) {
   constexpr std::int32_t HALF_A_BODY = CELL_SIZE / 2;
   EXPECT_EQ(hit_by(shape_world(
@@ -3536,7 +3561,7 @@ TEST(World, ATargetedSkillHitsThePersonItLocksOnAlone) {
   EXPECT_EQ(hit_by(disc), (Hit{BY_EAST, BY_NORTH_EAST}));
 }
 
-TEST(World, EachUseIsRecordedWithItsShapeOriginAndDirectionForATick) {
+TEST(World, EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck) {
   World world = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
   EXPECT_TRUE(world.strikes().empty());
   world.tick();
@@ -3546,11 +3571,28 @@ TEST(World, EachUseIsRecordedWithItsShapeOriginAndDirectionForATick) {
   EXPECT_EQ(strike.person, 0U);
   EXPECT_EQ(strike.skill, 0U);
   EXPECT_EQ(strike.shape, Shape::ARC);
+  EXPECT_EQ(strike.range, ARM);
+  EXPECT_EQ(strike.radius, 0);
+  EXPECT_EQ(strike.body_damage, SHAPE_DAMAGE);
   EXPECT_EQ(strike.origin.x, centre_of(USER_CELL).x);
   EXPECT_EQ(strike.origin.y, centre_of(USER_CELL).y);
   EXPECT_EQ(strike.toward.x, centre_of(AROUND.front()).x);
   EXPECT_EQ(strike.toward.y, centre_of(AROUND.front()).y);
+  EXPECT_EQ(strike.end.x, strike.toward.x);
+  EXPECT_EQ(strike.end.y, strike.toward.y);
+  Hit struck = strike.struck;
+  std::sort(struck.begin(), struck.end());
+  EXPECT_EQ(struck, (Hit{BY_EAST, BY_NORTH_EAST}));
   EXPECT_EQ(world.strikes().back().shape, Shape::AREA);
+  EXPECT_EQ(world.strikes().back().body_damage, 0U);
+  EXPECT_TRUE(world.strikes().back().struck.empty());
+  // A line's record ends its range along the way it was used, past the foe
+  // it faced a cell away.
+  constexpr std::int32_t LENGTH = 6 * CELL_SIZE;
+  World line = shape_world(Skill{LENGTH, 0, 0, 0, 0, 0, Shape::LINE});
+  line.tick();
+  EXPECT_EQ(line.strikes().front().end.x, centre_of(USER_CELL).x + LENGTH);
+  EXPECT_EQ(line.strikes().front().end.y, centre_of(USER_CELL).y);
   // Control: on the next tick, cooling down, it strikes nothing, and the
   // record holds the foes' uses alone.
   world.tick();
