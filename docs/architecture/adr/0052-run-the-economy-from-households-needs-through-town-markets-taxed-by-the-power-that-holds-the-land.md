@@ -13,6 +13,7 @@ Issue #211 asks for merchant houses that carry goods between towns, with prices 
   - Earners feed dependants. Each member eats a daily ration bought from the market or the village granary, and the household pays for housing and gear upkeep.
   - People earn by wages, selling harvests, game and crafts, escort or mercenary work (#172), sect stipends and loot.
   - Failing to earn brings, in turn, hunger, a debt of goods to kin, selling gear, migrating to a richer town and turning bandit (#172). These are outcomes of the same need thresholds, not scripted events.
+  - The PM settled the order on PR #215's review over the issue text's: a debt of goods, then selling, then hunger, since people borrow and sell before they starve. Migrating and banditry follow hunger.
 - **Taxes, and treasuries that fund wars.**
   - The power holding a territory taxes its households and markets: a share of trade, a levy per household, and a toll on caravans at its gates. Sects take dues.
   - Taxes, loot sales and dues fill the faction's or sect's treasury, held in its warehouse.
