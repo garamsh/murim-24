@@ -2899,8 +2899,15 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   if (art) {
     body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
   }
-  strikes_.push_back(Strike{self, index, skill.shape, skill.range, skill.radius,
-                            skill.body_damage, striker.position, toward, {}});
+  strikes_.push_back(Strike{self,
+                            index,
+                            skill.shape,
+                            skill.range,
+                            skill.radius,
+                            skill.body_damage,
+                            striker.position,
+                            toward,
+                            {}});
   const bool hit =
       cover(user, crowd, skill, toward, locked, body_damage, damage);
   // A use that hits anyone or anything practises its art's discipline, or,
