@@ -125,7 +125,7 @@ Options weighed:
 - **Cost per tick.**
   - Wear is a decrement inside the strike and damage loops, which already visit every hit.
   - The basic strike reads the weapon slot in place of the army's first skill.
-  - The gear rule runs per change, and touches at most 12 stacks. Its changes in a tick are bounded by that tick's breaks, purchases, withdrawals and pick-ups. Breaks are at most the tick's hits, about 30 in the M1 battle. Pick-ups are at most ADR 0051's bound of about 700 piles a tick. Purchases and withdrawals are daily rules spread over the day. So the worst case is about 1,000 changes, or 12,000 stack comparisons, a tick. That is a few hundredths of a millisecond, under 1% of ADR 0048's 4 ms p99, by this estimate; the implementing pull request measures it.
+  - The gear rule runs per change, and touches at most 12 stacks. It runs at most once a person a tick, after every change to what that person holds that tick: breaks, purchases, withdrawals and pick-ups. Breaks are at most the tick's hits, about 30 in the M1 battle. Pick-ups reach at most the people ADR 0051's scan visits, about 1,700 a tick at worst. Purchases and withdrawals are daily rules spread over the day. So the worst case is about 1,750 runs, or 21,000 stack comparisons, a tick. That is a few hundredths of a millisecond, under 1% of ADR 0048's 4 ms p99, by this estimate; the implementing pull request measures it.
 - **Determinism, saves and the hash.** All of it is integers. Equipment and inventories are saved and hashed, and `SAVE_VERSION` rises.
 - **Wares.** ADR 0040's herbs and elixirs become item kinds that stack, held in the inventory and used by the consume order as before. A person's wares are now stacks, not counts.
 

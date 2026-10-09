@@ -40,15 +40,19 @@ Options weighed:
   - Rejected: a carry weight. Every kind would need a weight, and every pick-up a sum, for a limit players read less easily than a row of boxes.
 - **Death.** Everything the dead carried drops on the cell where it died: its slots, its inventory and its pocket silver. Anyone may pick it up. This supersedes ADR 0040's rule that the dead keep their silver, which held silver no one could reach.
 - **The ground.**
-  - A pile is one stack on a cell, with the tick it expires. Piles are kept by 32-cell area.
+  - A pile is one stack on a cell, with the tick it expires. Piles are kept by 32-cell area, and indexed by cell.
   - A pile expires 30 days after it lands, in the base pack. A pile of silver that expires leaves the world, one of ADR 0052's sinks.
-  - The world holds at most 131,072 piles, 16 bytes each, 2 MiB, and an area at most 256. When either is full, the oldest pile there goes first.
+  - **Nothing just dropped is lost.** The owner decided that whoever picks up what a destroyed warehouse scatters owns it, so a drop must reach the ground whole:
+    - A cell holds at most 16 piles. A stack landing on a full cell spills to the nearest passable cell with room, the first in a fixed spiral order, so a scatter or a battle's dead spread over the cells around them and none of it is dropped.
+    - The world holds at most 1,048,576 piles, 16 bytes each, 16 MiB. When it is full, a new pile replaces an expired one first, then the oldest pile at least a day old. A pile younger than a day is never removed to make room.
+    - The worst day fits under the bound. The most one day can drop is every living person dying with full slots, inventory and pocket silver, 13 stacks each, 650,000 at a bound of 50,000. Every warehouse can scatter on the same day, at most 327,680 lots and balances in the world (below), and every caravan, 256 of 32 lots, 8,192. That is 985,872 piles. A stack picked up and dropped again the same day replaces the pile it was taken from, so it is not counted twice.
+  - Rejected: a bound per area, with the oldest pile there evicted. A destroyed treasury of 512 lots scatters into one area, and about twenty deaths in a battle fill 256, so the newest drops would evict the scatter the owner decided anyone may pick up.
   - Rejected: piles that never expire. A long war would fill the world's memory with swords no one will walk back for.
 - **Picking up.**
-  - Once a second, in live and stepped areas, each pile is taken by the nearest living person within a cell of it who has room and is not steered, the lower index among equals.
+  - Once a second, in live and stepped areas, each living person not steered with room looks at the piles in its own cell and the eight around it, through the cell index. Each pile wanted goes to the nearest such person, the lower index among equals. A person takes no more piles than its room, in the order of its wants below, then nearest, then the lower index. Piles and people are read as the second began, so the order people are visited in decides nothing.
   - A person wants a pile, in order, when it is silver, when the gear rule would wear it or it meets a spare it lacks (ADR 0050), when it is food while the person is hungry, when it is a valuable, and otherwise when it has a price. A person with no room for a wanted pile leaves it.
   - The player picks up through the port, by an order naming a pile within a cell, refused with its reason as data, as `buy` is.
-  - **The scan's cost.** Only piles in live and stepped areas are scanned. At the standard profile's stepped radius of 4 areas (ADR 0048), that is at most 81 areas of 256 piles, 20,736 piles a second. Each area is scanned on its own tick of the second, by index, so a tick sees about 700 piles. Each is one query of the spatial hash within a cell. By this estimate that is about 0.15 ms a tick at worst, under 4% of ADR 0048's 4 ms p99; the implementing pull request measures it.
+  - **The scan's cost.** The scan visits people, not piles, so its cost does not grow with what lies on the ground. Each person is visited on its own tick of the second, by index. Worst case: all 50,000 people in live and stepped areas, about 1,700 a tick. Each looks at 9 cells of at most 16 piles, 144, so a tick reads at most about 240,000 piles, but only where people stand in piles. A person with no pile within a cell costs 9 lookups in the cell index. By this estimate that is under 0.5 ms a tick in the worst case, under 13% of ADR 0048's 4 ms p99, and a few hundredths of a millisecond in a battle's aftermath. The implementing pull request measures it.
   - Rejected: picking up only what a person needs. Piles nobody needs would wait out their days, and the scrap of a battle would never reach a market.
 - **Loot.**
   - A soldier at war is a person serving in an army that is not a village's residents and not a caravan, while its faction is hostile to the faction of the person whose drop it is, or of the warehouse's village, as `hostile` reads it (ADR 0038).
@@ -69,6 +73,7 @@ Options weighed:
 
   - The pack's map names each faction's capital (ADR 0047). A faction whose capital has no standing treasury keeps its account at its first village, by index, with a warehouse, holding only what reaches it from then on.
   - Growth may build a warehouse in a village by the scarcity rule (ADR 0023), with its own `lots` as a holding.
+  - The world's warehouses hold at most 327,680 lots and balances together, a bound in the core. Growth lays no warehouse that would pass it. So the ground's worst day stays bounded. About 1,000 warehouses of 256 lots and 32 balances come to 288,000.
   - Rejected: one shared store per village with no accounts. Every deposit would belong to everyone, so no one could own anything stored.
 - **Who owns a deposit.** A person deposits into its household's account, or into its soul's account if it has a soul. Any adult of the household may withdraw from the household's account; only a body of the soul may withdraw from the soul's. A sect member deposits into its sect's account only by an order its master or an elder gives. The faction's account is filled by loot, taxes and purchases (ADR 0052). A soldier of the faction may withdraw issue: gear of the kinds its spares and slots need, up to them.
 - **The keeper.** A village warehouse's keeper is the first resident whose trade is keeping (#170), and until trades exist, the first resident of its village's first household. Fees go to the keeper's household. A keeper who dies is replaced by the same rule the next day, and the lots are untouched. The keeper never withdraws another account's lots.
@@ -93,7 +98,7 @@ Options weighed:
 - **Memory at 50,000 people.**
   - A lot is 12 bytes: its stack and its account. A balance is 12 bytes: an account and a 64-bit count.
   - About 1,000 warehouses averaging 256 lots and 32 balances come to about 3.4 MB.
-  - Piles are at most 2 MiB.
+  - Piles are at most 16 MiB, at the bound of 1,048,576. In ordinary play they are far fewer, since piles are picked up or expire.
   - Persons' slots and inventories are ADR 0050's 4.8 MB.
   - Caves are the map's, and few.
 - **Saves, the hash and determinism.** Lots, balances, piles and their expiries, keepers and the loot flag are saved and hashed. Piles are read by area and index, and ties go to the lower index.
@@ -107,7 +112,7 @@ Options weighed:
 
 Every item has one holder: a person's slots and inventory of 8 stacks, a warehouse's lot owned by an account, or a pile on the ground. Silver is held the same way. An account is a household, a soul, a sect, a faction or a merchant house. Four verbs move items: pick up, deposit or withdraw, buy and sell.
 
-The dead drop everything where they die, and piles expire after 30 days, within a bound of 131,072. Once a second the nearest person with room takes a pile it wants. A soldier at war takes it as loot, carried until it is deposited to its faction's account.
+The dead drop everything where they die, and piles expire after 30 days. A cell holds 16 piles and spills the rest to the nearest cells with room. The world holds 1,048,576 piles, above the most one day can drop, and never removes one younger than a day, so nothing a death or a scatter drops is lost. Once a second each person with room takes the piles it wants within a cell, each pile going to the nearest. A soldier at war takes it as loot, carried until it is deposited to its faction's account.
 
 Warehouses keep lots and balances by account. A keeper's warehouse charges a fee a stack. A sect's vault answers to its master and elders, and a faction's treasury to its leader and to soldiers drawing issue. A destroyed warehouse scatters everything on the ground for whoever picks it up. A village taken with its warehouse standing passes the old owner's accounts to the new. A dead household's account passes to its heirs, or else to the village's faction.
 
@@ -121,7 +126,7 @@ This supersedes ADR 0040's rule that the dead keep their silver.
 - The player's soul has a reason to store wealth, and a reason to walk back to it after rebirth.
 - A ruined village's warehouse spills into the hands of whoever stands there, which makes raids pay. That changes ADR 0023's growth balance, and the sweep is rerun in the implementing pull request.
 - Caves add the game's only rule for the player alone, so the concept's principle now has one written exception.
-- Saves grow by the lots, balances and piles, a few MB at the bound.
+- Saves grow by the lots, balances and piles: a few MB in ordinary play, and up to about 21 MB in the worst case, with the ground full at 16 MiB.
 
 ## Signs the decision was wrong
 
