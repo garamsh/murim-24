@@ -100,7 +100,7 @@ Options weighed:
   - Rejected: planning, such as saving toward a goal or weighing needs against prices. Every step is a threshold on today's purse, cheap at the bound.
 - **Markets.** A town is a village with a standing market, a structure kind of the pack's. The map's starting cities and towns have one, and growth builds one past 60 residents.
   - A market holds, for each item kind it trades, a stock of whole items, a pool of worn durability, a price, and the demand of the last 30 days. It also holds a till.
-  - A village without a market buys food at its granary, and everything else at the nearest market within 64 cells, by the daily rule, without walking.
+  - A village without a market buys food at its granary, and everything else at the nearest market within 64 cells, by the daily rule, without walking. This is a simplification, accepted by the PM and named in Consequences.
   - A market trades at most 64 item kinds, the pack's list for its kind of market, so its daily pass and a caravan's search are bounded.
   - The player buys and sells by talking to the market's keeper. ADR 0040's `Offer::TRADE` moves from a person whose best discipline is medicine to a market's keeper, and `sells` reads the market.
 - **Price.** Each day, per kind, a market compares its stock against its target, its last 30 days' demand:
@@ -244,6 +244,7 @@ This supersedes these:
 ## Consequences
 
 - Silver has a use and a cost, which ADR 0040's signs named as missing: prices move, and wealth is spent.
+- **A simplification.** Villages without a market buy at the nearest one within 64 cells without anyone walking there, so no NPC is seen carrying goods home. It keeps the daily rule cheap. The player, and caravans, still walk.
 - Villages can starve with full granaries, if their households cannot pay. Field wages paid from the granary's own sales are what prevent it in peace, and the sweep must show it.
 - Wars are paid for. A long war drains the treasury, raises the rate and drives households away over years, which ends wars that numbers alone would not.
 - The player gains goals: trading between towns, paying a household, leading with a rate.
