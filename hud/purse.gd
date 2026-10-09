@@ -4,15 +4,17 @@
 ## greyed at none. What it shows is read from the world through the adapter. It holds no game rule.
 extends "res://hud/panel.gd"
 
-## The silver strip, in the native 480x270.
-const STRIP := Rect2(4, 92, 100, 18)
+## The silver strip's size, and where it stands in the native 480x270: under the leader's on the
+## keyboard layout, and under the touch layout's square buttons, which stand where it would.
+const STRIP_SIZE := Vector2(100, 18)
+const STRIP_AT := {false: Vector2(4, 92), true: Vector2(4, 138)}
 const BELT_STEP := 32
 
 ## Each ware's key, by its index in WorldAdapter.wares.
 var keys: Array[String] = []
 ## Where the belt stands, its top-left, in the HUD's pixels.
 var belt_at := Vector2.ZERO
-## Whether the belt shows: on the keyboard layout, not on touch.
+## Whether the belt shows, and where the strip stands: the keyboard layout's, or not, on touch.
 var belt := true
 ## The silver and the count of each ware the player holds, as last read.
 var silver := 0
@@ -32,17 +34,23 @@ func read(world: WorldAdapter, person: int) -> void:
 		queue_redraw()
 
 
-## Returns the strip's width in the HUD's pixels and the belt's rect, for a layout check.
+## Returns the strip's rect in the HUD's pixels, for a layout check.
+func strip_rect() -> Rect2:
+	return Rect2(STRIP_AT[not belt], STRIP_SIZE)
+
+
+## Returns the belt's rect in the HUD's pixels, for a layout check.
 func belt_rect() -> Rect2:
 	return Rect2(belt_at, Vector2(_wares.size() * BELT_STEP + 6, 26))
 
 
 func _draw() -> void:
 	_font = get_theme_default_font() if _font == null else _font
-	_frame(STRIP, INK)
-	_ware_icon("silver", STRIP.position + Vector2(4, 1))
+	var strip := strip_rect()
+	_frame(strip, INK)
+	_ware_icon("silver", strip.position + Vector2(4, 1))
 	var text := tr("SILVER") % silver
-	_text(Vector2(STRIP.end.x - 6 - _width(text), STRIP.position.y + 3), fit(text, STRIP.size.x - 28), PAPER)
+	_text(Vector2(strip.end.x - 6 - _width(text), strip.position.y + 3), fit(text, strip.size.x - 28), PAPER)
 	if not belt or _wares.is_empty():
 		return
 	var rect := belt_rect()

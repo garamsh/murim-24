@@ -135,7 +135,8 @@ func run() -> bool:
 # included; control: before the day it showed the silver it was born with. At each PC window in each
 # locale the silver strip and the ware belt lie within the room, clear of each other and of every
 # panel the HUD shows, the belt right of the technique bar, and the silver's widest amount fits its
-# strip; with the touch controls the belt is hidden. Each notice of consuming each ware, consumed or
+# strip; with the touch controls the belt is hidden and the strip stands within the room, clear of
+# the square buttons, the pause button and the stick. Each notice of consuming each ware, consumed or
 # refused for each reason, fits the notice's label.
 func _purse_pass() -> bool:
 	const DAY := 5
@@ -157,12 +158,12 @@ func _purse_pass() -> bool:
 	for locale: String in hud.LOCALES:
 		TranslationServer.set_locale(locale)
 		var widest := hud.tr("SILVER") % 99999
-		if _width(hud.labels.notice, widest) > hud.purse.STRIP.size.x - 28:
+		if _width(hud.labels.notice, widest) > hud.purse.STRIP_SIZE.x - 28:
 			faults.append("%s: %s past its strip" % [locale, widest])
 		for window: Vector2i in PC_WINDOWS:
 			hud.fit(window, false)
 			var room := Rect2(Vector2.ZERO, hud.room)
-			var strip: Rect2 = hud.purse.STRIP
+			var strip: Rect2 = hud.purse.strip_rect()
 			var belt: Rect2 = hud.purse.belt_rect()
 			var bar: Rect2 = hud._skill_bar.get_rect()
 			if not hud.purse.belt or not room.encloses(strip) or not room.encloses(belt) or strip.intersects(belt) \
@@ -181,10 +182,14 @@ func _purse_pass() -> bool:
 					faults.append("%s: notice \"%s\" in %d px" % [locale, said, notice.size.x])
 	TranslationServer.set_locale(hud.LOCALES[0])
 	hud.use_touch(true)
-	var touch_hidden: bool = not hud.purse.belt
+	var touch_strip: Rect2 = hud.purse.strip_rect()
+	var touch_hidden: bool = not hud.purse.belt and Rect2(Vector2.ZERO, hud.NATIVE).encloses(touch_strip)
+	var stick := Rect2(hud.touch.STICK - Vector2.ONE * hud.touch.STICK_RADIUS, Vector2.ONE * 2 * hud.touch.STICK_RADIUS)
+	for button: Rect2 in hud.touch.BUTTONS.values() + [hud.touch.PAUSE, stick]:
+		touch_hidden = touch_hidden and not touch_strip.intersects(button)
 	hud.free()
 	var passed := born_right and paid and faults.is_empty() and touch_hidden
-	print("hud_test: the purse showed %d silver at birth %s, after a day %s with the wares held; faults %s; the belt hidden on touch %s: %s" % [
+	print("hud_test: the purse showed %d silver at birth %s, after a day %s with the wares held; faults %s; on touch the belt hidden and the strip clear of the buttons and the stick %s: %s" % [
 		born, born_right, paid, faults, touch_hidden, "pass" if passed else "FAIL"])
 	return passed
 
