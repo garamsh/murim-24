@@ -1,0 +1,81 @@
+== run 1 flags [level]
+angle bench: levelling, whole sequence: 1768 frames, p50 3.310 ms, p99 9.609 ms, max 37.971 ms
+angle bench: levelling, pull-back to return, 1.0 to 6.0 s: 1055 frames, p50 3.872 ms, p99 9.246 ms, max 17.195 ms
+angle bench: levelling, window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official); 3 casts; villagers reached and dead [60, 60] of 60; stages { "intact": 69, "rubble": 12 }
+angle bench: levelling, worst frame from the pull-back on 17.195 ms at 2.15 s
+angle bench: levelling, chunks 9 resident now, 9 at most, 9 built; ground images 7225344 bytes
+== run 1 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 35 bodies drawn, 7 hidden behind something in the last frame
+angle bench: frame time p50 3.959 ms, p99 13.673 ms, max 16.174 ms over 1200 frames
+angle bench: chunks of 32 cells; 6 resident now, 6 at most; 6 built, 0 freed; ground images 4816896 bytes now (802816 a chunk)
+angle bench: chunk build p50 4.281 ms, max 9.243 ms; camera travelled 0 cells
+angle bench: texture memory 36.2 MB, video memory 42.3 MB, static memory 139.3 MB, 1600 nodes
+== run 1 flags [pan]
+angle bench: village sequence under the HUD, flags ["pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 0 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 3.148 ms, p99 12.198 ms, max 15.030 ms over 1200 frames
+angle bench: chunks of 32 cells; 11 resident now, 12 at most; 14 built, 3 freed; ground images 8830976 bytes now (802816 a chunk)
+angle bench: chunk build p50 4.172 ms, max 9.180 ms; camera travelled 104 cells
+angle bench: texture memory 41.3 MB, video memory 47.4 MB, static memory 140.0 MB, 1755 nodes
+== run 1 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 354 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.894 ms, p99 9.908 ms, max 27.875 ms over 1200 frames
+angle bench: chunks of 32 cells; 4 resident now, 4 at most; 4 built, 0 freed; ground images 3211264 bytes now (802816 a chunk)
+angle bench: chunk build p50 2.682 ms, max 3.327 ms; camera travelled 0 cells
+angle bench: texture memory 31.6 MB, video memory 37.7 MB, static memory 66.1 MB, 767 nodes
+== run 2 flags [level]
+angle bench: levelling, whole sequence: 1121 frames, p50 6.902 ms, p99 11.253 ms, max 49.507 ms
+angle bench: levelling, pull-back to return, 1.0 to 6.0 s: 722 frames, p50 6.898 ms, p99 8.953 ms, max 11.253 ms
+angle bench: levelling, window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official); 3 casts; villagers reached and dead [60, 60] of 60; stages { "intact": 69, "rubble": 12 }
+angle bench: levelling, worst frame from the pull-back on 11.253 ms at 1.05 s
+angle bench: levelling, chunks 9 resident now, 9 at most, 9 built; ground images 7225344 bytes
+== run 2 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 34 bodies drawn, 5 hidden behind something in the last frame
+angle bench: frame time p50 6.910 ms, p99 8.557 ms, max 8.842 ms over 1200 frames
+angle bench: chunks of 32 cells; 6 resident now, 6 at most; 6 built, 0 freed; ground images 4816896 bytes now (802816 a chunk)
+angle bench: chunk build p50 3.977 ms, max 8.928 ms; camera travelled 0 cells
+angle bench: texture memory 36.2 MB, video memory 42.3 MB, static memory 139.3 MB, 1598 nodes
+== run 2 flags [pan]
+angle bench: village sequence under the HUD, flags ["pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 0 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 6.906 ms, p99 8.353 ms, max 16.025 ms over 1200 frames
+angle bench: chunks of 32 cells; 8 resident now, 12 at most; 17 built, 9 freed; ground images 6422528 bytes now (802816 a chunk)
+angle bench: chunk build p50 5.309 ms, max 8.846 ms; camera travelled 184 cells
+angle bench: texture memory 38.2 MB, video memory 44.4 MB, static memory 141.5 MB, 2136 nodes
+== run 2 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 355 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.903 ms, p99 14.519 ms, max 44.781 ms over 1200 frames
+angle bench: chunks of 32 cells; 4 resident now, 4 at most; 4 built, 0 freed; ground images 3211264 bytes now (802816 a chunk)
+angle bench: chunk build p50 2.733 ms, max 3.036 ms; camera travelled 0 cells
+angle bench: texture memory 31.6 MB, video memory 37.7 MB, static memory 66.1 MB, 770 nodes
+== run 3 flags [level]
+angle bench: levelling, whole sequence: 1873 frames, p50 3.031 ms, p99 10.055 ms, max 38.404 ms
+angle bench: levelling, pull-back to return, 1.0 to 6.0 s: 1111 frames, p50 3.230 ms, p99 9.102 ms, max 11.907 ms
+angle bench: levelling, window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official); 3 casts; villagers reached and dead [60, 60] of 60; stages { "intact": 69, "rubble": 12 }
+angle bench: levelling, worst frame from the pull-back on 11.907 ms at 2.28 s
+angle bench: levelling, chunks 9 resident now, 9 at most, 9 built; ground images 7225344 bytes
+== run 3 flags []
+angle bench: village sequence under the HUD, flags [], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 34 bodies drawn, 5 hidden behind something in the last frame
+angle bench: frame time p50 6.911 ms, p99 8.613 ms, max 9.718 ms over 1200 frames
+angle bench: chunks of 32 cells; 6 resident now, 6 at most; 6 built, 0 freed; ground images 4816896 bytes now (802816 a chunk)
+angle bench: chunk build p50 4.445 ms, max 9.051 ms; camera travelled 0 cells
+angle bench: texture memory 36.2 MB, video memory 42.3 MB, static memory 139.3 MB, 1598 nodes
+== run 3 flags [pan]
+angle bench: village sequence under the HUD, flags ["pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 0 bodies drawn, 0 hidden behind something in the last frame
+angle bench: frame time p50 6.876 ms, p99 8.863 ms, max 17.644 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 7225344 bytes now (802816 a chunk)
+angle bench: chunk build p50 4.022 ms, max 8.984 ms; camera travelled 158 cells
+angle bench: texture memory 39.3 MB, video memory 45.4 MB, static memory 140.6 MB, 1933 nodes
+== run 3 flags [m1]
+angle bench: M1 scenario, flags ["m1"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 354 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.895 ms, p99 9.815 ms, max 24.445 ms over 1200 frames
+angle bench: chunks of 32 cells; 4 resident now, 4 at most; 4 built, 0 freed; ground images 3211264 bytes now (802816 a chunk)
+angle bench: chunk build p50 2.739 ms, max 2.836 ms; camera travelled 0 cells
+angle bench: texture memory 31.6 MB, video memory 37.7 MB, static memory 66.1 MB, 769 nodes

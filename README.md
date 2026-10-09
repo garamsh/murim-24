@@ -2,6 +2,8 @@
 
 Phase 1 of #200: the world drawn at Albion's 3/4 angle in 2D pixel art, shown to the owner before anything is rebuilt (PR #204). This branch is never merged.
 
+This file covers the first round, a generic village at ba32a9f. Two later rounds of the same PR have their own: `streaming/`, rendering only round the camera by 32-cell chunks, and `levelling/`, one skill levelling a whole village with the camera pulled back.
+
 ## How it was made
 
 On macOS arm64 (Apple M1), Godot 4.7.2 and Aseprite 1.3.18.6, at ba32a9f, the head of `mockup/two-point-five-d`, after `make build`:
