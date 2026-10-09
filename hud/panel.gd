@@ -43,6 +43,9 @@ var _world: WorldAdapter
 var _font: Font
 var _bodies := {}
 var _scrim: ImageTexture
+# The ware icons' sheet and the frame of each tag, loaded on first use.
+var _ware_art: Texture2D
+var _ware_frames := {}
 
 
 func _ready() -> void:
@@ -217,6 +220,19 @@ func _menu_row(top_left: Vector2, width: float, count: int, at: Vector2) -> int:
 	if at.x < top_left.x or at.x >= top_left.x + width or row < 0 or row >= count:
 		return -1
 	return row
+
+
+# The icon tagged `tag` in art/icons/ware_icons.aseprite, a ware's name or "silver", from `top_left`,
+# darkened when `dim`; nothing for a tag the sheet lacks.
+func _ware_icon(tag: String, top_left: Vector2, dim := false) -> void:
+	if _ware_art == null:
+		_ware_art = load(ART + "icons/ware_icons.png")
+		var sheet: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "icons/ware_icons.json"))
+		for frame: Dictionary in sheet.meta.frameTags:
+			_ware_frames[frame.name] = int(frame.from)
+	if _ware_frames.has(tag):
+		draw_texture_rect_region(_ware_art, Rect2(top_left, Vector2(16, 16)),
+				Rect2(_ware_frames[tag] * 16, 0, 16, 16), DEAD_TINT if dim else Color.WHITE)
 
 
 ## Returns the width of a key's cap bearing `text`.

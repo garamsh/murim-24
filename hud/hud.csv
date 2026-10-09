@@ -136,6 +136,7 @@ CONTROLS_SKILL,기술 하나,One skill
 CONTROLS_ALL_SKILLS,모든 기술,All skills
 CONTROLS_FACTIONS,세력,Factions
 CONTROLS_TALK,대화,Talk
+CONTROLS_WARES,약 먹기,Use wares
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
@@ -287,3 +288,23 @@ DIALOGUE_NO_SECT,문파 없음,No sect
 DIALOGUE_AGE,%d세,Age %d
 DIALOGUE_KEYS_MENU,방향키 고르기 · Enter 말하기 · Esc 닫기,Arrows choose · Enter say · Esc close
 DIALOGUE_KEYS_NEWS,방향키 넘기기 · Esc 돌아가기,Arrows scroll · Esc back
+DIALOGUE_TRADE,물건 좀 봅시다.,Show me your wares.
+DIALOGUE_TRADE_GREETING,“무엇이 필요하오?”,“What do you need?”
+DIALOGUE_SELLER,%s · 약장수,%s · seller
+DIALOGUE_KEYS_TRADE,방향키 고르기 · Enter 사기 · Esc 돌아가기,Arrows choose · Enter buy · Esc back
+DIALOGUE_BOUGHT,샀다 · %s,Bought · %s
+BUY_DEAD,쓰러진 이와는 거래할 수 없다,No trade with the fallen
+BUY_CANNOT_TALK,말이 닿지 않는다,Out of talking reach
+BUY_NOT_SOLD,팔지 않는 물건이다,Not sold here
+BUY_NO_SILVER,은이 모자라다,Not enough silver
+SILVER,%d냥,%d silver
+WARE_HERB,약초,Healing herb
+WARE_ELIXIR,소환단,Lesser Return Pill
+WARE_HEALTH,체력 +%d,Health +%d
+WARE_QI,내공 +%s,Qi +%s
+WARE_HELD,%d개,%d held
+CONSUME_USED,%s · %s,%s · %s
+CONSUME_DEAD,쓰러진 몸으로는 먹을 수 없다,You cannot take it while fallen
+CONSUME_NONE_HELD,%s · 가진 것이 없다,%s · none held
+CONSUME_FULL_HEALTH,체력이 이미 가득하다,Health is already full
+CONSUME_FULL_QI,내공이 이미 가득하다,Qi is already full

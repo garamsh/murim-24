@@ -25,10 +25,11 @@ const SHOWN := {
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD", "HUD_AUTOSAVED", "HUD_AUTOSAVE_FAILED"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
-# the dialogue window's and the rumours' among them, and of the lessons' words, which _lessons_pass
-# measures.
+# the dialogue window's, its wares' and the rumours' among them, of the lessons' words, which
+# _lessons_pass measures, and of the purse's silver and its notices, which _purse_pass measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
-		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_"]
+		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
+		"BUY_", "WARE_", "SILVER", "CONSUME_"]
 const Arts := preload("res://hud/arts.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
 # person.
@@ -125,8 +126,67 @@ func run() -> bool:
 	var lessons_passed := _lessons_pass()
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
+	var purse_passed := _purse_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed
+
+
+# The purse shows the steered person's silver and wares as the world holds them, its wage of a day
+# included; control: before the day it showed the silver it was born with. At each PC window in each
+# locale the silver strip and the ware belt lie within the room, clear of each other and of every
+# panel the HUD shows, the belt right of the technique bar, and the silver's widest amount fits its
+# strip; with the touch controls the belt is hidden. Each notice of consuming each ware, consumed or
+# refused for each reason, fits the notice's label.
+func _purse_pass() -> bool:
+	const DAY := 5
+	var world := WorldAdapter.create_region(SEED, 0, DAY)
+	var steered := world.player_army()
+	world.steer(steered, true)
+	var person := world.roster(steered)[0]
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, steered)
+	hud.refresh(world, steered, PackedInt64Array())
+	var born: int = hud.purse.silver
+	var born_right := born == world.person_silver(person) and born > 0
+	for tick in DAY:
+		world.tick()
+	hud.refresh(world, steered, PackedInt64Array())
+	var paid: bool = hud.purse.silver == world.person_silver(person) and hud.purse.silver > born \
+			and hud.purse.held == world.person_held(person) and hud.purse.held.size() == world.wares().size()
+	var faults := []
+	for locale: String in hud.LOCALES:
+		TranslationServer.set_locale(locale)
+		var widest := hud.tr("SILVER") % 99999
+		if _width(hud.labels.notice, widest) > hud.purse.STRIP.size.x - 28:
+			faults.append("%s: %s past its strip" % [locale, widest])
+		for window: Vector2i in PC_WINDOWS:
+			hud.fit(window, false)
+			var room := Rect2(Vector2.ZERO, hud.room)
+			var strip: Rect2 = hud.purse.STRIP
+			var belt: Rect2 = hud.purse.belt_rect()
+			var bar: Rect2 = hud._skill_bar.get_rect()
+			if not hud.purse.belt or not room.encloses(strip) or not room.encloses(belt) or strip.intersects(belt) \
+					or belt.position.x < bar.end.x or belt.position.y != bar.position.y:
+				faults.append("%s %s: strip %s, belt %s beside the bar %s" % [window, locale, strip, belt, bar])
+			for shown: Control in _shown_panels(hud):
+				if strip.intersects(shown.get_rect()) or belt.intersects(shown.get_rect()):
+					faults.append("%s %s: the purse over %s" % [window, locale, shown.name])
+		for ware in world.wares().size():
+			for refusal: int in [WorldAdapter.CONSUME_NONE, WorldAdapter.CONSUME_DEAD, WorldAdapter.CONSUME_NONE_HELD,
+					WorldAdapter.CONSUME_FULL]:
+				hud.show_consume(world, ware, refusal)
+				var notice: Label = hud.labels.notice
+				var said := notice.atr(notice.text)
+				if said.contains("%") or said.begins_with("CONSUME_") or _width(notice, said) > notice.size.x:
+					faults.append("%s: notice \"%s\" in %d px" % [locale, said, notice.size.x])
+	TranslationServer.set_locale(hud.LOCALES[0])
+	hud.use_touch(true)
+	var touch_hidden: bool = not hud.purse.belt
+	hud.free()
+	var passed := born_right and paid and faults.is_empty() and touch_hidden
+	print("hud_test: the purse showed %d silver at birth %s, after a day %s with the wares held; faults %s; the belt hidden on touch %s: %s" % [
+		born, born_right, paid, faults, touch_hidden, "pass" if passed else "FAIL"])
+	return passed
 
 
 # At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives

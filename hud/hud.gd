@@ -99,6 +99,8 @@ var factions: Control
 var dialogue: Control
 ## The prompt over the person the player may talk to.
 var talk_prompt: Control
+## The player's silver on a strip, and the wares it holds on a belt beside the technique bar.
+var purse: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
 var loadout := Loadout.new()
 ## The title screen, the new-game panel over it, the pause panel over the game, and the settings
@@ -276,6 +278,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		qi_bar.value = 100.0 * world.person_qi(person) / maxi(capacity, 1)
 		labels.qi_value.text = "%s / %s" % [Arts.grouped(world.person_qi(person)), Arts.grouped(capacity)]
 		labels.realm_value.text = Arts.realm_name(world, world.person_realm(person))
+		purse.read(world, person)
 		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
@@ -367,6 +370,9 @@ func _place() -> void:
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
 	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
+	purse.belt_at = _skill_bar.position + Vector2(_skill_bar.size.x + 4, 0)
+	purse.belt = not on
+	purse.queue_redraw()
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
 	labels.notice.position = NOTICE_AT[on] + gained / 2.0
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
@@ -410,6 +416,23 @@ func show_challenge(refusal: int) -> void:
 func show_cast(refusal: int) -> void:
 	_set_up()
 	_notice(CAST_KEYS[refusal])
+
+
+## Shows for NOTICE_MS what came of consuming ware `ware` of `world`: `refusal`, one of the
+## WorldAdapter.CONSUME_* constants, CONSUME_NONE for consumed, the ware and what it restored.
+func show_consume(world: WorldAdapter, ware: int, refusal: int) -> void:
+	_set_up()
+	var shown: Dictionary = world.wares()[ware]
+	var named: String = dialogue.ware_name(shown)
+	match refusal:
+		WorldAdapter.CONSUME_NONE:
+			_notice(tr("CONSUME_USED") % [named, dialogue.ware_effect(shown)])
+		WorldAdapter.CONSUME_DEAD:
+			_notice("CONSUME_DEAD")
+		WorldAdapter.CONSUME_NONE_HELD:
+			_notice(tr("CONSUME_NONE_HELD") % named)
+		_:
+			_notice("CONSUME_FULL_HEALTH" if int(shown.health) > 0 else "CONSUME_FULL_QI")
 
 
 ## Shows for NOTICE_MS whether the autosave was written, as `written` says.
@@ -564,6 +587,8 @@ func _build() -> void:
 	talk_prompt = preload("res://hud/talk_prompt.gd").new()
 	talk_prompt.use_font(_theme.default_font)
 	talk_prompt.visible = false
+	purse = preload("res://hud/purse.gd").new()
+	purse.use_font(_theme.default_font)
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
 	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), GOLD_LIGHT)
@@ -592,6 +617,8 @@ func _build() -> void:
 	touch = preload("res://hud/touch.gd").new()
 	touch.use_font(_theme.default_font)
 	touch.visible = false
+	add_child(purse)
+	purse.visible = true
 	add_child(talk_prompt)
 	add_child(arts)
 	add_child(touch)

@@ -28,7 +28,7 @@ for name in terrain/terrain terrain/transitions terrain/landforms bodies/orthodo
 	bodies/unorthodox structures/house structures/hall structures/well structures/barrels structures/fence \
 	structures/granary structures/storehouse structures/training_ground structures/manual_hall \
 	structures/seat_gate structures/smithy structures/apothecary decorations/fields icons/economy_icons \
-	decorations/ground decorations/banner decorations/sect_banner icons/skill_icons markers/army_marker \
+	decorations/ground decorations/banner decorations/sect_banner icons/skill_icons icons/ware_icons markers/army_marker \
 	markers/player_marker title/backdrop icon/icon; do
 	"$aseprite" --batch "$name.aseprite" --sheet "$name.png" --data "$name.json" --format json-array --list-tags
 done
