@@ -1,5 +1,6 @@
-// Measures the tick cost of the M1 benchmark scenario against the tick
-// budget. `make bench` builds it optimised and runs it; it is not a test.
+// Measures the tick cost of the M1 and the live benchmark scenarios against
+// the tick budget. `make bench` builds it optimised and runs it; it is not a
+// test.
 
 #include <algorithm>
 #include <chrono>
@@ -13,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "live_scenario.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "world.hpp"
@@ -36,6 +38,19 @@ std::vector<std::uint64_t> cooldowns(const World& world) {
     ready.push_back(world.person(person).ready_at);
   }
   return ready;
+}
+
+// Whether each person serves in one of armies `first` to `last`, `last`
+// excluded.
+std::vector<bool> serving(const World& world, std::size_t first,
+                          std::size_t last) {
+  std::vector<bool> serves(world.population(), false);
+  for (std::size_t army = first; army < last; ++army) {
+    for (const std::size_t member : world.roster(army)) {
+      serves.at(member) = true;
+    }
+  }
+  return serves;
 }
 
 // Whether each person serves in one of the two caster armies.
@@ -87,6 +102,21 @@ double milliseconds(std::chrono::steady_clock::duration duration) {
   return std::chrono::duration<double, std::milli>(duration).count();
 }
 
+struct TickTimes {
+  double p50;
+  double p99;
+  double max;
+};
+
+// The median, 99th percentile and longest of `durations`, in milliseconds.
+TickTimes times_of(std::vector<std::chrono::steady_clock::duration> durations) {
+  std::sort(durations.begin(), durations.end());
+  return TickTimes{
+      milliseconds(durations.at(durations.size() / 2)),
+      milliseconds(durations.at((((durations.size() * 99) + 99) / 100) - 1)),
+      milliseconds(durations.back())};
+}
+
 // The people still alive in the world's armies.
 std::size_t living(const World& world, std::size_t armies) {
   std::size_t people = 0;
@@ -96,7 +126,7 @@ std::size_t living(const World& world, std::size_t armies) {
   return people;
 }
 
-int run() {
+bool run_m1() {
   const M1Scenario scenario = m1_scenario();
   const std::size_t armies = scenario.armies.size();
   World world{scenario.seed, Map{scenario.map_rows}, scenario.armies,
@@ -128,11 +158,7 @@ int run() {
     timed.all += strikes.all;
     timed.area += strikes.area;
   }
-  std::sort(durations.begin(), durations.end());
-  const double p50 = milliseconds(durations.at(durations.size() / 2));
-  const double p99 =
-      milliseconds(durations.at((((durations.size() * 99) + 99) / 100) - 1));
-  const double max = milliseconds(durations.back());
+  const auto [p50, p99, max] = times_of(durations);
   const bool pass = p99 <= BUDGET_MS;
   require(living(world, armies) > people / 2,
           "most of the battle must still be fighting when timing ends");
@@ -163,7 +189,81 @@ int run() {
             << max << " ms\n"
             << (pass ? "PASS" : "FAIL") << ": p99 " << p99 << " ms against a "
             << BUDGET_MS << " ms budget\n";
-  return pass ? EXIT_SUCCESS : EXIT_FAILURE;
+  return pass;
+}
+
+// The live scenario's battles must strike at least this often a tick while
+// timed, or they no longer bound two battles in play.
+constexpr std::uint64_t LEAST_BATTLE_STRIKES_PER_TICK = 16;
+
+bool run_live() {
+  const LiveScenario scenario = live_scenario();
+  const std::size_t armies = scenario.armies.size();
+  World world{scenario.seed,
+              Map{scenario.map_rows},
+              scenario.armies,
+              {},
+              scenario.rules};
+  const std::size_t people = living(world, armies);
+  const std::vector<bool> fighting = serving(world, 0, scenario.battle_armies);
+  require(people == LIVE_PEOPLE, "the world must hold LIVE_PEOPLE people");
+
+  Strikes warm_up{0, 0};
+  for (int tick = 0; tick < WARM_UP_TICKS; ++tick) {
+    const auto before = cooldowns(world);
+    world.tick();
+    const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
+    warm_up.all += strikes.all;
+    warm_up.area += strikes.area;
+  }
+  require(warm_up.area > 0, "the battles must strike during the warm-up");
+
+  std::vector<std::chrono::steady_clock::duration> durations;
+  Strikes timed{0, 0};
+  for (int tick = 0; tick < TIMED_TICKS; ++tick) {
+    const auto before = cooldowns(world);
+    const auto start = std::chrono::steady_clock::now();
+    world.tick();
+    durations.push_back(std::chrono::steady_clock::now() - start);
+    const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
+    timed.all += strikes.all;
+    timed.area += strikes.area;
+  }
+  const auto [p50, p99, max] = times_of(durations);
+  const bool pass = p99 <= BUDGET_MS;
+  require(living(world, armies) > people / 2,
+          "most of the world must still live when timing ends");
+  require(timed.area >= LEAST_BATTLE_STRIKES_PER_TICK *
+                            static_cast<std::uint64_t>(TIMED_TICKS),
+          "the battles must strike at least 16 times a tick while timed");
+
+  std::cout << std::fixed << std::setprecision(3)
+            << "scenario: live (core/live_scenario.cpp), seed "
+            << static_cast<std::uint64_t>(scenario.seed) << ", "
+            << scenario.map_rows.size() << "x" << scenario.map_rows.size()
+            << " cells, " << armies << " armies\n"
+            << "ticks: " << WARM_UP_TICKS << " warm-up, then " << TIMED_TICKS
+            << " timed, at " << TICKS_PER_SECOND << " ticks per second\n"
+            << "people: " << people << ", "
+            << std::count(fighting.begin(), fighting.end(), true)
+            << " in two battles, the rest in villages and on roads; "
+            << living(world, armies) << " alive when timing ended\n"
+            << "strikes per tick: "
+            << static_cast<double>(timed.all) / TIMED_TICKS
+            << ", of which in battle "
+            << static_cast<double>(timed.area) / TIMED_TICKS << "\n"
+            << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max "
+            << max << " ms\n"
+            << (pass ? "PASS" : "FAIL") << ": p99 " << p99 << " ms against a "
+            << BUDGET_MS << " ms budget\n";
+  return pass;
+}
+
+// Runs both scenarios, each reporting before either decides the exit status.
+int run() {
+  const bool m1 = run_m1();
+  const bool live = run_live();
+  return m1 && live ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 }  // namespace
