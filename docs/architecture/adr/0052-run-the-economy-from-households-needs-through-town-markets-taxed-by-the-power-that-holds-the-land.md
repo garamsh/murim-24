@@ -46,6 +46,7 @@ Decided by the PM on PR #215's review, 2026-10-09, on this ADR's recommendations
 - A gate held by a fleeing household's own faction stops it at one in two, as pack data.
 - The food cap counts four fifths of the harvest, and the sweep is rerun.
 - Money is counted in copper.
+- Trade with the world beyond the map is kept as proposed, bounded in the money balance below.
 
 This is the third of #211's three ADRs, after ADR 0050's items and ADR 0051's holders and warehouses. Its data is ADR 0049's pack format.
 
@@ -112,9 +113,9 @@ Options weighed:
 - **Making.** A workshop's holding lists the kinds it makes and the materials each needs, as pack data. Each day each standing workshop makes up to its workers' output, adding to its market's stock and taking materials from it, and pays each worker's household a share of the price as wages.
   - A smithy also turns its worn pool into whole items at a material cost, which is ADR 0050's repair by sale.
   - An apothecary makes herbs and elixirs.
-- **Imports and exports.** Each market trades with the world beyond the map at the kind's ceiling and floor:
+- **Imports and exports.** Each market trades with the world beyond the map at the kind's ceiling and floor. This trade is a source and a sink of money that the owner did not name. The PM kept it, because without it a market whose village makes none of a kind starves of it, and one making more than it sells floods:
   - A market whose stock of a kind falls below a tenth of its target imports up to the target at the ceiling, while its till pays. The silver leaves the world.
-  - A market whose stock passes four times its target exports the surplus at the floor. The silver enters the world.
+  - A market whose stock passes four times its target exports the surplus at the floor, at most its target a day. The silver enters the world.
   - Valuables are made by no one inside the map, so every new one is an import.
 - **Merchant houses.** A house is pack data: its name, its home town, its faction or none, its caravans, the lots a caravan carries (32) and the guards it takes (6). It holds a balance at its counting house (ADR 0051).
   - Each day, for each caravan at home and idle, the house chooses the kind and the market within 1,500 cells along its roads whose margin is largest. The margin is the price there less the price at home and the selling discount, times the cargo, less the tolls on the way and the caravan's wages for the days of the trip.
@@ -172,6 +173,7 @@ Options weighed:
   - **Sources.** Exports at the floor, and the starting purses, tills, treasuries and balances. ADR 0040's purse at birth and wage from nowhere are retired: a newborn holds nothing, and every wage is paid by someone.
   - **Sinks.** Imports at the ceiling, valuables among them; the upkeep of houses and of factions' structures; the court of treasuries and vaults above twice their needs; silver piles that expire (ADR 0051); and the gap between floor and ceiling on everything sold out of the world and bought back.
   - **Comfort.** A household whose purse is above 30 days of its needs spends 1% a day of the excess on valuables, and a market's till above 60 days of its turnover pays the excess to its faction's treasury.
+  - **Trade with the world beyond the map.** Exports pay at most each market's target a day at the floor, and only for stock past four times the target, which the world made. So they are bounded by what its people make, and its people by the bound. Imports leave only while a till pays, and only to bring stock back to its target. So this trade cannot create money faster than the world produces, nor drain a till below empty.
   - **Why it is bounded.** Every holder of silver has a level above which a share of the excess leaves, or moves to a holder whose excess leaves:
     - households by comfort, through imports of valuables
     - treasuries and vaults by the court
