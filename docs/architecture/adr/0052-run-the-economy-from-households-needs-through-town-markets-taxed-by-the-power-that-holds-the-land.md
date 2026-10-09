@@ -135,7 +135,7 @@ Options weighed:
   - a levy: `r` per mille of 10 days of a household's rations, on each season's first day
   - a toll: `r` per mille of 10 silver for each cargo lot a caravan carries past a gate (ADR 0047) in its territory
   - A sect takes its dues, per mille of its members' earnings, into its vault, from the pack.
-  - A higher rate lowers the faction's reputation with its households, as the owner said, once #175's reputation lands. Until then, the rate reaches households through discontent alone.
+  - A higher rate lowers the faction's reputation with its households, as the owner said, once #175's reputation lands: in the terms of #175's design (ADR 0054, PR #217), the standing of each of the faction's villages toward its leader, since standing is held by groups toward people. Until then, the rate reaches households through discontent alone.
   - Rejected: a rate per tax. Three levers for every NPC leader to set is three rules where one does.
 - **The treasury.** A faction's account at its treasury (ADR 0051).
 
