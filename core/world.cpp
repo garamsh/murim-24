@@ -2872,7 +2872,7 @@ void World::strike(std::size_t user, const Crowd& crowd,
   // It faces the nearest hostile person in range. The crowd's order breaks
   // ties, so the order the query visits people in does not decide the target.
   const std::optional<std::size_t> target = crowd.hash.nearest(
-      striker.position, skill.range, foe_kinds(self, army),
+      foe_kinds(self, own), striker.position, skill.range,
       [&](std::size_t other) {
         return foes(self, army, crowd.people.at(other), crowd.armies.at(other));
       });
@@ -3112,7 +3112,7 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   const std::optional<std::size_t> home = people_.at(member).home;
   const bool marching = !home || !claims(*home, army.order.objective);
   const std::optional<std::size_t> foe = crowd.hash.nearest(
-      from, rules_.sight * CELL_SIZE, foe_kinds(member, own),
+      foe_kinds(member, army), from, rules_.sight * CELL_SIZE,
       [&](std::size_t other) {
         return (marching ||
                 claims(*home, cell_of(crowd.hash.position(other)))) &&
@@ -3178,10 +3178,10 @@ bool World::foes(std::size_t person, std::size_t army, std::size_t other,
          duelling(person, other);
 }
 
-// The kinds the crowd's index marks the people person `person` of army `army`
-// may strike by: those of the factions hostile to its army's, or every kind
-// while it fights a duel, whose foe may be of any faction.
-std::uint64_t World::foe_kinds(std::size_t person, std::size_t army) const {
+// The kinds the crowd's index marks the people person `person`, serving in
+// `army`, may strike by: those of the factions hostile to its army's, or every
+// kind while it fights a duel, whose foe may be of any faction.
+std::uint64_t World::foe_kinds(std::size_t person, const Army& army) const {
   const bool duellist =
       std::any_of(duels_.begin(), duels_.end(), [person](const Fight& fight) {
         return fight.challenger == person || fight.leader == person;
@@ -3191,7 +3191,7 @@ std::uint64_t World::foe_kinds(std::size_t person, std::size_t army) const {
   }
   std::uint64_t kinds = 0;
   for (std::size_t faction = 0; faction < rules_.hostile.size(); ++faction) {
-    if (hostile(armies_.at(army).faction, faction)) {
+    if (hostile(army.faction, faction)) {
       kinds |= kind_of(faction);
     }
   }

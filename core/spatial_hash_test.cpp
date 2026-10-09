@@ -78,7 +78,7 @@ TEST(SpatialHash, VisitWithinMatchesABruteForceScan) {
 // The position nearest `index`'s within `radius`, other than itself, among
 // those `accepted`, the lowest index among equals, by checking every position.
 std::optional<std::size_t> nearest_by_force(
-    const std::vector<Position>& positions, std::size_t index,
+    std::size_t index, const std::vector<Position>& positions,
     std::int32_t radius, const std::vector<bool>& accepted) {
   const Position centre = positions.at(index);
   std::optional<std::size_t> best;
@@ -116,9 +116,9 @@ TEST(SpatialHash, NearestMatchesABruteForceScan) {
   std::size_t none = 0;
   for (std::size_t index = 0; index < positions.size(); ++index) {
     const std::optional<std::size_t> expected =
-        nearest_by_force(positions, index, SIGHT, accepted);
+        nearest_by_force(index, positions, SIGHT, accepted);
     const std::optional<std::size_t> nearest = hash.nearest(
-        positions.at(index), SIGHT, SOUGHT, [index](std::size_t other) {
+        SOUGHT, positions.at(index), SIGHT, [index](std::size_t other) {
           return other != index && other % 3 != 0;
         });
     EXPECT_EQ(nearest, expected) << "agent " << index;
@@ -138,11 +138,11 @@ TEST(SpatialHash, NearestTakesTheLowerIndexAmongEquals) {
   const SpatialHash hash{positions};
   constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
 
-  EXPECT_EQ(hash.nearest(centre, SIGHT, EVERY_KIND,
+  EXPECT_EQ(hash.nearest(EVERY_KIND, centre, SIGHT,
                          [](std::size_t other) { return other != 0; }),
             std::optional<std::size_t>{1});
   // The control: the one above is found when the one below is not offered.
-  EXPECT_EQ(hash.nearest(centre, SIGHT, EVERY_KIND,
+  EXPECT_EQ(hash.nearest(EVERY_KIND, centre, SIGHT,
                          [](std::size_t other) { return other == 2; }),
             std::optional<std::size_t>{2});
 }
@@ -159,10 +159,10 @@ TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
   constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
   const auto any = [](std::size_t /*other*/) { return true; };
 
-  EXPECT_EQ(hash.nearest(centre, SIGHT, FAR_KIND, any),
+  EXPECT_EQ(hash.nearest(FAR_KIND, centre, SIGHT, any),
             std::optional<std::size_t>{1});
   // The control: asked for either kind, it finds the near one.
-  EXPECT_EQ(hash.nearest(centre, SIGHT, NEAR_KIND | FAR_KIND, any),
+  EXPECT_EQ(hash.nearest(NEAR_KIND | FAR_KIND, centre, SIGHT, any),
             std::optional<std::size_t>{0});
 }
 

@@ -47,7 +47,7 @@ std::size_t slot_count_for(std::size_t entries) {
 
 }  // namespace
 
-SpatialHash::SpatialHash(std::vector<Position> positions)
+SpatialHash::SpatialHash(const std::vector<Position>& positions)
     : SpatialHash(positions, std::vector<std::uint64_t>(
                                  positions.size(),
                                  std::numeric_limits<std::uint64_t>::max())) {}
@@ -97,9 +97,9 @@ Position SpatialHash::position(std::size_t index) const {
   return positions_.at(index);
 }
 
-bool SpatialHash::holds(Cell low, Cell high, std::uint64_t kinds) const {
-  const Cell first = block_of(low);
-  const Cell last = block_of(high);
+bool SpatialHash::holds(std::pair<Cell, Cell> span, std::uint64_t kinds) const {
+  const Cell first = block_of(span.first);
+  const Cell last = block_of(span.second);
   for (Cell block{first.x, first.y}; block.y <= last.y; ++block.y) {
     for (block.x = first.x; block.x <= last.x; ++block.x) {
       if ((block_kinds_.at(slot_of(block)) & kinds) != 0) {

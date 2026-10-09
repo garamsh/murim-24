@@ -20,7 +20,7 @@ namespace murim {
 class SpatialHash {
  public:
   /// Indexes `positions`, every one of every kind.
-  explicit SpatialHash(std::vector<Position> positions);
+  explicit SpatialHash(const std::vector<Position>& positions);
 
   /// Indexes `positions`, each of the kinds of the same index in `kinds`.
   SpatialHash(std::vector<Position> positions,
@@ -44,20 +44,21 @@ class SpatialHash {
     }
   }
 
-  /// Returns the index of the position nearest `centre` within `radius`
-  /// sub-cell units, Euclidean distance inclusive, among those of any of
-  /// `kinds` that `accept` accepts, the lowest index among equals. It walks
+  /// Returns the index of the position of any of `kinds` nearest `centre`
+  /// within `radius` sub-cell units, Euclidean distance inclusive, among
+  /// those `accept` accepts, the lowest index among equals. It walks
   /// the cells in rings outward from the centre's, passing over those that
   /// hold none of `kinds`, stops at the first ring no nearer position can lie
   /// in, and asks `accept` only of a position nearer than the best so far;
   /// it allocates nothing.
   template <typename Accept>
-  [[nodiscard]] std::optional<std::size_t> nearest(Position centre,
+  [[nodiscard]] std::optional<std::size_t> nearest(std::uint64_t kinds,
+                                                   Position centre,
                                                    std::int32_t radius,
-                                                   std::uint64_t kinds,
                                                    Accept accept) const {
-    const auto [low, high] = walk(centre, radius);
-    if (!holds(low, high, kinds)) {
+    const std::pair<Cell, Cell> span = walk(centre, radius);
+    const auto [low, high] = span;
+    if (!holds(span, kinds)) {
       return std::nullopt;
     }
     const Cell middle = cell_of(centre);
@@ -81,16 +82,17 @@ class SpatialHash {
       if (best && ring > 0 && gap * gap > best_distance) {
         break;
       }
-      for (std::int32_t y = std::max(low.y, middle.y - ring);
-           y <= std::min(high.y, middle.y + ring); ++y) {
+      for (std::int32_t row = std::max(low.y, middle.y - ring);
+           row <= std::min(high.y, middle.y + ring); ++row) {
         // The ring's top and bottom rows whole, and its sides' two cells.
-        const bool edge = y == middle.y - ring || y == middle.y + ring;
+        const bool edge = row == middle.y - ring || row == middle.y + ring;
         const std::int32_t step = edge ? 1 : std::max(1, 2 * ring);
-        for (std::int32_t x = middle.x - ring; x <= middle.x + ring;
-             x += step) {
-          if (x >= low.x && x <= high.x &&
-              (slot_kinds_.at(slot_of(Cell{x, y})) & kinds) != 0) {
-            visit_cell(Cell{x, y}, offer);
+        for (std::int32_t column = middle.x - ring; column <= middle.x + ring;
+             column += step) {
+          const Cell cell{column, row};
+          if (column >= low.x && column <= high.x &&
+              (slot_kinds_.at(slot_of(cell)) & kinds) != 0) {
+            visit_cell(cell, offer);
           }
         }
       }
@@ -110,14 +112,15 @@ class SpatialHash {
  private:
   [[nodiscard]] std::size_t slot_of(Cell cell) const;
 
-  // Whether any block of cells overlapping the cells from `low` to `high`,
+  // Whether any block of cells overlapping `span`, its first and last cell
   // corner to corner, may hold a position of any of `kinds`.
-  [[nodiscard]] bool holds(Cell low, Cell high, std::uint64_t kinds) const;
+  [[nodiscard]] bool holds(std::pair<Cell, Cell> span,
+                           std::uint64_t kinds) const;
 
-  [[nodiscard]] static std::int64_t distance_squared(Position from,
-                                                     Position to) {
-    const std::int64_t offset_x = std::int64_t{to.x} - from.x;
-    const std::int64_t offset_y = std::int64_t{to.y} - from.y;
+  [[nodiscard]] static std::int64_t distance_squared(Position origin,
+                                                     Position point) {
+    const std::int64_t offset_x = std::int64_t{point.x} - origin.x;
+    const std::int64_t offset_y = std::int64_t{point.y} - origin.y;
     return (offset_x * offset_x) + (offset_y * offset_y);
   }
 
