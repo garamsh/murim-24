@@ -58,7 +58,7 @@ Options weighed:
 
   A year is 4 seasons of 30 days, 120 days (ADR 0019). Rocks lie on hills only. The map's mountains are blocked footing (ADR 0047), so no slot lies on them.
 
-  Fruit and berries are food, measures of it, sold to the granary. Herbs go to the apothecary as its material.
+  Fruit and berries are food, measures of it, sold to the granary. Herbs go to the apothecary as its material. Herbs were "later" in the issue. They are kept because a herb patch is one more row of kind data under the same rules, and ADR 0040's herb is already a ware.
 - **Growth and spread.** Once a day, by ADR 0048's spread, each area's slots advance:
   - a sapling or growing slot moves a stage on its days
   - a stump returns to sapling on its days
