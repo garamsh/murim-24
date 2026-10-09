@@ -150,7 +150,7 @@ The implementation, in order, each a pull request with its acceptance:
 
 Natural objects are slots the map's build tool places, up to 64 an area, each a cell and a kind from the area's biomes. At run time each holds 2 bytes: a stage, empty, sapling, growing, grown, stump or harvested, and a timer of days in it. Kinds are pack data with biomes, growth, spread, regrowth and yields. Slots advance by 8 days at once, an area on each tick of an 8-day cycle, and refill from grown neighbours of their kind by draws from a counter-based stream of their own. Objects block nothing.
 
-`gather` is an order for anyone within a cell of a grown slot, taking 15 seconds and yielding stacks to the inventory. Villages keep a materials account at their storehouse with targets from their next plan. Earners with no other work are assigned to gather what is short, and are paid with builders from the owning faction's treasury. Surplus is sold.
+`gather` is an order for anyone within a cell of a grown slot, taking 15 seconds and yielding stacks to the inventory. Villages keep a materials account at their store, or at their hall's yard until one stands, with targets from their next plan, owned by the village and charged no fee. Earners with no other work are assigned to gather what is short, and are paid with builders from the owning faction's treasury. Surplus is sold.
 
 Structures cost materials as pack data, carried to the site, and the repair rule raises a structure only as far as its materials are delivered. Founding carries a first house's cost. Far villages gather and build in aggregate by the same accounts. Hunting waits for #171, and layouts for #169.
 
