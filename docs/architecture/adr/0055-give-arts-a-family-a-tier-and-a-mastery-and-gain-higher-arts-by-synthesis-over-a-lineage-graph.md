@@ -82,6 +82,7 @@ Options weighed:
 - **The synthesis rule.**
   - Once a day, with the other daily rules spread over the day (ADR 0048), a person who meets an edge's every condition and lacks its higher art rolls the edge's chance for a day.
   - The roll is scaled by its talent limit in the higher art's discipline over that discipline's mean limit, as ADR 0035 scaled comprehension, and by the nature's ease (ADR 0035).
+  - **The integer roll.** The day's chance is the edge's per mille a year, times the talent scale per mille, times the ease per mille, multiplied first and divided last, rounded down. It succeeds when a draw from the world's one seeded generator, in [0, 1,000 × 120 × 1,000 × 1,000), falls below it. People are taken in index order, and each person's edges in the order of the arts it knows, then by edge index, so the draws come in one order on every host.
   - On success it learns the higher art's forms of stage 0, and the progress store notes it, with how: by synthesis.
   - It is one rule for every person, steered or not. A person meets few edges, so the daily check reads at most the edges whose first art it knows.
   - Rejected: synthesis by a quest or an order. The owner made it a chance, the same for NPCs.
