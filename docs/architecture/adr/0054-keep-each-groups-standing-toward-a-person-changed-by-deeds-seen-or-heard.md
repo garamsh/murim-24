@@ -98,7 +98,7 @@ Options weighed:
   - Rejected: spreading only by people talking (ADR 0039). Rumours are derived, not carried, today. Carrying them would track who heard what for every person.
   - Rejected: deeds in ADR 0032's ring. A battle's kills alone would flood its 64.
 - **Decay and repair.**
-  - Standing moves toward zero by 2 a day, in the base pack, applied when an entry is read or changed, from the day it was last changed. So −600 heals in 300 days, about two and a half years.
+  - Standing moves toward zero by 2 a day, in the base pack, computed from the day it was last changed whenever it is needed, and never written by a read. So −600 heals in 300 days, about two and a half years.
   - Gifts and blood money raise it at once.
   - A group's standing toward a dead person is dropped, since it decides nothing. A soul's next body starts at zero with every group, as rebirth starts a new life.
 - **Thresholds and what each changes.** The thresholds are pack data:
