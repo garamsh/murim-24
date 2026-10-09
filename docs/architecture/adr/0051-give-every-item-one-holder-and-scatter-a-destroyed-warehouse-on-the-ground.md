@@ -77,6 +77,8 @@ Options weighed:
   - Nothing marks anyone a thief for picking up from a warehouse they helped destroy, as the owner decided. Once #175's reputation lands, witnesses within sight of such a pick-up mark the picker a thief in it.
 - **War taking a village.** When a village's owner changes and its warehouse stands, household and soul accounts stay. The old faction's and sect's accounts there pass to the new owner, as spoils. A raid that destroys the warehouse scatters it instead.
 - **Caves.** A cave is a named place in the map's data, an entrance cell with a cache of 32 lots and 1 account, its soul's.
+  - **Finding one.** A cave is hidden: the view draws its entrance, on the ground, the minimap and the map window, only once the player's soul has found it. The steered body finds a cave by searching: a search order through the port, standing still for 3 seconds, finds every cave whose entrance lies within 4 cells. A body stepping onto an entrance finds it too. Both values are pack data. The caves a soul has found are kept with the soul, saved and hashed, so a reborn body still knows them. No NPC, rumour or witness takes part, since caves are the player's alone. The pack may hint at a cave in its text, such as a landmark's description, which is content and no rule.
+  - Rejected: finding caves through rumours or witnesses, as the issue offered. Both would have NPCs know of caves, which the owner ruled out.
   - Only a steered body standing at the entrance opens it, through the warehouse window. A cave blocks nothing and draws no one, and no rule for people no driver steers reads caves. That is the owner's decision. It is the one rule that tells the player from an NPC, an exception to the concept's principle that the same rules apply to both, recorded in `concept.md`.
   - A cache cannot be destroyed, and only its soul's bodies withdraw from it.
   - The map places treasure in some caves, as the owner decided: a cache's starting lots, owned by no one until the player withdraws them, after which the rest of the cache is the soul's.
@@ -108,7 +110,7 @@ The dead drop everything where they die, and piles expire after 30 days, within 
 
 Warehouses keep lots and balances by account. A keeper's warehouse charges a fee a stack. A sect's vault answers to its master and elders, and a faction's treasury to its leader and to soldiers drawing issue. A destroyed warehouse scatters everything on the ground for whoever picks it up. A village taken with its warehouse standing passes the old owner's accounts to the new. A dead household's account passes to its heirs, or else to the village's faction.
 
-Caves are the player's alone: only a steered body opens a cave's cache, by the owner's decision. The soul owns its accounts and caches, so they outlive every body. Far areas loot in aggregate.
+Caves are the player's alone: only a steered body finds a hidden cave, by searching near it or stepping on it, and opens its cache, by the owner's decision. Some caves hold treasure the map places. The soul owns its accounts and caches, so they outlive every body. Far areas loot in aggregate.
 
 This supersedes ADR 0040's rule that the dead keep their silver.
 

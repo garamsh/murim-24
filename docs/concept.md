@@ -212,7 +212,7 @@ Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 a
 - **Every item has one owner:** a person, a warehouse, a faction or the ground. There are four ways to move one: pick it up, deposit or withdraw it, buy it and sell it.
   - The dead drop what they carried, for anyone to pick up.
 - **Warehouses.** Villages keep warehouses run by keepers, sects keep vaults, and factions keep treasuries. A destroyed warehouse scatters its contents on the ground, and whoever picks an item up owns it. A soldier at war picks it up as loot for its faction, which sells it.
-- **Caves are the player's alone.** Only the player enters a cave, and its hidden cache is the player's. The player's soul keeps its warehouses and caches through rebirth.
+- **Caves are the player's alone.** Only the player finds and enters caves. A cave is hidden until the player searches near it or steps on it, and its cache is the player's. Some caves hold treasure. The player's soul keeps its warehouses and caches through rebirth.
 - **People earn to eat and to keep their families.** The household is the unit, with a purse. Earners feed dependants, buy their rations, keep their house and their tools, and buy gear as their roles need.
   - Failing to earn brings hunger, a debt to kin, selling one's gear, then leaving for a richer town.
 - **Markets from needs.** Each town has a market whose prices move with stock against demand. Merchant houses send caravans to buy where it is cheap and sell where it is dear.
