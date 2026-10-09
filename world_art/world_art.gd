@@ -2,10 +2,9 @@
 ## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
 ## buildings by stage, bodies by faction, the steered person's markers and a crimson ring round each
 ## body hostile to the person names are read around, as WorldAdapter.relation says. Bodies are drawn
-## between
-## the positions of the last two ticks, as far between as the caller says the frame is, so they
-## move on every frame; the core's positions stay the only truth. Each refresh also lists the people
-## within NAME_REACH of that person, for their names to be drawn over them. Bodies are batched:
+## between the positions of the last two ticks, as far between as the caller says the frame is, so
+## they move on every frame; the core's positions stay the only truth. Each refresh also lists the
+## people within NAME_REACH of that person, for their names to be drawn over them. Bodies are batched:
 ## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
 ## edge of what they stand on. It reads the world and holds no game rule.
 extends Node2D
