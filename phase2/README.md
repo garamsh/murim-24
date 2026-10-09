@@ -1,6 +1,6 @@
 # Evidence for trade in the real game
 
-Phase 2 of PR #181: the real `play.tscn` at fffcfcb, the head of `feat/merchants`. This branch is never merged.
+Phase 2 of PR #181: the real `play.tscn` at e20120d, the head of `feat/merchants`. This branch is never merged.
 
 `trade_capture.gd` made the images. I ran it with Godot 4.7.2 on macOS arm64 after `make build`: copied to the project root, then `godot --path . --script res://trade_capture.gd -- <dir>`.
 
@@ -20,7 +20,7 @@ The views:
 - `pill` (PC): down and Enter on the pill. The player has 1,237 silver, holds 1 and 1, and the line reads "Bought · Lesser Return Pill".
 - `full` (PC): the window closed, Z at full health. The notice reads "체력이 이미 가득하다 / Health is already full", and nothing is consumed.
 - `hud` (PC): the player walked into hostile person 8 until wounded, at 88 of 120 health, holding a herb and a pill.
-- `used` (PC): Z. Health goes to 118, the herb is consumed, and the notice reads "약초 · 체력 +30 / Healing herb · Health +30".
+- `used` (PC): Z. Health goes to 118, the herb is consumed, and the notice reads "약초 · 체력 +30 / Healing herb · Health +30". The notice stands on its own slip, clear of the crimson refusal over the hostile person nearby.
 - `touch` (touch): the touch HUD with the silver strip under its square buttons and no belt (touch deferred).
 
 Not shown in the real game: a purchase refused for too little silver. The player holds over 1,200 silver at year 10, so it never arises here. `hud/dialogue_test.gd` and `play/play_test.gd` show that refusal at the player's starting 30 silver, and the mockup's `short` view shows how it looks.
