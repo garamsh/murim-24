@@ -29,6 +29,13 @@ Facts from `main` at `aff1434`, and from the open PR #215, on which this branch 
   - Earners earn by wages someone pays.
 - **What is not built.** There are no animals yet (#171), and no trades (#170).
 
+Decided by the PM on PR #220's review, 2026-10-10:
+- **Extending, not superseding.** ADRs 0051 and 0052 are unmerged, and ADR 0052 already defers gathering to #187, so this ADR extends them.
+- **The village's account** is accepted as a new kind of account, extending ADR 0051.
+- **Slot kinds compiled into the map** from the pack's affinities are accepted.
+- **Proposals in pack data**, which the sweep checks: the gatherers' reach of 32 cells, the cap of a third of earners, building before field work, and fruit and berries sold to the granary and herbs to the apothecary.
+- **The player gathers but never builds,** as the issue gives it.
+
 Options weighed:
 
 - **Natural objects as slots.** The map's build tool gives each area up to 64 object slots, as part of the compiled map:
