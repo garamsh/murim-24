@@ -134,7 +134,7 @@ func _mine_pass() -> bool:
 	var now := Time.get_ticks_msec()
 	var bystanders := [world.roster(2)[0], world.roster(3)[0]]
 	var lost := [fight.victim] + bystanders
-	var setup := combat.damage_numbers == "mine" and fight.tick >= 0 and lost.all(func(person: int) -> bool:
+	var setup: bool = combat.damage_numbers == "mine" and fight.tick >= 0 and lost.all(func(person: int) -> bool:
 		return world.person_health(person) == HEALTH - SWEEP.body_damage) and bystanders.all(
 		func(person: int) -> bool: return combat.view.has_point(_drawn_at(fight.art, person)))
 	var numbers := combat.shown_numbers(now)
