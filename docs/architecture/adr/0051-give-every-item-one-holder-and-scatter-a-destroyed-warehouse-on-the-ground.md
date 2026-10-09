@@ -51,7 +51,7 @@ Options weighed:
   - Rejected: picking up only what a person needs. Piles nobody needs would wait out their days, and the scrap of a battle would never reach a market.
 - **Loot.**
   - A soldier at war is a person serving in an army that is not a village's residents and not a caravan, while its faction is hostile to the faction of the person whose drop it is, or of the warehouse's village, as `hostile` reads it (ADR 0038).
-  - What a soldier at war picks up is marked as loot, a flag on the stack. Loot is carried and cannot be worn or sold.
+  - What a soldier at war picks up is marked as loot, a flag on the stack. Loot is carried and cannot be worn or sold. Deposited to its faction's account, it loses the mark, so the faction may issue it to its soldiers or sell it. A soldier wears looted gear only by drawing it as issue.
   - When the soldier's army disbands at home, or the soldier stands within a cell of a warehouse holding its faction's account, the loot is deposited to its faction's account there.
   - A soldier who dies drops its loot as any stack, unmarked, so loot can be lost and taken back.
   - A faction with no warehouse leaves the loot with the soldier, unmarked, when its army disbands.
