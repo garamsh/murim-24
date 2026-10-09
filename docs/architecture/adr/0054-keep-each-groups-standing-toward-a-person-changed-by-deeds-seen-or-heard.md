@@ -121,7 +121,12 @@ Options weighed:
 - **Tiers.** Deeds happen in every tier. In a far area, a fight's kills are witnessed by the two armies' members, read from their rosters, since positions there are coarse (ADR 0042). Rumour and decay are daily rules, untiered.
 - **Cost.**
   - **A deed** reads one spatial query within sight, made only on a kill, an attack or a dialogue action: a few a tick in a battle.
-  - **The hostile bit** keeps the strike and engagement rules at today's cost for the many people no group is hostile to. For those it marks, a strike's foe check reads 3 entries.
+  - **The hostile bit** keeps the strike and engagement rules at today's cost for the many people no group is hostile to. When either of two people is marked, `hostile` reads both directions, each person's three groups toward the other: 6 entries, each a few hash probes.
+  - **A battle's worst case,** at 50,000 people with #216's live tier of 5,000:
+    - Say ten kills a tick. That is five times the peak of the M1 battle's 500 scaled to 5,000, which loses half its people in about 2,700 ticks (ADR 0046).
+    - Each kill queries sight's disc of 6 cells, about 113 cells. At the separation of a cell, that is at most about 113 witnesses, each with 3 groups: 339 group reads a kill.
+    - The distinct groups among them are few, at most about 20, so each kill writes at most about 20 entries, each a hash lookup and a heap update of about 18 steps.
+    - So ten kills are about 3,400 reads and 200 writes a tick, with 4,000 heap steps. That is well under a tenth of a millisecond by this estimate; the implementing pull request measures it.
   - **The daily rumour pass** is at most 12,288 anchor checks.
   - **Memory** is at most 9 MiB for the store, its table and its heap, and 128 KB of pending deeds. Each person adds a feud, a list head and a bit, 650 KB at 50,000.
 - **Saves, the hash and determinism.** Entries, pending deeds, feuds and the hostile bits are saved and hashed. Everything is an integer. Witnesses and anchors are read in index order, and the lower index wins among equals.
