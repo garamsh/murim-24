@@ -38,6 +38,9 @@ const STILLS := {"village": 40, "skirmish": 130}
 # walking; the whole valley pulled back to 2x, the rest at the PC's 3x. VALLEY_PEOPLE walk it in
 # armies of VALLEY_ARMY, or CROWD people with crowd.
 const VALLEY_STILLS := ["village", "town", "terraces", "riverside", "valley"]
+# The regions of #200's screens. A region's stills are the region at 2x and its village or town at
+# the PC's 3x, in Korean.
+const REGIONS := ["central", "sichuan", "west", "jiangnan"]
 const VALLEY_TICKS := 90
 const VALLEY_PEOPLE := 80
 const VALLEY_ARMY := 4
@@ -103,6 +106,7 @@ const MUSTER_TICKS := 6000
 var _dir := ""
 var _mode := ""
 var _flags := PackedStringArray()
+var _region := ""
 var _world: WorldAdapter
 var _view: AngleView
 var _camera: Camera2D
@@ -443,14 +447,16 @@ class AngleView extends Node2D:
 	# The chunk: its ground at level 0 and below in one image, each raised row a strip, shadows
 	# baked into both, then its structures and trees.
 	# The ground shader's kinds and face materials, in the order its cell texture indexes them.
-	const KINDS := ["water", "plain", "hills", "forest", "rock", "lane", "paving", "paddy", "garden", "steps"]
+	const KINDS := ["water", "plain", "hills", "forest", "rock", "lane", "paving", "paddy", "garden", "steps", "earth",
+			"sand", "snow", "wheat"]
 	const FACES := ["rock_face", "bank_face", "stone_face"]
 	# Each kind's ramp as hue in degrees, saturation and lightness, stepped dark to light by
 	# shifting hue toward blue in the dark and toward yellow in the light (#212's ramp theory);
 	# a kind given four colours instead is drawn with them as they are.
 	const RAMPS := [[205, 0.45, 0.42], [100, 0.42, 0.42], [80, 0.36, 0.5], [130, 0.38, 0.27], [220, 0.12, 0.46],
 			[33, 0.32, 0.5], [215, 0.06, 0.6], ["2b5770", "3d7a8f", "5fa3a8", "8fae5a"],
-			["3a2c24", "6b523a", "4f7a3f", "8fae5a"], [215, 0.06, 0.6], [28, 0.35, 0.36]]
+			["3a2c24", "6b523a", "4f7a3f", "8fae5a"], [215, 0.06, 0.6], [28, 0.35, 0.36], [40, 0.45, 0.64],
+			[210, 0.16, 0.86], [44, 0.6, 0.55]]
 	const SHADE_COLOUR := Color(0.078, 0.094, 0.157)
 	# Rows above a chunk's own for the ground its raised rows lift, and below for water and faces.
 	const TOP_PAD := 88
@@ -490,7 +496,17 @@ class AngleView extends Node2D:
 		_bake_material.set_shader_parameter("map_size", Vector2i(cells.get_width(), cells.get_height()))
 		_bake_material.set_shader_parameter("image_size", Vector2(_baker.size))
 		var ramps := PackedVector3Array()
-		for spec: Array in RAMPS:
+		# A region's look may recolour kinds, and set its air.
+		var specs := RAMPS.duplicate()
+		if look.has_method("ramps"):
+			var changed: Dictionary = look.ramps()
+			for kind: String in changed:
+				specs[KINDS.find(kind)] = changed[kind]
+		if look.has_method("air"):
+			var air: Dictionary = look.air()
+			for name: String in air:
+				_bake_material.set_shader_parameter(name, air[name])
+		for spec: Array in specs:
 			for step in 4:
 				var colour := Color(spec[step]) if spec[0] is String else _ramp_step(spec, step)
 				_ramp_colours.append(colour)
@@ -629,6 +645,16 @@ class AngleView extends Node2D:
 					if edge:
 						for t in 4:
 							marks.append([Vector2i(0, -t), _ramp_colour(3, 3 if t == 3 else 1)])
+				11:
+					# Dry scrub and pebbles, sparse.
+					if pick < 0.25:
+						marks = [[Vector2i.ZERO, _ramp_colour(4, 0)], [Vector2i(-1, -1), _ramp_colour(4, 1)],
+								[Vector2i(1, -1), _ramp_colour(4, 1)]]
+					elif pick < 0.4:
+						marks = [[Vector2i.ZERO, _ramp_colour(4, 1)], [Vector2i(1, 0), _ramp_colour(4, 3)]]
+				13:
+					# Ears standing above the rows.
+					marks = [[Vector2i.ZERO, _ramp_colour(13, 3)], [Vector2i(0, 1), _ramp_colour(13, 1)]]
 			for mark: Array in marks:
 				var p: Vector2i = at + mark[0]
 				var there := _what(what, width, p)
@@ -652,6 +678,12 @@ class AngleView extends Node2D:
 			var density := _value_noise(foot / 30.0)
 			var keep := (here.z == 3 and point.z < 0.55 + density * 0.6) or (here.z in [1, 2] and point.z < 0.02)
 			if not keep:
+				continue
+			# A region names its own trees; the valley's are pines up high and broadleaf below.
+			var pick: Array = look.tree_kind(here.y, rng) if look.has_method("tree_kind") else []
+			if not pick.is_empty():
+				trees.append({"foot": foot, "kind": pick[0], "variant": rng.randi_range(0, pick[1] - 1), "cell": cell,
+						"level": here.y})
 				continue
 			var pine := here.y >= 2 or rng.randf() < 0.35
 			trees.append({"foot": foot, "kind": "pine" if pine else "tree", "variant": rng.randi_range(0, 1 if pine else 2),
@@ -1623,12 +1655,18 @@ class Valley extends RefCounted:
 	var _region := PackedInt32Array()
 	var _built := PackedByteArray()
 	var _slope := PackedByteArray()
+	# Cells a bridge or pier carries people over, open though they lie on a cliff's edge.
+	var _crossings := {}
 	var _structures: Array[Dictionary] = []
 	var _trees := {}
 	var _lanes := {"village": [], "town": [], "terraces": [], "riverside": []}
 	var _rng := RandomNumberGenerator.new()
+	## The region laid out in place of the valley (#200's region screens), or "" for the valley.
+	var region := ""
+	var _places: Dictionary = PLACES
 
-	func _init() -> void:
+	func _init(name := "") -> void:
+		region = name
 		_rng.seed = 2026
 		var cells := WIDTH * HEIGHT
 		_level.resize(cells)
@@ -1639,15 +1677,71 @@ class Valley extends RefCounted:
 		_blocked.resize(cells)
 		_built.resize(cells)
 		_slope.resize(cells)
-		_lay_ground()
-		_lay_range()
-		_lay_river()
-		_lay_terraces()
-		_lay_town()
-		_lay_village()
-		_lay_riverside()
-		_lay_woods()
+		match region:
+			"central":
+				_lay_central()
+			"sichuan":
+				_lay_sichuan()
+			"west":
+				_lay_west()
+			"jiangnan":
+				_lay_jiangnan()
+			_:
+				_lay_ground()
+				_lay_range()
+				_lay_river()
+				_lay_terraces()
+				_lay_town()
+				_lay_village()
+				_lay_riverside()
+				_lay_woods()
 		_block_cliffs()
+
+	## The cells each still centres on.
+	func places() -> Dictionary:
+		return _places
+
+	## The places the people are spread over, by their lanes, one army after another.
+	func people_places() -> Array:
+		return {"central": ["village", "village", "fields", "shaolin"], "sichuan": ["clan", "clan", "village", "terraces"],
+				"west": ["village", "village", "pass", "fortress"], "jiangnan": ["town", "town", "town", "fields"]}.get(
+				region, ["village", "village", "town", "terraces", "riverside"])
+
+	## Kinds of ground the region recolours, as the view's RAMPS gives them.
+	func ramps() -> Dictionary:
+		return {
+			"central": {"water": ["8c6d4a", "9c7048", "b08d60", "d1b787"], "plain": [78, 0.36, 0.44], "hills": [66, 0.38, 0.5]},
+			"sichuan": {"plain": [110, 0.42, 0.4], "hills": [96, 0.38, 0.47], "forest": [140, 0.36, 0.25],
+					"water": [190, 0.35, 0.4], "paddy": ["284536", "3b6138", "4f7a3f", "5fa3a8"]},
+			"west": {"rock": [28, 0.14, 0.46], "earth": [34, 0.3, 0.52], "plain": [85, 0.4, 0.42], "hills": [70, 0.38, 0.5],
+					"lane": [36, 0.32, 0.6], "water": [185, 0.4, 0.42], "forest": [95, 0.35, 0.3], "paving": [20, 0.08, 0.45]},
+			"jiangnan": {"water": [170, 0.32, 0.42], "plain": [105, 0.42, 0.42], "paving": [210, 0.05, 0.62]},
+		}.get(region, {})
+
+	## The region's air, as the ground shader's uniforms: mist, moss on rock, slopes lit.
+	func air() -> Dictionary:
+		return {
+			"central": {"relief": true, "flow": true},
+			"sichuan": {"relief": true, "flow": true, "mist": Color(0.86, 0.89, 0.9, 0.32)},
+			"west": {"relief": true, "moss": false},
+			"jiangnan": {"relief": true, "flow": true},
+		}.get(region, {})
+
+	## The kind of a decorative tree on ground of `level`, and how many variants it has; none for
+	## the valley, whose view picks its own.
+	func tree_kind(level: int, rng: RandomNumberGenerator) -> Array:
+		match region:
+			"central":
+				return ["pine", 2] if level >= 2 or rng.randf() < 0.3 else ["tree", 3]
+			"sichuan":
+				if level <= 1:
+					return ["bamboo", 2] if rng.randf() < 0.6 else ["tree", 3]
+				return ["pine", 2] if rng.randf() < 0.5 else ["tree", 3]
+			"west":
+				return ["snow_pine", 2] if level >= 2 else ["poplar", 2]
+			"jiangnan":
+				return ["willow", 2] if level == 0 and rng.randf() < 0.4 else ["tree", 3]
+		return []
 
 	func size() -> Vector2i:
 		return Vector2i(WIDTH, HEIGHT)
@@ -1736,6 +1830,8 @@ class Valley extends RefCounted:
 			if best < 0 or count[region] > count[best]:
 				best = region
 		var out: Array[Vector2i] = []
+		if best < 0:
+			return out
 		for cell: Vector2i in _lanes[place]:
 			if _region[_i(cell.x, cell.y)] == best and not out.has(cell):
 				out.append(cell)
@@ -2151,7 +2247,7 @@ class Valley extends RefCounted:
 		for y in HEIGHT:
 			for x in WIDTH:
 				var level := level_at(x, y)
-				if stairs_at(x, y):
+				if stairs_at(x, y) or _crossings.has(Vector2i(x, y)):
 					continue
 				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 					var other := Vector2i(x, y) + d
@@ -2172,7 +2268,8 @@ class Valley extends RefCounted:
 				var wobble := Vector2((_noise(at.x, at.y, 3.0, 41) - 0.5) * 1.2, 0)
 				var cell := Vector2i((at + wobble).floor())
 				for c: Vector2i in [cell, cell + Vector2i(1, 0)]:
-					if _inside(c) and level_at(c.x, c.y) >= 0 and not SQUARE.has_point(c) and not stairs_at(c.x, c.y):
+					if _inside(c) and level_at(c.x, c.y) >= 0 and (region != "" or not SQUARE.has_point(c)) \
+							and not stairs_at(c.x, c.y):
 						_lay_tile(c, "lane")
 						_taken[_i(c.x, c.y)] = 1
 				_lanes[place].append(cell)
@@ -2181,6 +2278,8 @@ class Valley extends RefCounted:
 	# over water when `wet`; with `apart`, a cell clear of any other building all round. Returns
 	# whether it was placed.
 	func _place(kind: String, corner: Vector2i, size: Vector2i, wet: bool, apart := false) -> bool:
+		if kind == "arch_bridge":
+			return _bridge(corner, size)
 		var level := level_at(corner.x, corner.y + size.y - 1)
 		if apart:
 			for x in range(corner.x - 1, corner.x + size.x + 1):
@@ -2206,7 +2305,28 @@ class Valley extends RefCounted:
 					_blocked[_i(x, y)] = 1
 				else:
 					_blocked[_i(x, y)] = 0
+		if region != "" and kind == "pier":
+			_crossings[corner] = true
+		# A region's gates are walked through, under their arch.
+		if region != "" and kind == "town_gate":
+			for y in range(corner.y, corner.y + size.y):
+				_blocked[_i(corner.x + 1, y)] = 0
+				_blocked[_i(corner.x + 2, y)] = 0
 		_structures.append({"kind": kind, "corner": corner, "size": size, "id": _structures.size()})
+		return true
+
+	# A bridge spans a canal from bank to bank, so its cells are of two levels; people cross it.
+	func _bridge(corner: Vector2i, size: Vector2i) -> bool:
+		for x in range(corner.x, corner.x + size.x):
+			for y in range(corner.y, corner.y + size.y):
+				if not _inside(Vector2i(x, y)) or _built[_i(x, y)] == 1:
+					return false
+		for x in range(corner.x, corner.x + size.x):
+			for y in range(corner.y, corner.y + size.y):
+				_taken[_i(x, y)] = 1
+				_blocked[_i(x, y)] = 0
+				_crossings[Vector2i(x, y)] = true
+		_structures.append({"kind": "arch_bridge", "corner": corner, "size": size, "id": _structures.size()})
 		return true
 
 	func _add_tree(cell: Vector2i, kind: String, variants: int) -> void:
@@ -2216,6 +2336,566 @@ class Valley extends RefCounted:
 				cell.y * 12 + 3 + int(_hash(cell.x, cell.y, 7) * 7)), "kind": kind,
 				"variant": int(_hash(cell.x, cell.y, 5) * variants) % variants, "cell": cell, "level": level_at(cell.x, cell.y)}
 
+	# -- The regions' screens (#200): each a region of the map plan laid out by hand on the
+	# valley's grid, with the valley's means.
+
+	# Levels from `rise`, a height in steps at each cell, taken through `steps`, then each cell
+	# the level most of its neighbours have, twice over. Raised cells are taken, faced in rock from
+	# the second level up and in earth below, and where the noise passes `slopes` rise as a slope.
+	func _raise(rise: Callable, steps: Array, slopes: float) -> void:
+		var raw := PackedInt32Array()
+		raw.resize(WIDTH * HEIGHT)
+		for y in HEIGHT:
+			for x in WIDTH:
+				raw[_i(x, y)] = steps[clampi(floori(rise.call(x, y)), 0, steps.size() - 1)]
+		for pass_count in 2:
+			var smooth := raw.duplicate()
+			for y in range(1, HEIGHT - 1):
+				for x in range(1, WIDTH - 1):
+					var count := {}
+					for dy in range(-1, 2):
+						for dx in range(-1, 2):
+							var l: int = raw[_i(x + dx, y + dy)]
+							count[l] = count.get(l, 0) + 1
+					var best: int = raw[_i(x, y)]
+					for l: int in count:
+						if count[l] > count.get(best, 0):
+							best = l
+					smooth[_i(x, y)] = best
+			raw = smooth
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level: int = raw[_i(x, y)]
+				if level <= _level[_i(x, y)]:
+					continue
+				var i := _i(x, y)
+				_level[i] = level
+				_face[i] = "rock_face" if level >= 2 else "bank_face"
+				_taken[i] = 1
+				if level < TOP and _noise(x, y, 9.0, 41) > slopes:
+					_slope[i] = 1
+
+	# Ground of one level over `r`, faced in `face`, open to building.
+	func _flat(r: Rect2i, level: int, face: String, tile: String) -> void:
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				var i := _i(x, y)
+				_level[i] = level
+				_face[i] = face
+				_tile[i] = tile
+				_taken[i] = 0
+				_slope[i] = 0
+
+	func _water(x: int, y: int) -> void:
+		if not _inside(Vector2i(x, y)):
+			return
+		var i := _i(x, y)
+		_level[i] = -1
+		_tile[i] = "water"
+		_taken[i] = 1
+		_blocked[i] = 1
+		_slope[i] = 0
+
+	# A stair down from the cell at (x, y) to the one below it.
+	func _stair(x: int, y: int) -> void:
+		_stairs[_i(x, y)] = 1
+		_tile[_i(x, y)] = "steps"
+		_taken[_i(x, y)] = 1
+
+	# Fields between balks, warped so no balk is ruled: each field a crop drawn from `crops`, a
+	# list of [tile, share], on the open level ground of `r`.
+	func _fields(r: Rect2i, crops: Array, salt: int) -> void:
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				var i := _i(x, y)
+				if _taken[i] == 1 or _level[i] != 0:
+					continue
+				var fx := x + (_noise(x, y, 10.0, salt) - 0.5) * 4.0
+				var fy := y + (_noise(x, y, 10.0, salt + 1) - 0.5) * 3.0
+				if fposmod(fx, 7.0) < 0.9 or fposmod(fy, 5.0) < 0.8:
+					_tile[i] = "plain"
+					continue
+				var roll := _hash(floori(fx / 7.0), floori(fy / 5.0), salt + 2)
+				for crop: Array in crops:
+					roll -= crop[1]
+					if roll < 0.0:
+						_tile[i] = crop[0]
+						break
+
+	# Peaks of the sheet's `tag` on the front of the top tier, and trees of `kind` round each foot.
+	func _crown(tag: String, kind: String, x_from: int, x_to: int) -> void:
+		var peaks := 0
+		for x in range(x_from, x_to - 7, 11):
+			for y in range(HEIGHT / 2, -1, -1):
+				if level_at(x, y) == TOP and level_at(x + 6, y) == TOP:
+					_structures.append({"kind": "mountains", "tag": tag, "variant": peaks % 3,
+							"corner": Vector2i(x, y - 2), "size": Vector2i(7, 1), "id": -1})
+					peaks += 1
+					for fx in range(x - 2, x + 9):
+						for fy in range(y - 1, y + 2):
+							if _inside(Vector2i(fx, fy)) and level_at(fx, fy) == TOP and _hash(fx, fy, 17) > 0.35:
+								_taken[_i(fx, fy)] = 0
+								_add_tree(Vector2i(fx, fy), kind, 2)
+								_taken[_i(fx, fy)] = 1
+					break
+
+	# Houses along `lane`'s points on both sides, by `kinds`, dressed as the valley's are.
+	func _line_houses(lane: Array, kinds: Array, gap: float, dress: bool) -> void:
+		for n in lane.size() - 1:
+			var a: Vector2 = lane[n]
+			var b: Vector2 = lane[n + 1]
+			var steps := int(a.distance_to(b) / gap) + 1
+			for t in steps:
+				var at := a.lerp(b, float(t) / steps)
+				var across := (b - a).normalized().orthogonal()
+				for sign: int in [-1, 1]:
+					var spot: Vector2 = at + across * sign * _rng.randf_range(2.5, 3.5)
+					var kind: String = kinds[_rng.randi_range(0, kinds.size() - 1)]
+					var size: Vector2i = {"tiled_house_big": Vector2i(4, 3), "water_house_big": Vector2i(4, 3),
+							"thatched_small": Vector2i(2, 2), "adobe_small": Vector2i(2, 2)}.get(kind, Vector2i(3, 2))
+					var corner := Vector2i(int(spot.x) - size.x / 2, int(spot.y) - size.y / 2)
+					if _place(kind, corner, size, false, true) and dress:
+						_dress(corner, size, 1.0)
+
+	# A walled compound over `r`: walls round it, a gate of `gate`'s width in the south wall at
+	# `gate_x`, a tower in each front corner.
+	func _walls(r: Rect2i, gate_x: int) -> void:
+		for x in range(r.position.x, r.end.x):
+			_place("wall_h", Vector2i(x, r.position.y), Vector2i.ONE, false)
+			if x < gate_x or x > gate_x + 3:
+				_place("wall_h", Vector2i(x, r.end.y - 1), Vector2i.ONE, false)
+		for y in range(r.position.y + 1, r.end.y - 1):
+			_place("wall_v", Vector2i(r.position.x, y), Vector2i.ONE, false)
+			_place("wall_v", Vector2i(r.end.x - 1, y), Vector2i.ONE, false)
+		_place("town_gate", Vector2i(gate_x, r.end.y - 2), Vector2i(4, 2), false)
+		_place("watchtower", Vector2i(r.position.x + 1, r.end.y - 4), Vector2i(2, 2), false)
+		_place("watchtower", Vector2i(r.end.x - 3, r.end.y - 4), Vector2i(2, 2), false)
+
+	func _lane_cells(cells: Array, place: String) -> void:
+		for cell: Vector2i in cells:
+			if _inside(cell) and _blocked[_i(cell.x, cell.y)] == 0:
+				_lanes[place].append(cell)
+
+	# 중원, the Central Plains: wheat to the horizon between balks, the Yellow River across the
+	# north with silt beaches and willows, Luoyang's south wall and gate with its streets behind,
+	# a farming hamlet on the road east, and Song Shan standing alone with Shaolin's terrace,
+	# halls and pagodas on its south face, and a forest of pagodas at its foot.
+	func _lay_central() -> void:
+		_lanes = {"village": [], "fields": [], "shaolin": []}
+		_places = {"central": Vector2(58, 39), "central_village": Vector2(44, 52), "village": Vector2(44, 52)}
+		for y in HEIGHT:
+			for x in WIDTH:
+				_tile[_i(x, y)] = "plain"
+				_face[_i(x, y)] = "bank_face"
+		var shan := Vector2(80, 27)
+		var rise := func(x: int, y: int) -> float:
+			var d := (Vector2(x, y) - shan) / Vector2(16.0, 11.0)
+			return (1.25 - d.length()) * 6.0 + (_noise(x, y, 8.0, 54) - 0.5) * 2.5
+		_raise(rise, [0, 0, 2, 2, 4, 5], 0.62)
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level := level_at(x, y)
+				if level > 0:
+					var patch := _noise(x, y, 7.0, 4)
+					_tile[_i(x, y)] = "rock" if level >= 4 and patch > 0.3 else ("forest" if patch > 0.38 else "hills")
+		_crown("peak", "pine", 66, 96)
+		_fields(Rect2i(0, 0, WIDTH, HEIGHT), [["wheat", 0.62], ["hills", 0.18], ["garden", 0.2]], 51)
+		# Shaolin's terrace, two levels up the mountain's face, its stair down the middle.
+		_flat(Rect2i(70, 37, 16, 7), 2, "stone_face", "paving")
+		_flat(Rect2i(64, 44, 26, 4), 0, "bank_face", "plain")
+		_stair(77, 43)
+		_stair(78, 43)
+		_place("ancestral_hall", Vector2i(75, 37), Vector2i(5, 3), false)
+		_place("pagoda", Vector2i(71, 38), Vector2i(2, 2), false)
+		_place("pagoda", Vector2i(83, 38), Vector2i(2, 2), false)
+		_place("shrine", Vector2i(72, 41), Vector2i(2, 2), false)
+		_place("pavilion", Vector2i(82, 41), Vector2i(2, 2), false)
+		_place("lantern", Vector2i(75, 41), Vector2i.ONE, false)
+		_place("lantern", Vector2i(80, 41), Vector2i.ONE, false)
+		for x in range(70, 86):
+			if x < 76 or x > 79:
+				_place("stone_wall", Vector2i(x, 43), Vector2i.ONE, false)
+		_place("village_gate", Vector2i(76, 46), Vector2i(3, 1), false)
+		_place("guardian", Vector2i(75, 46), Vector2i.ONE, false)
+		_place("guardian", Vector2i(79, 46), Vector2i.ONE, false)
+		# The forest of pagodas, the monks' graves, at the foot.
+		for spot: Vector2i in [Vector2i(66, 45), Vector2i(69, 46), Vector2i(85, 45)]:
+			_place("pagoda", spot, Vector2i(2, 2), false)
+		var shaolin := []
+		for y in range(40, 50):
+			shaolin.append(Vector2i(77, y))
+			shaolin.append(Vector2i(78, y))
+		for x in range(72, 84):
+			shaolin.append(Vector2i(x, 40))
+		_lane_cells(shaolin, "shaolin")
+		# The Yellow River, bending north under the mountain, silt beaches on its south bank.
+		for x in WIDTH:
+			var centre := 25.0 + sin(x / 16.0) * 2.5 + (_noise(x, 0, 20.0, 56) - 0.5) * 3.0 - maxf(0.0, x - 56.0) * 0.4
+			for y in range(int(centre) - 3, int(centre) + 4):
+				_water(x, y)
+			for y in range(int(centre) + 4, int(centre) + 6):
+				if _inside(Vector2i(x, y)) and level_at(x, y) == 0 and _noise(x, y, 4.0, 57) > 0.4:
+					_tile[_i(x, y)] = "sand"
+			if _hash(x, 0, 58) > 0.72:
+				_add_tree(Vector2i(x, int(centre) + 6), "willow", 2)
+		# Luoyang: the south wall and its gate, the main street up from it, a cross street, and
+		# the city's houses, its yamen, an inn and stalls.
+		var city := Rect2i(24, 44, 36, 15)
+		for y in range(city.position.y, city.end.y):
+			for x in range(city.position.x, city.end.x):
+				_tile[_i(x, y)] = "paving" if x == 41 or x == 42 or y == 50 or y == 51 else "lane"
+		_walls(city, 40)
+		_place("ancestral_hall", Vector2i(44, 45), Vector2i(5, 3), false)
+		_place("inn", Vector2i(44, 52), Vector2i(4, 3), false)
+		for k in 3:
+			_place(["stall_red", "stall_blue", "stall_amber"][k], Vector2i(35 + k * 2, 52), Vector2i(2, 1), false)
+		for y in range(46, 58, 4):
+			_place("lantern", Vector2i(40, y), Vector2i.ONE, false)
+			_place("lantern", Vector2i(43, y), Vector2i.ONE, false)
+		for by in [46, 53]:
+			for bx in range(26, 58, 4):
+				var kind: String = "tiled_house_big" if _hash(bx, by, 59) > 0.6 else "tiled_house"
+				var size := Vector2i(4, 3) if kind == "tiled_house_big" else Vector2i(3, 2)
+				_place(kind, Vector2i(bx, by), size, false, true)
+		var street := []
+		for y in range(45, 66):
+			street.append(Vector2i(41, y))
+			street.append(Vector2i(42, y))
+		for x in range(26, 58):
+			street.append(Vector2i(x, 50))
+		_lane_cells(street, "village")
+		_lay_lane([Vector2(41, 58), Vector2(41, 70), Vector2(39, 95)], "village")
+		_lay_lane([Vector2(43, 60), Vector2(58, 61), Vector2(66, 55), Vector2(72, 50), Vector2(77, 47)], "fields")
+		# The hamlet on the road east: farmhouses with their gardens, a threshing floor, stacks.
+		_flat(Rect2i(66, 61, 4, 3), 0, "bank_face", "paving")
+		_line_houses([Vector2(58, 63), Vector2(66, 57), Vector2(76, 56), Vector2(86, 52)], ["thatched_house", "thatched_house",
+				"thatched_small", "tiled_house"], 4.0, true)
+		for spot: Vector2i in [Vector2i(66, 60), Vector2i(70, 64), Vector2i(64, 64)]:
+			_place("haystack", spot, Vector2i.ONE, false)
+		_place("cart", Vector2i(70, 61), Vector2i(2, 1), false)
+		for y in HEIGHT:
+			for x in WIDTH:
+				if _taken[_i(x, y)] == 0 and level_at(x, y) == 0 and not city.grow(2).has_point(Vector2i(x, y)) \
+						and _noise(x, y, 9.0, 55) > 0.74:
+					_tile[_i(x, y)] = "forest"
+
+	# 사천, Sichuan: a misty basin ringed by peaks, terraced paddies climbing its north side, a
+	# gorge cut through the eastern range with its river running out across the basin, bamboo
+	# everywhere, the Tang clan's walled compound on the floor, and a village by the river.
+	func _lay_sichuan() -> void:
+		_lanes = {"village": [], "clan": [], "terraces": []}
+		_places = {"sichuan": Vector2(56, 37), "sichuan_village": Vector2(53, 55), "village": Vector2(53, 55)}
+		for y in HEIGHT:
+			for x in WIDTH:
+				_tile[_i(x, y)] = "hills" if _noise(x, y, 9.0, 1) > 0.6 else "plain"
+				_face[_i(x, y)] = "bank_face"
+		var rise := func(x: int, y: int) -> float:
+			var height := (26.0 - y) / 3.0 + (_noise(x, y, 12.0, 2) - 0.5) * 2.0 + (_noise(x, y, 30.0, 3) - 0.5) * 3.0
+			height += maxf(0.0, x - 92.0) / 4.0
+			# A ridge south of the gorge, so the river runs between two walls.
+			if x > 72.0 + _noise(0, y, 4.0, 79) * 6.0 and y >= 35 and y <= 44:
+				height = maxf(height, 4.2 + _noise(x, y, 6.0, 60))
+			return height
+		_raise(rise, [0, 0, 2, 2, 4, 5], 0.64)
+		# The ridge falls to the basin by cliffs, too tall to rise as a slope.
+		for y in range(33, 47):
+			for x in range(72, WIDTH):
+				_slope[_i(x, y)] = 0
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level := level_at(x, y)
+				if level > 0:
+					var patch := _noise(x, y, 7.0, 4)
+					_tile[_i(x, y)] = "rock" if level >= 4 and patch > 0.45 else ("forest" if patch > 0.35 else "hills")
+		_crown("peak", "pine", 4, 124)
+		# The terraces: a level each five rows up the north hillside, earth-banked paddies.
+		var terraces := Rect2i(14, 22, 40, 22)
+		for y in range(terraces.position.y, terraces.end.y):
+			for x in range(terraces.position.x, terraces.end.x):
+				if x < terraces.position.x + _noise(0, y, 6.0, 14) * 5.0 or x >= terraces.end.x - _noise(1, y, 6.0, 15) * 5.0:
+					continue
+				var wobble := (_noise(x, 0, 11.0, 8) - 0.5) * 7.0
+				var level := clampi(1 + floori((terraces.end.y - y + wobble) / 5.0), 1, 4)
+				var i := _i(x, y)
+				if _level[i] > level:
+					continue
+				_level[i] = level
+				_face[i] = "bank_face"
+				_tile[i] = "paddy" if _noise(x, y, 5.0, 10) > 0.3 else "garden"
+				_taken[i] = 0
+				_slope[i] = 0
+		var climb := []
+		var sx := 33
+		for y in range(terraces.end.y + 1, terraces.position.y, -1):
+			if level_at(sx, y) > level_at(sx, y + 1):
+				_stair(sx, y)
+			else:
+				_lay_tile(Vector2i(sx, y), "lane")
+				_taken[_i(sx, y)] = 1
+			climb.append(Vector2i(sx, y))
+		_lane_cells(climb, "terraces")
+		var k := 0
+		for hx in range(terraces.position.x + 2, terraces.end.x - 3, 6):
+			for y in range(terraces.position.y + 1, terraces.end.y - 2):
+				var kind: String = ["thatched_house", "thatched_small", "tiled_house"][k % 3]
+				var size := Vector2i(2, 2) if kind == "thatched_small" else Vector2i(3, 2)
+				if level_at(hx, y - 1) > level_at(hx, y) and _place(kind, Vector2i(hx, y), size, false, true):
+					k += 1
+		# The gorge's river, out of the east between its walls and south across the basin.
+		for x in range(64, WIDTH):
+			var centre := 39.0 + sin(x / 9.0) * 1.2
+			for y in range(int(centre) - 1, int(centre) + 2):
+				_water(x, y)
+		for y in range(38, HEIGHT):
+			var centre := 66.0 + sin(y / 8.0) * 2.5
+			for x in range(int(centre) - 1, int(centre) + 2):
+				_water(x, y)
+		_fields(Rect2i(0, 46, WIDTH, HEIGHT - 46), [["paddy", 0.6], ["hills", 0.15], ["garden", 0.25]], 61)
+		# The Tang clan: a walled compound of halls on the basin floor, crocks of its poisons
+		# standing about, bamboo crowding its walls.
+		var clan := Rect2i(42, 48, 22, 15)
+		_flat(clan, 0, "bank_face", "lane")
+		_flat(Rect2i(42, 63, 22, 3), 0, "bank_face", "plain")
+		_walls(clan, 51)
+		_place("ancestral_hall", Vector2i(50, 50), Vector2i(5, 3), false)
+		_place("tiled_house_big", Vector2i(44, 51), Vector2i(4, 3), false)
+		_place("tiled_house_big", Vector2i(57, 51), Vector2i(4, 3), false)
+		for x in [44, 48, 56, 60]:
+			_place("tiled_house", Vector2i(x, 56), Vector2i(3, 2), false)
+		for spot: Vector2i in [Vector2i(49, 59), Vector2i(55, 59), Vector2i(48, 54), Vector2i(56, 54)]:
+			_place("crocks", spot, Vector2i.ONE, false)
+		_place("lantern", Vector2i(51, 54), Vector2i.ONE, false)
+		_place("lantern", Vector2i(54, 54), Vector2i.ONE, false)
+		for y in range(53, 61):
+			_lay_tile(Vector2i(52, y), "paving")
+			_lay_tile(Vector2i(53, y), "paving")
+		var court := []
+		for y in range(54, 66):
+			court.append(Vector2i(52, y))
+			court.append(Vector2i(53, y))
+		for x in range(44, 62):
+			court.append(Vector2i(x, 55))
+		_lane_cells(court, "clan")
+		# The village by the river: houses along a lane between paddies.
+		var lane := [Vector2(70, 48), Vector2(73, 55), Vector2(79, 59), Vector2(88, 57), Vector2(96, 60)]
+		_lay_lane(lane, "village")
+		_line_houses(lane, ["thatched_house", "thatched_house", "thatched_small", "tiled_house"], 4.0, true)
+		_place("pier", Vector2i(67, 56), Vector2i.ONE, true)
+		_place("boat", Vector2i(65, 60), Vector2i(2, 1), true)
+		for y in HEIGHT:
+			for x in WIDTH:
+				var cell := Vector2i(x, y)
+				if _taken[_i(x, y)] == 1 or level_at(x, y) != 0 or clan.has_point(cell):
+					continue
+				var near_clan := clan.grow(6).has_point(cell) and _noise(x, y, 5.0, 62) > 0.42
+				if near_clan or _noise(x, y, 8.0, 63) > 0.66:
+					_tile[_i(x, y)] = "forest"
+
+	# 서역, the Western Regions: sand and gravel under the Tianshan's snow, the Cult's fortress on a
+	# terrace of the range with its hall, towers and a long stair, the wall of Jiayu Pass across
+	# the corridor with its gate, an oasis of poplars and adobe houses round a pool, and dunes
+	# running away east.
+	func _lay_west() -> void:
+		_lanes = {"village": [], "pass": [], "fortress": []}
+		_places = {"west": Vector2(60, 31), "west_village": Vector2(44, 46), "village": Vector2(44, 46)}
+		for y in HEIGHT:
+			for x in WIDTH:
+				_tile[_i(x, y)] = "earth" if _noise(x, y, 8.0, 64) > 0.66 else "sand"
+				_face[_i(x, y)] = "bank_face"
+		var rise := func(x: int, y: int) -> float:
+			return (30.0 - y) / 3.0 + (_noise(x, y, 12.0, 2) - 0.5) * 2.0 + (_noise(x, y, 30.0, 3) - 0.5) * 3.0
+		_raise(rise, [0, 0, 2, 2, 4, 5], 0.66)
+		for y in HEIGHT:
+			for x in WIDTH:
+				var level := level_at(x, y)
+				if level > 0:
+					var patch := _noise(x, y, 6.0, 65)
+					_tile[_i(x, y)] = "snow" if level >= 4 or patch > 0.62 else ("forest" if level == 2 and patch < 0.25 else "rock")
+		_crown("snow", "snow_pine", 4, 124)
+		# The fortress: a terrace four levels up, a lower landing, and a stair down both.
+		_flat(Rect2i(62, 14, 26, 16), 4, "rock_face", "paving")
+		# The landing: a rounded shelf of rock under the gate, its stair cut down its front.
+		_flat(Rect2i(66, 30, 20, 10), 0, "bank_face", "sand")
+		for y in range(30, 36):
+			for x in range(66, 86):
+				var d := ((Vector2(x, y) - Vector2(75.5, 30.5)) / Vector2(9.0, 5.5)).length() + (_noise(x, y, 4.0, 78) - 0.5) * 0.35
+				if d < 1.0 or (x >= 74 and x <= 77):
+					_level[_i(x, y)] = 2
+					_face[_i(x, y)] = "rock_face"
+					_tile[_i(x, y)] = "rock"
+		for y in [29, 35]:
+			_stair(75, y)
+			_stair(76, y)
+		for x in range(63, 87):
+			if x < 73 or x > 76:
+				_place("wall_h", Vector2i(x, 28), Vector2i.ONE, false)
+		for y in range(15, 28):
+			_place("wall_v", Vector2i(63, y), Vector2i.ONE, false)
+			_place("wall_v", Vector2i(86, y), Vector2i.ONE, false)
+		_place("town_gate", Vector2i(73, 27), Vector2i(4, 2), false)
+		_place("cult_hall", Vector2i(72, 18), Vector2i(5, 3), false)
+		_place("tiled_house_big", Vector2i(65, 20), Vector2i(4, 3), false)
+		_place("tiled_house_big", Vector2i(81, 20), Vector2i(4, 3), false)
+		_place("watchtower", Vector2i(64, 25), Vector2i(2, 2), false)
+		_place("watchtower", Vector2i(84, 25), Vector2i(2, 2), false)
+		for spot: Vector2i in [Vector2i(71, 22), Vector2i(78, 22), Vector2i(72, 25), Vector2i(78, 25)]:
+			_place("lantern", spot, Vector2i.ONE, false)
+		var fortress := []
+		for y in range(22, 40):
+			fortress.append(Vector2i(75, y))
+			fortress.append(Vector2i(76, y))
+		for x in range(66, 85):
+			fortress.append(Vector2i(x, 24))
+		_lane_cells(fortress, "fortress")
+		# Jiayu Pass: the wall across the corridor, its gate tower and watchtowers.
+		_flat(Rect2i(18, 36, 38, 5), 0, "bank_face", "earth")
+		for x in range(20, 53):
+			if x < 34 or x > 37:
+				_place("wall_h", Vector2i(x, 39), Vector2i.ONE, false)
+		_place("town_gate", Vector2i(34, 38), Vector2i(4, 2), false)
+		_place("watchtower", Vector2i(24, 37), Vector2i(2, 2), false)
+		_place("watchtower", Vector2i(48, 37), Vector2i(2, 2), false)
+		_lay_lane([Vector2(35.5, 31), Vector2(35.5, 43), Vector2(42, 48), Vector2(60, 52), Vector2(96, 56)], "pass")
+		_lay_lane([Vector2(75.5, 39), Vector2(70, 37), Vector2(52, 34), Vector2(36, 33)], "pass")
+		# The oasis: a pool among grass, poplars and willows, adobe houses round it, a caravan.
+		var pool := Vector2(46, 51)
+		for y in range(41, 66):
+			for x in range(30, 68):
+				var d := ((Vector2(x, y) - pool) / Vector2(13.0, 8.0)).length() + (_noise(x, y, 4.0, 66) - 0.5) * 0.3
+				if _taken[_i(x, y)] == 1:
+					continue
+				if d < 0.42:
+					_water(x, y)
+				elif d < 0.75:
+					_tile[_i(x, y)] = "forest" if _noise(x, y, 4.0, 67) > 0.55 else "plain"
+				elif d < 1.0:
+					_tile[_i(x, y)] = "hills" if _noise(x, y, 4.0, 68) > 0.5 else "plain"
+		for x in range(40, 54):
+			if _hash(x, 1, 69) > 0.6:
+				_add_tree(Vector2i(x, 54), "willow", 2)
+		var ring := []
+		for k in 24:
+			var at := pool + Vector2(cos(k * TAU / 24.0) * 10.0, sin(k * TAU / 24.0) * 6.0)
+			ring.append(at)
+		ring.append(ring[0])
+		_lay_lane(ring, "village")
+		_line_houses(ring, ["adobe_house", "adobe_house", "adobe_small"], 5.0, false)
+		_place("cart", Vector2i(36, 46), Vector2i(2, 1), false)
+		_place("cart", Vector2i(38, 45), Vector2i(2, 1), false)
+		for spot: Vector2i in [Vector2i(35, 49), Vector2i(55, 45), Vector2i(58, 52)]:
+			_place("crocks", spot, Vector2i.ONE, false)
+		# Dunes: long ridges of sand rising as slopes, never by a cliff.
+		for y in range(40, HEIGHT):
+			for x in range(60, WIDTH):
+				var i := _i(x, y)
+				if _taken[i] == 1 or level_at(x, y) != 0:
+					continue
+				var ridge := sin((x * 0.45 + y * 0.9) / 3.2 + _noise(x, y, 14.0, 70) * 4.0)
+				var height := (ridge + 0.2) * 1.4 * clampf((x - 60) / 12.0, 0.0, 1.0)
+				var level := clampi(roundi(height), 0, 2)
+				_tile[i] = "sand"
+				if level > 0:
+					_level[i] = level
+					_slope[i] = 1
+					_taken[i] = 1
+
+	# 강남, Jiangnan: a white-walled water town on a grid of canals faced in stone, arched bridges
+	# over them, boats, houses opening on the water; Tai Lake to the west, tea on the low hills,
+	# and rice paddies and a hamlet south of the town.
+	func _lay_jiangnan() -> void:
+		_lanes = {"town": [], "fields": [], "village": []}
+		_places = {"jiangnan": Vector2(60, 46), "jiangnan_village": Vector2(60, 43), "village": Vector2(60, 43)}
+		for y in HEIGHT:
+			for x in WIDTH:
+				_tile[_i(x, y)] = "hills" if _noise(x, y, 9.0, 1) > 0.62 else "plain"
+				_face[_i(x, y)] = "bank_face"
+		# Tea on low hills to the north-east, rising as slopes.
+		for y in HEIGHT:
+			for x in WIDTH:
+				var h := _noise(x, y, 10.0, 71) * 2.6 + (x - 86.0) / 10.0 - (y - 30.0) / 10.0
+				if x > 84 and y < 40 and h > 1.0:
+					var i := _i(x, y)
+					_level[i] = clampi(floori(h), 1, 2)
+					_slope[i] = 1
+					_taken[i] = 1
+					_tile[i] = "garden" if _noise(x, y, 6.0, 72) > 0.35 else "forest"
+		# Tai Lake's shore.
+		for y in HEIGHT:
+			for x in WIDTH:
+				if x < 18 + _noise(0, y, 8.0, 73) * 10.0:
+					_water(x, y)
+		var town := Rect2i(30, 30, 56, 32)
+		_flat(town, 0, "bank_face", "plain")
+		# The canals: one east and west to the lake, two north and south, faced in stone.
+		var canals := []
+		for x in range(10, 90):
+			for y in range(44, 48):
+				canals.append(Vector2i(x, y))
+		for cx in [50, 70]:
+			for y in range(town.position.y, town.end.y + 2):
+				for x in range(cx, cx + 3):
+					canals.append(Vector2i(x, y))
+		for cell: Vector2i in canals:
+			_water(cell.x, cell.y)
+		for cell: Vector2i in canals:
+			for d: Vector2i in [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1)]:
+				var bank := cell + d
+				if _inside(bank) and level_at(bank.x, bank.y) == 0:
+					_face[_i(bank.x, bank.y)] = "stone_face"
+					if town.has_point(bank):
+						_tile[_i(bank.x, bank.y)] = "paving"
+		_place("arch_bridge", Vector2i(49, 38), Vector2i(5, 1), true)
+		_place("arch_bridge", Vector2i(69, 54), Vector2i(5, 1), true)
+		_place("arch_bridge", Vector2i(49, 56), Vector2i(5, 1), true)
+		_place("arch_bridge", Vector2i(69, 36), Vector2i(5, 1), true)
+		for x in [60, 80, 38]:
+			for y in range(44, 48):
+				_place("pier", Vector2i(x, y), Vector2i.ONE, true)
+		# Houses on the water: rows along the canal banks, their fronts on the streets.
+		# Stone streets along the canals and alleys between the rows, grass in the courts.
+		for x in range(town.position.x, town.end.x):
+			for y in [37, 42, 49, 54]:
+				_lay_tile(Vector2i(x, y), "paving")
+		for y in range(town.position.y, town.end.y):
+			for x in [48, 54, 68, 74]:
+				_lay_tile(Vector2i(x, y), "paving")
+		for row: int in [34, 39, 51, 56]:
+			var x := town.position.x + 1 + int(_hash(row, 0, 76) * 2.0)
+			while x < town.end.x - 3:
+				var big := _hash(x, row, 74) > 0.7
+				var size := Vector2i(4, 3) if big else Vector2i(3, 2)
+				var corner := Vector2i(x, row - (1 if big else 0))
+				# Now and then a court is left open, with a tree or a well in it.
+				if _hash(x, row, 77) < 0.16:
+					_add_tree(Vector2i(x + 1, row + 1), "tree", 3)
+					x += 3
+				elif _place("water_house_big" if big else "water_house", corner, size, false, true):
+					x += size.x + 1
+				else:
+					x += 1
+		for spot: Vector2i in [Vector2i(56, 45), Vector2i(76, 46), Vector2i(42, 44), Vector2i(50, 32), Vector2i(71, 58)]:
+			_place("boat", spot, Vector2i(2, 1), true)
+		for k in 3:
+			_place(["stall_red", "stall_blue", "stall_amber"][k], Vector2i(57 + k * 3, 41), Vector2i(2, 1), false)
+		for x in range(33, 86, 6):
+			_place("lantern", Vector2i(x, 42), Vector2i.ONE, false)
+		for x in range(31, 86, 7):
+			_add_tree(Vector2i(x, 49), "willow", 2)
+		var streets := []
+		for x in range(31, 86):
+			streets.append(Vector2i(x, 42))
+			streets.append(Vector2i(x, 49))
+		for y in range(31, 61):
+			streets.append(Vector2i(48, y))
+			streets.append(Vector2i(54, y))
+		_lane_cells(streets, "town")
+		# Paddies and a hamlet south of the town.
+		_fields(Rect2i(18, 63, WIDTH - 18, HEIGHT - 63), [["paddy", 0.7], ["garden", 0.15], ["hills", 0.15]], 75)
+		var lane := [Vector2(40, 72), Vector2(55, 70), Vector2(70, 73), Vector2(88, 70)]
+		_lay_lane(lane, "fields")
+		_line_houses(lane, ["water_house", "thatched_house", "thatched_small"], 5.0, true)
+		_lay_lane([Vector2(60, 61), Vector2(58, 70)], "village")
+		_lane_cells(streets.slice(0, 40), "village")
 
 ## Walks the valley's people: each army goes to a lane cell of its place, and on arriving, to
 ## another, picked by a seeded draw, so a run replays exactly.
@@ -2230,7 +2910,7 @@ class Villagers extends RefCounted:
 	func _init(on: Valley, people: int, per_army: int) -> void:
 		valley = on
 		_rng.seed = 7
-		var places := ["village", "village", "town", "terraces", "riverside"]
+		var places := valley.people_places()
 		var armies: Array[Dictionary] = []
 		var room := {}
 		for place: String in places:
@@ -2271,12 +2951,17 @@ class Villagers extends RefCounted:
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() < 2 or not args[1] in ["frames", "stills", "bench", "level"]:
-		printerr("angle: usage: -- <dir> frames|stills|level|bench [valley] [crowd] [m1|level] [pan] [flat] [solid]")
+		printerr("angle: usage: -- <dir> frames|stills|level|bench [valley|central|sichuan|west|jiangnan] [crowd] [m1|level] [pan] [flat] [solid]")
 		quit(2)
 		return
 	_dir = args[0]
 	_mode = args[1]
 	_flags = args.slice(2)
+	for flag: String in _flags:
+		if flag in REGIONS:
+			_region = flag
+	if _region != "" and not "valley" in _flags:
+		_flags.append("valley")
 	create_timer(DEADLINES[_mode]).timeout.connect(func() -> void:
 		printerr("angle: %s ran past its %.0f s deadline; quitting" % [args[1], DEADLINES[args[1]]])
 		quit(3))
@@ -2285,11 +2970,14 @@ func _initialize() -> void:
 		DisplayServer.window_set_size(Vector2i(640, 360))
 		_start_valley()
 		_add_view(root, -1)
-		_camera.position = (Valley.PLACES.village * AngleView.CELL).round()
+		_camera.position = (_valley.places().village * AngleView.CELL).round()
 	elif _mode == "frames":
 		DisplayServer.window_set_size(Vector2i(640, 360))
 		_start_world()
 		_add_view(root, _world.player_army())
+	elif _mode == "stills" and _region != "":
+		_shots.append({"still": _region, "locale": "ko"})
+		_shots.append({"still": _region + "_village", "locale": "ko"})
 	elif _mode == "stills" and "valley" in _flags:
 		for still: String in VALLEY_STILLS:
 			for locale: String in LOCALES:
@@ -2326,14 +3014,15 @@ func _initialize() -> void:
 
 # The valley and its people, VALLEY_PEOPLE or with crowd CROWD.
 func _start_valley() -> void:
-	_valley = Valley.new()
+	_valley = Valley.new(_region)
 	var crowd := "crowd" in _flags
 	_villagers = Villagers.new(_valley, CROWD if crowd else VALLEY_PEOPLE, 10 if crowd else VALLEY_ARMY)
 	_world = _villagers.world
 	var people := 0
 	for army in _world.army_count():
 		people += _world.roster(army).size()
-	print("angle: valley %dx%d cells, %d structures, %d people in %d armies" % [Valley.WIDTH, Valley.HEIGHT,
+	print("angle: %s %dx%d cells, %d structures, %d people in %d armies" % [_region if _region != "" else "valley",
+			Valley.WIDTH, Valley.HEIGHT,
 			_valley.structures().size(), people, _world.army_count()])
 
 
@@ -2367,12 +3056,12 @@ func _add_view(parent: Node, steered: int) -> void:
 
 # The cell a still centres on; in the valley the bench's is the village's.
 func _still_focus(still: String) -> Vector2:
-	return Valley.PLACES.get(still, Valley.PLACES.village) if _valley != null else FOCUS
+	return _valley.places().get(still, _valley.places().village) if _valley != null else FOCUS
 
 
 # The point `distance` cells along PAN's loop.
 func _pan_at(distance: float) -> Vector2:
-	var path: Array = PAN if _valley == null else VALLEY_PAN.map(func(place: String) -> Vector2: return Valley.PLACES[place])
+	var path: Array = PAN if _valley == null else VALLEY_PAN.map(func(place: String) -> Vector2: return _valley.places()[place])
 	var length := 0.0
 	for n in path.size():
 		length += (path[n] as Vector2).distance_to(path[(n + 1) % path.size()])
@@ -2592,7 +3281,7 @@ func _stills() -> bool:
 				return false
 		3:
 			_play.fit_view()
-			if shot.still == "valley":
+			if shot.still == "valley" or shot.still in REGIONS:
 				_camera.zoom = Vector2(2, 2)
 			_view.refresh(_view_rect(), 1.0, STILLS.get(shot.still, 0) * FRAME_MS)
 			_hud.refresh(_play.world, _play.steered, _play._skills)
@@ -2600,7 +3289,7 @@ func _stills() -> bool:
 				return false
 		4:
 			var name := "%s_%s" % [shot.still, shot.locale]
-			if shot.still == "valley":
+			if shot.still == "valley" or shot.still in REGIONS:
 				_camera.zoom = Vector2(2, 2)
 				_view.refresh(_view_rect(), 1.0, 0)
 				RenderingServer.force_draw(false)

@@ -23,7 +23,16 @@ uniform vec2 image_size;
 uniform int row_from;
 uniform int row_to;
 uniform int pass_kind;
-uniform vec3 ramps[44];
+uniform vec3 ramps[56];
+// A region's air: mist lying in its low ground, in this colour, up to `mist.a` of the way.
+uniform vec4 mist = vec4(0.0);
+// Whether rock wears moss; a dry or snowy region's does not.
+uniform bool moss = true;
+// Whether slopes are lit as they face, so ground that rises without a cliff, as dunes do, shows
+// its shape.
+uniform bool relief = false;
+// Whether water runs, streaked along its current.
+uniform bool flow = false;
 
 const float CW = 16.0;
 const float CD = 12.0;
@@ -42,6 +51,9 @@ const int PADDY = 7;
 const int GARDEN = 8;
 const int STEPS = 9;
 const int EARTH = 10;
+const int SAND = 11;
+const int SNOW = 12;
+const int WHEAT = 13;
 const vec3 SHADE = vec3(0.078, 0.094, 0.157);
 
 uint mix_hash(int x, int y, int salt) {
@@ -198,6 +210,10 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	int step = tex < 0.3 + macro * 0.5 ? 0 : (tex > 0.74 + macro * 0.5 ? 2 : 1);
 	if (kind == WATER) {
 		step = vnoise(p / 9.0, 24) > 0.55 ? 1 : 0;
+		if (flow) {
+			float streak = fract((p.y + (vnoise(vec2(p.x / 40.0, p.y / 9.0), 46) - 0.5) * 8.0) / 4.0);
+			step = streak < 0.16 && vnoise(p / vec2(14.0, 3.0), 47) > 0.42 ? 3 : (vnoise(p / vec2(18.0, 5.0), 24) > 0.5 ? 1 : 0);
+		}
 		if (near_other(p, level, WATER, 1)) {
 			step = 3;
 		} else if (near_other(p, level, WATER, 3)) {
@@ -224,15 +240,36 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 		}
 	} else if ((kind == PLAIN || kind == MEADOW) && near_kind(p, level, LANE, 1)) {
 		step = 0;
+	} else if (kind == SAND) {
+		// Ripples the wind laid across the sand, wavering, lit on their windward side.
+		float ripple = fract((p.y + p.x * 0.35 + (vnoise(p / 14.0, 42) - 0.5) * 10.0) / 5.0);
+		step = ripple < 0.2 ? 3 : (ripple < 0.7 ? 2 : (tex > 0.6 ? 1 : 2));
+		if (macro < -0.12) {
+			step = max(step - 1, 1);
+		}
+	} else if (kind == SNOW) {
+		// Snow lies smooth, blue in its hollows.
+		step = tex < 0.18 + macro ? 1 : (tex > 0.8 ? 3 : 2);
+	} else if (kind == WHEAT) {
+		// Rows of wheat across each field, ears catching the light.
+		step = px.y % 3 == 0 ? 1 : (hash01(px.x, px.y, 43) > 0.7 ? 3 : 2);
+		if (near_other(p, level, WHEAT, 1)) {
+			step = 0;
+		}
 	}
 	// Rock wears moss and lichen in patches.
-	if (kind == ROCK && fbm(screen / 18.0 + vec2(3.0, 9.0), 30) > 0.58 && vnoise(screen / 1.7, 31) > 0.45) {
+	if (moss && kind == ROCK && fbm(screen / 18.0 + vec2(3.0, 9.0), 30) > 0.58 && vnoise(screen / 1.7, 31) > 0.45) {
 		return ramp(FOREST, step == 2 ? 2 : 1);
+	}
+	if (relief && kind != WATER) {
+		// Lit from the upper left: rising eastward faces the light, rising northward turns from it.
+		float tilt = height_at(p + vec2(3.0, 0.0)) - height_at(p - vec2(3.0, 0.0)) + 0.6 * (height_at(p + vec2(0.0, 3.0)) - height_at(p - vec2(0.0, 3.0)));
+		step = clamp(step + (tilt > 0.12 ? 1 : 0) - (tilt < -0.12 ? 1 : 0), 0, 3);
 	}
 	vec3 colour = ramp(kind, step);
 	// The lit lip where the ground turns down into a face.
 	if (drops(p, p + vec2(0.0, 1.0))) {
-		colour = ramp(kind == ROCK ? ROCK : (kind == WATER ? WATER : MEADOW), 3);
+		colour = ramp(kind == ROCK || kind >= SAND ? kind : (kind == WATER ? WATER : MEADOW), 3);
 	}
 	// The foot of a face is in its shadow, thinning away from it, and scree lies there in
 	// clusters, more of it nearer the face.
@@ -251,7 +288,8 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 }
 
 // A face's colour by its material, `depth` pixels below its top and `height` pixels high.
-vec3 face(vec2 p, int material, float depth, float height) {
+// `lip` is the kind of the ground above, which hangs over the lip.
+vec3 face(vec2 p, int material, float depth, float height, int lip) {
 	ivec2 px = ivec2(int(floor(p.x)), int(depth));
 	int step = 1;
 	int kind = ROCK;
@@ -284,6 +322,12 @@ vec3 face(vec2 p, int material, float depth, float height) {
 		// Plants hang over the lip in tufts, and scree piles at the foot to an uneven height.
 		float hang = vnoise(vec2(p.x / 4.0, 9.0), 37) > 0.55 ? 4.0 * vnoise(vec2(p.x / 2.0, 1.0), 38) : 0.0;
 		if (depth < hang) {
+			if (lip == SNOW || lip == SAND) {
+				return ramp(lip, depth < 1.0 ? 3 : 2);
+			}
+			if (!moss) {
+				return ramp(ROCK, depth < 1.0 ? 3 : 2);
+			}
 			return ramp(FOREST, depth < 1.0 ? 2 : 1);
 		}
 		float pile = 2.0 + 9.0 * vnoise(vec2(p.x / 13.0, 5.0), 39);
@@ -353,7 +397,16 @@ void fragment() {
 		}
 		kind = 20 + material;
 		sort_row = int(floor(ground_y / CD));
-		out_colour = vec4(face(vec2(x, s), material, depth, height), 1.0);
+		out_colour = vec4(face(vec2(x, s), material, depth, height, kind_at(vec2(x, ground_y - 1.0), level)), 1.0);
+	}
+	// Mist in the low ground, in drifting banks.
+	if (mist.a > 0.0) {
+		float low = level <= 0 ? 1.0 : (level == 1 ? 0.5 : 0.0);
+		float bank = fbm(vec2(x, s) / vec2(90.0, 30.0) + vec2(17.0, 4.0), 44);
+		float amount = mist.a * low * smoothstep(0.5, 0.8, bank);
+		if (amount > vnoise(vec2(x, s) / 1.7, 45) * 0.5) {
+			out_colour.rgb = mix(out_colour.rgb, mist.rgb, clamp(amount * 1.4, 0.0, 0.75));
+		}
 	}
 	if (sort_row < row_from || sort_row >= row_to) {
 		COLOR = vec4(0.0);

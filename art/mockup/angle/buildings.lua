@@ -13,6 +13,9 @@
 --   town_gate 4x2, the market town's gate under a tower; stone_wall 1x1, brush_fence 1x1.
 --   well_square 2x2, crocks 1x1, laundry 2x1, cart 2x1, haystack 1x1, firewood 1x1, lantern 1x1,
 --   bush 1x1, boulder 1x1.
+--   The regions' screens: water_house 3x2 and water_house_big 4x3, whitewashed under horse-head
+--   gables; arch_bridge 5x1 over a canal; adobe_house 3x2 and adobe_small 2x2; pagoda 2x2;
+--   cult_hall 5x3.
 -- Run: aseprite --batch --script art/mockup/angle/buildings.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -473,4 +476,181 @@ do
     cv:set(xx, yy, (xx - x - 8) + (yy - base + 5) < -2 and c("stone", 5) or (d > 0.7 and c("stone", 2) or c("stone", 3)))
   end)
   save("boulder", cv)
+end
+
+-- The regions' screens (#200): Jiangnan's white-walled houses and arched bridges, the Western
+-- Regions' adobe houses and the Cult's hall, and Song Shan's pagoda.
+
+-- A whitewashed wall from x for w, its foot on `foot`, h high, stained grey toward its foot.
+local function whitewash(cv, x, foot, w, h)
+  for y = foot - h, foot - 1 do
+    for xx = x, x + w - 1 do
+      local stain = (y - (foot - h)) / h + (px.noise(xx, y, 4, 61) - 0.5) * 0.6
+      local col = c("robe", 3)
+      if stain > 0.85 then col = c("stone", 5) elseif stain > 0.65 and px.hash(xx, y, 62) > 0.5 then col = c("robe", 2) end
+      cv:set(xx, y, col)
+    end
+  end
+  cv:vline(x, foot - h, h, c("robe", 3)); cv:vline(x + w - 1, foot - h, h, c("robe", 2))
+end
+
+-- A horse-head gable: a white wall standing above the roof at a house's end, stepping down
+-- toward the front, each step capped in dark tile with an upturned end.
+local function horse_head(cv, x, foot, top, eave)
+  local steps = { { top, 6 }, { top + (eave - top) // 2, 6 } }
+  for k, s in ipairs(steps) do
+    local y = s[1]
+    cv:rect(x, y, s[2], foot - y, c("robe", k == 1 and 3 or 2))
+    cv:vline(x + s[2] - 1, y, foot - y, c("robe", 2))
+    cv:hline(x - 1, y - 1, s[2] + 2, c("ink", 2)); cv:hline(x - 1, y - 2, s[2] + 2, c("stone", 2))
+    cv:set(x - 2, y - 3, c("ink", 2)); cv:set(x + s[2] + 1, y - 3, c("ink", 2))
+  end
+end
+
+-- A water-town house: white walls under a dark gable roof, horse-head gables at both ends,
+-- small dark lattice windows high up, a stone-framed door; with `upper`, a timber upper storey
+-- opening on the canal.
+local function water_house(name, w, d, wallh, ridge, upper)
+  local cv, x, base = frame(w, d, wallh + ridge + d * CD // 2 + 30)
+  local W, D = w * CW, d * CD
+  block(cv, x, base, W, D, 3, "stone", 3)
+  local foot = base - 3
+  whitewash(cv, x + 2, foot, W - 4, wallh)
+  door(cv, x + W // 2 - 4, foot, 8, 14, true)
+  cv:rect(x + W // 2 - 6, foot - 16, 12, 2, c("stone", 4))
+  if upper then
+    local deck = foot - wallh + 18
+    cv:rect(x + 4, deck - 18, W - 8, 18, c("wood", 3))
+    for xx = x + 6, x + W - 7, 4 do cv:vline(xx, deck - 16, 12, c("wood", 4)); cv:vline(xx + 1, deck - 16, 12, c("ink", 2)) end
+    cv:hline(x + 3, deck, W - 6, c("wood", 2)); cv:hline(x + 3, deck - 18, W - 6, c("wood", 2))
+    for xx = x + 4, x + W - 5, 3 do cv:vline(xx, deck + 1, 3, c("wood", 4)) end
+    cv:hline(x + 3, deck + 4, W - 6, c("wood", 3))
+  else
+    for _, wx in ipairs({ 8, W - 16 }) do window(cv, x + wx, foot - wallh + 6, 6, 5) end
+  end
+  local eave = foot - wallh + 3
+  local top = foot - D // 2 - wallh - ridge
+  tiled_roof(cv, x + 4, x + W - 5, eave, top, foot - D - wallh + 4, 0)
+  for yy = top - 4, eave + 1 do for xx = x - 6, x + W + 6 do cv:shade_at(xx, yy, -2) end end
+  horse_head(cv, x, foot, top - 6, eave)
+  horse_head(cv, x + W - 6, foot, top - 6, eave)
+  save(name, cv)
+end
+water_house("water_house", 3, 2, 30, 16, false)
+water_house("water_house_big", 4, 3, 38, 20, true)
+
+-- An arched stone bridge over a canal three cells wide: a hump of dressed stone, a round arch
+-- over the water, steps on its deck and low parapets.
+do
+  local cv, x, base = frame(5, 1, 30)
+  local W = 80
+  local function rise(xx) return math.floor(4 + 18 * math.sin(math.pi * (xx + 0.5) / W) + 0.5) end
+  for xx = 0, W - 1 do
+    local h = rise(xx)
+    for yy = base - h, base - 1 do
+      local course = (base - yy) // 4
+      local col = ((base - yy) % 4 == 0 or (xx + course * 3) % 7 == 0) and c("stone", 3) or c("stone", 4)
+      cv:set(x + xx, yy, col)
+    end
+    for yy = base - h - 8, base - h - 1 do
+      cv:set(x + xx, yy, (xx % 4 == 0) and c("stone", 3) or c("stone", 5))
+    end
+    cv:set(x + xx, base - h - 9, c("stone", 6))
+    if xx % 6 == 0 then cv:vline(x + xx, base - h - 13, 4, c("stone", 4)) end
+    cv:set(x + xx, base - h - 13, c("stone", 5))
+  end
+  cv:each_ellipse(x + W // 2, base, 15, 16, function(xx, yy, dd)
+    if yy < base then cv:set(xx, yy, dd > 0.86 and c("stone", 2) or c("water", 1)) end
+  end)
+  for xx = x + W // 2 - 12, x + W // 2 + 12 do cv:set(xx, base - 1, c("water", 3)) end
+  save("arch_bridge", cv)
+end
+
+-- An adobe house: rammed-earth walls under a flat roof behind a parapet, roof beams showing,
+-- small dark windows, apricots drying on the roof.
+local function adobe(name, w, d, wallh)
+  local cv, x, base = frame(w, d, wallh + 20)
+  local W, D = w * CW, d * CD
+  local foot = base
+  for yy = foot - wallh, foot - 1 do
+    for xx = x, x + W - 1 do
+      local n = px.noise(xx, yy, 3, 71)
+      cv:set(xx, yy, n > 0.6 and c("earth", 6) or (n > 0.3 and c("earth", 5) or c("earth", 4)))
+    end
+  end
+  cv:vline(x, foot - wallh, wallh, c("earth", 6)); cv:vline(x + W - 1, foot - wallh, wallh, c("earth", 3))
+  local roof = foot - wallh
+  for yy = roof - D + 2, roof - 1 do
+    for xx = x + 1, x + W - 2 do cv:set(xx, yy, px.hash(xx, yy, 72) > 0.85 and c("earth", 5) or c("earth", 6)) end
+  end
+  cv:rect(x, roof - D, W, 3, c("earth", 5)); cv:hline(x, roof - D, W, c("paper", 3))
+  cv:vline(x, roof - D, D, c("earth", 5)); cv:vline(x + W - 1, roof - D, D, c("earth", 4))
+  cv:hline(x, roof - 1, W, c("earth", 4)); cv:hline(x, roof, W, c("earth", 3))
+  for xx = x + 4, x + W - 4, 7 do cv:rect(xx, roof + 1, 2, 2, c("wood", 2)) end
+  for k = 0, 9 do
+    local ax = x + 6 + math.floor(px.hash(k, 1, 73) * (W - 16))
+    local ay = roof - D + 4 + math.floor(px.hash(k, 2, 73) * (D - 8))
+    cv:rect(ax, ay, 2, 1, c("amber", 4))
+  end
+  door(cv, x + W // 2 - 4, foot, 8, 13, true)
+  for _, wx in ipairs({ 6, W - 11 }) do if W > 40 or wx == 6 then cv:rect(x + wx, roof + 6, 5, 4, c("ink", 1)); cv:hline(x + wx - 1, roof + 5, 7, c("wood", 2)) end end
+  save(name, cv)
+end
+adobe("adobe_house", 3, 2, 22)
+adobe("adobe_small", 2, 2, 18)
+
+-- A brick pagoda of seven storeys, each a little narrower, corbelled eaves between them, a
+-- gilt finial on top.
+do
+  local cv, x, base = frame(2, 2, 112)
+  block(cv, x + 1, base, 30, 20, 5, "stone", 3)
+  local foot = base - 5 - 10
+  local width = 24
+  for storey = 0, 6 do
+    local h = storey == 0 and 18 or 11
+    local left = x + 16 - width // 2
+    for yy = foot - h, foot - 1 do
+      for xx = left, left + width - 1 do
+        local col = (xx - left < 3) and c("earth", 6) or ((left + width - 1 - xx < 3) and c("earth", 3) or c("earth", 5))
+        if (foot - yy) % 4 == 0 then col = px.shift(col, -1) end
+        cv:set(xx, yy, col)
+      end
+    end
+    if storey == 0 then cv:rect(x + 13, foot - 11, 6, 11, c("ink", 1)) else cv:rect(x + 15, foot - 8, 3, 4, c("ink", 2)) end
+    local eave = foot - h
+    cv:hline(left - 3, eave, width + 6, c("stone", 2)); cv:hline(left - 2, eave - 1, width + 4, c("stone", 4))
+    cv:hline(left - 1, eave - 2, width + 2, c("stone", 5))
+    cv:set(left - 4, eave - 1, c("stone", 3)); cv:set(left + width + 3, eave - 1, c("stone", 3))
+    foot = eave - 2
+    width = width - 2
+  end
+  cv:rect(x + 15, foot - 10, 2, 10, c("gold", 3)); cv:set(x + 15, foot - 11, c("gold", 4))
+  cv:ellipse(x + 16, foot - 4, 2, 1, c("gold", 4))
+  save("pagoda", cv)
+end
+
+-- The Cult's hall: a high black plinth with a stair, crimson pillars, dark walls and a slate
+-- roof nearly black, a gilt plaque, braziers burning before it.
+do
+  local cv, x, base = frame(5, 3, 90)
+  local W, D = 80, 36
+  block(cv, x, base, W, D, 10, "stone", 2)
+  for k = 0, 4 do cv:hline(x + 30, base - 2 - k * 2, 20, c("stone", 4 - k % 2)) end
+  local foot = base - 10
+  cv:rect(x + 4, foot - 36, W - 8, 36, c("ink", 2))
+  for p = x + 4, x + W - 6, 12 do
+    cv:rect(p, foot - 36, 3, 36, c("crimson", 3)); cv:vline(p, foot - 36, 36, c("crimson", 4))
+  end
+  for _, wx in ipairs({ 16, 52 }) do window(cv, x + wx, foot - 28, 9, 12) end
+  door(cv, x + 34, foot, 12, 22, true)
+  cv:rect(x + 30, foot - 46, 20, 8, c("ink", 1)); cv:rect(x + 31, foot - 45, 18, 6, c("gold", 3))
+  for xx = x + 33, x + 46, 3 do cv:set(xx, foot - 43, c("crimson", 2)) end
+  local eave = foot - 36 + 3
+  tiled_roof(cv, x - 1, x + W, eave, foot - D // 2 - 36 - 26, foot - D - 36 + 4, 16)
+  for yy = foot - D - 70, eave + 2 do for xx = x - 8, x + W + 8 do cv:shade_at(xx, yy, -2) end end
+  for _, bx in ipairs({ x + 4, x + W - 10 }) do
+    cv:rect(bx + 2, base - 8, 2, 8, c("stone", 2)); cv:rect(bx, base - 11, 6, 3, c("stone", 3))
+    cv:set(bx + 2, base - 13, c("fire", 4)); cv:set(bx + 3, base - 14, c("fire", 3)); cv:set(bx + 2, base - 12, c("fire", 2))
+  end
+  save("cult_hall", cv)
 end

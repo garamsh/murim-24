@@ -23,7 +23,8 @@ for name in terrain faces trees house hall storehouse manual_hall granary well s
 	training_ground orthodox demonic villager marks qi pillar dust debris tiled_house tiled_house_big ancestral_hall \
 	thatched_house thatched_small inn shrine pavilion guardian village_gate stall_red stall_blue stall_amber watchtower \
 	stilt_house pier boat wall_h wall_v town_gate stone_wall brush_fence well_square crocks laundry cart haystack \
-	firewood lantern bush boulder mountains; do
+	firewood lantern bush boulder mountains water_house water_house_big arch_bridge adobe_house adobe_small pagoda \
+	cult_hall; do
 	"$aseprite" --batch "angle/$name.aseprite" --sheet "angle/$name.png" --data "angle/$name.json" --format json-array \
 		--list-tags
 done

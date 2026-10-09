@@ -5,7 +5,7 @@
 --   faces.aseprite: 16x8 tiles, two each, tagged hills_face, the step where hills, raised 8
 --     pixels, drop to the plain along their front edge, and stone_face, rock_face, bank_face and
 --     steps_face, tiled downward wherever the valley's ground drops to its south.
---   trees.aseprite: 32x40 frames tagged tree (three), pine, bamboo and willow (two each),
+--   trees.aseprite: 32x40 frames tagged tree (three), pine, bamboo, willow, poplar and snow_pine (two each),
 --     each foot at (16, 36), the point the tree is sorted by.
 --   shade.json: each palette colour with the colours one and two steps darker on its ramp.
 -- Ground tiles carry no outline, so tiles of one kind join into one surface.
@@ -337,9 +337,38 @@ local function willow(seed)
   cv:outline(0, 0, 32, 40, c("leaf", 1))
   return cv
 end
+-- Poplar: the oases' tree, a tall narrow crown of yellow-green on a pale trunk.
+local function poplar(seed)
+  local cv = px.canvas(32, 40)
+  cv:rect(15, 28, 2, 9, c("paper", 1)); cv:vline(15, 28, 9, c("paper", 2))
+  cv:each_ellipse(16, 16, 5, 14, function(x, y)
+    local n = px.noise(x, y, 2, seed)
+    local light = -(x - 16) / 5 * 0.6 - (y - 16) / 14 * 0.4 + (n - 0.5) * 0.8
+    cv:set(x, y, light > 0.4 and c("grass", 6) or (light > -0.1 and c("grass", 5) or (light > -0.5 and c("grass", 4) or c("leaf", 3))))
+  end)
+  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  return cv
+end
+-- A pine high on a snowy range, snow lying on the upper side of each tier.
+local function snow_pine(seed)
+  local cv = pine(seed)
+  for y = 0, 39 do
+    for x = 0, 31 do
+      local i = cv:get(x, y)
+      if i ~= 0 and i ~= c("leaf", 1) and cv:get(x, y - 1) == c("leaf", 1) and px.hash(x, y, seed) > 0.25 then
+        cv:set(x, y, x < 16 and c("robe", 3) or c("robe", 2))
+      end
+    end
+  end
+  return cv
+end
 trees[6] = bamboo(85)
 trees[7] = bamboo(86)
 trees[8] = willow(87)
 trees[9] = willow(88)
+trees[10] = poplar(89)
+trees[11] = poplar(90)
+trees[12] = snow_pine(91)
+trees[13] = snow_pine(92)
 px.save_frames(32, 40, trees, { { "tree", 1, 3, 100 }, { "pine", 4, 5, 100 }, { "bamboo", 6, 7, 100 },
-  { "willow", 8, 9, 100 } }, here .. "/trees.aseprite")
+  { "willow", 8, 9, 100 }, { "poplar", 10, 11, 100 }, { "snow_pine", 12, 13, 100 } }, here .. "/trees.aseprite")

@@ -1,5 +1,6 @@
 -- Draws the peaks that cap the tiered mountains of the revised village (PR #204's review), at
--- the 2.5D angle of #200: mountains.aseprite, 128x128 frames tagged peak (three), a crag of
+-- the 2.5D angle of #200: mountains.aseprite, 128x128 frames tagged peak (three) and snow (three,
+-- for the Western Regions' Tianshan, snow far down their flanks and no green), a crag of
 -- stone in strata rising from a ragged foot, lit from the upper left, scree spilling from its
 -- foot and pines along it, the foot's centre on (64, 120).
 -- Run: aseprite --batch --script art/mockup/angle/mountains.lua
@@ -35,8 +36,13 @@ local function peak(seed, height, width, lean, snow)
       if math.abs(x - ridge) < 1 then col = side and c("stone", 6) or c("stone", 2) end
       -- Green clings to the lower slopes.
       local green = px.noise(x, y, 4, seed + 3)
+      if type(snow) == "number" then green = 0 end
       if depth < 0.45 and green > 0.45 + depth then col = side and c("leaf", 4) or c("leaf", 2) end
-      if snow and y - top < 6 + px.noise(x, 3, 3, seed) * 6 then col = side and c("robe", 3) or c("stone", 5) end
+      if snow == true and y - top < 6 + px.noise(x, 3, 3, seed) * 6 then col = side and c("robe", 3) or c("stone", 5) end
+      -- A range under snow: the snow reaches down its flanks in tongues along the gullies.
+      if type(snow) == "number" and depth > snow - px.noise(x * 0.5, 0, 3, seed + 5) * 0.3 then
+        col = side and (strata > 0.4 and c("robe", 3) or c("robe", 2)) or (strata > 0.5 and c("stone", 5) or c("stone", 4))
+      end
       cv:set(x, y, col)
     end
   end
@@ -71,5 +77,6 @@ local function peak(seed, height, width, lean, snow)
   return cv
 end
 
-px.save_frames(W, H, { peak(301, 104, 54, -6, true), peak(302, 82, 60, 8, false), peak(303, 64, 46, 0, false) },
-  { { "peak", 1, 3, 100 } }, here .. "/mountains.aseprite")
+px.save_frames(W, H, { peak(301, 104, 54, -6, true), peak(302, 82, 60, 8, false), peak(303, 64, 46, 0, false),
+  peak(304, 112, 58, -4, 0.42), peak(305, 92, 62, 6, 0.38), peak(306, 76, 48, 0, 0.45) },
+  { { "peak", 1, 3, 100 }, { "snow", 4, 6, 100 } }, here .. "/mountains.aseprite")
