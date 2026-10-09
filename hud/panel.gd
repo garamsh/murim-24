@@ -232,6 +232,17 @@ func _draw_icon(sheet: String, tag: String, rect: Rect2, tint := Color.WHITE) ->
 		draw_texture_rect_region(drawn.atlas, rect, drawn.region, tint)
 
 
+# An icon drawn a pixel to a letter of `rows` from `top_left`: `#` in `colour`, `p` in lacquer and
+# `l` in gold, and `.` left clear.
+func _pixel_icon(rows: Array, top_left: Vector2, colour: Color) -> void:
+	for y in rows.size():
+		var row: String = rows[y]
+		for x in row.length():
+			if row[x] != ".":
+				var ink := Palette.LACQUER_3 if row[x] == "p" else (Palette.GOLD_3 if row[x] == "l" else colour)
+				draw_rect(Rect2(top_left + Vector2(x, y), Vector2.ONE), ink)
+
+
 # The icon tagged `tag` in art/icons/ware_icons.aseprite, a ware's name or "silver", from `top_left`,
 # darkened when `dim`; nothing for a tag the sheet lacks.
 func _ware_icon(tag: String, top_left: Vector2, dim := false) -> void:

@@ -20,16 +20,19 @@
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
 ## screen sums up the life just ended. Escape pauses the world under the pause panel, which saves
 ## it and whose guide shows the controls as bound here; it is also saved every AUTOSAVE_DAYS days.
+## On a PC, the HUD's shortcut rail lists SHORTCUTS, and a left click on a row does what its key
+## does, or for the settings, which no key opens, opens them.
 ## On a touch screen, or where the settings force it, the HUD's touch controls steer it instead:
 ## the joystick orders it the way it points, a skill button tapped casts its slot's skill at the
 ## hostile person the core's aim finds the way the person faces, or toward that way at the skill's
 ## range, dragged casts at the point it aims, dropped on the cancel zone casts nothing and held
 ## casts on the person itself, the HUD naming the core's reason when it refuses; the HUD's buttons
-## open the genealogy, sect and arts panels and the faction window, and pause, where on the arts panel a skill
+## do what SHORTCUTS' keys for them do, opening the genealogy, sect and arts panels and the faction
+## window, and pausing, where on the arts panel a skill
 ## tapped and then a skill button puts it on that button's slot; the screens take taps, and where
 ## the settings ask, a tap on the ground orders the person there.
 ## The camera follows the person, at the whole-pixel scale ViewScale gives the window, filling it;
-## the HUD's settings button opens the settings over the paused world. It ticks at the core's tick rate times the speed the settings
+## the settings open over the paused world. It ticks at the core's tick rate times the speed the settings
 ## choose, draws the world through world_art.tscn and the HUD and its screens through hud.tscn,
 ## sounds it through sound.tscn, and holds no game rule.
 extends Node2D
@@ -67,6 +70,19 @@ const WARE_KEYS := [KEY_Z, KEY_X]
 ## The key that takes the skill chosen on the arts panel off its slot.
 const CLEAR_KEY := KEY_DELETE
 const PAUSE_KEY := KEY_ESCAPE
+## What the HUD's shortcut rail lists, in its order, and the pause panel's guide lists after the
+## other controls, the guide only those with a key: each row the `action`, the HUD's name for the
+## panel or screen it opens, which a touch button for it bears too; its `key`, or KEY_NONE for the
+## settings, which no key opens; its `icon`, a key of the HUD's shortcut icons; and its `label`, the
+## hud.csv key of what it does.
+const SHORTCUTS: Array[Dictionary] = [
+	{"action": "genealogy", "key": GENEALOGY_KEY, "icon": "genealogy", "label": "CONTROLS_GENEALOGY"},
+	{"action": "sect", "key": SECT_KEY, "icon": "sect", "label": "CONTROLS_SECTS"},
+	{"action": "factions", "key": FACTIONS_KEY, "icon": "factions", "label": "CONTROLS_FACTIONS"},
+	{"action": "arts", "key": ARTS_KEY, "icon": "arts", "label": "CONTROLS_ARTS"},
+	{"action": "settings", "key": KEY_NONE, "icon": "settings", "label": "SETTINGS_TITLE"},
+	{"action": "pause", "key": PAUSE_KEY, "icon": "pause", "label": "CONTROLS_PAUSE_CANCEL"},
+]
 ## The slot the pause panel saves to, the autosave writes and continue loads.
 const SAVE_SLOT := 0
 ## The in-game days between autosaves.
@@ -129,7 +145,7 @@ var _talk_read_at := -1
 func _ready() -> void:
 	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.applied.connect(fit_view)
-	_hud.settings_asked.connect(open_settings)
+	_hud.show_shortcuts(SHORTCUTS)
 	for keycode: Key in PANEL_KEYS:
 		_hud.get(PANEL_KEYS[keycode]).toggle_key = keycode
 	_hud.arts.slot_keys = CAST_KEYS
@@ -228,7 +244,7 @@ func _play(made: WorldAdapter) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var on_hud: InputEvent = _hud.to_hud(event)
-	if not navigate(on_hud) and not touch(on_hud):
+	if not navigate(on_hud) and not touch(on_hud) and not click(on_hud):
 		command(make_input_local(event))
 
 
@@ -253,6 +269,45 @@ func navigate(event: InputEvent) -> bool:
 	var now: Control = _hud.screen()
 	_sound.ui("open" if now != null and now != open else "click")
 	return true
+
+
+## Works the HUD's shortcut rail with `event`, its position in the HUD's pixels, while a world is
+## played and the rail is shown: the cursor marks the row under it, and a left click on a row does
+## what shortcut() does with its action. Returns whether a click took a row.
+func click(event: InputEvent) -> bool:
+	var rail: Control = _hud.shortcuts
+	if world == null or not rail.visible:
+		return false
+	var motion := event as InputEventMouseMotion
+	if motion != null:
+		rail.hover(motion.position - rail.position)
+		return false
+	var mouse := event as InputEventMouseButton
+	if mouse == null or not mouse.pressed or mouse.button_index != MOUSE_BUTTON_LEFT:
+		return false
+	var action: String = rail.tap(mouse.position - rail.position)
+	if action.is_empty():
+		return false
+	shortcut(action)
+	return true
+
+
+## Does what the row of SHORTCUTS for `action` does, as the shortcut rail or a touch button asks:
+## presses its key, taken as a key pressed on the keyboard is, or opens the settings, which no key
+## opens.
+func shortcut(action: String) -> void:
+	for row: Dictionary in SHORTCUTS:
+		if row.action != action:
+			continue
+		if row.key == KEY_NONE:
+			open_settings()
+			return
+		var press := InputEventKey.new()
+		press.keycode = row.key
+		press.pressed = true
+		if not navigate(press):
+			command(press)
+		return
 
 
 ## Pauses the world under the pause panel, letting go of the move button and every finger held.
@@ -321,7 +376,8 @@ func _take(action: String) -> bool:
 
 
 ## Returns the controls as this scene binds them, for the pause panel's guide: each a Dictionary
-## of its `keys`, the words on its caps, and `does`, the hud.csv key of what it does.
+## of its `keys`, the words on its caps, and `does`, the hud.csv key of what it does; the rows of
+## SHORTCUTS with a key last, in their order.
 func controls() -> Array[Dictionary]:
 	var casts := ""
 	for keycode: Key in CAST_KEYS:
@@ -335,14 +391,12 @@ func controls() -> Array[Dictionary]:
 		{"keys": [casts], "does": "CONTROLS_CAST"},
 		{"keys": [skills], "does": "CONTROLS_SKILL"},
 		{"keys": [OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_ALL_SKILLS"},
-		{"keys": [OS.get_keycode_string(GENEALOGY_KEY)], "does": "CONTROLS_GENEALOGY"},
-		{"keys": [OS.get_keycode_string(SECT_KEY)], "does": "CONTROLS_SECTS"},
-		{"keys": [OS.get_keycode_string(ARTS_KEY)], "does": "CONTROLS_ARTS"},
-		{"keys": [OS.get_keycode_string(FACTIONS_KEY)], "does": "CONTROLS_FACTIONS"},
 		{"keys": [OS.get_keycode_string(TALK_KEY)], "does": "CONTROLS_TALK"},
 		{"keys": [wares], "does": "CONTROLS_WARES"},
-		{"keys": [OS.get_keycode_string(PAUSE_KEY)], "does": "CONTROLS_PAUSE_CANCEL"},
 	]
+	for row: Dictionary in SHORTCUTS:
+		if row.key != KEY_NONE:
+			rows.append({"keys": [OS.get_keycode_string(row.key)], "does": row.label})
 	return rows
 
 
@@ -493,8 +547,8 @@ func _steer(way: Vector2i) -> bool:
 
 ## Works the HUD's touch controls with `event`, a touch or a drag, while they are shown and a world
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
-## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel or the
-## faction window, or pause, and where the settings ask, a tap on the ground orders the person to
+## casts as cast_skill() does, the HUD's buttons do what shortcut() does with their names, opening
+## the genealogy, sect or arts panel or the faction window, or pausing, and where the settings ask, a tap on the ground orders the person to
 ## that cell. While a panel is open, a tap works it as its tap() reads it; while the arts panel is,
 ## a tap on a tile chooses its skill, a skill button tapped then puts it on that button's slot, a
 ## finger moved up or down scrolls the tiles and the close button closes it. Returns whether the
@@ -524,10 +578,7 @@ func touch(event: InputEvent) -> bool:
 		"cast":
 			cast_skill(action.slot, action.how, action.get("aim", Vector2.ZERO))
 		"button":
-			if action.button == "pause":
-				pause()
-			else:
-				open_panel(PANEL_KEYS.find_key(action.button))
+			shortcut(action.button)
 		"world":
 			if _hud.settings.tap_to_move():
 				var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom

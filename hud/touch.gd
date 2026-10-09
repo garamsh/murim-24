@@ -55,18 +55,7 @@ const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_FACTIONS": 36, "T
 const PLACE_SLIP := Vector2(404, 136)
 ## How far a finger on the arts panel moves up or down before it scrolls the panel's tiles.
 const SCROLL := 20.0
-# The square buttons' icons, as touch.lua and mobile_hud_arts.lua draw them: a tree of three kin, a
-# banner on its pole, crossed swords, a jian upright.
-const BUTTON_ICONS := {
-	"genealogy": ["...###...", "...#.#...", "...###...", "....#....", ".#######.", ".#.....#.",
-			"###...###", "#.#...#.#", "###...###"],
-	"sect": ["#........", "#######..", "#ppppp#..", "#ppppp##.", "#pp#pp#..", "#######..",
-			"#........", "#........", "##......."],
-	"factions": ["#.......#", ".#.....#.", "..#...#..", "...#.#...", "....#....", "...#.#...",
-			".##...##.", ".#.....#.", "#.......#"],
-	"arts": ["...#.....", "...#.....", "...#.....", "...#.....", "...#.....", "...#.....", ".#####...",
-			"...l.....", "...l....."],
-}
+const Shortcuts := preload("res://hud/shortcuts.gd")
 
 ## How many skill buttons are shown: the slots given, up to SKILLS.size().
 var skill_count := 0
@@ -77,6 +66,9 @@ var reach: Array[Dictionary] = []
 ## whether a skill chosen on it waits for a button to be placed on.
 var placing := false
 var waiting := false
+## Each square button's icon, by the button's name: a key of Shortcuts.ICONS, as the play scene's
+## shortcut table names it; a button with none shows its word alone.
+var icons := {}
 ## Where the steered body stands on screen, which the rings on the ground are drawn round.
 var body_at := Vector2(240, 135)
 ## The share of the body's cooldown still to run, and the whole seconds it lasts; 0 when ready.
@@ -439,15 +431,9 @@ func _word_slip(key: String, top: Vector2, rule: Color) -> void:
 # A square button in the HUD's frame with its icon over its word.
 func _square(rect: Rect2, button: String) -> void:
 	_trim(rect)
-	var rows: Array = BUTTON_ICONS[button]
-	var colour := Palette.PAPER_3 if button == "arts" else Palette.GOLD_3
-	var left := rect.position + Vector2(floorf((rect.size.x - 9) / 2.0), 7)
-	for y in rows.size():
-		var row: String = rows[y]
-		for x in row.length():
-			if row[x] != ".":
-				var ink := Palette.LACQUER_3 if row[x] == "p" else (Palette.GOLD_3 if row[x] == "l" else colour)
-				draw_rect(Rect2(left + Vector2(x, y), Vector2.ONE), ink)
+	if icons.has(button):
+		var colour := Palette.PAPER_3 if icons[button] == "arts" else Palette.GOLD_3
+		_pixel_icon(Shortcuts.ICONS[icons[button]], rect.position + Vector2(floorf((rect.size.x - 9) / 2.0), 7), colour)
 	var text := tr(BUTTON_KEYS[button])
 	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), rect.position.y + 24), text, Palette.PAPER_3)
 

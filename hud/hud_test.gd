@@ -42,6 +42,7 @@ const INSET := 5
 const SCREEN_WIDTH := 480
 const SCREEN_INSET := 4
 const ViewScale := preload("res://view_scale.gd")
+const Play := preload("res://play/play.gd")
 # The PC windows the layout is checked at, and the touch windows, a 16:9 screen and a wider phone.
 const PC_WINDOWS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 const TOUCH_WINDOWS: Array[Vector2i] = [Vector2i(1920, 1080), Vector2i(2400, 1080)]
@@ -248,18 +249,21 @@ func _purse_pass() -> bool:
 
 
 # At each PC window in PC_WINDOWS, in each locale: the HUD takes the scale and room ViewScale gives
-# it; every panel it shows, the duel panel and the settings button among them, lies within the room
-# and clear of every other; the settings button's word fits within its frame; the panels and
+# it; every panel it shows, the duel panel among them, lies within the room and clear of every
+# other; the shortcut rail, its rows play.gd's SHORTCUTS, lies within the room's top half, clear of
+# every panel, the purse, a 160x90 box at the room's centre and the panels and the dialogue window
+# opened over the HUD, each row's word translated and, with its key, within the row; the panels and
 # screens over the HUD stand in the room's middle, and the dialogue window centred across its foot,
 # clear of the technique bar; and the title, drawn at the least whole multiple
 # covering the room and standing on its foot, takes a tap on its first entry where it draws it. Control: the room gained moves the map, so
 # the 480x270 layout's places are not what is checked. With the touch controls, at each window in
-# TOUCH_WINDOWS, the HUD keeps the world's scale and 480x270, and every panel stands where the touch
-# layout puts it unscaled.
+# TOUCH_WINDOWS, the HUD keeps the world's scale and 480x270, hides the shortcut rail, and every
+# panel stands where the touch layout puts it unscaled.
 func _layout_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(SCENE).instantiate()
 	hud.show_player(world, world.army_count() - 1)
+	hud.show_shortcuts(Play.SHORTCUTS)
 	hud.duel_panel.visible = true
 	var faults := []
 	var checks := 0
@@ -283,12 +287,8 @@ func _layout_pass() -> bool:
 				for other: Control in shown.slice(n + 1):
 					if rect.intersects(other.get_rect()):
 						faults.append("%s: %s over %s" % [at, shown[n].name, other.name])
-			var button: Panel = hud.settings_button
-			var label: Label = button.get_child(0)
-			var said := label.atr(label.text)
-			checks += 1
-			if said == label.text or _width(label, said) > button.size.x - 2:
-				faults.append("%s: \"%s\" %d px in a %d px button" % [at, said, _width(label, said), button.size.x])
+			faults.append_array(_rail_faults(hud, room, at))
+			checks += 1 + hud.shortcuts.rows.size()
 			# The title's first entry, where the title draws it at the multiple covering the room, is
 			# taken; where the native layout puts it, unscaled, it is not.
 			var times := ceilf(maxf(room.size.x / hud.NATIVE.x, room.size.y / hud.NATIVE.y))
@@ -319,7 +319,8 @@ func _layout_pass() -> bool:
 	hud.use_touch(true)
 	hud.fit(Vector2i(hud.NATIVE), true)
 	var unscaled := _shown_panels(hud).map(func(panel: Control) -> Rect2: return panel.get_rect())
-	var touch_kept: bool = hud.touch.visible and hud.room == hud.NATIVE and hud.transform == Transform2D.IDENTITY
+	var touch_kept: bool = hud.touch.visible and not hud.shortcuts.visible and hud.room == hud.NATIVE \
+			and hud.transform == Transform2D.IDENTITY
 	for window: Vector2i in TOUCH_WINDOWS:
 		hud.fit(window, true)
 		var scale := ViewScale.world_scale(window, true)
@@ -333,7 +334,35 @@ func _layout_pass() -> bool:
 	return passed
 
 
-# The HUD's own panels that are shown, the settings button among them.
+# Where the shortcut rail of `hud`, laid out in `room` and labelled `at`, falls outside the room's
+# top half, over a panel the HUD shows, the purse, the room's centre or a panel opened over the HUD,
+# or where a row's word is untranslated or overruns its row with its key.
+func _rail_faults(hud: CanvasLayer, room: Rect2, at: String) -> Array[String]:
+	var faults: Array[String] = []
+	var rail: Control = hud.shortcuts
+	var rect: Rect2 = rail.rect()
+	var middle: Vector2 = ((room.size - hud.NATIVE) / 2.0).floor()
+	var clear_of := {"the centre": Rect2(room.size / 2.0 - Vector2(80, 45), Vector2(160, 90)),
+		"the silver strip": hud.purse.strip_rect(), "the ware belt": hud.purse.belt_rect(),
+		"an open panel": Rect2(middle + hud.genealogy.PANEL.position, hud.genealogy.PANEL.size),
+		"the dialogue window": Rect2(hud.dialogue.position + hud.dialogue.RECT.position, hud.dialogue.RECT.size)}
+	for shown: Control in _shown_panels(hud):
+		clear_of[shown.name] = shown.get_rect()
+	if not rail.visible or rail.rows.is_empty() or not Rect2(room.position, Vector2(room.size.x, room.size.y / 2.0)).encloses(rect):
+		faults.append("%s: the rail at %s, shown %s, outside the room's top half" % [at, rect, rail.visible])
+	for what: String in clear_of:
+		if rect.intersects(clear_of[what]):
+			faults.append("%s: the rail at %s over %s at %s" % [at, rect, what, clear_of[what]])
+	for n in rail.rows.size():
+		var row: Dictionary = rail.rows[n]
+		var word: String = rail.tr(row.label)
+		var reach: float = rail.WORD_X + rail._width(word) + 8 + rail._width(row.key)
+		if word == row.label or reach > rail.row_rect(n).size.x:
+			faults.append("%s: \"%s %s\" reaches %d in a %d px row" % [at, word, row.key, reach, rail.row_rect(n).size.x])
+	return faults
+
+
+# The HUD's own panels that are shown.
 func _shown_panels(hud: CanvasLayer) -> Array[Control]:
 	var shown: Array[Control] = []
 	for child: Node in hud.get_children():

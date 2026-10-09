@@ -12,14 +12,12 @@
 ## stand in for the technique bar and the keys, their arc holding the loadout, and the panels move
 ## as art/mockup/mobile_hud_idle.png lays them out.
 ## On a PC it is drawn at its own whole-pixel scale, finer than the world's, as ViewScale sets
-## it, its panels anchored to the corners of the room it is given and a settings button under the
-## map; with the touch controls it keeps the native 480x270 at the world's scale.
+## it, its panels anchored to the corners of the room it is given and, under the map, the shortcut
+## rail, a row for each panel or screen a key or a click opens; with the touch controls it keeps the
+## native 480x270 at the world's scale.
 ## Every word comes from hud.csv through Godot's translations, Korean first, or in the language
 ## the settings keep. It reads the world and holds no game rule.
 extends CanvasLayer
-
-## Sent when the settings button is clicked.
-signal settings_asked
 
 const LOCALES := ["ko", "en"]
 const FONT := "res://hud/fonts/Galmuri9.ttf"
@@ -55,8 +53,8 @@ const MAP_AT := {false: Vector2(392, 4), true: Vector2(346, 4)}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
 const NOTICE_SLIP_HEIGHT := 16
-# The settings button, under the map; the touch layout has none, its pause button standing in.
-const SETTINGS_RECT := Rect2(424, 70, 52, 16)
+# How far under the map the shortcut rail hangs.
+const RAIL_GAP := 4
 # The translation key of each challenge verdict, by WorldAdapter.CHALLENGE_* constant.
 const CHALLENGE_KEYS := {
 	WorldAdapter.CHALLENGE_NONE: "CHALLENGE_NONE",
@@ -115,8 +113,9 @@ var slot_skills: Array[Dictionary] = []
 var touch: Control
 ## The room the HUD is laid out in, in its own pixels.
 var room := NATIVE
-## The settings button, shown in the keyboard layout.
-var settings_button: Panel
+## The shortcut rail under the map, shown in the keyboard layout; the touch layout has its own
+## buttons.
+var shortcuts: Control
 
 var _theme := Theme.new()
 var _portrait := TextureRect.new()
@@ -325,7 +324,7 @@ func use_touch(on: bool) -> void:
 		touch.release_all()
 	Input.emulate_touch_from_mouse = on and not DisplayServer.is_touchscreen_available()
 	_skill_bar.visible = not on
-	settings_button.visible = not on
+	shortcuts.visible = not on
 	_place()
 
 
@@ -355,11 +354,35 @@ func from_window(at: Vector2) -> Vector2:
 	return transform.affine_inverse() * at
 
 
-# Asks for the settings when the settings button is clicked.
-func _on_settings_button(event: InputEvent) -> void:
-	var click := event as InputEventMouseButton
-	if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-		settings_asked.emit()
+## Shows `table` on the shortcut rail, a row for each entry, a Dictionary of its `action`, the name
+## of the panel or screen it opens as this HUD holds it, its `key`, KEY_NONE for none, its `icon`,
+## a key of the rail's icons, and its `label`, the hud.csv key of its word; gives the touch
+## controls' buttons their icons by action; and lights the row whose panel or screen is open
+## whenever one opens or closes.
+func show_shortcuts(table: Array[Dictionary]) -> void:
+	_set_up()
+	var rows: Array[Dictionary] = []
+	for row: Dictionary in table:
+		var shown := row.duplicate()
+		shown.key = OS.get_keycode_string(row.key) if row.key != KEY_NONE else ""
+		rows.append(shown)
+		touch.icons[row.action] = row.icon
+		var opened: Control = get(row.action)
+		if not opened.visibility_changed.is_connected(_light_shortcut):
+			opened.visibility_changed.connect(_light_shortcut)
+	shortcuts.rows = rows
+	_place()
+	_light_shortcut()
+
+
+# Lights the shortcut rail's row whose panel or screen is open on top, or none.
+func _light_shortcut() -> void:
+	var open: Control = screen() if screen() != null else panel()
+	shortcuts.lit = ""
+	for row: Dictionary in shortcuts.rows:
+		if get(row.action) == open:
+			shortcuts.lit = row.action
+	shortcuts.queue_redraw()
 
 
 # Places the panels of the layout shown in the room: each keeps its place against the corner it
@@ -369,7 +392,8 @@ func _place() -> void:
 	var on := touch.visible
 	var gained := room - NATIVE
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
-	settings_button.position = SETTINGS_RECT.position + Vector2(gained.x, 0)
+	shortcuts.top_right = _map_panel.position + Vector2(_map_panel.size.x, _map_panel.size.y + RAIL_GAP)
+	shortcuts.queue_redraw()
 	_skill_bar.position = Vector2(240 - _skill_bar.size.x / 2.0, 240) + Vector2(gained.x / 2.0, gained.y)
 	purse.belt_at = _skill_bar.position + Vector2(_skill_bar.size.x + 4, 0)
 	purse.belt = not on
@@ -546,12 +570,6 @@ func _build() -> void:
 	labels.qi_value.text = "—"
 
 	var map := _panel(Rect2(MAP_AT[false], Vector2(84, 62)))
-	settings_button = _panel(SETTINGS_RECT)
-	var word := _label(settings_button, "SETTINGS_TITLE", Vector2.ZERO, Palette.PAPER_3)
-	word.size = SETTINGS_RECT.size - Vector2(0, 2)
-	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	word.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	settings_button.gui_input.connect(_on_settings_button)
 	_map_panel = map
 	_map.position = Vector2(4, 4)
 	_map.size = Vector2(MAP_SIZE)
@@ -664,6 +682,12 @@ func _build() -> void:
 	add_child(sect)
 	add_child(factions)
 	add_child(dialogue)
+	# The shortcut rail, over the panels, so the row of the one open reads lit over its dimmed room,
+	# and under the screens.
+	shortcuts = preload("res://hud/shortcuts.gd").new()
+	shortcuts.use_font(_theme.default_font)
+	add_child(shortcuts)
+	shortcuts.visible = true
 	# The screens, closed until the play scene opens one, over every panel and each over the last.
 	title_screen = preload("res://hud/title.gd").new()
 	new_game = preload("res://hud/new_game.gd").new()
