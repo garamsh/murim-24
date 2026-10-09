@@ -1,0 +1,14 @@
+# Evidence for PR #208, round 2
+
+Captured at 3d20657 on the development Mac (Apple M1, macOS, Godot 4.7.2, Compatibility renderer), in Korean, with the damage numbers at their default, "mine", unless named otherwise. Every Godot run exited on its own within a frame cap. The captures keep the settings in a file of their own (`user://capture_r2_settings.cfg`), not the player's.
+
+- `fight_ko_strip.png`: 8 frames, 640x360 each, cropped round where the player is drawn in the play scene at 1920x1080. The player is born in Hwasan (village 0) of seed 2026 and ordered on the smallest hostile army. The frames are frames 1366, 1370, 1372, 1376, 1382, 1390, 1400 and 1412 of `fight_log.txt`, ticks 1842 to 1868. Read left to right, top to bottom:
+  - (d) The player's sword strike, the blade's arc, is drawn in jade as the half-disc ahead of it (frames 2 to 4, and 7).
+  - (c) The strike on tick 1845 kills person 2. It flashes in the impact colour, its number floats up, and it falls a quarter turn and fades where it stood (frames 2 to 6). It is gone by frame 8, 700 ms on.
+  - (a) The same strike hits person 3, the target in crimson brackets, and its 10 floats up over it in paper (frames 2 to 5). In "mine", only the player's own numbers show: the player's losses in crimson, and its hits in paper.
+- `first_hit_ko_strip.png`: the player's first strike, on tick 1109, frames 13, 16, 20 and 30. The struck flashes and is bracketed. Its number floats up under the HUD's red "적대 · 말을 섞지 않는다" label over the target, so the label covers it here. That label is drawn by the HUD, on a layer above the world, and is not changed by this PR.
+- `m1_mine_everyone_strip.png`: (b) the M1 battle through `world_view.tscn`, where no one is steered, so everyone who fights is a bystander. The top row is "mine": 26 to 32 uses drawn a frame, and 0 numbers. The bottom row is the same battle a few ticks on with "everyone" as the control: 61 to 504 numbers a frame. Log: `m1_log.txt`.
+  - It is the M1 battle and not the region because no bystander fight happens near the player in seed 2026. A headless scan of the play scene found no use by anyone but the player that struck anyone but the player, at any distance, within 12000 ticks of birth in Hwasan or the Cult village (4000 in the Black Fang village). The region's fighting is against the player.
+- `settings_ko_strip.png`: the settings panel over the world, on the damage numbers row (피해 숫자), with 끔 (off), 내 것 (mine) and 모두 (everyone) chosen in turn. The line under the rows says what the row sets. As each was chosen, the world art's `damage_numbers` read off, mine and everyone.
+
+Scripts: `zz_capture_r2.gd` (the fight; its second argument is the birth village), `zz_capture_m1_r2.gd` and `zz_capture_settings.gd`. The strips are laid out by `../zz_strip.gd`. Run each from the repository root as `godot --path . --script res://<script> -- <out dir> [village]`, after copying it there.
