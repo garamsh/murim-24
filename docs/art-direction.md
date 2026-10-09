@@ -32,15 +32,19 @@ The approved target, which the production set is taken from:
 - `art/mockup/mobile_hud_targets.png` — `mobile_hud_idle` over the dimmed world with every touch target's outline and size in native pixels, and a legend of a native pixel's size on a phone at the 4x export; `mobile_hud_targets_4x.png` at 4x. It is for review.
 - `art/mockup/arts_panel.png` — the arts panel open over the target screen on PC: the realm on a ladder of the eight realms, the qi left against the store, the heart method and its nature; a list of each art known by its nature, every skill with its qi cost, the realm it needs, its cooldown and the key it is on, greyed when not yet learned and its realm in crimson when not reached; and the loadout of five slots on Q W E R T, in Korean; `arts_panel_4x.png` at 4x. Its data and words, each checked for room in Korean and English, are drawn by `art/mockup/arts.lua`.
 - `art/mockup/arts_panel_touch.png` — the arts panel on a phone: each art's skills as 42-pixel tiles of their icons, the realm and qi, and the tapped skill's details beside them, with the skill arc left clear and ringed in jade, waiting for the button the tapped skill goes on; `arts_panel_touch_4x.png` at 4x.
+- `art/mockup/angle/`, drawn by `art/mockup/angle.gd` (#204, evidence/pr-204) — the world at Albion's angle (ADR 0059), the reference the game's view is ported to: ground off the cell grid (`angle/ground.gdshader`), levels with rock faces, trees, the buildings and bodies redrawn at the angle, and the four region screens.
 - `art/mockup/mobile_hud_arts.png` — `mobile_hud_idle` with the qi left against the store and the realm in the status, an arts button beside the genealogy, sect and duel buttons, and the loadout on the arc; `mobile_hud_arts_4x.png` at 4x.
 
 The production set. Each `.aseprite` file is drawn by the `.lua` script beside it and exported beside it as a `.png` sheet with a `.json` of its frames and tags, by the command in `docs/convention/stack-godot.md` §Asset export. `art/build.sh` redraws and exports all of it.
 
 | Asset | Frame | Tags |
 |---|---|---|
-| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each |
-| `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14 |
-| `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3` |
+| `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
+| `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
+| `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
+| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each; the top-down ground, drawn on the contact sheet and not by the game |
+| `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14; as `terrain` |
+| `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3`; as `terrain` |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` (four frames) |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
@@ -54,8 +58,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/seat_gate` | 64 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/decorations/fields` | 16 x 16 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
-| `art/decorations/ground` | 16 x 16 | `paving` and `road` (four each), `millet` and `rice` (two each) |
+| `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
+| `art/decorations/ground` | 16 x 12 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
 | `art/decorations/sect_banner` | 16 x 32 | `orthodox`, `demonic`, `unorthodox` |
 | `art/icons/skill_icons` | 16 x 16 | `strike`, `burst` |
@@ -75,11 +79,13 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 |---|---|
 | Native resolution | 480 x 270 pixels (16:9) |
 | Scale | Whole multiples only, filling the window: on a PC, the largest showing at least 640 x 360 (3x at 1920 x 1080); with the touch controls, at least 480 x 270 (4x at 1920 x 1080). The HUD on a PC is drawn at half the world's multiple, rounded up |
-| Grid | One core cell to one 16 x 16 tile; at least 40 cells across and 22.5 down on a PC, 30 and 16.875 with the touch controls |
-| View | Three-quarter top-down (ADR 0012): ground and roofs seen from above, facades and standing bodies drawn upright; no isometric diamond and no perspective |
-| Draw order | Everything standing is drawn in order of its footprint's bottom edge, back to front |
+| Grid | One core cell drawn 16 pixels wide and 12 deep (ADR 0059); at least 40 cells across and 30 down on a PC, 30 and 22.5 with the touch controls |
+| Levels | Ground on level `n` is raised 16 pixels times `n`: water at -1, plain and forest at 0, hills rising as slopes to 1 and 2, mountains in steps of 2, 4 and 5. A face drops where a level ends, and only where the ground cannot be crossed |
+| View | Albion's angle (ADR 0059): ground and roofs seen from above, foreshortened down the screen; facades and standing bodies drawn upright; no isometric diamond and no perspective |
+| Draw order | Everything standing is drawn in order of the row its footprint ends on, back to front, the raised rows of the ground among it |
 | Light | From the upper left; shadows fall to the lower right |
 
+- Until #200's next pull requests redraw them at the angle, bodies and structures keep the art of the 16-pixel grid below: a body stands with its feet on the point the core gives it, and a structure with its footprint's bottom edge on the ground's.
 - A sprite covers its footprint and may rise above it. A body's footprint is its cell, the bottom 16 rows of its 16 x 24 frame. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
 - Shadows are not in the sprites. The view draws them on the ground by darkening it two steps along its own ramp: an ellipse under a body's feet, a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene shows them in place.
 
@@ -95,7 +101,9 @@ References, described in words:
 
 ## Palette
 
-Every pixel comes from the master palette, defined in `art/pixel.lua` as ramps that run dark to light. Shading moves along a ramp, never off it, and nothing is blended by transparency: smoke and glows are dithered. `art/contact_sheet/contact_sheet.lua` refuses a source holding a colour outside the palette.
+The ground is the exception: it takes the ramps of Terrain below, and its shadows lean toward a dark blue (`141828`). Everything else is drawn from the master palette.
+
+Every other pixel comes from the master palette, defined in `art/pixel.lua` as ramps that run dark to light. Shading moves along a ramp, never off it, and nothing is blended by transparency: smoke and glows are dithered. `art/contact_sheet/contact_sheet.lua` refuses a source holding a colour outside the palette.
 
 | Ramp | Hex, dark to light | Use |
 |---|---|---|
@@ -129,28 +137,22 @@ Faction accents, chosen to stay apart at one cell and against every terrain kind
 
 ## Terrain
 
-One tile set covers the terrain kinds the region generator defines (`core/region.cpp`, `region_data()`): plain, forest, hills, water and mountain.
+The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the cell grid from each cell's kind of ground, level, face material and slope (ADR 0059), and the view bakes it once per 32-cell area. What an artist draws for it is not whole tiles but each kind's materials in `art/terrain/`: its ramp (`ramps`), the detail scattered over it (`detail`) and the trees (`trees`). The shader makes the texture's grain and the faces' strata from the kind's ramp.
 
-| Kind | Passable | Full tile | Where it meets the plain | Landforms |
+| Kind | Where | Ramp, dark to light, hue in degrees, saturation, lightness | Surface | Rim |
 |---|---|---|---|---|
-| Plain | yes | Grass in three tones with tufts and a rare flower | (the ground under every other kind) | none |
-| Forest | yes | Separate tree crowns from above, lit from the upper left with a dark rim, the understorey and the odd trunk between them | A dark canopy edge and a shadow on the grass | none |
-| Hills | yes | Upland grass a step lighter than the plain, with a faint contour arc | A contour, dark on the lower-right side and lit on the upper-left | Clusters of low mounds, 2 x 1 to 3 x 3 cells |
-| Water | no | Blue with a little deep-water grain and short light ripples | Foam, then a bank of wet earth | none |
-| Mountain | no | Fractured stone and scree | A lit lip above, a dark cliff foot below, a shadow on the grass | Massifs of sharp peaks, 2 x 2 to 4 x 3 cells |
+| Plain | Plain cells | hue 100, 0.42, 0.42 | Grass in clustered texture and large colour patches | None of its own |
+| Hills | Hills cells, as slopes | hue 80, 0.36, 0.50 | As the plain, a step lighter and yellower | As the plain |
+| Forest | Forest floor | hue 130, 0.38, 0.27 | Leaf litter under clustered trees | Darkest step along its edge, a narrow dither where it meets other ground |
+| Water | Water cells, a level down | hue 205, 0.45, 0.42 | Deep-water grain | Shallows and foam at the shore, reeds |
+| Rock | Mountain cells | hue 220, 0.12, 0.46 | Two greys with moss in clusters | A lit lip at each drop |
 
-- A tile carries no outline, so tiles of one kind join into one surface.
-- Full tiles carry no feature larger than a tuft, a crown or a ripple, and near their edge all four variants are the same grain, so a stretch of one kind shows neither seams nor a feature per cell.
-- Features larger than a cell are landforms: mountain massifs and hill clusters, each over a footprint of several cells, standing on a stretch of their kind and drawn with everything standing, by the bottom edge of the footprint. A landform's frame is 64 x 64 with the footprint at its bottom-left; what rises above the footprint is drawn above it in the frame.
-- Water and mountain, the two impassable kinds, carry no green, so passability reads from colour family alone.
-
-Transitions:
-
-- Every kind but the plain is laid over the plain on a dual grid, half a cell up and left of the cells, so each tile's four corners sit on four cells' centres.
-- A tile's corner mask adds top-left 1, top-right 2, bottom-left 4 and bottom-right 8 for each of those four cells that is of the kind. Masks 1 to 14 are the transition tiles, frame mask of the kind's tag in `art/terrain/transitions`; mask 15 is one of the kind's full tiles; mask 0 is empty. The 16 tiles are the set Godot's Match Corners terrain mode describes.
-- Within a transition tile, the kind's area is its corners blended across the tile with noise that repeats every 16 pixels, so neighbouring tiles agree all along their shared edge. The rest is transparent, so the plain shows.
-- Where two kinds other than the plain meet, each meets the plain, and a strip of plain shows between them, read as a bank or a clearing.
-- How Godot lays them is in `docs/convention/stack-godot.md` §Terrain layers.
+- Each ramp has four steps shifted in hue: toward blue in the dark steps and toward yellow in the light ones (#212). `art/terrain/ground.lua` draws them from the hue, saturation and lightness in the table above, and an earth bank's from hue 28, 0.35, 0.36.
+- An edge between kinds is the cells' values interpolated through a point warped by noise, so it wanders over the cells' sides and never runs along one. The noise varies slowly enough that the warp never folds the ground over, so no island of one kind lies inside another. Where two kinds meet, a dither a few pixels wide joins them.
+- A face drops where the ground drops a level and the ground cannot be crossed. Rock faces have strata of uneven thickness that tilt along the face, split by fissures, with plants over the lip and scree piled at the foot. Water's banks are earth. Each face has a lit lip above and a shadow at its foot.
+- Detail is scattered per area by Poisson-disc spacing, denser near an edge between kinds: tufts and flowers on grass, litter on the forest floor and reeds at the water's edge. A detail frame's ink pixels take the ramp of the ground it lies on, or the forest's for litter and reeds.
+- Decorative trees (`art/terrain/trees`) cluster inside forests and thin toward their edges, with a lone tree now and then in the open. A shadow lies on the ground round each one's foot, and none stands on a village or a structure.
+- Fields are tiles a cell each over the ground (`art/decorations/fields`), since their state changes. What people build in straight lines is drawn over the ground as well, not in it: a village's paving and road are tiles a cell each (`art/decorations/ground`).
 
 ## Bodies and markers
 
@@ -246,10 +248,10 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 | Do | Don't |
 |---|---|
 | Draw every pixel from the master palette | Blend with transparency or add colours outside it |
-| Stand bodies and facades upright on the square grid | Draw isometric diamonds or a perspective view |
+| Stand bodies and facades upright at the angle, on cells 16 wide and 12 deep | Draw isometric diamonds or a perspective view |
 | Draw a structure over its footprint and let it rise above | Draw a structure larger than its footprint to fit in more detail |
 | Give each faction its accent, value and silhouette together | Rely on colour alone to tell factions apart |
-| Outline bodies and structures in ink | Outline terrain tiles |
+| Outline bodies and structures in ink | Outline the ground, or let it follow the cells' sides |
 | Light from the upper left, shadow to the lower right | Bake shadows into sprites, or mix light directions in one scene |
 | Keep the player its faction's body with markers around it | Give the player a larger or unique sprite |
 | Scale by whole multiples | Scale by fractions, which smears pixels |
