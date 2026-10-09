@@ -276,10 +276,30 @@ struct Growth {
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
 };
 
-/// An ability as data. A body uses it on the nearest living hostile body
-/// within `range`, or on its own position when `range` is 0; every hostile
-/// body within `radius` of that point takes `body_damage`, and every
-/// structure whose footprint that disc reaches loses `structure_damage` of
+/// The ground a skill covers, aimed toward a point: the nearest living
+/// hostile body within its range when used on its own, or the target of a
+/// cast.
+enum class Shape : std::uint8_t {
+  /// The disc of `radius` around the point, brought within `range`.
+  AREA,
+  /// A sweep: every point within `range` of the user ahead of the way to the
+  /// point, within a quarter turn either side, or all around when the point
+  /// is the user's own.
+  ARC,
+  /// Every point within `radius` of the line `range` long from the user
+  /// toward the point.
+  LINE,
+  /// The disc of `radius` around the user, wherever it is aimed.
+  SELF,
+  /// The one person aimed at, within `range`, and nothing else; a cast of it
+  /// must name a person.
+  TARGETED,
+};
+
+/// An ability as data. A body uses it toward the nearest living hostile body
+/// within `range`, or where it stands when its shape is SELF or `range` is 0;
+/// every hostile body its `shape` covers takes `body_damage`, and every
+/// structure whose footprint the shape reaches loses `structure_damage` of
 /// durability. A negative `structure_damage` restores durability instead, up
 /// to the intact stage's floor. A village with living residents takes damage
 /// only from factions hostile to its owner, and repair only from the others.
@@ -292,6 +312,18 @@ struct Skill {
   std::int32_t structure_damage = 0;
   std::uint64_t cooldown = 0;
   std::uint32_t qi_cost = 0;
+  Shape shape = Shape::AREA;
+};
+
+/// One use of a skill on the last tick, for a view to draw: person
+/// `person` used its skill `skill`, of shape `shape`, from `origin` toward
+/// `toward`, both in sub-cell units.
+struct Strike {
+  std::size_t person = 0;
+  std::size_t skill = 0;
+  Shape shape = Shape::AREA;
+  Position origin{};
+  Position toward{};
 };
 
 /// The orientation of qi: orthodox, unorthodox or demonic.
@@ -789,7 +821,8 @@ enum class CastRefusal : std::uint8_t {
   ON_COOLDOWN,
   /// The caster holds less qi than the skill costs.
   NO_QI,
-  /// The target is a person the world lacks or a dead one.
+  /// The target is a person the world lacks or a dead one, or not a person
+  /// for a targeted skill.
   NO_TARGET,
   /// The target is a person farther from the caster than the skill's range.
   OUT_OF_RANGE,
@@ -968,6 +1001,9 @@ struct Rules {
   std::int32_t rumour_reach = 0;
   /// Cells, along each axis, within which one person may talk to another.
   std::int32_t talk_reach = 0;
+  /// Cells within which a person no driver steers, with no foe within its
+  /// reach, closes on the nearest foe; 0 for none.
+  std::int32_t sight = 0;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -1162,6 +1198,10 @@ class World {
   /// Returns how many ticks the world has run, the tick a person's
   /// `ready_at` is counted against.
   [[nodiscard]] std::uint64_t tick_count() const { return tick_count_; }
+
+  /// Returns every use of a skill on the last tick, in the order people
+  /// struck; none before the first tick. Neither hashed nor saved.
+  [[nodiscard]] const std::vector<Strike>& strikes() const { return strikes_; }
 
   /// Returns person `person`'s age in whole years of the calendar.
   [[nodiscard]] std::int64_t age_in_years(std::size_t person) const;
@@ -1467,8 +1507,12 @@ class World {
               const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
   void use(std::size_t user, const Crowd& crowd, std::size_t index,
-           Position centre, const std::vector<std::uint32_t>& edges,
+           Position toward, std::optional<std::size_t> locked,
+           const std::vector<std::uint32_t>& edges,
            std::vector<std::uint64_t>& damage);
+  bool cover(std::size_t user, const Crowd& crowd, const Skill& skill,
+             Position toward, std::optional<std::size_t> locked,
+             std::uint64_t body_damage, std::vector<std::uint64_t>& damage);
   [[nodiscard]] const Skill& usable(const Person& person, const Army& army,
                                     std::size_t skill) const;
   [[nodiscard]] std::uint32_t rank_of(const Person& person) const;
@@ -1497,6 +1541,8 @@ class World {
                           std::size_t other, std::size_t other_army) const;
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
+  [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
+                                            const Crowd& crowd) const;
   [[nodiscard]] bool held(std::size_t index, Step pull,
                           const std::vector<bool>& standing,
                           const Crowd& crowd) const;
@@ -1676,6 +1722,7 @@ class World {
   std::vector<std::optional<Declared>> declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.
   std::vector<Event> events_;
+  std::vector<Strike> strikes_;
   /// The latest steps of progress, oldest first, at most PROGRESS_CAPACITY.
   std::vector<Progress> progress_;
   Life life_;

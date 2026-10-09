@@ -282,6 +282,7 @@ void put_skill(Writer& out, const Skill& skill) {
   out.i32(skill.structure_damage);
   out.u64(skill.cooldown);
   out.u32(skill.qi_cost);
+  out.u8(static_cast<std::uint8_t>(skill.shape));
 }
 
 Skill get_skill(Reader& input) {
@@ -292,6 +293,8 @@ Skill get_skill(Reader& input) {
   skill.structure_damage = input.i32();
   skill.cooldown = input.u64();
   skill.qi_cost = input.u32();
+  constexpr std::uint8_t SHAPES = 5;
+  skill.shape = static_cast<Shape>(input.tag(SHAPES));
   return skill;
 }
 
@@ -614,6 +617,7 @@ void put_rules(Writer& out, const Rules& rules) {
   out.u64(rules.ticks_per_day);
   out.i32(rules.rumour_reach);
   out.i32(rules.talk_reach);
+  out.i32(rules.sight);
 }
 
 Rules get_rules(Reader& input) {
@@ -628,6 +632,7 @@ Rules get_rules(Reader& input) {
   rules.ticks_per_day = input.u64();
   rules.rumour_reach = input.i32();
   rules.talk_reach = input.i32();
+  rules.sight = input.i32();
   return rules;
 }
 

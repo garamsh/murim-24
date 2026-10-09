@@ -3371,6 +3371,267 @@ TEST(World, ACastAtItselfCentresItsDiscOnTheCaster) {
   EXPECT_EQ(lost(world, NEAR_FOE), 0U);
 }
 
+// A user at USER_CELL and five hostile people around it, each an army of
+// its own with IDLE, in this order: a cell east, a cell north-east, a cell
+// west, three cells east and five cells east. The user's order strikes with
+// `skill`, so it uses it on its own once ready, and never again after.
+constexpr Cell USER_CELL{6, 8};
+constexpr std::array<Cell, 5> AROUND{{{7, 8}, {7, 7}, {5, 8}, {9, 8}, {11, 8}}};
+constexpr std::size_t BY_EAST = 1;
+constexpr std::size_t BY_NORTH_EAST = 2;
+constexpr std::size_t BY_WEST = 3;
+constexpr std::size_t BY_THREE_EAST = 4;
+constexpr std::size_t BY_FIVE_EAST = 5;
+constexpr std::uint64_t SHAPE_DAMAGE = 3;
+constexpr std::int32_t ARM = 3 * CELL_SIZE / 2;
+
+World shape_world(Skill skill) {
+  skill.body_damage = SHAPE_DAMAGE;
+  skill.cooldown = NEVER_AGAIN;
+  std::vector<ArmySpec> armies{
+      army(USER_CELL, USER_CELL, 1, TARGET_HEALTH, 0, {skill})};
+  for (const Cell cell : AROUND) {
+    armies.push_back(army(cell, cell, 1, TARGET_HEALTH, 1, {IDLE}));
+  }
+  return World{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, at_war(0)};
+}
+
+// The people of shape_world() hit, by index, after its first tick.
+std::vector<std::size_t> hit_by(World world) {
+  world.tick();
+  std::vector<std::size_t> hit;
+  for (std::size_t person = 1; person <= AROUND.size(); ++person) {
+    if (lost(world, person) == SHAPE_DAMAGE) {
+      hit.push_back(person);
+    }
+  }
+  return hit;
+}
+
+using Hit = std::vector<std::size_t>;
+
+TEST(World, AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind) {
+  // It faces the nearest foe, east, the first in roster order of the two a
+  // cell away, and sweeps the one north-east too, a diagonal cell away.
+  EXPECT_EQ(hit_by(shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC})),
+            (Hit{BY_EAST, BY_NORTH_EAST}));
+  // Control: an area of no radius at the same range hits only the one it
+  // aims at.
+  EXPECT_EQ(hit_by(shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::AREA})),
+            (Hit{BY_EAST}));
+  // Cast toward the west, it sweeps the one there alone.
+  World west = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
+  west.cast(0, 0, Point{centre_of({0, USER_CELL.y})});
+  EXPECT_EQ(hit_by(west), (Hit{BY_WEST}));
+  // Cast at itself, it sweeps all around.
+  World around = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
+  around.cast(0, 0, Itself{});
+  EXPECT_EQ(hit_by(around), (Hit{BY_EAST, BY_NORTH_EAST, BY_WEST}));
+}
+
+TEST(World, ALineHitsEveryFoeAlongItWithinItsLength) {
+  constexpr std::int32_t HALF_A_BODY = CELL_SIZE / 2;
+  EXPECT_EQ(hit_by(shape_world(
+                Skill{6 * CELL_SIZE, HALF_A_BODY, 0, 0, 0, 0, Shape::LINE})),
+            (Hit{BY_EAST, BY_THREE_EAST, BY_FIVE_EAST}));
+  // Control: four cells long, it stops short of the one five cells east.
+  EXPECT_EQ(hit_by(shape_world(
+                Skill{4 * CELL_SIZE, HALF_A_BODY, 0, 0, 0, 0, Shape::LINE})),
+            (Hit{BY_EAST, BY_THREE_EAST}));
+  // Its far end is rounded: a foe a cell aside, five cells along, lies
+  // within a cell of a line 4.3 cells long only were it longer, and is
+  // spared; a line five cells long takes it in.
+  const auto aside = [](std::int32_t range) {
+    const Cell beyond{USER_CELL.x + 5, USER_CELL.y + 1};
+    World world{
+        Seed{1},
+        Map{open_map(OPEN_SIDE)},
+        {army(USER_CELL, USER_CELL, 1, TARGET_HEALTH, 0,
+              {Skill{range, CELL_SIZE, SHAPE_DAMAGE, 0, NEVER_AGAIN, 0,
+                     Shape::LINE}}),
+         army(AROUND.front(), AROUND.front(), 1, TARGET_HEALTH, 1, {IDLE}),
+         army(beyond, beyond, 1, TARGET_HEALTH, 1, {IDLE})},
+        {},
+        at_war(0)};
+    world.tick();
+    return lost(world, 2);
+  };
+  constexpr std::int32_t SHORT_OF_IT = (43 * CELL_SIZE) / 10;
+  EXPECT_EQ(aside(SHORT_OF_IT), 0U);
+  EXPECT_EQ(aside(5 * CELL_SIZE), SHAPE_DAMAGE);
+}
+
+// The durability each of `structures` keeps after a user at USER_CELL uses
+// `skill` once toward a lone foe a cell north-east of it.
+std::vector<std::uint32_t> standing_after(Skill skill,
+                                          const std::vector<Cell>& structures) {
+  constexpr std::uint32_t DURABLE = 100;
+  skill.structure_damage = 1;
+  skill.cooldown = NEVER_AGAIN;
+  std::vector<Structure> built;
+  built.reserve(structures.size());
+  for (const Cell cell : structures) {
+    built.push_back(Structure{cell, DURABLE});
+  }
+  const Cell foe = AROUND.at(BY_NORTH_EAST - 1);
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army(USER_CELL, USER_CELL, 1, TARGET_HEALTH, 0, {skill}),
+               army(foe, foe, 1, TARGET_HEALTH, 1, {IDLE})},
+              built,
+              at_war(0)};
+  world.tick();
+  std::vector<std::uint32_t> left;
+  left.reserve(built.size());
+  for (std::size_t structure = 0; structure < built.size(); ++structure) {
+    left.push_back(world.structure(structure).durability);
+  }
+  return left;
+}
+
+TEST(World, AnArcAndALineReachTheStructuresTheyCover) {
+  using Left = std::vector<std::uint32_t>;
+  // The arc reaches the barrel east, ahead of the foe's way, and not the one
+  // west, behind it.
+  EXPECT_EQ(
+      standing_after(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC}, {{7, 8}, {5, 8}}),
+      (Left{99, 100}));
+  // The line north-east reaches the barrel on its way four cells out, and
+  // not one as far east off it.
+  EXPECT_EQ(standing_after(
+                Skill{5 * CELL_SIZE, CELL_SIZE / 2, 0, 0, 0, 0, Shape::LINE},
+                {{9, 5}, {10, 8}}),
+            (Left{99, 100}));
+}
+
+TEST(World, ASelfSkillLandsAroundItsUserWhereverItIsCast) {
+  const Skill self{3 * CELL_SIZE, ARM, 0, 0, 0, 0, Shape::SELF};
+  World cast = shape_world(self);
+  cast.cast(0, 0, Point{centre_of(AROUND.at(BY_THREE_EAST - 1))});
+  EXPECT_EQ(hit_by(cast), (Hit{BY_EAST, BY_NORTH_EAST, BY_WEST}));
+  // Control: an area cast at the same point lands there.
+  Skill area = self;
+  area.shape = Shape::AREA;
+  World there = shape_world(area);
+  there.cast(0, 0, Point{centre_of(AROUND.at(BY_THREE_EAST - 1))});
+  EXPECT_EQ(hit_by(there), (Hit{BY_THREE_EAST}));
+}
+
+TEST(World, ATargetedSkillHitsThePersonItLocksOnAlone) {
+  const Skill locked{3 * CELL_SIZE, ARM, 0, 0, 0, 0, Shape::TARGETED};
+  World cast = shape_world(locked);
+  cast.cast(0, 0, AtPerson{BY_EAST});
+  EXPECT_EQ(hit_by(cast), (Hit{BY_EAST}));
+  EXPECT_EQ(cast.cast_refusal(0, 0, Point{centre_of(AROUND.front())}),
+            CastRefusal::NO_TARGET);
+  EXPECT_EQ(cast.cast_refusal(0, 0, Itself{}), CastRefusal::NO_TARGET);
+  // Control: an area of the same radius cast at the same person also hits
+  // the one beside it, and may be cast at a point.
+  Skill area = locked;
+  area.shape = Shape::AREA;
+  World disc = shape_world(area);
+  EXPECT_EQ(disc.cast_refusal(0, 0, Point{centre_of(AROUND.front())}),
+            CastRefusal::NONE);
+  disc.cast(0, 0, AtPerson{BY_EAST});
+  EXPECT_EQ(hit_by(disc), (Hit{BY_EAST, BY_NORTH_EAST}));
+}
+
+TEST(World, EachUseIsRecordedWithItsShapeOriginAndDirectionForATick) {
+  World world = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
+  EXPECT_TRUE(world.strikes().empty());
+  world.tick();
+  // Every foe uses IDLE on itself each tick; the user's sweep comes first.
+  ASSERT_EQ(world.strikes().size(), 1 + AROUND.size());
+  const Strike& strike = world.strikes().front();
+  EXPECT_EQ(strike.person, 0U);
+  EXPECT_EQ(strike.skill, 0U);
+  EXPECT_EQ(strike.shape, Shape::ARC);
+  EXPECT_EQ(strike.origin.x, centre_of(USER_CELL).x);
+  EXPECT_EQ(strike.origin.y, centre_of(USER_CELL).y);
+  EXPECT_EQ(strike.toward.x, centre_of(AROUND.front()).x);
+  EXPECT_EQ(strike.toward.y, centre_of(AROUND.front()).y);
+  EXPECT_EQ(world.strikes().back().shape, Shape::AREA);
+  // Control: on the next tick, cooling down, it strikes nothing, and the
+  // record holds the foes' uses alone.
+  world.tick();
+  ASSERT_EQ(world.strikes().size(), AROUND.size());
+  EXPECT_NE(world.strikes().front().person, 0U);
+}
+
+TEST(World, ASkillsShapeChangesTheHash) {
+  const World arc = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
+  EXPECT_NE(arc.hash(),
+            shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::LINE}).hash());
+  // Control: the same shape hashes the same.
+  EXPECT_EQ(arc.hash(),
+            shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC}).hash());
+}
+
+// Two hostile people on row 8, each standing on its own objective, `apart`
+// cells apart, each sweeping an arc at arm's length, in a world whose people
+// close on a foe within SIGHT cells.
+constexpr std::int32_t SIGHT = 6;
+constexpr Cell STAND{3, 8};
+
+World closing_world(std::int32_t apart) {
+  const Skill arm{ARM, 0, 1, 0, 1, 0, Shape::ARC};
+  const Cell other{STAND.x + apart, STAND.y};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(STAND, STAND, 1, TARGET_HEALTH, 0, {arm}),
+                army(other, other, 1, TARGET_HEALTH, 1, {arm})},
+               {},
+               rules};
+}
+
+constexpr std::uint64_t CLOSING_TICKS = 90;
+
+// The ticks, up to the last of CLOSING_TICKS, the two people of `world` have
+// stood within arm's length of each other without a break.
+std::uint64_t ticks_within_reach(World& world) {
+  std::uint64_t within = 0;
+  for (std::uint64_t tick = 0; tick < CLOSING_TICKS; ++tick) {
+    world.tick();
+    const bool reached =
+        distance_squared(world.person(0).position, world.person(1).position) <=
+        std::int64_t{ARM} * ARM;
+    within = reached ? within + 1 : 0;
+  }
+  return within;
+}
+
+TEST(World, APersonClosesOnAFoeInSightAndStandsToFightIt) {
+  World world = closing_world(SIGHT - 1);
+  // Once within reach, the two stay there rather than walk back to their
+  // objectives.
+  EXPECT_GT(ticks_within_reach(world), CLOSING_TICKS / 2);
+  EXPECT_GT(lost(world, 0), 0U);
+  EXPECT_GT(lost(world, 1), 0U);
+  // Control: a foe a cell beyond sight is left alone, each keeping its
+  // objective, unhurt.
+  World apart = closing_world(SIGHT + 1);
+  run_ticks(apart, CLOSING_TICKS);
+  EXPECT_TRUE(in(STAND, apart.person(0).position));
+  EXPECT_TRUE(in(Cell{STAND.x + SIGHT + 1, STAND.y}, apart.person(1).position));
+  EXPECT_EQ(lost(apart, 0), 0U);
+  EXPECT_EQ(lost(apart, 1), 0U);
+}
+
+TEST(World, ASteeredBodyDoesNotCloseOnAFoe) {
+  World steered = closing_world(SIGHT - 1);
+  steered.steer(0, true);
+  run_ticks(steered, CLOSING_TICKS);
+  // The foe closes on it, and its automatic strike still swings back.
+  EXPECT_TRUE(in(STAND, steered.person(0).position));
+  EXPECT_GT(lost(steered, 1), 0U);
+  // Control: unsteered, it leaves its cell to close on the foe.
+  World free = closing_world(SIGHT - 1);
+  run_ticks(free, CLOSING_TICKS);
+  EXPECT_FALSE(in(STAND, free.person(0).position));
+}
+
 TEST(World, ACastIsRefusedWithItsReason) {
   World world = cast_world();
   // Bolt reaches four cells; the far foe stands four cells east.

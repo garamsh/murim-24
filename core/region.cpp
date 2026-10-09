@@ -33,6 +33,9 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 
 // People stand a cell apart, as wide as a body is drawn.
 constexpr std::int32_t SEPARATION = CELL_SIZE;
+// Arm's length, the reach of a blade or a fist: a body and a half, so a foe
+// at the separation, straight or diagonal, lies within it.
+constexpr std::int32_t MELEE = 3 * CELL_SIZE / 2;
 // Combat is paced by this data at 30 ticks a second: a duel to the death in
 // 10 to 30 seconds, twenty a side in 10 seconds to 2 minutes, and a band of
 // twenty raiders leaving a hamlet in ruins in 1 to 5 minutes. Health is eight
@@ -45,6 +48,9 @@ constexpr std::int32_t RUMOUR_REACH = 32;
 // One person may talk to another within 2 cells, a step past the cell apart
 // people keep.
 constexpr std::int32_t TALK_REACH = 2;
+// A person closes on a foe within 8 cells while none is within its reach,
+// past the 6 cells two bands meeting in the open start apart.
+constexpr std::int32_t SIGHT = 8;
 // The rules of life in region_data().
 constexpr std::uint32_t GROWTH = 10;
 constexpr std::uint32_t GROWTH_SPREAD = 5;
@@ -158,7 +164,9 @@ std::vector<Realm> realms() {
 // orthodox and yang; the Heavenly Demon's saber, demonic and yang; and the
 // Black Fang's hidden weapons, unorthodox and yin. Each has a strike at
 // the third-rate realm, taught or read only, a wider one at first-rate and
-// the widest at beyond peak, both of which comprehension unlocks too.
+// the widest at beyond peak, both of which comprehension unlocks too. A
+// blade's strike sweeps an arc at arm's length and a dart flies along a
+// line; the wider two land as discs at a point within the art's range.
 std::vector<Art> arts() {
   constexpr std::uint32_t FIRST = 1;
   constexpr std::uint32_t THIRD = 3;
@@ -172,18 +180,23 @@ std::vector<Art> arts() {
   constexpr std::uint32_t STRIKE_QI = 100;
   constexpr std::uint32_t SWEEP_QI = 400;
   constexpr std::uint32_t FORM_QI = 1'200;
-  constexpr std::int32_t NEAR = 3 * CELL_SIZE;
   constexpr std::int32_t FAR = 8 * CELL_SIZE;
   constexpr std::int32_t WIDE = 2 * CELL_SIZE;
   constexpr std::int32_t WIDEST = 3 * CELL_SIZE;
+  // A blade sweeps an arc at arm's length; a dart flies along a line half
+  // a body wide, far.
+  constexpr Skill BLADE{MELEE, 0, 0, 0, 0, 0, Shape::ARC};
+  constexpr Skill DART{FAR, CELL_SIZE / 2, 0, 0, 0, 0, Shape::LINE};
   const auto art = [&](NameEntry name, std::size_t discipline, Nature nature,
-                       std::int32_t range, std::array<NameEntry, 3> skills) {
+                       Skill strike, std::array<NameEntry, 3> skills) {
+    const std::int32_t range = strike.range;
     return Art{
         std::move(name),
         discipline,
         nature,
         {ArtSkill{std::move(skills.at(0)),
-                  Skill{range, 0, STRIKE_DAMAGE, 0, STRIKE_COOLDOWN, STRIKE_QI},
+                  Skill{range, strike.radius, STRIKE_DAMAGE, 0, STRIKE_COOLDOWN,
+                        STRIKE_QI, strike.shape},
                   FIRST, false},
          ArtSkill{std::move(skills.at(1)),
                   Skill{range, WIDE, SWEEP_DAMAGE, 0, SWEEP_COOLDOWN, SWEEP_QI},
@@ -194,17 +207,17 @@ std::vector<Art> arts() {
   };
   return {
       art({"매화검법", "Plum Blossom Sword"}, 0,
-          Nature{Orientation::ORTHODOX, Polarity::YANG}, NEAR,
+          Nature{Orientation::ORTHODOX, Polarity::YANG}, BLADE,
           {NameEntry{"매화일검", "Plum Blossom Strike"},
            NameEntry{"이십사수매화검법", "Twenty-Four Plum Blossoms"},
            NameEntry{"매화낙영", "Falling Plum Blossoms"}}),
       art({"천마도법", "Heavenly Demon Saber"}, 1,
-          Nature{Orientation::DEMONIC, Polarity::YANG}, NEAR,
+          Nature{Orientation::DEMONIC, Polarity::YANG}, BLADE,
           {NameEntry{"천마일도", "Heavenly Demon Cut"},
            NameEntry{"천마혈풍", "Heavenly Demon Blood Wind"},
            NameEntry{"천마군림", "Heavenly Demon Descends"}}),
       art({"흑아비도술", "Black Fang Darts"}, 3,
-          Nature{Orientation::UNORTHODOX, Polarity::YIN}, FAR,
+          Nature{Orientation::UNORTHODOX, Polarity::YIN}, DART,
           {NameEntry{"흑아표", "Black Fang Dart"},
            NameEntry{"만천화우", "Rain of Flowers"},
            NameEntry{"흑아폭우", "Black Fang Storm"}}),
@@ -626,20 +639,23 @@ void validate(const RegionData& data) {
 }  // namespace
 
 RegionData region_data() {
-  // A guard's strike; a mend that restores the structures within ten cells
-  // of where it is used, a village's from its centre; and a torch that burns
-  // them, where they belong to a faction its user is hostile to.
+  // A guard's strike, sweeping an arc at arm's length; a mend that restores
+  // the structures within ten cells of where it is used, a village's from its
+  // centre; and a torch that burns them, where they belong to a faction its
+  // user is hostile to.
   constexpr std::uint64_t GUARD_COOLDOWN = 15;
   constexpr std::uint64_t GUARD_DAMAGE = 10;
-  constexpr Skill GUARD{3 * CELL_SIZE, 0, GUARD_DAMAGE, 0, GUARD_COOLDOWN};
+  constexpr Skill GUARD{MELEE,          0, GUARD_DAMAGE, 0,
+                        GUARD_COOLDOWN, 0, Shape::ARC};
   constexpr std::int32_t MEND_REACH = 10;
   constexpr std::int32_t MEND_REPAIR = -5;
   constexpr std::uint64_t MEND_COOLDOWN = 30;
-  constexpr Skill MEND{0, MEND_REACH * CELL_SIZE, 0, MEND_REPAIR,
-                       MEND_COOLDOWN};
+  constexpr Skill MEND{
+      0, MEND_REACH * CELL_SIZE, 0, MEND_REPAIR, MEND_COOLDOWN, 0, Shape::SELF};
   constexpr std::int32_t TORCH_DAMAGE = 10;
-  constexpr Skill TORCH{0, MEND_REACH * CELL_SIZE, 0, TORCH_DAMAGE,
-                        MEND_COOLDOWN};
+  constexpr Skill TORCH{
+      0,          MEND_REACH * CELL_SIZE, 0, TORCH_DAMAGE, MEND_COOLDOWN, 0,
+      Shape::SELF};
   constexpr Footprint HOUSE{3, 3};
   constexpr Footprint HALL{5, 3};
   constexpr Footprint WELL{2, 2};
@@ -920,7 +936,8 @@ Region generate_region(Seed seed, const RegionData& data) {
                       {DURABILITY, DURABILITY / 2, 1},
                       TICKS_PER_DAY,
                       RUMOUR_REACH,
-                      TALK_REACH},
+                      TALK_REACH,
+                      SIGHT},
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
                 {},

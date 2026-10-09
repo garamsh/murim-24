@@ -101,20 +101,23 @@ bool block_footprints(Map& map, const std::vector<Structure>& structures) {
   return true;
 }
 
+// The sub-cell unit of the structure's footprint nearest `point`.
+Position nearest_point(const Structure& structure, Position point) {
+  const auto clamp = [](std::int32_t along, std::int32_t first,
+                        std::int32_t cells) {
+    const std::int64_t low = std::int64_t{first} * CELL_SIZE;
+    const std::int64_t high = ((std::int64_t{first} + cells) * CELL_SIZE) - 1;
+    return static_cast<std::int32_t>(
+        std::clamp<std::int64_t>(along, low, high));
+  };
+  return Position{clamp(point.x, structure.cell.x, structure.footprint.width),
+                  clamp(point.y, structure.cell.y, structure.footprint.height)};
+}
+
 // Whether the disc of `radius` around `centre` reaches a sub-cell unit of the
 // structure's footprint: the footprint's nearest point lies within it.
 bool reaches(const Structure& structure, Position centre, std::int32_t radius) {
-  const auto gap = [](std::int64_t point, std::int32_t first,
-                      std::int32_t cells) {
-    const std::int64_t low = std::int64_t{first} * CELL_SIZE;
-    const std::int64_t high = ((std::int64_t{first} + cells) * CELL_SIZE) - 1;
-    return std::max({low - point, std::int64_t{0}, point - high});
-  };
-  const std::int64_t gap_x =
-      gap(centre.x, structure.cell.x, structure.footprint.width);
-  const std::int64_t gap_y =
-      gap(centre.y, structure.cell.y, structure.footprint.height);
-  return (gap_x * gap_x) + (gap_y * gap_y) <=
+  return distance_squared(centre, nearest_point(structure, centre)) <=
          std::int64_t{radius} * std::int64_t{radius};
 }
 
@@ -201,6 +204,132 @@ class Nearest {
   std::optional<Key> best_;
 };
 
+// The person a cast at `target` is aimed at, if it is aimed at one.
+std::optional<std::size_t> person_aimed_at(const Target& target) {
+  const auto* aimed = std::get_if<AtPerson>(&target);
+  return aimed == nullptr ? std::nullopt
+                          : std::optional<std::size_t>{aimed->person};
+}
+
+// The ground one use of a skill of any shape but TARGETED covers, from its
+// user at `from` toward `toward`: a disc around `toward`, which a SELF skill
+// is always used toward its user's own position for; an arc of the range's
+// reach ahead of the way to `toward`; or the points within the radius of a
+// line the range long toward it.
+class Swath {
+ public:
+  Swath(const Skill& skill, Position from, Position toward)
+      : shape_(skill.shape),
+        from_(from),
+        range_(skill.range),
+        radius_(skill.radius),
+        centre_(toward),
+        facing_{toward.x - from.x, toward.y - from.y} {
+    if (shape_ == Shape::LINE) {
+      const std::int64_t length = root(distance_squared(from, toward));
+      end_ =
+          length == 0
+              ? from
+              : Position{
+                    static_cast<std::int32_t>(
+                        from.x + (facing_.x * std::int64_t{range_} / length)),
+                    static_cast<std::int32_t>(
+                        from.y + (facing_.y * std::int64_t{range_} / length))};
+      length_ = root(distance_squared(from, end_));
+    }
+  }
+
+  // The centre and reach of a query that finds every point it covers.
+  [[nodiscard]] Position centre() const {
+    return shape_ == Shape::ARC || shape_ == Shape::LINE ? from_ : centre_;
+  }
+  [[nodiscard]] std::int32_t extent() const {
+    switch (shape_) {
+      case Shape::ARC:
+        return range_;
+      case Shape::LINE:
+        return range_ + radius_;
+      case Shape::AREA:
+      case Shape::SELF:
+      case Shape::TARGETED:
+        break;
+    }
+    return radius_;
+  }
+
+  [[nodiscard]] bool covers(Position point) const {
+    const std::int64_t offset_x = std::int64_t{point.x} - from_.x;
+    const std::int64_t offset_y = std::int64_t{point.y} - from_.y;
+    switch (shape_) {
+      case Shape::ARC:
+        return distance_squared(from_, point) <=
+                   std::int64_t{range_} * range_ &&
+               (offset_x * facing_.x) + (offset_y * facing_.y) >= 0;
+      case Shape::LINE: {
+        const std::int64_t along_x = std::int64_t{end_.x} - from_.x;
+        const std::int64_t along_y = std::int64_t{end_.y} - from_.y;
+        const std::int64_t along = (offset_x * along_x) + (offset_y * along_y);
+        const std::int64_t radius = radius_;
+        if (along <= 0) {
+          return distance_squared(from_, point) <= radius * radius;
+        }
+        if (along >= length_ * length_) {
+          return distance_squared(end_, point) <= radius * radius;
+        }
+        return std::abs((offset_x * along_y) - (offset_y * along_x)) <=
+               radius * length_;
+      }
+      case Shape::AREA:
+      case Shape::SELF:
+      case Shape::TARGETED:
+        break;
+    }
+    return distance_squared(centre_, point) <= std::int64_t{radius_} * radius_;
+  }
+
+  // Whether it covers the point of the structure's footprint nearest the
+  // point of its own nearest the footprint's centre.
+  [[nodiscard]] bool reaches(const Structure& structure) const {
+    if (shape_ != Shape::LINE) {
+      const Position near = shape_ == Shape::ARC ? from_ : centre_;
+      return covers(nearest_point(structure, near));
+    }
+    const std::int64_t middle_x =
+        (std::int64_t{structure.cell.x} * CELL_SIZE) +
+        (std::int64_t{structure.footprint.width} * CELL_SIZE / 2);
+    const std::int64_t middle_y =
+        (std::int64_t{structure.cell.y} * CELL_SIZE) +
+        (std::int64_t{structure.footprint.height} * CELL_SIZE / 2);
+    const std::int64_t along_x = std::int64_t{end_.x} - from_.x;
+    const std::int64_t along_y = std::int64_t{end_.y} - from_.y;
+    // How far along the line the footprint's centre lies, within its length.
+    const std::int64_t along =
+        length_ == 0
+            ? 0
+            : std::clamp<std::int64_t>((((middle_x - from_.x) * along_x) +
+                                        ((middle_y - from_.y) * along_y)) /
+                                           length_,
+                                       0, length_);
+    const Position near =
+        length_ == 0 ? from_
+                     : Position{static_cast<std::int32_t>(
+                                    from_.x + (along_x * along / length_)),
+                                static_cast<std::int32_t>(
+                                    from_.y + (along_y * along / length_))};
+    return covers(nearest_point(structure, near));
+  }
+
+ private:
+  Shape shape_;
+  Position from_;
+  std::int32_t range_;
+  std::int32_t radius_;
+  Position centre_;
+  Step facing_;
+  Position end_{};
+  std::int64_t length_ = 0;
+};
+
 // The push a person at `from` takes from one at `there`, closer than the
 // separation: away along the line between them, the harder the closer. Two on
 // one point part along `lean`.
@@ -263,8 +392,9 @@ void fold_selection(const Fold& fold, const Leadership& faction) {
   fold(faction.election.value_or(Election{}).term);
 }
 
-// Folds skill `skill` into `fold`; its qi cost only when it has one, so a
-// world of free skills hashes as before.
+// Folds skill `skill` into `fold`; its qi cost only when it has one, and its
+// shape only when not an area, so a world of free area skills hashes as
+// before.
 template <typename Fold>
 void fold_skill(const Fold& fold, const Skill& skill) {
   fold(skill.range);
@@ -274,6 +404,9 @@ void fold_skill(const Fold& fold, const Skill& skill) {
   fold(skill.cooldown);
   if (skill.qi_cost != 0) {
     fold(skill.qi_cost);
+  }
+  if (skill.shape != Shape::AREA) {
+    fold(static_cast<std::uint8_t>(skill.shape));
   }
 }
 
@@ -329,13 +462,16 @@ void fold_event(const Fold& fold, const Event& event) {
 }
 
 // Folds step `step` of progress into `fold`.
-// Folds the rules' reaches; the talk reach only when set, so a world where
-// no one talks keeps its hash.
+// Folds the rules' reaches; the talk reach and the sight only when set, so a
+// world where no one talks or closes on a foe keeps its hash.
 template <typename Fold>
 void fold_reaches(const Fold& fold, const Rules& rules) {
   fold(rules.rumour_reach);
   if (rules.talk_reach != 0) {
     fold(rules.talk_reach);
+  }
+  if (rules.sight != 0) {
+    fold(rules.sight);
   }
 }
 
@@ -867,11 +1003,13 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     recruits += army.members.size();
   }
   if (!reachable(rules_.separation) || !reachable(rules_.rumour_reach) ||
-      !reachable(rules_.talk_reach) || recruits > MAX_PEOPLE ||
+      !reachable(rules_.talk_reach) || !reachable(rules_.sight) ||
+      recruits > MAX_PEOPLE ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
-        "separation, rumour and talk reach, range and radius must lie in "
+        "separation, rumour and talk reach, sight, range and radius must lie "
+        "in "
         "[0, MAX_REACH], hostility "
         "must be square, the world must hold at most MAX_PEOPLE people, each "
         "with health up to MAX_HEALTH on a passable cell, every army must "
@@ -952,6 +1090,7 @@ void World::restore() {
   const bool bad_rules =
       rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
       !reachable(rules_.rumour_reach) || !reachable(rules_.talk_reach) ||
+      !reachable(rules_.sight) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
@@ -2083,6 +2222,7 @@ void World::tick() {
                     std::move(owners)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
+  strikes_.clear();
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     strike(index, crowd, edges, damage);
   }
@@ -2183,7 +2323,9 @@ std::vector<World::Passing> World::passings() const {
 // root of its rank in its army, and none while a living foe on the move
 // within its reach lies ahead along it, so it holds and fights rather than
 // walking past. A person within two cells of its ring counts as standing
-// still, so a crowd jostled a little stays standing.
+// still, so a crowd jostled a little stays standing. One no driver steers,
+// with a foe in sight, closes on it instead, or stands to fight one within
+// its reach.
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
                   std::vector<Step>& pulls, std::vector<bool>& standing) const {
   for (const Army& army : armies_) {
@@ -2195,6 +2337,11 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
       const std::uint32_t distance = army.field.distance(cell);
       pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
       standing.at(index) = distance <= ring + STANDING_SLACK;
+      if (const std::optional<Step> engaged = closing(index, army, crowd)) {
+        pulls.at(index) = *engaged;
+        standing.at(index) =
+            standing.at(index) && engaged->x == 0 && engaged->y == 0;
+      }
     }
   }
   // Read from the pulls as they were, so the order people are held in
@@ -2658,7 +2805,7 @@ void World::strike(std::size_t user, const Crowd& crowd,
     if (assess_cast(self, army, *cast, tick_count_) == CastRefusal::NONE) {
       use(user, crowd, cast->skill,
           landing(striker, usable(striker, own, cast->skill), cast->target),
-          edges, damage);
+          person_aimed_at(cast->target), edges, damage);
     }
     return;
   }
@@ -2693,13 +2840,14 @@ void World::strike(std::size_t user, const Crowd& crowd,
     }
   }
   const Skill& skill = usable(striker, own, index);
-  // A skill of range 0 reaches only its user, so it lands where it stands.
-  if (skill.range == 0) {
-    use(user, crowd, index, striker.position, edges, damage);
+  // A self skill, or one of range 0, reaches only its user, so it lands where
+  // it stands.
+  if (skill.shape == Shape::SELF || skill.range == 0) {
+    use(user, crowd, index, striker.position, std::nullopt, edges, damage);
     return;
   }
-  // The crowd's order breaks ties, so the order the query visits people in
-  // does not decide the target.
+  // It faces the nearest hostile person in range. The crowd's order breaks
+  // ties, so the order the query visits people in does not decide the target.
   Nearest nearest{striker.position, Step{0, 0}};
   crowd.hash.visit_within(
       striker.position, skill.range, [&](std::size_t other) {
@@ -2708,18 +2856,20 @@ void World::strike(std::size_t user, const Crowd& crowd,
         }
       });
   if (const std::optional<std::size_t> target = nearest.found()) {
-    use(user, crowd, index, crowd.hash.position(*target), edges, damage);
+    use(user, crowd, index, crowd.hash.position(*target),
+        crowd.people.at(*target), edges, damage);
   }
 }
 
 // The one rule every skill resolves through, whoever uses it and however it
-// was aimed: each use of skill `index`, among the user's, spends its qi and
-// hits every hostile person in the disc around `centre` once, as much harder
-// as the edge `edges` gives the user's home, the might of its realm and, for
-// an art skill, the potency of its nature, and every structure its disc
-// reaches.
+// was aimed: each use of skill `index`, among the user's, toward `toward`,
+// spends its qi and hits once every hostile person its shape covers, or for
+// a targeted skill the person `locked` alone, as much harder as the edge
+// `edges` gives the user's home, the might of its realm and, for an art
+// skill, the potency of its nature, and every structure its shape reaches.
 void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
-                Position centre, const std::vector<std::uint32_t>& edges,
+                Position toward, std::optional<std::size_t> locked,
+                const std::vector<std::uint32_t>& edges,
                 std::vector<std::uint64_t>& damage) {
   const std::size_t army = crowd.armies.at(user);
   const std::size_t self = crowd.people.at(user);
@@ -2740,7 +2890,6 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
     striker.ready_at = ready;
   }
   striker.qi -= skill.qi_cost;
-  bool hit = false;
   const std::uint64_t edge = striker.home ? edges.at(*striker.home) : 0;
   const std::uint32_t rank = rank_of(striker);
   const std::uint64_t might =
@@ -2750,20 +2899,10 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   if (art) {
     body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
   }
-  crowd.hash.visit_within(centre, skill.radius, [&](std::size_t other) {
-    if (foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
-      damage.at(other) += body_damage;
-      hit = true;
-    }
-  });
-  structure_index_.visit_within(
-      centre, skill.radius + structure_extent_, [&](std::size_t index) {
-        if (reaches(structures_.at(index), centre, skill.radius)) {
-          hit = shift(index, Destroyer{army, own.faction},
-                      skill.structure_damage) ||
-                hit;
-        }
-      });
+  strikes_.push_back(
+      Strike{self, index, skill.shape, striker.position, toward});
+  const bool hit =
+      cover(user, crowd, skill, toward, locked, body_damage, damage);
   // A use that hits anyone or anything practises its art's discipline, or,
   // for an army's skill, the striker's best discipline, its highest limit.
   if (hit && !striker.talent.empty()) {
@@ -2773,6 +2912,49 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
     striker.attainment.at(practised) = std::min(
         aptitude.limit, striker.attainment.at(practised) + aptitude.growth);
   }
+}
+
+// Whether one use of `skill` by the person at `user` of `crowd` toward
+// `toward` hits anyone or anything: every hostile person its shape covers
+// takes `body_damage` into `damage`, or for a targeted skill the person
+// `locked` alone, and every structure its shape reaches its structure damage.
+bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
+                  Position toward, std::optional<std::size_t> locked,
+                  std::uint64_t body_damage,
+                  std::vector<std::uint64_t>& damage) {
+  const std::size_t army = crowd.armies.at(user);
+  const std::size_t self = crowd.people.at(user);
+  bool hit = false;
+  if (skill.shape == Shape::TARGETED) {
+    // Only the person locked on, wherever its slot in the crowd lies.
+    for (std::size_t other = 0; locked && other < crowd.people.size();
+         ++other) {
+      if (crowd.people.at(other) == *locked &&
+          foes(self, army, *locked, crowd.armies.at(other))) {
+        damage.at(other) += body_damage;
+        hit = true;
+      }
+    }
+    return hit;
+  }
+  const Swath swath{skill, crowd.hash.position(user), toward};
+  crowd.hash.visit_within(
+      swath.centre(), swath.extent(), [&](std::size_t other) {
+        if (swath.covers(crowd.hash.position(other)) &&
+            foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
+          damage.at(other) += body_damage;
+          hit = true;
+        }
+      });
+  const Destroyer striker{army, armies_.at(army).faction};
+  structure_index_.visit_within(
+      swath.centre(), swath.extent() + structure_extent_,
+      [&](std::size_t index) {
+        if (swath.reaches(structures_.at(index))) {
+          hit = shift(index, striker, skill.structure_damage) || hit;
+        }
+      });
+  return hit;
 }
 
 // Skill `skill` of person `person`, serving in `army`: the army's skills,
@@ -2872,6 +3054,62 @@ bool World::held(std::size_t index, Step pull,
   return engaged;
 }
 
+// The pull of the person at `index` of `crowd`, serving in `army`, engaged
+// with a living foe within the rules' sight: none while a foe lies within its
+// reach, so it stands and fights, and otherwise the step closing on the
+// nearest, the first in the crowd's order among equals. The step is the one
+// of the eight nearest the line to the foe, open as a flow field's is: into a
+// passable cell, and on a diagonal only where both cells beside it are
+// passable. Nothing, so it keeps its objective, when a driver steers its
+// army, it reaches no farther than itself, no foe is in sight or the step is
+// not open.
+std::optional<Step> World::closing(std::size_t index, const Army& army,
+                                   const Crowd& crowd) const {
+  const std::size_t member = crowd.people.at(index);
+  const std::int64_t reached = reach(people_.at(member), army);
+  if (army.steered || rules_.sight == 0 || reached == 0) {
+    return std::nullopt;
+  }
+  const Position from = crowd.hash.position(index);
+  const std::size_t own = crowd.armies.at(index);
+  Nearest nearest{from, Step{0, 0}};
+  bool within = false;
+  crowd.hash.visit_within(
+      from, rules_.sight * CELL_SIZE, [&](std::size_t other) {
+        const Position there = crowd.hash.position(other);
+        if (foes(member, own, crowd.people.at(other), crowd.armies.at(other))) {
+          nearest.offer(other, there);
+          within = within || distance_squared(from, there) <= reached * reached;
+        }
+      });
+  const std::optional<std::size_t> foe = nearest.found();
+  if (within) {
+    return Step{0, 0};
+  }
+  if (!foe) {
+    return std::nullopt;
+  }
+  const Position there = crowd.hash.position(*foe);
+  const std::int64_t offset_x = std::int64_t{there.x} - from.x;
+  const std::int64_t offset_y = std::int64_t{there.y} - from.y;
+  // A component a twelfth over five of the other's or less is dropped, so
+  // the step lies within an eighth of a turn of the line to the foe.
+  constexpr std::int64_t SLOPE_RISE = 5;
+  constexpr std::int64_t SLOPE_RUN = 12;
+  const Step step{
+      std::abs(offset_x) * SLOPE_RUN >= std::abs(offset_y) * SLOPE_RISE
+          ? sign(offset_x)
+          : 0,
+      std::abs(offset_y) * SLOPE_RUN >= std::abs(offset_x) * SLOPE_RISE
+          ? sign(offset_y)
+          : 0};
+  const Cell cell = cell_of(from);
+  const bool open = map_.passable(Cell{cell.x + step.x, cell.y + step.y}) &&
+                    map_.passable(Cell{cell.x + step.x, cell.y}) &&
+                    map_.passable(Cell{cell.x, cell.y + step.y});
+  return open ? std::optional<Step>{step} : std::nullopt;
+}
+
 // The farthest person `person` of army `army` may strike on its own: the
 // longest range of its order's skills and the art skills it knows.
 std::int32_t World::reach(const Person& person, const Army& army) const {
@@ -2895,9 +3133,13 @@ bool World::foes(std::size_t person, std::size_t army, std::size_t other,
          duelling(person, other);
 }
 
-// Where a cast of `skill` by `caster` at `target` lands.
+// Where a cast of `skill` by `caster` at `target` lands, or which way it
+// goes.
 Position World::landing(const Person& caster, const Skill& skill,
                         const Target& target) const {
+  if (skill.shape == Shape::SELF) {
+    return caster.position;
+  }
   if (const auto* point = std::get_if<Point>(&target)) {
     return within_range(caster.position, point->position, skill.range);
   }
@@ -2927,7 +3169,11 @@ CastRefusal World::assess_cast(std::size_t person,
   if (caster.qi < skill.qi_cost) {
     return CastRefusal::NO_QI;
   }
-  if (const auto* aimed = std::get_if<AtPerson>(&cast.target)) {
+  const auto* aimed = std::get_if<AtPerson>(&cast.target);
+  if (aimed == nullptr && skill.shape == Shape::TARGETED) {
+    return CastRefusal::NO_TARGET;
+  }
+  if (aimed != nullptr) {
     if (aimed->person >= people_.size() ||
         people_.at(aimed->person).health == 0) {
       return CastRefusal::NO_TARGET;
