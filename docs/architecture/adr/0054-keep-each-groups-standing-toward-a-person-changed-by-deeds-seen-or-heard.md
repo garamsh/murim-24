@@ -114,7 +114,8 @@ Options weighed:
   | 200 to 599 | Friendly | Its sect's admission chance doubled. Markets charge a tenth less |
   | 600 to 1,000 | Honoured | Its sect admits it without the chance, by the thresholds alone, as `apply` does. Markets charge a fifth less |
 
-  - A member's group for this purpose is each of its home village, its sect and its faction. The member takes the lowest tier any of them holds toward the person.
+  - A member's groups for this purpose are its home village and its sect, and its faction under a guard. The member takes the lowest tier among them toward the person.
+  - **The faction's guard.** A faction's standing below neutral counts for its members only while the faction stands hostile or at war, by `relation`, toward the person's own faction. Otherwise its members act on their village's and sect's standing alone. Without the guard, one deed against a faction at its weight of 200 per mille could turn every member of it against a person of an allied faction. A faction's standing above neutral always counts.
   - So `hostile` between two people becomes: their factions are hostile (ADR 0038), they are duellists, they are in a feud, or a group of one stands hostile toward the other.
   - The hostile bit keeps the per-tick reads to the people some group is hostile to.
 - **Factions' relations.** Standing is toward people, never toward factions, so it feeds faction relations in one place only: ADR 0038's diplomacy.
@@ -173,7 +174,7 @@ Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a 
 
 The witnesses within sight teach their groups at once, and a deed no one saw stays hidden. A witnessed deed spreads from its cell at 64 cells a day to the anchors of the victim's groups, kept in a store of 4,096 apart from ADR 0032's ring.
 
-Standing decays toward zero by 2 a day. Its tiers decide hostility, sales, admission, teaching and prices. Standing toward a faction's leader doubles war chances and halves peace chances in ADR 0038's diplomacy, so no faction turns hostile for one person's deed.
+Standing decays toward zero by 2 a day. Its tiers decide hostility, sales, admission, teaching and prices. A member acts on its village's and sect's tier, and on its faction's below neutral only while the faction stands hostile or at war with the person's own. Standing toward a faction's leader doubles war chances and halves peace chances in ADR 0038's diplomacy, so no faction turns hostile for one person's deed.
 
 This supersedes these:
 - ADR 0038's `hostile` as a reading of factions and duels alone, now also feuds and hostile standing; and its diplomacy reading no standing
