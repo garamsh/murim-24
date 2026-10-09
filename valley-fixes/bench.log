@@ -1,0 +1,204 @@
+# 739d086, under load (load average 17; two core test suites at 100% CPU): not counted
+== run 1 flags [valley]
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 41 bodies drawn, 17 hidden behind something in the last frame
+angle bench: frame time p50 5.903 ms, p99 8.486 ms, max 10.510 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.034 ms, max 8.720 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2016 ms, p50 178.3 ms, max 222.2 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2870 nodes
+== run 1 flags [valley crowd]
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 232 bodies drawn, 132 hidden behind something in the last frame
+angle bench: frame time p50 14.042 ms, p99 16.746 ms, max 18.080 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.595 ms, max 9.741 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2089 ms, p50 171.2 ms, max 234.7 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.7 MB, 3608 nodes
+== run 1 flags [valley pan]
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 41 bodies drawn, 29 hidden behind something in the last frame
+angle bench: frame time p50 5.941 ms, p99 8.765 ms, max 14.307 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.655 ms, max 8.689 ms; camera travelled 163 cells
+angle bench: map build baked 12 chunks in 2036 ms, p50 168.3 ms, max 229.8 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.2 MB, 2907 nodes
+== run 2 flags [valley]
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.898 ms, p99 7.558 ms, max 11.199 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.045 ms, max 8.804 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2078 ms, p50 171.3 ms, max 230.3 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2872 nodes
+== run 2 flags [valley crowd]
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 236 bodies drawn, 143 hidden behind something in the last frame
+angle bench: frame time p50 14.184 ms, p99 16.838 ms, max 17.463 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.656 ms, max 9.793 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2144 ms, p50 178.8 ms, max 230.5 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.8 MB, 3620 nodes
+== run 2 flags [valley pan]
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 41 bodies drawn, 29 hidden behind something in the last frame
+angle bench: frame time p50 5.960 ms, p99 9.038 ms, max 14.165 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.621 ms, max 9.891 ms; camera travelled 164 cells
+angle bench: map build baked 12 chunks in 2069 ms, p50 171.1 ms, max 229.2 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.2 MB, 2907 nodes
+== run 3 flags [valley]
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 40 bodies drawn, 17 hidden behind something in the last frame
+angle bench: frame time p50 5.961 ms, p99 9.142 ms, max 11.222 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.074 ms, max 10.088 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2092 ms, p50 173.9 ms, max 231.9 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2870 nodes
+== run 3 flags [valley crowd]
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 232 bodies drawn, 133 hidden behind something in the last frame
+angle bench: frame time p50 14.179 ms, p99 16.892 ms, max 18.649 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.617 ms, max 9.467 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 2099 ms, p50 173.8 ms, max 236.6 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.7 MB, 3608 nodes
+== run 3 flags [valley pan]
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 41 bodies drawn, 29 hidden behind something in the last frame
+angle bench: frame time p50 5.933 ms, p99 8.737 ms, max 13.923 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 5.833 ms, max 9.654 ms; camera travelled 163 cells
+angle bench: map build baked 12 chunks in 2082 ms, p50 171.8 ms, max 230.8 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.2 MB, 2907 nodes
+
+# A/B under the same conditions (one core test at 100%, load average about 3): 5ba6909's angle.gd (angle_old) against 739d086's (angle), crowd
+(copied from the console; the runs printed only these lines to it)
+== angle_old run 1: frame time p50 11.561 ms, p99 16.763 ms, max 18.454 ms over 1200 frames
+== angle run 1: frame time p50 11.918 ms, p99 17.649 ms, max 19.081 ms over 1200 frames
+== angle_old run 2: frame time p50 11.735 ms, p99 16.934 ms, max 18.295 ms over 1200 frames
+== angle run 2: frame time p50 12.119 ms, p99 17.558 ms, max 19.145 ms over 1200 frames
+== angle_old run 3: frame time p50 11.751 ms, p99 17.061 ms, max 18.815 ms over 1200 frames
+== angle run 3: frame time p50 12.146 ms, p99 17.686 ms, max 19.435 ms over 1200 frames
+
+# 739d086, quiet machine (load average under 4, no other test, lint or Godot running)
+== run 1 flags [valley] load 1.59 2.25 3.54
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 42 bodies drawn, 18 hidden behind something in the last frame
+angle bench: frame time p50 4.950 ms, p99 7.214 ms, max 9.519 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.669 ms, max 6.458 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1336 ms, p50 112.3 ms, max 150.3 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2867 nodes
+== run 1 flags [valley crowd] load 1.88 2.29 3.54
+angle: valley 128x96 cells, 331 structures, 500 people in 50 armies
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 224 bodies drawn, 152 hidden behind something in the last frame
+angle bench: frame time p50 12.073 ms, p99 14.101 ms, max 15.332 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.611 ms, max 6.429 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1345 ms, p50 112.7 ms, max 151.9 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.7 MB, 3569 nodes
+== run 1 flags [valley pan] load 2.13 2.32 3.52
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 34 bodies drawn, 25 hidden behind something in the last frame
+angle bench: frame time p50 5.349 ms, p99 8.020 ms, max 11.921 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.748 ms, max 6.176 ms; camera travelled 147 cells
+angle bench: map build baked 12 chunks in 1343 ms, p50 111.3 ms, max 151.6 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.1 MB, 2888 nodes
+== run 2 flags [valley] load 2.34 2.36 3.52
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 42 bodies drawn, 17 hidden behind something in the last frame
+angle bench: frame time p50 4.934 ms, p99 7.101 ms, max 9.454 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.550 ms, max 6.284 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1321 ms, p50 110.7 ms, max 151.2 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2867 nodes
+== run 2 flags [valley crowd] load 2.44 2.38 3.51
+angle: valley 128x96 cells, 331 structures, 500 people in 50 armies
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 225 bodies drawn, 150 hidden behind something in the last frame
+angle bench: frame time p50 12.248 ms, p99 15.407 ms, max 40.942 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.607 ms, max 6.282 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1322 ms, p50 110.7 ms, max 150.8 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.7 MB, 3565 nodes
+== run 2 flags [valley pan] load 2.50 2.40 3.50
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 20 hidden behind something in the last frame
+angle bench: frame time p50 6.898 ms, p99 7.457 ms, max 12.300 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.327 ms, max 8.931 ms; camera travelled 185 cells
+angle bench: map build baked 12 chunks in 1360 ms, p50 112.3 ms, max 151.6 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 170.2 MB, 2914 nodes
+== run 3 flags [valley] load 2.74 2.45 3.50
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.900 ms, p99 7.389 ms, max 7.613 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.892 ms, max 6.460 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1363 ms, p50 115.4 ms, max 151.4 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 169.4 MB, 2872 nodes
+== run 3 flags [valley crowd] load 2.56 2.43 3.47
+angle: valley 128x96 cells, 331 structures, 500 people in 50 armies
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 237 bodies drawn, 150 hidden behind something in the last frame
+angle bench: frame time p50 6.898 ms, p99 7.107 ms, max 7.753 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.841 ms, max 6.703 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1363 ms, p50 111.7 ms, max 152.4 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 171.5 MB, 3503 nodes
+== run 3 flags [valley pan] load 2.69 2.46 3.47
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 20 hidden behind something in the last frame
+angle bench: frame time p50 6.896 ms, p99 7.424 ms, max 14.427 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.483 ms, max 11.247 ms; camera travelled 185 cells
+angle bench: map build baked 12 chunks in 1363 ms, p50 120.2 ms, max 152.1 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 170.2 MB, 2914 nodes
+ALLDONE
+
+# 739d086, reruns of the capped runs
+== extra flags [valley] load 2.41 2.41 3.42
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 24 hidden behind something in the last frame
+angle bench: frame time p50 6.899 ms, p99 7.328 ms, max 7.538 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.827 ms, max 6.646 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1368 ms, p50 112.4 ms, max 151.8 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 169.4 MB, 2872 nodes
+== extra flags [valley crowd] load 2.31 2.39 3.40
+angle: valley 128x96 cells, 331 structures, 500 people in 50 armies
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 237 bodies drawn, 150 hidden behind something in the last frame
+angle bench: frame time p50 6.893 ms, p99 7.122 ms, max 7.428 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.797 ms, max 6.646 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1372 ms, p50 119.1 ms, max 155.4 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 171.5 MB, 3503 nodes
+== extra flags [valley pan] load 2.41 2.41 3.39
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 20 hidden behind something in the last frame
+angle bench: frame time p50 6.898 ms, p99 7.476 ms, max 11.268 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.882 ms, max 7.979 ms; camera travelled 185 cells
+angle bench: map build baked 12 chunks in 1367 ms, p50 117.9 ms, max 165.2 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 170.2 MB, 2914 nodes
+== extra flags [valley pan] load 2.43 2.41 3.38
+angle: valley 128x96 cells, 331 structures, 80 people in 20 armies
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 38 bodies drawn, 20 hidden behind something in the last frame
+angle bench: frame time p50 6.897 ms, p99 7.393 ms, max 11.791 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.380 ms, max 8.497 ms; camera travelled 185 cells
+angle bench: map build baked 12 chunks in 1370 ms, p50 113.2 ms, max 152.5 ms a chunk
+angle bench: texture memory 41.1 MB, video memory 47.3 MB, static memory 170.2 MB, 2914 nodes

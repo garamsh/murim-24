@@ -32,7 +32,7 @@ The fixes the PM asked for on the revised look (PR #204 comment 6078753845). Mad
 4. **Peaks pasted on a flat base, and busy rock.**
    - **What drew it:** each peak sprite's foot was one straight row of pixels the full width of the mountain, standing on bare rock ground.
    - **Fix:**
-     - The foot wanders by 6 px.
+     - The foot rises and falls by up to 5 px.
      - Scree spills a few pixels from it, thinning by dithering.
      - 16 pines straddle it.
      - Pines are planted round each peak's footing on the ground.
@@ -41,4 +41,16 @@ The fixes the PM asked for on the revised look (PR #204 comment 6078753845). Mad
 
 ## Frame cost
 
-To follow. The bench is rerun on a quiet machine. A series run at 739d086 while two core test suites were each holding a CPU at 100% (load average 17) read about 20 to 25% slower than the quiet series in `../revised/`, and is not counted.
+`bench valley [crowd|pan]` at 739d086, 1920x1080, vsync off, under the HUD, 1200 timed frames, each run quitting on its own, on AC power, on a quiet machine (load average 1.6 to 2.7, no other test, lint or Godot process). `bench.log` holds every printed line.
+
+| Scene | p50 (ms) | p99 (ms) | max (ms) |
+|---|---|---|---|
+| the village, 80 people (runs 1, 2) | 4.950, 4.934 | 7.214, 7.101 | 9.519, 9.454 |
+| `crowd`: 500 people (runs 1, 2) | 12.073, 12.248 | 14.101, 15.407 | 15.332, 40.942 |
+| `pan` (run 1) | 5.349 | 8.020 | 11.921 |
+
+- Not counted: from the second `pan` run on, every run, including 500 people, sat at p50 6.89 to 6.90 ms, the period of a 144 Hz display. A crowd that took 12 ms a frame minutes earlier cannot take 6.9, so those frames were paced by the display, not measured. Its four reruns did the same. The display was on (`pmset -g log`). The window was 1920x1080 and drew as many people (237). Round 2 met the same thing in one run.
+- What the fixes cost, measured apart from the machine's state: crowd runs of 5ba6909's and 739d086's `angle.gd` taken in turn, three each, while one core test held a core: p50 11.56 to 11.75 against 11.92 to 12.15 ms, p99 16.76 to 17.06 against 17.56 to 17.69 ms. About 0.4 ms of p50 and 0.6 ms of p99; I have not traced which change costs it.
+- The second crowd run's 40.9 ms maximum is one frame; its p99 is 15.4 ms.
+- Under the 16.7 ms budget at p99 in every counted run.
+- The map build baked the 12 chunks in 1.34 s on the quiet machine, 111 to 113 ms a chunk at p50 and 152 ms at most (1.39 to 1.52 s in `../revised/`).
