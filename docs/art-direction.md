@@ -9,6 +9,7 @@ How Murim24 looks: the screen, the palette, terrain, bodies, structures, effects
 - Palette
 - Terrain
 - Bodies and markers
+- Scale
 - Structures and damage stages
 - Effects and HUD
 - Do and don't
@@ -183,6 +184,37 @@ An individual agent and an aggregate army read differently:
 | Detail | Face, weapon, pose | Rows of heads in the faction's colours, no faces |
 | Frame | None | Accent-coloured bracket corners round the block, the faction's banner above it |
 | Number | None | A plate under it with the army's name and count, drawn by the HUD as text |
+
+## Scale
+
+Places, buildings and land follow real proportions, measured against a person, who fills a cell (`docs/concept.md` §Identity). These are the base pack's proposed sizes, data a pack may change (ADR 0049). Each layout patch, art round and growth rule is checked against them.
+
+The li of ADR 0047 measures the distance between places, and a place's layout patch carries the size of what stands there. A walled town of 40 × 30 cells keeps its neighbours where the map puts them.
+
+| Thing | Size in cells | Note |
+|---|---|---|
+| House, one household | 4 x 3 | A rural house of three bays; the base pack's 3 x 3 house grows to this |
+| Courtyard house | 10 x 10 | Rooms on three or four sides round a court, a well-off household's |
+| Village hall | 6 x 4 | Ancestral or meeting hall, twice a house's floor |
+| Temple compound | 12 x 10 | Gate, court and main hall |
+| Yamen or great hall | 16 x 12 | A town's seat of rule, with its court |
+| Market square | 10 x 8 in a town, 16 x 12 in a city | Open paving with stalls on its edges |
+| Wall, thickness | 2 for a town, 3 for a city | Owner: at least 2 |
+| Wall, height | 2 levels for a town, 3 for a city | Lifted like a cliff level, with a walkway and crenellations |
+| Gate | 2 to 3 cells wide, under a 4 x 3 gate tower | 2 to 4 gates a town, on its roads |
+| Corner tower | 3 x 3 | On every corner of a town's wall |
+| Village | 15 x 10 to 30 x 20, unwalled | 5 to 30 households |
+| Walled town | at least 40 x 30 inside the wall | Owner: streets, wards, market, hall, temples, courtyard houses |
+| Major city | at least 80 x 60 inside the wall | Owner: with inner wards |
+| Sect seat | 24 x 16 to 40 x 30 | A compound of gate, halls, training grounds and quarters, not a single hall |
+| Field, one household's | 4 to 8 cells | Exaggerated: a real household farmed several thousand cells' worth. ADR 0022's food data feeds about 5 people a cell, which the rules need |
+| Track | 1 cell wide | |
+| Road | 2 cells wide | |
+| Highway | 3 to 4 cells wide | |
+| Stream | 1 to 2 cells wide | |
+| River | 4 to 8 cells wide | |
+| Great river, the Yellow River or the Yangtze | 16 to 40 cells wide | Exaggerated narrow: at a person's scale a real width would be hundreds of cells |
+| Bridge | the river's width plus 2, 3 cells wide | Arched over streams and rivers. Great rivers are crossed by ferries and fords (ADR 0047) |
 
 ## Structures and damage stages
 
