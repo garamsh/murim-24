@@ -89,7 +89,7 @@ The review on #204 asked for three fixes before the benches count:
 - Against 739d086's reruns under the same conditions, the shaded ground costs nothing measurable per frame: the village 5.05 to 5.07 against 5.05 ms p50, the crowd 12.02 to 12.05 against 12.00 ms. A frame draws the baked images, as before.
 - `pan` is 0.15 to 0.2 ms higher at p50 (5.51 to 5.56 against 5.35 to 5.36 ms).
 - The crowd's p99, 16.9 to 17.3 ms, is over the 16.7 ms budget in all three runs, as in 739d086's rerun. The village and `pan` are under it.
-- The map build bakes the 12 chunks in 3.31 to 3.34 s, 267 to 274 ms a chunk at p50 and 485 ms at most, against 1.34 s at 739d086. The shader takes about 30 ms of a chunk. The rest is on the CPU: the detail, the trees, the shadows and cutting the image into strips. None of it is paid while the game runs.
+- The map build bakes the 12 chunks in 3.31 to 3.34 s, 267 to 274 ms a chunk at p50 and 485 ms at most, against 1.34 s at 739d086. I have not timed how this splits between the shader's draw, read back to the CPU, and the CPU's work: the detail, the trees, the shadows and cutting the image into strips. None of it is paid while the game runs.
 - Less ground image is resident: 1.16 MB a chunk against 1.90 MB at 739d086, because the strips are cut to their content.
 - A first measurement, at 53d76c1, gave a p50 of about 22.6 ms in every scene (`bench_53d76c1.log`, not counted). The viewport that bakes the ground drew its shader again every frame after the bake. 8440a71 frees it once every chunk is baked.
 
