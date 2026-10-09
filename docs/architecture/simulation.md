@@ -211,7 +211,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - **Arts' families, tiers, mastery and lineage.** ADR 0055 (`adr/0055-give-arts-a-family-a-tier-and-a-mastery-and-gain-higher-arts-by-synthesis-over-a-lineage-graph.md`), proposed; nothing above changes until the pull requests that build it land.
   - **Mastery.** Each known art carries a mastery raised by hits, training and teaching, capped by talent, whose stages open forms with the realm's rank. Manuals and teaching give an art's first forms.
   - **Synthesis.** Higher arts come by a daily chance for anyone meeting an edge of a lineage graph in the pack, replacing the comprehension above.
-  - **Footwork and heart methods.** They are passive per stage, and nature comes from the first heart method.
+  - **Left open by ADR 0055.** What footwork and heart-method arts do beyond their skills, such as speed or cultivation, which would touch ADRs 0037 and 0046. Whether nature should come from a heart-method art rather than the first art learned. Whether talk or rumour reveals a person's arts, which would change ADR 0039. Whether people draw an art at birth.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.

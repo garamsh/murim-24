@@ -1,6 +1,6 @@
 # ADR 0035: Cultivate qi into realms, and gain arts by comprehension, manuals and teaching
 
-> Status: accepted; its realms, qi, cultivation and heart method named in the core, and its fixed orientations and polarities, superseded by ADR-0049, which gives them general names and makes the natures' axes pack data; its draw among all of a person's skills whatever it holds superseded by ADR-0050, under which an art skill needs its discipline's weapon family; its comprehension on a realm gained, its manual teaching every skill the rank allows, its teaching of the first skill lacked and its heart method as the first art learned superseded by ADR-0055, which opens forms by mastery stage, gains higher arts by synthesis and takes the heart method from its family
+> Status: accepted; its realms, qi, cultivation and heart method named in the core, and its fixed orientations and polarities, superseded by ADR-0049, which gives them general names and makes the natures' axes pack data; its draw among all of a person's skills whatever it holds superseded by ADR-0050, under which an art skill needs its discipline's weapon family; its comprehension on a realm gained, its manual teaching every skill the rank allows, and its teaching of the first skill lacked superseded by ADR-0055, which opens forms by mastery stage and gains higher arts by synthesis
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

@@ -182,7 +182,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Qi amount.** Every person holds a store of inner energy (naegong), which grows by cultivation: time and practice. Talent bounds how far and how fast it grows, and stays hidden (§Talent).
 - **Realms (gyeongji).** Thresholds of qi make realms, on a ladder familiar from Korean wuxia: for example third-rate (samryu), second-rate (iryu), first-rate (ilryu), peak (jeoljeong), beyond peak (chojeoljeong), transformation (hwagyeong), mystery (hyeongyeong) and life-and-death (saengsagyeong). The names and thresholds are data.
 - **Qi nature.** Qi has two axes:
-  - Orientation: orthodox (jeong), unorthodox (sa) or demonic (ma), set by the person's heart method (simbeop), the first art of the heart-method family it learns.
+  - Orientation: orthodox (jeong), unorthodox (sa) or demonic (ma), set by the person's heart method (simbeop).
   - Polarity: firm yang (yanggang) or soft yin (eumyu).
   - Each art has a nature. An art of another nature than one's own is harder to learn or weaker to use.
 - **Skills need qi.** Each skill has a minimum qi or realm to learn and to use, and costs qi to cast.

@@ -51,7 +51,7 @@ Options weighed:
     | Footwork | fist | none |
     | Heart method | medicine | none |
 
-    Footwork and heart method share the talent of fist and medicine, so no new talent axis is drawn at birth.
+    Footwork and heart method share the talent of fist and medicine, so no new talent axis is drawn at birth. What their arts do beyond mastery and synthesis is out of this ADR's scope, below.
   - A tier is one of five, from 1 to 5: third-rate (삼류), second-rate (이류), first-rate (일류), peak (절정) and peerless (절세). It sets how slowly mastery rises in the art, and where the window places the art.
   - Rejected: families as a fixed list in the core. A re-theme names its own (ADR 0049).
 - **Mastery.** Each art a person knows carries a mastery from 0 to 10,000 beside it, in the list of known arts.
@@ -106,14 +106,14 @@ Options weighed:
   | Arhat Fist at consummate, Cloud Ladder at minor | Hundred Paces Divine Fist | 10 per mille |
   | Black Fang Darts at consummate, Dark Fragrance Steps at major | Heavenly Maiden Scatters Flowers | 10 per mille |
 
-  - Tier 1 arts are common: every person may draw one at birth by its faction's data, and sects hold the manuals of their tier 2 arts as today. No tier 3 art has a manual at the start, so synthesis is the only way to one.
-- **Footwork and the heart method.** Their skills are passive effects, pack data on the art at each stage:
-  - **Footwork** raises the person's speed per mille, up to 1,200, on both `SPEED` and `DIAGONAL_SPEED`, so ADR 0037's equal speed either way holds.
-  - **A heart method** raises cultivation growth and qi recovery per mille.
-
-  A person's nature is now its first heart-method art's, or its first art's while it knows none. A Hwasan disciple's nature is then Purple Mist's whatever sword it learned first.
+  - Sects hold the manuals of their tier 2 arts as today. Tier 1 arts' manuals are placed in the world by the pack, as a fallen sect's are. No tier 3 art has a manual at the start, so synthesis is the only way to one.
+- **Out of scope, as open questions.** #194 did not ask for these, so they are left to follow-ups and listed in `simulation.md`:
+  - what footwork and heart-method arts do beyond their skills, such as speed or cultivation, which would touch ADRs 0037 and 0046
+  - which art a person's nature comes from, which stays ADR 0035's first art learned
+  - whether talking to a person reveals its arts, which would change ADR 0039
+  - whether people draw an art at birth, which would change the region's generation
 - **Known of.** The player's soul keeps a set of the arts it knows of, one bit an art, saved and hashed.
-  - An art enters it when the body learns it, stands within reading reach of its manual, or talks (ADR 0039) to a person who knows it, whose arts the dialogue then names.
+  - An art enters it when the body learns it, or stands within reading reach of its manual. Hearing of an art by rumour waits for a rumour that carries arts, an open question.
   - The window names an art in the set, and shows ??? for the rest.
   - It is a fact about one soul. No rule for people no driver steers reads it.
 - **Saves and the hash.**
@@ -138,11 +138,10 @@ Options weighed:
   - **Selection.** Selecting a node lists its forms with the stage and rank that open each. An unknown node lists nothing.
   - On a touch screen a tap selects and the window scrolls.
   - The implementing pull request presents a mockup in `art/mockup/` for the PM's approval before the window is built, as earlier panels did.
-- **Supersessions.** This ADR supersedes four points of ADR 0035:
+- **Supersessions.** This ADR supersedes three points of ADR 0035:
   - its comprehension on a realm gained, replaced by forms opening by mastery stage and by synthesis
   - its manual teaching every skill the rank allows, now the initiate forms, with the rest by stage
   - its teaching of the first skill lacked, now an art's initiate forms and then daily mastery
-  - its heart method as the first art learned, now the first art of the heart-method family, or the first art while there is none
 
   It also supersedes ADR 0036's three ways a skill is learned, which gain synthesis.
 
@@ -155,8 +154,7 @@ The implementation, in order, each a pull request with its acceptance:
    - Acceptance: a person meeting an edge comprehending its art at the chance, and one short of a stage never.
    - Acceptance: the starting graph's 18 arts and 6 edges.
    - Acceptance: the sweep's rarity target held.
-3. **Footwork and heart-method effects, and nature from the heart method.** Acceptance: speed and cultivation scaled at each stage, and nature taken from a later heart method.
-4. **The lineage window,** after its mockup is approved. Acceptance: known, known-of and ??? nodes, and edges with their conditions.
+3. **The lineage window,** after its mockup is approved. Acceptance: known, known-of and ??? nodes, and edges with their conditions.
 
 ## Decision
 
@@ -164,15 +162,14 @@ Arts gain a family and a tier as pack data. A family names its discipline and th
 
 Manuals and teaching give an art's initiate forms. Higher arts come by synthesis: a daily chance, scaled by talent, for anyone meeting an edge of the lineage graph, which is pack data of arts, stages, a higher art and a chance. The base pack starts with six families of three tiers and six edges, and tier 3 arts have no manual, so they stay rare.
 
-Footwork and heart methods are passive per stage. Nature comes from the first heart method. The player's soul keeps the arts it knows of, for a lineage window on L that hides the rest as ???.
+What footwork and heart methods do beyond their skills, nature, arts named in talk and arts at birth are left to follow-ups. The player's soul keeps the arts it knows of, for a lineage window on L that hides the rest as ???.
 
-This supersedes ADR 0035's comprehension on a realm gained, its manual teaching every skill the rank allows, its teaching of the first skill lacked and its heart method as the first art learned; and ADR 0036's three ways a skill is learned.
+This supersedes ADR 0035's comprehension on a realm gained, its manual teaching every skill the rank allows, and its teaching of the first skill lacked; and ADR 0036's three ways a skill is learned.
 
 ## Consequences
 
 - Fighting and training now raise a person's arts, so veterans hold stronger forms than recruits of the same realm.
 - The arts' balance moves to data: the tiers' rates, the stages and the edges' chances.
-- A person's movement speed can differ by its footwork, which ADR 0037's holding and ADR 0046's closing must tolerate; the implementing pull request tests a fast chaser.
 - Saves grow by about 200 KB at the bound, and the pinned hash changes.
 - The K panel stays the loadout. The arts' depth moves to the L window.
 
