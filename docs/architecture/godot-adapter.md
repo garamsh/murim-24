@@ -105,4 +105,9 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Touch layout on a wide screen.** With the touch controls, the HUD keeps its 480 x 270 layout centred, so on a screen wider than 16:9 the world fills the sides while the joystick and the skill buttons stand inward of the screen's edges.
 - **Inner energy.** The core has none. The HUD's inner-energy bar stands empty with a dash for its value until the core holds it.
 
+- **Content from packs.** ADR 0049 (`adr/0049-load-the-games-content-from-data-packs-and-let-mods-be-packs-over-the-base.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Packs.** The extension passes the bytes Godot's file access reads from the base pack and from `user://mods/` to the pack reader, which parses them into the core's terms.
+  - **Text.** `hud/hud.csv` becomes each pack's `text/` documents per locale, given to the translation server when the packs load, since Godot imports a CSV only in the editor and at export.
+  - **Art.** Faction accents and sprite sets, and each nature axis value's colour, come from the packs' entries, in place of `hud/palette.gd`'s accents, `hud/affiliation.gd`'s list of sprite sets and `hud/arts.gd`'s ramp by orientation.
+  - **Mods.** A mods screen lists the mods found, with their order, errors and overlaps, and the new-game screen shows the packs refused.
 - **Which platforms the library is built for.** It is built for the host, macOS arm64 and Linux x86_64 so far, for Android arm64, and for the PC exports, macOS universal and Windows x86_64; iOS, Linux and Windows arm64 exports are not built.
