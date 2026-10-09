@@ -66,7 +66,7 @@ func key(event: InputEventKey) -> String:
 	if event.keycode == KEY_UP or event.keycode == KEY_DOWN:
 		chosen = _next(chosen, 1 if event.keycode == KEY_DOWN else -1)
 		queue_redraw()
-	elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+	elif ENTER_KEYS.has(event.keycode):
 		return ENTRIES[chosen]
 	return ""
 
@@ -110,8 +110,8 @@ func _draw() -> void:
 	_font = get_theme_default_font() if _font == null else _font
 	draw_set_transform_matrix(_stage())
 	draw_texture(_backdrop, Vector2.ZERO)
-	_text(LINE, tr("TITLE_LINE"), PAPER_DARK, true)
-	_frame(MENU, INK_DARK)
+	_text(LINE, tr("TITLE_LINE"), Palette.PAPER_2, true)
+	_frame(MENU, Palette.INK_1)
 	var items: Array[Dictionary] = []
 	for entry: String in ENTRIES:
 		var item := {"text": tr(ENTRY_KEYS[entry])}
@@ -120,8 +120,8 @@ func _draw() -> void:
 		items.append(item)
 	_menu(MENU.position + MENU_INSET, MENU.size.x - 2 * MENU_INSET.x, items, chosen)
 	if not notice.is_empty():
-		_text(NOTICE, tr(notice), PAPER_DARK, true)
-	draw_rect(Rect2(0, size.y - FOOT, size.x, FOOT), INK_DARK)
-	draw_rect(Rect2(0, size.y - FOOT - 1, size.x, 1), GOLD_DARK)
+		_text(NOTICE, tr(notice), Palette.PAPER_2, true)
+	draw_rect(Rect2(0, size.y - FOOT, size.x, FOOT), Palette.INK_1)
+	draw_rect(Rect2(0, size.y - FOOT - 1, size.x, 1), Palette.GOLD_2)
 	var keys := tr("TITLE_KEYS")
-	_text(Vector2(floorf((size.x - _width(keys)) / 2.0), size.y - FOOT + 1), keys, STONE)
+	_text(Vector2(floorf((size.x - _width(keys)) / 2.0), size.y - FOOT + 1), keys, Palette.STONE_4)

@@ -90,33 +90,33 @@ class Dialogue extends "res://hud/panel.gd":
 		_dialog(RECT, view.name, w("CLOSE") if view.mode == "menu" else "", keys)
 		# The card: the person standing twice its size on a cell of ground, and its particulars.
 		var c := CARD_RECT
-		draw_rect(Rect2(c.position + Vector2(26, 2), Vector2(32, 48)), INK_DARK)
-		draw_rect(Rect2(c.position + Vector2(26, 34), Vector2(32, 16)), GRASS)
-		draw_rect(Rect2(c.position + Vector2(26, 34), Vector2(32, 1)), GRASS_LIGHT)
+		draw_rect(Rect2(c.position + Vector2(26, 2), Vector2(32, 48)), Palette.INK_1)
+		draw_rect(Rect2(c.position + Vector2(26, 34), Vector2(32, 16)), Palette.GRASS_3)
+		draw_rect(Rect2(c.position + Vector2(26, 34), Vector2(32, 1)), Palette.GRASS_4)
 		_portrait(view.person, Rect2(c.position + Vector2(26, 2), Vector2(32, 48)), false)
 		_text(Vector2(c.position.x, c.position.y + 54), fit(view.faction, c.size.x), view.colour)
-		_text(Vector2(c.position.x, c.position.y + 68), fit(view.sect, c.size.x), STONE)
-		_text(Vector2(c.position.x, c.position.y + 82), view.age, STONE)
-		draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), INK_LIGHT)
+		_text(Vector2(c.position.x, c.position.y + 68), fit(view.sect, c.size.x), Palette.STONE_4)
+		_text(Vector2(c.position.x, c.position.y + 82), view.age, Palette.STONE_4)
+		draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_3)
 		var room := RECT.end.x - 12 - SAY_X
 		if view.mode == "menu":
-			_text(Vector2(SAY_X, SAY_Y), "“" + w("GREETING") + "”", GOLD_LIGHT)
+			_text(Vector2(SAY_X, SAY_Y), "“" + w("GREETING") + "”", Palette.GOLD_4)
 			var items: Array[Dictionary] = []
 			for offer: String in view.offers:
 				items.append({"text": offer})
 			_menu(Vector2(SAY_X, SAY_Y + 22), room, items, view.chosen)
 			return
-		_text(Vector2(SAY_X, SAY_Y), w("NEWS"), GOLD_LIGHT)
+		_text(Vector2(SAY_X, SAY_Y), w("NEWS"), Palette.GOLD_4)
 		var news: Array = view.news
 		if news.is_empty():
-			_text(Vector2(SAY_X, SAY_Y + 18), "“" + w("NEWS_NONE") + "”", PAPER)
+			_text(Vector2(SAY_X, SAY_Y + 18), "“" + w("NEWS_NONE") + "”", Palette.PAPER_3)
 			return
 		var more := w("MORE") % [mini(NEWS_LINES, news.size()), news.size()]
-		_text(Vector2(RECT.end.x - 12 - _width(more), SAY_Y), more, STONE_DARK)
+		_text(Vector2(RECT.end.x - 12 - _width(more), SAY_Y), more, Palette.STONE_3)
 		for n in mini(NEWS_LINES, news.size()):
 			var y := SAY_Y + 18 + n * LINE
-			draw_rect(Rect2(SAY_X, y + 5, 3, 3), GOLD_DARK)
-			_text(Vector2(SAY_X + 8, y), fit(news[n], room - 8), PAPER if n == 0 else PAPER_DARK)
+			draw_rect(Rect2(SAY_X, y + 5, 3, 3), Palette.GOLD_2)
+			_text(Vector2(SAY_X + 8, y), fit(news[n], room - 8), Palette.PAPER_3 if n == 0 else Palette.PAPER_2)
 
 	func width_of(text: String) -> float:
 		_font = get_theme_default_font() if _font == null else _font
@@ -139,14 +139,14 @@ class Prompt extends "res://hud/panel.gd":
 		var cap := 0.0 if refused else keycap_width(key) + 4
 		var width := cap + _width(word) + 8
 		var at := (head - Vector2(width / 2.0, 18)).floor()
-		draw_rect(Rect2(at, Vector2(width, 17)), GOLD_DARK if not refused else Color("9c1f24"))
-		draw_rect(Rect2(at + Vector2.ONE, Vector2(width - 2, 15)), INK)
+		draw_rect(Rect2(at, Vector2(width, 17)), Palette.GOLD_2 if not refused else Color("9c1f24"))
+		draw_rect(Rect2(at + Vector2.ONE, Vector2(width - 2, 15)), Palette.INK_2)
 		# A tick under the slip points at the person.
-		draw_rect(Rect2(head.x - 1, at.y + 17, 3, 1), GOLD_DARK if not refused else Color("9c1f24"))
-		draw_rect(Rect2(head.x, at.y + 18, 1, 1), GOLD_DARK if not refused else Color("9c1f24"))
+		draw_rect(Rect2(head.x - 1, at.y + 17, 3, 1), Palette.GOLD_2 if not refused else Color("9c1f24"))
+		draw_rect(Rect2(head.x, at.y + 18, 1, 1), Palette.GOLD_2 if not refused else Color("9c1f24"))
 		if not refused:
 			_keycap(at + Vector2(4, 2), key)
-		_text(at + Vector2(4 + cap, 2), word, Color("d63a2f") if refused else PAPER)
+		_text(at + Vector2(4 + cap, 2), word, Color("d63a2f") if refused else Palette.PAPER_3)
 
 
 var _dir := "."

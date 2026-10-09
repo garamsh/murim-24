@@ -1,11 +1,15 @@
 ## What the HUD's full-screen panels share, as art/mockup/panel.lua shares it among their mockups:
 ## the game behind a panel dimmed by a checker of ink, the panel's frame, its title bar and the keys
 ## along its foot, a menu, a choice's slip, a key's cap, a person's card and portrait, and words
-## drawn in the HUD's font, cut short where they would overrun. It holds no game rule.
+## drawn in the HUD's font, cut short where they would overrun; and how a panel or a screen takes a
+## key and a tap: key() and tap() return what the play scene does next, as a word it acts on, "done"
+## for what the panel did itself, or "" for nothing. It holds no game rule.
 extends Control
 
+const Palette := preload("res://hud/palette.gd")
+const Affiliation := preload("res://hud/affiliation.gd")
+const PersonName := preload("res://hud/person_name.gd")
 const ART := "res://art/"
-const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 const FONT_SIZE := 10
 # The mockups' layout, in the native 480x270.
 const PANEL := Rect2(20, 12, 440, 246)
@@ -15,37 +19,23 @@ const CARD := Vector2(66, 40)
 # Where a card's text starts.
 const CARD_TEXT_X := 23
 const ELLIPSIS := "…"
-# docs/art-direction.md §Palette.
-const INK := Color("2a2433")
-const INK_DARK := Color("14101a")
-const INK_LIGHT := Color("3d3647")
-const GOLD_DARK := Color("8c6a2a")
-const GOLD := Color("c99a3c")
-const GOLD_LIGHT := Color("f0d080")
-const LACQUER := Color("a83a2c")
-const PAPER := Color("efe3c2")
-const PAPER_DARK := Color("d9c9a3")
-const STONE := Color("8a94a0")
-const STONE_DARK := Color("66707d")
-const JADE := Color("4fc49a")
-const JADE_DARK := Color("2f8c6e")
-const INK_PALE := Color("524a5e")
-const GRASS := Color("3b6138")
-const GRASS_LIGHT := Color("4f7a3f")
-const AZURE_LIGHT := Color("5b9ae0")
-const DEAD_TINT := Color(0.45, 0.45, 0.5)
 # A menu's rows, and the height of a key's cap and a choice's slip.
 const MENU_STEP := 18
 const KEYCAP_HEIGHT := 13
 const SLIP_HEIGHT := 14
+## The keys that take what is chosen, and the way each arrow key moves a choice.
+const ENTER_KEYS := [KEY_ENTER, KEY_KP_ENTER]
+const DIRECTIONS := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT, KEY_RIGHT: Vector2i.RIGHT}
+
+## The key that opens the panel and closes it again, as the play scene binds it, or KEY_NONE.
+var toggle_key := KEY_NONE
 
 var _world: WorldAdapter
 var _font: Font
 var _bodies := {}
 var _scrim: ImageTexture
-# The ware icons' sheet and the frame of each tag, loaded on first use.
-var _ware_art: Texture2D
-var _ware_frames := {}
+# Each icon sheet under art/icons/, by its name: each of its tags' icons, loaded on first use.
+static var _sheets := {}
 
 
 func _ready() -> void:
@@ -79,13 +69,18 @@ func _room() -> Rect2:
 
 # A panel in `rect` with `title` and `close` in its title bar and `keys` along its foot.
 func _dialog(rect: Rect2, title: String, close: String, keys: String) -> void:
-	_frame(rect, INK)
-	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(rect.size.x - 6, 16)), INK_DARK)
-	draw_rect(Rect2(rect.position + Vector2(3, 19), Vector2(rect.size.x - 6, 1)), GOLD_DARK)
-	draw_rect(Rect2(rect.position.x + 3, rect.end.y - 20, rect.size.x - 6, 1), GOLD_DARK)
-	_text(rect.position + Vector2(8, 4), title, PAPER, true)
-	_text(Vector2(rect.end.x - 8 - _width(close), rect.position.y + 4), close, STONE)
-	_text(Vector2(rect.position.x + (rect.size.x - _width(keys)) / 2.0, rect.end.y - 17), keys, STONE)
+	_titled(rect, title, close)
+	draw_rect(Rect2(rect.position.x + 3, rect.end.y - 20, rect.size.x - 6, 1), Palette.GOLD_2)
+	_text(Vector2(rect.position.x + (rect.size.x - _width(keys)) / 2.0, rect.end.y - 17), keys, Palette.STONE_4)
+
+
+# A panel in `rect` with `title` and `close` in its title bar.
+func _titled(rect: Rect2, title: String, close: String) -> void:
+	_frame(rect, Palette.INK_2)
+	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(rect.size.x - 6, 16)), Palette.INK_1)
+	draw_rect(Rect2(rect.position + Vector2(3, 19), Vector2(rect.size.x - 6, 1)), Palette.GOLD_2)
+	_text(rect.position + Vector2(8, 4), title, Palette.PAPER_3, true)
+	_text(Vector2(rect.end.x - 8 - _width(close), rect.position.y + 4), close, Palette.STONE_4)
 
 
 # A menu of `items` from `top_left`, `width` wide, a row every MENU_STEP pixels. An item is a
@@ -96,36 +91,36 @@ func _menu(top_left: Vector2, width: float, items: Array[Dictionary], chosen: in
 		var item := items[n]
 		var y := top_left.y + n * MENU_STEP
 		if n > 0:
-			draw_rect(Rect2(top_left.x, y - 3, width, 1), INK_LIGHT)
+			draw_rect(Rect2(top_left.x, y - 3, width, 1), Palette.INK_3)
 		if n == chosen:
-			draw_rect(Rect2(top_left.x, y - 2, width, 16), INK)
-			draw_rect(Rect2(top_left.x, y - 2, 1, 16), JADE)
+			draw_rect(Rect2(top_left.x, y - 2, width, 16), Palette.INK_2)
+			draw_rect(Rect2(top_left.x, y - 2, 1, 16), Palette.JADE_3)
 			for k in 4:
-				draw_rect(Rect2(top_left.x + 4 + k, y + 2 + k, 1, 7 - 2 * k), GOLD_LIGHT)
+				draw_rect(Rect2(top_left.x + 4 + k, y + 2 + k, 1, 7 - 2 * k), Palette.GOLD_4)
 		var note: String = item.get("note", "")
-		var colour := STONE_DARK if not note.is_empty() else (GOLD_LIGHT if n == chosen else PAPER)
+		var colour := Palette.STONE_3 if not note.is_empty() else (Palette.GOLD_4 if n == chosen else Palette.PAPER_3)
 		_text(Vector2(top_left.x + 12, y), item.text, colour)
 		if not note.is_empty():
-			_text(Vector2(top_left.x + width - 4 - _width(note), y), note, STONE_DARK)
+			_text(Vector2(top_left.x + width - 4 - _width(note), y), note, Palette.STONE_3)
 
 
 # A choice's slip `width` wide from `top_left`, its word centred: jade when `on`, ink when not.
 func _slip(top_left: Vector2, width: float, text: String, on: bool) -> void:
 	if on:
-		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), JADE_DARK)
-		draw_rect(Rect2(top_left, Vector2(width, 1)), JADE)
+		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), Palette.JADE_2)
+		draw_rect(Rect2(top_left, Vector2(width, 1)), Palette.JADE_3)
 	else:
-		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), INK_LIGHT)
-		draw_rect(Rect2(top_left + Vector2(0, SLIP_HEIGHT - 1), Vector2(width, 1)), INK_PALE)
-	_text(top_left + Vector2(floorf((width - _width(text)) / 2.0), 1), text, PAPER if on else STONE)
+		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), Palette.INK_3)
+		draw_rect(Rect2(top_left + Vector2(0, SLIP_HEIGHT - 1), Vector2(width, 1)), Palette.INK_4)
+	_text(top_left + Vector2(floorf((width - _width(text)) / 2.0), 1), text, Palette.PAPER_3 if on else Palette.STONE_4)
 
 
 # A key's cap from `top_left` with `text` on it; returns its width.
 func _keycap(top_left: Vector2, text: String) -> float:
 	var w := keycap_width(text)
-	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT)), INK_PALE)
-	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT - 1)), INK_LIGHT)
-	_text(top_left + Vector2(floorf((w - _width(text)) / 2.0), 0), text, PAPER)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT)), Palette.INK_4)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT - 1)), Palette.INK_3)
+	_text(top_left + Vector2(floorf((w - _width(text)) / 2.0), 0), text, Palette.PAPER_3)
 	return w
 
 
@@ -135,22 +130,22 @@ func _person_card(rect: Rect2, person: int, name: String, line: String, dead: bo
 		inner: Color) -> void:
 	draw_rect(rect, border)
 	draw_rect(rect.grow(-1), inner)
-	draw_rect(rect.grow(-2), INK)
+	draw_rect(rect.grow(-2), Palette.INK_2)
 	# The body stands on a cell of ground, as it does in the world.
-	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 16)), GRASS)
-	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 1)), GRASS_LIGHT)
+	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 16)), Palette.GRASS_3)
+	draw_rect(Rect2(rect.position + Vector2(4, 20), Vector2(16, 1)), Palette.GRASS_4)
 	_portrait(person, Rect2(rect.position + Vector2(4, 12), Vector2(16, 24)), dead)
 	# A card's name stays within its 2-pixel frame.
 	var room := CARD.x - CARD_TEXT_X - 2
-	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(name, room), STONE if dead else PAPER)
-	_text(rect.position + Vector2(CARD_TEXT_X, 21), line, STONE_DARK if dead else STONE)
+	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(name, room), Palette.STONE_4 if dead else Palette.PAPER_3)
+	_text(rect.position + Vector2(CARD_TEXT_X, 21), line, Palette.STONE_3 if dead else Palette.STONE_4)
 
 
 # A word on a filled slip whose top-right is `top_right`, its text in paper; returns its width.
 func _tag(top_right: Vector2, text: String, fill: Color) -> float:
 	var w := _width(text) + 6
 	draw_rect(Rect2(top_right - Vector2(w, 0), Vector2(w, 11)), fill)
-	_text(top_right - Vector2(w - 3, 0), text, PAPER)
+	_text(top_right - Vector2(w - 3, 0), text, Palette.PAPER_3)
 	return w
 
 
@@ -158,36 +153,43 @@ func _tag(top_right: Vector2, text: String, fill: Color) -> float:
 # is drawn in the first faction's body, greyed.
 func _portrait(person: int, rect: Rect2, dead: bool) -> void:
 	var faction := _world.person_faction(person)
-	var names := _world.faction_names()
-	var sprite: String = FACTIONS[0]
-	if faction >= 0 and faction < names.size():
-		sprite = names[faction].to_lower()
+	var sprite: String = Affiliation.SPRITES[Affiliation.sprite(_world, faction)]
 	if not _bodies.has(sprite):
 		_bodies[sprite] = load(ART + "bodies/" + sprite + ".png")
-	var tint := DEAD_TINT if dead or faction < 0 else Color.WHITE
+	var tint := Palette.DEAD_TINT if dead or faction < 0 else Color.WHITE
 	draw_texture_rect_region(_bodies[sprite], rect, Rect2(0, 0, 16, 24), tint)
+
+
+# The colour faction `faction`'s name is drawn in.
+func _faction_colour(faction: int) -> Color:
+	return Palette.FACTION_TEXT[Affiliation.sprite(_world, faction)]
 
 
 # A HUD panel: ink with a gold trim and lacquer corner studs.
 func _frame(rect: Rect2, fill: Color) -> void:
-	draw_rect(rect, INK)
-	draw_rect(rect.grow(-1), INK_DARK)
+	draw_rect(rect, Palette.INK_2)
+	draw_rect(rect.grow(-1), Palette.INK_1)
 	draw_rect(rect.grow(-2), fill)
-	draw_rect(Rect2(rect.position + Vector2(2, 0), Vector2(rect.size.x - 4, 1)), GOLD)
-	draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 1), Vector2(rect.size.x - 4, 1)), GOLD_DARK)
-	draw_rect(Rect2(rect.position + Vector2(0, 2), Vector2(1, rect.size.y - 4)), GOLD_DARK)
-	draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1, 2), Vector2(1, rect.size.y - 4)), GOLD_DARK)
+	draw_rect(Rect2(rect.position + Vector2(2, 0), Vector2(rect.size.x - 4, 1)), Palette.GOLD_3)
+	draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 1), Vector2(rect.size.x - 4, 1)), Palette.GOLD_2)
+	draw_rect(Rect2(rect.position + Vector2(0, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_2)
+	draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_2)
 	for corner in [rect.position, Vector2(rect.end.x - 3, rect.position.y),
 			Vector2(rect.position.x, rect.end.y - 3), rect.end - Vector2(3, 3)]:
-		draw_rect(Rect2(corner, Vector2(3, 3)), GOLD)
-		draw_rect(Rect2(corner + Vector2.ONE, Vector2.ONE), LACQUER)
+		draw_rect(Rect2(corner, Vector2(3, 3)), Palette.GOLD_3)
+		draw_rect(Rect2(corner + Vector2.ONE, Vector2.ONE), Palette.LACQUER_3)
 
 
 func _text(top_left: Vector2, text: String, colour: Color, shadow := false) -> void:
 	var baseline := top_left + Vector2(0, _font.get_ascent(FONT_SIZE))
 	if shadow:
-		draw_string(_font, baseline + Vector2.ONE, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, INK_DARK)
+		draw_string(_font, baseline + Vector2.ONE, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, Palette.INK_1)
 	draw_string(_font, baseline, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, colour)
+
+
+# `text` ending at `right`, from `y`.
+func _right(right: float, y: float, text: String, colour: Color) -> void:
+	_text(Vector2(right - _width(text), y), text, colour)
 
 
 func _width(text: String) -> float:
@@ -199,8 +201,8 @@ func _width(text: String) -> float:
 func _scrim_texture() -> ImageTexture:
 	if _scrim == null:
 		var image := Image.create_empty(2, 2, false, Image.FORMAT_RGBA8)
-		image.set_pixel(0, 0, INK_DARK)
-		image.set_pixel(1, 1, INK_DARK)
+		image.set_pixel(0, 0, Palette.INK_1)
+		image.set_pixel(1, 1, Palette.INK_1)
 		_scrim = ImageTexture.create_from_image(image)
 	return _scrim
 
@@ -222,17 +224,38 @@ func _menu_row(top_left: Vector2, width: float, count: int, at: Vector2) -> int:
 	return row
 
 
+# The icon tagged `tag` in art/icons/`sheet`.aseprite in `rect`, tinted by `tint`; nothing for a tag
+# the sheet lacks.
+func _draw_icon(sheet: String, tag: String, rect: Rect2, tint := Color.WHITE) -> void:
+	var drawn := sheet_icon(sheet, tag)
+	if drawn != null:
+		draw_texture_rect_region(drawn.atlas, rect, drawn.region, tint)
+
+
 # The icon tagged `tag` in art/icons/ware_icons.aseprite, a ware's name or "silver", from `top_left`,
 # darkened when `dim`; nothing for a tag the sheet lacks.
 func _ware_icon(tag: String, top_left: Vector2, dim := false) -> void:
-	if _ware_art == null:
-		_ware_art = load(ART + "icons/ware_icons.png")
-		var sheet: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "icons/ware_icons.json"))
-		for frame: Dictionary in sheet.meta.frameTags:
-			_ware_frames[frame.name] = int(frame.from)
-	if _ware_frames.has(tag):
-		draw_texture_rect_region(_ware_art, Rect2(top_left, Vector2(16, 16)),
-				Rect2(_ware_frames[tag] * 16, 0, 16, 16), DEAD_TINT if dim else Color.WHITE)
+	_draw_icon("ware_icons", tag, Rect2(top_left, Vector2(16, 16)), Palette.DEAD_TINT if dim else Color.WHITE)
+
+
+## Returns the icon tagged `tag` in art/icons/`sheet`.aseprite, one 16-pixel frame of its export, or
+## null for a tag the sheet lacks.
+static func sheet_icon(sheet: String, tag: String) -> AtlasTexture:
+	if not _sheets.has(sheet):
+		var art: Texture2D = load(ART + "icons/" + sheet + ".png")
+		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART + "icons/" + sheet + ".json"))
+		_sheets[sheet] = {}
+		for frame: Dictionary in data.meta.frameTags:
+			var each := AtlasTexture.new()
+			each.atlas = art
+			each.region = Rect2(int(frame.from) * 16, 0, 16, 16)
+			_sheets[sheet][frame.name] = each
+	return _sheets[sheet].get(tag)
+
+
+# Returns "done" when the panel did what a key or a tap asked, and "" when it did nothing.
+static func _done(did: bool) -> String:
+	return "done" if did else ""
 
 
 ## Returns the width of a key's cap bearing `text`.

@@ -10,7 +10,6 @@
 ## rule.
 extends "res://hud/panel.gd"
 
-const PersonName := preload("res://hud/person_name.gd")
 const Arts := preload("res://hud/arts.gd")
 ## The menu row that ends the talk, after what the person offers.
 const FAREWELL := -1
@@ -32,9 +31,6 @@ const SAY_X := 132
 const SAY_Y := 116
 const LINE := 14
 const WARE_ROW := 20
-const CRIMSON_LIGHT := Color("d63a2f")
-# The text of each faction's name, by its sprite set in FACTIONS, as the sect panel draws it.
-const FACTION_TEXT: Array[Color] = [Color("5b9ae0"), Color("d63a2f"), Color("e8a830")]
 
 ## The person talked to, or -1 while the window is closed.
 var person := -1
@@ -146,6 +142,30 @@ func back() -> bool:
 	return was
 
 
+## Works the window with `event`: up and down choose what to ask, scroll the news or choose a ware,
+## Enter asks what is chosen, the news shown here and farewell ending the talk, or buys the ware
+## chosen, and Escape goes back from the news or the wares or ends the talk. Returns "buy",
+## "wares", "close", "done", or "" when the key did nothing.
+func key(event: InputEventKey) -> String:
+	if event.keycode == KEY_ESCAPE:
+		return "done" if back() else "close"
+	if DIRECTIONS.has(event.keycode):
+		return _done(move(DIRECTIONS[event.keycode].y))
+	if not ENTER_KEYS.has(event.keycode) or (showing_news and not trading):
+		return ""
+	if trading:
+		return "buy"
+	if choice() == WorldAdapter.OFFER_NEWS:
+		show_news()
+		return "done"
+	return "wares" if choice() == WorldAdapter.OFFER_TRADE else "close"
+
+
+## Works the window with a tap anywhere: it ends the talk. Returns "close".
+func tap(_at: Vector2) -> String:
+	return "close"
+
+
 func _show_menu() -> void:
 	showing_news = false
 	trading = false
@@ -157,7 +177,7 @@ func _show_menu() -> void:
 ## Returns `event`, a rumour as WorldAdapter.rumours gives it, worded in the current locale.
 func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
 	var faction := func(index: int) -> String:
-		return tr("FACTION_" + world.faction_names()[index].to_upper())
+		return Affiliation.faction_name(world, index)
 	var named := func(index: int) -> String:
 		return PersonName.of(world, index, true)
 	match event.kind:
@@ -168,7 +188,7 @@ func rumour_text(world: WorldAdapter, event: Dictionary) -> String:
 		"ruined":
 			return tr("RUMOUR_RUINED") % faction.call(event.owner)
 		"sect_fell":
-			return tr("RUMOUR_SECT_FELL") % tr("SECT_" + world.sect_name(event.sect).to_upper().replace(" ", "_"))
+			return tr("RUMOUR_SECT_FELL") % Affiliation.sect_name(world, event.sect)
 		"leader_changed":
 			var key := "RUMOUR_DUEL" if event.by == "duel" else "RUMOUR_ELECTED"
 			return tr(key) % [named.call(event.leader), faction.call(event.faction)]
@@ -202,9 +222,8 @@ func card_room() -> float:
 func particulars() -> Array[String]:
 	var faction := _world.person_faction(person)
 	var sect := _world.person_sect(person)
-	var faction_name: String = tr("FACTION_" + _world.faction_names()[faction].to_upper()) if faction >= 0 else ""
-	var sect_name: String = tr("DIALOGUE_NO_SECT") if sect < 0 \
-			else tr("SECT_" + _world.sect_name(sect).to_upper().replace(" ", "_"))
+	var faction_name: String = Affiliation.faction_name(_world, faction) if faction >= 0 else ""
+	var sect_name: String = Affiliation.sect_name(_world, sect) if sect >= 0 else tr("DIALOGUE_NO_SECT")
 	var sold := _sold()
 	if not sold.is_empty():
 		var discipline: String = _world.discipline_names()[int(sold.discipline)]
@@ -222,49 +241,48 @@ func _draw() -> void:
 	# The card: the person standing twice its size on a cell of ground, and its particulars.
 	var card := CARD_RECT
 	var body := Rect2(card.position + Vector2(26, 2), Vector2(32, 48))
-	draw_rect(body, INK_DARK)
-	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 16)), GRASS)
-	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 1)), GRASS_LIGHT)
+	draw_rect(body, Palette.INK_1)
+	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 16)), Palette.GRASS_3)
+	draw_rect(Rect2(card.position + Vector2(26, 34), Vector2(32, 1)), Palette.GRASS_4)
 	_portrait(person, body, false)
 	var said := particulars()
 	var faction := _world.person_faction(person)
-	var faction_colour := FACTION_TEXT[maxi(FACTIONS.find(_world.faction_names()[faction].to_lower()), 0)] \
-			if faction >= 0 else STONE
+	var faction_colour := _faction_colour(faction) if faction >= 0 else Palette.STONE_4
 	_text(Vector2(card.position.x, card.position.y + 54), fit(said[0], card.size.x), faction_colour)
-	_text(Vector2(card.position.x, card.position.y + 68), fit(said[1], card.size.x), JADE if not _sold().is_empty() else STONE)
-	_text(Vector2(card.position.x, card.position.y + 82), fit(said[2], card.size.x), STONE)
-	draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), INK_LIGHT)
+	_text(Vector2(card.position.x, card.position.y + 68), fit(said[1], card.size.x), Palette.JADE_3 if not _sold().is_empty() else Palette.STONE_4)
+	_text(Vector2(card.position.x, card.position.y + 82), fit(said[2], card.size.x), Palette.STONE_4)
+	draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_3)
 	var room := line_room()
 	if trading:
 		_draw_wares(room)
 		return
 	if not showing_news:
-		_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_GREETING"), room), GOLD_LIGHT)
+		_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_GREETING"), room), Palette.GOLD_4)
 		var items: Array[Dictionary] = []
 		for row in rows:
 			items.append({"text": fit(tr("DIALOGUE_FAREWELL" if row == FAREWELL else OFFER_KEYS[row]), room - 16)})
 		_menu(Vector2(SAY_X, SAY_Y + 22), room, items, chosen)
 		return
-	_text(Vector2(SAY_X, SAY_Y), tr("DIALOGUE_HEARD"), GOLD_LIGHT)
+	_text(Vector2(SAY_X, SAY_Y), tr("DIALOGUE_HEARD"), Palette.GOLD_4)
 	if news.is_empty():
-		_text(Vector2(SAY_X, SAY_Y + 18), fit(tr("DIALOGUE_NONE"), room), PAPER)
+		_text(Vector2(SAY_X, SAY_Y + 18), fit(tr("DIALOGUE_NONE"), room), Palette.PAPER_3)
 		return
 	var count := "%d / %d" % [mini(first + NEWS_LINES, news.size()), news.size()]
-	_text(Vector2(RECT.end.x - 12 - _width(count), SAY_Y), count, STONE_DARK)
+	_text(Vector2(RECT.end.x - 12 - _width(count), SAY_Y), count, Palette.STONE_3)
 	for n in mini(NEWS_LINES, news.size() - first):
 		var y := SAY_Y + 18 + n * LINE
-		draw_rect(Rect2(SAY_X, y + 5, 3, 3), GOLD_DARK)
-		_text(Vector2(SAY_X + 8, y), fit(news[first + n], room - 8), PAPER if first + n == 0 else PAPER_DARK)
+		draw_rect(Rect2(SAY_X, y + 5, 3, 3), Palette.GOLD_2)
+		_text(Vector2(SAY_X + 8, y), fit(news[first + n], room - 8), Palette.PAPER_3 if first + n == 0 else Palette.PAPER_2)
 
 
 # The wares, from the greeting down: the buyer's silver at the right, a row for each ware, and the
 # line for what came of the last purchase.
 func _draw_wares(room: float) -> void:
-	_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_TRADE_GREETING"), room - 80), GOLD_LIGHT)
+	_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_TRADE_GREETING"), room - 80), Palette.GOLD_4)
 	var right := RECT.end.x - 12
 	var silver := _world.person_silver(buyer)
 	var purse := tr("SILVER") % silver
-	_text(Vector2(right - _width(purse), SAY_Y), purse, PAPER)
+	_text(Vector2(right - _width(purse), SAY_Y), purse, Palette.PAPER_3)
 	_ware_icon("silver", Vector2(right - _width(purse) - 18, SAY_Y - 2))
 	var wares := _world.wares()
 	var held := _world.person_held(buyer)
@@ -272,18 +290,18 @@ func _draw_wares(room: float) -> void:
 		var shown: Dictionary = wares[n]
 		var y := SAY_Y + 22 + n * WARE_ROW
 		if n > 0:
-			draw_rect(Rect2(SAY_X, y - 3, room, 1), INK_LIGHT)
+			draw_rect(Rect2(SAY_X, y - 3, room, 1), Palette.INK_3)
 		var on := n == ware
 		if on:
-			draw_rect(Rect2(SAY_X, y - 2, room, WARE_ROW - 2), INK)
-			draw_rect(Rect2(SAY_X, y - 2, 1, WARE_ROW - 2), JADE)
+			draw_rect(Rect2(SAY_X, y - 2, room, WARE_ROW - 2), Palette.INK_2)
+			draw_rect(Rect2(SAY_X, y - 2, 1, WARE_ROW - 2), Palette.JADE_3)
 		_ware_icon(shown.name, Vector2(SAY_X + 4, y - 1))
-		_text(Vector2(SAY_X + 24, y + 1), fit(ware_name(shown), 104), GOLD_LIGHT if on else PAPER)
+		_text(Vector2(SAY_X + 24, y + 1), fit(ware_name(shown), 104), Palette.GOLD_4 if on else Palette.PAPER_3)
 		_text(Vector2(SAY_X + 132, y + 1), fit(ware_effect(shown), 70),
-				CRIMSON_LIGHT if int(shown.health) > 0 else AZURE_LIGHT)
-		_text(Vector2(SAY_X + 204, y + 1), fit(tr("WARE_HELD") % held[n], 44), STONE)
+				Palette.CRIMSON_4 if int(shown.health) > 0 else Palette.AZURE_4)
+		_text(Vector2(SAY_X + 204, y + 1), fit(tr("WARE_HELD") % held[n], 44), Palette.STONE_4)
 		var price := tr("SILVER") % int(shown.price)
-		_text(Vector2(right - 4 - _width(price), y + 1), price, GOLD if silver >= int(shown.price) else STONE_DARK)
+		_text(Vector2(right - 4 - _width(price), y + 1), price, Palette.GOLD_3 if silver >= int(shown.price) else Palette.STONE_3)
 	if not line.is_empty():
 		var y := SAY_Y + 22 + wares.size() * WARE_ROW + 6
-		_text(Vector2(SAY_X, y), fit(line, room), CRIMSON_LIGHT if refused else JADE)
+		_text(Vector2(SAY_X, y), fit(line, room), Palette.CRIMSON_4 if refused else Palette.JADE_3)

@@ -1,11 +1,11 @@
 # Checks that the genealogy panel shows what the adapter reads: after the region has lived long
 # enough for families to form, the panel on a parent shows that person's name, spouse and
 # children, their family name, age and sect, and talent and lifespan as unknown; moving down and
-# pressing Enter centres it on a child, whose parents then include that parent, and whose
-# generation in the header is one more than its parents'. Control: a person the world began with
-# has no parents, the panel shows none, and its header reads the first generation. Every word the
-# panel draws from hud.csv, and every name the world's data can make, fits the room the panel gives
-# it, in each locale.
+# pressing Enter centres it on a child, as keypad Enter does through its keys, whose parents then
+# include that parent, and whose generation in the header is one more than its parents'. Control: a
+# person the world began with has no parents, the panel shows none, and its header reads the first
+# generation. Every word the panel draws from hud.csv, and every name the world's data can make, fits
+# the room the panel gives it, in each locale.
 extends RefCounted
 
 const SEED := 2026
@@ -63,6 +63,12 @@ func run() -> bool:
 	var recentred: bool = moved and children.has(child) and panel.centre == child \
 			and panel.cards.any(func(card: Dictionary) -> bool: return card.role == "parent" and card.person == parent)
 
+	# Keypad Enter, taken as the play scene passes keys, centres the tree as Enter does.
+	panel.show_person(world, parent, parent)
+	var keyed: Array[String] = [panel.key(_key(KEY_DOWN)), panel.key(_key(KEY_KP_ENTER))]
+	var keypad_centred: bool = keyed == ["done", "done"] and panel.centre == child
+	recentred = recentred and keypad_centred
+
 	# Control: the person the world began with, steered, has no parents to show.
 	var founder: int = world.roster(world.army_count() - 1)[0]
 	panel.show_person(world, founder, founder)
@@ -78,12 +84,19 @@ func run() -> bool:
 	var generations_right: bool = founder_generation == "1대" and parents_founders \
 			and child_generation == "2대"
 	var passed := kin_right and details_right and recentred and control and generations_right
-	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s; the founder %d shows %d parents; generations: founder %s, child %s: %s" % [
+	print("genealogy_test: after %d days person %d %s%s, spouse %d, children %s; cards %s; details %s; down and Enter centre on child %d %s, keypad Enter %s; the founder %d shows %d parents; generations: founder %s, child %s: %s" % [
 		DAYS, parent, name.surname, name.given, spouse, children, shown, panel.details if not details_right else "match",
-		child, recentred, founder, founder_parents, founder_generation, child_generation,
+		child, recentred, keypad_centred, founder, founder_parents, founder_generation, child_generation,
 		"pass" if passed else "FAIL"])
 	panel.free()
 	return passed and fits
+
+
+func _key(keycode: Key) -> InputEventKey:
+	var key := InputEventKey.new()
+	key.keycode = keycode
+	key.pressed = true
+	return key
 
 
 # In each locale, every word the panel draws, in the HUD's font at the panel's size, fits where
@@ -95,7 +108,8 @@ func run() -> bool:
 # drawn whole. Setup: every GENEALOGY_ key in hud.csv is measured, and the widths are not zero.
 func _fit_pass() -> bool:
 	var font: Font = load(Hud.FONT)
-	var table := WorldAdapter.create_region(SEED, 0).names()
+	var region := WorldAdapter.create_region(SEED, 0)
+	var table := region.names()
 	var names: Array[Dictionary] = []
 	for surname: Dictionary in table.surnames:
 		for given: Dictionary in table.female + table.male:
@@ -118,7 +132,7 @@ func _fit_pass() -> bool:
 		for surname: Dictionary in table.surnames:
 			families.append(say.call("GENEALOGY_FAMILY") % (surname.korean if locale == "ko" else surname.romanised))
 		var sects: Array[String] = [say.call("GENEALOGY_NONE")]
-		for faction: String in Hud.FACTIONS:
+		for faction: String in region.faction_names():
 			sects.append(say.call("FACTION_" + faction.to_upper()))
 		# Each check: what is measured, how far it reaches and the room it has.
 		var fits := []

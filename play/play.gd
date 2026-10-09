@@ -57,6 +57,9 @@ const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const ARTS_KEY := KEY_K
 const FACTIONS_KEY := KEY_F
+## The keys that open a panel over the world and close it again, by the HUD's name for the panel
+## each opens, which the touch controls' button for it bears too.
+const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions"}
 ## The key that talks to the person the prompt names.
 const TALK_KEY := KEY_SPACE
 ## The keys that consume the wares, by their index in WorldAdapter.wares.
@@ -127,6 +130,11 @@ func _ready() -> void:
 	_hud.open_title(WorldAdapter.load_refusal(SAVE_SLOT, save_directory) != WorldAdapter.LOAD_MISSING)
 	_hud.settings.applied.connect(fit_view)
 	_hud.settings_asked.connect(open_settings)
+	for keycode: Key in PANEL_KEYS:
+		_hud.get(PANEL_KEYS[keycode]).toggle_key = keycode
+	_hud.arts.slot_keys = CAST_KEYS
+	_hud.arts.clear_key = CLEAR_KEY
+	_hud.factions.challenge_key = CHALLENGE_KEY
 	# Outside a tree, as a test readies it, the scene has no window to fit.
 	if is_inside_tree():
 		get_viewport().size_changed.connect(fit_view)
@@ -232,9 +240,7 @@ func navigate(event: InputEvent) -> bool:
 	var tapped := event as InputEventScreenTouch
 	var open: Control = _hud.screen()
 	if open == null:
-		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.genealogy.visible \
-				or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible or _hud.dialogue.visible \
-				or _aiming != KEY_NONE:
+		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.panel() != null or _aiming != KEY_NONE:
 			return false
 		pause()
 		return true
@@ -258,9 +264,12 @@ func pause() -> void:
 	_sound.ui("open")
 
 
-# Does what a screen's entry or key asks: one of the actions the screens' key() returns.
-func _take(action: String) -> void:
+# Does what the screen or the panel open asks of a key or a tap: one of the words their key() and
+# tap() return. Returns whether it did anything.
+func _take(action: String) -> bool:
 	match action:
+		"":
+			return false
 		"new":
 			_hud.new_game.open()
 		"start":
@@ -285,6 +294,30 @@ func _take(action: String) -> void:
 			get_tree().reload_current_scene()
 		"quit":
 			get_tree().quit()
+		"close":
+			_hud.panel().close()
+			_hud.show_placing()
+		"placed":
+			_hud.show_loadout(world)
+		"apply":
+			return apply_to_sect() >= 0
+		"order":
+			declare(_hud.factions.ask())
+		"yes":
+			declare(_hud.factions.answer(true))
+		"no":
+			_hud.factions.answer(false)
+		"challenge":
+			return challenge() == WorldAdapter.CHALLENGE_NONE
+		"buy":
+			return buy()
+		"wares":
+			var roster := world.roster(steered)
+			if roster.is_empty():
+				_hud.dialogue.close()
+			else:
+				_hud.dialogue.show_wares(roster[0])
+	return true
 
 
 ## Returns the controls as this scene binds them, for the pause panel's guide: each a Dictionary
@@ -358,16 +391,10 @@ func command(event: InputEvent) -> bool:
 		return mouse.pressed and follow(_cursor)
 	elif motion != null:
 		return _moving and follow(_cursor)
-	elif key != null and key.pressed and (key.keycode == GENEALOGY_KEY or _hud.genealogy.visible):
-		return genealogy(key.keycode)
-	elif key != null and key.pressed and (key.keycode == SECT_KEY or _hud.sect.visible):
-		return sects(key.keycode)
-	elif key != null and key.pressed and (key.keycode == ARTS_KEY or _hud.arts.visible):
-		return arts(key.keycode)
-	elif key != null and key.pressed and (key.keycode == FACTIONS_KEY or _hud.factions.visible):
-		return factions(key.keycode)
-	elif key != null and key.pressed and (key.keycode == TALK_KEY or _hud.dialogue.visible):
-		return talk(key.keycode)
+	elif key != null and key.pressed and _hud.panel() != null:
+		return _take(_hud.panel().key(key))
+	elif key != null and key.pressed and (PANEL_KEYS.has(key.keycode) or key.keycode == TALK_KEY):
+		return open_panel(key.keycode)
 	elif key != null and key.pressed and not key.echo and WARE_KEYS.has(key.keycode):
 		return consume(WARE_KEYS.find(key.keycode))
 	elif key != null and CAST_KEYS.has(key.keycode) and not key.echo:
@@ -468,28 +495,21 @@ func _steer(way: Vector2i) -> bool:
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
 ## casts as cast_skill() does, the HUD's buttons open the genealogy, sect or arts panel or the
 ## faction window, or pause, and where the settings ask, a tap on the ground orders the person to
-## that cell. While the genealogy or sect panel or the dialogue window is open, a tap closes it; while the faction window
-## is, a tap works it as factions_tap() does; while the arts panel is, a tap on a tile
-## chooses its skill, a skill button tapped then puts it on that button's slot, a finger moved up or
-## down scrolls the tiles and the close button closes it. Returns whether the touch controls took
-## the event.
+## that cell. While a panel is open, a tap works it as its tap() reads it; while the arts panel is,
+## a tap on a tile chooses its skill, a skill button tapped then puts it on that button's slot, a
+## finger moved up or down scrolls the tiles and the close button closes it. Returns whether the
+## touch controls took the event.
 func touch(event: InputEvent) -> bool:
 	if world == null or not _hud.touch.visible or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
 		return false
-	if _hud.arts.visible:
+	var panel: Control = _hud.panel()
+	if panel == _hud.arts:
 		_place(_hud.touch.take(event))
 		return true
-	if _hud.factions.visible:
-		var pressed_on := event as InputEventScreenTouch
-		if pressed_on != null and pressed_on.pressed:
-			factions_tap(pressed_on.position - _hud.factions.position)
-		return true
-	var panel: Control = _hud.genealogy if _hud.genealogy.visible else (_hud.sect if _hud.sect.visible \
-			else (_hud.dialogue if _hud.dialogue.visible else null))
 	if panel != null:
 		var pressed := event as InputEventScreenTouch
 		if pressed != null and pressed.pressed:
-			panel.close()
+			_take(panel.tap(pressed.position - panel.position))
 		return true
 	var action: Dictionary = _hud.touch.take(event)
 	match action.get("do", ""):
@@ -504,17 +524,10 @@ func touch(event: InputEvent) -> bool:
 		"cast":
 			cast_skill(action.slot, action.how, action.get("aim", Vector2.ZERO))
 		"button":
-			match action.button:
-				"genealogy":
-					genealogy(GENEALOGY_KEY)
-				"sect":
-					sects(SECT_KEY)
-				"factions":
-					factions(FACTIONS_KEY)
-				"arts":
-					arts(ARTS_KEY)
-				"pause":
-					pause()
+			if action.button == "pause":
+				pause()
+			else:
+				open_panel(PANEL_KEYS.find_key(action.button))
 		"world":
 			if _hud.settings.tap_to_move():
 				var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom
@@ -605,8 +618,7 @@ func show_talk() -> void:
 		if _hud.dialogue.visible and (roster.is_empty()
 				or world.talk_refusal(roster[0], _hud.dialogue.person) != WorldAdapter.TALK_NONE):
 			_hud.dialogue.close()
-	var hidden: bool = talk_to < 0 or _hud.touch.visible or _hud.dialogue.visible or _hud.genealogy.visible \
-			or _hud.sect.visible or _hud.arts.visible or _hud.factions.visible
+	var hidden: bool = talk_to < 0 or _hud.touch.visible or _hud.panel() != null
 	if hidden:
 		_hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
 		return
@@ -617,40 +629,35 @@ func show_talk() -> void:
 			talk_hostile)
 
 
-## Works the dialogue window with `keycode`: Space opens it on the person the prompt names, when the
-## core lets the steered person talk to it; up and down choose what to ask or scroll the news, Enter
-## asks it, the news showing the person's news, its wares showing what it sells, where up and down
-## choose a ware and Enter buys it, and farewell ending the talk, and Escape goes back from the news
-## or the wares or ends the talk. While it is open no key gives an order or casts. Returns whether
-## the key did anything.
-func talk(keycode: Key) -> bool:
-	var panel: Control = _hud.dialogue
+## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
+## genealogy panel; the sect panel while the world has sects; the arts panel; the faction window; or
+## the dialogue window, on the person the prompt names when the core lets the steered person talk to
+## it. While a panel is open, it takes every key, and no key gives an order or casts. Returns
+## whether it opened.
+func open_panel(keycode: Key) -> bool:
 	var roster := world.roster(steered)
-	if not panel.visible:
-		if keycode != TALK_KEY or roster.is_empty() or talk_to < 0 \
-				or world.talk_refusal(roster[0], talk_to) != WorldAdapter.TALK_NONE:
+	if roster.is_empty():
+		return false
+	match keycode:
+		GENEALOGY_KEY:
+			_hud.genealogy.show_person(world, roster[0], roster[0])
+		SECT_KEY:
+			if world.sect_count() == 0:
+				return false
+			_hud.sect.show_sect(world, steered)
+		ARTS_KEY:
+			_hud.arts.show_arts(world, steered, _hud.loadout, _hud.touch.visible)
+			_hud.show_placing()
+		FACTIONS_KEY:
+			_hud.factions.show_factions(world, steered, _hud.touch.visible)
+		TALK_KEY:
+			if talk_to < 0 or world.talk_refusal(roster[0], talk_to) != WorldAdapter.TALK_NONE:
+				return false
+			_hud.dialogue.open(world, talk_to)
+		_:
 			return false
-		panel.open(world, talk_to)
-		_sound.ui("open")
-		return true
-	if keycode == KEY_ESCAPE:
-		if not panel.back():
-			panel.close()
-		return true
-	if keycode == KEY_UP or keycode == KEY_DOWN:
-		return panel.move(-1 if keycode == KEY_UP else 1)
-	if (keycode == KEY_ENTER or keycode == KEY_KP_ENTER) and panel.trading:
-		return buy()
-	if (keycode == KEY_ENTER or keycode == KEY_KP_ENTER) and not panel.showing_news:
-		var chosen: int = panel.choice()
-		if chosen == WorldAdapter.OFFER_NEWS:
-			panel.show_news()
-		elif chosen == WorldAdapter.OFFER_TRADE and not roster.is_empty():
-			panel.show_wares(roster[0])
-		else:
-			panel.close()
-		return true
-	return false
+	_sound.ui("open")
+	return true
 
 
 ## Has the steered person buy the ware chosen in the dialogue window from the person it talks to,
@@ -697,57 +704,6 @@ func challenge() -> int:
 	return refusal
 
 
-## Works the faction window with `keycode`: F opens it on the steered person's faction or closes it,
-## up and down choose a faction, left and right an order, Enter gives the order lit, war being asked
-## again, where Enter declares it and Escape takes it back, C challenges the faction's leader, and
-## Escape closes the window. While it is open no key gives an order or casts. Returns whether the
-## key did anything.
-func factions(keycode: Key) -> bool:
-	var panel: Control = _hud.factions
-	if keycode == FACTIONS_KEY and not panel.visible:
-		if world.roster(steered).is_empty():
-			return false
-		panel.show_factions(world, steered, _hud.touch.visible)
-		_sound.ui("open")
-		return true
-	if panel.confirming >= 0:
-		if keycode == KEY_ENTER or keycode == KEY_KP_ENTER or keycode == KEY_ESCAPE:
-			declare(panel.answer(keycode != KEY_ESCAPE))
-			return true
-		return false
-	if keycode == FACTIONS_KEY or keycode == KEY_ESCAPE:
-		panel.close()
-		return true
-	var directions := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT,
-			KEY_RIGHT: Vector2i.RIGHT}
-	if directions.has(keycode):
-		return panel.move(directions[keycode])
-	if keycode == KEY_ENTER or keycode == KEY_KP_ENTER:
-		declare(panel.ask())
-		return true
-	if keycode == CHALLENGE_KEY:
-		return challenge() == WorldAdapter.CHALLENGE_NONE
-	return false
-
-
-## Works the faction window with a tap at `at`, in the window's pixels, as its tap() reads it: closes
-## it, chooses a faction, challenges, or asks for the order tapped, war being asked again, where yes
-## declares it and no takes it back.
-func factions_tap(at: Vector2) -> void:
-	var panel: Control = _hud.factions
-	match panel.tap(at):
-		"close":
-			panel.close()
-		"challenge":
-			challenge()
-		"order":
-			declare(panel.ask())
-		"yes":
-			declare(panel.answer(true))
-		"no":
-			panel.answer(false)
-
-
 ## Has the steered person declare `what`, one of the WorldAdapter.DECLARATION_* constants, toward the
 ## faction the faction window has chosen, through the core's declare port, and reads the window
 ## again. Returns the core's verdict, one of the WorldAdapter.DECLARE_* constants, of which
@@ -764,111 +720,21 @@ func declare(what: int) -> int:
 	return refusal
 
 
-## Works the genealogy panel with `keycode`: G opens it on the steered person or closes it,
-## arrows move the selection, Enter centres the tree on the selected person, Escape closes it.
-## While it is open no key gives an order. Returns whether the key did anything.
-func genealogy(keycode: Key) -> bool:
-	var panel: Control = _hud.genealogy
-	var roster := world.roster(steered)
-	if keycode == GENEALOGY_KEY and not panel.visible:
-		if roster.is_empty():
-			return false
-		panel.show_person(world, roster[0], roster[0])
-		_sound.ui("open")
-		return true
-	if keycode == GENEALOGY_KEY or keycode == KEY_ESCAPE:
-		panel.close()
-		return true
-	var directions := {KEY_UP: Vector2i.UP, KEY_DOWN: Vector2i.DOWN, KEY_LEFT: Vector2i.LEFT,
-			KEY_RIGHT: Vector2i.RIGHT}
-	if directions.has(keycode):
-		return panel.move(directions[keycode])
-	if keycode == KEY_ENTER:
-		panel.centre_selected()
-		return true
-	return false
-
-
-## Works the sect panel with `keycode`: M opens it on the steered person's sect or closes it,
-## up and down choose among the shown faction's sects, Tab shows the next faction, Enter applies to
-## the sect shown, Escape closes it. While it is open no key gives an order. Returns whether the
-## key did anything.
-func sects(keycode: Key) -> bool:
-	var panel: Control = _hud.sect
-	if keycode == SECT_KEY and not panel.visible:
-		if world.sect_count() == 0 or world.roster(steered).is_empty():
-			return false
-		panel.show_sect(world, steered)
-		_sound.ui("open")
-		return true
-	if keycode == SECT_KEY or keycode == KEY_ESCAPE:
-		panel.close()
-		return true
-	if keycode == KEY_TAB:
-		panel.next_faction()
-		return true
-	if keycode == KEY_ENTER or keycode == KEY_KP_ENTER:
-		return apply_to_sect() >= 0
-	if keycode == KEY_UP or keycode == KEY_DOWN:
-		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
-	return false
-
-
-## Works the arts panel with `keycode`: K opens it on the steered person or closes it, up and down
-## choose among its skills, Q to T put the skill chosen on that slot of the loadout, Delete takes it
-## off its slot, Escape closes it. While it is open no key gives an order or casts. Returns whether
-## the key did anything.
-func arts(keycode: Key) -> bool:
-	var panel: Control = _hud.arts
-	if keycode == ARTS_KEY and not panel.visible:
-		if world.roster(steered).is_empty():
-			return false
-		panel.show_arts(world, steered, _hud.loadout, _hud.touch.visible)
-		_hud.touch.placing = true
-		_hud.touch.waiting = not panel.selected.is_empty()
-		_hud.touch.queue_redraw()
-		_sound.ui("open")
-		return true
-	if keycode == ARTS_KEY or keycode == KEY_ESCAPE:
-		_close_arts()
-		return true
-	if keycode == KEY_UP or keycode == KEY_DOWN:
-		return panel.move(Vector2i.UP if keycode == KEY_UP else Vector2i.DOWN)
-	if CAST_KEYS.has(keycode) and panel.assign(CAST_KEYS.find(keycode)):
-		_hud.show_loadout(world)
-		return true
-	if keycode == CLEAR_KEY and panel.clear_selected():
-		_hud.show_loadout(world)
-		return true
-	return false
-
-
-# Closes the arts panel, and gives the touch controls back their whole layout.
-func _close_arts() -> void:
-	_hud.arts.close()
-	_hud.touch.placing = false
-	_hud.touch.waiting = false
-	_hud.touch.queue_redraw()
-
-
 # Does what the touch controls ask while the arts panel is open, `action` as their take() returns
 # it: chooses the skill on a tile tapped, puts the skill chosen on a skill button's slot, scrolls the
 # tiles, or closes the panel.
 func _place(action: Dictionary) -> void:
-	var panel: Control = _hud.arts
 	match action.get("do", ""):
 		"panel":
-			panel.tap(action.at)
+			_hud.arts.tap(action.at)
 		"scroll":
-			panel.scroll(action.way)
+			_hud.arts.scroll(action.way)
 		"place":
-			if panel.assign(action.slot):
+			if _hud.arts.assign(action.slot):
 				_hud.show_loadout(world)
 		"button":
-			_close_arts()
-			return
-	_hud.touch.waiting = not panel.selected.is_empty()
-	_hud.touch.queue_redraw()
+			_hud.arts.close()
+	_hud.show_placing()
 
 
 ## Has the steered person apply to the sect the sect panel shows, and shows the core's verdict on
@@ -934,8 +800,9 @@ func step() -> void:
 		_show_aim()
 		_stick = Vector2i.ZERO
 		_hud.touch.release_all()
-		_close_arts()
+		_hud.arts.close()
 		_hud.dialogue.close()
+		_hud.show_placing()
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]
