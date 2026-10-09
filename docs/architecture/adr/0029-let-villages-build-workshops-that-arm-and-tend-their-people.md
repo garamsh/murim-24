@@ -1,6 +1,6 @@
 # ADR 0029: Let villages build workshops that arm and tend their people
 
-> Status: accepted
+> Status: accepted; its edge on the strike rule superseded by ADR-0050, under which a smithy makes and restores gear and weapons give the edge
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

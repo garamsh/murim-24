@@ -222,6 +222,7 @@ This supersedes these:
 - ADR 0040's sellers by best discipline, its fixed prices, its purse at birth, its wage from nowhere and its NPC daily purchase of each ware
 - ADR 0022's free feeding from the village's stock, now rations bought from it; its cap from the whole harvest, now four fifths of it; and its migration by the person, now by the household
 - ADR 0038's diplomacy by numbers alone, now gated by the treasury
+- ADR 0023's raiding party of a fixed count, now no more than the treasury pays for 30 days
 
 ## Consequences
 

@@ -1,6 +1,6 @@
 # ADR 0023: Let villages build, found and raid as they press their caps
 
-> Status: accepted; its laying clear of an impassable cell superseded by ADR-0024, which lays only on buildable cells
+> Status: accepted; its laying clear of an impassable cell superseded by ADR-0024, which lays only on buildable cells; its raiding party of a fixed count superseded by ADR-0052, which caps it by what the treasury pays
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

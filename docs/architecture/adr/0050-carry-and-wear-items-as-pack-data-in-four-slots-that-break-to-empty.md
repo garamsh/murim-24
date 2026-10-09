@@ -128,7 +128,7 @@ Options weighed:
 
 Items are pack data: kinds with a family, tier, material, worth, durability or stack size, price and effects. The core names none. A person wears four slots, weapon, armour, head and accessory, and carries spares in its inventory. A weapon family gives the basic strike, its shape, reach and damage, and an edge for art skills. An art skill needs its discipline's weapon family, and an empty weapon slot strikes bare-handed: an arc at arm's length for 6, which fist arts use at their own edge. Armour and headgear guard against body damage, and are capped so a strike always lands. Weapons wear by hits made, armour by hits taken, tools by days worked, and nothing by time. A broken piece leaves its slot empty until the person equips one it owns. One rule ranks and wears the best piece held, run only when what a person holds changes. Spares by role and wealth are needs that drive buying. Starting gear is drawn from weighted loadouts. The view tints armour and headgear with the wearer's faction.
 
-This supersedes ADR 0046's guard strike as an army skill, which becomes the weapon's basic strike; ADR 0029's edge, since a smithy no longer raises its village's strikes and instead makes and restores gear for the market; and ADR 0040's wares as counts, which become stacks.
+This supersedes ADR 0046's guard strike as an army skill, which becomes the weapon's basic strike; ADR 0029's edge, since a smithy no longer raises its village's strikes and instead makes and restores gear for the market; ADR 0040's wares as counts, which become stacks; and ADR 0035's draw among all of a person's skills whatever it holds, since an art skill now needs its discipline's weapon family.
 
 ## Consequences
 
