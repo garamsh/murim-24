@@ -104,8 +104,8 @@ Options weighed:
   - A market trades at most 64 item kinds, the pack's list for its kind of market, so its daily pass and a caravan's search are bounded.
   - The player buys and sells by talking to the market's keeper. ADR 0040's `Offer::TRADE` moves from a person whose best discipline is medicine to a market's keeper, and `sells` reads the market.
 - **Price.** Each day, per kind, a market compares its stock against its target, its last 30 days' demand:
-  - below the target, the price rises 5%
-  - above twice the target, it falls 5%
+  - below the target, the price rises 5%, and above twice the target it falls 5%
+  - a step is the price times 50 over 1,000, rounded down, and never less than 1 copper, so a price under 20 copper still moves
   - it stays within a floor and a ceiling, half and double the kind's base price in the base pack
   - **Buying** takes the price from the buyer to the till, and the faction's share of trade from the till to its treasury.
   - **Selling** pays a quarter below the price, scaled by the durability left, from the till, refused when the till cannot pay. A worn item goes to the worn pool.
@@ -173,7 +173,7 @@ Options weighed:
 - **The money balance.**
   - **Sources.** Exports at the floor, and the starting purses, tills, treasuries and balances. ADR 0040's purse at birth and wage from nowhere are retired: a newborn holds nothing, and every wage is paid by someone.
   - **Sinks.** Imports at the ceiling, valuables among them; the upkeep of houses and of factions' structures; the court of treasuries and vaults above twice their needs; silver piles that expire (ADR 0051); and the gap between floor and ceiling on everything sold out of the world and bought back.
-  - **Comfort.** A household whose purse is above 30 days of its needs spends 1% a day of the excess on valuables, and a market's till above 60 days of its turnover pays the excess to its faction's treasury.
+  - **Comfort.** A household whose purse is above 30 days of its needs spends 1% a day of the excess, rounded down and at least 1 copper while there is an excess, on valuables, and a market's till above 60 days of its turnover pays the excess to its faction's treasury.
   - **Trade with the world beyond the map.** Exports pay at most each market's target a day at the floor, and only for stock past four times the target, which the world made. So they are bounded by what its people make, and its people by the bound. Imports leave only while a till pays, and only to bring stock back to its target. So this trade cannot create money faster than the world produces, nor drain a till below empty.
   - **Why it is bounded.** Every holder of silver has a level above which a share of the excess leaves, or moves to a holder whose excess leaves:
     - households by comfort, through imports of valuables
