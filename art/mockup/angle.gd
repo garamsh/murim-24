@@ -7,19 +7,30 @@
 # order port every driver uses: Demonic people walk WALKS through the village and the seat, then
 # Orthodox armies, the player's among them, gather at MUSTER and march on the village, and the
 # Demonic people meet them.
+# With valley it draws instead the Valley, a hand-composed map of levels, a village, a walled
+# town, terraces and a riverside, its ground drawn by angle/ground.gdshader and baked per chunk at
+# map build, walked by VALLEY_PEOPLE of the core, or CROWD with crowd; with a region of REGIONS,
+# that region laid out in the valley's place.
 # Run, after make build, with this file copied to the project root:
-#   godot --path . --script res://angle.gd -- <dir> frames
+#   godot --path . --script res://angle.gd -- <dir> frames [valley]
 #     FRAMES frames, TICKS_PER_FRAME ticks apart, 640x360 at 1x without the HUD:
 #     <dir>/frames/frame_<n>.png, and 4x crops of a person behind a house and in front of one,
 #     depth_behind.png and depth_front.png.
-#   godot --path . --script res://angle.gd -- <dir> stills
-#     The sequence at STILLS' frames under the HUD of play.tscn, 1920x1080, in ko and en:
-#     <dir>/<still>_<locale>.png.
-#   godot --path . --script res://angle.gd -- <dir> bench [m1] [pan] [flat] [solid]
-#     Frame time, vsync off, in a 1920x1080 window: the sequence in real time under the HUD, or
-#     with m1 the core's M1 scenario of 500 people without it. pan moves the camera round PAN, so
-#     chunks stream in and out; flat turns the y-sort off and solid the outlines, to measure what
-#     each costs. Prints p50, p99 and max over TIMED_FRAMES, and what streaming held and built.
+#   godot --path . --script res://angle.gd -- <dir> stills [valley [crowd] | <region>]
+#     Under the HUD of play.tscn, 1920x1080: the sequence at STILLS' frames, or the valley's
+#     VALLEY_STILLS after VALLEY_TICKS ticks, in ko and en: <dir>/<still>_<locale>.png. A region
+#     gives <dir>/<region>_ko.png at 2x and <dir>/<region>_village_ko.png at 3x.
+#   godot --path . --script res://angle.gd -- <dir> level
+#     The Leveller's skill taking a village down, LEVEL_SECONDS at LEVEL_FPS, 1920x1080:
+#     <dir>/level/frame_<n>.png.
+#   godot --path . --script res://angle.gd -- <dir> bench [valley [crowd] | <region> | m1 | level] [pan] [flat] [solid]
+#     Frame time, vsync off, in a 1920x1080 window: the sequence, the valley or a region in real
+#     time under the HUD; with m1 the core's M1 scenario of 500 people without it; with level the
+#     Leveller's moment. pan moves the camera round PAN, or the valley's VALLEY_PAN, so chunks
+#     stream in and out; flat turns the y-sort off and solid the outlines, to measure what each
+#     costs. Prints p50, p99 and max over TIMED_FRAMES or BENCH_SECONDS, whichever ends first,
+#     what streaming held and built, and how long the map build baked.
+# Every mode quits on its own, past DEADLINES at the latest.
 extends SceneTree
 
 const ViewScale := preload("res://view_scale.gd")
