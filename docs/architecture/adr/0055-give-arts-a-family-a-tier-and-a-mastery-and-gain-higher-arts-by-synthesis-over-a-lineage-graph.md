@@ -117,13 +117,18 @@ Options weighed:
   - An art enters it when the body learns it, or stands within reading reach of its manual. Hearing of an art by rumour waits for a rumour that carries arts, an open question.
   - The window names an art in the set, and shows ??? for the rest.
   - It is a fact about one soul. No rule for people no driver steers reads it.
+- **Bounds, with refusals.**
+  - A person knows at most 16 arts, pack data within a core bound of 16. A manual, teaching or synthesis gives a person at its bound no new art, so a pack cannot grow a person without limit.
+  - Each known art carries its art, its mastery and the tick its skills last hit, 8 bytes. The last-use tick is what training's least recently used reads.
+  - A pack defines at most 256 arts, since the soul's set is a bit an art, and an art leads at most 16 edges, with at most 4,096 edges in all. A pack past any of these is refused at load with a `ContentRefusal` naming the bound (ADR 0049).
 - **Saves and the hash.**
-  - The known list gains a mastery of 2 bytes for each art, and each skill its stage. At 50,000 people knowing about 2 arts each, that is 200 KB.
-  - The soul gains 32 bytes, for up to 256 arts. The graph is pack data.
+  - A person's known arts are 8 bytes each. At 50,000 people knowing about 2 arts each that is 800 KB, and at the bound of 16 each, 6.4 MB.
+  - The soul gains 32 bytes, for up to 256 arts. A skill's stage and the graph are pack data, not save data.
   - `SAVE_VERSION` rises. The pinned hash changes, since mastery is folded.
 - **Cost.**
   - Mastery is an addition in the strike rule for each hit with an art skill.
-  - Training and synthesis are daily rules, spread over the day: at most 6 edges for each person who knows an edge's first art.
+  - Training and synthesis are daily rules, spread over the day. Synthesis reads the edges led by each art a person knows, at most 16 arts × 16 edges, 256 checks. At 50,000 people spread over 1,800 ticks that is about 28 people and at most about 7,100 checks a tick, a few hundredths of a millisecond.
+  - In a battle of #216's live tier of 5,000, each hit with an art skill finds its art among at most 16 known and adds to its mastery: a few hundred additions a tick.
 - **The measure plan, `make sweep`.** Per seed, at years 10, 50 and 100, the sweep prints:
   - the count of known arts at each stage, by family and tier
   - the people who ever reached each tier, and by which way: manual, teaching or synthesis
