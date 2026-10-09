@@ -133,6 +133,18 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - A village's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, derived from its structures, with what each kind holds given as data.
   - Growth slows as the population nears the cap.
   - A shortage brings starvation or migration.
+- **Nature grows on its own.** Decided by the owner on 2026-10-09 (issue #187). ADR 0056 (`docs/architecture/adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed, designs it.
+  - Terrain is a biome, and the trees and fruit on it grow naturally. Today's forest is ground on which trees grow, spread and can be felled.
+  - NPCs move, gather and hunt on their own, and can found new villages.
+- **Villages are built from trees and stones.** Trees and stones are world objects, and NPCs build villages from them, automatically. Construction stays NPC-only.
+- **Villages grow like WorldBox,** with people and resources: centre first, houses placed outward into suitable ground, expanding, and founding new villages. Villages are larger by default.
+- **[proposed]** ADR 0056's details:
+  - natural objects in fixed slots the map places, with fruit trees, bushes, rocks and herbs beside trees
+  - a village's materials account, with its idle earners assigned to gather what its next building lacks and paid from the treasury
+  - buildings rising only as far as their materials are delivered
+  - settlers carrying a first house's materials
+  - the player gathering but never building
+  - hunting waiting for animals (#171)
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
 - **A hard upper bound.** A world's population never exceeds a bound. That bound is a ceiling, not a target: the caps below it set the actual population. It is about 500 until it is measured for the larger world (§World and scale).
 - **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
