@@ -270,7 +270,12 @@ class AngleView extends Node2D:
 		_chevron.offset = Vector2(-8, -38)
 		note_tick()
 		note_tick()
-		if look.baked_shadows():
+		# The ground shader's viewport draws only from the next frame, so the shaded map is baked
+		# at the first refresh after it; another look's is baked at once.
+		if _shaded():
+			_set_up_baker()
+			_baker_frame = Engine.get_frames_drawn()
+		elif look.baked_shadows():
 			bake_all()
 
 	## Where a point in sub-cell units is drawn: x by CELL.x, y by CELL.y, raised by its level.
@@ -307,6 +312,10 @@ class AngleView extends Node2D:
 	## Streams the chunks round `view`, the screen in world pixels, and draws the bodies on it
 	## `between` of the way from the tick before last to the last, at `now_ms`.
 	func refresh(view: Rect2, between: float, now_ms: int) -> void:
+		if _shaded() and _baked.is_empty():
+			if Engine.get_frames_drawn() <= _baker_frame:
+				return
+			bake_all()
 		_stream(view)
 		# A structure that changed stage shows it at once, its shadow with it.
 		for key: Vector2i in _chunks:
@@ -429,10 +438,321 @@ class AngleView extends Node2D:
 
 	# The chunk: its ground at level 0 and below in one image, each raised row a strip, shadows
 	# baked into both, then its structures and trees.
+	# The ground shader's kinds and face materials, in the order its cell texture indexes them.
+	const KINDS := ["water", "plain", "hills", "forest", "rock", "lane", "paving", "paddy", "garden", "steps"]
+	const FACES := ["rock_face", "bank_face", "stone_face"]
+	# Each kind's ramp as hue in degrees, saturation and lightness, stepped dark to light by
+	# shifting hue toward blue in the dark and toward yellow in the light (#212's ramp theory);
+	# a kind given four colours instead is drawn with them as they are.
+	const RAMPS := [[205, 0.45, 0.42], [100, 0.42, 0.42], [80, 0.36, 0.5], [130, 0.38, 0.27], [220, 0.12, 0.46],
+			[33, 0.32, 0.5], [215, 0.06, 0.6], ["2b5770", "3d7a8f", "5fa3a8", "8fae5a"],
+			["3a2c24", "6b523a", "4f7a3f", "8fae5a"], [215, 0.06, 0.6], [28, 0.35, 0.36]]
+	const SHADE_COLOUR := Color(0.078, 0.094, 0.157)
+	# Rows above a chunk's own for the ground its raised rows lift, and below for water and faces.
+	const TOP_PAD := 88
+	const BOTTOM_PAD := 40
+	# Poisson spacing, in pixels, of detail and of trees, and the tries made for each per chunk.
+	const DETAIL_SPACING := 4.2
+	const DETAIL_TRIES := 2600
+	const TREE_SPACING := 8.0
+	const TREE_TRIES := 1400
+
+	var _baker: SubViewport
+	var _baker_frame := 0
+	var _bake_material: ShaderMaterial
+	var _ramp_colours: Array[Color] = []
+
+	func _shaded() -> bool:
+		return look.has_method("ground_cells")
+
+	# The viewport the ground shader draws a chunk into, and its cell texture and ramps.
+	func _set_up_baker() -> void:
+		_baker = SubViewport.new()
+		_baker.size = Vector2i(CHUNK * int(CELL.x), CHUNK * int(CELL.y) + TOP_PAD + BOTTOM_PAD)
+		_baker.transparent_bg = true
+		_baker.disable_3d = true
+		_baker.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		var shader := Shader.new()
+		shader.code = FileAccess.get_file_as_string(ART + "ground.gdshader")
+		_bake_material = ShaderMaterial.new()
+		_bake_material.shader = shader
+		var rect := ColorRect.new()
+		rect.size = Vector2(_baker.size)
+		rect.material = _bake_material
+		_baker.add_child(rect)
+		add_child(_baker)
+		var cells: Image = look.ground_cells(KINDS, FACES)
+		_bake_material.set_shader_parameter("cells", ImageTexture.create_from_image(cells))
+		_bake_material.set_shader_parameter("map_size", Vector2i(cells.get_width(), cells.get_height()))
+		_bake_material.set_shader_parameter("image_size", Vector2(_baker.size))
+		var ramps := PackedVector3Array()
+		for spec: Array in RAMPS:
+			for step in 4:
+				var colour := Color(spec[step]) if spec[0] is String else _ramp_step(spec, step)
+				_ramp_colours.append(colour)
+				ramps.append(Vector3(colour.r, colour.g, colour.b))
+		_bake_material.set_shader_parameter("ramps", ramps)
+
+	func _ramp_step(spec: Array, step: int) -> Color:
+		var rock: bool = spec[1] < 0.1
+		var hue: float = spec[0] + [-22.0, -8.0, 6.0, 14.0][step] * (0.5 if rock else 1.0)
+		var saturation: float = clampf(spec[1] + [0.04, 0.0, 0.02, -0.04][step], 0.0, 1.0)
+		var lightness: float = clampf(spec[2] + [-0.13, -0.05, 0.04, 0.12][step], 0.0, 1.0)
+		var q := lightness * (1.0 + saturation) if lightness < 0.5 else lightness + saturation - lightness * saturation
+		var p := 2.0 * lightness - q
+		var h := fposmod(hue, 360.0) / 360.0
+		var channel := func(t: float) -> float:
+			t = fposmod(t, 1.0)
+			if t < 1.0 / 6.0:
+				return p + (q - p) * 6.0 * t
+			if t < 0.5:
+				return q
+			if t < 2.0 / 3.0:
+				return p + (q - p) * (2.0 / 3.0 - t) * 6.0
+			return p
+		return Color(channel.call(h + 1.0 / 3.0), channel.call(h), channel.call(h - 1.0 / 3.0))
+
+	func _ramp_colour(kind: int, step: int) -> Color:
+		return _ramp_colours[kind * 4 + clampi(step, 0, 3)]
+
+	# Draws the chunk at `key` with the ground shader, in colour or, with `pass_kind` 1, what each
+	# pixel is; the image's top-left is `top` on the screen, unlifted.
+	func _draw_ground(key: Vector2i, pass_kind: int, top: Vector2i) -> Image:
+		var origin := key * CHUNK
+		_bake_material.set_shader_parameter("origin", Vector2(top))
+		_bake_material.set_shader_parameter("row_from", origin.y)
+		_bake_material.set_shader_parameter("row_to", mini(origin.y + CHUNK, _size.y))
+		_bake_material.set_shader_parameter("pass_kind", pass_kind)
+		RenderingServer.force_draw(false)
+		var image := _baker.get_texture().get_image()
+		image.convert(Image.FORMAT_RGBA8)
+		return image
+
+	# The chunk drawn off the cell grid (#212): the shader's ground; detail scattered over it and
+	# decorative trees clustered in it by Poisson-disc spacing from a seed the chunk's index
+	# gives, the same on every build; contact shadows under trees and shadows cast by structures;
+	# then cut into the ground at level 0 and below and a strip per raised row and level, as the
+	# grid's chunks are, so people behind a raised row are hidden by it.
+	func _compose_shaded(key: Vector2i) -> Dictionary:
+		var origin := key * CHUNK
+		var top := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y) - TOP_PAD)
+		var colour := _draw_ground(key, 0, top)
+		var ids := _draw_ground(key, 1, top)
+		var what := ids.get_data()
+		var width := ids.get_width()
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(key)
+		_scatter_detail(colour, what, width, rng)
+		var trees := _scatter_trees(colour, what, width, top, rng)
+		for tree: Dictionary in look.trees_in(Rect2i(origin, Vector2i(CHUNK, CHUNK))):
+			trees.append(tree)
+		for tree: Dictionary in trees:
+			_contact_shadow(colour, what, width, tree.foot - Vector2(0, tree.level * _px) - Vector2(top), tree.level)
+		_shade_structures(key, colour, what, width, top)
+		var pieces := _cut(colour, what, width, origin.y)
+		var strips := {}
+		var ground := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+		var ground_at := Vector2(top)
+		for piece_key: Variant in pieces:
+			var piece: Dictionary = pieces[piece_key]
+			if piece_key is String:
+				ground = piece.image
+				ground_at = Vector2(top + piece.at)
+			else:
+				strips[piece_key] = {"image": piece.image, "at": top + piece.at}
+		return {"ground": ground, "ground_at": ground_at, "strips": strips, "trees": trees}
+
+	# What the shader says a pixel is: [sort row offset, level, kind], kind 20 and up for a face;
+	# a clear pixel has a sort row offset of -1.
+	func _what(what: PackedByteArray, width: int, at: Vector2i) -> Vector3i:
+		if at.x < 0 or at.y < 0 or at.x >= width or (at.y * width + at.x) * 4 + 3 >= what.size():
+			return Vector3i(-1, 0, 0)
+		var i := (at.y * width + at.x) * 4
+		if what[i + 3] == 0:
+			return Vector3i(-1, 0, 0)
+		return Vector3i(what[i] - 1, what[i + 1] - 2, what[i + 2])
+
+	func _poisson(rng: RandomNumberGenerator, size: Vector2i, spacing: float, tries: int) -> Array[Vector3]:
+		var points: Array[Vector3] = []
+		var cell := spacing / sqrt(2.0)
+		var grid := {}
+		for n in tries:
+			var p := Vector2(rng.randf() * size.x, rng.randf() * size.y)
+			var g := Vector2i((p / cell).floor())
+			var free := true
+			for gy in range(g.y - 2, g.y + 3):
+				for gx in range(g.x - 2, g.x + 3):
+					var other: Variant = grid.get(Vector2i(gx, gy))
+					if other != null and (other as Vector2).distance_squared_to(p) < spacing * spacing:
+						free = false
+			if free:
+				grid[g] = p
+				points.append(Vector3(p.x, p.y, rng.randf()))
+		return points
+
+	# Tufts and flowers on grass, litter on the forest floor, pebbles on lanes and paving, reeds at
+	# the water's edge: more of them near an edge between kinds, drawn only on their own ground.
+	func _scatter_detail(colour: Image, what: PackedByteArray, width: int, rng: RandomNumberGenerator) -> void:
+		var flowers := [Color("d63a2f"), Color("f5d27a"), Color("f4f1e6")]
+		for point: Vector3 in _poisson(rng, colour.get_size(), DETAIL_SPACING, DETAIL_TRIES):
+			var at := Vector2i(int(point.x), int(point.y))
+			var here := _what(what, width, at)
+			if here.x < 0 or here.z >= 20:
+				continue
+			var edge := false
+			for d: Vector2i in [Vector2i(4, 0), Vector2i(-4, 0), Vector2i(0, 4), Vector2i(0, -4)]:
+				var other := _what(what, width, at + d)
+				if other.x >= 0 and other.z != here.z:
+					edge = true
+			if point.z > (0.9 if edge else 0.38):
+				continue
+			var marks := []
+			var pick := rng.randf()
+			match here.z:
+				1, 2:
+					if pick < 0.72:
+						marks = [[Vector2i.ZERO, _ramp_colour(here.z, 0)], [Vector2i(-1, -1), _ramp_colour(here.z, 0)],
+								[Vector2i(1, -1), _ramp_colour(here.z, 0)], [Vector2i(0, -1), _ramp_colour(here.z, 3)]]
+					else:
+						marks = [[Vector2i.ZERO, flowers[int(pick * 30) % 3]], [Vector2i(0, 1), _ramp_colour(here.z, 0)]]
+				3:
+					marks = [[Vector2i.ZERO, _ramp_colour(3, 0)], [Vector2i(1, -1), _ramp_colour(3, 0)],
+							[Vector2i(-1, -1), _ramp_colour(3, 2)]]
+				5, 6:
+					marks = [[Vector2i.ZERO, _ramp_colour(4, 1)], [Vector2i(1, 0), _ramp_colour(4, 1)],
+							[Vector2i(0, -1), _ramp_colour(4, 3)]]
+				0:
+					if edge:
+						for t in 4:
+							marks.append([Vector2i(0, -t), _ramp_colour(3, 3 if t == 3 else 1)])
+			for mark: Array in marks:
+				var p: Vector2i = at + mark[0]
+				var there := _what(what, width, p)
+				if there.x >= 0 and there.y == here.y and there.z < 20:
+					colour.set_pixelv(p, mark[1])
+
+	# Decorative trees: dense inside forests, thinning toward their edges by noise, a lone tree
+	# now and then in the open, each on a cell open to it. Trees the rules know come from the core.
+	func _scatter_trees(colour: Image, what: PackedByteArray, width: int, top: Vector2i,
+			rng: RandomNumberGenerator) -> Array:
+		var trees := []
+		for point: Vector3 in _poisson(rng, colour.get_size(), TREE_SPACING, TREE_TRIES):
+			var at := Vector2i(int(point.x), int(point.y))
+			var here := _what(what, width, at)
+			if here.x < 0 or here.z >= 20:
+				continue
+			var foot := Vector2(top + at) + Vector2(0, here.y * _px)
+			var cell := Vector2i(int(foot.x / CELL.x), int(foot.y / CELL.y))
+			if not look.open_at(cell.x, cell.y):
+				continue
+			var density := _value_noise(foot / 30.0)
+			var keep := (here.z == 3 and point.z < 0.55 + density * 0.6) or (here.z in [1, 2] and point.z < 0.02)
+			if not keep:
+				continue
+			var pine := here.y >= 2 or rng.randf() < 0.35
+			trees.append({"foot": foot, "kind": "pine" if pine else "tree", "variant": rng.randi_range(0, 1 if pine else 2),
+					"cell": cell, "level": here.y})
+		return trees
+
+	func _value_noise(p: Vector2) -> float:
+		var i := p.floor()
+		var f := p - i
+		f = f * f * (Vector2(3, 3) - 2.0 * f)
+		var corner := func(x: int, y: int) -> float: return float(_hash(x, y, 91) % 1000) / 1000.0
+		var a: float = corner.call(int(i.x), int(i.y))
+		var b: float = corner.call(int(i.x) + 1, int(i.y))
+		var c: float = corner.call(int(i.x), int(i.y) + 1)
+		var d: float = corner.call(int(i.x) + 1, int(i.y) + 1)
+		return lerpf(lerpf(a, b, f.x), lerpf(c, d, f.x), f.y)
+
+	# A tree's shadow on the ground at its foot, `at` in the image, on its own level.
+	func _contact_shadow(colour: Image, what: PackedByteArray, width: int, at: Vector2, level: int) -> void:
+		for dy in range(-3, 4):
+			for dx in range(-10, 11):
+				if pow(dx / 10.0, 2) + pow(dy / 3.0, 2) > 1.0:
+					continue
+				_darken_at(colour, what, width, Vector2i(int(at.x) + dx + 3, int(at.y) + dy + 1), level)
+
+	# Shadows the structures on and round the chunk cast to the lower right, on their own level.
+	func _shade_structures(key: Vector2i, colour: Image, what: PackedByteArray, width: int, top: Vector2i) -> void:
+		var area := Rect2i(top, colour.get_size())
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				for entry: Dictionary in _structures_in.get(key + Vector2i(dx, dy), []):
+					if entry.kind in GROUND_KINDS or entry.has("tag") or _stage(entry) == 3:
+						continue
+					var level := _level(entry.corner.x, entry.corner.y + entry.size.y - 1)
+					var rise: float = (_used(_entry_frame(entry, "intact")).size.y - entry.size.y * CELL.y) * (0.5 if _stage(entry) == 2 else 1.0)
+					var lifted := Rect2i(Vector2i(area.position.x, area.position.y + level * _px), area.size)
+					# The shadow's edge wanders a couple of pixels, so it is not a ruled line.
+					_sweep(Rect2(Vector2(entry.corner) * CELL, Vector2(entry.size) * CELL).grow(2.0), rise, lifted,
+							func(wx: int, gy: int) -> void:
+								var wobble := Vector2(_value_noise(Vector2(wx, gy) / 5.0), _value_noise(Vector2(gy, wx) / 5.0)) * 4.0 - Vector2(2, 2)
+								var inside := Rect2(Vector2(entry.corner) * CELL, Vector2(entry.size) * CELL)
+								var swept := inside.merge(Rect2(inside.position + SHADOW * rise, inside.size))
+								if swept.has_point(Vector2(wx, gy) + wobble) and not inside.has_point(Vector2(wx, gy) + wobble):
+									_darken_at(colour, what, width, Vector2i(wx, gy - level * _px) - top, level))
+
+	func _darken_at(colour: Image, what: PackedByteArray, width: int, at: Vector2i, level: int) -> void:
+		var here := _what(what, width, at)
+		if here.x < 0 or here.y != level or here.z >= 20:
+			return
+		var i := (at.y * width + at.x) * 4
+		if what[i + 3] == 254:
+			return
+		what[i + 3] = 254
+		colour.set_pixelv(at, colour.get_pixelv(at).lerp(SHADE_COLOUR, 0.38))
+
+	# Cuts the chunk's image into its ground, level 0 and below, keyed "ground", and a piece for
+	# each raised row and level, keyed by (row, level), each cropped to what it holds, with where
+	# it stands in the image.
+	func _cut(colour: Image, what: PackedByteArray, width: int, row_from: int) -> Dictionary:
+		var height := colour.get_height()
+		var data := colour.get_data()
+		var bounds := {}
+		for y in height:
+			for x in width:
+				var i := (y * width + x) * 4
+				if what[i + 3] == 0:
+					continue
+				var level: int = what[i + 1] - 2
+				var piece_key: Variant = "ground" if level <= 0 else Vector2i(row_from + what[i] - 1, level)
+				var box: Variant = bounds.get(piece_key)
+				if box == null:
+					bounds[piece_key] = PackedInt32Array([x, y, x, y])
+				else:
+					var b: PackedInt32Array = box
+					b[0] = mini(b[0], x)
+					b[1] = mini(b[1], y)
+					b[2] = maxi(b[2], x)
+					b[3] = maxi(b[3], y)
+					bounds[piece_key] = b
+		var pieces := {}
+		var images := {}
+		var corners := {}
+		for piece_key: Variant in bounds:
+			var b: PackedInt32Array = bounds[piece_key]
+			images[piece_key] = Image.create_empty(b[2] - b[0] + 1, b[3] - b[1] + 1, false, Image.FORMAT_RGBA8)
+			corners[piece_key] = Vector2i(b[0], b[1])
+		for y in height:
+			for x in width:
+				var i := (y * width + x) * 4
+				if what[i + 3] == 0:
+					continue
+				var level: int = what[i + 1] - 2
+				var piece_key: Variant = "ground" if level <= 0 else Vector2i(row_from + what[i] - 1, level)
+				var at: Vector2i = corners[piece_key]
+				(images[piece_key] as Image).set_pixel(x - at.x, y - at.y, Color8(data[i], data[i + 1], data[i + 2], 255))
+		for piece_key: Variant in images:
+			pieces[piece_key] = {"image": images[piece_key], "at": corners[piece_key]}
+		return pieces
+
 	# The chunk's images, as a map build bakes them: its ground at level 0 and below, a strip per
 	# raised row, the edges between kinds of ground roughened, shadows baked in, and the trees
 	# standing on it and round it.
 	func _compose(key: Vector2i) -> Dictionary:
+		if _shaded():
+			return _compose_shaded(key)
 		var origin := key * CHUNK
 		var cells := Rect2i(origin, Vector2i(CHUNK, CHUNK)).intersection(Rect2i(Vector2i.ZERO, _size))
 		var top_left := Vector2i(origin.x * int(CELL.x), origin.y * int(CELL.y))
@@ -503,17 +823,19 @@ class AngleView extends Node2D:
 		var ground_sprite := Sprite2D.new()
 		ground_sprite.centered = false
 		ground_sprite.texture = ImageTexture.create_from_image(ground)
-		ground_sprite.position = Vector2(top_left)
+		ground_sprite.position = composed.get("ground_at", Vector2(top_left))
 		_ground.add_child(ground_sprite)
 		for strip_key: Vector2i in strips:
-			var image: Image = strips[strip_key]
+			# A strip is an image, or the shader's piece with where it stands on the screen.
+			var piece: Variant = strips[strip_key]
+			var image: Image = piece.image if piece is Dictionary else piece
 			bytes += image.get_data_size()
 			var strip := Sprite2D.new()
 			strip.centered = false
 			strip.texture = ImageTexture.create_from_image(image)
 			# Sorted by its row's north edge, so the row's own people stand on it.
 			strip.position = Vector2(top_left.x, strip_key.x * CELL.y - 0.5)
-			strip.offset = Vector2(0, 0.5 - strip_key.y * _px)
+			strip.offset = Vector2(piece.at) - strip.position if piece is Dictionary else Vector2(0, 0.5 - strip_key.y * _px)
 			_add_occluder(strip, "terrain", image.get_used_rect(), occluders)
 		for tree: Dictionary in trees:
 			if not cells.has_point(tree.cell):
@@ -1351,6 +1673,29 @@ class Valley extends RefCounted:
 	func stage(_entry: Dictionary) -> int:
 		return 0
 
+	## The cells as the ground shader reads them, one texel a cell: the ground kind's index in
+	## `kinds` in red, the level plus one in green, and in blue the material of the face the cell
+	## drops by, an index in `faces`, or 3 for a stair.
+	func ground_cells(kinds: Array, faces: Array) -> Image:
+		var image := Image.create_empty(WIDTH, HEIGHT, false, Image.FORMAT_RGBA8)
+		for y in HEIGHT:
+			for x in WIDTH:
+				var kind := kinds.find(tile_at(x, y))
+				if kind < 0:
+					kind = 1
+				var face := 3 if stairs_at(x, y) else maxi(faces.find(face_at(x, y)), 0)
+				image.set_pixel(x, y, Color8(kind, level_at(x, y) + 1, face, 255))
+		return image
+
+	## Whether a decorative tree may stand on the cell: open natural ground, nothing built on it
+	## and nothing laid there.
+	func open_at(x: int, y: int) -> bool:
+		if not _inside(Vector2i(x, y)):
+			return false
+		var i := _i(x, y)
+		return _blocked[i] == 0 and _built[i] == 0 and _tile[i] in ["plain", "hills", "forest", "rock"] \
+				and not _trees.has(Vector2i(x, y))
+
 	func trees_in(cells: Rect2i) -> Array:
 		var found := []
 		for y in range(maxi(cells.position.y, 0), mini(cells.end.y, HEIGHT)):
@@ -1534,15 +1879,13 @@ class Valley extends RefCounted:
 								_add_tree(foot, "pine", 2)
 								_taken[_i(fx, fy)] = 1
 					break
+		# Forest clothes the slopes where the noise is dense; its trees are scattered as the
+		# ground is drawn, not set on cells.
 		for y in HEIGHT:
 			for x in WIDTH:
 				var level := level_at(x, y)
-				var dense := _noise(x, y, 6.0, 12) > 0.5
-				if level >= 1 and level <= 4 and _hash(x, y, 5) > (0.45 if dense else 0.85) and level_at(x, y + 1) == level \
-						and _taken[_i(x, y)] == 1 and not TERRACES.has_point(Vector2i(x, y)):
-					_taken[_i(x, y)] = 0
-					_add_tree(Vector2i(x, y), "pine" if level >= 2 or _hash(x, y, 13) > 0.5 else "tree", 2)
-					_taken[_i(x, y)] = 1
+				if level >= 1 and level <= 4 and _noise(x, y, 6.0, 12) > 0.5 and not TERRACES.has_point(Vector2i(x, y)):
+					_tile[_i(x, y)] = "forest"
 
 	# The river: five cells wide, a level below the plain, winding west along the valley's foot;
 	# its north bank drops into it in earth.
@@ -1786,8 +2129,8 @@ class Valley extends RefCounted:
 				if VILLAGE.has_point(cell) or TOWN.grow(1).has_point(cell) or TERRACES.has_point(cell):
 					continue
 				var wood := _noise(x, y, 8.0, 31)
-				if wood > 0.6 and _hash(x, y, 32) > 0.45:
-					_add_tree(cell, "pine" if _hash(x, y, 33) > 0.7 else "tree", 3 if _hash(x, y, 33) <= 0.7 else 2)
+				if wood > 0.6:
+					_tile[_i(x, y)] = "forest"
 				elif _hash(x, y, 34) > 0.985:
 					_place("bush" if _hash(x, y, 35) > 0.4 else "boulder", cell, Vector2i.ONE, false)
 
@@ -2144,8 +2487,8 @@ func _level_bench(delta: float) -> bool:
 # One frame of the sequence each process frame, drawn before it is read, so a capture holds it
 # even while the window is hidden and the loop would not draw.
 func _frames() -> bool:
-	# The first frame streams the chunks in; what it adds draws from the next.
-	if _frame == 1:
+	# The first frames bake the map and stream the chunks in; what they add draws from the next.
+	if _frame <= 2:
 		_view.refresh(_view_rect(), 1.0, 0)
 		return false
 	if _sequence_frame > 0:
@@ -2287,6 +2630,9 @@ func _bench(delta: float) -> bool:
 		_play.fit_view()
 		_hud.refresh(_play.world, _play.steered, _play._skills)
 	_bench_frames += 1
+	# A window behind others is paced at the display's refresh rather than drawn as fast as it can.
+	if _bench_frames == 1:
+		DisplayServer.window_move_to_foreground()
 	if _bench_frames == WARM_UP_FRAMES:
 		_bench_started = Time.get_ticks_msec()
 	if _bench_frames > WARM_UP_FRAMES:
@@ -2303,6 +2649,8 @@ func _bench(delta: float) -> bool:
 	print("angle bench: %d bodies drawn, %d hidden behind something in the last frame" % [_view.drawn, _view.occluded])
 	print("angle bench: frame time p50 %.3f ms, p99 %.3f ms, max %.3f ms over %d frames" % [
 		sorted[sorted.size() / 2], sorted[ceili(sorted.size() * 0.99) - 1], sorted[-1], sorted.size()])
+	if absf(sorted[sorted.size() / 2] - 1000.0 / 144.0) < 0.05:
+		print("angle bench: PACED: the p50 is a 144 Hz display's period, so the window was paced, not measured")
 	var builds := Array(_view.build_usec)
 	builds.sort()
 	print("angle bench: chunks of %d cells; %d resident now, %d at most; %d built, %d freed; ground images %d bytes now (%d a chunk)" % [
