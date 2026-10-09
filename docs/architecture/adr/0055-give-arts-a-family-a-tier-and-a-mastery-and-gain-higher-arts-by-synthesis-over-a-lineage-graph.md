@@ -185,5 +185,4 @@ This supersedes ADR 0035's comprehension on a realm gained, its manual teaching 
 
 - Mastery from hits makes the factions that fight most master everything, so training needs a larger share, or hits a smaller one.
 - Synthesis never happens in the sweep, or happens to most elders, so the chances are wrong by an order of magnitude.
-- Footwork's speed lets a chaser close on anyone, so ADR 0046's engagement turns every fight into a chase.
 - Players find the ??? nodes frustrating rather than tempting, because nothing they can do reveals them.
