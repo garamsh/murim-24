@@ -283,8 +283,8 @@ enum class Shape : std::uint8_t {
   /// The disc of `radius` around the point, brought within `range`.
   AREA,
   /// A sweep: every point within `range` of the user ahead of the way to the
-  /// point, within a quarter turn either side, or all around when the point
-  /// is the user's own.
+  /// point, within ARC_HALF_WIDTH_DEGREES either side, or all around when the
+  /// point is the user's own.
   ARC,
   /// Every point within `radius` of the line `range` long from the user
   /// toward the point.
@@ -295,6 +295,10 @@ enum class Shape : std::uint8_t {
   /// must name a person.
   TARGETED,
 };
+
+/// How far either side of the way it faces an ARC sweeps, in degrees: a
+/// quarter turn, so the arc is the half-disc ahead.
+constexpr std::int32_t ARC_HALF_WIDTH_DEGREES = 90;
 
 /// An ability as data. A body uses it toward the nearest living hostile body
 /// within `range`, or where it stands when its shape is SELF or `range` is 0;
@@ -317,9 +321,11 @@ struct Skill {
 
 /// One use of a skill on the last tick, for a view to draw: person
 /// `person` used its skill `skill`, of shape `shape`, `range` and
-/// `radius`, from `origin` toward `toward`, all in sub-cell units; the
-/// skill deals `body_damage` before its user's edges, none for a skill that
-/// strikes only structures, and the use hit the people `struck`.
+/// `radius`, from `origin` toward `toward`, its shape reaching as far as
+/// `end`, all in sub-cell units: a LINE's far end, and for any other shape
+/// `toward`; the skill deals `body_damage` before its user's edges, none for
+/// a skill that strikes only structures, and the use hit the people
+/// `struck`.
 struct Strike {
   std::size_t person = 0;
   std::size_t skill = 0;
@@ -329,6 +335,7 @@ struct Strike {
   std::uint64_t body_damage = 0;
   Position origin{};
   Position toward{};
+  Position end{};
   std::vector<std::size_t> struck;
 };
 

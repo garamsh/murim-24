@@ -239,6 +239,12 @@ class Swath {
     }
   }
 
+  // The point its shape reaches as far as: a line's far end, and for any
+  // other shape the point it was used toward.
+  [[nodiscard]] Position end() const {
+    return shape_ == Shape::LINE ? end_ : centre_;
+  }
+
   // The centre and reach of a query that finds every point it covers.
   [[nodiscard]] Position centre() const {
     return shape_ == Shape::ARC || shape_ == Shape::LINE ? from_ : centre_;
@@ -262,6 +268,10 @@ class Swath {
     const std::int64_t offset_y = std::int64_t{point.y} - from_.y;
     switch (shape_) {
       case Shape::ARC:
+        // A point ahead makes no obtuse angle with the facing: a quarter turn
+        // either side.
+        static_assert(ARC_HALF_WIDTH_DEGREES == 90,
+                      "an arc covers the half-disc ahead of its facing");
         return distance_squared(from_, point) <=
                    std::int64_t{range_} * range_ &&
                (offset_x * facing_.x) + (offset_y * facing_.y) >= 0;
@@ -2907,6 +2917,7 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
                             skill.body_damage,
                             striker.position,
                             toward,
+                            toward,
                             {}});
   const bool hit =
       cover(user, crowd, skill, toward, locked, body_damage, damage);
@@ -2925,7 +2936,8 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
 // `toward` hits anyone or anything: every hostile person its shape covers
 // takes `body_damage` into `damage`, or for a targeted skill the person
 // `locked` alone, noted among the people the use's record struck, and every
-// structure its shape reaches its structure damage.
+// structure its shape reaches its structure damage. The record also notes how
+// far the shape reaches.
 bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
                   Position toward, std::optional<std::size_t> locked,
                   std::uint64_t body_damage,
@@ -2947,6 +2959,7 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
     return hit;
   }
   const Swath swath{skill, crowd.hash.position(user), toward};
+  strikes_.back().end = swath.end();
   crowd.hash.visit_within(
       swath.centre(), swath.extent(), [&](std::size_t other) {
         if (swath.covers(crowd.hash.position(other)) &&

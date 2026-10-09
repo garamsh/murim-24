@@ -670,6 +670,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::strikes() const {
     fields.set("body_damage", static_cast<std::int64_t>(strike.body_damage));
     fields.set("origin", vector(strike.origin));
     fields.set("toward", vector(strike.toward));
+    fields.set("end", vector(strike.end));
     godot::PackedInt64Array struck;
     for (const std::size_t person : strike.struck) {
       struck.push_back(static_cast<std::int64_t>(person));
@@ -1632,6 +1633,8 @@ void WorldAdapter::_bind_methods() {
                                         murim::TICKS_PER_SECOND);
   godot::ClassDB::bind_integer_constant(name, "", "CELL_SIZE",
                                         murim::CELL_SIZE);
+  godot::ClassDB::bind_integer_constant(name, "", "ARC_HALF_WIDTH_DEGREES",
+                                        murim::ARC_HALF_WIDTH_DEGREES);
   godot::ClassDB::bind_integer_constant(name, "", "STAGE_INTACT",
                                         static_cast<int>(murim::Stage::INTACT));
   godot::ClassDB::bind_integer_constant(
