@@ -1271,7 +1271,6 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
     fields.set("structure_damage", used.structure_damage);
     fields.set("cooldown", static_cast<std::int64_t>(used.cooldown));
     fields.set("qi_cost", used.qi_cost);
-    fields.set("shape", static_cast<std::int64_t>(used.shape));
     fields.set("ready_at",
                static_cast<std::int64_t>(core.ready_at(index, skill)));
     fields.set("art", -1);
