@@ -78,9 +78,9 @@ The ground is drawn by a shader from the cells' data, not laid from tiles:
 
 - Each area the view streams in is given to `world_art`'s ground shader as a texture of one texel a cell, holding what the core holds of the cell.
 - The shader decides each pixel from the four nearest cells' values, interpolated and warped by noise, so no edge between kinds runs along a cell's side. Where two kinds are nearly even it dithers them in a narrow band.
-- An area is drawn once into a texture when it streams in, and the viewport that drew it is freed. Nothing redraws the ground each frame.
+- An area is drawn once into a texture before it is first shown, and the viewport that drew it is freed. Nothing redraws the ground each frame. A map small enough to hold whole is drawn when it loads; a larger one draws each area within the stream's prefetch margin, spread over frames so no frame stalls.
 - Detail (tufts, flowers, pebbles, reeds) and decorative trees are placed per area by Poisson-disc spacing, from a seed derived from the area's index, so an area drawn again shows the same. Anything a rule reads comes from the core, never from this placement.
-- `art/terrain/` holds each kind's materials, exported as §Asset export says: a ramp of four colours, texture swatches, detail sprites, tree variants and face strata. What people build in straight lines, such as walls, bridges and paving, is drawn as sprites, not as ground.
+- `art/terrain/` holds each kind's materials, exported as §Asset export says: a ramp of four colours, detail sprites and tree variants. Texture grain and face strata may be made by the shader instead of drawn, coloured only from the kind's ramp. What people build in straight lines, such as walls, bridges and paving, is drawn as sprites, not as ground.
 - A test checks what the view gives the shader and where it places detail: the same area and seed give the same texture and the same placements. The drawn pixels are shown by captures in the pull request's evidence.
 
 ## Android export
