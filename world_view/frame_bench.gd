@@ -1,5 +1,6 @@
 ## Measures frame time with world_view.tscn rendering and the simulation ticking together, vsync off
-## so a frame takes as long as its work, and prints p50, p99 and max against the frame budget.
+## so a frame takes as long as its work, and prints p50, p99 and max against the frame budget, with
+## how many uses of skills and damage numbers the timed frames drew.
 ## `make bench` runs it; it needs a display, so it runs on a developer's machine and not in CI.
 extends SceneTree
 
@@ -14,6 +15,8 @@ var _frame := 0
 var _last_usec := 0
 var _ticks_before := 0
 var _times := PackedFloat64Array()
+var _uses_drawn := 0
+var _numbers_drawn := 0
 
 
 func _initialize() -> void:
@@ -33,6 +36,9 @@ func _process(_delta: float) -> bool:
 		_ticks_before = _view.ticks
 	elif _frame > WARM_UP_FRAMES:
 		_times.append((now - _last_usec) / 1000.0)
+		var combat: Node2D = _view.get_node("WorldArt/Combat")
+		_uses_drawn += combat.shown_strikes(Time.get_ticks_msec()).size()
+		_numbers_drawn += combat.shown_numbers(Time.get_ticks_msec()).size()
 	_last_usec = now
 	if _times.size() == TIMED_FRAMES:
 		_report()
@@ -53,6 +59,8 @@ func _check_setup() -> void:
 		_fail("the world must tick during the warm-up")
 	elif _view.names_shown == 0:
 		_fail("the view must name the people near its viewer")
+	elif _view.get_node("WorldArt/Combat").shown_strikes(Time.get_ticks_msec()).is_empty():
+		_fail("the battle must draw the uses of its skills")
 
 
 func _report() -> void:
@@ -79,6 +87,8 @@ func _report() -> void:
 		_view.bodies, _view.bodies_drawn])
 	print("names: %d shown over the %d people within reach in the last frame" % [_view.names_shown, _view.named_near])
 	print("structures broken: %d of %d" % [broken, world.structure_count()])
+	print("combat feedback: %.1f uses of skills and %.1f damage numbers drawn a frame on average" % [
+		float(_uses_drawn) / TIMED_FRAMES, float(_numbers_drawn) / TIMED_FRAMES])
 	print("frame time: p50 %.3f ms, p99 %.3f ms, max %.3f ms" % [p50, p99, sorted[-1]])
 	print("%s: p99 %.3f ms against a %.1f ms budget" % ["PASS" if passed else "FAIL", p99, BUDGET_MS])
 	print("frame time is measured on this machine only: CI has no display and does not run make bench")
