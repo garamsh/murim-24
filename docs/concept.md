@@ -5,6 +5,7 @@ This document is the single reference for the game concept agreed with the user.
 ## Contents
 - Status tags
 - Identity [agreed]
+- World and scale [agreed]
 - Factions and the rules for gaining power [agreed]
 - Sects [agreed]
 - Reputation and rumors [agreed]
@@ -43,6 +44,16 @@ Each section carries one of the following statuses.
 - **Language**: UI text in Korean first, with English supported.
 - **Title**: "Murim24" is a working title for development. The 24 has no meaning, and the official title is decided after the MVP.
 
+## World and scale [agreed]
+
+Decided by the user on 2026-10-08 (issue #173), with the measurement scoped on 2026-10-09.
+
+- **One continuous world.** The game's world is one generated map of about 512 x 512 cells, four by four of the first 128-cell region, shaped like the Central Plains (jungwon): a great river, famous mountains, plains, cities and the roads between them.
+- **Natural borders.** The world is closed by the sea, mountain ranges and desert, never by a hard edge.
+- **Sects on famous mountains.** Each sect's seat stands on a famous mountain, such as Hwasan for the Hwasan sect.
+- **Distance level of detail.** Places near the player are simulated in full; far places are simulated coarsely. Every person stays an individual in every tier (§Growing civilization).
+- **The population bound is measured.** It is raised from about 500 to the largest number between 2,000 and 5,000 that keeps a tick's p99 within its 4 ms budget with the level of detail. It is measured on PC, macOS first and Linux when available. The mobile bound is measured at the mobile port and may be lower.
+
 ## Factions and the rules for gaining power [agreed]
 
 | Faction | Values | How to become its leader | Joining requirement |
@@ -60,7 +71,7 @@ Each section carries one of the following statuses.
   - A **sect** (munpa, for example Hwasan or Wudang) is an organization within a faction, with members, elders, martial arts and a seat (bonsan).
 - **Members may live in several villages.** Membership does not follow from where one lives.
 - **Each can fall without the other.** A sect can be wiped out while its villages stand, and a village can burn while its sect survives.
-- **No fixed population per village.** The economy sets each village's cap, and the world's bound of about 500 NPCs (§Growing civilization) stays.
+- **No fixed population per village.** The economy sets each village's cap, under the world's population bound (§Growing civilization).
 
 ## Reputation and rumors [agreed]
 
@@ -88,7 +99,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - Growth slows as the population nears the cap.
   - A shortage brings starvation or migration.
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
-- **A hard upper bound.** A world's population never exceeds about 500 NPCs. That bound is a ceiling, not a target: the caps below it set the actual population.
+- **A hard upper bound.** A world's population never exceeds a bound. That bound is a ceiling, not a target: the caps below it set the actual population. It is about 500 until it is measured for the larger world (§World and scale).
 - **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
 - **[proposed]** Building kinds beyond the current set. The current set, in `core/region.cpp`, is houses and halls (housing), fields (harvest), granaries and storehouses (storage), and wells, barrels and fences, which hold nothing. Proposed additions:
   - Smithy: makes and mends weapons.
@@ -148,7 +159,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 ## MVP scope [proposed]
 
-- **Scale**: one region, three factions (Orthodox, Demonic, Unorthodox), six to eight villages.
+- **Scale**: one continuous world (§World and scale), three factions (Orthodox, Demonic, Unorthodox), and the villages its generation places.
 - **Flow**: world generation → travel and combat → one loop of a village being destroyed and rebuilt → succession by duel in the Demonic Cult → death and rebirth.
 
 ## Open questions [open]
@@ -158,7 +169,6 @@ The items below are not yet decided.
 - What happens after immortality is reached (for example, an ending in which ascension (deungseon) ends the cycle of reincarnation, versus remaining in the world).
 - Whether to include factors that shorten lifespan (side effects of demonic martial arts, qi deviation, poison, and so on).
 - Whether to include the martial clan and government factions.
-- Distance-based simulation LOD: to be decided in an ADR together with the simulation core.
 - How a sect's seat relates to a village: a compound within one, or a settlement of its own.
 - How sect membership is gained and lost, per faction.
 - What caps a sect's size.
