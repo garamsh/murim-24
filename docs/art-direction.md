@@ -162,6 +162,7 @@ Transitions:
 - Villagers wear the cloth ramp and carry no faction accent (approved line-up; not yet in the production set).
 - A knocked-down body is the same sprite lying on its side, without a shadow (approved line-up; not yet in the production set).
 - The player is a body like any other (`docs/concept.md` §Identity), drawn with its faction's sprite. Two markers tell it apart: the jade `ring`, drawn under the body round its feet, and the gold `chevron`, drawn over it above the head and bobbing a pixel every 400 ms.
+- A body whose faction is hostile to the player's, or at war with it, carries a one-pixel crimson `d63a2f` ring outside its ink outline (`art/mockup/nameplates.gd`, evidence/pr-199).
 
 An individual agent and an aggregate army read differently:
 
@@ -237,6 +238,7 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 - The economy icons, at the technique icons' scale: food is a lacquered bowl of rice with chopsticks, stock a tied sack of grain, housing a house under its slate roof.
 - The ware icons, at the same scale: herb is a sprig of three jade leaves on a pale root, elixir a round crimson pill lit at its top left, silver an ingot with its two ends raised.
 - A technique slot shows its key, Q, W, E, R or T, in a column of its own left of an icon of the skill's shape: a blade with an arc of sword qi for a strike at one body, an open palm in a ring of force for a burst that reaches the bodies round its target.
+- The people near the player are named over their heads in the HUD's font, outlined in ink: own and allied in jade `2f8c6e`, neutral in paper `a8946c`, and hostile or at war in crimson `d63a2f`, the loudest. A few names show at once, the hostile first, never over one another or a panel.
 - UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
 ## Do and don't

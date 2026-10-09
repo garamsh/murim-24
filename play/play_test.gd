@@ -31,7 +31,8 @@
 # names it and Space opens the dialogue window on it, which takes the keys: Enter lists its news,
 # Escape goes back, then ends the talk. Once its faction is at war with the person's, the prompt
 # shows its refusal, Space opens nothing, and an open window closes; control: until then it stays
-# open.
+# open. The people near the person are named over their heads, the person itself and the one the
+# talk prompt names left out, and no name shows while a panel is open.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -63,6 +64,7 @@ const GROWN_SEED := 3
 const GROWN_TICKS_PER_DAY := 5
 const GROWN_TICKS := 9000
 const TestSaves := preload("res://extension/test_saves.gd")
+const ViewScale := preload("res://view_scale.gd")
 # Ticks a hostile army marched on the person has to come within its first skill's range, and ticks
 # the person has to be ready to cast again.
 const APPROACH_LIMIT := 4000
@@ -109,7 +111,7 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass()
+			and _talk_pass() and _trade_pass() and _names_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -1047,6 +1049,65 @@ func _genealogy_pass() -> bool:
 	var passed := opened and digit_taken and closed and digit_orders
 	print("play_test: G opens the genealogy on the steered person %s, a digit gives no order while open %s, G closes it %s, then the digit orders %s: %s" % [
 		opened, digit_taken, closed, digit_orders, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# Walked up to the nearest person of its faction, the steered person sees the names of the people
+# world_art.gd finds within its reach, at most NAME_CAP, each one of them, and not its own, with the
+# person the talk prompt names left out while the prompt shows; G's panel open, no name shows.
+# Control: with the panel closed again, the names show again. Setup: people stand within the reach
+# and the prompt names one.
+func _names_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var art: Node2D = scene.get_node("WorldArt")
+	# The person walks up to the nearest other person of its faction, who waits for it, until the
+	# prompt may name someone.
+	var player: int = world.roster(scene.steered)[0]
+	var nearest := -1
+	var waiting := -1
+	for army in world.army_count():
+		for person in world.roster(army):
+			if person != player and world.army_faction(army) == world.army_faction(scene.steered) \
+					and (nearest < 0 or _apart(world, player, person) < _apart(world, player, nearest)):
+				nearest = person
+				waiting = army
+	if nearest >= 0:
+		world.steer(waiting, true)
+		var at := Vector2i((world.person_position(nearest) / WorldAdapter.CELL_SIZE).floor())
+		world.order(waiting, at, PackedInt64Array(range(world.skill_count(waiting))))
+		var ticks := 0
+		while ticks < TALK_WALK_LIMIT and scene.talk_target().person < 0:
+			if ticks % 20 == 0:
+				world.order(scene.steered, at, PackedInt64Array(range(world.skill_count(scene.steered))))
+			scene.step()
+			ticks += 1
+	var window := Vector2i(1920, 1080)
+	var zoom := ViewScale.world_scale(window, false)
+	scene.get_node("Camera").zoom = Vector2(zoom, zoom)
+	hud.fit(window, false)
+	var view := Rect2(scene.lead() * 16 / WorldAdapter.CELL_SIZE - Vector2(window) / zoom / 2.0, Vector2(window) / zoom)
+	art.refresh(view, 1.0)
+	scene._view_origin = view.position
+	scene.show_talk()
+	scene.show_names()
+	var near: Array = art.near.map(func(person: Dictionary) -> int: return person.person)
+	var named: Array = hud.nameplates.plates.map(func(plate: Dictionary) -> int: return plate.person)
+	var setup: bool = not near.is_empty() and scene.talk_to >= 0 and hud.talk_prompt.visible
+	var within := named.all(func(person: int) -> bool: return near.has(person))
+	var shown: bool = not named.is_empty() and named.size() <= hud.nameplates.NAME_CAP \
+			and not named.has(world.roster(scene.steered)[0]) and not named.has(scene.talk_to)
+	scene.command(_key(KEY_G))
+	scene.show_names()
+	var hidden: bool = hud.genealogy.visible and hud.nameplates.plates.is_empty()
+	scene.command(_key(KEY_G))
+	scene.show_names()
+	var back: bool = not hud.genealogy.visible and hud.nameplates.plates.size() == named.size()
+	var passed := setup and within and shown and hidden and back
+	print("play_test: %d people within reach, %d named %s, all of them within %s, neither the player nor person %d the prompt names %s; G's panel hides them %s, closed shows them %s (setup %s): %s" % [
+		near.size(), named.size(), named, within, scene.talk_to, shown, hidden, back, setup, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 

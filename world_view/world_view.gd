@@ -1,10 +1,14 @@
 ## Shows the core's M1 benchmark scenario in the approved art, through world_art.tscn, and sounds
 ## it through sound.tscn, with a camera the arrow keys move, at the PC's scale ViewScale gives the
 ## window. It ticks the world at the core's tick rate whatever the frame rate, draws the bodies
-## between their last two ticks' positions on every frame, and holds no game rule.
+## between their last two ticks' positions on every frame, names the people round the lead of the
+## army nearest the battle's centre as the play scene names those round the player, at the HUD's
+## scale, and holds no game rule.
 extends Node2D
 
 const ViewScale := preload("res://view_scale.gd")
+const Hud := preload("res://hud/hud.gd")
+const Nameplates := preload("res://hud/nameplates.gd")
 const PIXELS_PER_CELL := 16.0
 const CAMERA_PIXELS_PER_SECOND := 200.0
 # Ticks one frame may run to catch up; beyond it the simulation falls behind instead of stalling.
@@ -18,6 +22,8 @@ var bodies := 0
 var bodies_drawn := 0
 
 var _since_tick := 0.0
+var _names := Nameplates.new()
+var _hud_scale := 1
 
 @onready var _art: Node2D = $WorldArt
 @onready var _camera: Camera2D = $Camera
@@ -30,7 +36,16 @@ func _ready() -> void:
 	world = WorldAdapter.create_m1()
 	_camera.position = _to_pixels(Vector2(WorldAdapter.m1_centre()))
 	_art.show_world(world, -1)
+	_art.name_around(_nearest_army(WorldAdapter.m1_centre()))
 	_sound.show_world(world)
+	var window := Vector2i(get_viewport_rect().size)
+	_hud_scale = ViewScale.hud_scale(window, false)
+	var layer := CanvasLayer.new()
+	layer.scale = Vector2(_hud_scale, _hud_scale)
+	add_child(layer)
+	_names.use_font(load(Hud.FONT))
+	_names.size = Vector2(window / _hud_scale)
+	layer.add_child(_names)
 
 
 func _process(delta: float) -> void:
@@ -49,9 +64,29 @@ func _process(delta: float) -> void:
 	_art.refresh(view, _since_tick / step)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
+	var people: Array[Dictionary] = []
+	for person: Dictionary in _art.near:
+		people.append({"person": person.person, "relation": person.relation,
+			"head": ((person.head - view.position) * _camera.zoom / _hud_scale).floor()})
+	_names.show_names(world, people, [])
 	bodies = 0
 	for army in world.army_count():
 		bodies += world.body_positions(army).size()
+
+
+# The army whose lead stands nearest `cell`.
+func _nearest_army(cell: Vector2i) -> int:
+	var nearest := -1
+	var least := INF
+	for army in world.army_count():
+		var roster := world.roster(army)
+		if roster.is_empty():
+			continue
+		var apart := _to_pixels(world.person_position(roster[0])).distance_to(_to_pixels(Vector2(cell) * WorldAdapter.CELL_SIZE))
+		if apart < least:
+			least = apart
+			nearest = army
+	return nearest
 
 
 func _to_pixels(sub_cells: Vector2) -> Vector2:

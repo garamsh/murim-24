@@ -418,6 +418,7 @@ func _process(delta: float) -> void:
 	_hud.touch.body_at = _hud.from_window((drawn_lead() - view.position) * _camera.zoom).round()
 	_hud.refresh(world, steered, _skills)
 	show_talk()
+	show_names()
 
 
 ## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
@@ -678,6 +679,18 @@ func show_talk() -> void:
 	_hud.talk_prompt.key = OS.get_keycode_string(TALK_KEY)
 	_hud.talk_prompt.point_at(world, talk_to, _hud.from_window((head - _view_origin) * _camera.zoom).floor(),
 			talk_hostile)
+
+
+## Names the people world_art.gd finds within its reach of the steered person over their heads,
+## while no panel is open, all but the one the talk prompt names.
+func show_names() -> void:
+	var people: Array[Dictionary] = []
+	if _hud.panel() == null:
+		for person: Dictionary in _art.near:
+			if person.person != talk_to or not _hud.talk_prompt.visible:
+				people.append({"person": person.person, "relation": person.relation,
+					"head": _hud.from_window((person.head - _view_origin) * _camera.zoom).floor()})
+	_hud.show_names(world, people)
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
