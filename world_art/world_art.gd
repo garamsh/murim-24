@@ -1,8 +1,10 @@
 ## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid
 ## as docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms,
-## buildings by stage, bodies by faction and the steered person's markers. Bodies are drawn between
-## the positions of the last two ticks, as far between as the caller says the frame is, so they
-## move on every frame; the core's positions stay the only truth. Bodies are batched:
+## buildings by stage, bodies by faction, the steered person's markers and a crimson ring round each
+## body hostile to the person names are read around, as WorldAdapter.relation says. Bodies are drawn
+## between the positions of the last two ticks, as far between as the caller says the frame is, so
+## they move on every frame; the core's positions stay the only truth. Each refresh also lists the
+## people within NAME_REACH of that person, for their names to be drawn over them. Bodies are batched:
 ## one MultiMesh per row of cells on screen, sorted with buildings and landforms by the bottom
 ## edge of what they stand on. It reads the world and holds no game rule.
 extends Node2D
@@ -50,9 +52,22 @@ const CHEVRON_FRAME_MS := 400
 const MARGIN := 64.0
 # Frame positions in the body atlas built at startup, in pixels.
 const BODY_FRAME := Vector2i(16, 24)
+## How far from the person names are read around another person's name is drawn, in cells.
+const NAME_REACH := 8
+## The relations, as WorldAdapter.relation gives them, of a person drawn ringed in RING.
+const HOSTILE_RELATIONS := [WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
+const RING := Color("d63a2f")
+# Floats per body in a band's buffer: its 2D transform, its colour and its custom data.
+const BODY_FLOATS := 16
 
 var world: WorldAdapter
 var steered := -1
+## The army whose lead names are read around and relations read toward, or -1 for none.
+var viewer := -1
+## The people within NAME_REACH of the viewer's lead in the last refresh, the lead itself left out,
+## nearest first, each as `person`, `head`, where its head is drawn in pixels, `relation`, how its
+## faction stands toward the viewer's, and `cells`, how far it stands from the lead.
+var near: Array[Dictionary] = []
 ## Bodies drawn in the last refresh, after culling to the screen.
 var drawn := 0
 ## The territory the borders were last drawn from, as WorldAdapter.territory() gives it.
@@ -72,6 +87,8 @@ var _last_positions: Array[PackedVector2Array] = []
 var _rosters: Array[PackedInt64Array] = []
 var _same_roster: Array[bool] = []
 var _army_sprites := PackedInt64Array()
+# How each army's faction stands toward the viewer's, read once a tick.
+var _relations := PackedInt64Array()
 ## The layer of the villages' ground decorations: paving and road.
 var built: TileMapLayer
 # How many villages have their decorations laid, the world's order kept.
@@ -143,6 +160,21 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_ring.visible = steered >= 0
 	_chevron.visible = steered >= 0
 	_add_armies()
+	name_around(steered)
+
+
+## Reads names around army `army`'s lead and relations toward its faction from now on, or neither
+## for an army of -1.
+func name_around(army: int) -> void:
+	viewer = army
+	_read_relations()
+
+
+func _read_relations() -> void:
+	_relations.resize(_tick_positions.size())
+	var faction := world.army_faction(viewer) if viewer >= 0 else -1
+	for army in _relations.size():
+		_relations[army] = world.relation(faction, world.army_faction(army)) if faction >= 0 else -1
 
 
 ## Records the bodies' positions as a tick leaves them, so a body that moved since the last
@@ -156,6 +188,7 @@ func note_tick() -> void:
 		_same_roster[army] = roster == _rosters[army]
 		_rosters[army] = roster
 	_add_armies()
+	_read_relations()
 	var now := world.territory()
 	var villages := world.villages()
 	if now == owners and villages.size() == _decorated:
@@ -206,14 +239,23 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	buffers.resize(maxi(last_row - first_row + 1, 0))
 	var walk := (now / WALK_FRAME_MS) % 4
 	drawn = 0
+	near.clear()
+	var named := viewer >= 0 and not _tick_positions[viewer].is_empty()
+	var named_from := body_at(viewer, 0, between) if named else Vector2.ZERO
 	for army in _tick_positions.size():
 		var positions := _tick_positions[army]
 		var before := _last_positions[army]
 		var sprite := _army_sprites[army]
+		var tint := RING if _relations[army] in HOSTILE_RELATIONS else Color.WHITE
 		for body in positions.size():
 			var at := body_at(army, body, between)
 			if not shown.has_point(at):
 				continue
+			var cells := at.distance_to(named_from) / CELL
+			if named and cells <= NAME_REACH and (army != viewer or body > 0):
+				# A body is drawn from 16 pixels above its position.
+				near.append({"person": _rosters[army][body], "head": at - Vector2(0, 17),
+					"relation": _relations[army], "cells": cells})
 			var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
 			if buffers.is_empty():
 				continue
@@ -224,9 +266,10 @@ func refresh(view: Rect2, between := 1.0) -> void:
 					heading = NAN
 			var frame := 0 if is_nan(heading) else 1 + walk
 			_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
-					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0)
+					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0, tint)
 			drawn += 1
 	_fill_bands(buffers, first_row)
+	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
 	# The markers follow the steered person while it lives.
 	var alive := steered >= 0 and not _tick_positions[steered].is_empty()
 	_ring.visible = alive
@@ -494,15 +537,17 @@ func _build_body_atlas() -> void:
 
 
 # Adds one sprite to band `band`, the row of cells whose bottom edge is at `row`: `frame` is its
-# rectangle in the atlas, `centre` its centre in world pixels, and `flip` mirrors it.
+# rectangle in the atlas, `centre` its centre in world pixels, `flip` mirrors it, and a `tint` other
+# than white rings it in that colour.
 func _append(buffers: Array[PackedFloat32Array], band: int, row: int, frame: Rect2, centre: Vector2,
-		flip: bool) -> void:
+		flip: bool, tint: Color) -> void:
 	var size := _atlas.get_size()
 	var local := centre.round() - Vector2(0, row * CELL)
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y.
 	buffers[band].append_array(PackedFloat32Array([
 		frame.size.x * (-1.0 if flip else 1.0), 0.0, 0.0, local.x,
 		0.0, -frame.size.y, 0.0, local.y,
+		tint.r, tint.g, tint.b, tint.a,
 		frame.position.x / size.x, frame.position.y / size.y, frame.size.x / size.x, frame.size.y / size.y]))
 
 
@@ -511,6 +556,7 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 		var band := MultiMeshInstance2D.new()
 		band.multimesh = MultiMesh.new()
 		band.multimesh.transform_format = MultiMesh.TRANSFORM_2D
+		band.multimesh.use_colors = true
 		band.multimesh.use_custom_data = true
 		var quad := QuadMesh.new()
 		quad.size = Vector2.ONE
@@ -527,12 +573,12 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 	for band in _bands.size():
 		var multimesh := _bands[band].multimesh
 		var data: PackedFloat32Array = buffers[band] if band < buffers.size() else PackedFloat32Array()
-		var count := data.size() / 12
+		var count := data.size() / BODY_FLOATS
 		_bands[band].position = Vector2(0, (first_row + band) * CELL)
 		if multimesh.instance_count < count:
 			multimesh.instance_count = count + 64
 		if count > 0:
-			data.resize(multimesh.instance_count * 12)
+			data.resize(multimesh.instance_count * BODY_FLOATS)
 			multimesh.buffer = data
 		multimesh.visible_instance_count = count
 

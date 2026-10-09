@@ -3,7 +3,8 @@
 ## art/mockup/mobile_hud_arts.png shows them; the
 ## genealogy panel, which G opens; the sect panel, which M opens; the arts panel, which K opens,
 ## and the loadout it fills; the faction window, which F opens; the dialogue window, open while the
-## player talks to someone, and the prompt over whom it may talk to; the title, new-game, pause and
+## player talks to someone, and the prompt over whom it may talk to; the names over the people near
+## the player, under every panel; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
 ## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
 ## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
@@ -89,6 +90,8 @@ var factions: Control
 var dialogue: Control
 ## The prompt over the person the player may talk to.
 var talk_prompt: Control
+## The names over the people near the player.
+var nameplates: Control
 ## The player's silver on a strip, and the wares it holds on a belt beside the technique bar.
 var purse: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
@@ -397,6 +400,7 @@ func _light_shortcut() -> void:
 func _place() -> void:
 	var on := touch.visible
 	var gained := room - NATIVE
+	nameplates.size = room
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
 	shortcuts.top_right = _map_panel.position + Vector2(_map_panel.size.x, _map_panel.size.y + RAIL_GAP)
 	shortcuts.queue_redraw()
@@ -409,6 +413,22 @@ func _place() -> void:
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
+
+
+## Names the people of `people` in `world` as nameplates.gd names them, clear of every panel shown,
+## the shortcut rail, the purse, and the talk prompt's slip.
+func show_names(world: WorldAdapter, people: Array[Dictionary]) -> void:
+	var clear: Array[Rect2] = [purse.strip_rect()]
+	if purse.belt:
+		clear.append(purse.belt_rect())
+	if talk_prompt.visible:
+		clear.append(talk_prompt.slip_rect())
+	for child: Node in get_children():
+		if child is Panel and (child as Control).visible:
+			clear.append((child as Control).get_rect())
+	if shortcuts.visible:
+		clear.append(shortcuts.rect())
+	nameplates.show_names(world, people, clear)
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
@@ -550,6 +570,10 @@ func season_text(date: Dictionary) -> String:
 
 
 func _build() -> void:
+	# The names, first, so every panel draws over them.
+	nameplates = preload("res://hud/nameplates.gd").new()
+	nameplates.use_font(_theme.default_font)
+	add_child(nameplates)
 	var player := _panel(Rect2(4, 4, 168, 62))
 	_portrait.position = Vector2(4, 8)
 	_portrait.size = Vector2(32, 32)

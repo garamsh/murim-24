@@ -11,6 +11,7 @@
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
+const WorldArt := preload("res://world_art/world_art.gd")
 const SEED := 2026
 const TICKS := 2000
 # A wall of blocked cells, drawn as mountain, down column 8 from row 0 to row 7.
@@ -441,7 +442,7 @@ func _drawn_at(art: Node2D, centre: Vector2) -> bool:
 	for band in _bands(art):
 		var buffer := band.multimesh.buffer
 		for i in band.multimesh.visible_instance_count:
-			if Vector2(buffer[i * 12 + 3], buffer[i * 12 + 7]) + band.position == centre:
+			if Vector2(buffer[i * WorldArt.BODY_FLOATS + 3], buffer[i * WorldArt.BODY_FLOATS + 7]) + band.position == centre:
 				return true
 	return false
 
@@ -460,8 +461,9 @@ func _extent(band: MultiMeshInstance2D) -> Rect2:
 	var buffer := band.multimesh.buffer
 	var extent := Rect2()
 	for i in band.multimesh.visible_instance_count:
-		var size := Vector2(absf(buffer[i * 12]), absf(buffer[i * 12 + 5]))
-		var quad := Rect2(Vector2(buffer[i * 12 + 3], buffer[i * 12 + 7]) - size / 2, size)
+		var at := i * WorldArt.BODY_FLOATS
+		var size := Vector2(absf(buffer[at]), absf(buffer[at + 5]))
+		var quad := Rect2(Vector2(buffer[at + 3], buffer[at + 7]) - size / 2, size)
 		extent = quad if i == 0 else extent.merge(quad)
 	return extent
 

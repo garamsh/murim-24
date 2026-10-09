@@ -51,6 +51,8 @@ func _check_setup() -> void:
 		_fail("the camera must have bodies on screen to draw")
 	elif _view.ticks == 0:
 		_fail("the world must tick during the warm-up")
+	elif _view.names_shown == 0:
+		_fail("the view must name the people near its viewer")
 
 
 func _report() -> void:
@@ -75,6 +77,7 @@ func _report() -> void:
 		WorldAdapter.TICKS_PER_SECOND])
 	print("bodies: %d in the world, %d on screen drawn as sprites through MultiMesh bands" % [
 		_view.bodies, _view.bodies_drawn])
+	print("names: %d shown over the %d people within reach in the last frame" % [_view.names_shown, _view.named_near])
 	print("structures broken: %d of %d" % [broken, world.structure_count()])
 	print("frame time: p50 %.3f ms, p99 %.3f ms, max %.3f ms" % [p50, p99, sorted[-1]])
 	print("%s: p99 %.3f ms against a %.1f ms budget" % ["PASS" if passed else "FAIL", p99, BUDGET_MS])
