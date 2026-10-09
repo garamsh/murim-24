@@ -14,6 +14,10 @@ Issue #211 asks for inventories, what drops on death, warehouses with keepers, s
   - a soldier at war picks it up as loot, which goes to its faction's warehouse, and the faction sells it for income
 - **PM direction.** Every item has one holder: a person, a warehouse, a faction or the ground. Four verbs move items between holders: pick up, deposit or withdraw, buy and sell. Loot is a soldier at war picking up, routed to its faction's warehouse.
 
+Decided on PR #215's review, 2026-10-09:
+- **By the owner.** Nothing marks a thief now. Witnesses will, once #175's reputation lands. The map places treasure in some caves.
+- **By the PM, on this ADR's recommendation,** with the owner told. An heirless household's estate goes to the faction owning its village.
+
 ADR 0050 defines items as stacks of a kind, and the four slots. ADR 0052 defines households, markets and treasuries. This ADR sits between them.
 
 Facts from `main` at `5047f29`:
@@ -67,15 +71,15 @@ Options weighed:
   - Rejected: one shared store per village with no accounts. Every deposit would belong to everyone, so no one could own anything stored.
 - **Who owns a deposit.** A person deposits into its household's account, or into its soul's account if it has a soul. Any adult of the household may withdraw from the household's account; only a body of the soul may withdraw from the soul's. A sect member deposits into its sect's account only by an order its master or an elder gives. The faction's account is filled by loot, taxes and purchases (ADR 0052). A soldier of the faction may withdraw issue: gear of the kinds its spares and slots need, up to them.
 - **The keeper.** A village warehouse's keeper is the first resident whose trade is keeping (#170), and until trades exist, the first resident of its village's first household. Fees go to the keeper's household. A keeper who dies is replaced by the same rule the next day, and the lots are untouched. The keeper never withdraws another account's lots.
-- **An owner's death.** A household's account passes to the household that takes in its last member (ADR 0052). With none, it passes to the faction owning the village, the way an estate with no heir goes to the crown. A soul's account outlives every body. A sect that falls passes its vault's accounts to the faction owning the seat, as its manuals scatter.
+- **An owner's death.** A household's account passes to the household that takes in its last member (ADR 0052). With none, it passes to the faction owning the village, the way an estate with no heir goes to the crown, as the PM decided. A soul's account outlives every body. A sect that falls passes its vault's accounts to the faction owning the seat, as its manuals scatter.
 - **Destroying a warehouse.** A warehouse whose structure reaches the destroyed stage scatters every lot and every balance onto the ground. Each stack becomes a pile on a passable cell drawn by the seed within 2 cells of its footprint, and the accounts are emptied. Then the pick-up rule applies: a person takes a pile as its own, and a soldier at war as loot. Only people whose faction is hostile to the village's owner can damage it while it has a living resident (ADR 0015), so robbing a warehouse is an act of war or of an enemy.
   - Rejected: opening a standing warehouse by force, as a fifth verb. The owner decided that destruction scatters, and that rule already covers it.
-  - Whether picking up from a warehouse one destroyed marks one a thief to witnesses is a decision for the owner, listed for the PM. Until #175's reputation exists, nothing marks anyone.
+  - Nothing marks anyone a thief for picking up from a warehouse they helped destroy, as the owner decided. Once #175's reputation lands, witnesses within sight of such a pick-up mark the picker a thief in it.
 - **War taking a village.** When a village's owner changes and its warehouse stands, household and soul accounts stay. The old faction's and sect's accounts there pass to the new owner, as spoils. A raid that destroys the warehouse scatters it instead.
 - **Caves.** A cave is a named place in the map's data, an entrance cell with a cache of 32 lots and 1 account, its soul's.
   - Only a steered body standing at the entrance opens it, through the warehouse window. A cave blocks nothing and draws no one, and no rule for people no driver steers reads caves. That is the owner's decision. It is the one rule that tells the player from an NPC, an exception to the concept's principle that the same rules apply to both, recorded in `concept.md`.
   - A cache cannot be destroyed, and only its soul's bodies withdraw from it.
-  - The map may place treasure in some caves, owned by no one until the player takes it, which is listed as a decision for the owner.
+  - The map places treasure in some caves, as the owner decided: a cache's starting lots, owned by no one until the player withdraws them, after which the rest of the cache is the soul's.
 - **Rebirth.** The player's soul owns its account at every warehouse it deposited into, and its caches. A new body of the soul withdraws from them by walking there; the keeper knows the soul as a matter of the world's rules, not of the body. The soul's holdings are listed in the inventory window, by warehouse and place, so the player knows where to go.
   - Rejected: a token item that unlocks the account. A token dropped at death would lose the account, and the owner asked that warehouses survive rebirth.
   - Rejected: a password the player types. It is the same rule with a step the world never checks.

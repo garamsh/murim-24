@@ -17,6 +17,10 @@ The owner said on 2026-10-09, in issue #211, that people look too alike and that
   - whether the demand for spares, repairs and replacements helps keep the money supply bounded
 - **PM direction.** Every item has one holder: a person, a warehouse, a faction or the ground. Four verbs move items between holders: pick up, deposit or withdraw, buy and sell. Needs are deterministic thresholds, not planning.
 
+Decided on PR #215's review, 2026-10-09:
+- **By the owner.** The faction dye is the wearer's faction now. An art needs its discipline's weapon family: a sword art a sword, and a fist art bare hands or gauntlets.
+- **By the PM, on this ADR's recommendation,** with the owner told. Darts are used up: each throw spends one.
+
 This ADR is the first of three that #211 splits into. ADR 0051 holds inventories, warehouses and looting. ADR 0052 holds markets, households, taxes, treasuries and discontent. All three use ADR 0049's pack format, so every item is data and the core names none.
 
 Facts from `main` at `5047f29`:
@@ -58,15 +62,16 @@ Options weighed:
   | Fan | arc | 1.5 cells | 8 | 12 | none yet |
   | Hidden weapons | line, half a cell either side | 8 cells | 6 | 30 | hidden weapons |
 
+  - Darts are a stack. Every throw, the basic strike or a hidden-weapons art skill, spends one dart, as the PM decided. A thrower with none left strikes bare-handed until it holds darts again.
   - Iron is the base material. A steel kind deals a fifth more and a fine-steel kind two fifths more, each with the edge to match. The implementing pull request measures fights at these values against ADR 0046's targets.
   - Rejected: weapons as a multiplier on today's guard strike. Every weapon would then strike in the same shape at the same reach.
 - **Arts and weapon families.** Each discipline names the weapon family its arts need. An art skill can be used only while the weapon slot holds that family:
   - a sword art needs a sword, and a saber art a saber
   - a fist art needs gauntlets or an empty weapon slot
-  - a hidden-weapons art needs darts in the weapon slot, and each use spends one
+  - a hidden-weapons art needs darts in the weapon slot
   - medicine needs none
 
-  A cast refused for this names a new `CastRefusal`, `WRONG_WEAPON`. The automatic strike draws only among the skills the weapon allows. Chosen, so gear matters to a martial artist and to a merchant selling to one. The owner may choose otherwise; it is the first of the decisions listed for the PM.
+  A cast refused for this names a new `CastRefusal`, `WRONG_WEAPON`. The automatic strike draws only among the skills the weapon allows. Decided by the owner, so gear matters to a martial artist and to a merchant selling to one.
   - Rejected: arts usable with any weapon. A swordsman's sword would then add damage and nothing else.
 - **The bare-handed strike.** It is the empty weapon slot's strike: an arc at arm's length, the same shape and reach as the sword's, at 6 damage instead of 10. It costs nothing and never wears. Fist arts strike bare-handed at an edge of 1,000, and with gauntlets at the gauntlets' edge, 1,200 for iron. So an unarmed person still holds its ground under ADR 0046's engagement, at three fifths of a sword's damage, and a fist artist loses nothing by losing a weapon.
 - **Armour.** Armour and headgear each give a `guard` per mille. Body damage taken is multiplied by (1,000 − the sum of the guards) / 1,000. The guard never passes 600, so a strike always lands. The base pack's starting guards:
@@ -114,8 +119,8 @@ Options weighed:
   - soldiers drawn at the start carry a sword or saber, by faction, in lamellar
   - **Rejected: a basic piece issued free.** The owner decided against it.
 - **An empty slot's looks.** The view draws a body in plain clothes, of its sex. An empty weapon slot shows empty hands, and an empty head slot shows the body's hair. Every item kind's sprite is named in the pack's `view/` (ADR 0049), outside the hashed data, and the view draws the layers in order: body, armour, head, weapon.
-- **Faction dye.** Each armour and head sprite has a dye mask: pixels the view tints with a faction's colour, both from the packs' `view/` documents (ADR 0049), so a recoloured or redrawn item changes no simulation data. The tint is the wearer's faction now, read from the army it serves in. A person who changes faction, or wears looted gear, shows its own faction at once. Chosen: the core stores nothing for it, and a battle reads friend from foe by colour.
-  - Rejected: the dye as the maker's faction, stored on each item. Looted gear would show its old colours, which reads well in a story but misleads in a fight, and it costs a byte for every stack. This is listed as a decision for the owner.
+- **Faction dye.** Each armour and head sprite has a dye mask: pixels the view tints with a faction's colour, both from the packs' `view/` documents (ADR 0049), so a recoloured or redrawn item changes no simulation data. The tint is the wearer's faction now, read from the army it serves in. A person who changes faction, or wears looted gear, shows its own faction at once. Decided by the owner. The core stores nothing for it, and a battle reads friend from foe by colour.
+  - Rejected: the dye as the maker's faction, stored on each item. Looted gear would show its old colours, which reads well in a story but misleads in a fight, and it costs a byte for every stack.
 - **Memory.** A stack is 8 bytes: a kind of 16 bits, durability or count of 16 bits, and flags. A person holds 4 slots and 8 inventory stacks (ADR 0051), 96 bytes. At 50,000 people that is 4.8 MB. A pack may define up to 65,535 item kinds. The dead hold nothing: what they carried drops where they die (ADR 0051).
 - **Cost per tick.**
   - Wear is a decrement inside the strike and damage loops, which already visit every hit.

@@ -41,6 +41,12 @@ Issue #211 asks for merchant houses that carry goods between towns, with prices 
   - Loans, interest, banks, exchange rates and haggling are out of scope for now.
   - Far tiers trade in aggregate per town.
 
+Decided by the PM on PR #215's review, 2026-10-09, on this ADR's recommendations, with the owner told and free to override:
+- Caravans read the prices of the markets within reach at once.
+- A gate held by a fleeing household's own faction stops it at one in two, as pack data.
+- The food cap counts four fifths of the harvest, and the sweep is rerun.
+- Money is counted in copper.
+
 This is the third of #211's three ADRs, after ADR 0050's items and ADR 0051's holders and warehouses. Its data is ADR 0049's pack format.
 
 Facts from `main` at `5047f29` (`core/region.cpp`, `simulation.md`):
@@ -113,7 +119,7 @@ Options weighed:
   - Each day, for each caravan at home and idle, the house chooses the kind and the market within 1,500 cells along its roads whose margin is largest. The margin is the price there less the price at home and the selling discount, times the cargo, less the tolls on the way and the caravan's wages for the days of the trip.
   - It buys that cargo with its balance and marches the caravan there as an army: a merchant and its guards from the home town's earners, paid daily, the objective the market.
   - It sells on arrival, buys the best cargo for home by the same rule, and returns. Nothing positive leaves the caravan home.
-  - Prices are read from every market within reach at once, which is listed as a decision for the owner.
+  - Prices are read from every market within reach at once, as the PM decided. Prices heard by rumour, some days old, are the alternative, if caravans crowd one route.
   - A caravan destroyed scatters its cargo as ADR 0051's piles.
   - A house's balance above 60 days of its wages pays the excess to its members' households.
   - Rejected: caravans by fixed routes. Prices would not meet, and the owner asked for a market that emerges.
