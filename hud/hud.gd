@@ -416,7 +416,7 @@ func _place() -> void:
 
 
 ## Names the people of `people` in `world` as nameplates.gd names them, clear of every panel shown,
-## the purse, and the talk prompt's slip.
+## the shortcut rail, the purse, and the talk prompt's slip.
 func show_names(world: WorldAdapter, people: Array[Dictionary]) -> void:
 	var clear: Array[Rect2] = [purse.strip_rect()]
 	if purse.belt:
@@ -426,6 +426,8 @@ func show_names(world: WorldAdapter, people: Array[Dictionary]) -> void:
 	for child: Node in get_children():
 		if child is Panel and (child as Control).visible:
 			clear.append((child as Control).get_rect())
+	if shortcuts.visible:
+		clear.append(shortcuts.rect())
 	nameplates.show_names(world, people, clear)
 
 

@@ -15,6 +15,7 @@ const PersonName := preload("res://hud/person_name.gd")
 const Palette := preload("res://hud/palette.gd")
 const WorldArt := preload("res://world_art/world_art.gd")
 const Nameplates := preload("res://hud/nameplates.gd")
+const Play := preload("res://play/play.gd")
 const SEED := 2026
 const WINDOW := Vector2i(1920, 1080)
 const PC_WINDOWS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(2560, 1440)]
@@ -175,12 +176,13 @@ func _clear_pass() -> bool:
 
 # At each PC window in each locale, people bearing the region's widest names, hostile and own, with
 # heads on a grid across the whole room, are named whole, NAME_CAP of them, each inside the room
-# and clear of every other name, every panel the HUD shows, the purse and the talk prompt, which
-# points at the room's middle. Setup: the names are the widest the region's people bear.
+# and clear of every other name, every panel the HUD shows, the shortcut rail with play.gd's rows,
+# the purse and the talk prompt, which points at the room's middle. Setup: the names are the widest the region's people bear.
 func _fit_pass() -> bool:
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(HUD_SCENE).instantiate()
 	hud.show_player(world, world.player_army())
+	hud.show_shortcuts(Play.SHORTCUTS)
 	hud.talk_prompt.key = "Space"
 	var faults := []
 	var checks := 0
@@ -202,7 +204,7 @@ func _fit_pass() -> bool:
 					n += 1
 			hud.show_names(world, crowd)
 			var plates: Array[Dictionary] = hud.nameplates.plates
-			var kept := [hud.purse.strip_rect(), hud.purse.belt_rect(), hud.talk_prompt.slip_rect()]
+			var kept := [hud.purse.strip_rect(), hud.purse.belt_rect(), hud.talk_prompt.slip_rect(), hud.shortcuts.rect()]
 			for child: Node in hud.get_children():
 				if child is Panel and (child as Control).visible:
 					kept.append((child as Control).get_rect())
