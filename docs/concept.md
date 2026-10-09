@@ -106,10 +106,14 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 
 ## Reputation and rumors [agreed]
 
-- Favor has two layers.
-  - Personal favor with a village or an individual NPC
-  - Reputation with a faction
-- Actions become rumors and spread with a time delay.
+Decided by the owner on 2026-10-08 (issue #175). The design is ADR 0054 (`docs/architecture/adr/0054-keep-each-groups-standing-toward-a-person-changed-by-deeds-seen-or-heard.md`).
+
+- **Groups hold standing toward a person, each separately:** the village, the sect and the faction. A deed counts for or against every group of the person it is done to, more for the village than the sect, and more for the sect than the faction. Extorting a sect disciple who lives in village A drops A a lot, the sect moderately and the faction a little.
+- **Deeds.** Through the dialogue one can attack, extort, threaten, help or give a gift. Kills and fights count too, and defending someone counts as help.
+- **Deeds become known through witnesses and rumour.** The groups of those who saw a deed react at once. Farther groups learn as the rumour spreads with a time delay. A deed no one saw stays hidden.
+- **What standing changes.** Groups that are hostile attack on sight. Unfriendly ones refuse trade, admission and teaching. Friendly and honoured ones admit more readily and charge less. A faction's standing toward another faction's leader makes war likelier, but no faction turns hostile over one person's deed.
+- **Standing heals with time,** and a gift or blood money mends it faster.
+- **The same rules for NPCs and the player.** Raiders and rivals build the world's own grudges and debts.
 - An epithet (byeolho) is generated automatically from one's deeds.
 
 ## Village life cycle [agreed]
@@ -239,3 +243,4 @@ The items below are not yet decided.
 - The realm names and thresholds, which are data.
 - How much an art of a mismatched nature costs: how much harder to learn, how much weaker to use.
 - Whether a lost manual can be copied.
+- Whether individual NPCs hold a personal favor toward a person, apart from their village, sect and faction (§Reputation and rumors).
