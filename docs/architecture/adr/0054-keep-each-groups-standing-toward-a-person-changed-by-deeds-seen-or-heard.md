@@ -155,11 +155,11 @@ Options weighed:
      - A takes −300 × 1,000 / 1,000 = −300: unfriendly. A's residents refuse to sell to P.
      - Hwasan takes −150: neutral.
      - The Orthodox take −60: neutral.
-  3. A woodcutter of village B stands 5 cells away. B is not V's village, so B takes the witnesses' weight, −300 × 100 / 1,000 = −30.
+  3. A woodcutter of village B, another Orthodox village, stands 5 cells away. B is not V's village, so B takes the witnesses' weight, −300 × 100 / 1,000 = −30. The Orthodox, the woodcutter's faction too, already took −60 as V's faction, the larger weight, and take nothing more.
   4. Thirty days later, decay has moved A to −240 and Hwasan to −90. The Orthodox and B are at 0.
   5. P gives a resident of A 50 silver: +50, so A is at −190, neutral, and sells to P again.
   6. Instead, P kills V on a road 40 cells from A with no one within 6 cells. The deed is hidden and nothing changes.
-  7. Had the woodcutter seen the kill, B would take −50 at once. The rumour, at 64 cells a day, would reach A's centre, 40 cells off, on the first day: −500, unfriendly. The Orthodox, whose nearest village is A, would take −100 the same day. Hwasan's seat lies 120 cells off, so it would take −250 on the second day.
+  7. Had the woodcutter seen the kill, V's faction, the Orthodox, would learn at once through the woodcutter, a member: −500 × 200 / 1,000 = −100. B would take the witnesses' weight, −50. The rumour, at 64 cells a day, would reach A's centre, 40 cells off, on the first day: −500, unfriendly. Hwasan's seat lies 120 cells off, so Hwasan would take −250 on the second day.
 
 The implementation, in order, each a pull request with its acceptance:
 1. **The store, deeds by fighting, witnesses, rumour and decay.**
