@@ -62,6 +62,7 @@ Measured against `main` at `ca54aca` with the same scratch instrumentation in bo
 - `run_crossing`'s pinned hash is unchanged: its skills are areas and its rules give no sight, and both are folded only when set. The region's hashes change.
 - A save holds each skill's shape and the rules' sight, so `SAVE_VERSION` rises to 8 and every earlier save is refused.
 - The test of a band outnumbered at the walled village kept its band where it stands as the control that no one is struck; with people engaging, the residents now close on that band, so the control runs with no sight.
+- A lone body sweeping an arc hits both of two defenders on every swing, so a fight of one against two equals is about even: `play_test`'s steered Cult body marched on the nearest Orthodox village, two defenders, won with 24 of 120 health where on `main` it died at about tick 1,366. That test, whose subject is the rebirth screen, now marches the body on the largest hostile army, and it dies at tick 2,090. Its cursor for an aim inside the reach moves from 32 to 16 pixels, inside the new 24.
 - The view (#184) draws each strike from `strikes()`; the adapter exposes neither the shape nor the record yet.
 
 ## Signs the decision was wrong
