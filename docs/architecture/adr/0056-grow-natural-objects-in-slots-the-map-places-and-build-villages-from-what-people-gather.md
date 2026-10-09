@@ -81,6 +81,11 @@ Options weighed:
   - **Unlike the shared store ADR 0051 rejected.** ADR 0051 rejected one store per village with no accounts, because every deposit would belong to everyone. This account holds only what the village itself owns: materials gathered for its building, paid for by its faction. Households' and others' accounts are untouched. Deposits to it pay no keeper's fee.
   - **Before the village has a store.** A village without a standing store structure keeps its account at its first structure that houses people, its hall or first house, as a yard of 16 lots. The account moves to the store once one stands. Destroying the structure that holds it scatters it as ADR 0051 scatters a warehouse.
   - Rejected: gathered materials as the gatherer's own, sold to a market for silver. Building would then wait on a village buying from its own people, two trades for one task.
+- **Arts and debris (#203).** ADR 0057, designed after this ADR, may change slots by an art:
+  - felling sets a grown slot to stump
+  - a crater or cut over a slot's cell sets it to empty, to regrow only by spread
+
+  Either drops the slot's yield, logs as wood and rock as stone, as piles (ADR 0051). Debris of a breached structure drops as stone piles too. Such piles are gatherable input: a gatherer assigned for a material first picks up piles of it within its 32 cells, by ADR 0051's pick-up rule, before it gathers from a slot, and deposits them into its village's account. So the owner's logs and stones from #203 feed building.
 - **Hunting** waits for animals (#171). It will be gathering from a slot that moves, and the yield, meat and hide, is pack data like any other.
 - **Building from materials.** Each structure kind's cost in materials is pack data: in the base pack, a house 40 wood and 10 stone, a hall 80 and 30, a granary 60 and 10, a storehouse 50 and 20, a smithy 40 and 40, a fence 4 wood a cell, and a field nothing.
   - Growth's plan (ADR 0023) is laid as rubble as before, once the village's account holds its cost. Builders carry the materials from the storehouse to the site, where they are spent.
