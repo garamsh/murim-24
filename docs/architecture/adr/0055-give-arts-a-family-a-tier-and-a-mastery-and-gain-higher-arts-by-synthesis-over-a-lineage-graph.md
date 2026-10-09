@@ -17,7 +17,7 @@ The owner's feedback and decisions of 2026-10-09, in issue #194, are binding. Th
 - **The lineage window** shows the graph's shape and edges. An unknown higher art's name and content stay hidden, as ???, until it is comprehended, or learned of by rumour or manual.
 
 Decided on PR #218's review, 2026-10-10:
-- **The owner's earlier decisions bind here.** An art's skill needs its discipline's weapon family, as the owner decided on #211, and darts are used up, as #215 records.
+- **The owner's earlier decisions bind here.** An art's skill needs its discipline's weapon family, as the owner decided on #211, and darts are used up, as ADR 0050 records.
 - **By the PM.**
   - The mastery cap and rates, the five stages, manuals giving only the first stage's forms, no manual for tier 3, and the rarity of 1 in 200 are proposals in pack data, which the sweep checks.
   - The window's key, L, and its mockup go to the PM in step 4.
@@ -33,7 +33,7 @@ Facts from `main` at `aff1434`:
 - **The arts panel** (#161) opens with K. The keys the HUD and play scene bind are C, E, F, G, K, M, Q, R, T, W, X and Z, so L is free.
 - **Pending designs.**
   - ADR 0049 renames realms, qi and the heart method to general words.
-  - An art's skill needs its discipline's weapon family, as the owner decided on #211. The open PR #215's ADR 0050 designs it.
+  - An art's skill needs its discipline's weapon family, as the owner decided on #211. ADR 0050, merged in #215 as proposed, designs it.
   - ADR 0046 gave each skill a shape. Issue #183 is done.
 
 Options weighed:
