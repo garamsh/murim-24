@@ -45,6 +45,8 @@ Options weighed:
     - a stage of 3 bits: empty, sapling, growing, grown, stump or harvested
     - a timer of 13 bits: the days the slot has spent in its stage, up to 8,191
 
+  Since the kinds' affinities are compiled into the map, a mod that changes natural-object kinds needs the map rebuilt, which changes the map's identity and so the pack's (ADR 0049).
+
   Chosen. Positions cost nothing at run time, the same map gives the same forests in every game, and ADR 0047's "objects come from the map" holds. Objects block nothing, so felling one rebuilds no path.
   - Rejected: objects as records with positions, at 8 bytes, which is 8 MiB at this count and grows with spread.
   - Rejected: counts per area for far areas, re-instantiated near the player. A stump felled far away would come back when the player arrives, and two forms of one object need two rules.
