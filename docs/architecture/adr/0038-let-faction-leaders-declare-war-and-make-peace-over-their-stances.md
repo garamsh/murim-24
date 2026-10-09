@@ -1,6 +1,6 @@
 # ADR 0038: Let faction leaders declare war and make peace over their stances
 
-> Status: accepted; its diplomacy by numbers alone superseded by ADR-0052, which gates war and peace by the treasury
+> Status: accepted; its diplomacy by numbers alone superseded by ADR-0052, which gates war and peace by the treasury; its `hostile` read from factions and duels alone, and its diplomacy reading no standing, superseded by ADR-0054, which adds feuds and hostile standing and weighs standing toward the other leader
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

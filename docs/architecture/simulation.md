@@ -181,7 +181,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - **Whether a soul widens cultivation.** A soul's past lives widen its talent by discipline, and not its cultivation, so the realms past beyond peak are reached by no one under the region's data.
 - **Qi deviation.** Forcing an art of another nature or above one's realm carries no risk (`docs/concept.md` §Qi and martial arts lists it as proposed).
 - **News of a war.** No event records a declaration, so no rumour carries it, and the HUD shows it only in the faction window.
-- **Standing feeding relations.** Issue #175's standing of villages, sects and factions toward one another will be another input to `relation` and `hostile`, between a declaration and the stances, leaving declarations a leader's order alone (ADR 0038).
+- **Standing feeding relations.** ADR 0054 (`adr/0054-keep-each-groups-standing-toward-a-person-changed-by-deeds-seen-or-heard.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Standing.** Villages, sects and factions hold standing toward people, changed by deeds as pack data that witnesses within sight teach their groups at once, and that a rumour carries at 64 cells a day to the victim's groups. Unseen deeds stay hidden, and standing decays toward zero.
+  - **Its effects.** Hostile standing makes `hostile` true between a group's members and the person, beside factions, duels and feuds. Unfriendly standing refuses sales, admission and teaching.
+  - **Faction relations.** Standing feeds faction relations only through ADR 0038's diplomacy, which weighs standing toward the other faction's leader. A deed never turns a faction hostile by itself.
 - **Where a soul goes with no village to be born in.** A soul whose body dies while no village has a living resident is not born again.
 
 - **When a settlement fails.** A founded village that raids burn back before its settlers raise it keeps them, and keeps its mother village from founding again, for as long as they live.

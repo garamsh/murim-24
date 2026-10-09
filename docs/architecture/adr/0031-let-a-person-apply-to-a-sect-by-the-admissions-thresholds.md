@@ -1,6 +1,6 @@
 # ADR 0031: Let a person apply to a sect by the admission's thresholds
 
-> Status: accepted
+> Status: accepted; its admission blind to standing superseded by ADR-0054, which refuses an applicant its sect stands unfriendly toward and eases admission for the friendly and honoured
 > Date: 2026-10-08
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
