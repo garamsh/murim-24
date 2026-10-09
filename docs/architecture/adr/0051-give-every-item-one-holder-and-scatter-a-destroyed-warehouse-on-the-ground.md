@@ -42,12 +42,13 @@ Options weighed:
 - **The ground.**
   - A pile is one stack on a cell, with the tick it expires. Piles are kept by 32-cell area.
   - A pile expires 30 days after it lands, in the base pack. A pile of silver that expires leaves the world, one of ADR 0052's sinks.
-  - The world holds at most 131,072 piles, 16 bytes each, 2 MiB. When it is full, the oldest pile goes first.
+  - The world holds at most 131,072 piles, 16 bytes each, 2 MiB, and an area at most 256. When either is full, the oldest pile there goes first.
   - Rejected: piles that never expire. A long war would fill the world's memory with swords no one will walk back for.
 - **Picking up.**
   - Once a second, in live and stepped areas, each pile is taken by the nearest living person within a cell of it who has room and is not steered, the lower index among equals.
   - A person wants a pile, in order, when it is silver, when the gear rule would wear it or it meets a spare it lacks (ADR 0050), when it is food while the person is hungry, when it is a valuable, and otherwise when it has a price. A person with no room for a wanted pile leaves it.
   - The player picks up through the port, by an order naming a pile within a cell, refused with its reason as data, as `buy` is.
+  - **The scan's cost.** Only piles in live and stepped areas are scanned. At the standard profile's stepped radius of 4 areas (ADR 0048), that is at most 81 areas of 256 piles, 20,736 piles a second. Each area is scanned on its own tick of the second, by index, so a tick sees about 700 piles. Each is one query of the spatial hash within a cell. By this estimate that is about 0.15 ms a tick at worst, under 4% of ADR 0048's 4 ms p99; the implementing pull request measures it.
   - Rejected: picking up only what a person needs. Piles nobody needs would wait out their days, and the scrap of a battle would never reach a market.
 - **Loot.**
   - A soldier at war is a person serving in an army that is not a village's residents and not a caravan, while its faction is hostile to the faction of the person whose drop it is, or of the warehouse's village, as `hostile` reads it (ADR 0038).

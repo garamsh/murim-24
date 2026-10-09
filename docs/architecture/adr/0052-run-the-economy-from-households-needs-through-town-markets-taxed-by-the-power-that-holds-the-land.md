@@ -100,6 +100,7 @@ Options weighed:
 - **Markets.** A town is a village with a standing market, a structure kind of the pack's. The map's starting cities and towns have one, and growth builds one past 60 residents.
   - A market holds, for each item kind it trades, a stock of whole items, a pool of worn durability, a price, and the demand of the last 30 days. It also holds a till.
   - A village without a market buys food at its granary, and everything else at the nearest market within 64 cells, by the daily rule, without walking.
+  - A market trades at most 64 item kinds, the pack's list for its kind of market, so its daily pass and a caravan's search are bounded.
   - The player buys and sells by talking to the market's keeper. ADR 0040's `Offer::TRADE` moves from a person whose best discipline is medicine to a market's keeper, and `sells` reads the market.
 - **Price.** Each day, per kind, a market compares its stock against its target, its last 30 days' demand:
   - below the target, the price rises 5%
@@ -120,6 +121,8 @@ Options weighed:
   - It buys that cargo with its balance and marches the caravan there as an army: a merchant and its guards from the home town's earners, paid daily, the objective the market.
   - It sells on arrival, buys the best cargo for home by the same rule, and returns. Nothing positive leaves the caravan home.
   - Prices are read from every market within reach at once, as the PM decided. Prices heard by rumour, some days old, are the alternative, if caravans crowd one route.
+  - Each house's routes use a table of the cost along roads between its home town and each market within reach. The table is built from ADR 0047's coarse graph when the world is created or loaded, and one row is refreshed a day, so the daily search reads it and runs no pathfinding.
+  - **The search's cost.** A caravan's search is at most 64 kinds over the markets within reach. At a pack bound of 256 caravans and 512 markets, the worst case is about 8.4 million margins a day. Spread over the day's 1,800 ticks with the other daily rules (ADR 0048), that is about 4,700 integer margins a tick, some hundredths of a millisecond, under 1% of the 4 ms p99, by this estimate.
   - A caravan destroyed scatters its cargo as ADR 0051's piles.
   - A house's balance above 60 days of its wages pays the excess to its members' households.
   - Rejected: caravans by fixed routes. Prices would not meet, and the owner asked for a market that emerges.
@@ -178,6 +181,7 @@ Options weighed:
   - the levy at a rate of 100, about 7
 
   That is about 218 copper. The two workers' share of their granary's takings is about 200 for what the village eats, plus 25 to 50 for its fifth sold, at the floor or the base price. So about 225 to 250 comes in, and the household saves about 7 to 32 a day toward gear and comfort. At 50,000 people, about 14,000 households spend about 30,000 silver a day. A household's record is 24 bytes, 336 KB in all. Its daily rule, spread over the day's 1,800 ticks, is about 8 households a tick.
+- **The daily market pass.** Each market updates the price, demand and trade with the world of at most 64 kinds, and runs its workshops. At 512 markets that is about 33,000 kind updates a day, about 18 a tick spread over the day. It is negligible beside the households.
 - **Tiers.** Daily rules are untiered (ADR 0042), so households' needs, markets' prices, production, taxes, treasuries, discontent and flight run for every village wherever it is. What a far area aggregates per village:
   - its households' gear purchases, summed by kind into one order at their market and handed out in roster order
   - wear in its fights, applied as the expected hits from ADR 0042's far strike rule
