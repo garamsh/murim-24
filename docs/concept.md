@@ -147,7 +147,11 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 Decided by the owner on 2026-10-08 and 2026-10-10 (issue #175, PR #217). ADR 0054 (`docs/architecture/adr/0054-keep-each-groups-standing-toward-a-person-changed-by-deeds-seen-or-heard.md`), proposed, designs the groups' standing.
 
 - **Groups hold standing toward a person, each separately:** the village, the sect and the faction. A deed counts against or for every group the other person belongs to, with weights. Extorting a sect disciple who lives in village A drops A a lot, the sect moderately and the faction a little.
-- **Individual NPCs hold a personal favor toward a person.** This stays agreed and is implemented later, in issue #219 (https://github.com/mandacode-labs/murim-24/issues/219), a follow-up to ADR 0054, which does not cover it. In outline: favor is held only toward people one has dealt with often, and is bounded per person.
+- **Individual NPCs hold a personal favor toward a person.** This stays agreed and is implemented after ADR 0054. Favor is held only toward people one has dealt with often, and is bounded per person. ADR 0060 (`docs/architecture/adr/0060-keep-each-persons-favor-toward-the-few-it-deals-with-often-beside-its-groups-standing.md`), proposed, designs it, for issue #219.
+- **[proposed]** ADR 0060's details:
+  - favor toward at most 8 people: kin, those dealt with three times in 30 days, and anyone whose single deed moved one strongly
+  - deeds felt first-hand at full weight, by kin less, by witnesses least, and betrayal counting double
+  - a person's own conduct following its favor where it holds one, and its groups' standing otherwise
 - **Deeds.** Through the dialogue a person can attack, extort, threaten, help or give a gift, and the groups of the other person remember it.
 - **Deeds become known through witnesses and rumour.** The witnesses' groups react at once. Farther groups learn as the rumour spreads over time. A deed no one saw stays hidden.
 - **Standing belongs to the body.** A reborn body starts with no standing. Warehouses and caves stay with the soul.
