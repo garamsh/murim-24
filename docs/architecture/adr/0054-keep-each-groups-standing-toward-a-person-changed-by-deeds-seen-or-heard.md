@@ -80,7 +80,8 @@ Options weighed:
   - **Threaten**, against someone of a lower realm rank, makes it stop engaging the actor for a day. Refused like extortion.
   - **Help** uses one of the actor's wares on the other person, as `consume` uses it on oneself.
   - **Give** moves silver or a ware from the actor to the other person. It is the one transfer between people. When #215's ADR 0051 lands, it becomes that ADR's fifth verb for any stack.
-  - All are refused beyond the talk reach.
+  - All are refused beyond the talk reach. Give alone is not refused by hostile standing, so a person a group is hostile to can still make amends to its members.
+  - **Gifts to a group directly.** Depositing silver into a group's own account at its warehouse (#215's ADR 0051), at its seat, counts as a gift to that group alone. Giving to anyone of a group, a go-between included, counts for that person's groups. So hostility is undone by gifts and blood money, not only by decay.
   - **Help without the dialogue.** Killing someone who attacked a third person within the last day counts as help toward that person's groups. A defender earns standing without a word.
 - **NPCs.** NPCs do deeds by the same rules: every kill and attack a fight makes, and help by defending. NPCs do not yet choose to extort, threaten or give. Those wait for #172's bandits and #170's routines, which will order them through the same port.
 - **Witnesses.** At a deed, its witnesses are every living person within the rules' sight, 6 cells in the region, of the victim, the victim included while it lives, the actor excluded. Each group a witness belongs to, its home village, its sect and its faction, learns the deed at once:
@@ -168,7 +169,7 @@ The implementation, in order, each a pull request with its acceptance:
 
 A village, a sect and a faction each hold a standing toward a person's body, from −1,000 to 1,000. Only non-zero entries are kept, at most 262,144. Decay is computed from each entry's last change and never written by a read. A min-heap keyed by magnitude and last-change day evicts the entry nearest zero, and a hash table and a list per person find entries without scanning. Each person carries a bit marking whether any group is hostile to it.
 
-Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a pile scattered from a group's warehouse, with a base value and weights for the victim's village, sect and faction and for the witnesses' groups. Provoked deeds and duels count nothing, kills at war less, and blood money double. The dialogue's verbs are orders refused for their reasons, the same for every person. Give is the one transfer between people.
+Deeds are pack data: attack, kill, extort, threaten, help, gift, and theft of a pile scattered from a group's warehouse, with a base value and weights for the victim's village, sect and faction and for the witnesses' groups. Provoked deeds and duels count nothing, kills at war less, and blood money double. The dialogue's verbs are orders refused for their reasons, the same for every person. Give is the one transfer between people, open even under hostile standing, and a deposit into a group's own account is a gift to it.
 
 The witnesses within sight teach their groups at once, and a deed no one saw stays hidden. A witnessed deed spreads from its cell at 64 cells a day to the anchors of the victim's groups, kept in a store of 4,096 apart from ADR 0032's ring.
 
