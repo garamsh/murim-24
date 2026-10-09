@@ -1,6 +1,6 @@
 # Ground off the cell grid
 
-Round 3 of the revised look: #212's natural terrain, approved by the owner step by step, prototyped in the valley. Made by `angle.gd` and `ground.gdshader` here, the same files as `art/mockup/angle.gd` and `art/mockup/angle/ground.gdshader` at 53d76c1. Run with Godot 4.7.2 on macOS arm64 (Apple M1), on AC power.
+Round 3 of the revised look: #212's natural terrain, approved by the owner step by step, prototyped in the valley. Made by `angle.gd` and `ground.gdshader` here, the same files as `art/mockup/angle.gd` and `art/mockup/angle/ground.gdshader` at 8440a71. The captures were made at 53d76c1; 8440a71 changes only when the baker is freed, and its stills are byte-identical to them. Run with Godot 4.7.2 on macOS arm64 (Apple M1), on AC power.
 
 ## Files
 
@@ -18,7 +18,20 @@ Round 3 of the revised look: #212's natural terrain, approved by the owner step 
 
 ## Step 1: the four uncounted runs
 
-To follow. The rerun waits for a quiet machine. Each bench now brings its window to the front on its first frame. It also prints `PACED` when its p50 is a 144 Hz display's period, so a paced run says so itself.
+The four runs `../valley-fixes/` did not count, rerun on 739d086's `angle.gd`, which now brings its window to the front on its first frame (`bench_739d086_rerun.log`). Conditions: on AC power, load average 1.7 to 2.1, no other test, lint or Godot process; the other workers held their runs for the window. None was paced: no p50 is near 6.94 ms.
+
+All 9 runs of 739d086, the 5 counted in `../valley-fixes/` and the 4 reruns:
+
+| Scene | p50 (ms) | p99 (ms) | max (ms) |
+|---|---|---|---|
+| the village, 80 people (runs 1, 2; rerun) | 4.950, 4.934; 5.054 | 7.214, 7.101; 10.195 | 9.519, 9.454; 10.737 |
+| `crowd`: 500 people (runs 1, 2; rerun) | 12.073, 12.248; 12.003 | 14.101, 15.407; 17.347 | 15.332, 40.942; 18.393 |
+| `pan` (run 1; reruns 1, 2) | 5.349; 5.351, 5.361 | 8.020; 10.315, 10.525 | 11.921; 12.185, 12.054 |
+
+- p50 agrees across the runs, to within 0.25 ms.
+- p99 is about 2 to 3 ms higher in the reruns than in the counted runs: 10.2 to 10.5 against 7.1 to 8.0 ms, and 17.3 against 14.1 and 15.4 ms with the crowd.
+- The window was in front for the reruns, and its place is not recorded for the counted runs. I have not established the cause.
+- The crowd's rerun p99, 17.3 ms, is over the 16.7 ms budget.
 
 ## Step 2: the ground off the grid
 
@@ -65,7 +78,20 @@ The review on #204 asked for three fixes before the benches count:
   - the shrine's terrace and the town's walls, which are built straight;
   - short vertical joins where a face's material changes between tiers, earth to rock;
   - the HUD.
-- Frame cost to follow, all 9 runs counted, on a quiet machine.
+- Frame cost: `bench valley [crowd|pan]` at 8440a71, three runs each, 1920x1080, vsync off, under the HUD, window in front, 1200 timed frames, each run quitting on its own. On AC power, load average 2.2 to 2.7, no other test, lint or Godot process, none paced. `bench.log` holds every printed line.
+
+| Scene | p50 (ms) | p99 (ms) | max (ms) |
+|---|---|---|---|
+| the village, 80 people | 5.072, 5.052, 5.061 | 9.953, 10.044, 9.915 | 10.253, 10.451, 10.635 |
+| `crowd`: 500 people | 12.048, 12.030, 12.015 | 16.933, 17.279, 17.113 | 17.862, 18.441, 18.479 |
+| `pan` | 5.559, 5.530, 5.505 | 10.271, 10.853, 10.370 | 11.742, 15.290, 11.186 |
+
+- Against 739d086's reruns under the same conditions, the shaded ground costs nothing measurable per frame: the village 5.05 to 5.07 against 5.05 ms p50, the crowd 12.02 to 12.05 against 12.00 ms. A frame draws the baked images, as before.
+- `pan` is 0.15 to 0.2 ms higher at p50 (5.51 to 5.56 against 5.35 to 5.36 ms).
+- The crowd's p99, 16.9 to 17.3 ms, is over the 16.7 ms budget in all three runs, as in 739d086's rerun. The village and `pan` are under it.
+- The map build bakes the 12 chunks in 3.31 to 3.34 s, 267 to 274 ms a chunk at p50 and 485 ms at most, against 1.34 s at 739d086. The shader takes about 30 ms of a chunk. The rest is on the CPU: the detail, the trees, the shadows and cutting the image into strips. None of it is paid while the game runs.
+- Less ground image is resident: 1.16 MB a chunk against 1.90 MB at 739d086, because the strips are cut to their content.
+- A first measurement, at 53d76c1, gave a p50 of about 22.6 ms in every scene (`bench_53d76c1.log`, not counted). The viewport that bakes the ground drew its shader again every frame after the bake. 8440a71 frees it once every chunk is baked.
 
 ## For the owner and the PM
 

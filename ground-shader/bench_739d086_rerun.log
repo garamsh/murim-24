@@ -1,0 +1,37 @@
+== angle_739.gd bench valley | load 2.09 | other busy 0 | Now drawing from 'AC Power'
+angle bench: valley under the HUD, flags ["valley"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 41 bodies drawn, 18 hidden behind something in the last frame
+angle bench: frame time p50 5.054 ms, p99 10.195 ms, max 10.737 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.004 ms, max 6.821 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1342 ms, p50 111.7 ms, max 153.1 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 169.4 MB, 2868 nodes
+rc=0
+== angle_739.gd bench valley crowd | load 2.05 | other busy 0 | Now drawing from 'AC Power'
+angle bench: valley under the HUD, flags ["valley", "crowd"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 226 bodies drawn, 145 hidden behind something in the last frame
+angle bench: frame time p50 12.003 ms, p99 17.347 ms, max 18.393 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 9 at most; 9 built, 0 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 3.547 ms, max 6.250 ms; camera travelled 0 cells
+angle bench: map build baked 12 chunks in 1333 ms, p50 111.5 ms, max 151.7 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 171.7 MB, 3575 nodes
+rc=0
+== angle_739.gd bench valley pan | load 1.70 | other busy 0 | Now drawing from 'AC Power'
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 34 bodies drawn, 26 hidden behind something in the last frame
+angle bench: frame time p50 5.351 ms, p99 10.315 ms, max 12.185 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.101 ms, max 6.488 ms; camera travelled 158 cells
+angle bench: map build baked 12 chunks in 1335 ms, p50 111.7 ms, max 151.9 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.1 MB, 2890 nodes
+rc=0
+== angle_739.gd bench valley pan | load 1.75 | other busy 0 | Now drawing from 'AC Power'
+angle bench: valley under the HUD, flags ["valley", "pan"], window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+angle bench: 34 bodies drawn, 26 hidden behind something in the last frame
+angle bench: frame time p50 5.361 ms, p99 10.525 ms, max 12.054 ms over 1200 frames
+angle bench: chunks of 32 cells; 9 resident now, 12 at most; 15 built, 6 freed; ground images 17104896 bytes now (1900544 a chunk)
+angle bench: chunk build p50 4.002 ms, max 6.288 ms; camera travelled 157 cells
+angle bench: map build baked 12 chunks in 1342 ms, p50 112.4 ms, max 152.0 ms a chunk
+angle bench: texture memory 51.7 MB, video memory 57.8 MB, static memory 170.1 MB, 2890 nodes
+rc=0
+DONE
