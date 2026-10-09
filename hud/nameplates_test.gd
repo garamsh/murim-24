@@ -3,9 +3,9 @@
 # faction stands toward the viewer's, as WorldAdapter.relation reads it, and a hostile body is
 # ringed in crimson; a person a cell past the reach is not named. Of more people than fit,
 # nameplates.gd names every hostile one before any other, then the nearest, no more than NAME_CAP,
-# none over another name, a place the HUD keeps clear or the room's edge. At each PC window in each
-# locale, a crowd of the longest names across the room is named whole, inside the room, clear of
-# every panel and of one another.
+# none over another name, a place the HUD keeps clear or the room's edge; the HUD keeps the shortcut
+# rail clear. At each PC window in each locale, a crowd of the longest names across the room is
+# named whole, inside the room, clear of every panel, the rail and one another.
 extends RefCounted
 
 const ART_SCENE := "res://world_art/world_art.tscn"
@@ -65,7 +65,7 @@ const COLOURS := {
 
 
 func run() -> bool:
-	return _colours_pass() and _order_pass() and _clear_pass() and _fit_pass()
+	return _colours_pass() and _order_pass() and _clear_pass() and _rail_pass() and _fit_pass()
 
 
 # Each person within the reach is named in its relation's colour and each hostile body ringed,
@@ -171,6 +171,33 @@ func _clear_pass() -> bool:
 	var passed := covered == [0] and apart == [0, 1] and kept.is_empty() and free == [1] and edge.is_empty()
 	print("nameplates_test: over a nearer name %s, apart %s; over a clear place %s, beside it %s; at the edge %s: %s" % [
 		covered, apart, kept, free, edge, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The HUD keeps names clear of the shortcut rail: a hostile person whose name would lie on the rail
+# is not named. Control: the same person further left, at the rail's height, is named. Setup: the
+# rail shows play.gd's rows.
+func _rail_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	var hud: CanvasLayer = load(HUD_SCENE).instantiate()
+	hud.show_player(world, world.player_army())
+	hud.show_shortcuts(Play.SHORTCUTS)
+	hud.fit(WINDOW, false)
+	var rail: Rect2 = hud.shortcuts.rect()
+	var set_up: bool = hud.shortcuts.visible and hud.shortcuts.rows.size() == Play.SHORTCUTS.size()
+	var person := world.roster(0)[0]
+	var under := rail.get_center() + Vector2(0, 8)
+	var on: Array[Dictionary] = [{"person": person, "relation": WorldAdapter.RELATION_HOSTILE, "head": under}]
+	hud.show_names(world, on)
+	var on_rail: Array = hud.nameplates.plates.duplicate()
+	var beside := Vector2(rail.position.x - 120, under.y)
+	var off: Array[Dictionary] = [{"person": person, "relation": WorldAdapter.RELATION_HOSTILE, "head": beside}]
+	hud.show_names(world, off)
+	var off_rail: Array = hud.nameplates.plates.duplicate()
+	hud.free()
+	var passed := set_up and on_rail.is_empty() and off_rail.size() == 1
+	print("nameplates_test: a name on the rail %s named %d; beside it at %s named %d (setup %s): %s" % [
+		rail, on_rail.size(), beside, off_rail.size(), set_up, "pass" if passed else "FAIL"])
 	return passed
 
 
