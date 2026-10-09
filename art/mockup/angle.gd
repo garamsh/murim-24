@@ -317,6 +317,9 @@ class AngleView extends Node2D:
 			if Engine.get_process_frames() <= _baker_frame + 1:
 				return
 			bake_all()
+			# Every chunk is baked: the baker would otherwise draw its shader again every frame.
+			_baker.queue_free()
+			_baker = null
 		_stream(view)
 		# A structure that changed stage shows it at once, its shadow with it.
 		for key: Vector2i in _chunks:
