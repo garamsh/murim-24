@@ -316,12 +316,17 @@ struct Skill {
 };
 
 /// One use of a skill on the last tick, for a view to draw: person
-/// `person` used its skill `skill`, of shape `shape`, from `origin` toward
-/// `toward`, both in sub-cell units.
+/// `person` used its skill `skill`, of shape `shape`, `range` and
+/// `radius`, from `origin` toward `toward`, all in sub-cell units; the
+/// skill deals `body_damage` before its user's edges, none for a skill that
+/// strikes only structures.
 struct Strike {
   std::size_t person = 0;
   std::size_t skill = 0;
   Shape shape = Shape::AREA;
+  std::int32_t range = 0;
+  std::int32_t radius = 0;
+  std::uint64_t body_damage = 0;
   Position origin{};
   Position toward{};
 };
