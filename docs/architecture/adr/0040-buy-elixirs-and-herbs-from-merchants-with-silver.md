@@ -1,6 +1,6 @@
 # ADR 0040: Buy elixirs and herbs from merchants with silver
 
-> Status: accepted
+> Status: accepted; its wares as counts superseded by ADR-0050, the dead keeping their silver by ADR-0051, and its sellers by best discipline, fixed prices, purse at birth, wage from nowhere and daily purchase of each ware by ADR-0052
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
