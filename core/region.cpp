@@ -48,9 +48,9 @@ constexpr std::int32_t RUMOUR_REACH = 32;
 // One person may talk to another within 2 cells, a step past the cell apart
 // people keep.
 constexpr std::int32_t TALK_REACH = 2;
-// A person closes on a foe within 8 cells while none is within its reach,
-// past the 6 cells two bands meeting in the open start apart.
-constexpr std::int32_t SIGHT = 8;
+// A person closes on a foe within 6 cells while none is within its reach,
+// as far as two bands meeting in the open start apart.
+constexpr std::int32_t SIGHT = 6;
 // The rules of life in region_data().
 constexpr std::uint32_t GROWTH = 10;
 constexpr std::uint32_t GROWTH_SPREAD = 5;

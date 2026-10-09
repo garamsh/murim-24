@@ -1002,7 +1002,8 @@ struct Rules {
   /// Cells, along each axis, within which one person may talk to another.
   std::int32_t talk_reach = 0;
   /// Cells within which a person no driver steers, with no foe within its
-  /// reach, closes on the nearest foe; 0 for none.
+  /// reach, closes on the nearest foe: at home, one inside its village's
+  /// claim, and on the march any; 0 for none.
   std::int32_t sight = 0;
 };
 
@@ -1541,6 +1542,7 @@ class World {
                           std::size_t other, std::size_t other_army) const;
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
+  [[nodiscard]] bool claims(std::size_t village, Cell cell) const;
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
                                             const Crowd& crowd) const;
   [[nodiscard]] bool held(std::size_t index, Step pull,

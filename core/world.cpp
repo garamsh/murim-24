@@ -3055,14 +3055,15 @@ bool World::held(std::size_t index, Step pull,
 }
 
 // The pull of the person at `index` of `crowd`, serving in `army`, engaged
-// with a living foe within the rules' sight: none while a foe lies within its
-// reach, so it stands and fights, and otherwise the step closing on the
-// nearest, the first in the crowd's order among equals. The step is the one
-// of the eight nearest the line to the foe, open as a flow field's is: into a
-// passable cell, and on a diagonal only where both cells beside it are
-// passable. Nothing, so it keeps its objective, when a driver steers its
-// army, it reaches no farther than itself, no foe is in sight or the step is
-// not open.
+// with a living foe within the rules' sight, inside its home village's claim
+// unless its army marches on an objective beyond it or it has no home: none
+// while a foe lies within its reach, so it stands and fights, and otherwise the
+// step closing on the nearest, the first in the crowd's order among equals. The
+// step is the one of the eight nearest the line to the foe, open as a flow
+// field's is: into a passable cell, and on a diagonal only where both cells
+// beside it are passable. Nothing, so it keeps its objective, when a driver
+// steers its army, it reaches no farther than itself, no foe is in sight or the
+// step is not open.
 std::optional<Step> World::closing(std::size_t index, const Army& army,
                                    const Crowd& crowd) const {
   const std::size_t member = crowd.people.at(index);
@@ -3072,12 +3073,17 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   }
   const Position from = crowd.hash.position(index);
   const std::size_t own = crowd.armies.at(index);
+  // At home, it defends its village's claim; on the march, it fights what it
+  // meets.
+  const std::optional<std::size_t> home = people_.at(member).home;
+  const bool marching = !home || !claims(*home, army.order.objective);
   Nearest nearest{from, Step{0, 0}};
   bool within = false;
   crowd.hash.visit_within(
       from, rules_.sight * CELL_SIZE, [&](std::size_t other) {
         const Position there = crowd.hash.position(other);
-        if (foes(member, own, crowd.people.at(other), crowd.armies.at(other))) {
+        if ((marching || claims(*home, cell_of(there))) &&
+            foes(member, own, crowd.people.at(other), crowd.armies.at(other))) {
           nearest.offer(other, there);
           within = within || distance_squared(from, there) <= reached * reached;
         }
@@ -3108,6 +3114,15 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
                     map_.passable(Cell{cell.x + step.x, cell.y}) &&
                     map_.passable(Cell{cell.x, cell.y + step.y});
   return open ? std::optional<Step>{step} : std::nullopt;
+}
+
+// Whether cell `cell` lies within the growth's claim of village `village`'s
+// centre, along each axis; with no growth a village claims its centre alone.
+bool World::claims(std::size_t village, Cell cell) const {
+  const Cell centre = seat(village);
+  const std::int32_t claim = life_.growth ? life_.growth->claim : 0;
+  return std::abs(cell.x - centre.x) <= claim &&
+         std::abs(cell.y - centre.y) <= claim;
 }
 
 // The farthest person `person` of army `army` may strike on its own: the

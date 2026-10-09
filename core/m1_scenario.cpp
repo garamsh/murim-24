@@ -40,7 +40,7 @@ constexpr Skill SWEEP{3 * CELL_SIZE, (3 * CELL_SIZE) / 2, JAB_DAMAGE, 1,
 
 // People close on a foe within the region's sight, so the lines meet
 // through the gaps between the barrels at arm's length.
-constexpr std::int32_t SIGHT = 8;
+constexpr std::int32_t SIGHT = 6;
 
 Rules rules() {
   const std::vector<std::vector<bool>> hostile{{false, true}, {true, false}};

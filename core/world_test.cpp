@@ -3619,6 +3619,61 @@ TEST(World, APersonClosesOnAFoeInSightAndStandsToFightIt) {
   EXPECT_EQ(lost(apart, 1), 0U);
 }
 
+// A village whose centre is STAND, claiming 3 cells about it, with one
+// resident there who strikes no one; a foe who strikes no one `apart` cells
+// east of the centre; and, a cell south of the centre, a person sweeping at
+// arm's length in an army of its own bound for `objective`, whose home is the
+// village if `homed`. Its people close on a foe within SIGHT cells.
+constexpr std::size_t DEFENDER = 2;
+constexpr Cell BESIDE{STAND.x, STAND.y + 1};
+
+World defending(std::int32_t apart, Cell objective, bool homed) {
+  constexpr std::int32_t CLAIM = 3;
+  const Skill arm{ARM, 0, 1, 0, 1, 0, Shape::ARC};
+  const Cell foe{STAND.x + apart, STAND.y};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  Life life = one_discipline(0);
+  Growth growth;
+  growth.interval = 1;
+  growth.claim = CLAIM;
+  growth.stances = {{}, {}};
+  life.growth = growth;
+  ArmySpec defender = army(BESIDE, objective, 1, TARGET_HEALTH, 0, {arm});
+  defender.home = homed ? std::optional<std::size_t>{0} : std::nullopt;
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(STAND, STAND, 1, TARGET_HEALTH, 0, {IDLE}),
+                army(foe, foe, 1, TARGET_HEALTH, 1, {IDLE}), defender},
+               {},
+               rules,
+               {VillageSpec{{}, 0, {}, 0, {}}},
+               {},
+               life};
+}
+
+TEST(World, AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets) {
+  constexpr std::uint64_t TICKS = 30;
+  // A foe inside the claim is closed on.
+  World inside = defending(3, BESIDE, true);
+  ASSERT_EQ(inside.person(DEFENDER).home, std::optional<std::size_t>{0});
+  run_ticks(inside, TICKS);
+  EXPECT_FALSE(in(BESIDE, inside.person(DEFENDER).position));
+  // A foe in sight beyond the claim is left alone at home.
+  World beyond = defending(5, BESIDE, true);
+  run_ticks(beyond, TICKS);
+  EXPECT_TRUE(in(BESIDE, beyond.person(DEFENDER).position));
+  // Control: with no home the same person closes on it.
+  World homeless = defending(5, BESIDE, false);
+  ASSERT_FALSE(homeless.person(DEFENDER).home.has_value());
+  run_ticks(homeless, TICKS);
+  EXPECT_GT(homeless.person(DEFENDER).position.x, centre_of(BESIDE).x);
+  // Marching south past its claim, it turns on the foe east of it.
+  World marching = defending(5, {BESIDE.x, BESIDE.y + 5}, true);
+  run_ticks(marching, TICKS);
+  EXPECT_GT(marching.person(DEFENDER).position.x, centre_of(BESIDE).x);
+}
+
 TEST(World, ASteeredBodyDoesNotCloseOnAFoe) {
   World steered = closing_world(SIGHT - 1);
   steered.steer(0, true);
