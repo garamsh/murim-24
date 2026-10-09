@@ -595,7 +595,7 @@ func _screens_pass() -> bool:
 # the touch controls shown, the rail hidden, a click on a row opens nothing. Setup: the world is
 # played, the rail shown with every row of SHORTCUTS, and nothing open before each click and key.
 # The rail lights the row whose panel or screen is open, and shows each row's key and word as the
-# pause panel's guide lists it, the settings' row, which has no key, unlisted.
+# pause panel's guide lists it, Esc for Escape, the settings' row, which has no key, unlisted.
 func _shortcuts_pass() -> bool:
 	var scene := _scene(0)
 	var hud: CanvasLayer = scene.get_node("Hud")
@@ -621,10 +621,12 @@ func _shortcuts_pass() -> bool:
 	var guide: Array[Dictionary] = scene.controls()
 	for n in scene.SHORTCUTS.size():
 		var row: Dictionary = scene.SHORTCUTS[n]
-		var word := OS.get_keycode_string(row.key) if row.key != KEY_NONE else ""
+		var word: String = hud.key_word(row.key) if row.key != KEY_NONE else ""
 		var listed := guide.has({"keys": [word], "does": row.label})
 		if rail.rows[n].key != word or rail.rows[n].label != row.label or listed != (row.key != KEY_NONE):
 			faults.append("%s: the rail shows %s, the guide lists it %s" % [row.action, rail.rows[n], listed])
+		if row.key == KEY_ESCAPE and word != "Esc":
+			faults.append("%s: the rail and the guide show %s, not Esc" % [row.action, word])
 	_open_from(scene, "")
 	var span := 3.5 / WorldAdapter.TICKS_PER_SECOND
 	scene.click(_left(rail.row_rect(scene.SHORTCUTS.find_custom(func(row: Dictionary) -> bool:

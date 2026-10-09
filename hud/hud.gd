@@ -354,6 +354,12 @@ func from_window(at: Vector2) -> Vector2:
 	return transform.affine_inverse() * at
 
 
+## The word a key's cap bears on the rail and in the pause panel's guide: Godot's name for it, but
+## Esc for Escape, as hud.csv's key hints write it.
+static func key_word(keycode: Key) -> String:
+	return "Esc" if keycode == KEY_ESCAPE else OS.get_keycode_string(keycode)
+
+
 ## Shows `table` on the shortcut rail, a row for each entry, a Dictionary of its `action`, the name
 ## of the panel or screen it opens as this HUD holds it, its `key`, KEY_NONE for none, its `icon`,
 ## a key of the rail's icons, and its `label`, the hud.csv key of its word; gives the touch
@@ -364,7 +370,7 @@ func show_shortcuts(table: Array[Dictionary]) -> void:
 	var rows: Array[Dictionary] = []
 	for row: Dictionary in table:
 		var shown := row.duplicate()
-		shown.key = OS.get_keycode_string(row.key) if row.key != KEY_NONE else ""
+		shown.key = key_word(row.key) if row.key != KEY_NONE else ""
 		rows.append(shown)
 		touch.icons[row.action] = row.icon
 		var opened: Control = get(row.action)

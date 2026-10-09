@@ -396,7 +396,7 @@ func controls() -> Array[Dictionary]:
 	]
 	for row: Dictionary in SHORTCUTS:
 		if row.key != KEY_NONE:
-			rows.append({"keys": [OS.get_keycode_string(row.key)], "does": row.label})
+			rows.append({"keys": [_hud.key_word(row.key)], "does": row.label})
 	return rows
 
 
