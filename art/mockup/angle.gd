@@ -109,6 +109,7 @@ var _driver: Driver
 var _level: Leveller
 var _level_ticks := 0
 var _level_window := PackedFloat64Array()
+var _worst := [0.0, 0.0]
 
 
 ## The world in the 2.5D projection, streamed by chunks of CHUNK x CHUNK cells: a chunk's ground
@@ -168,8 +169,6 @@ class AngleView extends Node2D:
 	var freed := 0
 	var most_resident := 0
 	var ground_bytes := 0
-	## Chunks built again since a structure on them changed stage.
-	var rebuilt := 0
 	## How long each chunk took to build, in microseconds.
 	var build_usec := PackedInt64Array()
 
@@ -186,6 +185,7 @@ class AngleView extends Node2D:
 	var _shadows := Node2D.new()
 	var _ground := Node2D.new()
 	var _chunks := {}
+	var _shadow_cache := {}
 	var _buckets := {}
 	# The cells the villages' decorations and the fields cover, with their tile.
 	var _laid := {}
@@ -279,18 +279,16 @@ class AngleView extends Node2D:
 	## `between` of the way from the tick before last to the last, at `now_ms`.
 	func refresh(view: Rect2, between: float, now_ms: int) -> void:
 		_stream(view)
-		# A chunk whose structures changed stage is built again, its shadows with them.
-		var restaged := {}
+		# A structure that changed stage shows it at once, its shadow with it.
 		for key: Vector2i in _chunks:
 			for sprite: Sprite2D in _chunks[key].occluders:
-				if sprite.has_meta("stages") and _stage(sprite.get_meta("entry")) != sprite.get_meta("stage"):
-					for next: Vector2i in [key, key + Vector2i(1, 0), key + Vector2i(0, 1)]:
-						if _chunks.has(next):
-							restaged[next] = true
-		for key: Vector2i in restaged:
-			_free_chunk(key)
-			_build_chunk(key)
-			rebuilt += 1
+				if sprite.has_meta("stages"):
+					var stage := _stage(sprite.get_meta("entry"))
+					if stage != sprite.get_meta("stage"):
+						sprite.set_meta("stage", stage)
+						sprite.texture = sprite.get_meta("stages")[stage]
+						var shadow: Sprite2D = sprite.get_meta("shadow")
+						shadow.texture = _shadow(sprite.get_meta("entry").size, stage)
 		for key: Vector2i in _chunks:
 			for sprite: Sprite2D in _chunks[key].occluders:
 				sprite.clip_children = CanvasItem.CLIP_CHILDREN_DISABLED
@@ -423,20 +421,6 @@ class AngleView extends Node2D:
 					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
 				if _kind(x + 1, y) != "hills":
 					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y) + HILL_LIFT)), EDGE)
-		# Shadows reach a little past a footprint, so the neighbours' structures cast them too.
-		for dx in range(-1, 2):
-			for dy in range(-1, 2):
-				for entry: Dictionary in _structures_in.get(key + Vector2i(dx, dy), []):
-					# The shadow shortens as the structure falls, and rubble casts none.
-					var reach: int = [6, 6, 3, 0][_stage(entry)]
-					if entry.kind in GROUND_KINDS or reach == 0:
-						continue
-					var left: int = entry.corner.x * int(CELL.x)
-					var top: int = entry.corner.y * int(CELL.y)
-					var right: int = (entry.corner.x + entry.size.x) * int(CELL.x)
-					var bottom: int = (entry.corner.y + entry.size.y) * int(CELL.y)
-					_dither(image, Rect2i(right, top + reach, reach, bottom - top - 2), top_left)
-					_dither(image, Rect2i(left + reach, bottom, right - left, reach / 2), top_left)
 		var occluders: Array[Sprite2D] = []
 		var trees := _trees(Rect2i(origin - Vector2i.ONE, Vector2i(CHUNK + 2, CHUNK + 2)))
 		for tree: Array in trees:
@@ -464,6 +448,14 @@ class AngleView extends Node2D:
 			sprite.set_meta("entry", entry)
 			sprite.set_meta("stage", _stage(entry))
 			sprite.texture = stages[sprite.get_meta("stage")]
+			if not entry.kind in GROUND_KINDS:
+				var shadow := Sprite2D.new()
+				shadow.centered = false
+				shadow.texture = _shadow(entry.size, sprite.get_meta("stage"))
+				shadow.position = Vector2(entry.corner) * CELL
+				_shadows.add_child(shadow)
+				sprite.set_meta("shadow", shadow)
+				extras.append(shadow)
 			sprite.centered = false
 			var frame_size := sprite.texture.get_size()
 			sprite.offset = Vector2(-8, -(frame_size.y - 8))
@@ -496,6 +488,21 @@ class AngleView extends Node2D:
 		ground_bytes -= chunk.bytes
 		_chunks.erase(key)
 		freed += 1
+
+	# The shadow a structure of `size` cells casts at `stage`, from its footprint's top-left: a
+	# dithered band past its right and bottom edges, shorter as it falls, none from rubble.
+	func _shadow(size: Vector2i, stage: int) -> ImageTexture:
+		var key := "%d,%d,%d" % [size.x, size.y, stage]
+		if not _shadow_cache.has(key):
+			var reach: int = [6, 6, 3, 0][stage]
+			var right := size.x * int(CELL.x)
+			var bottom := size.y * int(CELL.y)
+			var image := Image.create_empty(right + 6, bottom + 3, false, Image.FORMAT_RGBA8)
+			if reach > 0:
+				_dither(image, Rect2i(right, reach, reach, bottom - 2), Vector2i.ZERO)
+				_dither(image, Rect2i(reach, bottom, right, reach / 2), Vector2i.ZERO)
+			_shadow_cache[key] = ImageTexture.create_from_image(image)
+		return _shadow_cache[key]
 
 	func _stage(entry: Dictionary) -> int:
 		if _stage_of.is_valid():
@@ -1153,6 +1160,8 @@ func _level_bench(delta: float) -> bool:
 	var time := (now - _last_usec) / 1000.0
 	_last_usec = now
 	_times.append(time)
+	if seconds >= 1.0 and time > _worst[0]:
+		_worst = [time, seconds]
 	if seconds >= 1.0 and seconds < 6.0:
 		_level_window.append(time)
 	if seconds < LEVEL_SECONDS:
@@ -1166,8 +1175,9 @@ func _level_bench(delta: float) -> bool:
 			DisplayServer.window_get_size(), RenderingServer.get_video_adapter_name(),
 			Engine.get_version_info().string, _level.casts_given, _level.hit(), _level.villagers.size(),
 			_level.stages()])
-	print("angle bench: levelling, chunks %d resident now, %d at most, %d built, %d of them again on a stage change; ground images %d bytes" % [
-			_view.resident, _view.most_resident, _view.built, _view.rebuilt, _view.ground_bytes])
+	print("angle bench: levelling, worst frame from the pull-back on %.3f ms at %.2f s" % _worst)
+	print("angle bench: levelling, chunks %d resident now, %d at most, %d built; ground images %d bytes" % [
+			_view.resident, _view.most_resident, _view.built, _view.ground_bytes])
 	quit(0)
 	return true
 
