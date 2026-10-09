@@ -16,6 +16,7 @@ This document is the single reference for the game concept agreed with the user.
 - Lifespan [settled]
 - Martial arts [draft]
 - Qi and martial arts [agreed]
+- Mods and re-theming [agreed]
 - MVP scope [proposed]
 - Open questions [open]
 
@@ -185,6 +186,18 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   2. **Secret manuals (bigeup).** Manuals are items in the world (`docs/architecture/adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`). Reading one teaches its art when one's qi suffices.
   3. **Sect teaching (jeonsu).** A member learns its sect's arts from its master and elders, as its realm allows.
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
+
+## Mods and re-theming [agreed]
+
+Decided by the owner on 2026-10-09 (issue #202). The design is ADR 0049 (`docs/architecture/adr/0049-load-the-games-content-from-data-packs-and-let-mods-be-packs-over-the-base.md`).
+
+- **Players can mod the game.** A mod changes equipment, stats, skills, arts, factions, sects, names, structures, text, art, sound or the map.
+- **Content is data in packs.** Everything the rules read and everything the screen shows is data, loaded at start. Today's game is the base pack, `wuxia`.
+- **Mods are packs over the base.** A mod adds entries or changes them by a stable id. Mods load in an order the player sets, and where two change the same thing the later one wins and the game shows it.
+- **Mods are data only.** A mod cannot add a rule, so mods stay safe and the world stays deterministic. A behaviour no data expresses is a request for a rule in the game.
+- **A broken mod is refused whole**, with readable errors in the player's language, never half-loaded.
+- **Saves know their packs.** A save loads only with the same packs that change the simulation, in the same order. A pack of text, art and sound alone, such as a translation or a re-skin, can be added or removed at any time.
+- **Another theme is another base pack.** The rules name no wuxia concept; qi, realms and orthodox and demonic natures are the base pack's words for general rules. The same game can ship in another theme with another base pack.
 
 ## MVP scope [proposed]
 

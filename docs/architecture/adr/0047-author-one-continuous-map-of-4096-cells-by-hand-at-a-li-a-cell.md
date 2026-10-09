@@ -1,6 +1,6 @@
 # ADR 0047: Author one continuous map of 4,096 cells by hand, at a li a cell, and stream it by area
 
-> Status: proposed
+> Status: proposed; its map identity of pack, version and compiled hash, with a refusal of its own, superseded by ADR-0049, which folds it into the providing pack's identity and `PACKS_DIFFER`
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
