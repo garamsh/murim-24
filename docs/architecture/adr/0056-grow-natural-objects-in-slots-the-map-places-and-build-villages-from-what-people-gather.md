@@ -18,12 +18,12 @@ The issue's comments add two inputs:
 - **The PM, from #181.** Silver piles up with no sinks, so the economy should give it some.
 - **The owner, 2026-10-09.** Villages grow centre first, with houses placed outward into suitable ground, roads where people walk, building tiers upgraded with materials, and fields, docks and quarries around them. #169 owns the layout, and the growth rules here are the ones that give villages their shapes.
 
-Facts from `main` at `aff1434`, and from the open PR #215, on which this branch is stacked:
+Facts from `main` at `aff1434`, and from ADRs 0050 to 0052, proposed, merged in #215 at `84cb4e1`:
 - **Growth today** (ADR 0023). Every 30 days, a village at a fifth of its cap lays a plan as rubble within 8 cells of its centre. Residents raise it by the repair rule, 5 durability every 30 ticks against 10,000, so one builder raises a structure in 60,000 ticks, about 33 days. Building costs nothing else.
-- **Food** (ADR 0022). Food comes from fields into the village's stock. #215's ADR 0052 makes the granary sell it, paying its takings to field workers, and counts four fifths of the harvest in the cap.
+- **Food** (ADR 0022). Food comes from fields into the village's stock. ADR 0052 makes the granary sell it, paying its takings to field workers, and counts four fifths of the harvest in the cap.
 - **The map** (ADR 0047). One hand-made map of 4,096 cells, 16,384 areas of 32 cells. Its build tool places the initial natural objects, so they come from the map and not the seed. #187 is asked to lower ADR 0041's bound of 256 objects an area, which would allow 4.2 million, or to store far areas' objects as counts, keeping saved object state within 8 MiB.
 - **Daily rules** are untiered (ADR 0042), and are spread over the day's ticks (ADR 0048).
-- **Items and holders** (#215).
+- **Items and holders** (ADRs 0050 to 0052).
   - ADR 0050 defines materials as item kinds that stack, and tools that lose one durability a working day.
   - ADR 0051 holds every item with one holder, accounts at warehouses among them, and a market's stock is ADR 0052's.
   - Earners earn by wages someone pays.
@@ -131,14 +131,14 @@ Options weighed:
 - **Supersessions.**
   - ADR 0023's plans raised by the repair rule alone, which now raise only as far as their materials are delivered, and its founding with nothing carried.
   - ADR 0047's bound of 256 objects an area, as ADR 0041 set it, now 64 slots an area placed by the build tool.
-- **Extensions of the stacked #215.** ADR 0051's kinds of account gain the village's, and ADR 0052's earning order gains gathering and building paid from the treasury, which ADR 0052 defers to #187.
+- **Extensions of ADRs 0051 and 0052.** ADR 0051's kinds of account gain the village's, and ADR 0052's earning order gains gathering and building paid from the treasury, which ADR 0052 defers to #187.
 
 The implementation, in order, each a pull request with its acceptance:
 1. **Slots and kinds.** The build tool places slots on the test map, with stages, growth, spread and regrowth.
    - Acceptance: the same map giving the same slots, spread refilling only near grown slots with the same draws whatever the visiting order, stumps regrowing on their days, and 2 MiB of stages and timers saved and hashed.
 2. **Gathering.** The `gather` order and its refusals, and the village's account and its targets.
    - Acceptance: an NPC gathering a short material and depositing it, and a player gathering.
-   - Acceptance: after #215's economy, wages paid from the treasury.
+   - Acceptance: once ADR 0052's economy is built, wages paid from the treasury.
 3. **Building from materials.** Costs, carrying and raising only as far as delivered, and founding with materials.
    - Acceptance: a test of each.
    - Acceptance: `make sweep` showing villages still growing over 100 years, with the worked example's first house within 30 days of its plan on seed 2026.
@@ -154,7 +154,7 @@ Natural objects are slots the map's build tool places, up to 64 an area, each a 
 
 Structures cost materials as pack data, carried to the site, and the repair rule raises a structure only as far as its materials are delivered. Founding carries a first house's cost. Far villages gather and build in aggregate by the same accounts. Hunting waits for #171, and layouts for #169.
 
-This supersedes ADR 0023's plans raised by repair alone and its founding with nothing carried, and ADR 0047's bound of 256 objects an area. In #215 it extends ADR 0051's accounts with the village's, and ADR 0052's earning order with gathering and building.
+This supersedes ADR 0023's plans raised by repair alone and its founding with nothing carried, and ADR 0047's bound of 256 objects an area. It extends ADR 0051's accounts with the village's, and ADR 0052's earning order with gathering and building.
 
 ## Consequences
 
