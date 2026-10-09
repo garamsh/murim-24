@@ -124,6 +124,7 @@ Options weighed:
   - Prices are read from every market within reach at once, as the PM decided. Prices heard by rumour, some days old, are the alternative, if caravans crowd one route.
   - Each house's routes use a table of the cost along roads between its home town and each market within reach. The table is built from ADR 0047's coarse graph when the world is created or loaded, and one row is refreshed a day, so the daily search reads it and runs no pathfinding.
   - **The search's cost.** A caravan's search is at most 64 kinds over the markets within reach. At a pack bound of 256 caravans and 512 markets, the worst case is about 8.4 million margins a day. Spread over the day's 1,800 ticks with the other daily rules (ADR 0048), that is about 4,700 integer margins a tick, some hundredths of a millisecond, under 1% of the 4 ms p99, by this estimate.
+  - **In a single tick.** One caravan's whole search runs on its own tick, its fixed phase in the day by index, so no tick runs two of the 256. Its worst case is 512 markets × 64 kinds, 32,768 integer margins, about 0.2 ms by this estimate, 5% of the 4 ms p99. The implementing pull request measures it, and splits a search over several ticks if it costs more.
   - A caravan destroyed scatters its cargo as ADR 0051's piles.
   - A house's balance above 60 days of its wages pays the excess to its members' households.
   - Rejected: caravans by fixed routes. Prices would not meet, and the owner asked for a market that emerges.
