@@ -141,9 +141,10 @@ var _worst := [0.0, 0.0]
 class AngleView extends Node2D:
 	const ART := "res://art/mockup/angle/"
 	const CELL := Vector2(16, 12)
-	# grass 6 and grass 2 of docs/art-direction.md §Palette: a raised edge's lit lip and dark side.
+	# grass 6 of docs/art-direction.md §Palette: a raised edge's lit lip.
 	const LIP := Color("8fae5a")
-	const EDGE := Color("2c4a32")
+	# stone 5: the lit edge of rock.
+	const ROCK_LIP := Color("b4bcc4")
 	const SUB := 256.0
 	const GROUND_KINDS := ["training_ground"]
 	const STAGES := ["intact", "damaged", "destroyed", "rubble"]
@@ -450,17 +451,27 @@ class AngleView extends Node2D:
 								false, Image.FORMAT_RGBA8)
 					image = strips[strip_key]
 					at = Vector2i(x * int(CELL.x) - top_left.x, 0)
-				_blit_tile(image, "terrain", look.tile_at(x, y), x, y, at)
+				var tile: String = look.tile_at(x, y)
+				_blit_tile(image, "terrain", tile, x, y, at)
 				if drop > 0:
 					var face: String = "steps_face" if look.stairs_at(x, y) else look.face_at(x, y)
+					var face_top := at + Vector2i(0, int(CELL.y))
 					for row in range(0, drop, 8):
-						_blit_tile(image, "faces", face, x, y + row, at + Vector2i(0, int(CELL.y) + row))
+						_blit_tile(image, "faces", face, x, y + row, face_top + Vector2i(0, row))
+					# The edge where the ground turns down into the face catches the light.
+					image.fill_rect(Rect2i(face_top, Vector2i(int(CELL.x), 1)), ROCK_LIP if tile == "rock" else LIP)
+					# Where the run of a face ends, its end turns away: shaded, its top corner cut.
+					for side: int in [-1, 1]:
+						var beside := _drop(x + side, y, level)
+						if beside >= drop:
+							continue
+						var column := 0 if side < 0 else int(CELL.x) - 2
+						for row in range(beside, drop):
+							for dx in 2:
+								_darken(image, face_top + Vector2i(column + dx, row))
+						image.set_pixel(face_top.x + (0 if side < 0 else int(CELL.x) - 1), face_top.y + beside, Color(0, 0, 0, 0))
 				if level > _level(x, y - 1):
-					image.fill_rect(Rect2i(at, Vector2i(int(CELL.x), 1)), LIP)
-				if level > _level(x - 1, y):
-					image.fill_rect(Rect2i(at, Vector2i(1, int(CELL.y))), LIP)
-				if level > _level(x + 1, y):
-					image.fill_rect(Rect2i(at + Vector2i(int(CELL.x) - 1, 0), Vector2i(1, int(CELL.y))), EDGE)
+					image.fill_rect(Rect2i(at, Vector2i(int(CELL.x), 1)), ROCK_LIP if tile == "rock" else LIP)
 		if look.baked_shadows():
 			_roughen(cells, top_left, ground, strips)
 		var trees: Array = look.trees_in(cells.grow(4))
@@ -584,6 +595,20 @@ class AngleView extends Node2D:
 							if float(_hash(wx, wy, 77) % 100) / 100.0 < float(band - depth) / (band + 1.0) * 0.8:
 								image.set_pixel(at.x + px, at.y + py, sheet.image.get_pixel(from.position.x + px, from.position.y + py))
 
+	# How far the cell at (x, y) drops to its south, if it stands on `level`; 0 off that level.
+	func _drop(x: int, y: int, level: int) -> int:
+		if _level(x, y) != level:
+			return 0
+		return maxi(level - _level(x, y + 1), 0) * _px
+
+	# Darkens a pixel two steps along its ramp, if it is drawn.
+	func _darken(image: Image, at: Vector2i) -> void:
+		if not Rect2i(Vector2i.ZERO, image.get_size()).has_point(at):
+			return
+		var colour := image.get_pixel(at.x, at.y)
+		if colour.a > 0.0:
+			image.set_pixel(at.x, at.y, _shade.get(colour.to_rgba32(), colour))
+
 	# The deepest face a strip of `level` in row `y` drops to its south.
 	func _strip_drop(y: int, level: int, cells: Rect2i) -> int:
 		var drop := 0
@@ -649,6 +674,11 @@ class AngleView extends Node2D:
 					continue
 				_sweep(Rect2(Vector2(x, y) * CELL, CELL), (level - below) * _px, area,
 						func(wx: int, gy: int) -> void: shade.call(wx, gy, level - 1, -99))
+				# The foot of a face is in its shadow, all along it.
+				if _level(x, y + 1) < level:
+					for wx in range(x * int(CELL.x), (x + 1) * int(CELL.x)):
+						for gy in range((y + 1) * int(CELL.y), (y + 1) * int(CELL.y) + 3):
+							shade.call(wx, gy, level - 1, -99)
 
 	# Calls `paint` for each ground pixel within `area` that `rect`, raised `rise` pixels, shades:
 	# the rect swept along SHADOW times the rise.
@@ -1451,12 +1481,11 @@ class Valley extends RefCounted:
 		for y in HEIGHT:
 			for x in WIDTH:
 				var rise := (38.0 - y) / 4.0 + (_noise(x, y, 12.0, 2) - 0.5) * 2.0 + (_noise(x, y, 30.0, 3) - 0.5) * 3.0
-				# The village's valley stays low, and the village and the town lie on the floor.
-				if x > 30 and x < 70:
-					rise -= 1.0
-				if Rect2i(VILLAGE.position + Vector2i(0, 2), VILLAGE.size).has_point(Vector2i(x, y)) \
-						or TOWN.grow(2).has_point(Vector2i(x, y)):
-					rise = 0.0
+				# The village and the town lie on the valley's floor, the ground falling to them
+				# over a few cells all round, so no level ends along a straight line.
+				for floor: Array in [[Vector2(50, 46), Vector2(28, 17)], [Vector2(16, 48), Vector2(16, 16)]]:
+					var reach: float = ((Vector2(x, y) - floor[0]) / floor[1]).length()
+					rise -= clampf((1.35 - reach) * 6.0, 0.0, 99.0)
 				raw[_i(x, y)] = clampi(floori(rise), 0, TOP)
 		# Each cell takes the level most of its neighbours have, twice over.
 		for pass_count in 2:
@@ -1481,8 +1510,11 @@ class Valley extends RefCounted:
 					continue
 				var i := _i(x, y)
 				_level[i] = level
-				var rocky := _noise(x, y, 5.0, 4)
-				_tile[i] = ["plain", "hills", "plain", "forest", "rock" if rocky > 0.4 else "forest", "rock"][level]
+				# Ground by noise, not by level, so its kinds meet in blobs and not along the levels'
+				# edges: meadow and forest floor on the lower tiers, forest and rock higher up.
+				var patch := _noise(x, y, 7.0, 4)
+				var rock := (level - 2.5) / 2.5 + (patch - 0.5)
+				_tile[i] = "rock" if rock > 0.45 else ("forest" if patch > 0.55 - level * 0.05 else ("hills" if patch > 0.3 else "plain"))
 				_face[i] = "rock_face" if level >= 2 else "bank_face"
 				_taken[i] = 1
 		# Peaks stand on the front of the top tier, as far south as it reaches.
@@ -1493,6 +1525,14 @@ class Valley extends RefCounted:
 					_structures.append({"kind": "mountains", "tag": "peak", "variant": peaks % 3,
 							"corner": Vector2i(x, y - 2), "size": Vector2i(7, 1), "id": -1})
 					peaks += 1
+					# Pines gather round its footing, so it rises out of the forest.
+					for fx in range(x - 2, x + 9):
+						for fy in range(y - 1, y + 2):
+							var foot := Vector2i(fx, fy)
+							if _inside(foot) and level_at(fx, fy) == TOP and _hash(fx, fy, 17) > 0.35:
+								_taken[_i(fx, fy)] = 0
+								_add_tree(foot, "pine", 2)
+								_taken[_i(fx, fy)] = 1
 					break
 		for y in HEIGHT:
 			for x in WIDTH:
@@ -1512,7 +1552,7 @@ class Valley extends RefCounted:
 			for y in range(int(centre) - 2, int(centre) + 3):
 				var i := _i(x, y)
 				_level[i] = -1
-				_tile[i] = "river" if x < 20 else "water"
+				_tile[i] = "water"
 				_taken[i] = 1
 				_blocked[i] = 1
 
@@ -1522,6 +1562,10 @@ class Valley extends RefCounted:
 		var r := TERRACES
 		for y in range(r.position.y, r.end.y):
 			for x in range(r.position.x, r.end.x):
+				# The terraced hill's own edges wander, so its fields meet the meadow raggedly.
+				if x < r.position.x + _noise(0, y, 6.0, 14) * 6.0 or x >= r.end.x - _noise(1, y, 6.0, 15) * 4.0 \
+						or y < r.position.y + _noise(x, 0, 6.0, 16) * 4.0:
+					continue
 				var wobble := (_noise(x, 0, 11.0, 8) - 0.5) * 7.0
 				var level := clampi(1 + floori((r.end.y - y + wobble) / 6.0), 1, 5)
 				var i := _i(x, y)

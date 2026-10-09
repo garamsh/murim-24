@@ -1,7 +1,7 @@
 -- Draws the peaks that cap the tiered mountains of the revised village (PR #204's review), at
 -- the 2.5D angle of #200: mountains.aseprite, 128x128 frames tagged peak (three), a crag of
--- stone in strata rising from a foot four cells wide, lit from the upper left, scree and pines
--- at its foot, and its foot's centre on (64, 120).
+-- stone in strata rising from a ragged foot, lit from the upper left, scree spilling from its
+-- foot and pines along it, the foot's centre on (64, 120).
 -- Run: aseprite --batch --script art/mockup/angle/mountains.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -17,8 +17,10 @@ local function peak(seed, height, width, lean, snow)
   -- A ridge line from the summit down both flanks, roughened by noise.
   for x = cx - width, cx + width do
     local t = math.abs(x - cx - lean * (1 - math.abs(x - cx) / width)) / width
-    local top = FOOT - math.floor(height * (1 - t ^ 1.3) * (0.85 + px.noise(x, 0, 6, seed) * 0.3))
-    for y = top, FOOT do
+    -- The foot is ragged, rising and falling a few pixels, never a straight cut.
+    local bottom = FOOT - math.floor(px.noise(x, 0, 5, seed + 4) * 6)
+    local top = bottom - math.floor(height * (1 - t ^ 1.3) * (0.85 + px.noise(x, 0, 6, seed) * 0.3))
+    for y = top, bottom do
       local depth = (FOOT - y) / height
       -- The lit flank is left of a ridge that wanders down from the summit and spreads.
       local ridge = cx + lean + (FOOT - height - y) * 0 + (px.noise(0, y, 5, seed + 2) - 0.5) * 14 + (1 - depth) * 6
@@ -46,10 +48,19 @@ local function peak(seed, height, width, lean, snow)
       if cv:get(x, y + t) ~= 0 then cv:set(x + (t // 5), y + t, c("ink", 2)) end
     end
   end
-  -- Pines at the foot.
-  for k = 1, 9 do
-    local x = cx - width + 4 + math.floor(px.hash(k, 3, seed) * (width * 2 - 8))
-    local y = FOOT - math.floor(px.hash(k, 4, seed) * 10)
+  -- Scree spilling from the foot, thinning by dithering as it spreads.
+  for x = cx - width - 4, cx + width + 4 do
+    for y = FOOT - 8, FOOT + 5 do
+      if cv:get(x, y) == 0 and (cv:get(x, y - 1) ~= 0 or cv:get(x, y - 2) ~= 0 or cv:get(x, y - 3) ~= 0)
+          and px.bayer(x, y) > 0.35 then
+        cv:set(x, y, px.hash(x, y, seed) > 0.5 and c("stone", 3) or c("stone", 2))
+      end
+    end
+  end
+  -- Pines along the foot, straddling its edge.
+  for k = 1, 16 do
+    local x = cx - width + 2 + math.floor(px.hash(k, 3, seed) * (width * 2 - 4))
+    local y = FOOT + 3 - math.floor(px.hash(k, 4, seed) * 12)
     for row = 0, 7 do
       local half = (row + 1) // 2
       cv:hline(x - half, y - 8 + row, half * 2 + 1, row < 3 and c("leaf", 4) or c("leaf", 3))

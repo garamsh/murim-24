@@ -1,7 +1,7 @@
 -- Draws the ground at the 2.5D angle of #200, where a cell is 16 pixels wide and 12 deep:
 --   terrain.aseprite: 16x12 tiles tagged plain (four), hills, forest, road, paving (two each),
 --     one per field state the core gives, sown, growing, ripe, fallow and burnt, and for the
---     revised valley's water, river, rock, paddy, lane, garden and steps (two each).
+--     revised valley's water, rock, paddy, lane, garden and steps (two each).
 --   faces.aseprite: 16x8 tiles, two each, tagged hills_face, the step where hills, raised 8
 --     pixels, drop to the plain along their front edge, and stone_face, rock_face, bank_face and
 --     steps_face, tiled downward wherever the valley's ground drops to its south.
@@ -128,7 +128,7 @@ for _, state in ipairs({ "sown", "growing", "ripe", "fallow", "burnt" }) do
 end
 -- The revised valley's ground (PR #204's review), two variants each, after the first round's
 -- tags so those keep their frames.
--- Water: clear blue with ripples; river: the Yellow River's silt-laden brown with light streaks.
+-- Water: clear blue with ripples.
 local function waters(cv, v, ramp, seed)
   for y = 0, D - 1 do
     for x = 0, W - 1 do
@@ -141,14 +141,14 @@ local function waters(cv, v, ramp, seed)
   end
 end
 add("water", 2, function(cv, v) waters(cv, v, { c("water", 2), c("water", 3), c("water", 4), c("water", 5) }, 100) end)
-add("river", 2, function(cv, v) waters(cv, v, { c("earth", 3), c("earth", 4), c("earth", 5), c("paper", 1) }, 110) end)
 -- Rock: fractured stone.
 add("rock", 2, function(cv, v)
   for y = 0, D - 1 do
     for x = 0, W - 1 do
       local n = px.tile_noise(x, y * 4 // 3, 4, W, 150 + v)
-      local col = n > 0.6 and c("stone", 4) or (n > 0.35 and c("stone", 3) or c("stone", 2))
-      if px.hash(x, y, 151 + v) > 0.9 then col = c("stone", 5) end
+      -- Broad patches of two greys, a darker crack here and there: calm at 3x.
+      local col = n > 0.5 and c("stone", 4) or c("stone", 3)
+      if px.hash(x, y, 151 + v) > 0.96 then col = c("stone", 2) end
       cv:set(x, y, col)
     end
   end
