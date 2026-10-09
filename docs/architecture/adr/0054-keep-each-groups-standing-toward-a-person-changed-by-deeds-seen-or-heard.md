@@ -55,7 +55,7 @@ Options weighed:
   | Extort | −300 | 1,000 | 500 | 200 | 100 |
   | Threaten | −100 | 1,000 | 500 | 200 | 0 |
   | Help | +100 | 1,000 | 500 | 200 | 100 |
-  | Gift, per silver given, at most 100 a day for each group | +1 | 1,000 | 500 | 200 | 0 |
+  | Gift, per silver given (100 copper once #215's ADR 0052 counts copper), at most 100 a day for each group | +1 | 1,000 | 500 | 200 | 0 |
 
   - A deed's change to a group is the base times the tier's weight over 1,000, rounded toward zero.
   - A person who is the victim's kin, or of a group the victim belongs to, counts the deed against its own group's tiers, never twice: each group takes the largest weight it has in the deed.
