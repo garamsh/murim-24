@@ -2900,7 +2900,7 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
     body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
   }
   strikes_.push_back(Strike{self, index, skill.shape, skill.range, skill.radius,
-                            skill.body_damage, striker.position, toward});
+                            skill.body_damage, striker.position, toward, {}});
   const bool hit =
       cover(user, crowd, skill, toward, locked, body_damage, damage);
   // A use that hits anyone or anything practises its art's discipline, or,
@@ -2917,7 +2917,8 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
 // Whether one use of `skill` by the person at `user` of `crowd` toward
 // `toward` hits anyone or anything: every hostile person its shape covers
 // takes `body_damage` into `damage`, or for a targeted skill the person
-// `locked` alone, and every structure its shape reaches its structure damage.
+// `locked` alone, noted among the people the use's record struck, and every
+// structure its shape reaches its structure damage.
 bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
                   Position toward, std::optional<std::size_t> locked,
                   std::uint64_t body_damage,
@@ -2932,6 +2933,7 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
       if (crowd.people.at(other) == *locked &&
           foes(self, army, *locked, crowd.armies.at(other))) {
         damage.at(other) += body_damage;
+        strikes_.back().struck.push_back(*locked);
         hit = true;
       }
     }
@@ -2943,6 +2945,7 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
         if (swath.covers(crowd.hash.position(other)) &&
             foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
           damage.at(other) += body_damage;
+          strikes_.back().struck.push_back(crowd.people.at(other));
           hit = true;
         }
       });

@@ -319,7 +319,7 @@ struct Skill {
 /// `person` used its skill `skill`, of shape `shape`, `range` and
 /// `radius`, from `origin` toward `toward`, all in sub-cell units; the
 /// skill deals `body_damage` before its user's edges, none for a skill that
-/// strikes only structures.
+/// strikes only structures, and the use hit the people `struck`.
 struct Strike {
   std::size_t person = 0;
   std::size_t skill = 0;
@@ -329,6 +329,7 @@ struct Strike {
   std::uint64_t body_damage = 0;
   Position origin{};
   Position toward{};
+  std::vector<std::size_t> struck;
 };
 
 /// The orientation of qi: orthodox, unorthodox or demonic.

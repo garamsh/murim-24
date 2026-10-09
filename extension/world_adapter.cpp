@@ -670,6 +670,11 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::strikes() const {
     fields.set("body_damage", static_cast<std::int64_t>(strike.body_damage));
     fields.set("origin", vector(strike.origin));
     fields.set("toward", vector(strike.toward));
+    godot::PackedInt64Array struck;
+    for (const std::size_t person : strike.struck) {
+      struck.push_back(static_cast<std::int64_t>(person));
+    }
+    fields.set("struck", struck);
     strikes.push_back(fields);
   }
   return strikes;

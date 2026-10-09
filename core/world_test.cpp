@@ -3536,7 +3536,7 @@ TEST(World, ATargetedSkillHitsThePersonItLocksOnAlone) {
   EXPECT_EQ(hit_by(disc), (Hit{BY_EAST, BY_NORTH_EAST}));
 }
 
-TEST(World, EachUseIsRecordedWithItsShapeReachOriginAndDirectionForATick) {
+TEST(World, EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck) {
   World world = shape_world(Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC});
   EXPECT_TRUE(world.strikes().empty());
   world.tick();
@@ -3553,8 +3553,12 @@ TEST(World, EachUseIsRecordedWithItsShapeReachOriginAndDirectionForATick) {
   EXPECT_EQ(strike.origin.y, centre_of(USER_CELL).y);
   EXPECT_EQ(strike.toward.x, centre_of(AROUND.front()).x);
   EXPECT_EQ(strike.toward.y, centre_of(AROUND.front()).y);
+  Hit struck = strike.struck;
+  std::sort(struck.begin(), struck.end());
+  EXPECT_EQ(struck, (Hit{BY_EAST, BY_NORTH_EAST}));
   EXPECT_EQ(world.strikes().back().shape, Shape::AREA);
   EXPECT_EQ(world.strikes().back().body_damage, 0U);
+  EXPECT_TRUE(world.strikes().back().struck.empty());
   // Control: on the next tick, cooling down, it strikes nothing, and the
   // record holds the foes' uses alone.
   world.tick();

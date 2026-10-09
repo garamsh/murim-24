@@ -273,7 +273,8 @@ class WorldAdapter : public godot::RefCounted {
   /// tick. Each is a Dictionary of the `person` who used it, its `skill` by
   /// index among the person's, its `shape`, one of the SHAPE_* constants,
   /// its `range` and `radius`, the skill's `body_damage`, and the Vector2s
-  /// it went from, `origin`, and `toward`, all in sub-cell units.
+  /// it went from, `origin`, and `toward`, all in sub-cell units, and the
+  /// people it hit, `struck` (PackedInt64Array).
   [[nodiscard]] godot::TypedArray<godot::Dictionary> strikes() const;
 
   /// Returns the stage structure `structure` is in, one of the STAGE_*
