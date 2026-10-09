@@ -116,6 +116,7 @@ Options weighed:
 
   - A member's groups for this purpose are its home village and its sect, and its faction under a guard. The member takes the lowest tier among them toward the person.
   - **The faction's guard.** A faction's standing below neutral counts for its members only while the faction stands hostile or at war, by `relation`, toward the person's own faction. Otherwise its members act on their village's and sect's standing alone. Without the guard, one deed against a faction at its weight of 200 per mille could turn every member of it against a person of an allied faction. A faction's standing above neutral always counts.
+  - **The core exposes the tier.** A read gives the tier a person's groups hold toward another, after decay and the guard, so the view decides nothing.
   - So `hostile` between two people becomes: their factions are hostile (ADR 0038), they are duellists, they are in a feud, or a group of one stands hostile toward the other.
   - The hostile bit keeps the per-tick reads to the people some group is hostile to.
 - **Factions' relations.** Standing is toward people, never toward factions, so it feeds faction relations in one place only: ADR 0038's diplomacy.
