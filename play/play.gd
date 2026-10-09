@@ -682,14 +682,14 @@ func show_talk() -> void:
 
 
 ## Names the people world_art.gd finds within its reach of the steered person over their heads,
-## while no panel is open, all but the one the talk prompt names.
+## while no panel is open; the HUD keeps the talk prompt's slip, over the head of the one it names,
+## clear of names.
 func show_names() -> void:
 	var people: Array[Dictionary] = []
 	if _hud.panel() == null:
 		for person: Dictionary in _art.near:
-			if person.person != talk_to or not _hud.talk_prompt.visible:
-				people.append({"person": person.person, "relation": person.relation,
-					"head": _hud.from_window((person.head - _view_origin) * _camera.zoom).floor()})
+			people.append({"person": person.person, "relation": person.relation,
+				"head": _hud.from_window((person.head - _view_origin) * _camera.zoom).floor()})
 	_hud.show_names(world, people)
 
 
