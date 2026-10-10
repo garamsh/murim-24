@@ -64,7 +64,7 @@ Options weighed:
 
   Fruit and berries are food, measures of it, sold to the granary. Herbs go to the apothecary as its material. Herbs were "later" in the issue. They are kept because a herb patch is one more row of kind data under the same rules, and ADR 0040's herb is already a ware.
 - **Growth and spread.** Every 8 days, each area's slots advance by 8 days at once, on the area's own tick of the 8-day cycle, by area index, so a tick touches about 1 area of 64 slots. Each slot's timer rises by 8, then:
-  - a sapling past half its kind's growing days becomes growing, and a growing slot past them becomes grown
+  - a sapling past half its kind's growing days becomes growing, and a growing slot past the other half becomes grown, so a slot goes from sapling to grown in its kind's growing days
   - a stump past its kind's regrowing days becomes a sapling
   - a harvested slot becomes grown again at the next season's first day
   - an empty slot becomes a sapling with its kind's chance for every 8 days, per mille, for each grown slot of the same kind in its area
