@@ -1,6 +1,6 @@
 # ADR 0022: Cap each village by its housing, food and storage
 
-> Status: accepted; its free feeding from the village's stock, its cap from the whole harvest and its migration by the person superseded by ADR-0052, which sells rations from the stock, counts four fifths of the harvest and migrates households
+> Status: accepted; its free feeding from the village's stock, its cap from the whole harvest and its migration by the person superseded by ADR-0052, which sells rations from the stock, counts four fifths of the harvest and migrates households; its births scaled by headroom and stopping at the cap, and its single field yield, superseded by ADR-0063, under which births follow a household's provision and crowding, no rule stops at the cap, and yields are pack data by biome and season
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

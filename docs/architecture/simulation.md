@@ -227,6 +227,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Levels and cliffs.** The core holds a level per cell. A one-level drop is a step, and higher drops are cliffs, crossed by a leap. A person leaps up a cliff within its climb height, set by realm and footwork and paid in stamina, and jumps down one within twice it. A leap it cannot make is refused, so nobody falls.
   - **Paths.** Climb classes on the coarse graph let NPCs leap only drops their weakest member's class covers, up and down, and leap up only with the stamina for the whole drop.
   - **Sight.** `sees` hides the ground above a cliff of three levels from those below who cannot leap it, for engagement, witnesses and the explored map.
+- **Population bounded by food.** ADR 0063 (`adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Births.** A wife's chance is scaled by her household's provision, the days of food its purse and its village's stock give, full at 30, and by crowding past housing, in place of the headroom above. No birth stops at the cap, which growth, migration and the granary still read.
+  - **The capacity.** `MAX_PEOPLE`, or the bound ADR 0048 measures, is a technical capacity. A birth at it is refused and counted, and the sweep and the bench fail on any.
+  - **Levers and the loop.** Field and wild food yields are pack data by biome and season. `make sweep` reports population, food, money, villages and hunger by decade against target bands.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.

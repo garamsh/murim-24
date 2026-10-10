@@ -1,6 +1,6 @@
 # ADR 0017: Make every NPC an individual and every army a roster
 
-> Status: accepted; its rule that people on the move give way to one another superseded by ADR-0020
+> Status: accepted; its rule that people on the move give way to one another superseded by ADR-0020; its bound of 500 living people as a rule of the world superseded by ADR-0063, under which the bound is a technical capacity that the balance must never reach
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
