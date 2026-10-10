@@ -22,7 +22,6 @@ const BATTLE := preload("res://sound/battle.wav")
 const VOICES := 12
 ## How long the battle track plays on after the last strike heard, in seconds.
 const BATTLE_HOLD := 8.0
-const PIXELS_PER_CELL := 16.0
 # How far past a voice's position it fades out, in pixels.
 const VOICE_DISTANCE := 480.0
 # How long await_mix waits for the audio server to start a mix, in microseconds, before it gives up.
@@ -30,6 +29,8 @@ const MIX_WAIT_USEC := 1000000
 
 ## The part of the world sounds are heard from, in pixels; set by the scene each frame.
 var hearing := Rect2()
+# Where a point in sub-cell units is drawn, in the pixels `hearing` is in.
+var _to_screen := Callable()
 ## How many events of each kind were reported, and how many of them started a voice, by Heard.
 var heard := PackedInt64Array()
 var played := PackedInt64Array()
@@ -114,9 +115,11 @@ static func _last_mix_start() -> int:
 
 
 ## Starts listening to `shown`: what it holds now is read as it stands, and only what changes
-## from here on is heard.
-func show_world(shown: WorldAdapter) -> void:
+## from here on is heard, each sound placed where `to_screen` draws a point in sub-cell units,
+## world_art.gd's to_screen in the game.
+func show_world(shown: WorldAdapter, to_screen: Callable) -> void:
 	_world = shown
+	_to_screen = to_screen
 	_tick = 0
 	_stages.clear()
 	_seen.fill(-2)
@@ -202,12 +205,11 @@ func advance(delta: float) -> void:
 func _read(listen: bool) -> void:
 	for event: Dictionary in _world.events(_next_event):
 		_next_event = event.sequence + 1
-		var at := (Vector2(event.cell) + Vector2.ONE / 2.0) * PIXELS_PER_CELL
+		var at: Vector2 = _to_screen.call((Vector2(event.cell) + Vector2.ONE / 2.0) * WorldAdapter.CELL_SIZE)
 		if listen and event.kind == WorldAdapter.EVENT_DIED:
 			hear(Heard.FALL, at)
 		elif listen and event.kind == WorldAdapter.EVENT_RAIDED:
 			hear(Heard.BELL, at)
-	var cell := PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
 	for army in _world.army_count():
 		var roster := _world.roster(army)
 		var healths := _world.body_strengths(army)
@@ -217,7 +219,7 @@ func _read(listen: bool) -> void:
 			var person := roster[body]
 			if person >= _seen.size():
 				_grow(person + 1)
-			var at := positions[body] * cell
+			var at: Vector2 = _to_screen.call(positions[body])
 			if listen and _seen[person] == _tick - 1:
 				if ready[body] != _ready_at[person]:
 					hear(Heard.STRIKE, at)
@@ -231,8 +233,8 @@ func _read(listen: bool) -> void:
 		if structure == _stages.size():
 			_stages.append(stage)
 		elif stage != _stages[structure]:
-			var at := (Vector2(_world.structure_cell(structure)) \
-					+ Vector2(_world.structure_footprint(structure)) / 2.0) * PIXELS_PER_CELL
+			var at: Vector2 = _to_screen.call((Vector2(_world.structure_cell(structure))
+					+ Vector2(_world.structure_footprint(structure)) / 2.0) * WorldAdapter.CELL_SIZE)
 			if listen:
 				hear(Heard.FIRE if stage > _stages[structure] else Heard.MEND, at)
 			_stages[structure] = stage

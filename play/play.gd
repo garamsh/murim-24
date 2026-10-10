@@ -39,7 +39,6 @@ extends Node2D
 
 const ViewScale := preload("res://view_scale.gd")
 
-const PIXELS_PER_CELL := 16.0
 # Ticks one frame may run to catch up at the core's own rate, and as many times more at a higher
 # speed; beyond it the simulation falls behind instead of stalling.
 const MAX_TICKS_PER_FRAME := 4
@@ -229,9 +228,9 @@ func _play(made: WorldAdapter) -> void:
 	_date = world.date()
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
-	_camera.position = _to_pixels(lead()).floor()
 	_art.show_world(world, steered)
-	_sound.show_world(world)
+	_camera.position = _to_pixels(lead()).floor()
+	_sound.show_world(world, _art.to_screen)
 	_hud.show_player(world, steered)
 	_hud.purse.keys.clear()
 	for keycode: Key in WARE_KEYS:
@@ -242,8 +241,8 @@ func _play(made: WorldAdapter) -> void:
 	var rows := world.map_rows()
 	_camera.limit_left = 0
 	_camera.limit_top = 0
-	_camera.limit_right = int(rows[0].length() * PIXELS_PER_CELL)
-	_camera.limit_bottom = int(rows.size() * PIXELS_PER_CELL)
+	_camera.limit_right = int(rows[0].length() * _art.CELL.x)
+	_camera.limit_bottom = int(rows.size() * _art.CELL.y)
 	_hud.title_screen.close()
 	_hud.new_game.close()
 
@@ -480,7 +479,7 @@ func command(event: InputEvent) -> bool:
 ## Orders the person toward the cell under `at`, a position in this node's pixels, keeping its
 ## skills, unless it is ordered there already. Returns whether the core accepted an order.
 func follow(at: Vector2) -> bool:
-	var objective := Vector2i((at / PIXELS_PER_CELL).floor())
+	var objective: Vector2i = _art.cell_at(at)
 	if objective == _objective:
 		return false
 	if not world.order(steered, objective, _skills):
@@ -517,7 +516,7 @@ func cast_at(slot: int, at: Vector2) -> int:
 	if skill < 0:
 		_hud.show_cast(WorldAdapter.CAST_NO_SKILL)
 		return WorldAdapter.CAST_NO_SKILL
-	return cast(skill, at / PIXELS_PER_CELL * WorldAdapter.CELL_SIZE)
+	return cast(skill, _art.to_sub(at))
 
 
 # Shows the aimed skill's range round the person and its area at the cursor while a cast key is held
@@ -529,8 +528,8 @@ func _show_aim() -> void:
 		_aim.visible = false
 		return
 	var skills := world.person_skills(roster[0])
-	var reach: float = skills[skill]["range"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
-	var radius: float = skills[skill]["radius"] * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	var reach: float = skills[skill]["range"] * _art.CELL.x / WorldAdapter.CELL_SIZE
+	var radius: float = skills[skill]["radius"] * _art.CELL.x / WorldAdapter.CELL_SIZE
 	_aim.show_aim(drawn_lead(), reach, _cursor, radius)
 
 
@@ -589,7 +588,7 @@ func touch(event: InputEvent) -> bool:
 		"world":
 			if _hud.settings.tap_to_move():
 				var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom
-				var cell := Vector2i(((_view_origin + on_view) / PIXELS_PER_CELL).floor())
+				var cell: Vector2i = _art.cell_at(_view_origin + on_view)
 				if world.order(steered, cell, _skills):
 					_objective = cell
 	return true
@@ -680,8 +679,7 @@ func show_talk() -> void:
 	if hidden:
 		_hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
 		return
-	# world_art.gd draws a body from 16 pixels above its position.
-	var head := _to_pixels(world.person_position(talk_to)) - Vector2(0, 17)
+	var head := _to_pixels(world.person_position(talk_to)) - Vector2(0, _art.HEAD)
 	_hud.talk_prompt.key = OS.get_keycode_string(TALK_KEY)
 	_hud.talk_prompt.point_at(world, talk_to, _hud.from_window((head - _view_origin) * _camera.zoom).floor(),
 			talk_hostile)
@@ -910,4 +908,4 @@ func _all_skills() -> PackedInt64Array:
 
 
 func _to_pixels(sub_cells: Vector2) -> Vector2:
-	return sub_cells * PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	return _art.to_screen(sub_cells)

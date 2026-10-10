@@ -1,6 +1,6 @@
 # ADR 0012: Present the world in a three-quarter top-down view on the 16-pixel grid, with Korean-first UI text
 
-> Status: accepted
+> Status: accepted; its 16-pixel grid and ground tiles superseded by ADR 0059
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

@@ -1,21 +1,23 @@
-## Draws a WorldAdapter's world in the approved art (docs/art-direction.md): terrain tiles laid as
-## docs/convention/stack-godot.md §Terrain layers sets out, territory borders, landforms, buildings
-## by stage, bodies by faction, the steered person's markers, a crimson ring round each body hostile
+## Draws a WorldAdapter's world in the approved art (docs/art-direction.md) at the 2.5D angle of
+## ADR 0059, a cell CELL wide and deep and raised by the relief's levels: the ground drawn off the
+## cell grid by ground.gd, baked once from the relief.gd derives and streamed round the screen,
+## territory borders, buildings by stage, bodies by faction, the steered person's markers, a crimson ring round each body hostile
 ## to the person names are read around, as WorldAdapter.relation says, and what the fighting did
 ## through combat.gd, the struck drawn in the impact colour and knocked back and the dead falling
 ## and fading. Bodies are drawn between the positions of the last two ticks, as far between as the
 ## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
 ## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
-## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings
-## and landforms by the bottom edge of what they stand on. It reads the world and holds no game
-## rule.
+## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings,
+## trees and the raised rows of the ground by the row they stand on. It reads the world and holds no
+## game rule.
 extends Node2D
 
 ## Emitted after a tick changed the territory or the villages, once both are drawn anew.
 signal region_changed
 
 const Combat := preload("res://world_art/combat.gd")
-const CELL := 16
+## A cell's width and depth on the ground, in pixels.
+const CELL := Relief.CELL
 const ART := "res://art/"
 # Sprite sets by faction name; a world without faction names takes them in this order.
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
@@ -47,14 +49,16 @@ const DECORATIONS := "res://world_art/villages.json"
 # The art of each kind of banner a template names, by the key it is named with.
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 const FOOTPRINT_INSET := 8
-# How often a free cell is left without a landform: mountains mostly covered, hills open.
-const LANDFORM_SKIP := {"mountain": 0.05, "hills": 0.3}
+# Rows of a structure's frame for each cell of its footprint's depth: its art is drawn top-down.
+const STRUCTURE_ROWS := 16
 const WALK_FRAME_MS := 150
 const CHEVRON_FRAME_MS := 400
 # Pixels past the screen's edge that are still drawn, for sprites that reach across it.
 const MARGIN := 64.0
 # Frame positions in the body atlas built at startup, in pixels.
 const BODY_FRAME := Vector2i(16, 24)
+## How far above where a person stands its name's anchor, over its head, is, in pixels.
+const HEAD := 25.0
 ## How far from the person names are read around another person's name is drawn, in cells.
 const NAME_REACH := 8
 ## The relations, as WorldAdapter.relation gives them, of a person drawn ringed in RING.
@@ -76,9 +80,11 @@ var drawn := 0
 ## The territory the borders were last drawn from, as WorldAdapter.territory() gives it.
 var owners := PackedInt64Array()
 
+## The relief the ground is drawn with, and bodies and buildings raised by.
+var relief: Relief
+
 var _width := 0
 var _height := 0
-var _kinds := PackedStringArray()
 var _sprite_of_faction := PackedInt64Array()
 var _atlas: ImageTexture
 var _bands: Array[MultiMeshInstance2D] = []
@@ -92,7 +98,7 @@ var _same_roster: Array[bool] = []
 var _army_sprites := PackedInt64Array()
 # How each army's faction stands toward the viewer's, read once a tick.
 var _relations := PackedInt64Array()
-## The layer of the villages' ground decorations: paving and road.
+## The layer of the villages' ground decorations, laid over the ground: paving and road.
 var built: TileMapLayer
 # How many villages have their decorations laid, the world's order kept.
 var _decorated := 0
@@ -112,7 +118,7 @@ var _field_tags := {}
 var _chevron_frames: Array[AtlasTexture] = []
 var _material: ShaderMaterial
 
-var _ground: Node2D
+var _laid: Node2D
 var _territory: Territory
 var _standing: Node2D
 ## What the fighting of the last ticks did: uses, hits, deaths and the steered person's target.
@@ -125,7 +131,7 @@ var _chevron: Sprite2D
 ## whose lead body carries the player's markers, or -1 for none.
 func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	# Read here rather than on ready: a test readies only the scene it instantiates.
-	_ground = $Ground
+	_laid = $Laid
 	_territory = $Territory
 	_standing = $Standing
 	_ring = $Ring
@@ -136,19 +142,17 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	var rows := world.map_rows()
 	_height = rows.size()
 	_width = rows[0].length() if _height > 0 else 0
-	_kinds = _cell_kinds(rows)
+	relief = Relief.from_terrain(Vector2i(_width, _height), _cell_kinds(rows))
 	var names := world.faction_names()
 	_sprite_of_faction.clear()
 	for faction in maxi(names.size(), FACTIONS.size()):
 		var name: String = names[faction].to_lower() if faction < names.size() else FACTIONS[faction % FACTIONS.size()]
 		_sprite_of_faction.append(maxi(FACTIONS.find(name), 0))
-	_lay_terrain()
 	_colours.clear()
 	for faction in _sprite_of_faction:
 		_colours.append(ACCENTS[faction])
 	owners = world.territory()
 	_territory.show_borders(_borders(), _colours)
-	_lay_landforms()
 	for kind: String in BUILDINGS:
 		var sheet := _sheet(BUILDINGS[kind])
 		var frames: Array[AtlasTexture] = []
@@ -158,6 +162,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_lay_decorations()
 	_lay_fields()
 	_lay_structures()
+	_lay_ground()
 	_build_body_atlas()
 	var player := _sheet("markers/player_marker")
 	_ring.texture = _region(player, "ring", 0)
@@ -165,6 +170,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_chevron_frames.append(_region(player, "chevron", 1))
 	_ring.visible = steered >= 0
 	_chevron.visible = steered >= 0
+	combat.to_screen = to_screen
 	combat.begin(world)
 	_add_armies()
 	name_around(steered)
@@ -219,55 +225,90 @@ func _add_armies() -> void:
 		combat.accents.append(ACCENTS[_army_sprites[army]])
 
 
-## Returns where body `body` of army `army` is drawn, in pixels: `between` of the way from where
-## the tick before last left it to where the last tick did, so a body moves on every frame and not
-## only on a tick. While the army's roster changed on the last tick, the bodies are drawn where it
-## left them, since a body's index may then name another person than a tick before.
+## Returns where body `body` of army `army` stands as drawn, its feet, in pixels: `between` of the
+## way from where the tick before last left it to where the last tick did, so a body moves on every
+## frame and not only on a tick, raised with the ground under it. While the army's roster changed on
+## the last tick, the bodies are drawn where it left them, since a body's index may then name
+## another person than a tick before.
 func body_at(army: int, body: int, between: float) -> Vector2:
+	return to_screen(_sub_at(army, body, between))
+
+
+func _sub_at(army: int, body: int, between: float) -> Vector2:
 	var now := _tick_positions[army][body]
 	var before := _last_positions[army]
 	if _same_roster[army] and body < before.size():
 		now = before[body].lerp(now, clampf(between, 0.0, 1.0))
-	return now * CELL / WorldAdapter.CELL_SIZE
+	return now
+
+
+## Where a point in sub-cell units lies on the unraised ground, in pixels.
+func ground_point(sub: Vector2) -> Vector2:
+	return sub * CELL / WorldAdapter.CELL_SIZE
+
+
+## Where a point in sub-cell units is drawn, in pixels: on the ground, raised with it.
+func to_screen(sub: Vector2) -> Vector2:
+	var on_ground := ground_point(sub)
+	return on_ground - Vector2(0, relief.lift_at(on_ground))
+
+
+## The point in sub-cell units whose ground is drawn at `screen`, in pixels: what a click there
+## points at.
+func to_sub(screen: Vector2) -> Vector2:
+	return relief.ground_under(screen) / CELL * WorldAdapter.CELL_SIZE
+
+
+## The cell whose ground is drawn at `screen`, in pixels.
+func cell_at(screen: Vector2) -> Vector2i:
+	return Vector2i((to_sub(screen) / WorldAdapter.CELL_SIZE).floor())
 
 
 ## Updates buildings and bodies within `view`, the part of the world on screen, in pixels, the
 ## bodies `between` of the way from the tick before last to the last, as body_at() places them.
 func refresh(view: Rect2, between := 1.0) -> void:
 	var now := Time.get_ticks_msec()
+	$Ground.stream(view)
 	_tile_fields()
+
 	_lay_structures()
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
 			sprite.texture = sprite.get_meta("frames")[world.structure_stage(structure)]
 	var shown := view.grow(MARGIN)
-	var first_row := maxi(int(shown.position.y / CELL), 0)
-	var last_row := mini(int(shown.end.y / CELL) + 2, _height + 2)
+	# Raised ground draws its rows above where they lie, so the rows on screen reach further down.
+	var first_row := maxi(int(shown.position.y / CELL.y), 0)
+	var last_row := mini(int((shown.end.y + relief.highest() * Relief.LEVEL_PX) / CELL.y) + 1, _height + 1)
 	var buffers: Array[PackedFloat32Array] = []
 	buffers.resize(maxi(last_row - first_row + 1, 0))
 	var walk := (now / WALK_FRAME_MS) % 4
 	drawn = 0
 	near.clear()
 	var named := viewer >= 0 and not _tick_positions[viewer].is_empty()
-	var named_from := body_at(viewer, 0, between) if named else Vector2.ZERO
+	var named_from := _sub_at(viewer, 0, between) if named else Vector2.ZERO
+	var share := clampf(between, 0.0, 1.0)
+	var pixels := CELL / WorldAdapter.CELL_SIZE
 	for army in _tick_positions.size():
 		var positions := _tick_positions[army]
 		var before := _last_positions[army]
 		var roster := _rosters[army]
 		var sprite := _army_sprites[army]
 		var tint := _tint(army)
+		var moving := _same_roster[army]
 		for body in positions.size():
 			var person := roster[body]
-			var at := body_at(army, body, between) + combat.knock(person, now)
+			# As _sub_at() gives it, written out: this loop runs for every body on every frame.
+			var sub := before[body].lerp(positions[body], share) if moving and body < before.size() else positions[body]
+			var on_ground := sub * pixels
+			var at := on_ground - Vector2(0, relief.lift_at(on_ground)) + combat.knock(person, now)
 			if not shown.has_point(at):
 				continue
-			var cells := at.distance_to(named_from) / CELL
+			var cells := (sub - named_from).length() / WorldAdapter.CELL_SIZE
 			if named and cells <= NAME_REACH and (army != viewer or body > 0):
-				# A body is drawn from 16 pixels above its position.
-				near.append({"person": person, "head": at - Vector2(0, 17),
+				near.append({"person": person, "head": at - Vector2(0, HEAD),
 					"relation": _relations[army], "cells": cells})
-			var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
+			var row := clampi(int(on_ground.y / CELL.y), first_row, last_row)
 			if buffers.is_empty():
 				continue
 			var heading := 0.0
@@ -277,7 +318,7 @@ func refresh(view: Rect2, between := 1.0) -> void:
 					heading = NAN
 			var frame := 0 if is_nan(heading) else 1 + walk
 			_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
-					BODY_FRAME), Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), heading < 0.0, tint,
+					BODY_FRAME), Vector2(at.x, at.y - BODY_FRAME.y / 2.0), heading < 0.0, tint,
 					combat.flash(person, now))
 			drawn += 1
 	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
@@ -286,9 +327,9 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		var at: Vector2 = death.at
 		if not shown.has_point(at) or buffers.is_empty():
 			continue
-		var row := clampi(int(at.y / CELL) + 1, first_row, last_row)
+		var row := clampi(int(death.ground.y / CELL.y), first_row, last_row)
 		_append(buffers, row - first_row, row, Rect2(Vector2(_army_sprites[death.army] * 80, 0), BODY_FRAME),
-				Vector2(at.x, at.y + CELL / 2.0 - BODY_FRAME.y / 2.0), false, _tint(death.army),
+				Vector2(at.x, at.y - BODY_FRAME.y / 2.0), false, _tint(death.army),
 				death.flash, death.alpha, death.fallen * PI / 2.0)
 	_fill_bands(buffers, first_row)
 	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
@@ -326,52 +367,29 @@ func _cell_kinds(rows: PackedStringArray) -> PackedStringArray:
 	return kinds
 
 
-func _kind(x: int, y: int) -> String:
-	return _kinds[clampi(y, 0, _height - 1) * _width + clampi(x, 0, _width - 1)]
-
-
-# A hash of a cell, for the seeded choices of a variant or a landform.
+# A hash of a cell, for the seeded choice of a variant.
 func _hash(x: int, y: int, salt: int) -> int:
 	var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
 	h = (h ^ (h >> 13)) * 1274126177
 	return absi(h ^ (h >> 16))
 
 
-func _lay_terrain() -> void:
-	var terrain := _sheet("terrain/terrain")
-	var transitions := _sheet("terrain/transitions")
-	var tiles := TileSet.new()
-	tiles.tile_size = Vector2i(CELL, CELL)
-	for sheet: Dictionary in [terrain, transitions]:
-		var source := TileSetAtlasSource.new()
-		source.texture = sheet.texture
-		source.texture_region_size = Vector2i(CELL, CELL)
-		for frame in sheet.texture.get_width() / CELL:
-			source.create_tile(Vector2i(frame, 0))
-		tiles.add_source(source)
-	var plain := TileMapLayer.new()
-	plain.tile_set = tiles
-	_ground.add_child(plain)
-	for y in _height:
-		for x in _width:
-			plain.set_cell(Vector2i(x, y), 0, Vector2i(terrain.tags.plain[0] + _hash(x, y, 1) % 4, 0))
-	for kind: String in transitions.tags:
-		var layer := TileMapLayer.new()
-		layer.tile_set = tiles
-		layer.position = Vector2(-CELL / 2.0, -CELL / 2.0)
-		_ground.add_child(layer)
-		for y in _height + 1:
-			for x in _width + 1:
-				var mask := (1 if _kind(x - 1, y - 1) == kind else 0) + (2 if _kind(x, y - 1) == kind else 0) \
-						+ (4 if _kind(x - 1, y) == kind else 0) + (8 if _kind(x, y) == kind else 0)
-				if mask == 15:
-					layer.set_cell(Vector2i(x, y), 0, Vector2i(terrain.tags[kind][0] + _hash(x, y, 2) % 4, 0))
-				elif mask > 0:
-					layer.set_cell(Vector2i(x, y), 1, Vector2i(transitions.tags[kind][0] + mask, 0))
+# Prepares the ground to be baked from the relief, with a decorative tree on no village and no
+# structure.
+func _lay_ground() -> void:
+	var cleared: Array[Rect2i] = []
+	for village: Dictionary in world.villages():
+		cleared.append(Rect2i(village.corner, village.area).grow(1))
+	for structure in world.structure_count():
+		cleared.append(Rect2i(world.structure_cell(structure), world.structure_footprint(structure)))
+	var ground: Node2D = $Ground
+	ground.standing = _standing
+	ground.prepare(relief, {"open_at": func(cell: Vector2i) -> bool:
+			return not cleared.any(func(rect: Rect2i) -> bool: return rect.has_point(cell))})
 
 
 # Each edge between two cells in different territories, as [from, to, faction of the cell on
-# its left or top, faction on its right or bottom], -1 for a cell in none.
+# its left or top, faction on its right or bottom], -1 for a cell in none, on the unraised ground.
 func _borders() -> Array:
 	var borders := []
 	if owners.size() != _width * _height:
@@ -380,68 +398,18 @@ func _borders() -> Array:
 		for x in _width:
 			var here := owners[y * _width + x]
 			if x + 1 < _width and owners[y * _width + x + 1] != here:
-				borders.append([Vector2((x + 1) * CELL, y * CELL), Vector2((x + 1) * CELL, (y + 1) * CELL),
+				borders.append([Vector2(x + 1, y) * CELL, Vector2(x + 1, y + 1) * CELL,
 						here, owners[y * _width + x + 1]])
 			if y + 1 < _height and owners[(y + 1) * _width + x] != here:
-				borders.append([Vector2(x * CELL, (y + 1) * CELL), Vector2((x + 1) * CELL, (y + 1) * CELL),
+				borders.append([Vector2(x, y + 1) * CELL, Vector2(x + 1, y + 1) * CELL,
 						here, owners[(y + 1) * _width + x]])
 	return borders
 
 
-# Places landforms greedily: cells in a seeded order, each taking the first footprint, from a
-# seeded start among the kind's, whose cells are all of the kind and free.
-func _lay_landforms() -> void:
-	var sheet := _sheet("terrain/landforms")
-	var sizes := {}
-	for tag: String in sheet.tags:
-		var parts := tag.split("_")
-		var size := parts[1].split("x")
-		if not sizes.has(parts[0]):
-			sizes[parts[0]] = []
-		sizes[parts[0]].append([Vector2i(int(size[0]), int(size[1])), tag])
-	var order := range(_width * _height)
-	order.sort_custom(func(a: int, b: int) -> bool: return _hash(a, 0, 3) < _hash(b, 0, 3))
-	var taken := PackedByteArray()
-	taken.resize(_width * _height)
-	for cell: int in order:
-		var x := cell % _width
-		var y := cell / _width
-		var kind := _kinds[cell]
-		if not sizes.has(kind) or taken[cell] == 1 or (_hash(x, y, 4) % 1000) < LANDFORM_SKIP[kind] * 1000:
-			continue
-		var options: Array = sizes[kind]
-		var start := _hash(x, y, 5) % options.size()
-		for t in options.size():
-			var option: Array = options[(start + t) % options.size()]
-			var size: Vector2i = option[0]
-			if _fits(x, y, size, kind, taken):
-				for r in size.y:
-					for q in size.x:
-						taken[(y + r) * _width + x + q] = 1
-				var sprite := Sprite2D.new()
-				sprite.texture = _region(sheet, option[1], 0)
-				sprite.centered = false
-				sprite.position = Vector2(x * CELL, (y + size.y) * CELL)
-				sprite.offset = Vector2(0, -sheet.frame.y)
-				_standing.add_child(sprite)
-				break
-
-
-func _fits(x: int, y: int, size: Vector2i, kind: String, taken: PackedByteArray) -> bool:
-	if x + size.x > _width or y + size.y > _height:
-		return false
-	for r in size.y:
-		for q in size.x:
-			var cell := (y + r) * _width + x + q
-			if _kinds[cell] != kind or taken[cell] == 1:
-				return false
-	return true
-
-
 # One sprite per structure whose kind has art, the bottom edge of its footprint as its
-# position, for each structure laid since they were last laid, those the world's growth lays
-# among them; a kind of GROUND_KINDS on the ground, the rest standing. A structure with no
-# kind, as from WorldAdapter.create(), is not drawn.
+# position, raised with the ground there, for each structure laid since they were last laid, those
+# the world's growth lays among them; a kind of GROUND_KINDS on the ground, the rest standing. A
+# structure with no kind, as from WorldAdapter.create(), is not drawn.
 func _lay_structures() -> void:
 	var laid := structure_sprites.size()
 	structure_sprites.resize(world.structure_count())
@@ -454,29 +422,41 @@ func _lay_structures() -> void:
 		var frames: Array[AtlasTexture] = _stage_frames[kind]
 		var sprite := Sprite2D.new()
 		sprite.centered = false
-		sprite.position = Vector2(corner.x * CELL, (corner.y + footprint.y) * CELL)
+		sprite.position = Vector2(corner.x, corner.y + footprint.y) * CELL
+		var lift := relief.lift_at(sprite.position + Vector2(footprint.x * CELL.x / 2.0, -CELL.y / 2.0))
 		sprite.offset = -ANCHORS.get(kind, Vector2(FOOTPRINT_INSET, FOOTPRINT_INSET)) \
-				- Vector2(0, footprint.y * CELL)
+				- Vector2(0, footprint.y * STRUCTURE_ROWS + lift)
 		sprite.set_meta("frames", frames)
-		(_ground if GROUND_KINDS.has(kind) else _standing).add_child(sprite)
+		if GROUND_KINDS.has(kind):
+			sprite.position += sprite.offset
+			sprite.offset = Vector2.ZERO
+			_laid.add_child(sprite)
+		else:
+			_standing.add_child(sprite)
 		structure_sprites[structure] = sprite
 
 
-# Lays the layer the fields are tiled on, one tile of fields.png per cell, under the standing
-# sprites and over the decorations.
-func _lay_fields() -> void:
-	_field_sheet = _sheet("decorations/fields")
+# A layer of tiles a cell each, from the 16 x 12 frames of `sheet`.
+func _tile_layer(sheet: Dictionary) -> TileMapLayer:
 	var tiles := TileSet.new()
-	tiles.tile_size = Vector2i(CELL, CELL)
+	tiles.tile_size = Vector2i(CELL)
 	var source := TileSetAtlasSource.new()
-	source.texture = _field_sheet.texture
-	source.texture_region_size = Vector2i(CELL, CELL)
-	for frame in _field_sheet.texture.get_width() / CELL:
+	source.texture = sheet.texture
+	source.texture_region_size = Vector2i(CELL)
+	for frame in sheet.texture.get_width() / int(CELL.x):
 		source.create_tile(Vector2i(frame, 0))
 	tiles.add_source(source)
-	fields = TileMapLayer.new()
-	fields.tile_set = tiles
-	_ground.add_child(fields)
+	var layer := TileMapLayer.new()
+	layer.tile_set = tiles
+	_laid.add_child(layer)
+	return layer
+
+
+# Lays the layer the fields are tiled on, one tile of fields.png per cell, under the standing
+# sprites and over the ground.
+func _lay_fields() -> void:
+	_field_sheet = _sheet("decorations/fields")
+	fields = _tile_layer(_field_sheet)
 	_field_tags.clear()
 	_tile_fields()
 
@@ -503,31 +483,21 @@ func _tile_fields() -> void:
 				fields.set_cell(cell, 0, Vector2i(variant, 0))
 
 
-# Lays the layer the villages' ground decorations are tiled on, above the terrain, and each
-# village's decorations.
+# Lays the layer the villages' ground decorations are tiled on, over the ground, and each village's
+# decorations.
 func _lay_decorations() -> void:
 	_layouts = JSON.parse_string(FileAccess.get_file_as_string(DECORATIONS))
 	_ground_sheet = _sheet("decorations/ground")
 	for banner: String in BANNERS:
 		_banner_sheets[banner] = _sheet(BANNERS[banner])
-	var tiles := TileSet.new()
-	tiles.tile_size = Vector2i(CELL, CELL)
-	var source := TileSetAtlasSource.new()
-	source.texture = _ground_sheet.texture
-	source.texture_region_size = Vector2i(CELL, CELL)
-	for frame in _ground_sheet.texture.get_width() / CELL:
-		source.create_tile(Vector2i(frame, 0))
-	tiles.add_source(source)
-	built = TileMapLayer.new()
-	built.tile_set = tiles
-	_ground.add_child(built)
+	built = _tile_layer(_ground_sheet)
 	_decorated = 0
 	_decorate(world.villages())
 
 
 # Lays the decorations from DECORATIONS by its template of each of `villages` laid since they
-# were last laid, those the world's growth founds among them: ground tiles, a variant per cell
-# by a seeded hash, and banners in the owner's colours, standing with everything else.
+# were last laid, those the world's growth founds among them: ground tiles, a variant per cell by a
+# seeded hash, and banners in the owner's colours, standing with everything else.
 func _decorate(villages: Array[Dictionary]) -> void:
 	for village: Dictionary in villages.slice(_decorated):
 		var corner: Vector2i = village.corner
@@ -548,12 +518,10 @@ func _decorate(villages: Array[Dictionary]) -> void:
 				var sprite := Sprite2D.new()
 				sprite.texture = _region(sheet, FACTIONS[_sprite_of_faction[int(village.faction)]], 0)
 				sprite.centered = false
-				sprite.position = Vector2(cell.x * CELL, (cell.y + 1) * CELL)
+				sprite.position = Vector2(cell.x, cell.y + 1) * CELL
 				sprite.offset = Vector2(0, -sheet.frame.y)
 				_standing.add_child(sprite)
 	_decorated = villages.size()
-
-
 # Puts the bodies' frames in one texture, so every band draws from it: the three factions' body
 # sheets side by side.
 func _build_body_atlas() -> void:
@@ -566,7 +534,7 @@ func _build_body_atlas() -> void:
 	_atlas = ImageTexture.create_from_image(image)
 
 
-# Adds one sprite to band `band`, the row of cells whose bottom edge is at `row`: `frame` is its
+# Adds one sprite to band `band`, the band of row `row`: `frame` is its
 # rectangle in the atlas, BODY_FRAME in size, `centre` its centre in world pixels, `flip` mirrors it,
 # and a `tint` other than white rings it in that colour; it is drawn `white` of the way to white,
 # `alpha` opaque, and turned `turn` radians about its bottom edge's middle.
@@ -577,7 +545,7 @@ func _append(buffers: Array[PackedFloat32Array], band: int, row: int, frame: Rec
 	var height := frame.size.y
 	var cos_turn := cos(turn)
 	var sin_turn := sin(turn)
-	var local := centre.round() - Vector2(0, row * CELL) \
+	var local := centre.round() - Vector2(0, _band_y(row)) \
 			+ Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
 	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
@@ -602,8 +570,9 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 		# The renderer keeps a band's bounds from its MultiMesh's AABB when the band is first drawn,
 		# and culls a band refilled elsewhere by them; bounds over every body the band's row can
 		# hold, across the whole region, stay right wherever the view goes.
-		band.multimesh.custom_aabb = AABB(Vector3(-BODY_FRAME.x, -CELL - BODY_FRAME.y, 0),
-				Vector3(_width * CELL + 2 * BODY_FRAME.x, 2 * (CELL + BODY_FRAME.y), 0))
+		var rise := relief.highest() * Relief.LEVEL_PX + BODY_FRAME.y + CELL.y
+		band.multimesh.custom_aabb = AABB(Vector3(-BODY_FRAME.x, -rise, 0),
+				Vector3(_width * CELL.x + 2 * BODY_FRAME.x, 2 * rise, 0))
 		band.texture = _atlas
 		band.material = _band_material()
 		_standing.add_child(band)
@@ -612,13 +581,19 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 		var multimesh := _bands[band].multimesh
 		var data: PackedFloat32Array = buffers[band] if band < buffers.size() else PackedFloat32Array()
 		var count := data.size() / BODY_FLOATS
-		_bands[band].position = Vector2(0, (first_row + band) * CELL)
+		_bands[band].position = Vector2(0, _band_y(first_row + band))
 		if multimesh.instance_count < count:
 			multimesh.instance_count = count + 64
 		if count > 0:
 			data.resize(multimesh.instance_count * BODY_FLOATS)
 			multimesh.buffer = data
 		multimesh.visible_instance_count = count
+
+
+# Where the band of row `row` is sorted: the row's middle on the ground, after the raised strip of
+# its own row and before whatever stands on a footprint ending at the row's south edge.
+func _band_y(row: int) -> float:
+	return row * CELL.y + CELL.y / 2.0
 
 
 func _band_material() -> ShaderMaterial:

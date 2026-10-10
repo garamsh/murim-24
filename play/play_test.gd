@@ -65,6 +65,7 @@ const GROWN_TICKS_PER_DAY := 5
 const GROWN_TICKS := 9000
 const TestSaves := preload("res://extension/test_saves.gd")
 const ViewScale := preload("res://view_scale.gd")
+const WorldArt := preload("res://world_art/world_art.gd")
 # Ticks a hostile army marched on the person has to come within its first skill's range, and ticks
 # the person has to be ready to cast again.
 const APPROACH_LIMIT := 4000
@@ -90,8 +91,8 @@ func run() -> bool:
 	var wall := _cell_near(scene.world.map_rows(), home_cell, "#")
 	# Setup: both cells were found, so a refusal below is the wall's, not a missing cell.
 	var aimed := target != home_cell and wall != home_cell
-	var target_click := _click(target, scene.PIXELS_PER_CELL)
-	var wall_click := _click(wall, scene.PIXELS_PER_CELL)
+	var target_click := _click(target, scene)
+	var wall_click := _click(wall, scene)
 	var wall_refused: bool = not scene.command(wall_click)
 	var target_accepted: bool = scene.command(target_click)
 	var before := _distance(scene.lead(), target)
@@ -193,7 +194,7 @@ func _move_diagonal_pass() -> bool:
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
 	var target := home + way * 3 * stride
 	var from: Vector2 = scene.lead()
-	var pressed: bool = scene.command(_click(target, scene.PIXELS_PER_CELL))
+	var pressed: bool = scene.command(_click(target, scene))
 	for i in STICK_TICKS:
 		scene.step()
 	var walked: Vector2 = (scene.lead() - from) / WorldAdapter.CELL_SIZE * Vector2(way)
@@ -415,22 +416,22 @@ func _move_pass() -> bool:
 	var first := _cell_near(rows, home, ".")
 	var second := _cell_near(rows, first, ".")
 	var control_from: Vector2 = control.lead()
-	var pressed: bool = scene.command(_click(first, scene.PIXELS_PER_CELL))
+	var pressed: bool = scene.command(_click(first, scene))
 	var first_from := _distance(scene.lead(), first)
 	for i in WALK_TICKS:
 		scene.step()
 		control.step()
 	var first_to := _distance(scene.lead(), first)
-	var held_on: bool = scene.command(_drag(second, scene.PIXELS_PER_CELL, MOUSE_BUTTON_MASK_RIGHT))
+	var held_on: bool = scene.command(_drag(second, scene, MOUSE_BUTTON_MASK_RIGHT))
 	var second_from := _distance(scene.lead(), second)
 	for i in WALK_TICKS:
 		scene.step()
 		control.step()
 	var second_to := _distance(scene.lead(), second)
-	var release := _click(second, scene.PIXELS_PER_CELL)
+	var release := _click(second, scene)
 	release.pressed = false
 	var released: bool = not scene.command(release)
-	var after_release: bool = not scene.command(_drag(home, scene.PIXELS_PER_CELL, 0))
+	var after_release: bool = not scene.command(_drag(home, scene, 0))
 	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
 	var setup := first != home and second != first and second_from > 0.0
 	var passed := setup and pressed and first_to < first_from and held_on and second_to < second_from \
@@ -471,8 +472,8 @@ func _cast_pass() -> bool:
 
 	var releasing := _cast_scene(true)
 	var aim: Node2D = releasing.get_node("Aim")
-	var person: Vector2 = releasing.lead() * releasing.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
-	var reach: float = releasing.world.skills(releasing.steered)[0]["range"] * releasing.PIXELS_PER_CELL \
+	var person: Vector2 = releasing.get_node("WorldArt").to_screen(releasing.lead())
+	var reach: float = releasing.world.skills(releasing.steered)[0]["range"] * WorldArt.CELL.x \
 			/ WorldAdapter.CELL_SIZE
 	var held: bool = not releasing.command(_key(KEY_Q)) and releasing.aiming() == KEY_Q
 	var shown: bool = aim.visible and aim.point == (person + CAST_OFFSET).floor() and aim.reach == reach
@@ -526,7 +527,7 @@ func _cast_scene(on_release: bool) -> Node2D:
 	var scene := _scene(0)
 	scene.get_node("Hud").settings.chosen.cast = 1 if on_release else 0
 	scene.command(_key(KEY_1))
-	scene.command(_motion(scene.lead() * scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE + CAST_OFFSET, 0))
+	scene.command(_motion(scene.get_node("WorldArt").to_screen(scene.lead()) + CAST_OFFSET, 0))
 	return scene
 
 
@@ -989,7 +990,7 @@ func _apart(world: WorldAdapter, one: int, other: int) -> int:
 # Draws a frame as the scene does after its ticks, over the view around the steered person.
 func _frame(scene: Node2D) -> void:
 	var view := Vector2(480, 270)
-	scene.get_node("WorldArt").refresh(Rect2(scene.lead() * 16 / WorldAdapter.CELL_SIZE - view / 2, view))
+	scene.get_node("WorldArt").refresh(Rect2(scene.get_node("WorldArt").to_screen(scene.lead()) - view / 2, view))
 	scene.get_node("Hud").refresh(scene.world, scene.steered, PackedInt64Array([0]))
 
 
@@ -1004,7 +1005,7 @@ func _borders_follow(borders: Array, owners: PackedInt64Array, world: WorldAdapt
 		if i + width < owners.size() and owners[i] != owners[i + width]:
 			edges += 1
 	for border: Array in borders:
-		var cell := Vector2i(border[0]) / 16
+		var cell := Vector2i((border[0] / WorldArt.CELL).round())
 		var vertical: bool = border[0].x == border[1].x
 		var first := cell - (Vector2i(1, 0) if vertical else Vector2i(0, 1))
 		if border[2] != owners[first.y * width + first.x] or border[3] != owners[cell.y * width + cell.x] \
@@ -1088,7 +1089,7 @@ func _names_pass() -> bool:
 	var zoom := ViewScale.world_scale(window, false)
 	scene.get_node("Camera").zoom = Vector2(zoom, zoom)
 	hud.fit(window, false)
-	var view := Rect2(scene.lead() * 16 / WorldAdapter.CELL_SIZE - Vector2(window) / zoom / 2.0, Vector2(window) / zoom)
+	var view := Rect2(art.to_screen(scene.lead()) - Vector2(window) / zoom / 2.0, Vector2(window) / zoom)
 	art.refresh(view, 1.0)
 	scene._view_origin = view.position
 	scene.show_talk()
@@ -1284,11 +1285,11 @@ func _art_slot_pass() -> bool:
 	var key: Label = hud.slot_icons[4].get_parent().get_child(1)
 	var shown: bool = hud.slot_skills[4] == skills[art_skill] and hud.slot_icons[4].texture != null \
 			and key.text == OS.get_keycode_string(scene.CAST_KEYS[4])
-	var pixels: float = scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	var pixels: float = WorldArt.CELL.x / WorldAdapter.CELL_SIZE
 	var art_reach: float = skills[art_skill].range * pixels
 	var army_reach: float = skills[0].range * pixels
 	var aim: Node2D = scene.get_node("Aim")
-	scene.command(_motion(scene.lead() * pixels + CAST_OFFSET, 0))
+	scene.command(_motion(scene.get_node("WorldArt").to_screen(scene.lead()) + CAST_OFFSET, 0))
 	scene.command(_key(KEY_T))
 	var aimed: bool = aim.visible and aim.reach == art_reach
 	scene.command(_key(KEY_T))
@@ -1401,18 +1402,23 @@ func _cell_near(rows: PackedStringArray, home: Vector2i, tile: String) -> Vector
 	return home
 
 
-# A right click at the centre of `cell`, in the scene's pixels of `pixels_per_cell` to a cell.
-func _click(cell: Vector2i, pixels_per_cell: float) -> InputEventMouseButton:
+# A right click where `scene` draws the centre of `cell`.
+func _click(cell: Vector2i, scene: Node2D) -> InputEventMouseButton:
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_RIGHT
 	click.pressed = true
-	click.position = (Vector2(cell) + Vector2.ONE * 0.5) * pixels_per_cell
+	click.position = _centre(cell, scene)
 	return click
 
 
-# The cursor moved to the centre of `cell`, with the buttons of `mask` held.
-func _drag(cell: Vector2i, pixels_per_cell: float, mask: int) -> InputEventMouseMotion:
-	return _motion((Vector2(cell) + Vector2.ONE * 0.5) * pixels_per_cell, mask)
+# The cursor moved to where `scene` draws the centre of `cell`, with the buttons of `mask` held.
+func _drag(cell: Vector2i, scene: Node2D, mask: int) -> InputEventMouseMotion:
+	return _motion(_centre(cell, scene), mask)
+
+
+# Where `scene` draws the centre of `cell`, in its pixels.
+func _centre(cell: Vector2i, scene: Node2D) -> Vector2:
+	return scene.get_node("WorldArt").to_screen((Vector2(cell) + Vector2.ONE * 0.5) * WorldAdapter.CELL_SIZE)
 
 
 # The cursor moved to `at`, in the scene's pixels, with the buttons of `mask` held.

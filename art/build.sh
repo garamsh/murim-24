@@ -10,6 +10,8 @@ cd "$(dirname "$0")"
 
 "$aseprite" --batch --script terrain/terrain.lua
 "$aseprite" --batch --script terrain/landforms.lua
+"$aseprite" --batch --script terrain/trees.lua
+"$aseprite" --batch --script terrain/ground.lua
 "$aseprite" --batch --script bodies/bodies.lua
 "$aseprite" --batch --script structures/house.lua
 "$aseprite" --batch --script structures/hall.lua
@@ -24,7 +26,7 @@ cd "$(dirname "$0")"
 "$aseprite" --batch --script title/backdrop.lua
 "$aseprite" --batch --script icon/icon.lua
 
-for name in terrain/terrain terrain/transitions terrain/landforms bodies/orthodox bodies/demonic \
+for name in terrain/terrain terrain/transitions terrain/landforms terrain/trees terrain/ramps terrain/detail bodies/orthodox bodies/demonic \
 	bodies/unorthodox structures/house structures/hall structures/well structures/barrels structures/fence \
 	structures/granary structures/storehouse structures/training_ground structures/manual_hall \
 	structures/seat_gate structures/smithy structures/apothecary decorations/fields icons/economy_icons \
