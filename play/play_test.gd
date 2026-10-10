@@ -209,8 +209,8 @@ func _move_diagonal_pass() -> bool:
 # With the touch controls shown and a hostile person marched within the first skill's range: the
 # joystick pushed toward it faces the person that way, and the first skill's button tapped casts
 # at the person the core aims at that way. Once the person may cast again, the button dragged off
-# its pad onto the cancel zone casts nothing, while the same drag let go short of it casts at the
-# point it aims, the skill's range that way. The second skill's button held for a long press casts
+# its pad onto the cancel zone casts nothing, while the same drag toward the foe let go short of it
+# casts the targeted strike at the person the core aims at the way it points. The second skill's button held for a long press casts
 # on the person itself, while held a little less it casts as a tap, at a point. Once the cast has
 # struck, a tap the core refuses for its cooldown shows that reason. Control: the taps before it
 # were accepted and showed none. Setup: a hostile person stands within range and the person is
@@ -252,7 +252,7 @@ func _touch_cast_pass() -> bool:
 			and not hud.labels.notice.visible
 	scene.step()
 
-	var ready_again := _ready_to_cast(scene, person, 0, Vector2.ZERO)
+	var ready_again := _ready_to_cast(scene, person, 0, foe)
 	var reach := float(world.skills(scene.steered)[0].range)
 	scene.last_cast = {}
 	scene.touch(_finger(1, main, true))
@@ -260,13 +260,14 @@ func _touch_cast_pass() -> bool:
 	scene.touch(_slide(1, touch.CANCEL.at))
 	scene.touch(_finger(1, touch.CANCEL.at, false))
 	var cancelled: Dictionary = scene.last_cast
-	var at: Vector2 = world.person_position(person)
+	var way: Vector2 = (world.person_position(foe) - world.person_position(person)).normalized()
+	var pointed := world.aim(person, 0, (way * reach).round())
 	scene.touch(_finger(1, main, true))
-	scene.touch(_slide(1, main + Vector2(touch.PAD, 0)))
-	scene.touch(_finger(1, main + Vector2(touch.PAD, 0), false))
+	scene.touch(_slide(1, main + way * touch.PAD))
+	scene.touch(_finger(1, main + way * touch.PAD, false))
 	var dragged: Dictionary = scene.last_cast
-	var drag_right: bool = ready_again and cancelled.is_empty() \
-			and dragged == {"skill": 0, "target": (at + Vector2(reach, 0)).floor()}
+	var drag_right: bool = ready_again and cancelled.is_empty() and pointed >= 0 \
+			and dragged == {"skill": 0, "target": pointed}
 
 	var second: Vector2 = touch.SKILLS[1].at
 	scene.touch(_finger(2, second, true))
@@ -444,30 +445,33 @@ func _move_pass() -> bool:
 	return passed
 
 
-# Q casts the first skill, a bolt, at the cursor through the cast port. Setup: key 1 leaves the
-# person striking with the bolt alone, which finds no foe at home, so its ready tick moves only for
-# a cast. Cast on press: Q's press is accepted and the ready tick moves on the next tick; control,
-# the same scene given no Q keeps it. A second Q at once is refused as on cooldown and E, a skill
-# the person lacks, as no such skill, each with its reason on the HUD, where the first Q was
-# accepted. Cast on release: Q's press casts nothing but shows the aim, the bolt's range round the
-# person and its area at the cursor, or at the ring for a cursor beyond it; its release casts.
-# Q pressed again while aiming, or Escape, which then pauses nothing, cancels it, and the release
-# casts nothing.
+# Q holds the army's first skill, its targeted strike, and W its second, an area round the person
+# that shares the army's cooldown. Setup: key 1 leaves the person striking with the first alone,
+# which finds no foe at home, so its ready tick moves only for a cast. Cast on press: Q, with no one
+# selected and no foe in reach, is refused as no target, its reason on the HUD, and the ready tick
+# stays; W's press is accepted and the ready tick moves on the next tick; control, the same scene
+# given no key keeps it. A second W at once is refused as on cooldown and E, a skill the person
+# lacks, as no such skill, each with its reason on the HUD. Cast on release: Q's press casts nothing
+# but shows the aim, the strike's range round the person and its area at the cursor, or at the ring
+# for a cursor beyond it, and its release, with no target, casts nothing; W's press and release
+# casts. W pressed again while aiming, or Escape, which then pauses nothing, cancels it, and the
+# release casts nothing.
 func _cast_pass() -> bool:
 	var pressing := _cast_scene(false)
 	var control := _cast_scene(false)
 	var setup: bool = pressing.world.skill_count(pressing.steered) == 2 and _ready(pressing) == _ready(control)
 	var ready_from := _ready(pressing)
-	var cast: bool = pressing.command(_key(KEY_Q))
+	var notice: Label = pressing.get_node("Hud").labels.notice
+	var untargeted: bool = not pressing.command(_key(KEY_Q)) and notice.text == "CAST_NO_TARGET" and notice.visible
+	var cast: bool = pressing.command(_key(KEY_W))
 	pressing.step()
 	control.step()
 	var cast_moved := _ready(pressing) > ready_from and _ready(control) == ready_from
-	var notice: Label = pressing.get_node("Hud").labels.notice
-	var cooling: bool = not pressing.command(_key(KEY_Q)) and notice.text == "CAST_ON_COOLDOWN" and notice.visible
+	var cooling: bool = not pressing.command(_key(KEY_W)) and notice.text == "CAST_ON_COOLDOWN" and notice.visible
 	var lacking: bool = not pressing.command(_key(KEY_E)) and notice.text == "CAST_NO_SKILL"
-	var pressed := setup and cast and cast_moved and cooling and lacking
-	print("play_test: cast on press, Q accepted %s and the ready tick moved %d to %d, the control's staying %s; Q again refused as on cooldown with its reason %s; E refused as no skill %s (setup %s): %s" % [
-		cast, ready_from, _ready(pressing), _ready(control) == ready_from, cooling, lacking, setup,
+	var pressed := setup and untargeted and cast and cast_moved and cooling and lacking
+	print("play_test: cast on press, Q with no target refused with its reason %s; W accepted %s and the ready tick moved %d to %d, the control's staying %s; W again refused as on cooldown with its reason %s; E refused as no skill %s (setup %s): %s" % [
+		untargeted, cast, ready_from, _ready(pressing), _ready(control) == ready_from, cooling, lacking, setup,
 		"pass" if pressed else "FAIL"])
 
 	var releasing := _cast_scene(true)
@@ -484,15 +488,21 @@ func _cast_pass() -> bool:
 	var before := _ready(releasing)
 	releasing.step()
 	var nothing_on_press := _ready(releasing) == before
-	var let_go := _key(KEY_Q)
+	var let_go_q := _key(KEY_Q)
+	let_go_q.pressed = false
+	var untargeted_release: bool = not releasing.command(let_go_q) and not aim.visible
+	releasing.step()
+	var nothing_untargeted := _ready(releasing) == before
+	releasing.command(_key(KEY_W))
+	var let_go := _key(KEY_W)
 	let_go.pressed = false
 	var released: bool = releasing.command(let_go) and not aim.visible
 	releasing.step()
 	var cast_on_release := _ready(releasing) > before
 
 	var again := _cast_scene(true)
-	again.command(_key(KEY_Q))
-	var cancelled_again: bool = not again.command(_key(KEY_Q)) and again.aiming() == KEY_NONE \
+	again.command(_key(KEY_W))
+	var cancelled_again: bool = not again.command(_key(KEY_W)) and again.aiming() == KEY_NONE \
 			and not again.get_node("Aim").visible
 	var again_released: bool = not again.command(let_go)
 	var again_before := _ready(again)
@@ -501,7 +511,7 @@ func _cast_pass() -> bool:
 
 	var escaped := _cast_scene(true)
 	var escape_hud: CanvasLayer = escaped.get_node("Hud")
-	escaped.command(_key(KEY_Q))
+	escaped.command(_key(KEY_W))
 	var not_paused: bool = not escaped.navigate(_key(KEY_ESCAPE)) and escape_hud.screen() == null
 	escaped.command(_key(KEY_ESCAPE))
 	var escape_cancelled: bool = escaped.aiming() == KEY_NONE and not escaped.get_node("Aim").visible
@@ -509,20 +519,18 @@ func _cast_pass() -> bool:
 	var escape_before := _ready(escaped)
 	escaped.step()
 	var escape_still := _ready(escaped) == escape_before
-	var on_release := held and shown and at_ring and nothing_on_press and released and cast_on_release \
-			and cancelled_again and again_released and again_still and not_paused and escape_cancelled \
-			and escape_released and escape_still
-	print("play_test: cast on release, Q's press aims %s, the aim at the cursor with range %.0f px %s and at the ring past it %s, nothing cast while held %s; the release casts %s and the ready tick moved %s; Q again cancels %s, its release casts nothing %s %s; Escape pauses nothing %s, cancels %s, the release casts nothing %s %s: %s" % [
-		held, reach, shown, at_ring, nothing_on_press, released, cast_on_release, cancelled_again,
-		again_released, again_still, not_paused, escape_cancelled, escape_released, escape_still,
-		"pass" if on_release else "FAIL"])
+	var on_release := held and shown and at_ring and nothing_on_press and untargeted_release \
+			and nothing_untargeted and released and cast_on_release and cancelled_again and again_released \
+			and again_still and not_paused and escape_cancelled and escape_released and escape_still
+	print("play_test: cast on release, Q's press aims %s, the aim at the cursor with range %.0f px %s and at the ring past it %s, nothing cast while held %s; its release with no target casts nothing %s %s; W's release casts %s and the ready tick moved %s; W again cancels %s, its release casts nothing %s %s; Escape pauses nothing %s, cancels %s, the release casts nothing %s %s: %s" % [
+		held, reach, shown, at_ring, nothing_on_press, untargeted_release, nothing_untargeted, released,
+		cast_on_release, cancelled_again, again_released, again_still, not_paused, escape_cancelled,
+		escape_released, escape_still, "pass" if on_release else "FAIL"])
 	for scene: Node2D in [pressing, control, releasing, again, escaped]:
 		scene.free()
 	return pressed and on_release
 
 
-# The scene born into the first village, casting on release or on press as `on_release` says,
-# striking with its first skill alone and the cursor CAST_OFFSET east of the person.
 func _cast_scene(on_release: bool) -> Node2D:
 	var scene := _scene(0)
 	scene.get_node("Hud").settings.chosen.cast = 1 if on_release else 0

@@ -87,7 +87,7 @@ func run() -> bool:
 	touch.take(_touch_event(4, Vector2.ZERO, false))
 	var two := _touch(2)
 	var past: Dictionary = two.take(_touch_event(0, two.SKILLS[4].at, true))
-	var buttons_right: bool = named == ["genealogy", "sect", "factions", "arts", "pause"] \
+	var buttons_right: bool = named == ["genealogy", "sect", "factions", "arts", "attack", "cycle", "pause"] \
 			and ground == {"do": "world", "at": Vector2(240, 60)} and past.do == "world"
 	print("touch_test: buttons %s; the ground %s; the fifth button with two skills %s: %s" % [
 		named, ground, past, "pass" if buttons_right else "FAIL"])

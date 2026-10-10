@@ -3,8 +3,9 @@
 ## art/mockup/touch.lua: a joystick at the bottom left that a thumb anywhere in its zone puts under
 ## itself; up to SKILLS.size() round skill buttons in an arc at the bottom right, each showing how
 ## long the body has left before it may strike again; the genealogy, sect and faction buttons under the
-## status panel, with the arts button as art/mockup/mobile_hud_arts.png adds it; and the pause
-## button in the top-right corner. A skill button tapped casts at what the facing aims at, dragged
+## status panel, with the arts button as art/mockup/mobile_hud_arts.png adds it; the attack button,
+## which sets an attack intent, and under it the button selecting the next foe, left of the arc; and
+## the pause button in the top-right corner. A skill button tapped casts at what the facing aims at, dragged
 ## shows its range and the area it aims at and casts there on release, dropped on the cancel zone
 ## casts nothing, and held casts on the body itself; a button whose slot is empty shows a cross and
 ## casts nothing. While the arts panel is open, as arts_panel_touch.png shows it, only the arc is
@@ -44,12 +45,15 @@ const BUTTONS := {
 	"sect": Rect2(50, 92, 42, 42),
 	"factions": Rect2(96, 92, 42, 42),
 	"arts": Rect2(142, 92, 42, 42),
+	"attack": Rect2(328, 138, 34, 34),
+	"cycle": Rect2(328, 176, 34, 34),
 }
 const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "factions": "TOUCH_FACTIONS",
-		"arts": "TOUCH_ARTS"}
+		"arts": "TOUCH_ARTS", "attack": "TOUCH_ATTACK", "cycle": "TOUCH_CYCLE"}
 const PAUSE := Rect2(434, 4, 42, 42)
 ## The room each word is given, by its hud.csv key.
 const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_FACTIONS": 36, "TOUCH_ARTS": 36,
+		"TOUCH_ATTACK": 28, "TOUCH_CYCLE": 28,
 		"TOUCH_CANCEL": 40, "TOUCH_SELF": 50, "TOUCH_PLACE": 110}
 ## Where the slip asking for a button to place a skill on is centred, and its top.
 const PLACE_SLIP := Vector2(404, 136)
