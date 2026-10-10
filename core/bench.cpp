@@ -53,17 +53,6 @@ std::vector<bool> serving(const World& world, std::size_t first,
   return serves;
 }
 
-// Whether each person serves in one of the two caster armies.
-std::vector<bool> casters(const World& world, std::size_t casters_first) {
-  std::vector<bool> caster(world.population(), false);
-  for (const std::size_t army : {casters_first, casters_first + 1}) {
-    for (const std::size_t member : world.roster(army)) {
-      caster.at(member) = true;
-    }
-  }
-  return caster;
-}
-
 struct Strikes {
   std::uint64_t all;
   std::uint64_t area;
@@ -146,7 +135,9 @@ bool run_m1() {
   World world{scenario.seed, Map{scenario.map_rows}, scenario.armies,
               scenario.structures, scenario.rules};
   const std::size_t people = living(world, armies);
-  const std::vector<bool> caster = casters(world, scenario.casters_first);
+  // The two caster armies.
+  const std::vector<bool> caster =
+      serving(world, scenario.casters_first, scenario.casters_first + 2);
   std::size_t peak = living(world, world.army_count());
 
   Strikes warm_up{0, 0};
