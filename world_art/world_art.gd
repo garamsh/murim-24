@@ -370,11 +370,12 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			# Rounded before the band's origin is taken off, so a body stands on the same whole pixel in
 			# every band.
 			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false, Color.WHITE)
-			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, tint, combat.flash(person, now))
+			var white := combat.flash(person, now)
+			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, tint, white)
 			if _hidden(Rect2(centre - Vector2(BODY_FRAME) / 2.0, BODY_FRAME).grow(-2), origin.y):
 				var outline := frame
 				outline.position.x += (_body_frames[tag + "_xray"] - _body_frames[tag]) * BODY_FRAME.x
-				_pack(outlines, outline, centre, heading.x < 0.0, Color.WHITE, 0.0, 1.0, 0.0, frame.position)
+				_pack(outlines, outline, centre, heading.x < 0.0, Color.WHITE, white, 1.0, 0.0, frame.position)
 				outlined += 1
 			drawn += 1
 	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
@@ -609,7 +610,7 @@ func _build_body_atlas() -> void:
 # its centre in the pixels of the node the buffer is drawn in, `flip` mirrors it, and a `tint`
 # other than white rings it in that colour; it is drawn `white` of the way to white, `alpha`
 # opaque, and turned `turn` radians about its bottom edge's middle. `outline_of`, for an outline, is
-# where the body it outlines is in the atlas.
+# where the body it outlines is in the atlas, and `white` is how far to white that body is drawn.
 func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, tint: Color, white := 0.0,
 		alpha := 1.0, turn := 0.0, outline_of := Vector2(-1, -1)) -> void:
 	var size := _atlas.get_size()
@@ -620,9 +621,11 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 	var local := centre.round() + Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
 	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
-	# of the body shown, or, for an outline, where the body it outlines is. Written in place, so no
-	# array is made per sprite.
-	var custom := Vector2(white, alpha) if outline_of.x < 0.0 else outline_of / size
+	# of the body shown; or, for an outline, the body's share of white in the colour's red, and
+	# where the body it outlines is. Written in place, so no array is made per sprite.
+	var body := outline_of.x < 0.0
+	var custom := Vector2(white, alpha) if body else outline_of / size
+	var colour := tint if body else Color(white, 0.0, 0.0, 1.0)
 	var at := buffer.size()
 	buffer.resize(at + BODY_FLOATS)
 	buffer[at] = width * cos_turn
@@ -631,10 +634,10 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 	buffer[at + 4] = width * sin_turn
 	buffer[at + 5] = -height * cos_turn
 	buffer[at + 7] = local.y
-	buffer[at + 8] = tint.r
-	buffer[at + 9] = tint.g
-	buffer[at + 10] = tint.b
-	buffer[at + 11] = tint.a
+	buffer[at + 8] = colour.r
+	buffer[at + 9] = colour.g
+	buffer[at + 10] = colour.b
+	buffer[at + 11] = colour.a
 	buffer[at + 12] = frame.position.x / size.x
 	buffer[at + 13] = frame.position.y / size.y
 	buffer[at + 14] = custom.x

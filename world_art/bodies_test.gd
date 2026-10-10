@@ -1,7 +1,10 @@
 # Checks how world_art.tscn draws bodies at the 2.5D angle: a person walking away from the viewer
 # shows its back and one walking across its walk; a person who just struck shows its strike; every
-# body drawn has a shadow under it in its band; and a person standing just north of a house, which
-# hides it, is outlined over the house, while one standing just south of it, in front, is not.
+# body drawn has a shadow under it in its band; a person standing just north of a house, which
+# hides it, is outlined over the house, while one standing just south of it, in front, is not; and
+# an outlined body's outline carries the share of white its body flashes with as it is struck, for
+# outline.gdshader to tell the body's pixels from what hides it (world_art/outline_check.gd checks
+# the pixels it then draws, which need a renderer).
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -25,10 +28,12 @@ const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "s
 const VIEW := Rect2(0, 0, 480, 270)
 const REGION_SEED := 2026
 const WALK_TICKS := 600
+# Ticks of the M1 battle searched for a body outlined while it flashes.
+const BATTLE_TICKS := 400
 
 
 func run() -> bool:
-	return _facing_pass() and _strike_pass() and _outline_pass()
+	return _facing_pass() and _strike_pass() and _outline_pass() and _flash_pass()
 
 
 # One person walks north and one east, from the same row: after two ticks the first shows a frame
@@ -144,6 +149,54 @@ func _walked_beside_house(side: int) -> Dictionary:
 			hiders.append(-1)
 	art.free()
 	return {"cell": cell, "reached": reached, "outlined": outlined, "house": house, "hiders": hiders}
+
+
+# Over the M1 battle, drawn whole, every outlined body's outline carries the share of white its
+# body is drawn with in its band, and at some refresh an outlined body is flashing, struck, while
+# another is not, the control. Setup: bodies are outlined, and each outline has its body in a band.
+func _flash_pass() -> bool:
+	var world := WorldAdapter.create_m1()
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(world, -1)
+	var rows := world.map_rows()
+	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
+	var outlines: MultiMeshInstance2D = art.get_node("Outlines")
+	var checked := 0
+	var unmatched := 0
+	var differing := 0
+	var flashing := 0
+	var still := 0
+	for tick in BATTLE_TICKS:
+		world.tick()
+		art.note_tick()
+		art.refresh(whole, 1.0)
+		var bodies := {}
+		for band in _bands(art):
+			var buffer := band.multimesh.buffer
+			for i in band.multimesh.visible_instance_count:
+				var base := i * WorldArt.BODY_FLOATS
+				bodies[[Vector2(buffer[base + 3], buffer[base + 7]) + band.position,
+						Vector2(buffer[base + 12], buffer[base + 13])]] = buffer[base + 14]
+		var buffer := outlines.multimesh.buffer
+		for i in outlines.multimesh.visible_instance_count:
+			var base := i * WorldArt.BODY_FLOATS
+			var key := [Vector2(buffer[base + 3], buffer[base + 7]), Vector2(buffer[base + 14], buffer[base + 15])]
+			checked += 1
+			if not bodies.has(key):
+				unmatched += 1
+			elif not is_equal_approx(buffer[base + 8], bodies[key]):
+				differing += 1
+			elif bodies[key] > 0.0:
+				flashing += 1
+			else:
+				still += 1
+		if flashing > 0 and still > 0:
+			break
+	art.free()
+	var passed := checked > 0 and unmatched == 0 and differing == 0 and flashing > 0 and still > 0
+	print("bodies_test: over the M1 battle %d outlines read, %d without their body in a band, %d carrying another share of white than their body's; %d of a flashing body and %d of one not: %s" % [
+		checked, unmatched, differing, flashing, still, "pass" if passed else "FAIL"])
+	return passed
 
 
 # The tag of the frame a band draws the body standing at `at` with, within the knock a hit gives

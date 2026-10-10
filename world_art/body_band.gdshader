@@ -6,10 +6,7 @@
 // drawn at all, as when it fades in death, each by an ordered dither over the sprite's own pixels.
 shader_type canvas_item;
 
-#include "res://world_art/dither.gdshaderinc"
-
-// The fire ramp's lightest, the impact core of docs/art-direction.md §Palette.
-const vec3 IMPACT = vec3(1.0, 0.973, 0.863);
+#include "res://world_art/flash.gdshaderinc"
 
 uniform vec2 frame_size;
 
@@ -34,7 +31,7 @@ bool inside(vec2 uv) {
 void fragment() {
 	vec4 pixel = texture(TEXTURE, UV);
 	float threshold = dither_threshold(UV / TEXTURE_PIXEL_SIZE);
-	if (pixel.a >= 0.5 && white > threshold) {
+	if (pixel.a >= 0.5 && flashed(white, UV / TEXTURE_PIXEL_SIZE)) {
 		pixel = vec4(IMPACT, 1.0);
 	} else if (pixel.a == 0.0 && ring.rgb != vec3(1.0)) {
 		vec2 sides[4] = {vec2(TEXTURE_PIXEL_SIZE.x, 0.0), vec2(-TEXTURE_PIXEL_SIZE.x, 0.0),
