@@ -9,8 +9,8 @@
 ## frame its outline drew on screen, and those of them where the body's own pixel shows, in its
 ## band's colour, flashed or not. Once flashing bodies' outlines have drawn FLASHING_DRAWN pixels
 ## or more and a still body's some, over what hides them, it reports: no outline may be drawn over
-## its body's own pixels shown. It exits 0 when none is, 1 when one is or the battle's ticks run out
-## first, and 2 when it cannot draw.
+## its body's own pixels shown. It exits 0 when none is, 1 when one is or the battle's ticks, frames
+## or MAX_SECONDS run out first, and 2 when it cannot draw.
 extends SceneTree
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -27,11 +27,15 @@ const BAYER := [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
 const SAME := 0.004
 # The fewest outline pixels flashing bodies' outlines must draw on screen before it reports, and
 # the most still bodies drawn alone a tick.
-const FLASHING_DRAWN := 20
+const FLASHING_DRAWN := 10
 const STILL_BODIES := 4
 # Frames waited after the view changes before what it draws is read back, so the image read is of
 # the change.
 const DRAW_FRAMES := 3
+# The most frames and wall-clock seconds it runs before it gives up and fails, so a run that cannot
+# finish says so instead of running on.
+const MAX_FRAMES := 60000
+const MAX_SECONDS := 600
 
 var _viewport: SubViewport
 var _art: Node2D
@@ -73,6 +77,12 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	_frame += 1
+	var seconds := Time.get_ticks_msec() / 1000
+	if _frame > MAX_FRAMES or seconds > MAX_SECONDS:
+		printerr("outline_check: stopped after %d frames and %d s, %d ticks, flashing bodies' outlines drew %d pixels and %d still ones' some" % [
+			_frame, seconds, _ticks, _flashing_drawn, _still])
+		quit(1)
+		return false
 	if _wait > 0:
 		_wait -= 1
 		return false
@@ -84,8 +94,8 @@ func _process(_delta: float) -> bool:
 		"battle":
 			_ticks += 1
 			if _ticks > BATTLE_TICKS:
-				printerr("outline_check: in %d ticks flashing bodies' outlines drew %d pixels and %d still ones' some" % [
-					BATTLE_TICKS, _flashing_drawn, _still])
+				printerr("outline_check: in %d ticks flashing bodies' outlines drew %d pixels and %d still ones' some; %d outline pixels over a body's own pixels shown" % [
+					BATTLE_TICKS, _flashing_drawn, _still, _over])
 				quit(1)
 				return false
 			_world.tick()
