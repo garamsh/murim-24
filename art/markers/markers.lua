@@ -4,6 +4,8 @@
 -- army's name and count are text the HUD draws, not part of the frame.
 -- player_marker.aseprite, the player's markers on the body's 16x24 frame: tagged ring (drawn
 -- under the body) and chevron (drawn over it, two frames bobbing by a pixel).
+-- shadow.aseprite, a 16x8 frame tagged shadow: the dithered ink ellipse on the ground under every
+-- body's feet, centred on (8, 4).
 -- Run: aseprite --batch --script art/markers/markers.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -33,3 +35,8 @@ local function chevron(dy)
 end
 px.save_frames(16, 24, { ring, chevron(0), chevron(1) }, { { "ring", 1, 1, 100 }, { "chevron", 2, 3, 400 } },
   here .. "/player_marker.aseprite")
+
+-- Every body's shadow: every other pixel of a flat ellipse, so the ground shows through.
+local shadow = px.canvas(16, 8)
+shadow:each_ellipse(8, 4, 5.5, 2.2, function(x, y) if (x + y) % 2 == 0 then shadow:set(x, y, c("ink", 1)) end end)
+px.save_frames(16, 8, { shadow }, { { "shadow", 1, 1, 100 } }, here .. "/shadow.aseprite")
