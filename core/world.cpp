@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -151,20 +152,18 @@ struct Push {
   std::int64_t y;
 };
 
-// The integer square root, rounded down.
+// The integer square root of `value`, 0 or more, rounded down.
 std::int64_t root(std::int64_t value) {
-  std::int64_t low = 0;
-  constexpr std::int64_t ABOVE_ANY_ROOT = std::int64_t{1} << 32;
-  std::int64_t high = std::min<std::int64_t>(value, ABOVE_ANY_ROOT);
-  while (low < high) {
-    const std::int64_t middle = (low + high + 1) / 2;
-    if (middle <= value / middle) {
-      low = middle;
-    } else {
-      high = middle - 1;
-    }
+  // The floating-point root is only a guess: it is corrected to the exact
+  // floor in whole numbers, so every platform returns the same root.
+  auto guess = static_cast<std::int64_t>(std::sqrt(static_cast<double>(value)));
+  while (guess > 0 && guess > value / guess) {
+    --guess;
   }
-  return low;
+  while (guess + 1 <= value / (guess + 1)) {
+    ++guess;
+  }
+  return guess;
 }
 
 // `point` brought within `range` of `from`, along the line between them.
