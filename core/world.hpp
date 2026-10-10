@@ -1568,6 +1568,9 @@ class World {
   [[nodiscard]] bool within_reach(const Army& army, const VillageSpec& spec,
                                   std::int32_t reach) const;
   bool shift(std::size_t structure, Destroyer striker, std::int64_t effect);
+  [[nodiscard]] std::optional<std::size_t> aim_of(std::size_t user,
+                                                  const Skill& skill,
+                                                  const Crowd& crowd) const;
   void strike(std::size_t user, const Crowd& crowd,
               const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);

@@ -416,6 +416,21 @@ void fold_selection(const Fold& fold, const Leadership& faction) {
 // Folds skill `skill` into `fold`; its qi cost only when it has one, and its
 // shape only when not an area, so a world of free area skills hashes as
 // before.
+// Folds order `order` into `fold`; its attack intent's target only when it
+// holds one, so a world with no intent keeps its hash.
+template <typename Fold>
+void fold_order(const Fold& fold, const Order& order) {
+  fold(order.objective.x);
+  fold(order.objective.y);
+  if (order.target) {
+    fold(order.target.has_value());
+    fold(*order.target);
+  }
+  for (const std::size_t skill : order.skills) {
+    fold(skill);
+  }
+}
+
 template <typename Fold>
 void fold_skill(const Fold& fold, const Skill& skill) {
   fold(skill.range);
@@ -2560,16 +2575,7 @@ StateHash World::hash() const {
   }
   fold(rules_.ticks_per_day);
   for (const Army& army : armies_) {
-    fold(army.order.objective.x);
-    fold(army.order.objective.y);
-    // Only when set, so a world with no attack intent keeps its hash.
-    if (army.order.target) {
-      fold(army.order.target.has_value());
-      fold(*army.order.target);
-    }
-    for (const std::size_t skill : army.order.skills) {
-      fold(skill);
-    }
+    fold_order(fold, army.order);
     fold(army.faction);
     for (const Skill& skill : army.skills) {
       fold_skill(fold, skill);
@@ -2977,30 +2983,35 @@ void World::strike(std::size_t user, const Crowd& crowd,
     use(user, crowd, index, striker.position, std::nullopt, edges, damage);
     return;
   }
-  // It faces its army's target, while that lies in range, or else the
-  // nearest hostile person in range. The crowd's order breaks ties, so the
-  // order the query visits people in does not decide the target.
-  std::optional<std::size_t> target;
-  if (own.order.target) {
-    const std::size_t aimed = crowd.slot.at(*own.order.target);
-    const std::int64_t range = skill.range;
-    if (aimed != ABSENT &&
-        distance_squared(striker.position, crowd.hash.position(aimed)) <=
-            range * range) {
-      target = aimed;
-    }
-  } else {
-    target =
-        crowd.hash.nearest(foe_kinds(self, own), striker.position, skill.range,
-                           [&](std::size_t other) {
-                             return foes(self, army, crowd.people.at(other),
-                                         crowd.armies.at(other));
-                           });
-  }
-  if (target) {
+  if (const std::optional<std::size_t> target = aim_of(user, skill, crowd)) {
     use(user, crowd, index, crowd.hash.position(*target),
         crowd.people.at(*target), edges, damage);
   }
+}
+
+// The person at `user` of `crowd` faces with `skill`, by its index in the
+// crowd: its army's attack intent's target while that lies in range, none
+// while it lies out of range, and with no intent the nearest hostile person in
+// range. The crowd's order breaks ties, so the order the query visits people
+// in does not decide the target.
+std::optional<std::size_t> World::aim_of(std::size_t user, const Skill& skill,
+                                         const Crowd& crowd) const {
+  const std::size_t army = crowd.armies.at(user);
+  const std::size_t self = crowd.people.at(user);
+  const Position from = crowd.hash.position(user);
+  const Army& own = armies_.at(army);
+  if (own.order.target) {
+    const std::size_t aimed = crowd.slot.at(*own.order.target);
+    const std::int64_t range = skill.range;
+    const bool reached =
+        aimed != ABSENT &&
+        distance_squared(from, crowd.hash.position(aimed)) <= range * range;
+    return reached ? std::optional<std::size_t>{aimed} : std::nullopt;
+  }
+  return crowd.hash.nearest(
+      foe_kinds(self, own), from, skill.range, [&](std::size_t other) {
+        return foes(self, army, crowd.people.at(other), crowd.armies.at(other));
+      });
 }
 
 // The one rule every skill resolves through, whoever uses it and however it
@@ -3081,9 +3092,10 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
     // Only the person locked on, through its slot in the crowd.
     const std::size_t other =
         locked && *locked < crowd.slot.size() ? crowd.slot.at(*locked) : ABSENT;
-    if (other != ABSENT && foes(self, army, *locked, crowd.armies.at(other))) {
+    if (other != ABSENT &&
+        foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
       damage.at(other) += body_damage;
-      strikes_.back().struck.push_back(*locked);
+      strikes_.back().struck.push_back(crowd.people.at(other));
       hit = true;
     }
     return hit;

@@ -510,8 +510,9 @@ TEST(Save, ALoadedWorldKeepsItsPeopleCapacity) {
 // Two hostile people three cells apart in sight of each other, the first's
 // army, if `intent`, holding an attack intent on the second.
 World facing(bool intent) {
+  constexpr std::int32_t SIGHT = 6;
   Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
-  rules.sight = 6;
+  rules.sight = SIGHT;
   World world{
       Seed{1},
       Map{{"....", "...."}},

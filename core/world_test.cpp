@@ -3642,45 +3642,54 @@ std::pair<bool, bool> struck(Skill skill, const Target& target, Cell first,
   return {lost(world, 1) > 0, lost(world, 2) > 0};
 }
 
+// A use of `skill` at `target` that reaches the people at `first` and
+// `second`.
+struct Reaching {
+  Skill skill;
+  Target target;
+  Cell first;
+  Cell second;
+};
+
+// Checks that `use` spares the first person as an ally, while it strikes the
+// same person as a foe and, for a shape reaching past the one it aims at, the
+// foe beside it either way.
+void expect_spares_the_ally(const Reaching& use) {
+  const int shape = static_cast<int>(use.skill.shape);
+  const auto [ally_hit, foe_hit] =
+      struck(use.skill, use.target, use.first, use.second, true);
+  EXPECT_FALSE(ally_hit) << "shape " << shape;
+  // Control: with both hostile, the same use strikes the first, so the ally
+  // stood where the shape reaches.
+  const auto [first_hit, second_hit] =
+      struck(use.skill, use.target, use.first, use.second, false);
+  EXPECT_TRUE(first_hit) << "shape " << shape;
+  if (use.skill.shape != Shape::TARGETED) {
+    EXPECT_TRUE(foe_hit) << "shape " << shape;
+    EXPECT_TRUE(second_hit) << "shape " << shape;
+  }
+}
+
 TEST(World, NoShapeStrikesAnAlly) {
   const Cell east = AROUND.at(0);
   const Cell north_east = AROUND.at(1);
   const Cell three_east = AROUND.at(3);
   const Point at_east{centre_of(east)};
   const std::int32_t wide = 3 * CELL_SIZE / 2;
-  const std::int32_t far = 6 * CELL_SIZE;
-  struct Case {
-    Skill skill;
-    Target target;
-    Cell first;
-    Cell second;
-  };
-  const std::vector<Case> cases{
-      {Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC}, at_east, east, north_east},
+  const std::int32_t far_cells = 6;
+  const std::int32_t far = far_cells * CELL_SIZE;
+  expect_spares_the_ally(
+      {Skill{ARM, 0, 0, 0, 0, 0, Shape::ARC}, at_east, east, north_east});
+  expect_spares_the_ally(
       {Skill{far, CELL_SIZE / 2, 0, 0, 0, 0, Shape::LINE},
-       Point{centre_of({USER_CELL.x + 6, USER_CELL.y})}, east, three_east},
-      {Skill{ARM, wide, 0, 0, 0, 0, Shape::AREA}, at_east, east, north_east},
-      {Skill{0, wide, 0, 0, 0, 0, Shape::SELF}, Itself{}, east, north_east},
-      {Skill{ARM, 0, 0, 0, 0, 0, Shape::TARGETED}, AtPerson{1}, east,
-       north_east},
-  };
-  for (const Case& shape : cases) {
-    const auto [ally_hit, foe_hit] =
-        struck(shape.skill, shape.target, shape.first, shape.second, true);
-    EXPECT_FALSE(ally_hit) << "shape " << static_cast<int>(shape.skill.shape);
-    // Control: with both hostile, the same use strikes the first, so the
-    // ally stood where the shape reaches.
-    const auto [first_hit, second_hit] =
-        struck(shape.skill, shape.target, shape.first, shape.second, false);
-    EXPECT_TRUE(first_hit) << "shape " << static_cast<int>(shape.skill.shape);
-    // The foe beside the ally is struck by every shape that reaches past the
-    // one it aims at.
-    if (shape.skill.shape != Shape::TARGETED) {
-      EXPECT_TRUE(foe_hit) << "shape " << static_cast<int>(shape.skill.shape);
-      EXPECT_TRUE(second_hit)
-          << "shape " << static_cast<int>(shape.skill.shape);
-    }
-  }
+       Point{centre_of({USER_CELL.x + far_cells, USER_CELL.y})}, east,
+       three_east});
+  expect_spares_the_ally(
+      {Skill{ARM, wide, 0, 0, 0, 0, Shape::AREA}, at_east, east, north_east});
+  expect_spares_the_ally(
+      {Skill{0, wide, 0, 0, 0, 0, Shape::SELF}, Itself{}, east, north_east});
+  expect_spares_the_ally({Skill{ARM, 0, 0, 0, 0, 0, Shape::TARGETED},
+                          AtPerson{1}, east, north_east});
 }
 
 TEST(World, EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck) {
@@ -3784,9 +3793,9 @@ TEST(World, APersonClosesOnAFoeInSightAndStandsToFightIt) {
 }
 
 // A steered chaser at STAND striking one foe at arm's length, a foe of
-// INTENT_FOE_HEALTH standing `apart` cells east of it, bound for `bound` cells
-// east, an ally two cells east and two north, and a foe beyond sight to the
-// east; people close on a foe within SIGHT cells. The map is `rows`.
+// INTENT_FOE_HEALTH standing `apart` cells east of it, bound for `foe_bound`,
+// an ally two cells east and two north, and a foe beyond sight to the east;
+// people close on a foe within SIGHT cells. The map is `rows`.
 constexpr std::size_t CHASER = 0;
 constexpr std::size_t INTENT_FOE = 1;
 constexpr std::size_t INTENT_ALLY = 2;
@@ -3794,11 +3803,10 @@ constexpr std::size_t UNSEEN_FOE = 3;
 constexpr std::uint64_t INTENT_FOE_HEALTH = 30;
 constexpr std::uint64_t INTENT_DAMAGE = 10;
 
-World intent_world(std::int32_t apart, std::int32_t bound,
+World intent_world(std::int32_t apart, Cell foe_bound,
                    const std::vector<std::string>& rows) {
   const Skill strike{ARM, 0, INTENT_DAMAGE, 0, 1, 0, Shape::TARGETED};
   const Cell foe{STAND.x + apart, STAND.y};
-  const Cell foe_bound{STAND.x + bound, STAND.y};
   const Cell ally{STAND.x + 2, STAND.y - 2};
   const Cell far{STAND.x + SIGHT + 4, STAND.y + 4};
   Rules rules = at_war(SEPARATION);
@@ -3816,7 +3824,8 @@ World intent_world(std::int32_t apart, std::int32_t bound,
 }
 
 World intent_world(std::int32_t apart) {
-  return intent_world(apart, apart, open_map(OPEN_SIDE));
+  return intent_world(apart, Cell{STAND.x + apart, STAND.y},
+                      open_map(OPEN_SIDE));
 }
 
 TEST(World, AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies) {
@@ -3859,17 +3868,17 @@ TEST(World, AnOrderWithoutATargetEndsTheAttackIntent) {
 TEST(World, AnAttackIntentEndsWhenItsTargetLeavesSight) {
   // The chaser stands walled in, so the foe walking east leaves its sight.
   std::vector<std::string> rows = open_map(OPEN_SIDE);
-  for (std::int32_t y = STAND.y - 1; y <= STAND.y + 1; ++y) {
-    for (std::int32_t x = STAND.x - 1; x <= STAND.x + 1; ++x) {
-      const bool own = x == STAND.x && y == STAND.y;
-      rows.at(static_cast<std::size_t>(y)).at(static_cast<std::size_t>(x)) =
-          own ? '.' : '#';
+  for (std::int32_t row = STAND.y - 1; row <= STAND.y + 1; ++row) {
+    for (std::int32_t column = STAND.x - 1; column <= STAND.x + 1; ++column) {
+      const bool own = column == STAND.x && row == STAND.y;
+      rows.at(static_cast<std::size_t>(row))
+          .at(static_cast<std::size_t>(column)) = own ? '.' : '#';
     }
   }
   constexpr std::int32_t APART = 3;
   constexpr std::int32_t AWAY = 12;
   constexpr std::uint64_t WALK_TICKS = 200;
-  World leaving = intent_world(APART, AWAY, rows);
+  World leaving = intent_world(APART, Cell{STAND.x + AWAY, STAND.y}, rows);
   leaving.order(CHASER, Order{STAND, {0}, INTENT_FOE});
   run_ticks(leaving, WALK_TICKS);
   ASSERT_GT(distance_squared(leaving.person(CHASER).position,
@@ -3877,7 +3886,7 @@ TEST(World, AnAttackIntentEndsWhenItsTargetLeavesSight) {
             std::int64_t{SIGHT} * CELL_SIZE * SIGHT * CELL_SIZE);
   EXPECT_EQ(leaving.target(CHASER), std::nullopt);
   // Control: a foe that stays in sight keeps the intent.
-  World staying = intent_world(APART, APART, rows);
+  World staying = intent_world(APART, Cell{STAND.x + APART, STAND.y}, rows);
   staying.order(CHASER, Order{STAND, {0}, INTENT_FOE});
   run_ticks(staying, WALK_TICKS);
   EXPECT_EQ(staying.target(CHASER), std::optional<std::size_t>{INTENT_FOE});
@@ -3902,7 +3911,7 @@ TEST(World, AnArmyMayTargetOnlyALivingFoeInSight) {
 }
 
 TEST(World, FoesInSightAreListedNearestFirst) {
-  World world = intent_world(4);
+  const World world = intent_world(4);
   // The foe four cells east; the ally and the foe beyond sight are left out.
   EXPECT_EQ(world.foes_in_sight(CHASER),
             (std::vector<std::size_t>{INTENT_FOE}));
