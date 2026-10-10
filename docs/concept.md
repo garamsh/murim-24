@@ -125,6 +125,7 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 | Orthodox faction (Jeongpa; the Murim Alliance, Murimmaeng) | Righteousness and chivalry | Win an election by gathering the favor of sect elders. Cannot be taken by force | Enter a sect; infamy below a set threshold |
 | Unorthodox faction (Sapa) | Profit | Money, bribery, assassination, and backroom deals | Money, or proof of usefulness |
 
+- **Factions run policies.** Decided by the owner on 2026-10-10 (issue #230). Through a faction management system, a faction sets policies that adapt it to the world's causes and effects, so it strengthens and expands itself. A player who leads a faction sets them, and an NPC leader chooses them by rules. ADR 0065 (`docs/architecture/adr/0065-run-each-faction-by-a-few-policies-that-move-existing-rules-inputs-set-by-its-leader.md`), proposed, designs it.
 - **[candidate]** The martial clans (Sega; succession by bloodline and marriage) and the government (Gwanbu) are listed as candidates only. They are not in the MVP and are not decided.
 
 ## Sects [agreed]
