@@ -63,7 +63,7 @@ Options weighed:
 - **Yields as the levers.** Every food yield is pack data (ADR 0049), by biome and by season:
   - **Fields.** A field kind's yield per cell for each biome, and the seasons it is harvested. The base pack's: 600 measures on plain and 300 on hills, at the first day of winter, as today on plain.
   - **Wild food.** ADR 0056's slot kinds already give biomes, growing and regrowing days and yields. Each food kind gains its yield for each season, so the base pack's fruit tree yields 6 in spring, summer and autumn and none in winter, as ADR 0056 has it.
-  - **Game and fish,** when #171 lands, are slot kinds like any other, with their regrowth and their yield by biome and season.
+  - **Game and fish,** when #171 lands, are levers by the same rule: their rates of appearance and their yields are pack data, by biome and season, whatever form #171's design gives animals.
 
   The sweep tunes these and nothing else to reach the bands below.
   - Rejected: a multiplier on the whole world's food. One number cannot make a river valley richer than a hill, and the owner's levers are each kind's regrowth.
@@ -116,7 +116,7 @@ The implementation, in order, each a pull request with its acceptance, after ADR
 3. **Yields by biome and season.**
    - Acceptance, each with a control: a hill field yielding half a plain's; a fruit tree yielding nothing in winter; a pack past a yield bound refused.
    - Acceptance: `make sweep` within every band.
-4. **Game and fish,** with #171, as slot kinds. Acceptance: `make sweep` within every band.
+4. **Game and fish,** with #171, as #171's design gives them. Acceptance: `make sweep` within every band.
 
 ## Decision
 
