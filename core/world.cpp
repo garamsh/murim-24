@@ -2266,13 +2266,16 @@ void World::march(std::size_t army, const Crowd& crowd,
           other == self ||
           (!standing.at(self) && (standing.at(other) || ahead < 0)) ||
           (seeking.at(self) != ABSENT && seeking.at(self) == seeking.at(other));
+      if (ignored) {
+        return;
+      }
       const bool yields = standing.at(self) && !standing.at(other);
       const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
       const Push felt =
           yields ? aside(from, there, separation, pulls.at(other), side)
                  : repulsion(from, there, separation, lean);
-      push.x += ignored ? 0 : felt.x;
-      push.y += ignored ? 0 : felt.y;
+      push.x += felt.x;
+      push.y += felt.y;
     });
     const Step direction{sign((push.x * 2) + pull.x),
                          sign((push.y * 2) + pull.y)};
