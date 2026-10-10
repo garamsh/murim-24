@@ -17,8 +17,9 @@ var world: WorldAdapter
 var ticks := 0
 ## Bodies the world holds after the last frame, on screen or not.
 var bodies := 0
-## Bodies drawn in the last frame, the ones on screen.
+## Bodies drawn in the last frame, the ones on screen, and of them those outlined over what hides them.
 var bodies_drawn := 0
+var bodies_outlined := 0
 ## People within the names' reach in the last frame, and the names shown over them.
 var named_near := 0
 var names_shown := 0
@@ -66,6 +67,7 @@ func _process(delta: float) -> void:
 	_art.refresh(view, _since_tick / step)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
+	bodies_outlined = _art.outlined
 	var people: Array[Dictionary] = []
 	for person: Dictionary in _art.near:
 		people.append({"person": person.person, "relation": person.relation,

@@ -1,6 +1,6 @@
 ## Measures frame time with world_view.tscn rendering and the simulation ticking together, vsync off
 ## so a frame takes as long as its work, and prints p50, p99 and max against the frame budget, with
-## how many uses of skills and damage numbers the timed frames drew.
+## how many uses of skills and damage numbers the timed frames drew and how many bodies they outlined.
 ## `make bench` runs it; it needs a display, so it runs on a developer's machine and not in CI.
 extends SceneTree
 
@@ -17,6 +17,7 @@ var _ticks_before := 0
 var _times := PackedFloat64Array()
 var _uses_drawn := 0
 var _numbers_drawn := 0
+var _outlined := 0
 
 
 func _initialize() -> void:
@@ -39,6 +40,7 @@ func _process(_delta: float) -> bool:
 		var combat: Node2D = _view.get_node("WorldArt/Combat")
 		_uses_drawn += combat.shown_strikes(Time.get_ticks_msec()).size()
 		_numbers_drawn += combat.shown_numbers(Time.get_ticks_msec()).size()
+		_outlined += _view.bodies_outlined
 		# The next frame is timed from here, so counting what this one drew is not timed.
 		now = Time.get_ticks_usec()
 	_last_usec = now
@@ -87,6 +89,8 @@ func _report() -> void:
 		WorldAdapter.TICKS_PER_SECOND])
 	print("bodies: %d in the world, %d on screen drawn as sprites through MultiMesh bands" % [
 		_view.bodies, _view.bodies_drawn])
+	print("outlines: %.1f bodies outlined over what hides them a frame on average, %d in the last frame" % [
+		float(_outlined) / TIMED_FRAMES, _view.bodies_outlined])
 	print("names: %d shown over the %d people within reach in the last frame" % [_view.names_shown, _view.named_near])
 	print("structures broken: %d of %d" % [broken, world.structure_count()])
 	print("combat feedback: %.1f uses of skills and %.1f damage numbers drawn a frame on average" % [
