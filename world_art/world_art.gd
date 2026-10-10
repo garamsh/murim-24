@@ -16,6 +16,7 @@ extends Node2D
 signal region_changed
 
 const Combat := preload("res://world_art/combat.gd")
+const Ground := preload("res://world_art/ground.gd")
 ## A cell's width and depth on the ground, in pixels.
 const CELL := Relief.CELL
 const ART := "res://art/"
@@ -69,6 +70,8 @@ const BODY_TAGS := ["idle", "walk", "back", "strike"]
 const SHADOW := "markers/shadow"
 ## Pixels a band's bodies are bucketed by for the test of what stands in front of them.
 const BUCKET := 32.0
+# The bucket of a place nothing can hide a body in.
+const NO_OCCLUDERS: Array[Ground.Occluder] = []
 ## How far from the person names are read around another person's name is drawn, in cells.
 const NAME_REACH := 8
 ## The relations, as WorldAdapter.relation gives them, of a person drawn ringed in RING.
@@ -107,10 +110,11 @@ var _shadow_x := 0
 var _struck_at := PackedInt64Array()
 ## Bodies drawn over what stands in front of them as an outline in the last refresh.
 var outlined := 0
-# What can stand in front of a body, by BUCKET: [the rectangle it covers, the y it is sorted by],
-# rebuilt when the ground shows other areas or a structure is laid.
-var _occluders := {}
-var _occluders_for := Vector2i(-1, -1)
+# What can stand in front of a body, by BUCKET, rebuilt when the ground shows other areas, a
+# structure is laid or a structure's frame changes; and how many times a structure's frame changed.
+var _occluders: Dictionary[Vector2i, Array] = {}
+var _occluders_for := Vector3i(-1, -1, -1)
+var _structure_frames := 0
 # Bodies change only on a tick, so they are read once per tick: positions now and a tick ago,
 # whether each army's roster is the one it had a tick ago, and each army's sprite set. Every body
 # is one person.
@@ -304,7 +308,10 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
-			sprite.texture = sprite.get_meta("frames")[world.structure_stage(structure)]
+			var texture: Texture2D = sprite.get_meta("frames")[world.structure_stage(structure)]
+			if sprite.texture != texture:
+				sprite.texture = texture
+				_structure_frames += 1
 	var shown := view.grow(MARGIN)
 	# Raised ground draws its rows above where they lie, so the rows on screen reach further down.
 	var first_row := maxi(int(shown.position.y / CELL.y), 0)
@@ -639,8 +646,9 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 func _hidden(rect: Rect2, sort_y: float) -> bool:
 	for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
 		for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
-			for occluder: Array in _occluders.get(Vector2i(bx, by), []):
-				if occluder[1] > sort_y and (occluder[0] as Rect2).intersects(rect):
+			var bucket: Array = _occluders.get(Vector2i(bx, by), NO_OCCLUDERS)
+			for occluder: Ground.Occluder in bucket:
+				if occluder.sort_y > sort_y and occluder.rect.intersects(rect):
 					return true
 	return false
 
@@ -649,17 +657,17 @@ func _hidden(rect: Rect2, sort_y: float) -> bool:
 # every standing structure's frame, again whenever either changes.
 func _gather_occluders() -> void:
 	var ground: Node2D = $Ground
-	var now := Vector2i(ground.shows, structure_sprites.size())
+	var now := Vector3i(ground.shows, structure_sprites.size(), _structure_frames)
 	if now == _occluders_for:
 		return
 	_occluders_for = now
 	_occluders.clear()
-	var all: Array = ground.occluders()
+	var all: Array[Ground.Occluder] = ground.occluders()
 	for sprite in structure_sprites:
 		if sprite != null and sprite.get_parent() == _standing:
-			all.append([Rect2(sprite.position + sprite.offset, sprite.texture.get_size()), sprite.position.y])
-	for occluder: Array in all:
-		var rect: Rect2 = occluder[0]
+			all.append(Ground.Occluder.new(Rect2(sprite.position + sprite.offset, sprite.texture.get_size()), sprite.position.y))
+	for occluder in all:
+		var rect := occluder.rect
 		for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
 			for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
 				var key := Vector2i(bx, by)

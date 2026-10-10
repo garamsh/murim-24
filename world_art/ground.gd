@@ -9,6 +9,18 @@
 ## its row so whoever is behind a raised row is drawn behind it. It decides nothing.
 extends Node2D
 
+
+## Something standing that can hide a body behind it: the rectangle its opaque pixels lie in, and
+## the y it is sorted by.
+class Occluder:
+	var rect: Rect2
+	var sort_y: float
+
+	func _init(covers: Rect2, sorted_by: float) -> void:
+		rect = covers
+		sort_y = sorted_by
+
+
 const SHADER := preload("res://world_art/ground.gdshader")
 const TREES := "res://art/terrain/trees"
 ## Each kind's ramp of four colours, dark to light, a frame tagged by its name, then the earth
@@ -165,10 +177,9 @@ func shown_chunks() -> Array:
 	return _shown.keys()
 
 
-## What stands among the bodies on the chunks shown, the raised strips and the trees: each as
-## [the rectangle its opaque pixels lie in, the y it is sorted by].
-func occluders() -> Array:
-	var found := []
+## What stands among the bodies on the chunks shown, the raised strips and the trees.
+func occluders() -> Array[Occluder]:
+	var found: Array[Occluder] = []
 	for key: Vector2i in _shown:
 		for node: Node2D in _shown[key].nodes:
 			var sprite := node as Sprite2D
@@ -181,7 +192,7 @@ func occluders() -> Array:
 					texture.set_meta("used", Rect2((texture as AtlasTexture).atlas.get_image().get_region(
 							Rect2i((texture as AtlasTexture).region)).get_used_rect()))
 				used = texture.get_meta("used")
-			found.append([Rect2(sprite.position + sprite.offset + used.position, used.size), sprite.position.y])
+			found.append(Occluder.new(Rect2(sprite.position + sprite.offset + used.position, used.size), sprite.position.y))
 	return found
 
 
