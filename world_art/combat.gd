@@ -6,8 +6,9 @@
 ## back from the nearest use that struck it, its loss floating up while the damage numbers row
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
-## struck by nothing, of hunger or age, is not drawn falling; and the person the steered person's
-## last use struck nearest where it went is marked while it lives. Like sound.gd, it keeps what it
+## struck by nothing, of hunger or age, is not drawn falling; and the person the player selected is
+## marked while it lives, or with none selected, the person the steered person's last use struck
+## nearest where it went. Like sound.gd, it keeps what it
 ## compares by person in packed arrays. world_art.gd draws the bodies with what it gives. It reads
 ## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
@@ -53,8 +54,11 @@ var numbers: Array[Dictionary] = []
 ## Each person who died struck, in order: `person`, its `army`, `at`, where it last stood in
 ## pixels, `ground`, that place on the unraised ground, and `ms`, when.
 var deaths: Array[Dictionary] = []
-## The person the steered person's last use struck nearest where it went, or -1.
+## The person marked: the one selected while it lives, else the one the steered person's last use
+## struck nearest where it went, or -1.
 var target := -1
+## The person the player selected, which play.gd sets, or -1 for none.
+var selected := -1
 ## The view the last refresh showed, in pixels.
 var view := Rect2()
 ## Where a point in sub-cell units is drawn, in pixels: world_art.gd's projection, raised with the
@@ -139,7 +143,9 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 			deaths.append({"person": person, "army": _army[person], "at": at,
 				"ground": stood * CELL / WorldAdapter.CELL_SIZE, "ms": now})
 	_read_bodies(world, rosters, positions, true)
-	if target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
+	if selected >= 0 and selected < _seen.size() and _seen[selected] == _tick:
+		target = selected
+	elif target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
 		target = -1
 	_forget(now)
 

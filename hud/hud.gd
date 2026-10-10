@@ -6,7 +6,8 @@
 ## player talks to someone, and the prompt over whom it may talk to; the names over the people near
 ## the player, under every panel; the title, new-game, pause and
 ## settings screens and the rebirth screen; its faction's leader, a duel for the lead while one is
-## fought, and the verdict on a challenge, why a cast was refused, whether an autosave was
+## fought, the frame naming the target the player selected, its faction and health, and the verdict
+## on a challenge, why a cast or an attack was refused, whether an autosave was
 ## written, or, from the core's progress, a skill the player learned and how, or a realm it gained;
 ## a map of the region around the player with the season and year; and the technique bar, the
 ## loadout's five slots, each with its key, Q W E R T, and the icon of the skill on it. On a touch screen, or where the settings force it, the touch controls
@@ -52,6 +53,9 @@ const NOTICE_MS := 3000
 # as art/mockup/touch.lua places them.
 const MAP_AT := {false: Vector2(392, 4), true: Vector2(346, 4)}
 const DUEL_AT := {false: Vector2(176, 4), true: Vector2(176, 50)}
+# Where the target frame stands: under the duel panel in the keyboard layout, and where the touch
+# layout leaves the top's middle free.
+const TARGET_AT := {false: Vector2(176, 52), true: Vector2(176, 4)}
 const NOTICE_AT := {false: Vector2(90, 92), true: Vector2(140, 100)}
 const NOTICE_SLIP_HEIGHT := 16
 # How far under the map the shortcut rail hangs.
@@ -74,6 +78,13 @@ const CAST_KEYS := {
 	WorldAdapter.CAST_NO_QI: "CAST_NO_QI",
 	WorldAdapter.CAST_NO_TARGET: "CAST_NO_TARGET",
 	WorldAdapter.CAST_OUT_OF_RANGE: "CAST_OUT_OF_RANGE",
+}
+# The translation key of each reason an attack is refused, by WorldAdapter.ATTACK_* constant.
+const ATTACK_KEYS := {
+	WorldAdapter.ATTACK_NO_MEMBER: "ATTACK_NO_MEMBER",
+	WorldAdapter.ATTACK_NO_TARGET: "ATTACK_NO_TARGET",
+	WorldAdapter.ATTACK_NOT_A_FOE: "ATTACK_NOT_A_FOE",
+	WorldAdapter.ATTACK_OUT_OF_SIGHT: "ATTACK_OUT_OF_SIGHT",
 }
 
 ## Labels that show a translated key or a value, by what they show, so a test can read them.
@@ -103,6 +114,8 @@ var new_game: Control
 var pause: Control
 var settings: Control
 var rebirth: Control
+## The frame naming the target the player selected, shown while one is selected and lives.
+var target_panel: Panel
 ## The panel shown while a duel for the player's faction's lead is fought, and its two bars:
 ## `challenger` and `leader`.
 var duel_panel: Panel
@@ -409,15 +422,17 @@ func _place() -> void:
 	purse.belt = not on
 	purse.queue_redraw()
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
+	target_panel.position = TARGET_AT[on] + Vector2(gained.x / 2.0, 0)
 	_place_notice()
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
 
 
-## Names the people of `people` in `world` as nameplates.gd names them, clear of every panel shown,
-## the shortcut rail, the purse, and the talk prompt's slip.
-func show_names(world: WorldAdapter, people: Array[Dictionary]) -> void:
+## Names the people of `people` in `world` as nameplates.gd names them, `selected` and `hovered`
+## first and marked, clear of every panel shown, the shortcut rail, the purse, and the talk prompt's
+## slip.
+func show_names(world: WorldAdapter, people: Array[Dictionary], selected := -1, hovered := -1) -> void:
 	var clear: Array[Rect2] = [purse.strip_rect()]
 	if purse.belt:
 		clear.append(purse.belt_rect())
@@ -428,7 +443,7 @@ func show_names(world: WorldAdapter, people: Array[Dictionary]) -> void:
 			clear.append((child as Control).get_rect())
 	if shortcuts.visible:
 		clear.append(shortcuts.rect())
-	nameplates.show_names(world, people, clear)
+	nameplates.show_names(world, people, clear, selected, hovered)
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
@@ -467,6 +482,30 @@ func show_challenge(refusal: int) -> void:
 func show_cast(refusal: int) -> void:
 	_set_up()
 	_notice(CAST_KEYS[refusal])
+
+
+## Shows for NOTICE_MS why the core refused the player's attack, one of the WorldAdapter.ATTACK_*
+## constants other than ATTACK_NONE.
+func show_attack(refusal: int) -> void:
+	_set_up()
+	_notice(ATTACK_KEYS[refusal])
+
+
+## Shows the target frame on person `person` of `world`, the one the player selected: its name, in
+## crimson while its faction is hostile to the player's, its faction and its health; or hides it
+## for -1 or a dead person.
+func show_target(world: WorldAdapter, person: int, steered: int) -> void:
+	_set_up()
+	target_panel.visible = person >= 0 and world.person_health(person) > 0
+	if not target_panel.visible:
+		return
+	var faction := world.person_faction(person)
+	var hostile := world.relation(world.army_faction(steered), faction) in [
+		WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
+	labels.target_name.text = PersonName.of(world, person, true)
+	labels.target_name.add_theme_color_override("font_color", Palette.CRIMSON_4 if hostile else Palette.PAPER_3)
+	labels.target_faction.text = Affiliation.faction_name(world, faction)
+	labels.target_health.text = tr("HUD_TARGET_HEALTH") % world.person_health(person)
 
 
 ## Shows for NOTICE_MS what came of consuming ware `ware` of `world`: `refusal`, one of the
@@ -681,6 +720,12 @@ func _build() -> void:
 	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), Palette.CRIMSON_4)
 	duel_bars.challenger.size.x = 62
 	duel_bars.leader.size.x = 62
+
+	target_panel = _panel(Rect2(TARGET_AT[false], Vector2(136, 32)))
+	target_panel.visible = false
+	labels.target_name = _trimmed(target_panel, Vector2(5, 3), 126)
+	labels.target_faction = _trimmed(target_panel, Vector2(5, 16), 72)
+	labels.target_health = _value(target_panel, Vector2(79, 16), 52)
 
 	labels.notice = _label(self, "", NOTICE_AT[false], Palette.PAPER_3)
 	labels.notice.size = Vector2(300, 12)

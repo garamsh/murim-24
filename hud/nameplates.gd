@@ -1,7 +1,9 @@
 ## The names over the people near the player, as art/mockup/nameplates.gd proposed them
 ## (evidence/pr-199): each in the colour of how the person's faction stands toward the player's,
-## outlined in ink. At most NAME_CAP at once, the hostile first and then the nearest, and none over
-## another name, a place the HUD keeps clear or the room's edge. The play scene says who stands where.
+## outlined in ink. At most NAME_CAP at once: the target the player selected first, framed in gold,
+## then the person under the cursor, underlined, then the hostile and then the nearest, and none
+## over another name, a place the HUD keeps clear or the room's edge. The play scene says who stands
+## where and whom the player selected and points at.
 ## It holds no game rule.
 extends "res://hud/panel.gd"
 
@@ -19,8 +21,8 @@ const COLOURS := {
 }
 const HOSTILE_RELATIONS := [WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
 
-## The names shown, each as `person`, `text`, `colour` and `rect`, where its words and their
-## outline stand in the HUD's pixels.
+## The names shown, each as `person`, `text`, `colour`, `rect`, where its words and their outline
+## stand in the HUD's pixels, and `mark`: "selected", "hovered" or "".
 var plates: Array[Dictionary] = []
 
 # Each person's name as last shown, by person, and the locale it was shown in.
@@ -33,21 +35,28 @@ func _ready() -> void:
 
 
 ## Names the people of `people` in `world`, each as `person`, `head`, where its head stands in the
-## HUD's pixels, and `relation`, nearest first: the hostile first, then the rest, each in that order,
-## until NAME_CAP are named, leaving out a name that would cover one already placed, any of `clear`
-## or the edge of the room, the control's own rect.
-func show_names(world: WorldAdapter, people: Array[Dictionary], clear: Array[Rect2]) -> void:
+## HUD's pixels, and `relation`, nearest first: `selected` first and `hovered` next when among them,
+## then the hostile, then the rest, each in that order, until NAME_CAP are named, leaving out a name
+## that would cover one already placed, any of `clear` or the edge of the room, the control's own
+## rect.
+func show_names(world: WorldAdapter, people: Array[Dictionary], clear: Array[Rect2], selected := -1,
+		hovered := -1) -> void:
 	_font = get_theme_default_font() if _font == null else _font
 	if world != _world or TranslationServer.get_locale() != _locale:
 		_world = world
 		_locale = TranslationServer.get_locale()
 		_names.clear()
-	var hostile := people.filter(func(person: Dictionary) -> bool: return person.relation in HOSTILE_RELATIONS)
-	var rest := people.filter(func(person: Dictionary) -> bool: return not person.relation in HOSTILE_RELATIONS)
+	var marked := func(person: Dictionary) -> bool: return person.person in [selected, hovered]
+	var first := people.filter(func(person: Dictionary) -> bool: return person.person == selected) \
+			+ people.filter(func(person: Dictionary) -> bool: return person.person == hovered and hovered != selected)
+	var hostile := people.filter(func(person: Dictionary) -> bool:
+		return person.relation in HOSTILE_RELATIONS and not marked.call(person))
+	var rest := people.filter(func(person: Dictionary) -> bool:
+		return not person.relation in HOSTILE_RELATIONS and not marked.call(person))
 	var room := Rect2(Vector2.ZERO, size)
 	var taken := clear.duplicate()
 	plates.clear()
-	for person: Dictionary in hostile + rest:
+	for person: Dictionary in first + hostile + rest:
 		if plates.size() == NAME_CAP:
 			break
 		var text := _name(person.person)
@@ -56,7 +65,9 @@ func show_names(world: WorldAdapter, people: Array[Dictionary], clear: Array[Rec
 		if not room.encloses(rect) or taken.any(func(other: Rect2) -> bool: return other.intersects(rect.grow(1))):
 			continue
 		taken.append(rect)
-		plates.append({"person": person.person, "text": text, "colour": COLOURS[person.relation], "rect": rect})
+		var mark := "selected" if person.person == selected else ("hovered" if person.person == hovered else "")
+		plates.append({"person": person.person, "text": text, "colour": COLOURS[person.relation], "rect": rect,
+			"mark": mark})
 	queue_redraw()
 
 
@@ -79,3 +90,8 @@ func _draw() -> void:
 		var baseline := rect.position + Vector2(1, 1 + _font.get_ascent(FONT_SIZE))
 		draw_string_outline(_font, baseline, plate.text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 2, Palette.INK_1)
 		draw_string(_font, baseline, plate.text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, plate.colour)
+		match plate.mark:
+			"selected":
+				draw_rect(rect, Palette.GOLD_3, false, 1.0)
+			"hovered":
+				draw_line(Vector2(rect.position.x, rect.end.y), rect.end, Palette.PAPER_3, 1.0)

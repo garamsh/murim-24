@@ -28,6 +28,7 @@ HUD_LEADER,수장,Leader
 HUD_LEADER_NONE,없음,None
 HUD_LEADER_YOU,당신,You
 HUD_DUEL,결투,Duel
+HUD_TARGET_HEALTH,체력 %d,HP %d
 HUD_DUEL_NEW_LEADER,새 수장이 섰다.,A new leader stands.
 HUD_AUTOSAVED,자동 저장했다.,Autosaved.
 HUD_AUTOSAVE_FAILED,자동 저장하지 못했다.,Could not autosave.
@@ -45,6 +46,10 @@ CAST_ON_COOLDOWN,아직 기술을 다시 쓸 수 없다.,That skill is not ready
 CAST_NO_QI,내공이 모자라 기술을 쓸 수 없다.,Not enough inner energy for that skill.
 CAST_NO_TARGET,겨눌 상대가 없다.,There is no one to aim at.
 CAST_OUT_OF_RANGE,상대가 기술이 닿는 거리 밖에 있다.,The target is out of the skill's range.
+ATTACK_NO_MEMBER,쓰러진 몸으로는 공격할 수 없다.,You cannot attack while fallen.
+ATTACK_NO_TARGET,공격할 상대가 없다.,There is no one to attack.
+ATTACK_NOT_A_FOE,적이 아닌 사람은 공격하지 않는다.,You do not attack one who is no foe.
+ATTACK_OUT_OF_SIGHT,상대가 시야 밖에 있다.,The target is out of sight.
 GENEALOGY_TITLE,족보,Genealogy
 GENEALOGY_FAMILY,%s씨 가문,%s family
 GENEALOGY_GENERATION,%d대,Generation %d
@@ -132,15 +137,16 @@ CONTROLS_TITLE,조작법,Controls
 CONTROLS_CLICK,우클릭,R-Click
 CONTROLS_CLICK_MOVE,커서로 이동,Move to cursor
 CONTROLS_CAST,커서에 기술,Cast at cursor
-CONTROLS_SKILL,기술 하나,One skill
-CONTROLS_ALL_SKILLS,모든 기술,All skills
+CONTROLS_SKILL,기술 하나 · 모두,One skill · All
 CONTROLS_FACTIONS,세력,Factions
-CONTROLS_TALK,대화,Talk
 CONTROLS_WARES,약 먹기,Use wares
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
-CONTROLS_PAUSE_CANCEL,일시정지 · 조준 취소,Pause · Cancel aim
+CONTROLS_PAUSE_CANCEL,일시정지 · 취소,Pause · Cancel
+CONTROLS_LEFT_CLICK,좌클릭,L-Click
+CONTROLS_SELECT,선택 · 대화,Select · Talk
+CONTROLS_ATTACK,공격 · 다음 적,Attack · Next foe
 SETTINGS_TITLE,설정,Settings
 SETTINGS_BACK,Esc 뒤로,Esc Back
 SETTINGS_KEYS,↑↓ 고르기 · ←→ 바꾸기 · Esc 뒤로,↑↓ Choose · ←→ Change · Esc Back
@@ -185,6 +191,8 @@ TOUCH_GENEALOGY,족보,Family
 TOUCH_SECT,문파,Sects
 TOUCH_FACTIONS,세력,Faction
 TOUCH_ARTS,무공,Arts
+TOUCH_ATTACK,공격,Attack
+TOUCH_CYCLE,다음,Next
 TOUCH_PLACE,놓을 단추를 누른다,Tap a button
 TOUCH_CANCEL,취소,Cancel
 TOUCH_SELF,자신에게,On self
