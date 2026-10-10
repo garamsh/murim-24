@@ -154,6 +154,13 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Nature grows on its own.** Decided by the owner on 2026-10-09 (issue #187). ADR 0056 (`docs/architecture/adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed, designs it.
   - Terrain is a biome, and the trees and fruit on it grow naturally. Today's forest is ground on which trees grow, spread and can be felled.
   - NPCs move, gather and hunt on their own, and can found new villages.
+- **Animals arise where they can live.** Decided by the owner on 2026-10-10 (issue #171). ADR 0067 (`docs/architecture/adr/0067-let-animals-arise-where-food-feeds-them-hunt-them-for-meat-and-materials-and-let-spirit-beasts-hold-territories.md`), proposed, designs it.
+  - An animal appears on its own where its kind can live, at a rate set by the food there: forage for grazers, prey for predators. There are no fixed spawn points, and none appear in deserts without forage or in towns.
+  - Animals do not mate or raise young. Grazers crop forage, which regrows, and predators hunt grazers. Their numbers follow food: a balance of predators, prey and forage, not a cap.
+  - Spirit beasts (영수) are rare, strong animals that hold a territory, attack anyone entering it and never roam beyond it. A spirit beast arises the same way, in a suitable territory left empty, so killing one leaves it empty for a while.
+  - A spirit beast leaves a spirit core (영단), a cultivation item consumed or refined for qi or realm progress, and materials worth more than an ordinary animal's.
+  - Every animal leaves materials when killed, by species as pack data. Meat is food: it feeds the hunter's household and counts as food. Hide, bone and horn feed crafting.
+  - Hunters are a trade, and NPCs hunt for food and materials as the player does.
 - **Villages are built from trees and stones.** Trees and stones are world objects, and NPCs build villages from them, automatically. Construction stays NPC-only: the player may gather, but never builds.
 - **Villages grow like WorldBox,** with people and resources: centre first, houses placed outward into suitable ground, expanding, and founding new villages. Villages are larger by default.
 - **[proposed]** ADR 0056's details:
