@@ -30,7 +30,7 @@ Facts from `main` at `aff1434`, and from ADRs 0050 to 0052, proposed, merged in 
 - **What is not built.** There are no animals yet (#171), and no trades (#170).
 
 Decided by the PM on PR #220's review, 2026-10-10:
-- **Extending, not superseding.** ADRs 0051 and 0052 are unmerged, and ADR 0052 already defers gathering to #187, so this ADR extends them.
+- **Extending, not superseding.** ADRs 0051 and 0052 are proposed, and ADR 0052 already defers gathering to #187, so this ADR extends them.
 - **The village's account** is accepted as a new kind of account, extending ADR 0051.
 - **Slot kinds compiled into the map** from the pack's affinities are accepted.
 - **Proposals in pack data**, which the sweep checks: the gatherers' reach of 32 cells, the cap of a third of earners, building before field work, and fruit and berries sold to the granary and herbs to the apothecary.
@@ -50,7 +50,7 @@ Options weighed:
   Chosen. Positions cost nothing at run time, the same map gives the same forests in every game, and ADR 0047's "objects come from the map" holds. Objects block nothing, so felling one rebuilds no path.
   - Rejected: objects as records with positions, at 8 bytes, which is 8 MiB at this count and grows with spread.
   - Rejected: counts per area for far areas, re-instantiated near the player. A stump felled far away would come back when the player arrives, and two forms of one object need two rules.
-- **Kinds.** Kinds are pack data (ADR 0049): a name, the biomes it grows on with a weight each, the days from sapling to grown, a chance a day of spreading, the days a stump takes to regrow, and what gathering yields. The base pack's:
+- **Kinds.** Kinds are pack data (ADR 0049): a name, the biomes it grows on with a weight each, the days from sapling to grown, a chance of spreading every 8 days, the days a stump takes to regrow, and what gathering yields. The base pack's:
 
   | Kind | Biomes | Grows in | Yield | Stump regrows in |
   |---|---|---|---|---|
@@ -62,11 +62,13 @@ Options weighed:
 
   A year is 4 seasons of 30 days, 120 days (ADR 0019). Rocks lie on hills only. The map's mountains are blocked footing (ADR 0047), so no slot lies on them.
 
+  Plain and forest are biomes of ADR 0047's painted layer, named in the pack. Hills are not a biome: a kind's weight for hills applies to land on elevation tiers 1 to 5, which the build tool reads when it places slots.
+
   Fruit and berries are food, measures of it, sold to the granary. Herbs go to the apothecary as its material. Herbs were "later" in the issue. They are kept because a herb patch is one more row of kind data under the same rules, and ADR 0040's herb is already a ware.
 - **Growth and spread.** Every 8 days, each area's slots advance by 8 days at once, on the area's own tick of the 8-day cycle, by area index, so a tick touches about 1 area of 64 slots. Each slot's timer rises by 8, then:
   - a sapling past half its kind's growing days becomes growing, and a growing slot past the other half becomes grown, so a slot goes from sapling to grown in its kind's growing days
   - a stump past its kind's regrowing days becomes a sapling
-  - a harvested slot becomes grown again at the next season's first day
+  - a harvested slot becomes grown again at the first cycle on or after the next season's first day
   - an empty slot becomes a sapling with its kind's chance for every 8 days, per mille, for each grown slot of the same kind in its area
 
   A stage change resets the timer, so growth is deterministic.
@@ -79,6 +81,7 @@ Options weighed:
   - Each day, earners of the village with no other work (ADR 0052's earning order) are assigned to gather, nearest first by index, while a material is short of its target: one gatherer for each 10 of the shortfall, at most a third of the earners.
   - Builders are at most a third of the earners too, and gatherers and builders together at most half, so field work never falls below half the earners.
   - A gatherer walks to the nearest grown slot of the kind within 32 cells of the village's centre, gathers, and walks back to deposit its stacks into the village's account.
+  - **Which cells.** Every distance here, the 32-cell reach and the worked example's 16 and 10 cells, counts the map's cells, the cells a person walks and fills (ADR 0047). The core has one grid. The li is how far apart places on it are, not a second unit, and #227's reference sizes count the same cells.
   - **Pay.** Gatherers and builders are paid a day's wage, the mean daily share of the village's field workers, by the faction owning the village, from its treasury, as works (ADR 0052). A faction that cannot pay builds nothing that day, and its villagers work the fields.
   - Material above twice its target is sold to the village's market, or exported at the floor (ADR 0052), into the treasury.
   - **Unlike the shared store ADR 0051 rejected.** ADR 0051 rejected one store per village with no accounts, because every deposit would belong to everyone. This account holds only what the village itself owns: materials gathered for its building, paid for by its faction. Households' and others' accounts are untouched. Deposits to it pay no keeper's fee.
@@ -98,7 +101,7 @@ Options weighed:
 - **Shapes, with #169.** Growth lays a plan on the free buildable cell nearest the village's centre, as ADR 0023 does, so villages grow centre first and outward. #169 decides layouts, roads where people walk, tiers upgraded with materials, and docks and quarries. Those use the costs and the gathering decided here.
 - **Founding.** A village founding another, by ADR 0023's rule, sends its settlers with the first house's cost carried in their inventories, taken from its account. The new village gathers for itself from then on. A village without that cost does not found.
 - **Fields and granaries** stay. Farming feeds a village, and foraging adds fruit, berries and herbs to the granary and the apothecary.
-- **Tiers.** Daily rules are untiered, so the slots grow and assignments are made everywhere.
+- **Tiers.** Daily rules and the slots' 8-day cycle are untiered, so the slots grow and assignments are made everywhere.
   - In live and stepped areas, gatherers and builders walk and work, tick by tick.
   - In a far area, a village's gathering is settled in aggregate once a day: each assigned gatherer yields one gathering's stacks from the nearest grown slots of the kind within 32 cells, in slot order. Its building raises each site by a day of its builders' repair. Wages and accounts are the same.
 - **Cost.**
