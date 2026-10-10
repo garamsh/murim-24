@@ -19,12 +19,17 @@ namespace murim {
 /// over the places holding none.
 class SpatialHash {
  public:
+  /// A position to index and the kinds it is of.
+  struct Placed {
+    Position position;
+    std::uint64_t kinds;
+  };
+
   /// Indexes `positions`, every one of every kind.
   explicit SpatialHash(const std::vector<Position>& positions);
 
-  /// Indexes `positions`, each of the kinds of the same index in `kinds`.
-  SpatialHash(std::vector<Position> positions,
-              std::vector<std::uint64_t> kinds);
+  /// Indexes `placed`, each position of its own kinds.
+  explicit SpatialHash(std::vector<Placed> placed);
 
   /// Calls `visit` with the index of every position within `radius` sub-cell
   /// units of `centre`, Euclidean distance inclusive, once each and in no
@@ -68,7 +73,7 @@ class SpatialHash {
     std::int64_t best_distance = std::int64_t{radius} * radius;
     const auto offer = [&](std::size_t other, Position position) {
       const std::int64_t distance = distance_squared(centre, position);
-      if ((kinds_.at(other) & kinds) != 0 &&
+      if ((placed_.at(other).kinds & kinds) != 0 &&
           (distance < best_distance ||
            (distance == best_distance && (!best || other < *best))) &&
           accept(other)) {
@@ -132,7 +137,7 @@ class SpatialHash {
     for (std::size_t entry = slot_starts_.at(slot);
          entry < slot_starts_.at(slot + 1); ++entry) {
       const std::size_t other = entries_.at(entry);
-      const Position position = positions_.at(other);
+      const Position position = placed_.at(other).position;
       const Cell own = cell_of(position);
       if (own.x == cell.x && own.y == cell.y) {
         visit(other, position);
@@ -140,8 +145,7 @@ class SpatialHash {
     }
   }
 
-  std::vector<Position> positions_;
-  std::vector<std::uint64_t> kinds_;
+  std::vector<Placed> placed_;
   Cell first_;
   Cell last_;
   std::size_t slot_mask_;

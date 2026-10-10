@@ -2226,23 +2226,26 @@ void World::disband(std::size_t army) {
 void World::tick() {
   rng_state_ += SPLITMIX_INCREMENT;
   ++tick_count_;
-  std::vector<Position> positions;
+  std::vector<SpatialHash::Placed> placed;
   std::vector<std::size_t> people;
   std::vector<std::size_t> owners;
-  std::vector<std::uint64_t> kinds;
   // Each living person's index in the crowd.
   std::vector<std::size_t> slot(people_.size());
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     for (const std::size_t member : armies_.at(army).roster) {
       slot.at(member) = people.size();
-      positions.push_back(people_.at(member).position);
+      // Marked by the faction of the army each served in as the tick began,
+      // not by relation: foe_kinds() reads relations live at each search,
+      // and no army changes faction before the last search, in steer(), so
+      // the marks hold for the whole tick.
+      placed.push_back(SpatialHash::Placed{people_.at(member).position,
+                                           kind_of(armies_.at(army).faction)});
       people.push_back(member);
       owners.push_back(army);
-      kinds.push_back(kind_of(armies_.at(army).faction));
     }
   }
-  const Crowd crowd{SpatialHash{std::move(positions), std::move(kinds)},
-                    std::move(people), std::move(owners)};
+  const Crowd crowd{SpatialHash{std::move(placed)}, std::move(people),
+                    std::move(owners)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
   strikes_.clear();

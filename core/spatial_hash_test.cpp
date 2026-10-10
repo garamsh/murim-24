@@ -103,13 +103,14 @@ TEST(SpatialHash, NearestMatchesABruteForceScan) {
   // Each position is of one of four kinds and the search asks for two of
   // them; of those, it accepts the indices not divisible by three.
   constexpr std::uint64_t SOUGHT = 0b0110U;
-  std::vector<std::uint64_t> kinds(positions.size());
+  std::vector<SpatialHash::Placed> placed;
   std::vector<bool> accepted(positions.size());
   for (std::size_t index = 0; index < positions.size(); ++index) {
-    kinds.at(index) = std::uint64_t{1} << (index % 4);
-    accepted.at(index) = (kinds.at(index) & SOUGHT) != 0 && index % 3 != 0;
+    const std::uint64_t kind = std::uint64_t{1} << (index % 4);
+    placed.push_back(SpatialHash::Placed{positions.at(index), kind});
+    accepted.at(index) = (kind & SOUGHT) != 0 && index % 3 != 0;
   }
-  const SpatialHash hash{positions, kinds};
+  const SpatialHash hash{placed};
   constexpr std::int32_t SIGHT = 3 * CELL_SIZE;
 
   std::size_t found = 0;
@@ -152,10 +153,9 @@ TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
   constexpr std::uint64_t NEAR_KIND = 0b01U;
   constexpr std::uint64_t FAR_KIND = 0b10U;
   // One of each kind, the near one a cell away and the far one three.
-  const std::vector<Position> positions{
-      Position{centre.x + CELL_SIZE, centre.y},
-      Position{centre.x + (3 * CELL_SIZE), centre.y}};
-  const SpatialHash hash{positions, {NEAR_KIND, FAR_KIND}};
+  const SpatialHash hash{std::vector<SpatialHash::Placed>{
+      {Position{centre.x + CELL_SIZE, centre.y}, NEAR_KIND},
+      {Position{centre.x + (3 * CELL_SIZE), centre.y}, FAR_KIND}}};
   constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
   const auto any = [](std::size_t /*other*/) { return true; };
 

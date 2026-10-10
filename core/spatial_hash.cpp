@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <limits>
 #include <numeric>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -45,43 +44,49 @@ std::size_t slot_count_for(std::size_t entries) {
   return slots;
 }
 
+// `positions`, each of every kind.
+std::vector<SpatialHash::Placed> of_every_kind(
+    const std::vector<Position>& positions) {
+  std::vector<SpatialHash::Placed> placed;
+  placed.reserve(positions.size());
+  for (const Position position : positions) {
+    placed.push_back(SpatialHash::Placed{
+        position, std::numeric_limits<std::uint64_t>::max()});
+  }
+  return placed;
+}
+
 }  // namespace
 
 SpatialHash::SpatialHash(const std::vector<Position>& positions)
-    : SpatialHash(positions, std::vector<std::uint64_t>(
-                                 positions.size(),
-                                 std::numeric_limits<std::uint64_t>::max())) {}
+    : SpatialHash(of_every_kind(positions)) {}
 
-SpatialHash::SpatialHash(std::vector<Position> positions,
-                         std::vector<std::uint64_t> kinds)
-    : positions_(std::move(positions)),
-      kinds_(std::move(kinds)),
+SpatialHash::SpatialHash(std::vector<Placed> placed)
+    : placed_(std::move(placed)),
       first_{std::numeric_limits<std::int32_t>::max(),
              std::numeric_limits<std::int32_t>::max()},
       last_{std::numeric_limits<std::int32_t>::min(),
             std::numeric_limits<std::int32_t>::min()},
-      slot_mask_(slot_count_for(positions_.size()) - 1),
+      slot_mask_(slot_count_for(placed_.size()) - 1),
       slot_starts_(slot_mask_ + 2, 0),
-      entries_(positions_.size()),
+      entries_(placed_.size()),
       slot_kinds_(slot_mask_ + 1, 0),
       block_kinds_(slot_mask_ + 1, 0) {
-  if (kinds_.size() != positions_.size()) {
-    throw std::invalid_argument("every position must have its kinds");
-  }
-  for (std::size_t index = 0; index < positions_.size(); ++index) {
-    const Cell cell = cell_of(positions_.at(index));
+  for (const Placed& each : placed_) {
+    const Cell cell = cell_of(each.position);
     first_ = Cell{std::min(first_.x, cell.x), std::min(first_.y, cell.y)};
     last_ = Cell{std::max(last_.x, cell.x), std::max(last_.y, cell.y)};
     ++slot_starts_.at(slot_of(cell) + 1);
-    slot_kinds_.at(slot_of(cell)) |= kinds_.at(index);
-    block_kinds_.at(slot_of(block_of(cell))) |= kinds_.at(index);
+    slot_kinds_.at(slot_of(cell)) |= each.kinds;
+    block_kinds_.at(slot_of(block_of(cell))) |= each.kinds;
   }
   std::partial_sum(slot_starts_.begin(), slot_starts_.end(),
                    slot_starts_.begin());
   std::vector<std::size_t> cursors(slot_starts_.begin(),
                                    slot_starts_.end() - 1);
-  for (std::size_t index = 0; index < positions_.size(); ++index) {
-    entries_.at(cursors.at(slot_of(cell_of(positions_.at(index))))++) = index;
+  for (std::size_t index = 0; index < placed_.size(); ++index) {
+    const Cell cell = cell_of(placed_.at(index).position);
+    entries_.at(cursors.at(slot_of(cell))++) = index;
   }
 }
 
@@ -94,7 +99,7 @@ std::pair<Cell, Cell> SpatialHash::walk(Position centre,
 }
 
 Position SpatialHash::position(std::size_t index) const {
-  return positions_.at(index);
+  return placed_.at(index).position;
 }
 
 bool SpatialHash::holds(std::pair<Cell, Cell> span, std::uint64_t kinds) const {
