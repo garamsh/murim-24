@@ -129,6 +129,17 @@ std::size_t living(const World& world, std::size_t armies) {
   return people;
 }
 
+// Fails the bench when `peak`, the most people alive at once, reached the
+// capacity `capacity` the scenario's rules set: a world that fills its
+// capacity is held back by it, and its timing no longer measures the people
+// it was built for.
+void require_below_capacity(std::size_t peak, std::size_t capacity) {
+  require(peak < capacity,
+          "the living must never reach the scenario's capacity, " +
+              std::to_string(capacity) + "; they peaked at " +
+              std::to_string(peak));
+}
+
 bool run_m1() {
   const M1Scenario scenario = m1_scenario();
   const std::size_t armies = scenario.armies.size();
@@ -136,17 +147,18 @@ bool run_m1() {
               scenario.structures, scenario.rules};
   const std::size_t people = living(world, armies);
   const std::vector<bool> caster = casters(world, scenario.casters_first);
+  std::size_t peak = living(world, world.army_count());
 
   Strikes warm_up{0, 0};
   for (int tick = 0; tick < WARM_UP_TICKS; ++tick) {
     const auto before = cooldowns(world);
     world.tick();
+    peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), caster);
     warm_up.all += strikes.all;
     warm_up.area += strikes.area;
   }
-  require(people == MAX_PEOPLE,
-          "the world must hold MAX_PEOPLE people, the most it may");
+  require(people == MAX_PEOPLE, "the world must hold MAX_PEOPLE people");
   require(warm_up.all > 0, "the armies must strike during the warm-up");
   require(warm_up.area > 0, "area strikes must happen during the warm-up");
 
@@ -157,6 +169,7 @@ bool run_m1() {
     const auto start = std::chrono::steady_clock::now();
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
+    peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), caster);
     timed.all += strikes.all;
     timed.area += strikes.area;
@@ -165,6 +178,7 @@ bool run_m1() {
   const bool pass = p99 <= BUDGET_MS;
   require(living(world, armies) > people / 2,
           "most of the battle must still be fighting when timing ends");
+  require_below_capacity(peak, scenario.rules.people_capacity);
   require(timed.all >=
               LEAST_STRIKES_PER_TICK * static_cast<std::uint64_t>(TIMED_TICKS),
           "the battle must strike at least 16 times a tick while timed");
@@ -178,7 +192,9 @@ bool run_m1() {
             << "ticks: " << WARM_UP_TICKS << " warm-up, then " << TIMED_TICKS
             << " timed, at " << TICKS_PER_SECOND << " ticks per second\n"
             << "people: " << people << ", all in one battle; "
-            << living(world, armies) << " alive when timing ended\n"
+            << living(world, armies) << " alive when timing ended; at most "
+            << peak << " alive at once, under a capacity of "
+            << scenario.rules.people_capacity << "\n"
             << "strikes per tick: "
             << static_cast<double>(timed.all) / TIMED_TICKS
             << ", of which area "
@@ -209,12 +225,14 @@ bool run_live() {
               scenario.rules};
   const std::size_t people = living(world, armies);
   const std::vector<bool> fighting = serving(world, 0, scenario.battle_armies);
+  std::size_t peak = living(world, world.army_count());
   require(people == LIVE_PEOPLE, "the world must hold LIVE_PEOPLE people");
 
   Strikes warm_up{0, 0};
   for (int tick = 0; tick < WARM_UP_TICKS; ++tick) {
     const auto before = cooldowns(world);
     world.tick();
+    peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
     warm_up.all += strikes.all;
     warm_up.area += strikes.area;
@@ -228,6 +246,7 @@ bool run_live() {
     const auto start = std::chrono::steady_clock::now();
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
+    peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
     timed.all += strikes.all;
     timed.area += strikes.area;
@@ -236,6 +255,7 @@ bool run_live() {
   const bool pass = p99 <= BUDGET_MS;
   require(living(world, armies) > people / 2,
           "most of the world must still live when timing ends");
+  require_below_capacity(peak, scenario.rules.people_capacity);
   require(timed.area >= LEAST_BATTLE_STRIKES_PER_TICK *
                             static_cast<std::uint64_t>(TIMED_TICKS),
           "the battles must strike at least 16 times a tick while timed");
@@ -250,7 +270,9 @@ bool run_live() {
             << "people: " << people << ", "
             << std::count(fighting.begin(), fighting.end(), true)
             << " in two battles, the rest in villages and on roads; "
-            << living(world, armies) << " alive when timing ended\n"
+            << living(world, armies) << " alive when timing ended; at most "
+            << peak << " alive at once, under a capacity of "
+            << scenario.rules.people_capacity << "\n"
             << "strikes per tick: "
             << static_cast<double>(timed.all) / TIMED_TICKS
             << ", of which in battle "

@@ -27,6 +27,11 @@ struct LiveScenario {
 /// The people the live scenario holds.
 constexpr std::size_t LIVE_PEOPLE = 5'000;
 
+/// The capacity the live scenario's rules set: LIVE_PEOPLE with a quarter
+/// more for headroom, so the bench can tell a world that fills it from one
+/// that fits.
+constexpr std::size_t LIVE_CAPACITY = 6'250;
+
 /// Returns the live benchmark scenario; every call returns the same one.
 [[nodiscard]] LiveScenario live_scenario();
 

@@ -46,6 +46,7 @@ Rules rules() {
   const std::vector<std::vector<bool>> hostile{{false, true}, {true, false}};
   Rules battle{SEPARATION, hostile, {DURABILITY, DURABILITY / 2, 1}};
   battle.sight = SIGHT;
+  battle.people_capacity = M1_CAPACITY;
   return battle;
 }
 
