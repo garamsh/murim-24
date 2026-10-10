@@ -601,10 +601,10 @@ func _build_body_atlas() -> void:
 # Adds one sprite to `buffer`: `frame` is its rectangle in the atlas, BODY_FRAME in size, `centre`
 # its centre in the pixels of the node the buffer is drawn in, `flip` mirrors it, and a `tint`
 # other than white rings it in that colour; it is drawn `white` of the way to white, `alpha`
-# opaque, and turned `turn` radians about its bottom edge's middle. `outlined`, for an outline, is
+# opaque, and turned `turn` radians about its bottom edge's middle. `outline_of`, for an outline, is
 # where the body it outlines is in the atlas.
 func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, tint: Color, white := 0.0,
-		alpha := 1.0, turn := 0.0, outlined := Vector2(-1, -1)) -> void:
+		alpha := 1.0, turn := 0.0, outline_of := Vector2(-1, -1)) -> void:
 	var size := _atlas.get_size()
 	var width := frame.size.x * (-1.0 if flip else 1.0)
 	var height := frame.size.y
@@ -614,7 +614,7 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
 	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
 	# of the body shown, or, for an outline, where the body it outlines is.
-	var custom := Vector2(white, alpha) if outlined.x < 0.0 else outlined / size
+	var custom := Vector2(white, alpha) if outline_of.x < 0.0 else outline_of / size
 	buffer.append_array(PackedFloat32Array([
 		width * cos_turn, height * sin_turn, 0.0, local.x,
 		width * sin_turn, -height * cos_turn, 0.0, local.y,
