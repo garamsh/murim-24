@@ -586,6 +586,11 @@ std::int64_t WorldAdapter::target(std::int64_t army) const {
   return aimed ? static_cast<std::int64_t>(*aimed) : -1;
 }
 
+godot::Vector2i WorldAdapter::objective(std::int64_t army) const {
+  const murim::Cell cell = world().objective(army_index(army));
+  return godot::Vector2i{cell.x, cell.y};
+}
+
 godot::PackedInt64Array WorldAdapter::foes_in_sight(std::int64_t person) const {
   godot::PackedInt64Array seen;
   for (const std::size_t foe : world().foes_in_sight(person_index(person))) {
@@ -1476,6 +1481,8 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::attack_refusal);
   godot::ClassDB::bind_method(godot::D_METHOD("target", "army"),
                               &WorldAdapter::target);
+  godot::ClassDB::bind_method(godot::D_METHOD("objective", "army"),
+                              &WorldAdapter::objective);
   godot::ClassDB::bind_method(godot::D_METHOD("foes_in_sight", "person"),
                               &WorldAdapter::foes_in_sight);
   godot::ClassDB::bind_method(godot::D_METHOD("faction_count"),

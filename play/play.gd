@@ -643,7 +643,7 @@ func cast_at(slot: int, at: Vector2) -> int:
 	if skill < 0:
 		_hud.show_cast(WorldAdapter.CAST_NO_SKILL)
 		return WorldAdapter.CAST_NO_SKILL
-	var point := _art.to_sub(at)
+	var point: Vector2 = _art.to_sub(at)
 	return cast(skill, _aimed(skill, point - lead()) if _targeted(skill) else point)
 
 
@@ -1033,17 +1033,14 @@ func step() -> void:
 	_body = roster[0]
 
 
-# Clears the selection once its person has died, and once the steered army's attack intent has
-# ended, orders the person to stop where it stands, as a move order to its own cell does, rather
-# than walk back to where it was last ordered.
+# Clears the selection once its person has died, and once the core has ended the steered army's
+# attack intent, takes the objective the core left it holding, so a move order compares against it.
 func _note_intent() -> void:
 	if selected >= 0 and world.person_health(selected) == 0:
 		select(-1)
 	var intent := world.target(steered)
-	if _intent >= 0 and intent < 0 and not world.roster(steered).is_empty():
-		var here := Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
-		if world.order(steered, here, _skills):
-			_objective = here
+	if _intent >= 0 and intent < 0:
+		_objective = world.objective(steered)
 	_intent = intent
 
 

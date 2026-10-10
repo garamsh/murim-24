@@ -129,6 +129,9 @@ class WorldAdapter : public godot::RefCounted {
   /// holds none.
   [[nodiscard]] std::int64_t target(std::int64_t army) const;
 
+  /// Returns the cell army `army`'s order marches it toward.
+  [[nodiscard]] godot::Vector2i objective(std::int64_t army) const;
+
   /// Returns the living foes within the rules' sight of person `person`,
   /// nearest first.
   [[nodiscard]] godot::PackedInt64Array foes_in_sight(
