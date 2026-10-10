@@ -1,9 +1,10 @@
 // The ground drawn off the cell grid (#212) at the 2.5D angle of ADR 0059: a chunk's image, rendered
 // once when the map is built (world_art/ground.gd), from `cells`, one texel a cell: its ground kind
 // in red, its level plus one in green, the material of the face it drops by in blue, plus 128
-// where something is built on it, and alpha below 0.75 where it rises as a slope
-// (world_art/relief.gd, whose height_at() follows this file's). On a built cell the ground is
-// drawn straight: neither warped nor dithered, its own kind and level up to the cell's sides.
+// where it is drawn straight, something built on it with flat ground round it, and alpha below
+// 0.75 where it rises as a slope (world_art/relief.gd, whose height_at() follows this file's). On
+// a straight cell the ground is neither warped nor dithered, its own kind and level up to the
+// cell's sides.
 // For each pixel of the screen, as the world would be drawn unlifted from `origin`:
 // - the cells' values are read through coordinates warped by noise and interpolated between
 //   neighbouring cells, so edges and cliffs run along curves and not along the grid;
