@@ -63,7 +63,8 @@ The region's guard strike does 15 damage. This supersedes the following parts of
 - A save holds the order's target, so `SAVE_VERSION` rises to 10 and every earlier save is refused.
 - The M1 scenario's lines strike one foe each too. `make bench` still finds 18.0 strikes a tick, above its floor of 16.
 - A targeted hit finds its person through the crowd's slot table, where it had scanned the whole crowd. The scan would have cost every basic strike a pass over every living person.
-- The view's selection, its keys and buttons, the target frame and talk moving off Space land in the view's own pull request on top of this one; until then the play scene's body fights by the automatic strike.
+- The view passes the intent as input: Space or the touch attack button sets it on the selection, or on the nearest foe in sight with none, and the view decides nothing about the chase. Selection by click, Tab or tap, the target frame, and talk moving to a click and C land in the same pull request.
+- An intent's chase whose diagonal step a blocked corner shuts takes the open axis of that diagonal, the longer offset's first. Without it, a body inside a village stood still behind a house corner with its intent held. People engaging on their own keep ADR 0046's step unchanged, so `make sweep` is not moved by it.
 
 ## Signs the decision was wrong
 
