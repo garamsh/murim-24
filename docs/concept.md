@@ -164,6 +164,12 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - hunting waiting for animals (#171)
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
 - **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
+- **[proposed]** ADR 0063's details (`docs/architecture/adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`):
+  - births scaled by a household's days of food, from its purse and its village's stock, and slowed by crowding past housing
+  - a village's housing and food caps kept only as consequences, read by growth and migration, with no birth stopping at them
+  - the core's people storage a technical capacity, measured as ADR 0048 measures the bound, which the balance must never reach
+  - field and wild food yields by biome and season in pack data, as the levers
+  - `make sweep` reporting population, food, money, villages and hunger against target bands over 100 years
 - **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
 - **[proposed]** Building kinds beyond the current set. The current set, in `core/region.cpp`, is houses and halls (housing), fields (harvest), granaries and storehouses (storage), and wells, barrels and fences, which hold nothing. Proposed additions:
   - Smithy: makes and mends weapons.
