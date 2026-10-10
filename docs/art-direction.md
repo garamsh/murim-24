@@ -53,6 +53,14 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/training_ground` | 112 x 82 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/manual_hall` | 80 x 116 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/seat_gate` | 64 x 68 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_wall_south`, `town_wall_north` | 32 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_wall_west`, `town_wall_east` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_corner_tower` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_gate_tower` | 96 x 88 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_steps` | 32 x 58 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_temple` | 80 x 96 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_market_stall` | 48 x 50 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_courtyard_house` | 96 x 106 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
@@ -231,6 +239,21 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 | Apothecary (약방) | Structure | 4 x 2 | A plastered shop on a stone plinth under a slate roof over its left three cells: a counter window on a cabinet of small drawers with gold pulls, jars and a mortar on the sill, herbs hung under the eave, a door under a split cloth curtain and a name board; in the yard at its right a herb rack of two posts and two bars hung with bundles, a drying tray of woven bamboo on trestles and a round tray on the ground, herbs spread on both; damaged holes the roof, scorches the wall, pulls drawers out and snaps the rack's lower bar onto the ground, destroyed drops the roof in and burns the walls to stumps, the rack to two posts and the tray where it fell, rubble is a heap on the plinth and ash in the yard |
 
 - The anvil outlasts the smithy: it stands on its stump intact and damaged and lies on its side, destroyed and rubble.
+
+A walled town (#200) encloses a real town, at least about 40 x 30 cells inside its wall, with streets, wards, a market square, a hall, temples and courtyard houses; a village stays unwalled. The game does not lay one yet: the town's template and its growth are #169's. Its pieces, each in the four stages:
+
+| Piece | Footprint | Look |
+|---|---|---|
+| Wall, south and north | 1 x 2 | A face of stone courses a level high under a paved walkway two cells deep, merlons along its outer edge and a low parapet along its inner one; laid a piece a cell, its sides outlined only at a run's ends, so a run reads as one wall |
+| Wall, west and east | 2 x 1 | The walkway two cells wide seen from above, merlons down its outer edge, over the face that shows where its run ends |
+| Corner tower | 3 x 3 | Two levels of stone courses, crenellated all round, a small watch pavilion on its top |
+| Gate tower | 5 x 2 | The wall raised over a road, the passage through its middle cell dark under its arch with its doors open, a gold name board over it, a gate house of plaster and lacquered pillars on its top under a broad slate roof |
+| Steps | 1 x 2 | Eight treads, each three rows deep over a riser two rows high, between plain cheeks, up to the walkway behind them |
+| Temple | 4 x 3 | Lacquered walls on a high plinth with steps, under a skirt roof and an upper roof, a gold plaque between them |
+| Market stall | 2 x 1 | A striped awning of paper and crimson on four posts over a table of pots, greens and bolts of cloth |
+| Courtyard house | 5 x 5 | A grey wall round a paved court with a tree, the main hall across its back, a wing down each side, a gate in its front wall under a small roof |
+
+- What is built is drawn crisp: its edges run along the pixel grid, and the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam.
 
 ## Effects and HUD
 
