@@ -161,6 +161,13 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - A spirit beast leaves a spirit core (영단), a cultivation item consumed or refined for qi or realm progress, and materials worth more than an ordinary animal's.
   - Every animal leaves materials when killed, by species as pack data. Meat is food: it feeds the hunter's household and counts as food. Hide, bone and horn feed crafting.
   - Hunters are a trade, and NPCs hunt for food and materials as the player does.
+- **[proposed]** ADR 0067's details:
+  - grass as a forage slot, a grazer needing 3 of them
+  - predators eating every 16 days, starving after 3 cycles unfed
+  - none appearing in an area holding a village structure
+  - hunting as a livelihood for idle earners within 32 cells, not paid by a treasury, meat eaten at home first
+  - spirit beasts at least 48 cells from every village and 128 from another, holding 12 cells
+  - a spirit core adding its qi up to the talent's limit, or refined by an apothecary into pills
 - **Villages are built from trees and stones.** Trees and stones are world objects, and NPCs build villages from them, automatically. Construction stays NPC-only: the player may gather, but never builds.
 - **Villages grow like WorldBox,** with people and resources: centre first, houses placed outward into suitable ground, expanding, and founding new villages. Villages are larger by default.
 - **[proposed]** ADR 0056's details:
@@ -168,7 +175,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - a village's materials account, with its idle earners assigned to gather what its next building lacks and paid from the treasury
   - buildings rising only as far as their materials are delivered
   - settlers carrying a first house's materials
-  - hunting waiting for animals (#171)
+  - hunting by ADR 0067's animals
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
 - **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
 - **[proposed]** ADR 0063's details (`docs/architecture/adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`):
