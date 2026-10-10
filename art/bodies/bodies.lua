@@ -4,8 +4,9 @@
 --   higher), facing the viewer turned to the right,
 --   back (four) walking away from the viewer, the head seen from behind,
 --   strike (two): the weapon swung, then the standing frame,
--- and each again with _xray after it: only the silhouette's outline, in the faction's light
--- accent, which the view draws over whatever hides the body. The view mirrors a body to face left.
+-- and each again with _xray after it: only the silhouette's outline, which the view draws over
+-- whatever hides the body, in the Orthodox's and the Unorthodox's light accent and in violet for
+-- the Demonic Cult, whose crimson stays for hostility. The view mirrors a body to face left.
 -- Run: aseprite --batch --script art/bodies/bodies.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -23,7 +24,7 @@ local HEAD_BOTTOM = 15
 -- its outline seen through what hides it.
 local factions = {
   orthodox = { spec = { faction = "orthodox", head = "topknot", weapon = "sword" }, xray = c("azure", 4) },
-  demonic = { spec = { faction = "demonic", head = "spiky", body = "tunic", weapon = "saber" }, xray = c("crimson", 4) },
+  demonic = { spec = { faction = "demonic", head = "spiky", body = "tunic", weapon = "saber" }, xray = c("violet", 4) },
   unorthodox = { spec = { faction = "unorthodox", head = "topknot", hat = "straw", body = "tunic", weapon = "knife" },
     xray = c("amber", 4) },
 }
