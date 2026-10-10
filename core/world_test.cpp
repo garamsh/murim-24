@@ -490,6 +490,30 @@ TEST(World, OnlyHostilePeopleWithinRangeUseTheirSkills) {
   EXPECT_EQ(health_lost(user, ally, at_war(0)), 0U);
 }
 
+TEST(World, AWarDeclaredBetweenTicksIsStruckOnTheNextTick) {
+  const Skill reach{2 * CELL_SIZE, 0, 1, 0, 1};
+  // Two leaders of factions at peace by the rules, each in the other's
+  // reach.
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army({2, 0}, {2, 0}, 1, TARGET_HEALTH, 0, {reach}),
+               army({4, 0}, {4, 0}, 1, TARGET_HEALTH, 1, {reach})},
+              {},
+              Rules{SEPARATION, {{false, false}, {false, false}}, STAGE_FLOORS},
+              {},
+              {{0, std::nullopt, std::nullopt, std::nullopt},
+               {1, std::nullopt, std::nullopt, std::nullopt}}};
+  // The control: at peace, neither strikes.
+  world.tick();
+  ASSERT_EQ(health_of(world, 1), TARGET_HEALTH);
+  world.declare(0, 1, Declaration::WAR);
+  ASSERT_TRUE(world.hostile(0, 1));
+  world.tick();
+
+  EXPECT_LT(health_of(world, 1), TARGET_HEALTH);
+  EXPECT_LT(health_of(world, 0), TARGET_HEALTH);
+}
+
 TEST(World, EquallyNearTargetsGoToTheLowestIndex) {
   const ArmySpec user =
       army({4, 4}, {4, 4}, 1, 1, 0, {{3 * CELL_SIZE, 0, 1, 0, NEVER_AGAIN}});

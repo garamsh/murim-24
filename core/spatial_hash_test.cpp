@@ -168,5 +168,44 @@ TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
             std::optional<std::size_t>{0});
 }
 
+TEST(SpatialHash, NearestFindsAPositionAtTheRadiusAndNoneOneUnitPast) {
+  const Position centre = centre_of(Cell{10, 10});
+  constexpr std::int32_t SIGHT = 3 * CELL_SIZE;
+  const SpatialHash at_radius{
+      std::vector<Position>{centre, Position{centre.x + SIGHT, centre.y}}};
+  const SpatialHash past_radius{
+      std::vector<Position>{centre, Position{centre.x + SIGHT + 1, centre.y}}};
+  const auto other = [](std::size_t index) { return index != 0; };
+
+  EXPECT_EQ(at_radius.nearest(UINT64_LIMIT, centre, SIGHT, other),
+            std::optional<std::size_t>{1});
+  EXPECT_EQ(past_radius.nearest(UINT64_LIMIT, centre, SIGHT, other),
+            std::nullopt);
+  // The control: the radius one unit wider finds the one past it.
+  EXPECT_EQ(past_radius.nearest(UINT64_LIMIT, centre, SIGHT + 1, other),
+            std::optional<std::size_t>{1});
+}
+
+TEST(SpatialHash, NearestWeighsAnEqualDistanceOnALaterRing) {
+  const Position centre = centre_of(Cell{10, 10});
+  // Both five cells away: the lower index five cells east, on ring five, and
+  // the higher three east and four south, on ring four, which the walk
+  // meets first.
+  const std::vector<Position> positions{
+      centre, Position{centre.x + (5 * CELL_SIZE), centre.y},
+      Position{centre.x + (3 * CELL_SIZE), centre.y + (4 * CELL_SIZE)}};
+  const SpatialHash hash{positions};
+  constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
+
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
+                         [](std::size_t other) { return other != 0; }),
+            std::optional<std::size_t>{1});
+  // The control: the one on ring four is found when the other is not
+  // offered.
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
+                         [](std::size_t other) { return other == 2; }),
+            std::optional<std::size_t>{2});
+}
+
 }  // namespace
 }  // namespace murim
