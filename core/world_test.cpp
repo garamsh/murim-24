@@ -3848,6 +3848,37 @@ TEST(World, AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies) {
   EXPECT_EQ(world.target(CHASER), std::nullopt);
 }
 
+TEST(World, AMoveOrderGivenDuringAnIntentReachesItsCell) {
+  constexpr std::int32_t APART = 4;
+  // Too few ticks to reach a foe four cells away, then enough to walk on.
+  constexpr std::uint64_t APPROACH_TICKS = 10;
+  constexpr std::uint64_t AFTER_TICKS = 300;
+  const Cell elsewhere{STAND.x, STAND.y + 4};
+  World world = intent_world(APART);
+  world.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(world, APPROACH_TICKS);
+  ASSERT_FALSE(in(STAND, world.person(CHASER).position));
+  world.order(CHASER, Order{elsewhere, {0}});
+  run_ticks(world, AFTER_TICKS);
+  // The order replaced the intent and the chaser walked to its cell.
+  EXPECT_EQ(world.target(CHASER), std::nullopt);
+  EXPECT_TRUE(in(elsewhere, world.person(CHASER).position));
+  EXPECT_EQ(world.person(INTENT_FOE).health, INTENT_FOE_HEALTH);
+
+  // Control: an intent the core ends, its target dead, leaves the chaser
+  // holding where it struck, not walking back to STAND.
+  World ended = intent_world(APART);
+  ended.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(ended, AFTER_TICKS);
+  ASSERT_EQ(ended.person(INTENT_FOE).health, 0U);
+  const Cell held = cell_of(ended.person(CHASER).position);
+  EXPECT_EQ(ended.objective(CHASER).x, held.x);
+  EXPECT_EQ(ended.objective(CHASER).y, held.y);
+  run_ticks(ended, AFTER_TICKS);
+  EXPECT_TRUE(in(held, ended.person(CHASER).position));
+  EXPECT_FALSE(in(STAND, ended.person(CHASER).position));
+}
+
 TEST(World, AnAttackIntentStepsRoundACornerShuttingItsDiagonal) {
   constexpr std::uint64_t CHASE_TICKS = 300;
   // The foe stands two cells west and four north, so the step nearest the

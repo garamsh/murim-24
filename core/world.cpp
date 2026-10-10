@@ -2137,6 +2137,10 @@ std::optional<std::size_t> World::target(std::size_t army) const {
   return armies_.at(army).order.target;
 }
 
+Cell World::objective(std::size_t army) const {
+  return armies_.at(army).order.objective;
+}
+
 std::vector<std::size_t> World::foes_in_sight(std::size_t person) const {
   if (person >= people_.size()) {
     throw std::invalid_argument("no such person");
@@ -2177,22 +2181,30 @@ bool World::sighted(const std::vector<std::size_t>& roster,
 }
 
 // Ends each attack intent whose target is dead, no foe of its army's lead,
-// or out of every member's sight, positions read as the tick began.
+// or out of every member's sight, positions read as the tick began. The army
+// then holds where its lead stands, its objective that cell, rather than walk
+// back to the objective it chased from.
 void World::end_intents(const Crowd& crowd) {
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    Order& order = armies_.at(army).order;
+    Army& chasing = armies_.at(army);
+    Order& order = chasing.order;
     if (!order.target) {
       continue;
     }
     const std::size_t aimed = crowd.slot.at(*order.target);
-    const std::vector<std::size_t>& roster = armies_.at(army).roster;
+    const std::vector<std::size_t>& roster = chasing.roster;
     const bool held =
         aimed != ABSENT && people_.at(*order.target).health > 0 &&
         !roster.empty() &&
         foes(roster.front(), army, *order.target, crowd.armies.at(aimed)) &&
         sighted(roster, crowd.hash.position(aimed));
-    if (!held) {
-      order.target.reset();
+    if (held) {
+      continue;
+    }
+    order.target.reset();
+    if (!roster.empty()) {
+      order.objective = cell_of(people_.at(roster.front()).position);
+      chasing.field = FlowField{map_, order.objective};
     }
   }
 }

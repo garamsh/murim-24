@@ -568,8 +568,10 @@ struct ArmySpec {
 /// of `skills`, indices into the army's own skills, drawn by the seed. An
 /// army created from an ArmySpec follows its objective with all its skills
 /// until it is given another order. With a `target`, an attack intent, its
-/// members close on that person and aim every automatic strike at it, until
-/// it dies or no member has it in sight, which ends the intent.
+/// members close on that person and aim every automatic strike at it. The
+/// core ends the intent when the target dies, stops being a foe of the army's
+/// lead, or leaves every member's sight, and the army then holds where its
+/// lead stands; an order without a target, a move order, replaces it.
 struct Order {
   Cell objective;
   std::vector<std::size_t> skills;
@@ -1133,6 +1135,11 @@ class World {
   /// Returns the person army `army`'s attack intent targets, if it holds
   /// one. Throws std::out_of_range when there is no such army.
   [[nodiscard]] std::optional<std::size_t> target(std::size_t army) const;
+
+  /// Returns the cell army `army`'s order marches it toward, which an ended
+  /// attack intent sets to where its lead stands. Throws std::out_of_range
+  /// when there is no such army.
+  [[nodiscard]] Cell objective(std::size_t army) const;
 
   /// Returns the living foes within the rules' sight of person `person`,
   /// nearest first, the first in index order among equals: those its army

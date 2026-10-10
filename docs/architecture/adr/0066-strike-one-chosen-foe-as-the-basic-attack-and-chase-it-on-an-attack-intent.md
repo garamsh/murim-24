@@ -34,6 +34,11 @@ Options weighed for when the intent ends:
 - **The core ends it on the tick its target dies, stops being a foe of the army's lead, or lies beyond the rules' sight of every member, positions read as the tick began.** Chosen.
 - **Only the view ends it.** Rejected: the core would chase a target the view no longer sees.
 
+Options weighed for what an ended intent leaves the army doing:
+- **It holds where its lead stands: the core sets its objective to that cell.** Chosen. The core decides it, as it decides the chase.
+- **It walks back to the objective it chased from.** Rejected: after a kill the body would turn and walk away on its own.
+- **The view orders a stop when it sees the intent end.** Rejected on PR #237's review: it is a rule in the view, and it overwrote a move order the player gave during the intent a tick later.
+
 Retuning, with the basic strike hitting one person instead of 1.7. `make sweep`, seeds 0 to 49 for 100 years, every faction peopled, against `main` at `d89a52f`, which kept 48 (failing seeds 35 and 48), with 55 wars and 28 peaces:
 
 | Guard strike | Every faction peopled | Seeds failing | Wars, peaces |
@@ -47,7 +52,7 @@ Retuning, with the basic strike hitting one person instead of 1.7. `make sweep`,
 
 ## Decision
 
-The basic strike, the army's skill, is targeted. An army may hold an attack intent, a target given with its order. Its members close on the target and aim every automatic strike at it, whoever steers the army, until the target dies, stops being a foe, or leaves every member's sight, or an order without a target replaces it.
+The basic strike, the army's skill, is targeted. An army may hold an attack intent, a target given with its order. Its members close on the target and aim every automatic strike at it, whoever steers the army, until the target dies, stops being a foe, or leaves every member's sight, or an order without a target replaces it. An intent the core ends leaves the army holding where its lead stands, its objective that cell; the view issues no stop of its own.
 
 `attack_refusal` names why a person may not be the target: the army has no member, there is no such living person, the person is not a foe of the army's lead, or no member has it in sight. `order` refuses a target for the same reasons, and `foes_in_sight` lists a person's foes in sight, nearest first, for the view to cycle and to take when nothing is selected.
 
