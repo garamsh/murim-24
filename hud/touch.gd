@@ -45,15 +45,15 @@ const BUTTONS := {
 	"sect": Rect2(50, 92, 42, 42),
 	"factions": Rect2(96, 92, 42, 42),
 	"arts": Rect2(142, 92, 42, 42),
-	"attack": Rect2(328, 138, 34, 34),
-	"cycle": Rect2(328, 176, 34, 34),
+	"attack": Rect2(322, 134, 38, 38),
+	"cycle": Rect2(322, 176, 38, 38),
 }
 const BUTTON_KEYS := {"genealogy": "TOUCH_GENEALOGY", "sect": "TOUCH_SECT", "factions": "TOUCH_FACTIONS",
 		"arts": "TOUCH_ARTS", "attack": "TOUCH_ATTACK", "cycle": "TOUCH_CYCLE"}
 const PAUSE := Rect2(434, 4, 42, 42)
 ## The room each word is given, by its hud.csv key.
 const ROOM := {"TOUCH_GENEALOGY": 36, "TOUCH_SECT": 36, "TOUCH_FACTIONS": 36, "TOUCH_ARTS": 36,
-		"TOUCH_ATTACK": 28, "TOUCH_CYCLE": 28,
+		"TOUCH_ATTACK": 32, "TOUCH_CYCLE": 32,
 		"TOUCH_CANCEL": 40, "TOUCH_SELF": 50, "TOUCH_PLACE": 110}
 ## Where the slip asking for a button to place a skill on is centred, and its top.
 const PLACE_SLIP := Vector2(404, 136)
