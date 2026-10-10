@@ -28,10 +28,13 @@
 # army's skills, with it put on T, sees it on T's slot, aims at its range and casts it at that range
 # from the fifth skill button, while an empty slot shows and casts nothing. The loadout is saved
 # with the world, and Continue restores it. Walked up to a person of an allied faction, the prompt
-# names it and Space opens the dialogue window on it, which takes the keys: Enter lists its news,
-# Escape goes back, then ends the talk. Once its faction is at war with the person's, the prompt
-# shows its refusal, Space opens nothing, and an open window closes; control: until then it stays
-# open. The people near the person are named over their heads, the person itself and the one the
+# names it and C opens the dialogue window on it, as a left click on it does, which takes the keys:
+# Enter lists its news, Escape goes back, then ends the talk. Once its faction is at war with the
+# person's, the prompt shows its refusal, C opens nothing, and an open window closes; control: until
+# then it stays open. A left click on a foe in sight selects it without moving the person, and
+# Space then sets an attack intent on it, which the person chases, until a move order ends it; Tab
+# selects the next foe and Escape clears the selection; Space on an ally is refused, and with no
+# foe in sight does nothing; the touch controls' next and attack buttons do what Tab and Space do. The people near the person are named over their heads, the person itself and the one the
 # talk prompt names left out, and no name shows while a panel is open.
 extends RefCounted
 
@@ -70,6 +73,10 @@ const WorldArt := preload("res://world_art/world_art.gd")
 # the person has to be ready to cast again.
 const APPROACH_LIMIT := 4000
 const READY_LIMIT := 120
+# Cells from the person within which the hostile army halts in the attack intent's pass, within the
+# rules' sight of 6 cells, and ticks each of its steps runs.
+const INTENT_APART := 4
+const INTENT_TICKS := 30
 # Ticks after the joystick is let go, and the four ways it is pushed to find one passable.
 const STOP_TICKS := 60
 const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
@@ -112,7 +119,7 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass()
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
@@ -531,6 +538,8 @@ func _cast_pass() -> bool:
 	return pressed and on_release
 
 
+# The scene born into the first village, casting on release or on press as `on_release` says,
+# striking with its first skill alone and the cursor CAST_OFFSET east of the person.
 func _cast_scene(on_release: bool) -> Node2D:
 	var scene := _scene(0)
 	scene.get_node("Hud").settings.chosen.cast = 1 if on_release else 0
@@ -860,10 +869,11 @@ func _territory_pass() -> bool:
 
 
 # Walked up to the nearest person of a faction allied to its own, the person is prompted to talk to it
-# and Space opens the dialogue window on it, where a digit gives no order, Enter lists its own news
-# and Escape goes back to the menu and then ends the talk, without pausing. With the window open
-# again, a tick leaves it open; once the person's faction's leader declares war on the other's, the
-# next tick closes it, the prompt shows the refusal and Space opens nothing.
+# and C opens the dialogue window on it, where a digit gives no order, Enter lists its own news
+# and Escape goes back to the menu and then ends the talk, without pausing. A left click on the ally
+# opens the window too, and selects no one. With the window open again, a tick leaves it open; once
+# the person's faction's leader declares war on the other's, the next tick closes it, the prompt
+# shows the refusal and C opens nothing.
 func _talk_pass() -> bool:
 	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
@@ -904,8 +914,9 @@ func _talk_pass() -> bool:
 	var not_paused: bool = not scene.navigate(_key(KEY_ESCAPE)) and hud.screen() == null
 	var back: bool = scene.command(_key(KEY_ESCAPE)) and dialogue.visible and not dialogue.showing_news
 	var ended: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
+	var clicked: bool = scene.command(_left(_pixels_of(scene, ally))) and dialogue.visible \
+			and dialogue.person == ally and scene.selected < 0
 	# Control: a tick with nothing changed leaves the window open.
-	scene.command(_key(scene.TALK_KEY))
 	scene.step()
 	scene.show_talk()
 	var kept: bool = dialogue.visible and dialogue.person == ally
@@ -916,17 +927,17 @@ func _talk_pass() -> bool:
 	var closed: bool = not dialogue.visible and world.talk_refusal(player, ally) == WorldAdapter.TALK_HOSTILE
 	var refused: bool = scene.talk_to == ally and scene.talk_hostile and prompt.visible and prompt.refused
 	var nothing_opened: bool = not scene.command(_key(scene.TALK_KEY)) and not dialogue.visible
-	var passed := prompted and opened and digit_taken and news_shown and not_paused and back and ended and kept \
-			and declared and closed and refused and nothing_opened
-	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; Space opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, Space opened nothing %s: %s" % [
+	var passed := prompted and opened and digit_taken and news_shown and not_paused and back and ended and clicked \
+			and kept and declared and closed and refused and nothing_opened
+	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; C opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a left click on it opened it, selecting no one, %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, C opened nothing %s: %s" % [
 		ticks, ally, prompted, opened, digit_taken, world.rumours(ally).size(), news_shown, not_paused, back, ended,
-		kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
+		clicked, kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 
 
 # Walked up to the nearest person of a faction not hostile to its own who sells the herb, the steered
-# person opens the dialogue on it with Space, chooses its wares, and buys a herb with Enter, paying
+# person opens the dialogue on it with C, chooses its wares, and buys a herb with Enter, paying
 # its price, the purse following; Enter on the pill it cannot pay for is refused, nothing paid; Escape
 # goes back to the menu and then ends the talk. Z at full health is refused as full and X, holding no
 # pill, as none held, each noticed, nothing consumed; control: a digit, the window closed, orders.
@@ -981,7 +992,7 @@ func _trade_pass() -> bool:
 			and hud.labels.notice.text == hud.tr("CONSUME_NONE_HELD") % hud.dialogue.ware_name(world.wares()[1])
 	var digit: bool = scene.command(_key(KEY_1))
 	var passed := opened and wares_shown and bought and dear and back and ended and full and none_held and digit
-	print("play_test: walked %d ticks up to seller %d; Space opened its menu with wares %s; Enter showed them %s; bought a herb %s, %d silver left; the pill refused %s; back %s, ended %s; Z at full health refused %s, X with no pill %s; a digit then ordered %s: %s" % [
+	print("play_test: walked %d ticks up to seller %d; C opened its menu with wares %s; Enter showed them %s; bought a herb %s, %d silver left; the pill refused %s; back %s, ended %s; Z at full health refused %s, X with no pill %s; a digit then ordered %s: %s" % [
 		ticks, seller, opened, wares_shown, bought, world.person_silver(player), dear, back, ended, full, none_held,
 		digit, "pass" if passed else "FAIL"])
 	scene.free()
@@ -1542,3 +1553,101 @@ func _rebirth_pass() -> bool:
 	print("play_test: Cult body %d ordered on %s %s; after %d ticks the rebirth screen shows %d dead and %d born %s, not open before %s; no tick while open %s; Enter goes on and ticks run %s: %s" % [
 		body, target, ordered, ticks, body, reborn, shown, closed_before, held, resumed, "pass" if passed else "FAIL"])
 	return passed
+
+
+# Where person `person` of `scene`'s world stands, in the scene's pixels, where a click lands on its
+# body.
+func _pixels_of(scene: Node2D, person: int) -> Vector2:
+	return scene.world.person_position(person) * scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+
+
+# The nearest hostile army, steered so that it does not close on the person on its own, marches on
+# the person until two of it are in sight and the nearest within INTENT_APART cells, and halts
+# there; the person stands where it is.
+# A left click on the nearest foe in sight selects it and sets no intent; ticked INTENT_TICKS, the
+# person comes no closer to it (the control). Space then sets the intent on it, and as many ticks
+# bring the person closer by more than a cell. A right click, a move order, ends the intent. Tab
+# selects the next foe in sight and Escape clears the selection. Space on a person of the person's
+# own faction is refused as not a foe, the reason on the HUD, and sets no intent. The touch
+# controls' next button selects a foe and their attack button sets the intent on it. In a fresh
+# scene, with no foe in sight, Space does nothing and shows nothing.
+func _intent_pass() -> bool:
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var person: int = world.roster(scene.steered)[0]
+	var here := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	world.order(scene.steered, here, PackedInt64Array(range(world.skill_count(scene.steered))))
+	var foes := _nearest_hostile(world, scene.steered)
+	world.steer(foes, true)
+	world.order(foes, here, PackedInt64Array([0]))
+	var waited := 0
+	var near := func() -> bool:
+		var seen := world.foes_in_sight(person)
+		return seen.size() >= 2 and world.person_position(seen[0]).distance_to(scene.lead()) \
+				<= INTENT_APART * WorldAdapter.CELL_SIZE
+	while not near.call() and waited < APPROACH_LIMIT:
+		scene.step()
+		waited += 1
+	# Halted where it stands, the army comes no closer.
+	world.order(foes, Vector2i((world.body_positions(foes)[0] / WorldAdapter.CELL_SIZE).floor()), PackedInt64Array([0]))
+	for i in INTENT_TICKS:
+		scene.step()
+	var seen := world.foes_in_sight(person)
+	if seen.size() < 2:
+		print("play_test: fewer than two foes came within sight in %d ticks: FAIL" % APPROACH_LIMIT)
+		scene.free()
+		return false
+	var foe := seen[0]
+	var selected: bool = scene.command(_left(_pixels_of(scene, foe))) and scene.selected == foe \
+			and world.target(scene.steered) < 0
+	var before: float = scene.lead().distance_to(world.person_position(foe))
+	for i in INTENT_TICKS:
+		scene.step()
+	var stayed: bool = scene.lead().distance_to(world.person_position(foe)) >= before - WorldAdapter.CELL_SIZE / 2.0
+	var set: bool = scene.command(_key(KEY_SPACE)) and world.target(scene.steered) == foe
+	var from: float = scene.lead().distance_to(world.person_position(foe))
+	for i in INTENT_TICKS:
+		scene.step()
+	var chased := world.target(scene.steered) == foe or world.person_health(foe) == 0
+	var closed: bool = scene.lead().distance_to(world.person_position(foe)) < from - WorldAdapter.CELL_SIZE
+	scene.command(_click(here, scene.PIXELS_PER_CELL))
+	var ended := world.target(scene.steered) < 0
+	seen = world.foes_in_sight(person)
+	var expected := seen[(seen.find(scene.selected) + 1) % seen.size()]
+	var tabbed: bool = scene.command(_key(KEY_TAB)) and scene.selected == expected
+	scene.command(_key(KEY_ESCAPE))
+	var cleared: bool = scene.selected < 0 and hud.screen() == null
+	var own := -1
+	for army in world.army_count():
+		for other in world.roster(army):
+			if other != person and world.person_faction(other) == world.army_faction(scene.steered):
+				own = other
+	scene.select(own)
+	hud.labels.notice.visible = false
+	var refused: bool = own >= 0 and not scene.command(_key(KEY_SPACE)) and world.target(scene.steered) < 0 \
+			and hud.labels.notice.visible and hud.labels.notice.text == "ATTACK_NOT_A_FOE"
+	scene.select(-1)
+	hud.use_touch(true)
+	var touch: Control = hud.touch
+	scene.touch(_finger(0, touch.BUTTONS.cycle.get_center(), true))
+	scene.touch(_finger(0, touch.BUTTONS.cycle.get_center(), false))
+	var cycled: bool = world.foes_in_sight(person).has(scene.selected)
+	scene.touch(_finger(0, touch.BUTTONS.attack.get_center(), true))
+	scene.touch(_finger(0, touch.BUTTONS.attack.get_center(), false))
+	var tapped: bool = cycled and world.target(scene.steered) == scene.selected
+	scene.free()
+
+	var alone := _scene(0)
+	var alone_hud: CanvasLayer = alone.get_node("Hud")
+	var nobody: bool = alone.world.foes_in_sight(alone.world.roster(alone.steered)[0]).is_empty()
+	var nothing: bool = nobody and not alone.command(_key(KEY_SPACE)) and alone.world.target(alone.steered) < 0 \
+			and not alone_hud.labels.notice.visible
+	alone.free()
+	var passed: bool = selected and stayed and set and chased and closed and ended and tabbed and cleared and refused \
+			and tapped and nothing
+	print("play_test: %d foes in sight after %d ticks; a click selected foe %d with no intent %s, the person kept its distance %s; Space set the intent %s, chased %s and closed in %s; a move order ended it %s; Tab selected the next %s; Escape cleared %s; Space on one of its own faction refused %s; touch next and attack %s; with no foe in sight Space did nothing %s: %s" % [
+		seen.size(), waited, foe, selected, stayed, set, chased, closed, ended, tabbed, cleared, refused, tapped,
+		nothing, "pass" if passed else "FAIL"])
+	return passed
+
