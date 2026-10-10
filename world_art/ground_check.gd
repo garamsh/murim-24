@@ -5,10 +5,10 @@
 ## its viewport once every area is drawn; that the same relief bakes to the same pixels, detail and
 ## trees; that an edge between plain and forest running straight along the cells' sides is drawn
 ## wandering over them, where the same relief drawn without warp keeps it within a few pixels of the
-## cells' side; that across cells something is built on, the same edge runs straight down the
-## cells' side on every row; and that streaming shows the areas round the view, an area at most a frame once the
-## first are shown, frees those it left, and shows an area's trees again where they were. It exits 0
-## when every check passes, 1 when one fails and 2 when it cannot draw.
+## cells' side; that across cells something is built on, the same edge runs straight down the cells'
+## side on every row; and that streaming shows the areas round the view, an area at most a frame
+## once the first are shown, frees those it left, and shows an area's trees again where they were.
+## It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw.
 extends SceneTree
 
 const Ground := preload("res://world_art/ground.gd")
