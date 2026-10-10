@@ -3226,9 +3226,10 @@ bool World::held(std::size_t index, Step pull,
 // step closing on the nearest, the first in the crowd's order among equals. The
 // step is the one of the eight nearest the line to the foe, open as a flow
 // field's is: into a passable cell, and on a diagonal only where both cells
-// beside it are passable. Nothing, so it keeps its objective, when a driver
-// steers its army, it reaches no farther than itself, no foe is in sight or the
-// step is not open.
+// beside it are passable; an attack intent's chase whose diagonal is shut
+// steps along an open axis instead. Nothing, so it keeps its objective, when a
+// driver steers its army and it holds no intent, it reaches no farther than
+// itself, no foe is in sight or no step is open.
 std::optional<Step> World::closing(std::size_t index, const Army& army,
                                    const Crowd& crowd) const {
   const std::size_t member = crowd.people.at(index);
@@ -3277,10 +3278,29 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
           ? sign(offset_y)
           : 0};
   const Cell cell = cell_of(from);
-  const bool open = map_.passable(Cell{cell.x + step.x, cell.y + step.y}) &&
-                    map_.passable(Cell{cell.x + step.x, cell.y}) &&
-                    map_.passable(Cell{cell.x, cell.y + step.y});
-  return open ? std::optional<Step>{step} : std::nullopt;
+  const auto open = [&](Step way) {
+    return map_.passable(Cell{cell.x + way.x, cell.y + way.y}) &&
+           map_.passable(Cell{cell.x + way.x, cell.y}) &&
+           map_.passable(Cell{cell.x, cell.y + way.y});
+  };
+  if (open(step)) {
+    return step;
+  }
+  if (!army.order.target || step.x == 0 || step.y == 0) {
+    return std::nullopt;
+  }
+  // An attack intent's chase, its diagonal shut by a corner, takes the open
+  // one of its two axes, the one along the longer offset first.
+  const Step along_x{step.x, 0};
+  const Step along_y{0, step.y};
+  const bool x_first = std::abs(offset_x) >= std::abs(offset_y);
+  for (const Step way :
+       {x_first ? along_x : along_y, x_first ? along_y : along_x}) {
+    if (open(way)) {
+      return way;
+    }
+  }
+  return std::nullopt;
 }
 
 // Whether cell `cell` lies within the growth's claim of village `village`'s

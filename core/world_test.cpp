@@ -3848,6 +3848,33 @@ TEST(World, AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies) {
   EXPECT_EQ(world.target(CHASER), std::nullopt);
 }
 
+TEST(World, AnAttackIntentStepsRoundACornerShuttingItsDiagonal) {
+  constexpr std::uint64_t CHASE_TICKS = 300;
+  // The foe stands two cells west and four north, so the step nearest the
+  // line to it is north-west, which a wall west of the chaser shuts.
+  const Cell foe{STAND.x - 2, STAND.y - 4};
+  std::vector<std::string> rows = open_map(OPEN_SIDE);
+  rows.at(STAND.y).at(STAND.x - 1) = '#';
+  const Skill strike{ARM, 0, INTENT_DAMAGE, 0, 1, 0, Shape::TARGETED};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  World world{Seed{1},
+              Map{rows},
+              {army(rows, STAND, STAND, 1, TARGET_HEALTH, 0, {strike}),
+               army(rows, foe, foe, 1, INTENT_FOE_HEALTH, 1, {IDLE})},
+              {},
+              rules};
+  // Both steered, so neither closes on the other but by the intent.
+  world.steer(0, true);
+  world.steer(1, true);
+  world.order(0, Order{STAND, {0}, 1});
+  ASSERT_EQ(world.target(0), std::optional<std::size_t>{1});
+  run_ticks(world, CHASE_TICKS);
+
+  // It went north round the wall, reached the foe and struck it dead.
+  EXPECT_EQ(world.person(1).health, 0U);
+}
+
 TEST(World, AnOrderWithoutATargetEndsTheAttackIntent) {
   constexpr std::int32_t APART = 4;
   // Too few ticks to come within arm's length of a foe four cells away.
