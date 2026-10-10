@@ -45,7 +45,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each; the top-down ground, drawn on the contact sheet and not by the game |
 | `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14; as `terrain` |
 | `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3`; as `terrain` |
-| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the faction's light accent; feet on row 22 |
+| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
@@ -87,8 +87,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Light | From the upper left; shadows fall to the lower right |
 
 - A body stands with its feet, row 22 of its frame, on the point the core gives it. Until #200's next pull request redraws them at the angle, structures keep the art of the 16-pixel grid below, a structure standing with its footprint's bottom edge on the ground's.
-- A sprite covers its footprint and may rise above it. A body's footprint is its cell, the bottom 16 rows of its 16 x 24 frame. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
-- Shadows are not in the sprites. The view draws them on the ground by darkening it two steps along its own ramp: an ellipse under a body's feet, a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene shows them in place.
+- A structure's sprite covers its footprint and may rise above it; a body, standing on a point, has none. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
+- A body's shadow is a sprite of its own, `art/markers/shadow`, drawn under its feet (§Bodies and markers). No shadow is in a body's or a structure's sprite. The view draws the others on the ground by darkening it two steps along its own ramp: a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene, still on the 16-pixel grid, shows them in place, with the ellipse it darkens under a body's feet.
 
 ## Mood and references
 
@@ -126,6 +126,7 @@ Every other pixel comes from the master palette, defined in `art/pixel.lua` as r
 | gold | `5c4418` `8c6a2a` `c99a3c` `f0d080` | HUD trim, the player's chevron |
 | paper | `a8946c` `d9c9a3` `efe3c2` | Plaster walls, HUD text |
 | lacquer | `3d1418` `7a2a24` `a83a2c` | Pillars, HUD corners |
+| violet | `2a1438` `46205e` `6a3290` `9a5cd0` `c99cf0` | Demonic Cult body outline |
 
 Faction accents, chosen to stay apart at one cell and against every terrain kind:
 
@@ -163,7 +164,7 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 - The body faces the viewer, turned to the right; the view mirrors it to face left.
 - Walk: a step, a passing frame a pixel higher, the other step, a passing frame, at 150 ms a frame. Idle is the standing frame. A body walking more away from the viewer than across shows its back, the head seen from behind; one that has just struck shows the weapon swung, then the standing frame, for 200 ms.
 - Every standing body casts `art/markers/shadow` on the ground under its feet; a falling body casts none.
-- A body something standing in front of it hides, a building, a tree or a raised row of the ground, is drawn behind it, and its outline frame, in its faction's light accent (azure `5b9ae0`, crimson `d63a2f`, amber `e8a830`), is drawn over what hides it, only where the body itself does not show.
+- A body something standing in front of it hides, a building, a tree or a raised row of the ground, is drawn behind it, and its outline frame is drawn over what hides it, only where the body itself does not show, even while it flashes struck. The outline is the faction's light accent, azure `5b9ae0` and amber `e8a830`, and for the Demonic Cult violet `9a5cd0`: crimson stays for hostility, so an outline never reads as the hostile ring.
 - Villagers wear the cloth ramp and carry no faction accent (approved line-up; not yet in the production set).
 - A knocked-down body is the same sprite lying on its side, without a shadow (approved line-up; not yet in the production set).
 - The player is a body like any other (`docs/concept.md` §Identity), drawn with its faction's sprite. Two markers tell it apart: the jade `ring`, drawn under the body round its feet, and the gold `chevron`, drawn over it above the head and bobbing a pixel every 400 ms.
