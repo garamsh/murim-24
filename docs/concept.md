@@ -308,3 +308,10 @@ The items below are not yet decided.
 - The realm names and thresholds, which are data.
 - How much an art of a mismatched nature costs: how much harder to learn, how much weaker to use.
 - Whether a lost manual can be copied.
+- **Realistic scale (#227), for the owner.** Each has options and a recommendation:
+  - **What a cell is at a person's scale.** (a) About 2 metres, a person's height and reach, which the reference sizes assume; (b) about 1.5 metres. Recommended: (a), so a 4 x 3 house is about 8 x 6 m, a rural house of three bays.
+  - **Fields.** A real household farmed several thousand cells' worth. (a) Keep 4 to 8 cells a household, an exaggeration ADR 0022's food data needs; (b) real fields, which would fill most of the map. Recommended: (a).
+  - **Great rivers.** A real Yellow River or Yangtze is hundreds of cells wide. (a) 16 to 40 cells, crossed by ferries and fords; (b) the real width. Recommended: (a), so the river still reads on one screen.
+  - **Today's house and hall.** The drawn house is 3 x 3 and the hall 5 x 3, against the reference 4 x 3 and 6 x 4. (a) Grow them in the next structure art round; (b) keep them as stated exceptions. Recommended: (a).
+  - **When a village becomes a town.** (a) Only when its growth reaches the walled town's size, as #169's comment says; (b) by population alone. Recommended: (a), which #169 designs.
+  - **Climbing walls.** A town's wall of 2 levels is a drop every realm can climb under ADR 0058, proposed in #223. (a) Walls are structures, never climbed, entered at gates or breached; (b) walls climbed as cliffs of their height. Recommended: (a), so a wall still holds a siege.
