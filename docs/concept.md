@@ -41,6 +41,8 @@ Each section carries one of the following statuses.
   2. **A wuxia story of one life**: the starting point and the path differ by origin.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on). The one exception is caves, which only the player enters (§Gear, wealth and livelihoods).
+- **Principle: simple rules, complex consequences.** Decided by the owner on 2026-10-10 (issue #229). The world runs on simple rules whose consequences combine into complex cause and effect, the way money shapes villages' forms, their growth and each person's life. Our job is to tune the balance, not to script outcomes.
+  - **Population has no separate limit: it is bounded by the food that can be had.** Fruit, game and fish regrow, fields yield, and how fast they regrow is what governs how many people the world feeds.
 - **Genre and engine**: 2D RPG, Godot 4.7.
 - **Perspective and combat**: a three-quarter top-down view, with combat in real time (`docs/architecture/adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`).
 - **Art direction**: pixel art on a 16-pixel tile grid (`docs/art-direction.md`).
@@ -161,7 +163,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - settlers carrying a first house's materials
   - hunting waiting for animals (#171)
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
-- **A hard upper bound.** A world's population never exceeds a bound. That bound is a ceiling, not a target: the caps below it set the actual population. It is about 500 until it is measured for the larger world (§World and scale).
+- **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
 - **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
 - **[proposed]** Building kinds beyond the current set. The current set, in `core/region.cpp`, is houses and halls (housing), fields (harvest), granaries and storehouses (storage), and wells, barrels and fences, which hold nothing. Proposed additions:
   - Smithy: makes and mends weapons.
