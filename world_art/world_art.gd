@@ -613,13 +613,25 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 	var local := centre.round() + Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
 	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
-	# of the body shown, or, for an outline, where the body it outlines is.
+	# of the body shown, or, for an outline, where the body it outlines is. Written in place, so no
+	# array is made per sprite.
 	var custom := Vector2(white, alpha) if outline_of.x < 0.0 else outline_of / size
-	buffer.append_array(PackedFloat32Array([
-		width * cos_turn, height * sin_turn, 0.0, local.x,
-		width * sin_turn, -height * cos_turn, 0.0, local.y,
-		tint.r, tint.g, tint.b, tint.a,
-		frame.position.x / size.x, frame.position.y / size.y, custom.x, custom.y]))
+	var at := buffer.size()
+	buffer.resize(at + BODY_FLOATS)
+	buffer[at] = width * cos_turn
+	buffer[at + 1] = height * sin_turn
+	buffer[at + 3] = local.x
+	buffer[at + 4] = width * sin_turn
+	buffer[at + 5] = -height * cos_turn
+	buffer[at + 7] = local.y
+	buffer[at + 8] = tint.r
+	buffer[at + 9] = tint.g
+	buffer[at + 10] = tint.b
+	buffer[at + 11] = tint.a
+	buffer[at + 12] = frame.position.x / size.x
+	buffer[at + 13] = frame.position.y / size.y
+	buffer[at + 14] = custom.x
+	buffer[at + 15] = custom.y
 
 
 # Whether something standing in front of a body, sorted after `sort_y`, covers part of `rect`,
