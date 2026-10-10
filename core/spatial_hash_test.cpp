@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -16,7 +17,8 @@ namespace {
 constexpr std::size_t POPULATION = 400;
 constexpr std::uint64_t FIELD = std::uint64_t{64} * CELL_SIZE;
 constexpr std::int32_t RADIUS = CELL_SIZE;
-constexpr std::uint64_t EVERY_KIND = ~std::uint64_t{0};
+constexpr std::uint64_t UINT64_LIMIT =
+    std::numeric_limits<std::uint64_t>::max();
 // Knuth's MMIX linear congruential generator; the high bits are the output.
 constexpr std::uint64_t LCG_MULTIPLIER = 6364136223846793005ULL;
 constexpr std::uint64_t LCG_INCREMENT = 1442695040888963407ULL;
@@ -139,11 +141,11 @@ TEST(SpatialHash, NearestTakesTheLowerIndexAmongEquals) {
   const SpatialHash hash{positions};
   constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
 
-  EXPECT_EQ(hash.nearest(EVERY_KIND, centre, SIGHT,
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
                          [](std::size_t other) { return other != 0; }),
             std::optional<std::size_t>{1});
   // The control: the one above is found when the one below is not offered.
-  EXPECT_EQ(hash.nearest(EVERY_KIND, centre, SIGHT,
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
                          [](std::size_t other) { return other == 2; }),
             std::optional<std::size_t>{2});
 }

@@ -3190,7 +3190,7 @@ std::uint64_t World::foe_kinds(std::size_t person, const Army& army) const {
         return fight.challenger == person || fight.leader == person;
       });
   if (duellist) {
-    return std::numeric_limits<std::uint64_t>::max();
+    return UINT64_LIMIT;
   }
   std::uint64_t kinds = 0;
   for (std::size_t faction = 0; faction < rules_.hostile.size(); ++faction) {
