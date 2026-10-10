@@ -9,3 +9,7 @@ Captures of the game at 1920 x 1080 in Korean, through `play/play.tscn` and `wor
 - `probe.log`: `world_art/ground_probe.gd` at b49a1d9, the pixel checks: the viewport freed, the same pixels twice, the forest's edge off the cells' side against the blocky control, and streaming.
 
 The 2x views are centred on the same cells before and after: the angle draws a cell 12 pixels deep where main drew it 16, so their pixel centres differ by the ratio. Bodies and structures are still the 16-pixel grid's art, drawn at the angle's positions; PRs B and C redraw them.
+
+## Round 2 (e0cf847)
+
+After the review: the region code removed, the warp at 32 px over 48 px noise, the ground's ramps and detail as sheets. `round2/` holds the same views retaken at e0cf847 (`after_*`, with main's `before_*` copied beside them), `ground_check.log`, and a 3x crop of the rock edge at (1600, 700) before (`before_fix_mountain_rock_edge_crop.png`, from b49a1d9, with the island of hills inside the rock) and after (`after_mountain_rock_edge_crop.png`).
