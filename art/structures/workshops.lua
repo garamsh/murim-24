@@ -1,11 +1,13 @@
--- Draws the workshops a growing village builds, one frame per damage stage, tagged intact,
--- damaged, destroyed and rubble. Each frame holds its footprint at (8, 8), as the house's does.
--- The cast shadow is not in the frame.
+-- Draws the workshops a growing village builds at the 2.5D angle (ADR 0059), one frame per damage
+-- stage, tagged intact, damaged, destroyed and rubble. Each frame holds its footprint's bottom-left
+-- corner 8 pixels in from its left and bottom edges, as structures.lua's do: the footprint 12 rows
+-- a cell deep, its front standing at its front and its roof running back over it to its back edge,
+-- raised. The cast shadow is not in the frame.
 --   smithy.aseprite: a forge shed over 3x2 cells, open at the front on a glowing hearth, its
 --     chimney rising through a slate roof, an anvil, a quench tub and charcoal on the apron.
---     A 64x48 frame.
+--     A 64x58 frame.
 --   apothecary.aseprite: a shop over 4x2 cells, a cabinet of drawers behind its counter and herbs
---     hung under its eaves, a herb rack and a drying tray in the yard at its right. An 80x48 frame.
+--     hung under its eaves, a herb rack and a drying tray in the yard at its right. An 80x52 frame.
 -- Run: aseprite --batch --script art/structures/workshops.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -24,6 +26,8 @@ local function roof(cv, x0, w, top, ridge, bottom)
       local ch = (xx - x0) % 3
       local col = ch == 0 and c("stone", 2) or (ch == 1 and c("stone", 4) or c("stone", 3))
       if yy < ridge then col = ch == 0 and c("stone", 3) or c("stone", 4) end
+      -- Courses of tiles down the front slope, as structures.lua's roofs have.
+      if yy > ridge and (yy - ridge) % 4 == 3 and ch ~= 0 then col = px.shift(col, -1) end
       if bottom - yy < 3 and ch ~= 1 then col = px.shift(col, -1) end
       cv:set(xx, yy, col)
     end
@@ -117,9 +121,12 @@ local function anvil(cv, ax, base, tipped)
   cv:set(ax - 1, base - 8, c("ink", 3))
 end
 
+-- `y` is 32 rows above the footprint's front edge: the shed stands 6 rows behind it, on the apron's
+-- back, and its roof reaches back to the footprint's back edge 24 rows behind the front, raised by
+-- the shed's height.
 local function smithy(cv, stage, seed)
   local r = px.rng(seed)
-  local x, y, w = 8, 8, 48
+  local x, y, w = 8, cv.h - 8 - 32, 48
   -- The stone plinth under the shed, in every stage.
   cv:rect(x + 1, y + 22, w - 2, 4, c("stone", 4))
   cv:hline(x + 1, y + 22, w - 2, c("stone", 5)); cv:hline(x + 1, y + 25, w - 2, c("stone", 2))
@@ -127,7 +134,7 @@ local function smithy(cv, stage, seed)
   local bay = { x + 3, x + 25 } -- the open front, from its left post to its middle one
   local hearth = { x + 5, y + 14 } -- its stone block's top-left; the chimney rises from it
   local chimney_x = x + 7
-  local stack_top = y - 6
+  local stack_top = y - 16
 
   -- The shed: dark inside the open bay, the hearth and bellows in it; a plank wall hung with
   -- tools in the other bay; posts between.
@@ -175,7 +182,7 @@ local function smithy(cv, stage, seed)
   if stage == "intact" or stage == "damaged" then
     shed()
     coals(cv, hearth[1] + 3, hearth[2] + 1, 7, 3, stage == "intact" and 1 or 0.55, seed)
-    roof(cv, x, w, y - 3, y + 1, y + 10)
+    roof(cv, x, w, y - 10, y - 4, y + 10)
     chimney(stack_top)
     cv:rect(chimney_x - 1, stack_top - 1, 9, 2, c("stone", 4)); cv:hline(chimney_x - 1, stack_top - 1, 9, c("stone", 5))
     cv:rect(chimney_x + 1, stack_top - 1, 5, 1, c("ink", 1))
@@ -184,8 +191,8 @@ local function smithy(cv, stage, seed)
     glow(cv, hearth[1] + 6, hearth[2] + 2, 13, 9, 0.9)
     glow(cv, hearth[1] + 6, y + 23, 11, 3, 0.8)
   elseif stage == "damaged" then
-    hole(cv, x + 30, y - 1, 8, 5, r)
-    hole(cv, x + 18, y + 4, 6, 4, r)
+    hole(cv, x + 30, y - 6, 8, 5, r)
+    hole(cv, x + 18, y + 2, 6, 4, r)
     -- The stack's crown knocked off on one side.
     for yy = stack_top - 1, stack_top + 2 do
       for xx = chimney_x + 3, chimney_x + 7 do
@@ -286,9 +293,11 @@ local function tray(cv, tx, ty, w, seed, burnt)
   end
 end
 
+-- `y` is 32 rows above the footprint's front edge, where the shop's plinth stands; its roof reaches
+-- back to the footprint's back edge, raised by the shop's height.
 local function apothecary(cv, stage, seed)
   local r = px.rng(seed)
-  local x, y = 8, 8
+  local x, y = 8, cv.h - 8 - 32
   local sw = 44 -- the shop's width; the yard takes the rest of the 64
   local yard = x + sw + 2
   -- The plinth, in every stage.
@@ -325,15 +334,15 @@ local function apothecary(cv, stage, seed)
     end
   end
   if stage == "intact" or stage == "damaged" then
-    roof(cv, x, sw, y - 3, y + 1, y + 13)
+    roof(cv, x, sw, y - 10, y - 4, y + 13)
     -- Herbs hung from the eave over the counter.
     for k = 0, 3 do
       if not (stage == "damaged" and k == 2) then bundle(cv, x + 6 + k * 4, y + 14, k + 1) end
     end
   end
   if stage == "damaged" then
-    hole(cv, x + 28, y - 1, 8, 5, r)
-    hole(cv, x + 6, y + 5, 6, 4, r)
+    hole(cv, x + 28, y - 7, 8, 5, r)
+    hole(cv, x + 6, y + 3, 6, 4, r)
     scorch(cv, x + 22, y + 14, sw - 25, 13, 0.45, seed + 1)
     -- Drawers pulled out and spilled on the sill.
     cv:set(x + 10, y + 20, c("ink", 1)); cv:set(x + 11, y + 20, c("ink", 1)); cv:set(x + 16, y + 18, c("ink", 1))
@@ -404,8 +413,8 @@ local function apothecary(cv, stage, seed)
 end
 
 local buildings = {
-  { "smithy", 64, 48, smithy, 700 },
-  { "apothecary", 80, 48, apothecary, 710 },
+  { "smithy", 64, 58, smithy, 700 },
+  { "apothecary", 80, 52, apothecary, 710 },
 }
 for _, b in ipairs(buildings) do
   local frames, tags = {}, {}
