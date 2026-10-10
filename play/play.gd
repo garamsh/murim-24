@@ -507,10 +507,11 @@ func command(event: InputEvent) -> bool:
 
 
 ## Orders the person toward the cell under `at`, a position in this node's pixels, keeping its
-## skills, unless it is ordered there already. Returns whether the core accepted an order.
+## skills, unless it is ordered there already and holds no attack intent, which the order ends.
+## Returns whether the core accepted an order.
 func follow(at: Vector2) -> bool:
 	var objective: Vector2i = _art.cell_at(at)
-	if objective == _objective:
+	if objective == _objective and world.target(steered) < 0:
 		return false
 	if not world.order(steered, objective, _skills):
 		return false
