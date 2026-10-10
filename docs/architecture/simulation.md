@@ -213,6 +213,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Mastery.** Each known art carries a mastery raised by hits, training and teaching, capped by talent, whose stages open forms with the realm's rank. Manuals and teaching give an art's first forms.
   - **Synthesis.** Higher arts come by a daily chance for anyone meeting an edge of a lineage graph in the pack, replacing the comprehension above.
   - **Left open by ADR 0055.** What footwork and heart-method arts do beyond their skills, such as speed or cultivation, which would touch ADRs 0037 and 0046. Whether nature should come from a heart-method art rather than the first art learned. Whether talk or rumour reveals a person's arts, which would change ADR 0039. Whether people draw an art at birth.
+- **Nature and building from materials.** ADR 0056 (`adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Slots.** Natural objects are slots the map places, 64 an area, that grow, spread and regrow every 8 days and block nothing.
+  - **Gathering.** People gather from them by one order. Villages assign their idle earners to gather what their next plan lacks, paid from the treasury.
+  - **Building.** A structure rises only as far as its materials are delivered, which supersedes ADR 0023's raising by repair alone above, and settlers carry a first house's cost.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.

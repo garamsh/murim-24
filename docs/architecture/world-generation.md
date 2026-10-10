@@ -59,6 +59,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
 
 ## Open questions
 
+- **Natural objects on the map.** ADR 0056 (`adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed. ADR 0047's build tool places up to 64 object slots an area, each a cell and a kind chosen from the area's biomes by the kinds' affinities with the tool's fixed salt, 2 MiB in all, so the same map gives the same forests in every game.
 - **Room for seats with more factions.** Every one of 200 seeds has room for the three seats with three factions. A fourth faction added as data, with the sects unchanged, leaves a seat no room on 5 of 200 seeds, so the test that adds one does so without sects.
 - **Whether territory should follow terrain.** Territory ignores terrain, so a border can cross a mountain range, and a faction's territory can be mostly impassable. No seed tested lacks room for a village, but nothing guarantees it. ADR 0047, proposed, ends the question with the hand-made map: no faction territory is partitioned when a world is created, and territory is the claims of villages, as ADR 0023 gives it.
 - **How large a region the game needs.** The region is 128 cells square, the smallest size tested at which every one of 200 seeds held room for its villages with four factions; it is not measured against play. The owner decided on 2026-10-09 on one hand-made world of 4,096 cells square (`docs/concept.md` §World and scale).
