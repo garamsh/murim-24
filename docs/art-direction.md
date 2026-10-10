@@ -45,7 +45,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each; the top-down ground, drawn on the contact sheet and not by the game |
 | `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14; as `terrain` |
 | `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3`; as `terrain` |
-| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` (four frames) |
+| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the faction's light accent; feet on row 22 |
 | `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
@@ -67,6 +67,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/icons/ware_icons` | 16 x 16 | `herb`, `elixir`, `silver` |
 | `art/markers/army_marker` | 64 x 48 | `orthodox`, `demonic`, `unorthodox` |
 | `art/markers/player_marker` | 16 x 24 | `ring` (one frame), `chevron` (two frames) |
+| `art/markers/shadow` | 16 x 8 | `shadow`: every other pixel of an ink ellipse, centred on (8, 4) |
 | `art/title/backdrop` | 480 x 270 | none: one frame, the title screen's mountains and working title |
 
 `art/contact_sheet/contact_sheet.png` shows every frame of the set but the title backdrop, which `art/mockup/title_screen.png` shows, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
@@ -85,7 +86,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Draw order | Everything standing is drawn in order of the row its footprint ends on, back to front, the raised rows of the ground among it |
 | Light | From the upper left; shadows fall to the lower right |
 
-- Until #200's next pull requests redraw them at the angle, bodies and structures keep the art of the 16-pixel grid below: a body stands with its feet on the point the core gives it, and a structure with its footprint's bottom edge on the ground's.
+- A body stands with its feet, row 22 of its frame, on the point the core gives it. Until #200's next pull request redraws them at the angle, structures keep the art of the 16-pixel grid below, a structure standing with its footprint's bottom edge on the ground's.
 - A sprite covers its footprint and may rise above it. A body's footprint is its cell, the bottom 16 rows of its 16 x 24 frame. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
 - Shadows are not in the sprites. The view draws them on the ground by darkening it two steps along its own ramp: an ellipse under a body's feet, a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene shows them in place.
 
@@ -160,7 +161,9 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 - Silhouettes: Orthodox topknot and a long robe; Demonic Cult spiky hair under a crimson headband; Unorthodox the wide conical straw hat.
 - Every body has a one-pixel ink outline around its whole silhouette, weapon included.
 - The body faces the viewer, turned to the right; the view mirrors it to face left.
-- Walk: a step, a passing frame a pixel higher, the other step, a passing frame, at 150 ms a frame. Idle is the standing frame.
+- Walk: a step, a passing frame a pixel higher, the other step, a passing frame, at 150 ms a frame. Idle is the standing frame. A body walking more away from the viewer than across shows its back, the head seen from behind; one that has just struck shows the weapon swung, then the standing frame, for 200 ms.
+- Every standing body casts `art/markers/shadow` on the ground under its feet; a falling body casts none.
+- A body something standing in front of it hides, a building, a tree or a raised row of the ground, is drawn behind it, and its outline frame, in its faction's light accent (azure `5b9ae0`, crimson `d63a2f`, amber `e8a830`), is drawn over what hides it, only where the body itself does not show.
 - Villagers wear the cloth ramp and carry no faction accent (approved line-up; not yet in the production set).
 - A knocked-down body is the same sprite lying on its side, without a shadow (approved line-up; not yet in the production set).
 - The player is a body like any other (`docs/concept.md` §Identity), drawn with its faction's sprite. Two markers tell it apart: the jade `ring`, drawn under the body round its feet, and the gold `chevron`, drawn over it above the head and bobbing a pixel every 400 ms.
