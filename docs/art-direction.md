@@ -42,20 +42,17 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
 | `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
 | `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
-| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each; the top-down ground, drawn on the contact sheet and not by the game |
-| `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14; as `terrain` |
-| `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3`; as `terrain` |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
-| `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/barrels` | 32 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/fence` | 96 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/granary` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/storehouse` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/training_ground` | 112 x 80 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/manual_hall` | 80 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/seat_gate` | 64 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/house` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/hall` | 96 x 98 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/well` | 48 x 66 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/barrels` | 32 x 50 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/fence` | 96 x 34 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/granary` | 48 x 74 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/storehouse` | 64 x 72 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/training_ground` | 112 x 82 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/manual_hall` | 80 x 116 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/seat_gate` | 64 x 68 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
@@ -70,7 +67,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/markers/shadow` | 16 x 8 | `shadow`: every other pixel of an ink ellipse, centred on (8, 4) |
 | `art/title/backdrop` | 480 x 270 | none: one frame, the title screen's mountains and working title |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set but the title backdrop, which `art/mockup/title_screen.png` shows, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources under each sheet's name and tags, but the title backdrop, which `art/mockup/title_screen.png` shows, the icon and the ground's ramps, which are outside the master palette; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it. What the frames make assembled is shown by the game's own captures in each pull request's evidence.
 
 `art/icon/icon.aseprite`, drawn by `icon.lua` and exported as a 32 x 32 `icon.png` tagged `icon`, is the application icon: a jian planted before the title screen's ridges and low sun, in the HUD's frame. The PC exports scale it by nearest neighbour, and the contact sheet leaves it out.
 
@@ -86,9 +83,9 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Draw order | Everything standing is drawn in order of the row its footprint ends on, back to front, the raised rows of the ground among it |
 | Light | From the upper left; shadows fall to the lower right |
 
-- A body stands with its feet, row 22 of its frame, on the point the core gives it. Until #200's next pull request redraws them at the angle, structures keep the art of the 16-pixel grid below, a structure standing with its footprint's bottom edge on the ground's.
-- A structure's sprite covers its footprint and may rise above it; a body, standing on a point, has none. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
-- A body's shadow is a sprite of its own, `art/markers/shadow`, drawn under its feet (§Bodies and markers). No shadow is in a body's or a structure's sprite. The view draws the others on the ground by darkening it two steps along its own ramp: a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene, still on the 16-pixel grid, shows them in place, with the ellipse it darkens under a body's feet.
+- A body stands with its feet, row 22 of its frame, on the point the core gives it.
+- A structure's sprite covers its footprint and may rise above it; a body, standing on a point, has none. The house's footprint is 3 x 3 cells, 48 x 36 at the angle, its bottom-left corner 8 pixels in from its frame's left and bottom edges; the rows above hold its front and roof, and the margin round it the upturned eaves and spilled debris.
+- No shadow is in a body's or a structure's sprite. The view draws them on the ground: `art/markers/shadow` under a body's feet, every other pixel of an ink ellipse; and past a standing structure's right and bottom edges, every other pixel of ink in a band 6 pixels wide, 3 once it is destroyed and none from rubble.
 
 ## Mood and references
 
@@ -209,7 +206,7 @@ The village is furnished as the approved mockup's is. What blocks movement or br
 | Storehouse | Structure | 3 x 2 | A long plastered store on a stone plinth, iron-studded double doors and vents, no windows, a crate by the door, under a low slate roof; its stages break it as the house's break the house |
 | Field | Decoration | a plot | Rows of tilled soil four pixels apart, an earth border at the plot's edge, in five states: sown (dark soil with seeds showing), growing (green shoots in rows), ripe (amber grain), fallow (grass and weeds over old rows), burnt (black soil, ash, charred stubble and embers); in winter each lies under snow gathered in its furrows |
 
-- Every frame holds its footprint at (8, 8), as the house's does, except the seat gate's (see below).
+- Every frame holds its footprint's bottom-left corner 8 pixels in from its left and bottom edges, as the house's does, the seat gate's and the training ground's included.
 - Ground decorations are tiles laid over the terrain and under everything standing; the banner stands and is sorted with bodies and buildings.
 
 A sect's seat is a village of its own (ADR 0026), laid out with the village's buildings and these of its own, so that a seat reads apart from a farming village at a glance:
@@ -222,7 +219,7 @@ A sect's seat is a village of its own (ADR 0026), laid out with the village's bu
 | Sect banner | Decoration | one cell | A tall pole on a stone foot with a crossbar, a long paper-white streamer edged in the owner's accent, two ink characters down it and a swallowtail with tassels; the faction's banner is a short pennant of the accent itself |
 
 - The training ground is laid with the ground, over the terrain and under everything standing, so people stand and spar on it. What on it rises more than a few pixels, the racks and the dummies, stands along its back row, where anyone in front of it is drawn over it.
-- The seat gate rises 32 rows above its one-row footprint, so its frame holds the footprint at (8, 40), its bottom margin 8 rows as every frame's. Its pillars stand on its two end cells and the middle cell is the opening.
+- The seat gate's pillars stand on its two end cells and the middle cell is the opening.
 - The stone curb, the platform and the gate's bases stay in every stage, as the plinth does.
 - The court before the halls is paved, and a road runs down from it to the gate's opening; both are ground decorations, laid as a village's paving and road are.
 
