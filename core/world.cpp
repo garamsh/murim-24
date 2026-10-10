@@ -483,9 +483,9 @@ void fold_event(const Fold& fold, const Event& event) {
 }
 
 // Folds step `step` of progress into `fold`.
-// Folds the rules' reaches and bound; the talk reach and the sight only when
-// set, and the bound only when other than MAX_PEOPLE, so a world where no one
-// talks or closes on a foe, held to the default bound, keeps its hash.
+// Folds the rules' reaches and capacity; the talk reach and the sight only
+// when set, and the capacity only when other than MAX_PEOPLE, so a world where
+// no one talks or closes on a foe, at the default capacity, keeps its hash.
 template <typename Fold>
 void fold_reaches(const Fold& fold, const Rules& rules) {
   fold(rules.rumour_reach);
@@ -495,8 +495,8 @@ void fold_reaches(const Fold& fold, const Rules& rules) {
   if (rules.sight != 0) {
     fold(rules.sight);
   }
-  if (rules.people_bound != MAX_PEOPLE) {
-    fold(rules.people_bound);
+  if (rules.people_capacity != MAX_PEOPLE) {
+    fold(rules.people_capacity);
   }
 }
 
@@ -1029,14 +1029,15 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   if (!reachable(rules_.separation) || !reachable(rules_.rumour_reach) ||
       !reachable(rules_.talk_reach) || !reachable(rules_.sight) ||
-      rules_.people_bound > PEOPLE_CEILING || recruits > rules_.people_bound ||
+      rules_.people_capacity > PEOPLE_CEILING ||
+      recruits > rules_.people_capacity ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
         "separation, rumour and talk reach, sight, range and radius must lie "
         "in "
         "[0, MAX_REACH], hostility "
-        "must be square, the world must hold at most its rules' bound of "
+        "must be square, the world must hold at most its rules' capacity of "
         "people, itself at most PEOPLE_CEILING, each "
         "with health up to MAX_HEALTH on a passable cell, every army must "
         "have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known "
@@ -1116,7 +1117,7 @@ void World::restore() {
   const bool bad_rules =
       rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
       !reachable(rules_.rumour_reach) || !reachable(rules_.talk_reach) ||
-      !reachable(rules_.sight) || rules_.people_bound > PEOPLE_CEILING ||
+      !reachable(rules_.sight) || rules_.people_capacity > PEOPLE_CEILING ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
@@ -1200,7 +1201,7 @@ void World::restore() {
       !all_below(surnames_, life_.names.surnames.size());
   if (bad_rules || bad_life || bad_structures || !declarations_kept() ||
       !events_kept() || !progress_kept() || !rostered() ||
-      living() > rules_.people_bound ||
+      living() > rules_.people_capacity ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
       std::any_of(villages_.begin(), villages_.end(), stray_village) ||
       leadership_.size() != factions ||
@@ -3760,7 +3761,7 @@ void World::kin(const Kinship& kinship) {
     }
   }
   for (const std::size_t mother : alive) {
-    if (!may_bear(mother, kinship) || living() >= rules_.people_bound) {
+    if (!may_bear(mother, kinship) || living() >= rules_.people_capacity) {
       continue;
     }
     // Births slow as the child's village nears its cap, and stop at it.
@@ -3917,7 +3918,7 @@ Holding World::held(std::size_t village, Stage worst) const {
 
 std::size_t World::cap(std::size_t village) const {
   if (!life_.husbandry) {
-    return rules_.people_bound;
+    return rules_.people_capacity;
   }
   const Holding standing = held(village, Stage::DAMAGED);
   const std::uint64_t yearly = std::max<std::uint64_t>(

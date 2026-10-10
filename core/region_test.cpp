@@ -1105,8 +1105,8 @@ TEST(Region, BirthsStopOnceMaxPeopleLive) {
   EXPECT_LT(lived(grown(), SEED, GENERATIONS_YEARS).peak, MAX_PEOPLE);
 }
 
-TEST(Region, BirthsStopAtTheBoundTheRulesSet) {
-  // As fertile as above, for a few years under a bound a little above the
+TEST(Region, BirthsStopAtTheCapacityTheRulesSet) {
+  // As fertile as above, for a few years under a capacity a little above the
   // founders.
   RegionData fertile = grown();
   fertile.life.husbandry.reset();
@@ -1126,7 +1126,7 @@ TEST(Region, BirthsStopAtTheBoundTheRulesSet) {
       founders += army.members.size();
     }
     if (room) {
-      region.rules.people_bound = founders + *room;
+      region.rules.people_capacity = founders + *room;
     }
     World world = world_of(region);
     std::size_t most = world.living();
@@ -1139,7 +1139,7 @@ TEST(Region, BirthsStopAtTheBoundTheRulesSet) {
   const auto [founders, most] = peak(ROOM);
   // The bound was met and never passed.
   EXPECT_EQ(most, founders + ROOM);
-  // Control: under the default bound the same years pass it.
+  // Control: under the default capacity the same years pass it.
   EXPECT_GT(peak(std::nullopt).second, founders + ROOM);
 }
 

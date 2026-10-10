@@ -60,7 +60,7 @@ Rules rules() {
   }
   Rules live{SEPARATION, hostile, {DURABILITY, DURABILITY / 2, 1}};
   live.sight = SIGHT;
-  live.people_bound = LIVE_PEOPLE;
+  live.people_capacity = LIVE_PEOPLE;
   return live;
 }
 

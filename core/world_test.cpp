@@ -707,36 +707,36 @@ TEST(World, AWorldHoldsNoMoreThanMaxPeople) {
   EXPECT_TRUE(populated(MAX_PEOPLE));
 }
 
-// peaceful(0) under a bound of `bound` people.
-Rules bounded(std::size_t bound) {
+// peaceful(0) with a capacity of `capacity` people.
+Rules with_capacity(std::size_t capacity) {
   Rules rules = peaceful(0);
-  rules.people_bound = bound;
+  rules.people_capacity = capacity;
   return rules;
 }
 
-TEST(World, AWorldHoldsNoMoreThanTheBoundItsRulesSet) {
-  constexpr std::size_t BOUND = MAX_PEOPLE + 10;
-  EXPECT_FALSE(populated(BOUND + 1, bounded(BOUND)));
-  // Control: as many as the bound are accepted, past MAX_PEOPLE.
-  EXPECT_TRUE(populated(BOUND, bounded(BOUND)));
-  // A bound past the ceiling is refused, however few live.
-  EXPECT_FALSE(populated(1, bounded(PEOPLE_CEILING + 1)));
+TEST(World, AWorldHoldsNoMoreThanTheCapacityItsRulesSet) {
+  constexpr std::size_t CAPACITY = MAX_PEOPLE + 10;
+  EXPECT_FALSE(populated(CAPACITY + 1, with_capacity(CAPACITY)));
+  // Control: as many as the capacity are accepted, past MAX_PEOPLE.
+  EXPECT_TRUE(populated(CAPACITY, with_capacity(CAPACITY)));
+  // A capacity past the ceiling is refused, however few live.
+  EXPECT_FALSE(populated(1, with_capacity(PEOPLE_CEILING + 1)));
   // Control: the ceiling itself is accepted.
-  EXPECT_TRUE(populated(1, bounded(PEOPLE_CEILING)));
+  EXPECT_TRUE(populated(1, with_capacity(PEOPLE_CEILING)));
 }
 
-TEST(World, ABoundOtherThanMaxPeopleChangesTheHash) {
+TEST(World, ACapacityOtherThanMaxPeopleChangesTheHash) {
   const std::vector<std::string> rows = open_map(OPEN_SIDE);
-  const auto hashed = [&rows](std::size_t bound) {
+  const auto hashed = [&rows](std::size_t capacity) {
     return World{Seed{1},
                  Map{rows},
                  {army(rows, {0, 0}, {0, 0}, 1, 1, 0, {IDLE})},
                  {},
-                 bounded(bound)}
+                 with_capacity(capacity)}
         .hash();
   };
   EXPECT_NE(hashed(MAX_PEOPLE + 1), hashed(MAX_PEOPLE));
-  // Control: the default bound hashes as a world whose rules never set one.
+  // Control: the default capacity hashes as a world whose rules never set one.
   EXPECT_EQ(hashed(MAX_PEOPLE),
             (World{Seed{1},
                    Map{rows},

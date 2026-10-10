@@ -618,7 +618,7 @@ void put_rules(Writer& out, const Rules& rules) {
   out.i32(rules.rumour_reach);
   out.i32(rules.talk_reach);
   out.i32(rules.sight);
-  out.u64(rules.people_bound);
+  out.u64(rules.people_capacity);
 }
 
 Rules get_rules(Reader& input) {
@@ -634,7 +634,7 @@ Rules get_rules(Reader& input) {
   rules.rumour_reach = input.i32();
   rules.talk_reach = input.i32();
   rules.sight = input.i32();
-  rules.people_bound = input.u64();
+  rules.people_capacity = input.u64();
   return rules;
 }
 
