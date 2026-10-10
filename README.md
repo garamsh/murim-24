@@ -18,4 +18,4 @@ What to look at:
 - The selected person's name is framed in gold.
 - In `select_ko.png` and `cycle_ko.png` the player stands where it was ordered: selecting does not move it.
 - In `attack_ko.png` the player has walked out of the village to the selected foe and is fighting it. The foe's name is left out because the talk prompt's hostile-refusal slip stands there, and the nameplates keep that slip clear (#199). Its health still reads 120 because the capture stops on arrival, before the first strike lands.
-- In `own_ko.png` a person of the player's own faction is selected and named in jade in the frame. A click within talk reach would open the dialogue instead; `play_test`'s `_talk_pass` shows that.
+- In `own_ko.png` a person of the player's own faction is selected, named in the frame in paper colour, not crimson. A click within talk reach would open the dialogue instead; `play_test`'s `_talk_pass` shows that.
