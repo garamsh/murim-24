@@ -77,6 +77,8 @@ const READY_LIMIT := 120
 # rules' sight of 6 cells, and ticks each of its steps runs.
 const INTENT_APART := 4
 const INTENT_TICKS := 30
+# Ticks a person ordered off an attack intent is given to reach the cell it was ordered to.
+const MOVE_LIMIT := 200
 # Ticks after the joystick is let go, and the four ways it is pushed to find one passable.
 const STOP_TICKS := 60
 const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
@@ -871,9 +873,9 @@ func _territory_pass() -> bool:
 # Walked up to the nearest person of a faction allied to its own, the person is prompted to talk to it
 # and C opens the dialogue window on it, where a digit gives no order, Enter lists its own news
 # and Escape goes back to the menu and then ends the talk, without pausing. A left click on the ally
-# opens the window too, and selects no one. With the window open again, a tick leaves it open; once
-# the person's faction's leader declares war on the other's, the next tick closes it, the prompt
-# shows the refusal and C opens nothing.
+# opens the window too, and selects no one, and so does a tap on it with the touch controls shown.
+# With the window open again, a tick leaves it open; once the person's faction's leader declares war
+# on the other's, the next tick closes it, the prompt shows the refusal and C opens nothing.
 func _talk_pass() -> bool:
 	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
@@ -916,6 +918,14 @@ func _talk_pass() -> bool:
 	var ended: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
 	var clicked: bool = scene.command(_left(_pixels_of(scene, ally))) and dialogue.visible \
 			and dialogue.person == ally and scene.selected < 0
+	var closed_first: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
+	# With the touch controls shown, a tap where the ally stands, in the HUD's pixels, opens it too.
+	hud.use_touch(true)
+	var on_hud: Vector2 = hud.from_window((_pixels_of(scene, ally) - scene._view_origin) * scene._camera.zoom)
+	scene.touch(_finger(0, on_hud, true))
+	scene.touch(_finger(0, on_hud, false))
+	var tapped: bool = closed_first and dialogue.visible and dialogue.person == ally and scene.selected < 0
+	hud.use_touch(false)
 	# Control: a tick with nothing changed leaves the window open.
 	scene.step()
 	scene.show_talk()
@@ -928,10 +938,10 @@ func _talk_pass() -> bool:
 	var refused: bool = scene.talk_to == ally and scene.talk_hostile and prompt.visible and prompt.refused
 	var nothing_opened: bool = not scene.command(_key(scene.TALK_KEY)) and not dialogue.visible
 	var passed := prompted and opened and digit_taken and news_shown and not_paused and back and ended and clicked \
-			and kept and declared and closed and refused and nothing_opened
-	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; C opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a left click on it opened it, selecting no one, %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, C opened nothing %s: %s" % [
+			and tapped and kept and declared and closed and refused and nothing_opened
+	print("play_test: walked %d ticks up to person %d of an allied faction, prompted %s; C opened the window %s, a digit taken %s, Enter its %d rumours %s, Escape no pause %s, back %s, ended %s; a left click on it opened it, selecting no one, %s, and so did a tap with the touch controls shown %s; a tick kept it open %s; war declared %s closed it %s, the prompt refused %s, C opened nothing %s: %s" % [
 		ticks, ally, prompted, opened, digit_taken, world.rumours(ally).size(), news_shown, not_paused, back, ended,
-		clicked, kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
+		clicked, tapped, kept, declared, closed, refused, nothing_opened, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 
@@ -1558,7 +1568,7 @@ func _rebirth_pass() -> bool:
 # Where person `person` of `scene`'s world stands, in the scene's pixels, where a click lands on its
 # body.
 func _pixels_of(scene: Node2D, person: int) -> Vector2:
-	return scene.world.person_position(person) * scene.PIXELS_PER_CELL / WorldAdapter.CELL_SIZE
+	return scene.get_node("WorldArt").to_screen(scene.world.person_position(person))
 
 
 # The nearest hostile army, steered so that it does not close on the person on its own, marches on
@@ -1566,8 +1576,10 @@ func _pixels_of(scene: Node2D, person: int) -> Vector2:
 # there; the person stands where it is.
 # A left click on the nearest foe in sight selects it and sets no intent; ticked INTENT_TICKS, the
 # person comes no closer to it (the control). Space then sets the intent on it, and as many ticks
-# bring the person closer by more than a cell. A right click, a move order, ends the intent. Tab
-# selects the next foe in sight and Escape clears the selection. Space on a person of the person's
+# bring the person closer by more than a cell. A click on the other foe moves the intent to it. A
+# right click, a move order, replaces the intent, and the person reaches the cell clicked within
+# MOVE_LIMIT ticks. Space again sets an intent and Escape ends it. Tab selects the next foe in
+# sight and Escape clears the selection. Space on a person of the person's
 # own faction is refused as not a foe, the reason on the HUD, and sets no intent. The touch
 # controls' next button selects a foe and their attack button sets the intent on it. In a fresh
 # scene, with no foe in sight, Space does nothing and shows nothing.
@@ -1611,8 +1623,22 @@ func _intent_pass() -> bool:
 		scene.step()
 	var chased := world.target(scene.steered) == foe or world.person_health(foe) == 0
 	var closed: bool = scene.lead().distance_to(world.person_position(foe)) < from - WorldAdapter.CELL_SIZE
-	scene.command(_click(here, scene.PIXELS_PER_CELL))
+	var second := -1
+	for each in world.foes_in_sight(person):
+		if each != foe:
+			second = each
+	var retargeted: bool = second >= 0 and scene.command(_left(_pixels_of(scene, second))) \
+			and scene.selected == second and world.target(scene.steered) == second
+	scene.command(_click(here, scene))
 	var ended := world.target(scene.steered) < 0
+	var walked := 0
+	while Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor()) != here and walked < MOVE_LIMIT:
+		scene.step()
+		walked += 1
+	var reached := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor()) == here
+	var again: bool = scene.command(_key(KEY_SPACE)) and world.target(scene.steered) >= 0
+	scene.command(_key(KEY_ESCAPE))
+	var escaped: bool = again and world.target(scene.steered) < 0 and scene.selected < 0
 	seen = world.foes_in_sight(person)
 	var expected := seen[(seen.find(scene.selected) + 1) % seen.size()]
 	var tabbed: bool = scene.command(_key(KEY_TAB)) and scene.selected == expected
@@ -1644,10 +1670,10 @@ func _intent_pass() -> bool:
 	var nothing: bool = nobody and not alone.command(_key(KEY_SPACE)) and alone.world.target(alone.steered) < 0 \
 			and not alone_hud.labels.notice.visible
 	alone.free()
-	var passed: bool = selected and stayed and set and chased and closed and ended and tabbed and cleared and refused \
-			and tapped and nothing
-	print("play_test: %d foes in sight after %d ticks; a click selected foe %d with no intent %s, the person kept its distance %s; Space set the intent %s, chased %s and closed in %s; a move order ended it %s; Tab selected the next %s; Escape cleared %s; Space on one of its own faction refused %s; touch next and attack %s; with no foe in sight Space did nothing %s: %s" % [
-		seen.size(), waited, foe, selected, stayed, set, chased, closed, ended, tabbed, cleared, refused, tapped,
-		nothing, "pass" if passed else "FAIL"])
+	var passed: bool = selected and stayed and set and chased and closed and retargeted and ended and reached \
+			and escaped and tabbed and cleared and refused and tapped and nothing
+	print("play_test: %d foes in sight after %d ticks; a click selected foe %d with no intent %s, the person kept its distance %s; Space set the intent %s, chased %s and closed in %s; a click on foe %d moved it %s; a move order replaced it %s and the person reached its cell %s in %d ticks; Space again then Escape ended it %s; Tab selected the next %s; Escape cleared %s; Space on one of its own faction refused %s; touch next and attack %s; with no foe in sight Space did nothing %s: %s" % [
+		seen.size(), waited, foe, selected, stayed, set, chased, closed, second, retargeted, ended, reached, walked,
+		escaped, tabbed, cleared, refused, tapped, nothing, "pass" if passed else "FAIL"])
 	return passed
 
