@@ -375,7 +375,7 @@ func _between_pass() -> bool:
 	var halfway := before.lerp(after, 0.5)
 	var view := Rect2(Vector2.ZERO, Vector2(MAP_ROWS[0].length(), MAP_ROWS.size()) * WorldArt.CELL)
 	art.refresh(view, 0.5)
-	var drawn_halfway := _drawn_at(art, halfway.round() - Vector2(0, WorldArt.BODY_FRAME.y / 2.0))
+	var drawn_halfway := _drawn_at(art, Vector2(halfway.x, halfway.y - WorldArt.FEET + WorldArt.BODY_FRAME.y / 2.0).round())
 	var ring_halfway: bool = art.get_node("Ring").position == halfway.round()
 	var placed: bool = art.body_at(0, 0, 0.5) == halfway and art.body_at(0, 0, 1.0) == after \
 			and art.body_at(0, 0, 0.0) == before

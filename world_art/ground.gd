@@ -47,6 +47,8 @@ const DETAIL_RAMP := {"litter": "forest", "reed": "forest"}
 # More than the levels the what-pass can encode, plus two, so a row offset and a level make one key.
 const LEVELS := 16
 
+## How many times the chunks shown have changed, so what stands on them can be read again.
+var shows := 0
 ## Chunks shown now, the most shown at once, and the bytes their images hold now.
 var shown := 0
 var most_shown := 0
@@ -161,6 +163,26 @@ func chunk_rect(key: Vector2i) -> Rect2:
 ## The keys of the chunks shown now.
 func shown_chunks() -> Array:
 	return _shown.keys()
+
+
+## What stands among the bodies on the chunks shown, the raised strips and the trees: each as
+## [the rectangle its opaque pixels lie in, the y it is sorted by].
+func occluders() -> Array:
+	var found := []
+	for key: Vector2i in _shown:
+		for node: Node2D in _shown[key].nodes:
+			var sprite := node as Sprite2D
+			if sprite == null or sprite.get_parent() != standing:
+				continue
+			var texture := sprite.texture
+			var used := Rect2(Vector2.ZERO, texture.get_size())
+			if texture is AtlasTexture:
+				if not texture.has_meta("used"):
+					texture.set_meta("used", Rect2((texture as AtlasTexture).atlas.get_image().get_region(
+							Rect2i((texture as AtlasTexture).region)).get_used_rect()))
+				used = texture.get_meta("used")
+			found.append([Rect2(sprite.position + sprite.offset + used.position, used.size), sprite.position.y])
+	return found
 
 
 ## The decorative trees of the chunk at `key`, each {foot, kind, variant, level}, once baked.
@@ -449,6 +471,7 @@ func _show(key: Vector2i) -> void:
 		nodes.append(sprite)
 	_shown[key] = {"nodes": nodes, "bytes": bytes}
 	shown_bytes += bytes
+	shows += 1
 	show_usec.append(Time.get_ticks_usec() - started)
 
 
@@ -457,6 +480,7 @@ func _hide(key: Vector2i) -> void:
 		node.queue_free()
 	shown_bytes -= _shown[key].bytes
 	_shown.erase(key)
+	shows += 1
 
 
 func _tree_frame(kind: String, variant: int) -> AtlasTexture:

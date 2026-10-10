@@ -81,7 +81,7 @@ func _hit_pass() -> bool:
 
 
 # Ticked on after the first sweep, the second kills the foe: on that tick it lies among the dying,
-# drawn in a band beside the living, upright, opaque and flashing, its last loss floating up, then
+# drawn in a band beside the living, with no shadow of its own, upright, opaque and flashing, its last loss floating up, then
 # halfway fallen over and faded at half its time, and gone at its end. Control: before that tick
 # nothing was dying.
 func _death_pass() -> bool:
@@ -112,8 +112,8 @@ func _death_pass() -> bool:
 			and at_death.size() == 1 and at_death[0].alpha > 0.9 and at_death[0].fallen < 0.2 \
 			and at_death[0].flash > 0.5 and numbers.has(last_loss) and _white_bodies(art) == 1 \
 			and halfway.size() == 1 and halfway[0].fallen == 1.0 and absf(halfway[0].alpha - 0.5) < 0.05 \
-			and after.is_empty() and art.drawn == 1 and instances == 2
-	print("combat_test: the foe died %s with nothing dying before %s; at its death %s with numbers %s against its last loss %s and %d body drawn white, halfway %s, after %s; %d living drawn and %d bodies in the bands: %s" % [
+			and after.is_empty() and art.drawn == 1 and instances == 3
+	print("combat_test: the foe died %s with nothing dying before %s; at its death %s with numbers %s against its last loss %s and %d body drawn white, halfway %s, after %s; %d living drawn and %d sprites in the bands, a body and a shadow for each and the dying body: %s" % [
 		world.person_health(fight.victim) == 0, dying_before == 0, at_death, numbers, last_loss,
 		_white_bodies(art), halfway, after, art.drawn, instances, "pass" if died else "FAIL"])
 	art.free()

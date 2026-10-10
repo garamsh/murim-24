@@ -22,10 +22,12 @@ script = ExtResource("2")
 
 [node name="Ring" type="Sprite2D" parent="."]
 centered = false
-offset = Vector2(-8, -24)
+offset = Vector2(-8, -22)
 
 [node name="Standing" type="Node2D" parent="."]
 y_sort_enabled = true
+
+[node name="Outlines" type="MultiMeshInstance2D" parent="."]
 
 [node name="Combat" type="Node2D" parent="."]
 material = SubResource("ShaderMaterial_combat")
@@ -33,4 +35,4 @@ script = ExtResource("3")
 
 [node name="Chevron" type="Sprite2D" parent="."]
 centered = false
-offset = Vector2(-8, -24)
+offset = Vector2(-8, -22)

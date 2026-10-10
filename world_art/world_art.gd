@@ -57,8 +57,18 @@ const CHEVRON_FRAME_MS := 400
 const MARGIN := 64.0
 # Frame positions in the body atlas built at startup, in pixels.
 const BODY_FRAME := Vector2i(16, 24)
-## How far above where a person stands its name's anchor, over its head, is, in pixels.
-const HEAD := 25.0
+## The row of a body's frame its feet stand on, and how far above where a person stands its name's
+## anchor, over its head, is, in pixels.
+const FEET := 22
+const HEAD := 23.0
+## How long a body shows its strike frame after it struck, in milliseconds.
+const STRIKE_MS := 200
+# The frames of a faction's body sheet, `<tag>` and `<tag>_xray` for each of these, by its tags; and
+# the atlas slot after the factions' frames that holds the shadow, centred in it.
+const BODY_TAGS := ["idle", "walk", "back", "strike"]
+const SHADOW := "markers/shadow"
+## Pixels a band's bodies are bucketed by for the test of what stands in front of them.
+const BUCKET := 32.0
 ## How far from the person names are read around another person's name is drawn, in cells.
 const NAME_REACH := 8
 ## The relations, as WorldAdapter.relation gives them, of a person drawn ringed in RING.
@@ -88,6 +98,19 @@ var _height := 0
 var _sprite_of_faction := PackedInt64Array()
 var _atlas: ImageTexture
 var _bands: Array[MultiMeshInstance2D] = []
+# The first frame of each of BODY_TAGS, and of its outline, in a faction's sheet; the atlas's width
+# for one faction; and where the shadow's slot lies in the atlas.
+var _body_frames := {}
+var _faction_width := 0
+var _shadow_x := 0
+# When each person last struck, in milliseconds, by person; never, for one past its end.
+var _struck_at := PackedInt64Array()
+## Bodies drawn over what stands in front of them as an outline in the last refresh.
+var outlined := 0
+# What can stand in front of a body, by BUCKET: [the rectangle it covers, the y it is sorted by],
+# rebuilt when the ground shows other areas or a structure is laid.
+var _occluders := {}
+var _occluders_for := Vector2i(-1, -1)
 # Bodies change only on a tick, so they are read once per tick: positions now and a tick ago,
 # whether each army's roster is the one it had a tick ago, and each army's sprite set. Every body
 # is one person.
@@ -202,7 +225,13 @@ func note_tick() -> void:
 		_rosters[army] = roster
 	_add_armies()
 	_read_relations()
-	combat.note_tick(world, steered, Time.get_ticks_msec(), _rosters, _tick_positions)
+	var ms := Time.get_ticks_msec()
+	combat.note_tick(world, steered, ms, _rosters, _tick_positions)
+	for strike: Dictionary in combat.strikes:
+		if strike.ms == ms:
+			if strike.person >= _struck_at.size():
+				_struck_at.resize(strike.person + 1)
+			_struck_at[strike.person] = ms
 	var now := world.territory()
 	var villages := world.villages()
 	if now == owners and villages.size() == _decorated:
@@ -282,8 +311,14 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	var last_row := mini(int((shown.end.y + relief.highest() * Relief.LEVEL_PX) / CELL.y) + 1, _height + 1)
 	var buffers: Array[PackedFloat32Array] = []
 	buffers.resize(maxi(last_row - first_row + 1, 0))
+	# Each band's shadows, drawn before its bodies, and the outlines of the bodies something hides.
+	var shadows: Array[PackedFloat32Array] = []
+	shadows.resize(buffers.size())
+	var outlines := PackedFloat32Array()
+	_gather_occluders()
 	var walk := (now / WALK_FRAME_MS) % 4
 	drawn = 0
+	outlined = 0
 	near.clear()
 	var named := viewer >= 0 and not _tick_positions[viewer].is_empty()
 	var named_from := _sub_at(viewer, 0, between) if named else Vector2.ZERO
@@ -311,15 +346,29 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			var row := clampi(int(on_ground.y / CELL.y), first_row, last_row)
 			if buffers.is_empty():
 				continue
-			var heading := 0.0
-			if body < before.size():
-				heading = positions[body].x - before[body].x
-				if heading == 0.0 and positions[body].y == before[body].y:
-					heading = NAN
-			var frame := 0 if is_nan(heading) else 1 + walk
-			_append(buffers, row - first_row, row, Rect2(Vector2(sprite * 80 + frame * BODY_FRAME.x, 0),
-					BODY_FRAME), Vector2(at.x, at.y - BODY_FRAME.y / 2.0), heading < 0.0, tint,
-					combat.flash(person, now))
+			var heading := positions[body] - before[body] if body < before.size() else Vector2.ZERO
+			var tag := "idle"
+			var index := 0
+			var struck := _struck_at[person] if person < _struck_at.size() else -STRIKE_MS
+			if struck > 0 and now - struck < STRIKE_MS:
+				tag = "strike"
+				index = 0 if now - struck < STRIKE_MS / 2 else 1
+			elif heading != Vector2.ZERO:
+				tag = "back" if heading.y < 0.0 and -heading.y > absf(heading.x) else "walk"
+				index = walk
+			var centre := Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0)
+			var frame := Rect2(Vector2(sprite * _faction_width + (_body_frames[tag] + index) * BODY_FRAME.x, 0), BODY_FRAME)
+			var band := row - first_row
+			var origin := Vector2(0, _band_y(row))
+			# Rounded before the band's origin is taken off, so a body stands on the same whole pixel in
+			# every band.
+			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false, Color.WHITE)
+			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, tint, combat.flash(person, now))
+			if _hidden(Rect2(centre - Vector2(BODY_FRAME) / 2.0, BODY_FRAME).grow(-2), origin.y):
+				var outline := frame
+				outline.position.x += (_body_frames[tag + "_xray"] - _body_frames[tag]) * BODY_FRAME.x
+				_pack(outlines, outline, centre, heading.x < 0.0, Color.WHITE, 0.0, 1.0, 0.0, frame.position)
+				outlined += 1
 			drawn += 1
 	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
 	# their killing blow lands.
@@ -328,10 +377,16 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		if not shown.has_point(at) or buffers.is_empty():
 			continue
 		var row := clampi(int(death.ground.y / CELL.y), first_row, last_row)
-		_append(buffers, row - first_row, row, Rect2(Vector2(_army_sprites[death.army] * 80, 0), BODY_FRAME),
-				Vector2(at.x, at.y - BODY_FRAME.y / 2.0), false, _tint(death.army),
+		_pack(buffers[row - first_row], Rect2(Vector2(_army_sprites[death.army] * _faction_width, 0), BODY_FRAME),
+				Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0).round() - Vector2(0, _band_y(row)), false, _tint(death.army),
 				death.flash, death.alpha, death.fallen * PI / 2.0)
-	_fill_bands(buffers, first_row)
+	for band in buffers.size():
+		shadows[band].append_array(buffers[band])
+	_fill_bands(shadows, first_row)
+	# With nothing outlined the pass is not drawn, so the screen is not copied for it.
+	var outlining := _outlines()
+	outlining.visible = outlined > 0
+	_fill(outlining, outlines)
 	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
 	# The markers follow the steered person while it lives.
 	var alive := steered >= 0 and not _tick_positions[steered].is_empty()
@@ -523,38 +578,82 @@ func _decorate(villages: Array[Dictionary]) -> void:
 				_standing.add_child(sprite)
 	_decorated = villages.size()
 # Puts the bodies' frames in one texture, so every band draws from it: the three factions' body
-# sheets side by side.
+# sheets side by side, then the shadow, centred in a slot of its own.
 func _build_body_atlas() -> void:
-	var image := Image.create_empty(256, BODY_FRAME.y, false, Image.FORMAT_RGBA8)
+	var first := _sheet("bodies/" + FACTIONS[0])
+	for tag in BODY_TAGS:
+		_body_frames[tag] = first.tags[tag][0]
+		_body_frames[tag + "_xray"] = first.tags[tag + "_xray"][0]
+	_faction_width = first.texture.get_width()
+	_shadow_x = FACTIONS.size() * _faction_width
+	var image := Image.create_empty(_shadow_x + BODY_FRAME.x, BODY_FRAME.y, false, Image.FORMAT_RGBA8)
 	for faction in FACTIONS.size():
-		var sheet := _sheet("bodies/" + FACTIONS[faction])
-		var source: Image = sheet.texture.get_image()
+		var source: Image = _sheet("bodies/" + FACTIONS[faction]).texture.get_image()
 		source.convert(Image.FORMAT_RGBA8)
-		image.blit_rect(source, Rect2i(Vector2i.ZERO, source.get_size()), Vector2i(faction * 80, 0))
+		image.blit_rect(source, Rect2i(Vector2i.ZERO, source.get_size()), Vector2i(faction * _faction_width, 0))
+	var shadow: Image = _sheet(SHADOW).texture.get_image()
+	shadow.convert(Image.FORMAT_RGBA8)
+	image.blit_rect(shadow, Rect2i(Vector2i.ZERO, shadow.get_size()),
+			Vector2i(_shadow_x, (BODY_FRAME.y - shadow.get_height()) / 2))
 	_atlas = ImageTexture.create_from_image(image)
 
 
-# Adds one sprite to band `band`, the band of row `row`: `frame` is its
-# rectangle in the atlas, BODY_FRAME in size, `centre` its centre in world pixels, `flip` mirrors it,
-# and a `tint` other than white rings it in that colour; it is drawn `white` of the way to white,
-# `alpha` opaque, and turned `turn` radians about its bottom edge's middle.
-func _append(buffers: Array[PackedFloat32Array], band: int, row: int, frame: Rect2, centre: Vector2,
-		flip: bool, tint: Color, white := 0.0, alpha := 1.0, turn := 0.0) -> void:
+# Adds one sprite to `buffer`: `frame` is its rectangle in the atlas, BODY_FRAME in size, `centre`
+# its centre in the pixels of the node the buffer is drawn in, `flip` mirrors it, and a `tint`
+# other than white rings it in that colour; it is drawn `white` of the way to white, `alpha`
+# opaque, and turned `turn` radians about its bottom edge's middle. `outlined`, for an outline, is
+# where the body it outlines is in the atlas.
+func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, tint: Color, white := 0.0,
+		alpha := 1.0, turn := 0.0, outlined := Vector2(-1, -1)) -> void:
 	var size := _atlas.get_size()
 	var width := frame.size.x * (-1.0 if flip else 1.0)
 	var height := frame.size.y
 	var cos_turn := cos(turn)
 	var sin_turn := sin(turn)
-	var local := centre.round() - Vector2(0, _band_y(row)) \
-			+ Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
+	var local := centre.round() + Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
 	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
-	# of the body shown.
-	buffers[band].append_array(PackedFloat32Array([
+	# of the body shown, or, for an outline, where the body it outlines is.
+	var custom := Vector2(white, alpha) if outlined.x < 0.0 else outlined / size
+	buffer.append_array(PackedFloat32Array([
 		width * cos_turn, height * sin_turn, 0.0, local.x,
 		width * sin_turn, -height * cos_turn, 0.0, local.y,
 		tint.r, tint.g, tint.b, tint.a,
-		frame.position.x / size.x, frame.position.y / size.y, white, alpha]))
+		frame.position.x / size.x, frame.position.y / size.y, custom.x, custom.y]))
+
+
+# Whether something standing in front of a body, sorted after `sort_y`, covers part of `rect`,
+# the body's frame on screen.
+func _hidden(rect: Rect2, sort_y: float) -> bool:
+	for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
+		for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
+			for occluder: Array in _occluders.get(Vector2i(bx, by), []):
+				if occluder[1] > sort_y and (occluder[0] as Rect2).intersects(rect):
+					return true
+	return false
+
+
+# Buckets what can stand in front of a body: the ground's raised strips and trees shown now, and
+# every standing structure's frame, again whenever either changes.
+func _gather_occluders() -> void:
+	var ground: Node2D = $Ground
+	var now := Vector2i(ground.shows, structure_sprites.size())
+	if now == _occluders_for:
+		return
+	_occluders_for = now
+	_occluders.clear()
+	var all: Array = ground.occluders()
+	for sprite in structure_sprites:
+		if sprite != null and sprite.get_parent() == _standing:
+			all.append([Rect2(sprite.position + sprite.offset, sprite.texture.get_size()), sprite.position.y])
+	for occluder: Array in all:
+		var rect: Rect2 = occluder[0]
+		for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
+			for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
+				var key := Vector2i(bx, by)
+				if not _occluders.has(key):
+					_occluders[key] = []
+				_occluders[key].append(occluder)
 
 
 func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
@@ -578,16 +677,41 @@ func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
 		_standing.add_child(band)
 		_bands.append(band)
 	for band in _bands.size():
-		var multimesh := _bands[band].multimesh
-		var data: PackedFloat32Array = buffers[band] if band < buffers.size() else PackedFloat32Array()
-		var count := data.size() / BODY_FLOATS
 		_bands[band].position = Vector2(0, _band_y(first_row + band))
-		if multimesh.instance_count < count:
-			multimesh.instance_count = count + 64
-		if count > 0:
-			data.resize(multimesh.instance_count * BODY_FLOATS)
-			multimesh.buffer = data
-		multimesh.visible_instance_count = count
+		_fill(_bands[band], buffers[band] if band < buffers.size() else PackedFloat32Array())
+
+
+# Draws the sprites `data` holds in `instance`'s MultiMesh, growing it as it needs.
+func _fill(instance: MultiMeshInstance2D, data: PackedFloat32Array) -> void:
+	var multimesh := instance.multimesh
+	var count := data.size() / BODY_FLOATS
+	if multimesh.instance_count < count:
+		multimesh.instance_count = count + 64
+	if count > 0:
+		data.resize(multimesh.instance_count * BODY_FLOATS)
+		multimesh.buffer = data
+	multimesh.visible_instance_count = count
+
+
+# The MultiMesh the outlines are drawn in, over everything standing, set up the first time.
+func _outlines() -> MultiMeshInstance2D:
+	var outlines: MultiMeshInstance2D = $Outlines
+	if outlines.multimesh == null:
+		outlines.multimesh = MultiMesh.new()
+		outlines.multimesh.transform_format = MultiMesh.TRANSFORM_2D
+		outlines.multimesh.use_colors = true
+		outlines.multimesh.use_custom_data = true
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE
+		outlines.multimesh.mesh = quad
+		outlines.multimesh.custom_aabb = AABB(Vector3(-BODY_FRAME.x, -BODY_FRAME.y - relief.highest() * Relief.LEVEL_PX, 0),
+				Vector3(_width * CELL.x + 2 * BODY_FRAME.x, _height * CELL.y + 2 * BODY_FRAME.y + relief.highest() * Relief.LEVEL_PX, 0))
+		outlines.texture = _atlas
+		var material := ShaderMaterial.new()
+		material.shader = preload("res://world_art/outline.gdshader")
+		material.set_shader_parameter("frame_size", Vector2(BODY_FRAME) / _atlas.get_size())
+		outlines.material = material
+	return outlines
 
 
 # Where the band of row `row` is sorted: the row's middle on the ground, after the raised strip of
