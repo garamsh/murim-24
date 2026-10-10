@@ -86,7 +86,8 @@ Options weighed:
   - **Gates.** A gate tower's passage stays open, except that it closes while a hostile army, one whose faction `hostile` reads, stands within 16 cells of it. A closed gate blocks like a segment. The town's residents assigned as guards stand in its passage, paid as soldiers (ADR 0052), 2 a gate.
   - **Absorbing.** A segment absorbs strikes by its material, rammed earth or stone wall, as #222's ADR 0057 decides.
   - **Breaching.** Besiegers breach a segment by bringing it to its destroyed stage by the strike rule. A destroyed segment no longer blocks, so the breach is a way in.
-  - **Climbing.** A wall of 2 or 3 levels is a cliff of that height to #223's ADR 0058, so a master can climb it, which is listed for the owner.
+  - **Climbing.** Walls are never climbed. A segment is a structure, not a level of the ground, so #223's ADR 0058 does not see it as a cliff. Under that ADR's numbers every realm climbs a 2-level drop, so a wall climbed as a cliff would stop no one. Climbing walls is listed for the owner.
+    - Rejected: a wall of 2 or 3 levels as a cliff of that height. Levies would scale a town's wall as easily as masters.
 - **Upkeep, decay and repair.**
   - Each standing segment and tower costs its owning faction 2 copper a day in upkeep, a sink under ADR 0052. A treasury that cannot pay lets its walls lose 2 durability a day.
   - Builders repair them by ADR 0056's rule when the village's account holds the materials.
@@ -137,7 +138,7 @@ This extends ADR 0023's growth with a wall plan, ADR 0056's building with stages
 
 - Towns visibly become walled as they prosper under threat, and the frontiers of wars wall themselves first.
 - Wall building is a long, steady demand for stone and builders' wages, which ADR 0052's and ADR 0056's economies carry.
-- Sieges become possible. Raids on a walled town need a breach or a master who climbs, so raids target open villages more.
+- Sieges become possible. Raids on a walled town need a breach or an open gate, so raids target open villages more.
 - Paths are rebuilt as segments rise, a few areas over years per town.
 
 ## Signs the decision was wrong
