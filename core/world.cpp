@@ -211,6 +211,14 @@ std::optional<std::size_t> person_aimed_at(const Target& target) {
                           : std::optional<std::size_t>{aimed->person};
 }
 
+// The kind the crowd's index marks a person of faction `faction` by: one bit
+// per faction, factions past the mask's width sharing bits, so a search for
+// a faction's kind may visit people of another but never misses its own.
+std::uint64_t kind_of(std::size_t faction) {
+  constexpr std::size_t KIND_BITS = 64;
+  return std::uint64_t{1} << (faction % KIND_BITS);
+}
+
 // The degrees in a quarter turn.
 constexpr std::int32_t QUARTER_TURN_DEGREES = 90;
 
@@ -2218,7 +2226,7 @@ void World::disband(std::size_t army) {
 void World::tick() {
   rng_state_ += SPLITMIX_INCREMENT;
   ++tick_count_;
-  std::vector<Position> positions;
+  std::vector<SpatialHash::Placed> placed;
   std::vector<std::size_t> people;
   std::vector<std::size_t> owners;
   // Each living person's index in the crowd.
@@ -2226,12 +2234,17 @@ void World::tick() {
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     for (const std::size_t member : armies_.at(army).roster) {
       slot.at(member) = people.size();
-      positions.push_back(people_.at(member).position);
+      // Marked by the faction of the army each served in as the tick began,
+      // not by relation: foe_kinds() reads relations live at each search,
+      // and no army changes faction before the last search, in steer(), so
+      // the marks hold for the whole tick.
+      placed.push_back(SpatialHash::Placed{people_.at(member).position,
+                                           kind_of(armies_.at(army).faction)});
       people.push_back(member);
       owners.push_back(army);
     }
   }
-  const Crowd crowd{SpatialHash{std::move(positions)}, std::move(people),
+  const Crowd crowd{SpatialHash{std::move(placed)}, std::move(people),
                     std::move(owners)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
@@ -2861,14 +2874,12 @@ void World::strike(std::size_t user, const Crowd& crowd,
   }
   // It faces the nearest hostile person in range. The crowd's order breaks
   // ties, so the order the query visits people in does not decide the target.
-  Nearest nearest{striker.position, Step{0, 0}};
-  crowd.hash.visit_within(
-      striker.position, skill.range, [&](std::size_t other) {
-        if (foes(self, army, crowd.people.at(other), crowd.armies.at(other))) {
-          nearest.offer(other, crowd.hash.position(other));
-        }
+  const std::optional<std::size_t> target = crowd.hash.nearest(
+      foe_kinds(self, own), striker.position, skill.range,
+      [&](std::size_t other) {
+        return foes(self, army, crowd.people.at(other), crowd.armies.at(other));
       });
-  if (const std::optional<std::size_t> target = nearest.found()) {
+  if (target) {
     use(user, crowd, index, crowd.hash.position(*target),
         crowd.people.at(*target), edges, damage);
   }
@@ -3103,25 +3114,21 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   // meets.
   const std::optional<std::size_t> home = people_.at(member).home;
   const bool marching = !home || !claims(*home, army.order.objective);
-  Nearest nearest{from, Step{0, 0}};
-  bool within = false;
-  crowd.hash.visit_within(
-      from, rules_.sight * CELL_SIZE, [&](std::size_t other) {
-        const Position there = crowd.hash.position(other);
-        if ((marching || claims(*home, cell_of(there))) &&
-            foes(member, own, crowd.people.at(other), crowd.armies.at(other))) {
-          nearest.offer(other, there);
-          within = within || distance_squared(from, there) <= reached * reached;
-        }
+  const std::optional<std::size_t> foe = crowd.hash.nearest(
+      foe_kinds(member, armies_.at(own)), from, rules_.sight * CELL_SIZE,
+      [&](std::size_t other) {
+        return (marching ||
+                claims(*home, cell_of(crowd.hash.position(other)))) &&
+               foes(member, own, crowd.people.at(other),
+                    crowd.armies.at(other));
       });
-  const std::optional<std::size_t> foe = nearest.found();
-  if (within) {
-    return Step{0, 0};
-  }
   if (!foe) {
     return std::nullopt;
   }
   const Position there = crowd.hash.position(*foe);
+  if (distance_squared(from, there) <= reached * reached) {
+    return Step{0, 0};
+  }
   const std::int64_t offset_x = std::int64_t{there.x} - from.x;
   const std::int64_t offset_y = std::int64_t{there.y} - from.y;
   // A component a twelfth over five of the other's or less is dropped, so
@@ -3172,6 +3179,26 @@ bool World::foes(std::size_t person, std::size_t army, std::size_t other,
                  std::size_t other_army) const {
   return hostile(armies_.at(army).faction, armies_.at(other_army).faction) ||
          duelling(person, other);
+}
+
+// The kinds the crowd's index marks the people person `person`, serving in
+// `army`, may strike by: those of the factions hostile to its army's, or every
+// kind while it fights a duel, whose foe may be of any faction.
+std::uint64_t World::foe_kinds(std::size_t person, const Army& army) const {
+  const bool duellist =
+      std::any_of(duels_.begin(), duels_.end(), [person](const Fight& fight) {
+        return fight.challenger == person || fight.leader == person;
+      });
+  if (duellist) {
+    return UINT64_LIMIT;
+  }
+  std::uint64_t kinds = 0;
+  for (std::size_t faction = 0; faction < rules_.hostile.size(); ++faction) {
+    if (hostile(army.faction, faction)) {
+      kinds |= kind_of(faction);
+    }
+  }
+  return kinds;
 }
 
 // Where a cast of `skill` by `caster` at `target` lands, or which way it
