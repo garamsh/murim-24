@@ -60,14 +60,18 @@ static func paved() -> Array[Vector2i]:
 	return cells
 
 
-# Lays the town at `corner` in `art`, a world_art.tscn shown: marks its cells built in the relief,
+# Lays the town at `corner` in `art`, a world_art.tscn shown: marks its footprints and paving built,
 # paves its streets, and stands each piece as world_art.gd stands a structure, with its shadow. It
 # returns the sprites laid.
 static func lay(art: Node2D, corner: Vector2i) -> Array:
 	var cell := Vector2(art.CELL)
-	for y in SIZE.y:
-		for x in SIZE.x:
-			art.relief.build(corner + Vector2i(x, y))
+	# As world_art.gd marks a world's: every piece's footprint and every paved cell, built.
+	for piece: Array in pieces():
+		for y in piece[2].y:
+			for x in piece[2].x:
+				art.relief.build(corner + piece[1] + Vector2i(x, y))
+	for c in paved():
+		art.relief.build(corner + c)
 	var ground_sheet: Dictionary = art._sheet("decorations/ground")
 	for c in paved():
 		var tagged: Array = ground_sheet.tags["paving"]

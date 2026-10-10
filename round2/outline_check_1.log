@@ -1,0 +1,36 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+outline_check: the ground's 16 areas baked and shown after 60 frames
+outline_check: on tick 1 a body drawn 0.99 of the way to white at (1049.0, 825.0): 98 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 476.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 464.0): 111 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 475.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 536.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 524.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 535.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 596.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 584.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 595.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 656.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 644.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 655.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 716.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 704.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 715.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1049.0, 760.0): 103 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 836.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 835.0): 111 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1053.0, 837.0): 81 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 896.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 884.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 895.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 956.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1011.0, 981.0): 52 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 992.0): 89 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 944.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 955.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1010.0, 1016.0): 109 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1038.0, 1004.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 0.99 of the way to white at (1037.0, 1015.0): 110 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: after 13 ticks, the outlines of 31 flashing bodies drew 42 pixels on screen and of 7 still ones some; 0 outline pixels over a body's own pixels shown: pass
