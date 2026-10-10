@@ -1,0 +1,163 @@
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/python3
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 45 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S core -B build/bench -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
+-- The CXX compiler identification is AppleClang 21.0.0.21000101
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- [download 1% complete]
+-- [download 2% complete]
+-- [download 3% complete]
+-- [download 4% complete]
+-- [download 5% complete]
+-- [download 6% complete]
+-- [download 8% complete]
+-- [download 10% complete]
+-- [download 11% complete]
+-- [download 13% complete]
+-- [download 14% complete]
+-- [download 15% complete]
+-- [download 16% complete]
+-- [download 17% complete]
+-- [download 18% complete]
+-- [download 19% complete]
+-- [download 20% complete]
+-- [download 22% complete]
+-- [download 23% complete]
+-- [download 24% complete]
+-- [download 26% complete]
+-- [download 28% complete]
+-- [download 29% complete]
+-- [download 30% complete]
+-- [download 31% complete]
+-- [download 32% complete]
+-- [download 34% complete]
+-- [download 35% complete]
+-- [download 36% complete]
+-- [download 37% complete]
+-- [download 38% complete]
+-- [download 39% complete]
+-- [download 40% complete]
+-- [download 41% complete]
+-- [download 42% complete]
+-- [download 43% complete]
+-- [download 44% complete]
+-- [download 45% complete]
+-- [download 47% complete]
+-- [download 48% complete]
+-- [download 49% complete]
+-- [download 50% complete]
+-- [download 52% complete]
+-- [download 54% complete]
+-- [download 55% complete]
+-- [download 56% complete]
+-- [download 57% complete]
+-- [download 58% complete]
+-- [download 59% complete]
+-- [download 60% complete]
+-- [download 61% complete]
+-- [download 63% complete]
+-- [download 65% complete]
+-- [download 66% complete]
+-- [download 67% complete]
+-- [download 68% complete]
+-- [download 69% complete]
+-- [download 70% complete]
+-- [download 71% complete]
+-- [download 72% complete]
+-- [download 73% complete]
+-- [download 75% complete]
+-- [download 76% complete]
+-- [download 77% complete]
+-- [download 78% complete]
+-- [download 79% complete]
+-- [download 80% complete]
+-- [download 81% complete]
+-- [download 82% complete]
+-- [download 83% complete]
+-- [download 84% complete]
+-- [download 85% complete]
+-- [download 86% complete]
+-- [download 87% complete]
+-- [download 88% complete]
+-- [download 90% complete]
+-- [download 92% complete]
+-- [download 93% complete]
+-- [download 94% complete]
+-- [download 95% complete]
+-- [download 96% complete]
+-- [download 97% complete]
+-- [download 98% complete]
+-- [download 99% complete]
+-- [download 100% complete]
+-- The C compiler identification is AppleClang 21.0.0.21000101
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done (2.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build/bench
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build/bench --target murim_core_bench
+[1/11] Building CXX object CMakeFiles/murim_core.dir/random.cpp.o
+[2/11] Building CXX object CMakeFiles/murim_core.dir/spatial_hash.cpp.o
+[3/11] Building CXX object CMakeFiles/murim_core.dir/map.cpp.o
+[4/11] Building CXX object CMakeFiles/murim_core.dir/flow_field.cpp.o
+[5/11] Building CXX object CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[6/11] Building CXX object CMakeFiles/murim_core_bench.dir/bench.cpp.o
+[7/11] Building CXX object CMakeFiles/murim_core.dir/region.cpp.o
+[8/11] Building CXX object CMakeFiles/murim_core.dir/save.cpp.o
+[9/11] Building CXX object CMakeFiles/murim_core.dir/world.cpp.o
+[10/11] Linking CXX static library libmurim_core.a
+[11/11] Linking CXX executable murim_core_bench
+scenario: M1 (core/m1_scenario.cpp), seed 2026, 128x128 cells, 20 armies, 10 structures
+ticks: 60 warm-up, then 600 timed, at 30 ticks per second
+people: 500, all in one battle; 497 alive when timing ended
+strikes per tick: 18.063, of which area 1.097 (32.900 per second)
+structures broken: 3 of 10
+tick time: p50 2.179 ms, p99 3.063 ms, max 3.573 ms
+PASS: p99 3.063 ms against a 4.000 ms budget
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 361 ticks in 11.9 s timed (30 per second set)
+bodies: 500 in the world, 396 on screen drawn as sprites through MultiMesh bands
+outlines: 72.3 bodies outlined over what hides them a frame on average, 72 in the last frame
+names: 8 shown over the 154 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 41.9 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 9.024 ms, p99 16.593 ms, max 30.488 ms
+PASS: p99 16.593 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+make bench ran the tick benchmark (exit 0) and the frame benchmark (exit 0)

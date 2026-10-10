@@ -1,0 +1,13 @@
+outline_check: on tick 13 a body drawn 1.00 of the way to white at (1053.0, 837.0): 81 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 1.00 of the way to white at (1011.0, 981.0): 52 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 13 a body drawn 1.00 of the way to white at (1010.0, 992.0): 89 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 15 a body drawn 1.00 of the way to white at (1051.0, 783.0): 96 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 23 a body drawn 1.00 of the way to white at (1038.0, 773.0): 106 of its pixels shown, 1 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 480.0): 105 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 538.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 598.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 658.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 898.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1018.0, 983.0): 102 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: on tick 24 a body drawn 1.00 of the way to white at (1030.0, 958.0): 115 of its pixels shown, 2 outline pixels drawn on screen, 0 of them over its own pixels
+outline_check: after 24 ticks, the outlines of 12 flashing bodies drew 21 pixels on screen and of 14 still ones some; 0 outline pixels over a body's own pixels shown: pass
