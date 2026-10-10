@@ -61,8 +61,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/town_temple` | 80 x 96 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/town_market_stall` | 48 x 50 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/town_courtyard_house` | 96 x 106 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/smithy` | 64 x 58 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/apothecary` | 80 x 52 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 12 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
@@ -235,7 +235,7 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 
 | Prop | Kind | Footprint | Look |
 |---|---|---|---|
-| Smithy (대장간) | Structure | 3 x 2 | A forge shed on a stone plinth under a low slate roof, its left bay open on a stone hearth of white-hot coals whose glow is dithered over the dark inside and the plinth, bellows beside it, a stone chimney rising from the hearth through the roof; a plank wall hung with tongs and hammers in its right bay; an anvil on a stump, a quench tub of water and a heap of charcoal before it; damaged holes the roof, knocks the chimney's crown off, scorches the planks and dims the coals, destroyed drops the roof into the shed, breaks the chimney half down and burns the plank wall to stumps with a few embers left, rubble is a heap with the hearth and the chimney's stub standing out of it |
+| Smithy (대장간) | Structure | 3 x 2 | A forge shed on a stone plinth at the back of its apron, under a slate roof running back over its footprint, its left bay open on a stone hearth of white-hot coals whose glow is dithered over the dark inside and the plinth, bellows beside it, a stone chimney rising from the hearth through the roof; a plank wall hung with tongs and hammers in its right bay; an anvil on a stump, a quench tub of water and a heap of charcoal before it; damaged holes the roof, knocks the chimney's crown off, scorches the planks and dims the coals, destroyed drops the roof into the shed, breaks the chimney half down and burns the plank wall to stumps with a few embers left, rubble is a heap with the hearth and the chimney's stub standing out of it |
 | Apothecary (약방) | Structure | 4 x 2 | A plastered shop on a stone plinth under a slate roof over its left three cells: a counter window on a cabinet of small drawers with gold pulls, jars and a mortar on the sill, herbs hung under the eave, a door under a split cloth curtain and a name board; in the yard at its right a herb rack of two posts and two bars hung with bundles, a drying tray of woven bamboo on trestles and a round tray on the ground, herbs spread on both; damaged holes the roof, scorches the wall, pulls drawers out and snaps the rack's lower bar onto the ground, destroyed drops the roof in and burns the walls to stumps, the rack to two posts and the tray where it fell, rubble is a heap on the plinth and ash in the yard |
 
 - The anvil outlasts the smithy: it stands on its stump intact and damaged and lies on its side, destroyed and rubble.
@@ -253,7 +253,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 | Market stall | 2 x 1 | A striped awning of paper and crimson on four posts over a table of pots, greens and bolts of cloth |
 | Courtyard house | 5 x 5 | A grey wall round a paved court with a tree, the main hall across its back, a wing down each side, a gate in its front wall under a small roof |
 
-- What is built is drawn crisp: its edges run along the pixel grid, and the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam.
+- What is built is drawn crisp: its edges run along the pixel grid, and where the ground round it is flat, the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam; on a slope's edge the ground is drawn as any other, so no cliff stands where nothing blocks the way.
 
 ## Effects and HUD
 
