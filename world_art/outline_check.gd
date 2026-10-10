@@ -15,7 +15,9 @@ extends SceneTree
 
 const SCENE := "res://world_art/world_art.tscn"
 const WorldArt := preload("res://world_art/world_art.gd")
-# Frames the ground is given to bake and stream in before the battle ticks.
+const Ground := preload("res://world_art/ground.gd")
+# The fewest frames before the battle ticks; it waits on until every area of the ground is baked
+# and shown.
 const SETTLE_FRAMES := 60
 const BATTLE_TICKS := 600
 # The impact core a flashing pixel is drawn in, as world_art/flash.gdshaderinc's IMPACT.
@@ -27,7 +29,7 @@ const BAYER := [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
 const SAME := 0.004
 # The fewest outline pixels flashing bodies' outlines must draw on screen before it reports, and
 # the most still bodies drawn alone a tick.
-const FLASHING_DRAWN := 10
+const FLASHING_DRAWN := 20
 const STILL_BODIES := 4
 # Frames waited after the view changes before what it draws is read back, so the image read is of
 # the change.
@@ -89,7 +91,13 @@ func _process(_delta: float) -> bool:
 	match _phase:
 		"settle":
 			_art.refresh(_whole(), 1.0)
-			if _frame >= SETTLE_FRAMES:
+			# The trees and raised strips hide bodies only once their areas are baked and shown, and a
+			# loaded machine bakes them over more frames.
+			var ground: Node2D = _art.get_node("Ground")
+			var areas := ceili(_whole().size.x / (Ground.CHUNK * WorldArt.CELL.x)) \
+					* ceili(_whole().size.y / (Ground.CHUNK * WorldArt.CELL.y))
+			if _frame >= SETTLE_FRAMES and ground.baked and ground.shown == areas:
+				print("outline_check: the ground's %d areas baked and shown after %d frames" % [areas, _frame])
 				_phase = "battle"
 		"battle":
 			_ticks += 1
