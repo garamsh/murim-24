@@ -112,12 +112,27 @@ class WorldAdapter : public godot::RefCounted {
 
   /// Gives army `army` the order to march toward `objective` and strike with
   /// one of `skills`, indices into its skills; with `challenge` 0 or more, its
-  /// lead also challenges that faction's leader to a duel. Returns false,
-  /// after push_error, when the core or the conversion to its types refuses
-  /// it.
+  /// lead also challenges that faction's leader to a duel; with `target` 0 or
+  /// more, it holds an attack intent on that person. Returns false, after
+  /// push_error, when the core or the conversion to its types refuses it.
   bool order(std::int64_t army, const godot::Vector2i& objective,
-             const godot::PackedInt64Array& skills,
-             std::int64_t challenge = -1);
+             const godot::PackedInt64Array& skills, std::int64_t challenge = -1,
+             std::int64_t target = -1);
+
+  /// Returns why army `army` may not take person `person` as its attack
+  /// intent's target, one of the ATTACK_* constants; ATTACK_NONE when it
+  /// may, and ATTACK_NO_TARGET for a person below 0.
+  [[nodiscard]] std::int64_t attack_refusal(std::int64_t army,
+                                            std::int64_t person) const;
+
+  /// Returns the person army `army`'s attack intent targets, or -1 when it
+  /// holds none.
+  [[nodiscard]] std::int64_t target(std::int64_t army) const;
+
+  /// Returns the living foes within the rules' sight of person `person`,
+  /// nearest first.
+  [[nodiscard]] godot::PackedInt64Array foes_in_sight(
+      std::int64_t person) const;
 
   /// Returns how many factions the world's rules name.
   [[nodiscard]] std::int64_t faction_count() const;
