@@ -5,7 +5,10 @@
 -- (8, height - 8), with what rises above the footprint in the rows above: house (3 x 3 cells),
 -- hall (5 x 3), storehouse (3 x 2), manual_hall (4 x 3), granary (2 x 2), well (2 x 2), seat_gate
 -- (3 x 1), barrels (1 x 1), fence (5 x 1) and training_ground (6 x 4), which is laid with the
--- ground. The smithy and the apothecary are workshops.lua's. The cast shadow is not in the frame.
+-- ground; and the walled town's pieces: its wall along the south and north (1 x 2) and the west and
+-- east (2 x 1), corner tower (3 x 3), gate tower (5 x 2), steps (1 x 2), temple (4 x 3), market
+-- stall (2 x 1) and courtyard house (5 x 5), each named town_<piece>. The smithy and the
+-- apothecary are workshops.lua's. The cast shadow is not in the frame.
 -- Run: aseprite --batch --script art/structures/structures.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -232,8 +235,9 @@ end
 -- Outlines a finished frame in ink.
 local function save_frame(cv) cv:outline(0, 0, cv.w, cv.h, INK) end
 
--- Saves the intact frame and, given its footprint, the three damage stages after it.
-local function save(name, cv, w, d)
+-- Saves the intact frame and, given its footprint, the three damage stages after it. `trim`, for
+-- a piece laid end to end in a run, takes the outline off each frame where the next piece meets it.
+local function save(name, cv, w, d, trim)
   local frames = { cv }
   if w then
     local seed = #name * 97 + w * 13 + d
@@ -241,7 +245,10 @@ local function save(name, cv, w, d)
     frames[3] = destroyed(cv, w, d, seed)
     frames[4] = rubble(cv, w, d, seed)
   end
-  for _, f in ipairs(frames) do f:outline(0, 0, f.w, f.h, INK) end
+  for _, f in ipairs(frames) do
+    f:outline(0, 0, f.w, f.h, INK)
+    if trim then trim(f) end
+  end
   local tags = { { "intact", 1, 1, 1000 } }
   if w then
     tags[2] = { "damaged", 2, 2, 1000 }; tags[3] = { "destroyed", 3, 3, 1000 }; tags[4] = { "rubble", 4, 4, 1000 }
@@ -480,4 +487,264 @@ do
   for n, stage in ipairs({ "intact", "damaged", "destroyed", "rubble" }) do frames[n] = training_ground(stage) end
   px.save_frames(frames[1].w, frames[1].h, frames, { { "intact", 1, 1, 1000 }, { "damaged", 2, 2, 1000 },
     { "destroyed", 3, 3, 1000 }, { "rubble", 4, 4, 1000 } }, here .. "/training_ground.aseprite")
+end
+
+-- The walled town's pieces (#200): a wall two cells thick and a level high, laid a piece a cell
+-- along each side, its walkway behind crenellations on its outer edge; a corner tower; a gate
+-- tower over each gate, the passage through its middle cell; steps up to the walkway; and the
+-- town's own buildings, a temple, a market stall and a courtyard house.
+local LEVEL = 16
+
+-- A wall's face of stone courses `h` high, from x for w with its foot on `base`, the joints
+-- staggered course by course so pieces laid side by side run on unbroken.
+local function courses(cv, x, base, w, h)
+  for y = base - h, base - 1 do
+    local course = (y - (base - h)) // 4
+    for xx = x, x + w - 1 do
+      local joint = (y - (base - h)) % 4 == 3 or (xx + course * 4) % 8 == 0
+      cv:set(xx, y, joint and c("stone", 2) or c("stone", 3))
+    end
+  end
+  cv:hline(x, base - 1, w, c("stone", 2))
+end
+
+-- A paved walkway seen from above, from x for w and from row `top` for d rows.
+local function walkway(cv, x, top, w, d)
+  for y = top, top + d - 1 do
+    for xx = x, x + w - 1 do
+      local joint = (y - top) % 6 == 5 or (xx + ((y - top) // 6) * 4) % 8 == 0
+      cv:set(xx, y, joint and c("stone", 4) or c("stone", 5))
+    end
+  end
+end
+
+-- Merlons along a row: a block every 4 pixels, 2 wide, rising 5 above `edge`, lit on its left.
+local function merlons_along(cv, x, edge, w)
+  cv:hline(x, edge - 2, w, c("stone", 3))
+  for k = 0, w - 1, 4 do
+    cv:rect(x + k, edge - 5, 2, 5, c("stone", 4))
+    cv:set(x + k, edge - 5, c("stone", 5)); cv:set(x + k + 1, edge - 5, c("stone", 5))
+  end
+end
+
+-- Merlons down a column, from row `top` for d rows: each a top 3 wide and 2 deep over a face 3
+-- high, every 6 rows.
+local function merlons_down(cv, x, top, d)
+  cv:vline(x + 1, top, d, c("stone", 3))
+  for y = top + 4, top + d - 1, 6 do
+    cv:rect(x, y - 3, 3, 2, c("stone", 5))
+    cv:rect(x, y - 1, 3, 3, c("stone", 3))
+  end
+end
+
+-- Takes the outline off a piece's left and right, where the pieces beside it in its run meet it.
+local function trim_sides(w)
+  return function(f)
+    for y = 0, f.h - 1 do
+      for x = 0, 7 do f:clear(x, y) end
+      for x = 8 + w * CW, f.w - 1 do f:clear(x, y) end
+    end
+  end
+end
+
+-- Takes the outline off the rows above a piece's walkway, where the piece behind it in its run
+-- meets it.
+local function trim_above(top)
+  return function(f)
+    for y = 0, top - 1 do
+      for x = 0, f.w - 1 do f:clear(x, y) end
+    end
+  end
+end
+
+-- The wall along the south and north sides, 1 x 2 cells: its face a level high, the walkway two
+-- cells deep on it, crenellated along the outer edge, the front for the south wall and the back
+-- for the north, with a low parapet along the inner one.
+for _, side in ipairs({ "south", "north" }) do
+  local cv, x, base = frame(1, 2, LEVEL + 8)
+  local W, D = CW, 2 * CD
+  local top = base - LEVEL
+  courses(cv, x, base, W, LEVEL)
+  walkway(cv, x, top - D, W, D)
+  if side == "south" then
+    merlons_along(cv, x, top, W)
+    cv:hline(x, top - D, W, c("stone", 3))
+  else
+    merlons_along(cv, x, top - D + 1, W)
+    cv:hline(x, top - 1, W, c("stone", 3))
+  end
+  save("town_wall_" .. side, cv, 1, 2, trim_sides(1))
+end
+
+-- The wall along the west and east sides, 2 x 1 cells: the walkway two cells wide seen from
+-- above, crenellated down its outer edge, the left for the west wall and the right for the east,
+-- over a face that shows where the run ends.
+for _, side in ipairs({ "west", "east" }) do
+  local cv, x, base = frame(2, 1, LEVEL + 4)
+  local W, D = 2 * CW, CD
+  local top = base - LEVEL
+  courses(cv, x, base, W, LEVEL)
+  walkway(cv, x, top - D, W, D)
+  if side == "west" then
+    merlons_down(cv, x, top - D, D)
+    cv:vline(x + W - 1, top - D, D, c("stone", 3))
+  else
+    merlons_down(cv, x + W - 3, top - D, D)
+    cv:vline(x, top - D, D, c("stone", 3))
+  end
+  save("town_wall_" .. side, cv, 2, 1, trim_above(top - D))
+end
+
+-- A corner tower, 3 x 3 cells, two levels high, crenellated all round, with a small watch
+-- pavilion on its top.
+do
+  local cv, x, base = frame(3, 3, 40)
+  local W, D = 3 * CW, 3 * CD
+  local top = base - 2 * LEVEL
+  courses(cv, x, base, W, 2 * LEVEL)
+  cv:vline(x, top, 2 * LEVEL, c("stone", 4)); cv:vline(x + W - 1, top, 2 * LEVEL, c("stone", 2))
+  walkway(cv, x, top - D, W, D)
+  merlons_along(cv, x, top - D + 1, W)
+  merlons_down(cv, x, top - D, D)
+  merlons_down(cv, x + W - 3, top - D, D)
+  local foot = top - 10
+  front(cv, x + 10, foot, W - 20, 9, {}, false)
+  roof(cv, x + 7, x + W - 8, foot - 7, foot - 15, foot - 19, 5)
+  merlons_along(cv, x, top, W)
+  save("town_corner_tower", cv, 3, 3)
+end
+
+-- A gate tower, 5 x 2 cells, over the wall where a road passes it: the passage through its
+-- middle cell under a gold-framed name board, and a gate house on top under a broad tiled roof.
+do
+  local cv, x, base = frame(5, 2, 48)
+  local W, D = 5 * CW, 2 * CD
+  local h = LEVEL + 4
+  local top = base - h
+  courses(cv, x, base, W, h)
+  cv:vline(x, top, h, c("stone", 4)); cv:vline(x + W - 1, top, h, c("stone", 2))
+  -- The passage, dark under its arch, its doors open against its sides.
+  local px0 = x + 2 * CW
+  cv:rect(px0, base - 13, CW, 13, c("ink", 2))
+  cv:each_ellipse(px0 + CW / 2 - 0.5, base - 13, CW / 2, 4, function(xx, yy) if yy <= base - 13 then cv:set(xx, yy, c("ink", 2)) end end)
+  cv:rect(px0, base - 12, 2, 12, c("wood", 2)); cv:rect(px0 + CW - 2, base - 12, 2, 12, c("wood", 2))
+  cv:rect(px0 + 1, top + 1, CW - 2, 3, c("gold", 3)); cv:rect(px0 + 2, top + 2, CW - 4, 1, c("lacquer", 2))
+  walkway(cv, x, top - D, W, D)
+  merlons_along(cv, x, top - D + 1, W)
+  local foot = top - 6
+  front(cv, x + 10, foot, W - 20, 12, { 6, 47 })
+  roof(cv, x + 4, x + W - 5, foot - 10, foot - 22, foot - 28, 12)
+  merlons_along(cv, x, top, W)
+  save("town_gate_tower", cv, 5, 2)
+end
+
+-- Steps, 1 x 2 cells, rising from the ground at their front to the walkway a level up at their
+-- back: eight treads, each 3 rows deep over a riser 2 rows high, between plain cheeks.
+do
+  local cv, x, base = frame(1, 2, LEVEL + 2)
+  local W = CW
+  for k = 0, 7 do
+    local y0 = base - k * 5
+    cv:rect(x, y0 - 2, W, 2, c("stone", 3))
+    cv:rect(x, y0 - 5, W, 3, c("stone", 5))
+    cv:hline(x, y0 - 5, W, c("stone", 6))
+  end
+  cv:vline(x, base - 40, 40, c("stone", 4)); cv:vline(x + W - 1, base - 40, 40, c("stone", 2))
+  save("town_steps", cv, 1, 2)
+end
+
+-- Repaints a front's plaster in lacquer, as a temple's walls are.
+local function lacquer(cv, x, y, w, h)
+  for yy = y, y + h - 1 do
+    for xx = x, x + w - 1 do
+      local i = cv:get(xx, yy)
+      if i == c("paper", 2) then cv:set(xx, yy, c("lacquer", 3)) elseif i == c("paper", 1) then cv:set(xx, yy, c("lacquer", 2)) end
+    end
+  end
+end
+
+-- The temple, 4 x 3 cells: lacquered walls on a high plinth with steps, under a skirt roof and a
+-- second, upper roof, a gold plaque between them.
+do
+  local cv, x, base = frame(4, 3, 44)
+  local W, D = 4 * CW, 3 * CD
+  block(cv, x, base, W, D, 6, "stone", 3)
+  for k = 0, 2 do cv:hline(x + 24 - k, base - 2 - k * 2, 16 + k * 2, c("stone", 5 - (k % 2))) end
+  local foot = base - 6
+  front(cv, x + 4, foot, W - 8, 14, { 6, 45 })
+  lacquer(cv, x + 4, foot - 14, W - 8, 14)
+  local eave = foot - 14 + 2
+  roof(cv, x + 1, x + W - 2, eave, eave - 9, eave - 9, 3)
+  local foot2 = eave - 8
+  front(cv, x + 14, foot2, W - 28, 10, {}, false)
+  lacquer(cv, x + 14, foot2 - 10, W - 28, 10)
+  cv:rect(x + 26, foot2 - 8, 12, 5, c("gold", 3)); cv:rect(x + 27, foot2 - 7, 10, 3, c("ink", 2))
+  local eave2 = foot2 - 10 + 2
+  roof(cv, x + 6, x + W - 7, eave2, eave2 - 14, eave2 - 20, 8)
+  save("town_temple", cv, 4, 3)
+end
+
+-- A market stall, 2 x 1 cells: a striped awning on four posts over a table of pots, greens and
+-- bolts of cloth.
+do
+  local cv, x, base = frame(2, 1, 22)
+  local W, D = 2 * CW, CD
+  for _, p in ipairs({ { 1, 0 }, { W - 2, 0 }, { 1, -D }, { W - 2, -D } }) do
+    cv:vline(x + p[1], base + p[2] - 16, 16, c("wood", 2))
+  end
+  block(cv, x + 3, base - 1, W - 6, 7, 5, "wood", 3)
+  local table_top = base - 1 - 5 - 7
+  for k = 0, 2 do cv:each_ellipse(x + 7 + k * 3, table_top + 4, 1.6, 1.2, function(xx, yy) cv:set(xx, yy, c("earth", 3)) end) end
+  cv:rect(x + 16, table_top + 2, 4, 3, c("grass", 5)); cv:set(x + 17, table_top + 2, c("grass", 6))
+  cv:rect(x + 21, table_top + 1, 3, 4, c("azure", 4)); cv:rect(x + 24, table_top + 2, 3, 3, c("amber", 4))
+  -- The awning, sloping from the back posts' tops down to the front's, in stripes.
+  for yy = base - D - 18, base - 15 do
+    for xx = x - 1, x + W do
+      local stripe = ((xx - x) // 4) % 2 == 0
+      cv:set(xx, yy, stripe and c("paper", 3) or c("crimson", 3))
+    end
+  end
+  cv:hline(x - 1, base - 15, W + 2, c("ink", 3))
+  save("town_market_stall", cv, 2, 1)
+end
+
+-- A courtyard house, 5 x 5 cells: a grey wall round a paved court, the main hall across its
+-- back, a wing down each side, and a gate in the middle of its front wall under a small roof.
+do
+  local cv, x, base = frame(5, 5, 30)
+  local W, D = 5 * CW, 5 * CD
+  local back = base - D
+  -- The court, paved from wall to wall.
+  for yy = back + 1, base - 9 do
+    for xx = x + 2, x + W - 3 do
+      local joint = (yy - back) % 6 == 5 or (xx - x) % 8 == 0
+      cv:set(xx, yy, joint and c("stone", 4) or c("stone", 5))
+    end
+  end
+  cv:each_ellipse(x + 24, base - 18, 4, 3, function(xx, yy, dd) cv:set(xx, yy, dd > 0.7 and c("leaf", 2) or c("leaf", 4)) end)
+  -- The side wings: long roofs seen from above, their ridges running back to front, their gable
+  -- fronts facing the court's front.
+  for _, wx in ipairs({ x + 2, x + W - 18 }) do
+    for yy = back + 22, base - 20 do
+      for xx = wx, wx + 15 do
+        local col = xx < wx + 8 and c("stone", 4) or c("stone", 3)
+        if (yy - back) % 3 == 0 then col = px.shift(col, -1) end
+        cv:set(xx, yy, col)
+      end
+    end
+    cv:vline(wx + 7, back + 22, base - 20 - back - 22, c("stone", 2))
+    front(cv, wx + 1, base - 9, 14, 10, {}, true)
+  end
+  -- The main hall across the back.
+  building(cv, x + 8, back + 24, 4, 2, 11, 9, { 6, 49 }, { hip = 8 })
+  -- The wall round it: its cap down the sides and along the back, its face along the front with
+  -- the gate.
+  cv:rect(x, back - 2, W, 3, c("stone", 2)); cv:hline(x, back - 2, W, c("stone", 4))
+  cv:rect(x, back, 2, D - 8, c("stone", 4)); cv:rect(x + W - 2, back, 2, D - 8, c("stone", 2))
+  courses(cv, x, base, W, 9)
+  cv:hline(x, base - 10, W, c("stone", 4))
+  cv:rect(x + 34, base - 9, 12, 9, c("wood", 2)); cv:vline(x + 40, base - 9, 9, c("wood", 1))
+  cv:set(x + 37, base - 5, c("gold", 3)); cv:set(x + 42, base - 5, c("gold", 3))
+  roof(cv, x + 31, x + 48, base - 10, base - 15, base - 17, 3)
+  save("town_courtyard_house", cv, 5, 5)
 end

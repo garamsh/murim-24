@@ -23,7 +23,10 @@ cd "$(dirname "$0")"
 for name in terrain/trees terrain/ramps terrain/detail bodies/orthodox bodies/demonic \
 	bodies/unorthodox structures/house structures/hall structures/well structures/barrels structures/fence \
 	structures/granary structures/storehouse structures/training_ground structures/manual_hall \
-	structures/seat_gate structures/smithy structures/apothecary decorations/fields icons/economy_icons \
+	structures/seat_gate structures/smithy structures/apothecary structures/town_wall_south structures/town_wall_north \
+	structures/town_wall_west structures/town_wall_east structures/town_corner_tower structures/town_gate_tower \
+	structures/town_steps structures/town_temple structures/town_market_stall structures/town_courtyard_house \
+	decorations/fields icons/economy_icons \
 	decorations/ground decorations/banner decorations/sect_banner icons/skill_icons icons/ware_icons markers/army_marker \
 	markers/player_marker markers/shadow title/backdrop icon/icon; do
 	"$aseprite" --batch "$name.aseprite" --sheet "$name.png" --data "$name.json" --format json-array --list-tags
