@@ -190,6 +190,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		_stage_frames[kind] = frames
 	_lay_decorations()
 	_lay_fields()
+	_mark_built()
 	_lay_structures()
 	_lay_ground()
 	_build_body_atlas()
@@ -440,6 +441,20 @@ func _hash(x: int, y: int, salt: int) -> int:
 	var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
 	h = (h ^ (h >> 13)) * 1274126177
 	return absi(h ^ (h >> 16))
+
+
+# Marks in the relief every cell a structure stands on and every cell paved or a road, so the
+# ground there is drawn straight up to what is built on it.
+func _mark_built() -> void:
+	for structure in world.structure_count():
+		var corner := world.structure_cell(structure)
+		var footprint := world.structure_footprint(structure)
+		for y in range(corner.y, mini(corner.y + footprint.y, _height)):
+			for x in range(corner.x, mini(corner.x + footprint.x, _width)):
+				relief.build(Vector2i(x, y))
+	for cell in built.get_used_cells():
+		if cell.x >= 0 and cell.y >= 0 and cell.x < _width and cell.y < _height:
+			relief.build(cell)
 
 
 # Prepares the ground to be baked from the relief, with a decorative tree on no village and no

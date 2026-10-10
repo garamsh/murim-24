@@ -3,8 +3,9 @@
 # rock and the rest flat; that the texture it gives the shader holds each cell's kind, level, face
 # and slope, the same for the same cells; that no cliff drops between two points of ground the core
 # lets a person cross, across or down, with a control where hills rise without a slope and do drop
-# by one; and that the point a screen pixel shows is the point drawn there, on flat ground and up a
-# slope.
+# by one; that the point a screen pixel shows is the point drawn there, on flat ground and up a
+# slope; and that a cell something is built on is marked in the texture and stands at its own
+# level, where the same cell unbuilt is read off the slope round it.
 extends RefCounted
 
 const SIZE := Vector2i(16, 14)
@@ -30,7 +31,7 @@ const KINDS := {".": "plain", "f": "forest", "h": "hills", "w": "water", "m": "m
 
 
 func run() -> bool:
-	return _levels_pass() and _texture_pass() and _cliffs_pass() and _under_pass()
+	return _levels_pass() and _texture_pass() and _cliffs_pass() and _under_pass() and _built_pass()
 
 
 static func _relief(slopes := true) -> Relief:
@@ -153,4 +154,31 @@ func _under_pass() -> bool:
 	print("relief_test: under %s found %s; the slope's %s raised %.1f to %s found %s; its unraised pixel shows %s (setup %s): %s" % [
 		flat, relief.ground_under(flat), slope, relief.lift_at(slope), raised, relief.ground_under(raised),
 		relief.ground_under(slope), setup, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A cell on the hills' edge, built on, carries 128 more in its texel's blue and stands at its own
+# level at every point on it. Control: the same cell unbuilt, whose height varies across it as the
+# ground rises toward the hills, and a cell beside it, which is not marked.
+func _built_pass() -> bool:
+	var at := Vector2i(4, 6)
+	var built := _relief()
+	built.build(at)
+	var plain := _relief()
+	var data := built.cell_image().get_data()
+	var unbuilt := plain.cell_image().get_data()
+	var blue := func(bytes: PackedByteArray, cell: Vector2i) -> int: return bytes[(cell.y * SIZE.x + cell.x) * 4 + 2]
+	var level := float(built.level_at(at))
+	var flat := true
+	var varies := false
+	for step in 4:
+		var point := (Vector2(at) + Vector2(0.125 + step * 0.25, 0.5)) * Relief.CELL
+		flat = flat and built.height_at(point) == level
+		varies = varies or not is_equal_approx(plain.height_at(point), level)
+	var beside := at + Vector2i(1, 0)
+	var passed: bool = built.built_at(at) and not built.built_at(beside) \
+			and blue.call(data, at) == blue.call(unbuilt, at) + 128 and blue.call(data, beside) == blue.call(unbuilt, beside) \
+			and flat and varies
+	print("relief_test: built on %s, blue %d against %d unbuilt, beside it %d; its height its level %.0f across it %s, unbuilt varying %s: %s" % [
+		at, blue.call(data, at), blue.call(unbuilt, at), blue.call(data, beside), level, flat, varies, "pass" if passed else "FAIL"])
 	return passed
