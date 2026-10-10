@@ -30,6 +30,9 @@ const REGION_SEED := 2026
 const WALK_TICKS := 600
 # Ticks of the M1 battle searched for a body outlined while it flashes.
 const BATTLE_TICKS := 400
+# Rows before a house that nothing else stands on, so whatever stands south of it rises over no one
+# walked to its front.
+const FRONT_CLEAR := 6
 
 
 func run() -> bool:
@@ -101,9 +104,10 @@ func _outline_pass() -> bool:
 	return passed
 
 
-# Walks the steered person of REGION_SEED's region to the cell beside the house nearest it, north
-# of it for `side` -1 and south for 1, and reads whether it is outlined there, and what stands in
-# front of it and covers its frame: the structures, by index, and -1 for anything of the ground.
+# Walks the steered person of REGION_SEED's region to the cell beside the house nearest it with
+# nothing standing in the FRONT_CLEAR rows before it, north of it for `side` -1 and south for 1, and
+# reads whether it is outlined there, and what stands in front of it and covers its frame: the
+# structures, by index, and -1 for anything of the ground.
 func _walked_beside_house(side: int) -> Dictionary:
 	var world := WorldAdapter.create_region(REGION_SEED)
 	var art: Node2D = load(SCENE).instantiate()
@@ -112,7 +116,7 @@ func _walked_beside_house(side: int) -> Dictionary:
 	var lead := world.body_positions(steered)[0] / WorldAdapter.CELL_SIZE
 	var house := -1
 	for structure in world.structure_count():
-		if world.structure_kind(structure) == "house" and (house < 0
+		if world.structure_kind(structure) == "house" and _clear_before(world, structure) and (house < 0
 				or Vector2(world.structure_cell(structure)).distance_to(lead)
 				< Vector2(world.structure_cell(house)).distance_to(lead)):
 			house = structure
@@ -197,6 +201,19 @@ func _flash_pass() -> bool:
 	print("bodies_test: over the M1 battle %d outlines read, %d without their body in a band, %d carrying another share of white than their body's; %d of a flashing body and %d of one not: %s" % [
 		checked, unmatched, differing, flashing, still, "pass" if passed else "FAIL"])
 	return passed
+
+
+# Whether no other structure but a field stands in the FRONT_CLEAR rows before `structure`, two
+# cells either side of it.
+static func _clear_before(world: WorldAdapter, structure: int) -> bool:
+	var corner := world.structure_cell(structure)
+	var size := world.structure_footprint(structure)
+	var before := Rect2i(corner.x - 2, corner.y + size.y, size.x + 4, FRONT_CLEAR)
+	for other in world.structure_count():
+		if other != structure and world.structure_field_state(other) < 0 \
+				and before.intersects(Rect2i(world.structure_cell(other), world.structure_footprint(other))):
+			return false
+	return true
 
 
 # The tag of the frame a band draws the body standing at `at` with, within the knock a hit gives

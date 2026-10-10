@@ -44,10 +44,9 @@ const VIEW := Vector2(480, 270)
 # 3,660 days.
 const SHORT_DAY := 5
 const FOUNDING_DAYS := 4500
-# Where a kind's frames hold its footprint's top-left, as docs/art-direction.md §Structures and
-# damage stages gives it: (8, 8) for every kind but the seat gate.
-const GATE_ANCHOR := Vector2(8, 40)
-const ANCHOR := Vector2(8, 8)
+# How far in from its left and bottom edges every structure's frame holds its footprint's
+# bottom-left corner, as docs/art-direction.md §Structures and damage stages gives it.
+const INSET := 8
 
 
 func run() -> bool:
@@ -93,10 +92,10 @@ func run() -> bool:
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
 	# Buildings: every region structure but a field is drawn as its kind's art, its footprint's
-	# bottom-left on the ground on the sprite's position and the frame's anchor on its top-left as
-	# the art draws a footprint, STRUCTURE_ROWS rows a cell, raised with the ground, holding each
-	# stage's frame and showing its stage's; a training ground lies on the ground, under every
-	# body, and every other kind stands. Setup: the region holds a seat's training ground, manual
+	# bottom-left on the ground on the sprite's position and on the frame's, INSET in from its left
+	# and bottom edges, raised with the ground, holding each stage's frame and showing its stage's;
+	# a training ground lies on the ground, under every body, and casts no shadow, and every other
+	# kind stands, its shadow on the ground from its footprint's top-left. Setup: the region holds a seat's training ground, manual
 	# hall and gate. Control: the structures above, made by create() with no kind, are counted
 	# undrawn by the same count.
 	var region := WorldAdapter.create_region(SEED)
@@ -120,7 +119,6 @@ func run() -> bool:
 			continue
 		var frame := (sprite.texture as AtlasTexture).region
 		var stage: String = stages[region.structure_stage(structure)]
-		var anchor := GATE_ANCHOR if kind == "seat_gate" else ANCHOR
 		var layer := "Laid" if kind == "training_ground" else "Standing"
 		var staged := true
 		for index in stages.size():
@@ -130,9 +128,11 @@ func run() -> bool:
 		var lift: float = region_art.relief.lift_at(bottom + Vector2(footprint.x * WorldArt.CELL.x / 2.0,
 				-WorldArt.CELL.y / 2.0))
 		var standing := sprite.position if kind != "training_ground" else bottom
-		if standing == bottom \
-				and sprite.position + sprite.offset + anchor \
-						== bottom - Vector2(0, footprint.y * WorldArt.STRUCTURE_ROWS + lift) \
+		var shadowed: bool = not sprite.has_meta("shadow") if kind == "training_ground" else \
+				sprite.has_meta("shadow") and (sprite.get_meta("shadow") as Sprite2D).get_parent().name == "Laid" \
+				and (sprite.get_meta("shadow") as Sprite2D).position == Vector2(corner) * WorldArt.CELL - Vector2(0, lift)
+		if standing == bottom and shadowed \
+				and sprite.position + sprite.offset + Vector2(INSET, frame.size.y - INSET) == bottom - Vector2(0, lift) \
 				and sprite.get_parent().name == layer and staged \
 				and frame.position.x == sheet.tags[stage][0] * sheet.width \
 				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
@@ -143,7 +143,7 @@ func run() -> bool:
 	var seat_kinds := ["training_ground", "manual_hall", "seat_gate"].all(func(kind: String) -> bool: return kinds.has(kind))
 	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 10 \
 			and seat_kinds and undrawn == 0 and unkinded == world.structure_count() and unkinded > 0
-	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame and shadow, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
 		placed, region.structure_count(), kinds.keys(), seat_kinds, fields, undrawn, unkinded,
 		world.structure_count(), "pass" if buildings_right else "FAIL"])
 
