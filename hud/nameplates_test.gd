@@ -301,7 +301,7 @@ func _widest(world: WorldAdapter, plates: Control) -> Array[int]:
 # The colour the body standing at `at`, in world pixels, is drawn with in `art`'s bands, or black
 # where none is.
 func _tint(art: Node2D, at: Vector2) -> Color:
-	var centre := Vector2(at.x, at.y - art.BODY_FRAME.y / 2.0).round()
+	var centre := Vector2(at.x, at.y - art.FEET + art.BODY_FRAME.y / 2.0).round()
 	for child in art.get_node("Standing").get_children():
 		var band := child as MultiMeshInstance2D
 		if band == null:

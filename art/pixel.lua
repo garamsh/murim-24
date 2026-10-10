@@ -24,6 +24,7 @@ M.ramps = {
   gold = { "5c4418", "8c6a2a", "c99a3c", "f0d080" },
   paper = { "a8946c", "d9c9a3", "efe3c2" },
   lacquer = { "3d1418", "7a2a24", "a83a2c" },
+  violet = { "2a1438", "46205e", "6a3290", "9a5cd0", "c99cf0" },
 }
 
 M.colours = {} -- index -> "rrggbb"
@@ -32,7 +33,7 @@ M.ramp_of = {} -- index -> { ramp name, position }
 local by_hex = {}
 local order = {
   "ink", "stone", "grass", "leaf", "earth", "wood", "water", "crimson", "azure", "amber",
-  "skin", "cloth", "robe", "fire", "jade", "gold", "paper", "lacquer",
+  "skin", "cloth", "robe", "fire", "jade", "gold", "paper", "lacquer", "violet",
 }
 M.order = order
 for _, name in ipairs(order) do

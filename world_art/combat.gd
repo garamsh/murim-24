@@ -14,8 +14,9 @@ extends Node2D
 
 ## A cell's width and depth on the ground, in pixels, as world_art.gd draws it.
 const CELL := Vector2(16, 12)
-## How far above where a person stands the top of its body is drawn, in pixels.
-const BODY_HEIGHT := 24.0
+## How far above where a person stands the top of its body is drawn, in pixels: its feet are on
+## the 22nd of its frame's 24 rows.
+const BODY_HEIGHT := 22.0
 ## How long each thing shows, in milliseconds.
 const STRIKE_MS := 160
 const FLASH_MS := 120

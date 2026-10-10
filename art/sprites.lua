@@ -95,6 +95,9 @@ return function(px)
     end,
     staff = function(cv, x, y) cv:vline(x, y - 9, 14, c("wood", 4)); cv:vline(x, y - 9, 2, c("wood", 5)) end,
     knife = function(cv, x, y) cv:vline(x, y - 3, 3, c("stone", 6)); cv:set(x, y, c("wood", 3)) end,
+    knife_strike = function(cv, x, y)
+      cv:hline(x + 1, y - 1, 4, c("stone", 6)); cv:set(x, y - 1, c("wood", 3))
+    end,
     fan = function(cv, x, y)
       cv:hline(x, y - 2, 4, c("amber", 5)); cv:hline(x, y - 1, 4, c("amber", 4)); cv:set(x, y, c("wood", 3))
     end,
