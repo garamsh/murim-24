@@ -88,15 +88,17 @@ func _strike_pass() -> bool:
 func _outline_pass() -> bool:
 	var behind := _walked_beside_house(-1)
 	var front := _walked_beside_house(1)
-	var passed: bool = behind.reached and front.reached and behind.outlined and not front.outlined
-	print("bodies_test: north of the house at %s reached %s, outlined %s; south of it at %s reached %s, outlined %s: %s" % [
-		behind.cell, behind.reached, behind.outlined, front.cell, front.reached, front.outlined,
-		"pass" if passed else "FAIL"])
+	var passed: bool = behind.reached and front.reached and behind.hiders == [behind.house] and behind.outlined \
+			and front.hiders.is_empty() and not front.outlined
+	print("bodies_test: north of house %d at %s reached %s, hidden by %s, outlined %s; south of it at %s reached %s, hidden by %s, outlined %s: %s" % [
+		behind.house, behind.cell, behind.reached, behind.hiders, behind.outlined, front.cell, front.reached, front.hiders,
+		front.outlined, "pass" if passed else "FAIL"])
 	return passed
 
 
 # Walks the steered person of REGION_SEED's region to the cell beside the house nearest it, north
-# of it for `side` -1 and south for 1, and reads whether it is outlined there.
+# of it for `side` -1 and south for 1, and reads whether it is outlined there, and what stands in
+# front of it and covers its frame: the structures, by index, and -1 for anything of the ground.
 func _walked_beside_house(side: int) -> Dictionary:
 	var world := WorldAdapter.create_region(REGION_SEED)
 	var art: Node2D = load(SCENE).instantiate()
@@ -129,8 +131,19 @@ func _walked_beside_house(side: int) -> Dictionary:
 	for i in outlines.multimesh.visible_instance_count:
 		if Vector2(buffer[i * WorldArt.BODY_FLOATS + 3], buffer[i * WorldArt.BODY_FLOATS + 7]) == centre:
 			outlined = true
+	var body := Rect2(centre - Vector2(WorldArt.BODY_FRAME) / 2.0, WorldArt.BODY_FRAME).grow(-2)
+	var sort_y := cell.y * WorldArt.CELL.y + WorldArt.CELL.y / 2.0
+	var hiders := []
+	for structure in art.structure_sprites.size():
+		var sprite: Sprite2D = art.structure_sprites[structure]
+		if sprite != null and sprite.position.y > sort_y \
+				and Rect2(sprite.position + sprite.offset, sprite.texture.get_size()).intersects(body):
+			hiders.append(structure)
+	for occluder: WorldArt.Ground.Occluder in art.get_node("Ground").occluders():
+		if occluder.sort_y > sort_y and occluder.rect.intersects(body):
+			hiders.append(-1)
 	art.free()
-	return {"cell": cell, "reached": reached, "outlined": outlined}
+	return {"cell": cell, "reached": reached, "outlined": outlined, "house": house, "hiders": hiders}
 
 
 # The tag of the frame a band draws the body standing at `at` with, within the knock a hit gives
