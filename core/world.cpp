@@ -413,9 +413,6 @@ void fold_selection(const Fold& fold, const Leadership& faction) {
   fold(faction.election.value_or(Election{}).term);
 }
 
-// Folds skill `skill` into `fold`; its qi cost only when it has one, and its
-// shape only when not an area, so a world of free area skills hashes as
-// before.
 // Folds order `order` into `fold`; its attack intent's target only when it
 // holds one, so a world with no intent keeps its hash.
 template <typename Fold>
@@ -431,6 +428,9 @@ void fold_order(const Fold& fold, const Order& order) {
   }
 }
 
+// Folds skill `skill` into `fold`; its qi cost only when it has one, and its
+// shape only when not an area, so a world of free area skills hashes as
+// before.
 template <typename Fold>
 void fold_skill(const Fold& fold, const Skill& skill) {
   fold(skill.range);
