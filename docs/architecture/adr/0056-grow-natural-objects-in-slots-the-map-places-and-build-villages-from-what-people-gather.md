@@ -1,6 +1,6 @@
 # ADR 0056: Grow natural objects in slots the map places, and build villages from what people gather
 
-> Status: proposed
+> Status: proposed; its hunting as gathering from a slot that moves superseded by ADR-0067, under which animals are records of their own that appear where food feeds them
 > Date: 2026-10-10
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
