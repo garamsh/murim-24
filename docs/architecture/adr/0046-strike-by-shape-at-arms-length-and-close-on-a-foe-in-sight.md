@@ -1,6 +1,6 @@
 # ADR 0046: Strike by shape at arm's length, and close on a foe in sight
 
-> Status: accepted; its guard strike as an army skill superseded by ADR-0050, under which the weapon gives the basic strike; its foe as a person of a hostile faction superseded by ADR-0054, under which a foe is whoever `hostile` reads, standing included
+> Status: accepted; its guard strike as an army skill superseded by ADR-0050, under which the weapon gives the basic strike; its foe as a person of a hostile faction superseded by ADR-0054, under which a foe is whoever `hostile` reads, standing included; its foe engaged within the sight's reach alone superseded by ADR-0058, under which a foe must also be seen past cliffs
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
