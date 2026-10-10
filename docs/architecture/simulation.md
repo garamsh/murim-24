@@ -231,6 +231,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Births.** A wife's chance is scaled by her household's provision, the days of food its purse and its village's stock give, full at 30, and by crowding past housing, in place of the headroom above. No birth stops at the cap, which growth, migration and the granary still read.
   - **The capacity.** `MAX_PEOPLE`, or the bound ADR 0048 measures, is a technical capacity. A birth at it is refused and counted, and the sweep and the bench fail on any.
   - **Levers and the loop.** Field and wild food yields are pack data by biome and season. `make sweep` reports population, food, money, villages and hunger by decade against target bands.
+- **Making gear from materials, and recycling.** ADR 0064 (`adr/0064-make-gear-from-materials-by-recipe-and-reforge-broken-metal-at-a-loss.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Recipes.** Every made kind carries its workshop, materials and labour as pack data. Each day a workshop makes the kind its market lacks most among those it has materials for, and treasuries order gear at their capital's market.
+  - **Sources.** Ore comes from ore veins at the map's mine sites, gathered as ADR 0056 gathers, and a village gathers for its market's shortfall.
+  - **Scrap.** A broken item becomes scrap of its main metal, which supersedes ADR 0050's item gone above, and organic parts leave nothing. A smith reforges 2 scrap into 1 metal, so metal is made only from ore and halves with each round.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.
