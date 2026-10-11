@@ -47,6 +47,7 @@ Each section carries one of the following statuses.
   - **Exaggeration** is allowed only where a rule needs it, and is stated where it is made.
   - **Two scales.** The li of ADR 0047 measures the distance between places. A place's layout patch carries the size of what stands there, at a person's scale. A town of 40 × 30 cells does not move its neighbours 40 li away.
   - **[proposed]** The reference sizes in `docs/art-direction.md` §Scale, the base pack's proposals in pack data.
+  - **Fields and their yield.** Decided by the PM on #242, 2026-10-11: a household's fields stay at 4 to 8 cells, and the base pack's yield is lowered to about 1 person a cell, so food binds the population.
 - **Principle: simple rules, complex consequences.** Decided by the owner on 2026-10-10 (issue #229). The world runs on simple rules whose consequences combine into complex cause and effect, the way money shapes villages' forms, their growth and each person's life. Our job is to tune the balance, not to script outcomes.
   - **Population has no separate limit: it is bounded by the food that can be had.** Fruit, game and fish regrow, fields yield, and how fast they regrow is what governs how many people the world feeds.
 - **Genre and engine**: 2D RPG, Godot 4.7.
@@ -310,7 +311,6 @@ The items below are not yet decided.
 - Whether a lost manual can be copied.
 - **Realistic scale (#227), for the owner.** Each has options and a recommendation:
   - **What a cell is at a person's scale.** (a) About 2 metres, a person's height and reach, which the reference sizes assume; (b) about 1.5 metres. Recommended: (a), so a 4 x 3 house is about 8 x 6 m, a rural house of three bays.
-  - **Fields.** A real household farmed several thousand cells' worth. (a) Keep 4 to 8 cells a household, an exaggeration ADR 0022's food data needs; (b) real fields, which would fill most of the map. Recommended: (a).
   - **Great rivers.** A real Yellow River or Yangtze is hundreds of cells wide. (a) 16 to 40 cells, crossed by ferries and fords; (b) the real width. Recommended: (a), so the river still reads on one screen.
   - **Today's house and hall.** The drawn house is 3 x 3 and the hall 5 x 3, against the reference 4 x 3 and 6 x 4. (a) Grow them in the next structure art round; (b) keep them as stated exceptions. Recommended: (a).
   - **When a village becomes a town.** (a) Only when its growth reaches the walled town's size, as #169's comment says; (b) by population alone. Recommended: (a), which #169 designs.

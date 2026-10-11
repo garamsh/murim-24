@@ -193,21 +193,21 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 
 | Thing | Size in cells | Note |
 |---|---|---|
-| House, one household | 4 x 3 | A rural house of three bays; the base pack's 3 x 3 house grows to this |
-| Courtyard house | 10 x 10 | Rooms on three or four sides round a court, a well-off household's |
+| House, one household | 4 x 3 | A rural house of three bays; if the owner grows today's house (`docs/concept.md` §Open questions), the base pack's 3 x 3 house grows to this |
+| Courtyard house | 10 x 10 | Rooms on three or four sides round a court, a well-off household's. #239 draws it 5 x 5 for now, an exception the art will follow |
 | Village hall | 6 x 4 | Ancestral or meeting hall, twice a house's floor |
-| Temple compound | 12 x 10 | Gate, court and main hall |
+| Temple compound | 12 x 10 | Gate, court and main hall; #239's temple of 4 x 3 is the main hall standing inside it |
 | Yamen or great hall | 16 x 12 | A town's seat of rule, with its court |
 | Market square | 10 x 8 in a town, 16 x 12 in a city | Open paving with stalls on its edges |
 | Wall, thickness | 2 for a town, 3 for a city | Owner: at least 2 |
-| Wall, height | 2 levels for a town, 3 for a city | Lifted like a cliff level, with a walkway and crenellations |
-| Gate | 2 to 3 cells wide, under a 4 x 3 gate tower | 2 to 4 gates a town, on its roads |
+| Wall, height | 2 levels for a town, 3 for a city | Lifted like a cliff level, with a walkway and crenellations. #239 draws a town's wall one level high for now, an exception the art will follow |
+| Gate | 2 to 3 cells wide, under a 5 x 2 gate tower over a road of 3 cells, as #239 draws it | 2 to 4 gates a town, on its roads |
 | Corner tower | 3 x 3 | On every corner of a town's wall |
 | Village | 15 x 10 to 30 x 20, unwalled | 5 to 30 households |
 | Walled town | at least 40 x 30 inside the wall | Owner: streets, wards, market, hall, temples, courtyard houses |
 | Major city | at least 80 x 60 inside the wall | Owner: with inner wards |
 | Sect seat | 24 x 16 to 40 x 30 | A compound of gate, halls, training grounds and quarters, not a single hall |
-| Field, one household's | 4 to 8 cells | Exaggerated: a real household farmed several thousand cells' worth. ADR 0022's food data feeds about 5 people a cell, which the rules need |
+| Field, one household's | 4 to 8 cells | Exaggerated small: a real household farmed several thousand cells' worth. The base pack's yield is about 1 person a cell, below |
 | Track | 1 cell wide | |
 | Road | 2 cells wide | |
 | Highway | 3 to 4 cells wide | |
@@ -215,6 +215,11 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 | River | 4 to 8 cells wide | |
 | Great river, the Yellow River or the Yangtze | 16 to 40 cells wide | Exaggerated narrow: at a person's scale a real width would be hundreds of cells |
 | Bridge | the river's width plus 2, 3 cells wide | Arched over streams and rivers. Great rivers are crossed by ferries and fords (ADR 0047) |
+
+- **The field's yield.** Decided by the PM on #242, 2026-10-11: fields stay at 4 to 8 cells a household, and the base pack's yield is lowered from ADR 0022's 600 measures a cell, about 5 people, to about 1 person a cell, 120 measures. So a household's fields feed about a household, and food, not a field's size, binds the population (#229).
+  - It is a pack-data change. The pull request that applies it shows `make sweep` 48/50 or better, since births follow food.
+  - ADR 0056's worked example assumed today's yield. Its implementation reads the yield from pack data, so the example's field counts scale with it.
+- **#239's pieces.** The courtyard house and the town wall's height above are this table's sizes, by the owner's realistic-scale principle. #239's smaller drawings are the current exceptions, and the art follows this table in a later round.
 
 ## Structures and damage stages
 
