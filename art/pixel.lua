@@ -34,7 +34,7 @@ local function rgb_hsl(r, g, b)
   return h, s, l
 end
 
-local function hsl_hex(h, s, l)
+local function hsl_rgb(h, s, l)
   local function f(t)
     t = t % 1
     local q = l < 0.5 and l * (1 + s) or l + s - l * s
@@ -45,8 +45,11 @@ local function hsl_hex(h, s, l)
     return p
   end
   h = (h % 360) / 360
-  local r, g, b = l, l, l
-  if s > 0 then r, g, b = f(h + 1 / 3), f(h), f(h - 1 / 3) end
+  if s <= 0 then return l, l, l end
+  return f(h + 1 / 3), f(h), f(h - 1 / 3)
+end
+
+local function rgb_hex(r, g, b)
   return string.format("%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
@@ -59,9 +62,12 @@ local function turn(h, to) return ((to - h) % 360 + 540) % 360 - 180 end
 -- `u` from the middle, -1 to 1, darkens toward black by DARKEN or lightens toward white by LIGHTEN,
 -- and turns its hue toward SHADOW_HUE (blue-violet) or LIGHT_HUE (yellow) by TURN, at most half
 -- the way and at most TURN_CAP degrees times |u|; shadows gain saturation and lights lose it. A
--- grey base takes a little of either hue.
+-- grey base takes a little of either hue. Then a shadow is mixed toward SHADOW_TINT by COOL |u|,
+-- and a light toward LIGHT_TINT by WARM u, at its own lightness, so even a grey material's shadows
+-- read cool and its lights warm.
 M.DARKEN, M.LIGHTEN, M.TURN, M.TURN_CAP, M.SATURATE = 0.62, 0.8, 0.95, 30, 1.06
 M.SHADOW_HUE, M.LIGHT_HUE = 250, 55
+M.SHADOW_TINT, M.LIGHT_TINT, M.COOL, M.WARM = "3a2a7a", "ffe7a0", 0.55, 0.35
 function M.build_ramp(base)
   local h, s, l = rgb_hsl(hex_rgb(base))
   local grey = s < 0.06
@@ -75,7 +81,12 @@ function M.build_ramp(base)
     local hue = grey and to or h + clamp(turn(h, to) * math.min(0.5, amount * 0.45), -cap, cap)
     local sat = s * M.SATURATE * (u < 0 and 1 + 0.3 * math.abs(u) * M.TURN or 1 - 0.25 * u * M.TURN)
     if grey then sat = 0.12 * math.abs(u) * M.TURN end
-    ramp[#ramp + 1] = hsl_hex(hue, clamp(sat, 0, 1), clamp(lightness, 0.02, 0.98))
+    lightness = clamp(lightness, 0.02, 0.98)
+    local r, g, b = hsl_rgb(hue, clamp(sat, 0, 1), lightness)
+    local tr, tg, tb = hex_rgb(u < 0 and M.SHADOW_TINT or M.LIGHT_TINT)
+    local mix = math.abs(u) * (u < 0 and M.COOL or M.WARM)
+    local mh, ms = rgb_hsl(r + (tr - r) * mix, g + (tg - g) * mix, b + (tb - b) * mix)
+    ramp[#ramp + 1] = rgb_hex(hsl_rgb(mh, ms, lightness))
   end
   return ramp
 end
