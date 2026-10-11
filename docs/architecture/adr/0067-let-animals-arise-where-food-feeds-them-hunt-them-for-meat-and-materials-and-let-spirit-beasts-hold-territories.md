@@ -76,7 +76,7 @@ Options weighed:
   | Tiger | predator of deer and boar | forest 4 | 240 | 18 | 30 meat, 2 hide, 2 bone, 1 claw |
   | Spirit tiger | spirit beast, predator of deer and boar | forest 4, hills 2 | 4,000 | 18 | 1 spirit core, 4 spirit hide, 4 spirit bone, 2 spirit claw, 40 meat |
 
-  Speed is in sub-cell units a tick, beside a person's `SPEED` of 16. Meat is a food kind, a measure a unit. Hide is #245's material. Horn, bone, claw, spirit hide, spirit bone and spirit claw are new materials.
+  Speed is in sub-cell units a tick, beside a person's `SPEED` of 16. Meat is a food kind, a measure a unit. Hide, horn, bone, claw, spirit hide, spirit bone and spirit claw are #245's material kinds.
 - **Appearance.** At each area's cycle, after grazing, one draw for each role, from `animal_stream`, a counter-based stream of the world's seed, the area's index, the cycle's number and the role. Like `slot_stream`, no other rule's draws shift it, and no order of visiting matters.
   - **Where nothing appears.** No animal appears in an area holding any structure of a village, so none appear in towns. An area whose biomes no kind lives on, or with no forage, has no grazers, and so no predators.
   - **Grazers, at a rate set by the spare forage.** The forage supports S grazers, the area's forage slots that are not empty divided by `forage_per_grazer`, and G graze there. One grazer appears with a chance of 250 × (S − G) / S per mille, rounded down, and none while G is at least S. So an area with all its forage to spare fills at 250 per mille a cycle, one half grazed at 125, and one at its support not at all. The kind is drawn by its weight on the area's biomes, at a forage slot's cell.
@@ -103,15 +103,7 @@ Options weighed:
   - **Meat.** Meat a hunter brings home goes into its household's account. Its household eats from it before it buys rations, a measure for a member's day. Meat above 30 days of its members' rations is sold to the village granary at its price, into the household's purse. So meat feeds the hunter's household first, as the owner decided, and the rest joins the village's stock, which #243's ADR 0063 counts as food.
   - **Materials.** Hide, horn, bone and claw are sold to the village's market, or the nearest within 48 cells, into the household's purse. A market buys anything with a price (ADR 0052).
   - **The player** hunts by striking. Its drops are its own, to eat, to sell or to keep.
-- **How a drop reaches crafting.** A market's stock of hide feeds #245's leatherworks, which tans 2 hides into 1 leather and makes leather armour, as its recipes give. Horn, bone and claw are materials #245's recipes may name. The base pack adds three recipes, as pack data:
-
-  | Made | Workshop | Materials | Labour, workers' days |
-  |---|---|---|---|
-  | Horn bow | leatherworks | 2 wood, 1 horn, 1 leather | 2 |
-  | Spirit lamellar | smithy | 4 iron, 3 spirit hide, 2 spirit bone, 3 charcoal | 6 |
-  | Spirit claw gauntlets | smithy | 2 iron, 2 spirit claw, 1 leather, 1 charcoal | 3 |
-
-  Workshops make them when their market lacks them, by #245's rule, so spirit-beast gear appears only where spirit beasts have been killed.
+- **How a drop reaches crafting.** A market's stock of hide feeds #245's leatherworks, which tans 2 hides into 1 leather. Bone, horn, claw and the spirit parts are material kinds #245's ADR 0064 defines, by the owner's decision on #231, with its recipes: bone-studded leather armour, a horn-hilted saber, a horn-capped staff, claw gauntlets, spirit lamellar and spirit claw gauntlets. Workshops make them when their market lacks them, by #245's rule, so spirit-beast gear appears only where spirit beasts have been killed.
 - **Spirit beasts.**
   - **Territory.** A spirit beast's territory is the disc of its kind's radius, 12 cells in the base pack, around its home cell. Its home cell is the forage slot where it appeared.
   - **Where one appears.** At an area's cycle, one draw for each spirit-beast kind living on the area's biomes, when all of these hold:
@@ -178,7 +170,7 @@ Animals are records of 24 bytes in a store of their own, kept by home area, with
 
 Grass is a forage slot kind of ADR 0056. At each area's 8-day cycle, a grazer crops one grown forage slot, so it needs 3 of them, and starves at 2 cycles without one. A predator kills one grazer of its prey nearby every second cycle, and starves at 3 cycles without one. A grazer appears, with no breeding, at a chance of 250 per mille times the share of the area's forage support still unused, and a predator at 100 per mille times the share of the prey's support still unused, each by a counter-based draw, so the rate follows the spare food and is none at the support. None appear in an area holding a village structure.
 
-In live areas animals move within their home area, grazers flee people, and predators fight back when struck. Strikes hit animals as people, and a killed animal drops its kind's stacks as piles. Idle earners hunt while game stands within 32 cells, at most a fifth of them. Meat feeds the hunter's household first and the rest goes to the granary; hide, horn and bone go to the market, where #245's workshops make leather, bows and spirit-beast gear from them.
+In live areas animals move within their home area, grazers flee people, and predators fight back when struck. Strikes hit animals as people, and a killed animal drops its kind's stacks as piles. Idle earners hunt while game stands within 32 cells, at most a fifth of them. Meat feeds the hunter's household first and the rest goes to the granary; hide, horn, bone and claw go to the market, where #245's workshops make leather and gear from them, spirit-beast gear among it.
 
 A spirit beast appears, at a chance that rises with the spare prey from none at 12 to 8 per mille a cycle at 60, no village stands within 48 cells and no other spirit beast within 128, holds a territory of 12 cells, attacks anyone inside it and never leaves it. Its death drops a spirit core, which adds its qi to the consumer's store up to its talent's limit, or which an apothecary refines into pills.
 
@@ -187,7 +179,7 @@ This supersedes ADR 0056's hunting as gathering from a slot that moves, now hunt
 ## Consequences
 
 - Game follows the land: forests and hills hold deer and boar, predators follow them, and a region hunted hard empties of both.
-- Villages near rich ground eat better, and leather and bows come from where the game is.
+- Villages near rich ground eat better, and leather and horn and bone gear come from where the game is.
 - Spirit beasts make wild places dangerous and rewarding, and their cores are a rare path to qi that talent still bounds.
 - Live areas carry a few thousand more movers, each simpler than a person.
 - #243's ADR 0063 gains wild meat as a food source beside fields and fruit, tuned by forage and appearance rates in the pack.
