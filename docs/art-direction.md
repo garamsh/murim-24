@@ -216,7 +216,7 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 | Great river, the Yellow River or the Yangtze | 16 to 40 cells wide | Exaggerated narrow: at a person's scale a real width would be hundreds of cells |
 | Bridge | the river's width plus 2, 3 cells wide | Arched over streams and rivers. Great rivers are crossed by ferries and fords (ADR 0047) |
 
-- **The field's yield.** Decided by the PM on #242, 2026-10-11: fields stay at 4 to 8 cells a household, and the base pack's yield is lowered from ADR 0022's 600 measures a cell, about 5 people, to about 1 person a cell, 120 measures. So a household's fields feed about a household, and food, not a field's size, binds the population (#229).
+- **The field's yield.** Decided by the PM on #242, 2026-10-11: fields stay at 4 to 8 cells a household, and the base pack's yield is lowered from ADR 0022's 600 measures a cell, about 5 people, to about 1 person a cell: 120 measures a cell on plain and 60 on hills, as ADR 0063 sets them. So a household's fields feed about a household, and food, not a field's size, binds the population (#229).
   - It is a pack-data change. The pull request that applies it shows `make sweep` 48/50 or better, since births follow food.
   - ADR 0056's worked example assumed today's yield. Its implementation reads the yield from pack data, so the example's field counts scale with it.
 - **#239's pieces.** The courtyard house and the town wall's height above are this table's sizes, by the owner's realistic-scale principle. #239's smaller drawings are the current exceptions, and the art follows this table in a later round.
