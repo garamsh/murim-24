@@ -19,7 +19,7 @@ The issue asks the design to decide these:
 - far tiers in aggregate, the memory and tick cost at the bound, and determinism
 - the balance: the sweep reports faction outcomes per policy mix, and no single policy dominates over 100 years
 
-What this builds on, from `main` at `dd53743` and the open PRs it cites:
+What this builds on, from `main` at `c4e24a7` and the open PRs it cites:
 - **ADR 0052** (proposed). The core rule this ADR widens.
   - One faction rate `r`, 0 to 300 per mille, sets three taxes: a share of trade, a levy on households each season, and a toll on caravans at gates. A rate per tax was rejected there as three levers where one does.
   - The NPC leader's daily rule: the rate rises 10 per mille below 60 days of needs and falls 10 above twice them, at most once every 30 days; war and peace gated by the treasury; soldiers capped at what the treasury pays for 30 days; purchases for soldiers while above a reserve, which that ADR does not give a value.
@@ -29,10 +29,10 @@ What this builds on, from `main` at `dd53743` and the open PRs it cites:
 - **ADR 0023.** A faction's growth stance is pack data, an ordered list of `BUILD`, `FOUND` and `RAID`, and a village pressing its cap takes the first it can.
 - **ADR 0054** (proposed). Deeds change groups' standing by a table of base values and weights per tier, pack data. A tax rate above 100 lowers each of the faction's villages' standing toward its leader by 3 a day for each 100 above. Standing tiers decide hostility, sales, admission, teaching and prices.
 - **ADR 0056** (#220, on which this branch is stacked). Gatherers and builders are paid from the owning faction's treasury, and a faction that cannot pay builds nothing that day.
-- **#228's ADR 0062, proposed.** A village's threat counter; wall circuits funded from the treasury; corvée while a village's threat is at least 400, one earner a household one day in ten, 3 discontent a corvée day; guards in gates paid as soldiers.
-- **#229's ADR 0063, proposed.** The world runs by simple rules whose consequences combine, and population is bounded by food. Policies here are levers on those rules, never outcomes scripted.
-- **#231's ADR 0064, proposed.** Gear is made from materials by workshops, and a faction's arms spending orders gear.
-- **#207's ADR 0061, proposed.** Roads are map data, polylines with a class, and nothing builds them.
+- **ADR 0062, proposed in the open PR #246** for #228. A village's threat counter; wall circuits funded from the treasury; corvée while a village's threat is at least 400, one earner a household one day in ten, 3 discontent a corvée day; guards in gates paid as soldiers.
+- **ADR 0063,** proposed, merged in #243 for #229. The world runs by simple rules whose consequences combine, and population is bounded by food. Policies here are levers on those rules, never outcomes scripted.
+- **ADR 0064, proposed in the open PR #245** for #231. Gear is made from materials by workshops, and a faction's arms spending orders gear.
+- **ADR 0061, proposed in the open PR #254** for #207. Roads are map data, polylines with a class, and nothing builds them.
 - **Scale.** The bound is measured between 10,000 and 50,000 (ADR 0048), and #216's live tier holds 5,000. About 14,000 households at 50,000 people (ADR 0052).
 
 Options weighed:
@@ -68,12 +68,12 @@ Options weighed:
   - **Walls under threat.** ADR 0062's rule as it stands: corvée for wall works while the village's threat is at least 400. The base setting.
   - **All works.** Corvée raises any plan of ADR 0056 and ADR 0062 in the faction's villages, whatever the threat, at the same one earner a household one day in ten and 3 discontent a corvée day, net, since decay is suspended that day (above). Corvée workers take no wage, so the treasury pays for fewer builders.
 - **Spending.** Each day, the treasury first pays what is committed: soldiers' wages, guards, and ADR 0056's gatherers and builders. Then, while it holds more than its reserve, it pays the four priorities in the order the policy sets, each up to its daily target before the next:
-  - **Arms:** ADR 0052's purchases for soldiers' slots and spares, and #231's ADR 0064 orders for gear its workshops make.
+  - **Arms:** ADR 0052's purchases for soldiers' slots and spares, and #245's ADR 0064 orders for gear its workshops make.
   - **Granaries:** food bought at the village's market into its granary, until each village holds 30 days of its people's rations. A village of 32 at a measure a person a day holds 960 measures, 480 silver at the base price of 50 copper. This feeds ADR 0022's food stock, so a village with a granary filled weathers a bad harvest without hunger or migration.
   - **Walls:** ADR 0062's wall works, their wages and materials.
   - **Sect support:** a transfer to the faction's sect's vault, up to 30 days of its stipends.
   - **The reserve** is days of the faction's ADR 0052 needs, 0 to 120, base 60. This gives ADR 0052's reserve its value.
-  - **Roads are not a priority.** Roads are map data (ADR 0047, #207's ADR 0061), and no rule builds or keeps them, so spending on them would move no input. It is listed for the PM.
+  - **Roads are not a priority.** Roads are map data (ADR 0047, #254's ADR 0061), and no rule builds or keeps them, so spending on them would move no input. It is listed for the PM.
 - **Trade.**
   - **Free.** No toll at the faction's gates, so ADR 0052's caravans choose its roads more, and its markets' tills take more trade.
   - **Tolled.** ADR 0052's toll. The base setting.
