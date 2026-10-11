@@ -18,7 +18,7 @@ The issue asks the design to compare the ways to double travel time or more, wit
 
 For each, it asks for the map's bytes on disk and in memory, the authoring cost by hand with ADR 0047's tools, streaming and the tiers, the live tier's budget, the far tier's cost, save size and load time, and the effect on travel. It also asks what fills the space so it does not feel empty, and for the steps to build it. The bigger map replaces the 4,096 target of #173's steps; it does not add a second map. The mobile quality profiles of ADR 0048 must still fit.
 
-What this builds on, from `main` at `3dfecbb` and the open PRs it cites:
+What this builds on, from `main` at `2462921` and the open PRs it cites:
 - **ADR 0047,** proposed. One hand-made map of 4,096 × 4,096 cells, 16,777,216 cells in 16,384 areas of 32 cells.
   - A cell is a li, 500 metres, between places in the heartland, and the outer lands are compressed toward an impassable frame at least 128 cells deep.
   - Elevation, biome and region are painted at one value per 8 × 8 cells, and a deterministic build tool compiles four bytes a cell by area, with the bare map's coarse graph. The compiled map was projected at 2.8 to 5.2 MiB on disk, 64 MiB raw.
@@ -35,7 +35,7 @@ What this builds on, from `main` at `3dfecbb` and the open PRs it cites:
 - **ADR 0059.** The view draws a cell 16 pixels wide and 12 deep and bakes each area's ground once.
 - **Open PRs.**
   - #254's ADR 0061 gives travel by foot, horse and boat at speeds per mille of walking, and recomputes ADR 0047's route table.
-  - #242 records realistic scale: a person fills a cell, a walled town is at least 40 × 30 cells, and its "two scales" bullet says the li measures distance between places while a place's layout patch carries the size of what stands there.
+  - #242, merged as 2462921, records realistic scale: a person fills a cell, a walled town is at least 40 × 30 cells, and its "two scales" bullet says the li measures distance between places while a place's layout patch carries the size of what stands there.
   - ADR 0063, merged in #243, bounds the population by the food that can be had.
   - #241's ADR 0067 puts animals and herds in the wilderness, with a capacity sized on ADR 0056's slots.
 
