@@ -12,11 +12,11 @@ Issue #247. The owner decided on 2026-10-11 to add attack slots and attack token
 - **Attack tokens.** Each foe grants a small number of tokens, and only a token holder strikes it. The rest hold on a ring just outside, circling and waiting, and take a token when one frees, as in Batman: Arkham and God of War. One against many then reads as a wuxia brawl rather than a pile-on.
 - The same rule holds for NPCs and for attacks on the player. The core decides all of it; the view only draws.
 
-Facts from `core/` at `c86b08d` and the open pull requests it builds on:
+Facts from `core/` at `c86b08d`, and from ADR 0066 and #233, which have since merged:
 - Every living person acts on every tick (ADR 0017). People keep the separation, `SEPARATION`, a cell (256 sub-cell units), through a push from each neighbour closer than that, read from the spatial hash rebuilt each tick.
 - A person moves `SPEED`, 16 units a tick, or `DIAGONAL_SPEED`, 11 along each axis, on an 8-connected flow field toward its army's objective (ADR 0037). A mover feels no pull while a foe on the move lies ahead within its reach.
 - A person no driver steers engages the nearest foe within the rules' sight, 6 cells in the region: at home only a foe inside its home village's claim, and on the march any, as the PM narrowed ADR 0046 on 2026-10-09. It stands to fight while the foe is within its reach, and otherwise takes the open step nearest the line to the foe (ADR 0046's engage rule).
-- The basic strike, `MELEE`, reaches a cell and a half (384 units). In ADR 0066 (pull request #237) it is `TARGETED` and aimed at the army's attack-intent target, else at the nearest foe in range, every 15 ticks.
+- The basic strike, `MELEE`, reaches a cell and a half (384 units). In ADR 0066 it is `TARGETED` and aimed at the army's attack-intent target, else at the nearest foe in range, every 15 ticks.
 - An attack intent is an order's target, which the army's members chase and strike, steered or not. It ends when the target dies, stops being a foe or leaves sight (the army then holds where its lead stands), or when the player clears it or gives a move order.
 - Nothing limits how many strike one person: in the M1 battle, 18 strikes land a tick among 500 people, and a foe at the front of a line takes every strike in reach.
 - ADR 0058, proposed, adds levels, cliffs and leaps. A leaping person neither strikes nor engages, and `sees` hides the ground above a cliff from those below who cannot leap it.
