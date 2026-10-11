@@ -1,0 +1,13 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 282 ticks in 9.3 s timed (30 per second set)
+bodies: 500 in the world, 396 on screen drawn as sprites through MultiMesh bands
+outlines: 123.7 bodies outlined over what hides them a frame on average, 127 in the last frame
+names: 8 shown over the 151 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 41.8 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 7.242 ms, p99 13.234 ms, max 13.884 ms
+PASS: p99 13.234 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
