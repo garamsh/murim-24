@@ -101,6 +101,8 @@ var _bands: Array[MultiMeshInstance2D] = []
 var _body_frames := {}
 var _faction_width := 0
 var _shadow_x := 0
+# What a body no hit stop holds reads, so the loop over every body makes no dictionary for it.
+const NOT_HELD := {}
 # The people a hit stop holds, by person: `left`, the view frames it still holds, and from its first
 # held frame on, what that frame drew: `at`, `tag`, `frame`, `white` and `flip`.
 var _held := {}
@@ -350,8 +352,9 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			var on_ground := sub * pixels
 			var at := on_ground - Vector2(0, relief.lift_at(on_ground)) + combat.knock(person, now)
 			# A body a hit stop holds stays where its first held frame drew it.
-			var held: Dictionary = _held.get(person, {})
-			if held.has("at"):
+			var holding := _held.has(person)
+			var held: Dictionary = _held[person] if holding else NOT_HELD
+			if holding and held.has("at"):
 				at = held.at
 			if not shown.has_point(at):
 				continue
@@ -384,7 +387,7 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false)
 			var white := combat.flash(person, now)
 			var flip := heading.x < 0.0
-			if not held.is_empty():
+			if holding:
 				if held.has("at"):
 					tag = held.tag
 					frame = held.frame
@@ -431,7 +434,7 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
 	var aimed: Vector2i = combat.place_of(combat.target)
 	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
-	$Drops.show_drops(combat.shown_drops(now))
+	$Drops.show_drops(combat, now, view.grow(MARGIN))
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map
