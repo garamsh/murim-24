@@ -1325,9 +1325,14 @@ func _art_slot_pass() -> bool:
 		return false
 	var scene := _title()
 	var hud: CanvasLayer = scene.get_node("Hud")
-	scene._play(lived)
+	# The scene plays the lived region as Continue resumes it, then steers that person.
+	TestSaves.clear()
+	if not lived.save(scene.SAVE_SLOT, TestSaves.directory) or not scene.resume_saved():
+		print("play_test: the region lived ten years was not saved and resumed: FAIL")
+		scene.free()
+		return false
+	lived = scene.world
 	scene.steered = army
-	scene._body = lived.roster(army)[0]
 	hud.show_player(lived, army)
 	hud.settings.chosen.cast = 1
 	var person: int = lived.roster(army)[0]
