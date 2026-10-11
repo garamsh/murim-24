@@ -3,8 +3,9 @@
 # drops fall on the ground beyond it, where the same foe out of reach, struck by nothing, bleeds
 # nothing; with the settings' blood off, the same hit draws no blood and still flashes; a foe left
 # below half its health stands in its hurt frame and one below a quarter in its maimed frame, where
-# one left above half stands as it was; and a maimed foe drips as it stands, where a hurt one does
-# not.
+# one left above half stands as it was; a maimed foe drips as it stands, where a hurt one does
+# not; and the steered person's hit holds the struck foe's drawn flash for its hit stop, where with
+# the settings' hit stop off it fades, and a foe out of reach starts no hit stop.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -26,10 +27,12 @@ const BESIDE := Vector2i(3, 2)
 const OUT_OF_REACH := Vector2i(12, 2)
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const TICKS := 90
+# How far apart the two refreshes a hit stop must hold are, in milliseconds.
+const HELD_MS := 60
 
 
 func run() -> bool:
-	return _blood_pass() and _off_pass() and _wound_pass() and _drip_pass()
+	return _blood_pass() and _off_pass() and _wound_pass() and _drip_pass() and _hit_stop_pass()
 
 
 # On the hit tick the foe bleeds: one spray from its middle and three drops beyond its feet in the
@@ -108,9 +111,54 @@ func _drip_pass() -> bool:
 	return passed
 
 
+# After the steered person's hit, the struck foe is drawn with the same share of white on two
+# refreshes HELD_MS apart, held, and a hit stop was started for it. Control: with the hit stop off,
+# the share fades between them; out of reach, no hit stop starts.
+func _hit_stop_pass() -> bool:
+	var whites := []
+	var stops := []
+	for stop: bool in [true, false]:
+		var fight := _fight(BESIDE, 60, true, stop)
+		var first := _white_at(fight.art, fight.art.body_at(1, 0, 1.0))
+		OS.delay_msec(HELD_MS)
+		fight.art.refresh(_view())
+		whites.append([first, _white_at(fight.art, fight.art.body_at(1, 0, 1.0))])
+		stops.append(fight.art.combat.hit_stops.size())
+		fight.art.free()
+	var far := _fight(OUT_OF_REACH, 60, true, true)
+	var far_stops: int = far.art.combat.hit_stops.size()
+	far.art.free()
+	var passed: bool = whites[0][0] > 0.5 and is_equal_approx(whites[0][0], whites[0][1]) and stops[0] == 2 \
+			and whites[1][1] < whites[1][0] and stops[1] == 0 and far_stops == 0
+	print("blood_test: held, the struck foe's white %.2f then %.2f, %d hit stop(s); hit stop off %.2f then %.2f, %d; out of reach %d: %s" % [
+		whites[0][0], whites[0][1], stops[0], whites[1][0], whites[1][1], stops[1], far_stops,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+# The share of white the band instance nearest `at`, the feet of a body, draws, or -1 for none.
+func _white_at(art: Node2D, at: Vector2) -> float:
+	var centre := Vector2(at.x, at.y - WorldArt.FEET + WorldArt.BODY_FRAME.y / 2.0).round()
+	var best := INF
+	var white := -1.0
+	for child in art.get_node("Standing").get_children():
+		var band := child as MultiMeshInstance2D
+		if band == null:
+			continue
+		var buffer := band.multimesh.buffer
+		for i in band.multimesh.visible_instance_count:
+			var base := i * WorldArt.BODY_FLOATS
+			var d := (Vector2(buffer[base + 3], buffer[base + 7]) + band.position).distance_to(centre)
+			if d < best and d <= 4.0:
+				best = d
+				white = buffer[base + 14]
+	return white
+
+
 # The steered person, with a sweep of `damage` it uses once, and a foe of HEALTH at `foe_cell`,
-# drawn by world_art with blood `blood`, ticked until the first use the core records, at most TICKS.
-func _fight(foe_cell: Vector2i, damage: int, blood: bool) -> Dictionary:
+# drawn by world_art with blood `blood` and hit stop `stop`, ticked until the first use the core
+# records, at most TICKS.
+func _fight(foe_cell: Vector2i, damage: int, blood: bool, stop := true) -> Dictionary:
 	var sweep := {"range": 384, "radius": 0, "body_damage": damage, "structure_damage": 0, "cooldown": 100000,
 		"shape": WorldAdapter.SHAPE_ARC}
 	var armies: Array[Dictionary] = [
@@ -121,6 +169,7 @@ func _fight(foe_cell: Vector2i, damage: int, blood: bool) -> Dictionary:
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(world, 0)
 	art.combat.blood = blood
+	art.combat.hit_stop = stop
 	var first := -1
 	for i in TICKS:
 		world.tick()
