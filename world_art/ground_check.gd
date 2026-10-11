@@ -5,9 +5,10 @@
 ## its viewport once every area is drawn; that the same relief bakes to the same pixels, detail and
 ## trees; that an edge between plain and forest running straight along the cells' sides is drawn
 ## wandering over them, where the same relief drawn without warp keeps it within a few pixels of the
-## cells' side; and that streaming shows the areas round the view, an area at most a frame once the
-## first are shown, frees those it left, and shows an area's trees again where they were. It exits 0
-## when every check passes, 1 when one fails and 2 when it cannot draw.
+## cells' side; that across cells something is built on, the same edge runs straight down the cells'
+## side on every row; and that streaming shows the areas round the view, an area at most a frame
+## once the first are shown, frees those it left, and shows an area's trees again where they were.
+## It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw.
 extends SceneTree
 
 const Ground := preload("res://world_art/ground.gd")
@@ -27,6 +28,9 @@ const WARPED_ALONG := 0.4
 const BLOCKY_ALONG := 0.8
 # The least share of rows on which the edge is read: four pixels running of the forest's ramp.
 const READ := 0.9
+# Cells built on across the edge, below ROWS and clear of the mountain, whose rows the edge must run
+# straight down.
+const BUILT := Rect2i(EDGE - 3, 25, 6, 4)
 const VIEW := Vector2(640, 360)
 const FRAMES := 600
 
@@ -55,9 +59,14 @@ func _initialize() -> void:
 		for x in range(MOUNTAIN.position.x, MOUNTAIN.end.x):
 			relief.lay(Vector2i(x, y), "rock", 2 if Rect2i(MOUNTAIN).grow(-1).has_point(Vector2i(x, y)) else 4,
 					"rock_face", false)
-	_warped = _ground(relief, {})
-	_again = _ground(relief, {})
-	_blocky = _ground(relief, {"shader": {"warp": 0.0}})
+	for y in range(BUILT.position.y, BUILT.end.y):
+		for x in range(BUILT.position.x, BUILT.end.x):
+			relief.build(Vector2i(x, y))
+	# No tree stands on the built cells, as world_art.gd keeps them off what is built.
+	var open_at := func(cell: Vector2i) -> bool: return not BUILT.has_point(cell)
+	_warped = _ground(relief, {"open_at": open_at})
+	_again = _ground(relief, {"open_at": open_at})
+	_blocky = _ground(relief, {"open_at": open_at, "shader": {"warp": 0.0}})
 
 
 func _ground(relief: Relief, options: Dictionary) -> Node2D:
@@ -85,6 +94,7 @@ func _process(_delta: float) -> bool:
 			_check("ground_check: after the bake the grounds hold %d viewports" % _viewports(), _viewports() == 0)
 			_check_same()
 			_check_edge()
+			_check_built()
 			_first_trees = _warped.trees_of(Vector2i.ZERO)
 			_phase = "stream"
 		"stream":
@@ -125,8 +135,8 @@ func _check_same() -> void:
 # Where the forest begins along each of ROWS on each ground: wandering when warped, straight
 # along the cells' side when not.
 func _check_edge() -> void:
-	var warped := _edge(_warped)
-	var blocky := _edge(_blocky)
+	var warped := _edge(_warped, ROWS)
+	var blocky := _edge(_blocky, ROWS)
 	var side := EDGE * int(Relief.CELL.x)
 	var along := func(xs: Array) -> float:
 		return float(xs.filter(func(x: int) -> bool: return absi(x - side) <= NEAR_SIDE).size()) / maxi(xs.size(), 1)
@@ -136,9 +146,22 @@ func _check_edge() -> void:
 			and along.call(warped) <= WARPED_ALONG and along.call(blocky) >= BLOCKY_ALONG)
 
 
-# For each row of ROWS of `ground`'s first chunk, the first x from which four pixels running are of
-# the forest's ramp.
-func _edge(ground: Node2D) -> Array:
+# On every row of the built cells the warped ground's forest begins exactly at the cells' side;
+# the control is the same edge below them, which _check_edge() finds wandering.
+func _check_built() -> void:
+	# The chunk's image starts TOP_PAD rows above the ground's top.
+	var rows := Vector2i(BUILT.position.y * int(Relief.CELL.y), BUILT.end.y * int(Relief.CELL.y)) + Vector2i.ONE * Ground.TOP_PAD
+	var xs := _edge(_warped, rows)
+	var side := EDGE * int(Relief.CELL.x)
+	var straight := xs.filter(func(x: int) -> bool: return x == side).size()
+	_check("ground_check: across the built cells the forest begins at x %d on %d of %d rows %s, from x %d to %d" % [
+		side, straight, rows.y - rows.x, rows, xs.min() if not xs.is_empty() else -1, xs.max() if not xs.is_empty() else -1],
+			xs.size() == rows.y - rows.x and straight == xs.size())
+
+
+# For each row of `rows` of `ground`'s first chunk, the first x from which four pixels running are
+# of the forest's ramp.
+func _edge(ground: Node2D, rows: Vector2i) -> Array:
 	var image: Image = ground.images_of(Vector2i.ZERO).ground
 	var forest := Relief.KINDS.find("forest")
 	var ramp := []
@@ -149,7 +172,7 @@ func _edge(ground: Node2D) -> Array:
 		return ramp.any(func(c: Color) -> bool:
 				return absf(c.r - colour.r) < 0.01 and absf(c.g - colour.g) < 0.01 and absf(c.b - colour.b) < 0.01)
 	var xs := []
-	for y in range(ROWS.x, ROWS.y):
+	for y in range(rows.x, rows.y):
 		for x in range(EDGE * int(Relief.CELL.x) - 40, EDGE * int(Relief.CELL.x) + 40):
 			if range(4).all(func(d: int) -> bool: return of_forest.call(x + d, y)):
 				xs.append(x)

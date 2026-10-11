@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dk4um7nxkfgqm"
-path="res://.godot/imported/terrain.png-06c63c2b87b3131a2067f668f87a9d67.ctex"
+uid="uid://colsgb6hlo8s5"
+path="res://.godot/imported/town_market_stall.png-ac2abdc5efb6d800eabdc811e7c823f4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/terrain/terrain.png"
-dest_files=["res://.godot/imported/terrain.png-06c63c2b87b3131a2067f668f87a9d67.ctex"]
+source_file="res://art/structures/town_market_stall.png"
+dest_files=["res://.godot/imported/town_market_stall.png-ac2abdc5efb6d800eabdc811e7c823f4.ctex"]
 
 [params]
 

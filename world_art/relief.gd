@@ -37,6 +37,11 @@ var _kind := PackedByteArray()
 var _level := PackedInt32Array()
 var _face := PackedByteArray()
 var _slope := PackedByteArray()
+# Per cell, 1 where something built stands on it, a structure or paving: where the ground round it
+# is flat, the ground there is drawn straight, without warp or dither, so it meets what is built
+# along the cell's sides. On or beside a slope or a drop it is drawn as any ground, so the straight
+# ground never stands off the slope by a cliff the core does not block.
+var _built := PackedByteArray()
 # Per cell, its level plus one where every cell height_at() can read from a point on it is of that
 # level and none a slope, so the ground on it is flat; 0 where it is not. Built when first read
 # after a cell changes.
@@ -55,6 +60,7 @@ func _init(cells: Vector2i) -> void:
 	_face.resize(count)
 	_face.fill(FACES.find("bank_face"))
 	_slope.resize(count)
+	_built.resize(count)
 
 
 ## The relief of a region whose cells are of the core's terrain kinds `terrain`, row by row, in a
@@ -142,6 +148,16 @@ func cover(at: Vector2i, kind: String) -> void:
 	_kind[at.y * size.x + at.x] = KINDS.find(kind)
 
 
+## Marks cell `at` as one something built stands on.
+func build(at: Vector2i) -> void:
+	_built[at.y * size.x + at.x] = 1
+
+
+## Whether something built stands on cell `at`.
+func built_at(at: Vector2i) -> bool:
+	return _built[_index(at)] == 1
+
+
 ## The kind of cell `at`, a name of KINDS; cells past the edge are the edge's.
 func kind_at(at: Vector2i) -> String:
 	return KINDS[_kind[_index(at)]]
@@ -172,14 +188,17 @@ func highest() -> int:
 
 
 ## The cells as the shader reads them, one texel a cell: its kind in red, its level plus one in
-## green, its face material in blue, and alpha half where it rises as a slope.
+## green, its face material in blue, plus 128 where something is built on it and the ground round
+## it is flat, and alpha half where it rises as a slope.
 func cell_image() -> Image:
+	if _flat.is_empty():
+		_find_flat()
 	var data := PackedByteArray()
 	data.resize(size.x * size.y * 4)
 	for i in size.x * size.y:
 		data[i * 4] = _kind[i]
 		data[i * 4 + 1] = _level[i] + 1
-		data[i * 4 + 2] = _face[i]
+		data[i * 4 + 2] = _face[i] + (128 if _straight(i) else 0)
 		data[i * 4 + 3] = 128 if _slope[i] == 1 else 255
 	return Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, data)
 
@@ -187,13 +206,17 @@ func cell_image() -> Image:
 ## The height of the ground, in levels, at `point`, in pixels on the unraised ground, as
 ## ground.gdshader's height_at() gives it: its cells' levels read through coordinates warped by
 ## noise and interpolated, then taken to the nearest level one of them has, except toward cells
-## that rise as a slope.
+## that rise as a slope; on a cell drawn straight, its own level.
 func height_at(point: Vector2) -> float:
 	if _flat.is_empty():
 		_find_flat()
 	var on := _index(Vector2i((point / CELL).floor()))
 	if _flat[on] > 0:
 		return float(_flat[on] - 1)
+	# As the shader draws a straight cell; one is always flat, so this answers what the line above
+	# does, kept so the two read the same rule.
+	if _straight(on):
+		return float(_level[on])
 	var q := _warped(point)
 	var uv := Vector2(q.x / CELL.x, q.y / CELL.y) - Vector2(0.5, 0.5)
 	var c := Vector2i(uv.floor())
@@ -271,6 +294,12 @@ func _find_flat() -> void:
 					flat = false
 					break
 			_flat[y * size.x + x] = level + 1 if flat else 0
+
+
+# Whether the ground on cell `i` is drawn straight: something is built on it and the ground round it
+# is flat.
+func _straight(i: int) -> bool:
+	return _built[i] == 1 and _flat[i] > 0
 
 
 func _index(at: Vector2i) -> int:

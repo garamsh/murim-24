@@ -25,8 +25,8 @@ const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 # The faction accents of docs/art-direction.md §Palette, in the order of FACTIONS.
 const ACCENTS: Array[Color] = [Color("2f63b8"), Color("d63a2f"), Color("e8a830")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
-# The art for each kind of structure; its frames hold the structure's footprint at
-# (FOOTPRINT_INSET, FOOTPRINT_INSET) unless ANCHORS names another corner.
+# The art for each kind of structure; its frames hold the bottom-left corner of the structure's
+# footprint FOOTPRINT_INSET in from their left and bottom edges.
 const BUILDINGS := {
 	"house": "structures/house", "hall": "structures/hall", "well": "structures/well",
 	"barrels": "structures/barrels", "fence": "structures/fence",
@@ -35,8 +35,6 @@ const BUILDINGS := {
 	"seat_gate": "structures/seat_gate",
 	"smithy": "structures/smithy", "apothecary": "structures/apothecary",
 }
-# Where a kind's frames hold its footprint's top-left, for a kind that rises higher above it.
-const ANCHORS := {"seat_gate": Vector2(8, 40)}
 # The kinds laid with the ground, over the terrain and under everything standing.
 const GROUND_KINDS := ["training_ground"]
 # The fields' tile for each FIELD_* state the core gives, in their order; in winter each takes
@@ -50,8 +48,6 @@ const DECORATIONS := "res://world_art/villages.json"
 # The art of each kind of banner a template names, by the key it is named with.
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 const FOOTPRINT_INSET := 8
-# Rows of a structure's frame for each cell of its footprint's depth: its art is drawn top-down.
-const STRUCTURE_ROWS := 16
 const WALK_FRAME_MS := 150
 const CHEVRON_FRAME_MS := 400
 # Pixels past the screen's edge that are still drawn, for sprites that reach across it.
@@ -188,6 +184,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		_stage_frames[kind] = frames
 	_lay_decorations()
 	_lay_fields()
+	_mark_built()
 	_lay_structures()
 	_lay_ground()
 	_build_body_atlas()
@@ -308,10 +305,13 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
-			var texture: Texture2D = sprite.get_meta("frames")[world.structure_stage(structure)]
+			var stage := world.structure_stage(structure)
+			var texture: Texture2D = sprite.get_meta("frames")[stage]
 			if sprite.texture != texture:
 				sprite.texture = texture
 				_structure_frames += 1
+				if not GROUND_KINDS.has(world.structure_kind(structure)):
+					_shadow_of(structure)
 	var shown := view.grow(MARGIN)
 	# Raised ground draws its rows above where they lie, so the rows on screen reach further down.
 	var first_row := maxi(int(shown.position.y / CELL.y), 0)
@@ -437,6 +437,20 @@ func _hash(x: int, y: int, salt: int) -> int:
 	return absi(h ^ (h >> 16))
 
 
+# Marks in the relief every cell a structure stands on and every cell paved or a road, so the
+# ground there is drawn straight up to what is built on it.
+func _mark_built() -> void:
+	for structure in world.structure_count():
+		var corner := world.structure_cell(structure)
+		var footprint := world.structure_footprint(structure)
+		for y in range(corner.y, mini(corner.y + footprint.y, _height)):
+			for x in range(corner.x, mini(corner.x + footprint.x, _width)):
+				relief.build(Vector2i(x, y))
+	for cell in built.get_used_cells():
+		if cell.x >= 0 and cell.y >= 0 and cell.x < _width and cell.y < _height:
+			relief.build(cell)
+
+
 # Prepares the ground to be baked from the relief, with a decorative tree on no village and no
 # structure.
 func _lay_ground() -> void:
@@ -487,8 +501,7 @@ func _lay_structures() -> void:
 		sprite.centered = false
 		sprite.position = Vector2(corner.x, corner.y + footprint.y) * CELL
 		var lift := relief.lift_at(sprite.position + Vector2(footprint.x * CELL.x / 2.0, -CELL.y / 2.0))
-		sprite.offset = -ANCHORS.get(kind, Vector2(FOOTPRINT_INSET, FOOTPRINT_INSET)) \
-				- Vector2(0, footprint.y * STRUCTURE_ROWS + lift)
+		sprite.offset = -Vector2(FOOTPRINT_INSET, frames[0].get_size().y - FOOTPRINT_INSET) - Vector2(0, lift)
 		sprite.set_meta("frames", frames)
 		if GROUND_KINDS.has(kind):
 			sprite.position += sprite.offset
@@ -497,6 +510,18 @@ func _lay_structures() -> void:
 		else:
 			_standing.add_child(sprite)
 		structure_sprites[structure] = sprite
+		if not GROUND_KINDS.has(kind):
+			_shadow_of(structure)
+
+
+# Sets the shadow standing structure `structure` casts at its stage, from its footprint's top-left
+# raised with the ground, in the one node that draws every structure's shadow.
+func _shadow_of(structure: int) -> void:
+	var corner := world.structure_cell(structure)
+	var footprint := world.structure_footprint(structure)
+	var bottom := Vector2(corner.x, corner.y + footprint.y) * CELL
+	var lift := relief.lift_at(bottom + Vector2(footprint.x * CELL.x / 2.0, -CELL.y / 2.0))
+	$Shadows.set_shadow(structure, Vector2(corner) * CELL - Vector2(0, lift), footprint, world.structure_stage(structure))
 
 
 # A layer of tiles a cell each, from the 16 x 12 frames of `sheet`.

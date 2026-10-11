@@ -9,13 +9,15 @@
 ## frame its outline drew on screen, and those of them where the body's own pixel shows, in its
 ## band's colour, flashed or not. Once flashing bodies' outlines have drawn FLASHING_DRAWN pixels
 ## or more and a still body's some, over what hides them, it reports: no outline may be drawn over
-## its body's own pixels shown. It exits 0 when none is, 1 when one is or the battle's ticks run out
-## first, and 2 when it cannot draw.
+## its body's own pixels shown. It exits 0 when none is, 1 when one is or the battle's ticks, frames
+## or MAX_SECONDS run out first, and 2 when it cannot draw.
 extends SceneTree
 
 const SCENE := "res://world_art/world_art.tscn"
 const WorldArt := preload("res://world_art/world_art.gd")
-# Frames the ground is given to bake and stream in before the battle ticks.
+const Ground := preload("res://world_art/ground.gd")
+# The fewest frames before the battle ticks; it waits on until every area of the ground is baked
+# and shown.
 const SETTLE_FRAMES := 60
 const BATTLE_TICKS := 600
 # The impact core a flashing pixel is drawn in, as world_art/flash.gdshaderinc's IMPACT.
@@ -32,6 +34,10 @@ const STILL_BODIES := 4
 # Frames waited after the view changes before what it draws is read back, so the image read is of
 # the change.
 const DRAW_FRAMES := 3
+# The most frames and wall-clock seconds it runs before it gives up and fails, so a run that cannot
+# finish says so instead of running on.
+const MAX_FRAMES := 60000
+const MAX_SECONDS := 600
 
 var _viewport: SubViewport
 var _art: Node2D
@@ -73,19 +79,31 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	_frame += 1
+	var seconds := Time.get_ticks_msec() / 1000
+	if _frame > MAX_FRAMES or seconds > MAX_SECONDS:
+		printerr("outline_check: stopped after %d frames and %d s, %d ticks, flashing bodies' outlines drew %d pixels and %d still ones' some" % [
+			_frame, seconds, _ticks, _flashing_drawn, _still])
+		quit(1)
+		return false
 	if _wait > 0:
 		_wait -= 1
 		return false
 	match _phase:
 		"settle":
 			_art.refresh(_whole(), 1.0)
-			if _frame >= SETTLE_FRAMES:
+			# The trees and raised strips hide bodies only once their areas are baked and shown, and a
+			# loaded machine bakes them over more frames.
+			var ground: Node2D = _art.get_node("Ground")
+			var areas := ceili(_whole().size.x / (Ground.CHUNK * WorldArt.CELL.x)) \
+					* ceili(_whole().size.y / (Ground.CHUNK * WorldArt.CELL.y))
+			if _frame >= SETTLE_FRAMES and ground.baked and ground.shown == areas:
+				print("outline_check: the ground's %d areas baked and shown after %d frames" % [areas, _frame])
 				_phase = "battle"
 		"battle":
 			_ticks += 1
 			if _ticks > BATTLE_TICKS:
-				printerr("outline_check: in %d ticks flashing bodies' outlines drew %d pixels and %d still ones' some" % [
-					BATTLE_TICKS, _flashing_drawn, _still])
+				printerr("outline_check: in %d ticks flashing bodies' outlines drew %d pixels and %d still ones' some; %d outline pixels over a body's own pixels shown" % [
+					BATTLE_TICKS, _flashing_drawn, _still, _over])
 				quit(1)
 				return false
 			_world.tick()

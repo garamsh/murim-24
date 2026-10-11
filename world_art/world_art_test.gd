@@ -1,7 +1,8 @@
 # Checks that world_art.tscn lays a world at the 2.5D angle: the relief it draws the ground with
 # raises the cells the map blocks as rock and leaves the rest plain at level 0; it draws every body
 # on screen and none off it; every structure of a region is drawn over its footprint with its
-# stage's frame of its kind's art, a seat's training ground on the ground; each field is tiled with
+# stage's frame of its kind's art, a seat's training ground on the ground, every kind among them
+# once the region has grown its workshops; each field is tiled with
 # its state's tag; each village's ground decorations cover the cells its template's data names, a
 # village the world founds as it runs included, and its banners stand on the cells it names; after the view jumps across the region, every body a
 # band holds lies inside the bounds the renderer culls that band by; and between ticks a body is
@@ -44,10 +45,11 @@ const VIEW := Vector2(480, 270)
 # 3,660 days.
 const SHORT_DAY := 5
 const FOUNDING_DAYS := 4500
-# Where a kind's frames hold its footprint's top-left, as docs/art-direction.md §Structures and
-# damage stages gives it: (8, 8) for every kind but the seat gate.
-const GATE_ANCHOR := Vector2(8, 40)
-const ANCHOR := Vector2(8, 8)
+# Days of short days within which the region's growth builds a smithy and an apothecary.
+const WORKSHOP_DAYS := 9000
+# How far in from its left and bottom edges every structure's frame holds its footprint's
+# bottom-left corner, as docs/art-direction.md §Structures and damage stages gives it.
+const INSET := 8
 
 
 func run() -> bool:
@@ -93,57 +95,26 @@ func run() -> bool:
 	print(bodies_line + ": " + ("pass" if bodies_right else "FAIL"))
 
 	# Buildings: every region structure but a field is drawn as its kind's art, its footprint's
-	# bottom-left on the ground on the sprite's position and the frame's anchor on its top-left as
-	# the art draws a footprint, STRUCTURE_ROWS rows a cell, raised with the ground, holding each
-	# stage's frame and showing its stage's; a training ground lies on the ground, under every
-	# body, and every other kind stands. Setup: the region holds a seat's training ground, manual
-	# hall and gate. Control: the structures above, made by create() with no kind, are counted
-	# undrawn by the same count.
+	# bottom-left on the ground on the sprite's position and on the frame's, INSET in from its left and
+	# bottom edges, raised with the ground, holding each stage's frame and showing its stage's; a
+	# training ground lies on the ground, under every body, and casts no shadow, and every other kind
+	# stands, its shadow on the ground from its footprint's top-left. Setup: the region holds a seat's
+	# training ground, manual hall and gate. Control: the structures above, made by create() with no
+	# kind, are counted undrawn by the same count.
 	var region := WorldAdapter.create_region(SEED)
 	var region_art: Node2D = load(SCENE).instantiate()
 	region_art.show_world(region, region.army_count() - 1)
 	region_art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
-	var stages := ["intact", "damaged", "destroyed", "rubble"]
-	var placed := 0
-	var fields := 0
-	var kinds := {}
-	for structure in region.structure_count():
-		var sprite: Sprite2D = region_art.structure_sprites[structure]
-		var footprint := region.structure_footprint(structure)
-		var corner := region.structure_cell(structure)
-		var kind := region.structure_kind(structure)
-		if kind == "field":
-			fields += 1
-			continue
-		var sheet := _sheet("res://art/structures/%s.json" % kind)
-		if sprite == null or sheet.is_empty():
-			continue
-		var frame := (sprite.texture as AtlasTexture).region
-		var stage: String = stages[region.structure_stage(structure)]
-		var anchor := GATE_ANCHOR if kind == "seat_gate" else ANCHOR
-		var layer := "Laid" if kind == "training_ground" else "Standing"
-		var staged := true
-		for index in stages.size():
-			var held: AtlasTexture = sprite.get_meta("frames")[index]
-			staged = staged and held.region.position.x == sheet.tags[stages[index]][0] * sheet.width
-		var bottom := Vector2(corner.x, corner.y + footprint.y) * WorldArt.CELL
-		var lift: float = region_art.relief.lift_at(bottom + Vector2(footprint.x * WorldArt.CELL.x / 2.0,
-				-WorldArt.CELL.y / 2.0))
-		var standing := sprite.position if kind != "training_ground" else bottom
-		if standing == bottom \
-				and sprite.position + sprite.offset + anchor \
-						== bottom - Vector2(0, footprint.y * WorldArt.STRUCTURE_ROWS + lift) \
-				and sprite.get_parent().name == layer and staged \
-				and frame.position.x == sheet.tags[stage][0] * sheet.width \
-				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
-			placed += 1
-			kinds[kind] = true
+	var drawn := _placed(region, region_art)
+	var placed: int = drawn.placed if drawn.batched else 0
+	var fields: int = drawn.fields
+	var kinds: Dictionary = drawn.kinds
 	var undrawn := _undrawn(region, region_art)
 	var unkinded := _undrawn(world, art)
 	var seat_kinds := ["training_ground", "manual_hall", "seat_gate"].all(func(kind: String) -> bool: return kinds.has(kind))
 	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 10 \
 			and seat_kinds and undrawn == 0 and unkinded == world.structure_count() and unkinded > 0
-	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
+	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame and shadow, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
 		placed, region.structure_count(), kinds.keys(), seat_kinds, fields, undrawn, unkinded,
 		world.structure_count(), "pass" if buildings_right else "FAIL"])
 
@@ -229,7 +200,95 @@ func run() -> bool:
 	var passed := relief_right and bodies_right and buildings_right and banners_right and decorations_right \
 			and fields_right
 	art.free()
-	return _bands_pass() and _between_pass() and _founded_pass() and passed
+	return _bands_pass() and _between_pass() and _founded_pass() and _every_kind_pass() and passed
+
+
+# Every kind of structure is drawn as the buildings check above draws a region's: the region, on
+# short days, grown until it has built a smithy and an apothecary, the kinds only growth lays, has
+# every structure but a field placed so, of every kind world_art.gd draws. Setup: the region began
+# with neither workshop, and growth built both within WORKSHOP_DAYS.
+func _every_kind_pass() -> bool:
+	var region := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(region, region.army_count() - 1)
+	var workshops := ["smithy", "apothecary"]
+	var held := func() -> Array:
+		var found := []
+		for structure in region.structure_count():
+			var kind := region.structure_kind(structure)
+			if kind in workshops and not kind in found:
+				found.append(kind)
+		return found
+	var at_start: Array = held.call()
+	var ticks := 0
+	while held.call().size() < workshops.size() and ticks < WORKSHOP_DAYS * SHORT_DAY:
+		for step in 50:
+			region.tick()
+		ticks += 50
+	art.note_tick()
+	art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
+	var drawn := _placed(region, art)
+	var every: bool = WorldArt.BUILDINGS.keys().all(func(kind: String) -> bool: return drawn.kinds.has(kind))
+	var passed: bool = at_start.is_empty() and held.call().size() == workshops.size() \
+			and drawn.placed + drawn.fields == region.structure_count() and every and drawn.batched
+	print("world_art_test: after %d days, the workshops at the start %s and now %s; %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s): %s" % [
+		ticks / SHORT_DAY, at_start, held.call(), drawn.placed + drawn.fields, region.structure_count(), every,
+		drawn.kinds.keys(), "pass" if passed else "FAIL"])
+	art.free()
+	return passed
+
+
+# Of `world`'s structures as `art` draws them, {placed, fields, kinds}: how many but fields stand
+# as their kind's art over their footprint, its bottom-left on the ground on the sprite's position
+# and on the frame's, INSET in from its left and bottom edges, raised with the ground, holding each
+# stage's frame and showing its stage's, a training ground on the ground with no shadow and every
+# other kind standing with its shadow on the ground from its footprint's top-left; how many are
+# fields; the kinds placed; and whether every shadow is drawn by the Shadows node from one texture,
+# nothing but the ground's kinds laid beside it.
+func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
+	var stages := ["intact", "damaged", "destroyed", "rubble"]
+	var placed := 0
+	var fields := 0
+	var kinds := {}
+	for structure in world.structure_count():
+		var sprite: Sprite2D = art.structure_sprites[structure]
+		var footprint := world.structure_footprint(structure)
+		var corner := world.structure_cell(structure)
+		var kind := world.structure_kind(structure)
+		if kind == "field":
+			fields += 1
+			continue
+		var sheet := _sheet("res://art/structures/%s.json" % kind)
+		if sprite == null or sheet.is_empty():
+			continue
+		var frame := (sprite.texture as AtlasTexture).region
+		var stage: String = stages[world.structure_stage(structure)]
+		var layer := "Laid" if kind == "training_ground" else "Standing"
+		var staged := true
+		for index in stages.size():
+			var held: AtlasTexture = sprite.get_meta("frames")[index]
+			staged = staged and held.region.position.x == sheet.tags[stages[index]][0] * sheet.width
+		var bottom := Vector2(corner.x, corner.y + footprint.y) * WorldArt.CELL
+		var lift: float = art.relief.lift_at(bottom + Vector2(footprint.x * WorldArt.CELL.x / 2.0,
+				-WorldArt.CELL.y / 2.0))
+		var standing := sprite.position if kind != "training_ground" else bottom
+		var shadow: Dictionary = art.get_node("Shadows").shadow_of(structure)
+		var shadowed: bool = shadow.is_empty() if kind == "training_ground" else \
+				not shadow.is_empty() and shadow.at == Vector2(corner) * WorldArt.CELL - Vector2(0, lift) \
+				and shadow.footprint == footprint and shadow.stage == world.structure_stage(structure)
+		if standing == bottom and shadowed \
+				and sprite.position + sprite.offset + Vector2(INSET, frame.size.y - INSET) == bottom - Vector2(0, lift) \
+				and sprite.get_parent().name == layer and staged \
+				and frame.position.x == sheet.tags[stage][0] * sheet.width \
+				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
+			placed += 1
+			kinds[kind] = true
+	# Every shadow is drawn by the one node, from one texture: no sprite is laid with the ground but
+	# a structure of the ground's kinds.
+	var laid_others := art.get_node("Laid").get_children().filter(func(node: Node) -> bool:
+			return node is Sprite2D and (node as Sprite2D).get_meta("frames", []) == [])
+	var batched: bool = art.get_node("Shadows").textures() == (1 if placed > 0 else 0) and laid_others.is_empty()
+	return {"placed": placed, "fields": fields, "kinds": kinds, "batched": batched}
 
 
 # A village the region founds is drawn as its template is: its structures stand at the offsets a

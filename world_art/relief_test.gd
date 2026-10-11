@@ -3,8 +3,9 @@
 # rock and the rest flat; that the texture it gives the shader holds each cell's kind, level, face
 # and slope, the same for the same cells; that no cliff drops between two points of ground the core
 # lets a person cross, across or down, with a control where hills rise without a slope and do drop
-# by one; and that the point a screen pixel shows is the point drawn there, on flat ground and up a
-# slope.
+# by one; that the point a screen pixel shows is the point drawn there, on flat ground and up a
+# slope; and that a cell something is built on is marked in the texture to be drawn straight where
+# the ground round it is flat, and not on the hills' edge, where it would drop by a cliff.
 extends RefCounted
 
 const SIZE := Vector2i(16, 14)
@@ -30,7 +31,7 @@ const KINDS := {".": "plain", "f": "forest", "h": "hills", "w": "water", "m": "m
 
 
 func run() -> bool:
-	return _levels_pass() and _texture_pass() and _cliffs_pass() and _under_pass()
+	return _levels_pass() and _texture_pass() and _cliffs_pass() and _under_pass() and _built_pass()
 
 
 static func _relief(slopes := true) -> Relief:
@@ -153,4 +154,30 @@ func _under_pass() -> bool:
 	print("relief_test: under %s found %s; the slope's %s raised %.1f to %s found %s; its unraised pixel shows %s (setup %s): %s" % [
 		flat, relief.ground_under(flat), slope, relief.lift_at(slope), raised, relief.ground_under(raised),
 		relief.ground_under(slope), setup, "pass" if passed else "FAIL"])
+	return passed
+
+
+# Cells built on along the hills' edge, where a straight ground at their own level would stand off
+# the slope by a cliff, are not marked straight, and no cliff drops between passable points.
+# Control: a cell built on in the open plain is marked, 128 more in its texel's blue, its
+# neighbour not.
+func _built_pass() -> bool:
+	var edge: Array[Vector2i] = [Vector2i(4, 6), Vector2i(8, 8), Vector2i(6, 9)]
+	var open := Vector2i(13, 1)
+	var built := _relief()
+	for cell in edge:
+		built.build(cell)
+	built.build(open)
+	var data := built.cell_image().get_data()
+	var unbuilt := _relief().cell_image().get_data()
+	var blue := func(bytes: PackedByteArray, cell: Vector2i) -> int: return bytes[(cell.y * SIZE.x + cell.x) * 4 + 2]
+	var edge_marked := edge.filter(func(cell: Vector2i) -> bool: return blue.call(data, cell) != blue.call(unbuilt, cell))
+	var drops := _passable_drops(built)
+	var beside := open + Vector2i(1, 0)
+	var open_marked: bool = blue.call(data, open) == blue.call(unbuilt, open) + 128 \
+			and blue.call(data, beside) == blue.call(unbuilt, beside)
+	var passed: bool = edge.all(func(cell: Vector2i) -> bool: return built.built_at(cell)) and edge_marked.is_empty() \
+			and drops == 0 and open_marked
+	print("relief_test: built on the hills' edge %s, marked straight %s, cliffs between passable points %d; built on the plain at %s marked %s: %s" % [
+		edge, edge_marked, drops, open, open_marked, "pass" if passed else "FAIL"])
 	return passed

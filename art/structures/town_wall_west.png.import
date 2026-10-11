@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bjya1uionln6o"
-path="res://.godot/imported/transitions.png-acebb531e6320c0bcb4ce1552b013bd3.ctex"
+uid="uid://b5el0tgdxafdv"
+path="res://.godot/imported/town_wall_west.png-29b3ecc8dba7f48b78b15aba23567d74.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/terrain/transitions.png"
-dest_files=["res://.godot/imported/transitions.png-acebb531e6320c0bcb4ce1552b013bd3.ctex"]
+source_file="res://art/structures/town_wall_west.png"
+dest_files=["res://.godot/imported/town_wall_west.png-29b3ecc8dba7f48b78b15aba23567d74.ctex"]
 
 [params]
 

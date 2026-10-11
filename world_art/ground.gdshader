@@ -1,7 +1,10 @@
 // The ground drawn off the cell grid (#212) at the 2.5D angle of ADR 0059: a chunk's image, rendered
 // once when the map is built (world_art/ground.gd), from `cells`, one texel a cell: its ground kind
-// in red, its level plus one in green, the material of the face it drops by in blue, and alpha
-// below 0.75 where it rises as a slope (world_art/relief.gd, whose height_at() follows this file's).
+// in red, its level plus one in green, the material of the face it drops by in blue, plus 128
+// where it is drawn straight, something built on it with flat ground round it, and alpha below
+// 0.75 where it rises as a slope (world_art/relief.gd, whose height_at() follows this file's). On
+// a straight cell the ground is neither warped nor dithered, its own kind and level up to the
+// cell's sides.
 // For each pixel of the screen, as the world would be drawn unlifted from `origin`:
 // - the cells' values are read through coordinates warped by noise and interpolated between
 //   neighbouring cells, so edges and cliffs run along curves and not along the grid;
@@ -88,13 +91,27 @@ float bayer(ivec2 p) {
 ivec4 cell(ivec2 c) {
 	c = clamp(c, ivec2(0), map_size - 1);
 	vec4 t = texelFetch(cells, c, 0);
-	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)), t.a < 0.75 ? 1 : 0);
+	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)) & 127, t.a < 0.75 ? 1 : 0);
+}
+
+// Whether something is built on the cell under the point `p` on the ground.
+bool built(vec2 p) {
+	ivec2 c = clamp(ivec2(floor(vec2(p.x / CW, p.y / CD))), ivec2(0), map_size - 1);
+	return int(round(texelFetch(cells, c, 0).b * 255.0)) >= 128;
+}
+
+// The cell under the point `p` on the ground.
+ivec4 cell_under(vec2 p) {
+	return cell(ivec2(floor(vec2(p.x / CW, p.y / CD))));
 }
 
 // Where a point on the ground reads its cells from: warped by noise, so edges wander. The noise
 // varies over WARP_SCALE pixels, slowly enough for `warp` that the warp never folds the ground
 // over, which would leave islands of one kind inside another.
 vec2 warped(vec2 p) {
+	if (built(p)) {
+		return p;
+	}
 	return p + (vec2(fbm(p / WARP_SCALE + vec2(7.0, 0.0), 11), fbm(p / WARP_SCALE + vec2(0.0, 5.0), 12)) - 0.5) * 2.0 * warp;
 }
 
@@ -103,6 +120,9 @@ vec2 warped(vec2 p) {
 // ledge at a level none of them has; toward cells that rise as a slope, the interpolated height
 // itself, so the ground climbs without a cliff.
 float height_at(vec2 p) {
+	if (built(p)) {
+		return float(cell_under(p).y);
+	}
 	vec2 q = warped(p);
 	vec2 uv = vec2(q.x / CW, q.y / CD) - 0.5;
 	ivec2 c = ivec2(floor(uv));
@@ -136,6 +156,9 @@ bool drops(vec2 p, vec2 q) {
 // cells weigh most, those on the level first; a little noise in the weights dithers the band
 // where two kinds are nearly even.
 int kind_at(vec2 p, int level) {
+	if (built(p)) {
+		return cell_under(p).x;
+	}
 	vec2 q = warped(p);
 	vec2 uv = vec2(q.x / CW, q.y / CD) - 0.5;
 	ivec2 c = ivec2(floor(uv));

@@ -42,22 +42,27 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
 | `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
 | `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
-| `art/terrain/terrain` | 16 x 16 | `plain`, `forest`, `hills`, `water`, `mountain`, four full tiles each; the top-down ground, drawn on the contact sheet and not by the game |
-| `art/terrain/transitions` | 16 x 16 | `forest`, `hills`, `water`, `mountain`, 15 tiles each, by corner mask 0 to 14; as `terrain` |
-| `art/terrain/landforms` | 64 x 64 | `mountain_2x2`, `mountain_3x2`, `mountain_3x3`, `mountain_4x3`, `hills_2x1`, `hills_2x2`, `hills_3x2`, `hills_3x3`; as `terrain` |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
-| `art/structures/house` | 64 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/hall` | 96 x 60 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/well` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/barrels` | 32 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/fence` | 96 x 32 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/granary` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/storehouse` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/training_ground` | 112 x 80 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/manual_hall` | 80 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/seat_gate` | 64 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/smithy` | 64 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
-| `art/structures/apothecary` | 80 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/house` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/hall` | 96 x 98 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/well` | 48 x 66 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/barrels` | 32 x 50 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/fence` | 96 x 34 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/granary` | 48 x 74 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/storehouse` | 64 x 72 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/training_ground` | 112 x 82 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/manual_hall` | 80 x 116 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/seat_gate` | 64 x 68 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_wall_south`, `town_wall_north` | 32 x 64 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_wall_west`, `town_wall_east` | 48 x 48 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_corner_tower` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_gate_tower` | 96 x 88 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_steps` | 32 x 58 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_temple` | 80 x 96 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_market_stall` | 48 x 50 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/town_courtyard_house` | 96 x 106 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/smithy` | 64 x 58 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/apothecary` | 80 x 52 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 12 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
@@ -70,7 +75,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/markers/shadow` | 16 x 8 | `shadow`: every other pixel of an ink ellipse, centred on (8, 4) |
 | `art/title/backdrop` | 480 x 270 | none: one frame, the title screen's mountains and working title |
 
-`art/contact_sheet/contact_sheet.png` shows every frame of the set but the title backdrop, which `art/mockup/title_screen.png` shows, read back from the sources, a scene assembled from them on the grid, a seeded 24 x 12-cell patch of mixed terrain laid as described under Terrain, a farming village, a sect's seat and a grown village with its workshops assembled from them; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it.
+`art/contact_sheet/contact_sheet.png` shows every frame of the set, read back from the sources under each sheet's name and tags, but the title backdrop, which `art/mockup/title_screen.png` shows, the icon and the ground's ramps, which are outside the master palette; `contact_sheet_4x.png` at 4x. It is for review, and Godot does not import it. What the frames make assembled is shown by the game's own captures in each pull request's evidence.
 
 `art/icon/icon.aseprite`, drawn by `icon.lua` and exported as a 32 x 32 `icon.png` tagged `icon`, is the application icon: a jian planted before the title screen's ridges and low sun, in the HUD's frame. The PC exports scale it by nearest neighbour, and the contact sheet leaves it out.
 
@@ -86,9 +91,9 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Draw order | Everything standing is drawn in order of the row its footprint ends on, back to front, the raised rows of the ground among it |
 | Light | From the upper left; shadows fall to the lower right |
 
-- A body stands with its feet, row 22 of its frame, on the point the core gives it. Until #200's next pull request redraws them at the angle, structures keep the art of the 16-pixel grid below, a structure standing with its footprint's bottom edge on the ground's.
-- A structure's sprite covers its footprint and may rise above it; a body, standing on a point, has none. The house's footprint is 3 x 3 cells, the 48 x 48 at (8, 8) in its frame; the margin round it holds the upturned eaves and spilled debris.
-- A body's shadow is a sprite of its own, `art/markers/shadow`, drawn under its feet (§Bodies and markers). No shadow is in a body's or a structure's sprite. The view draws the others on the ground by darkening it two steps along its own ramp: a band past a structure's right and bottom edges that shortens as the structure falls, a soft patch under an army. `art/sprites.lua` draws these shapes, and the contact sheet's scene, still on the 16-pixel grid, shows them in place, with the ellipse it darkens under a body's feet.
+- A body stands with its feet, row 22 of its frame, on the point the core gives it.
+- A structure's sprite covers its footprint and may rise above it; a body, standing on a point, has none. The house's footprint is 3 x 3 cells, 48 x 36 at the angle, its bottom-left corner 8 pixels in from its frame's left and bottom edges; the rows above hold its front and roof, and the margin round it the upturned eaves and spilled debris.
+- No shadow is in a body's or a structure's sprite. The view draws them on the ground: `art/markers/shadow` under a body's feet, every other pixel of an ink ellipse; and past a standing structure's right and bottom edges, every other pixel of ink in a band 6 pixels wide, 3 once it is destroyed and none from rubble.
 
 ## Mood and references
 
@@ -209,7 +214,7 @@ The village is furnished as the approved mockup's is. What blocks movement or br
 | Storehouse | Structure | 3 x 2 | A long plastered store on a stone plinth, iron-studded double doors and vents, no windows, a crate by the door, under a low slate roof; its stages break it as the house's break the house |
 | Field | Decoration | a plot | Rows of tilled soil four pixels apart, an earth border at the plot's edge, in five states: sown (dark soil with seeds showing), growing (green shoots in rows), ripe (amber grain), fallow (grass and weeds over old rows), burnt (black soil, ash, charred stubble and embers); in winter each lies under snow gathered in its furrows |
 
-- Every frame holds its footprint at (8, 8), as the house's does, except the seat gate's (see below).
+- Every frame holds its footprint's bottom-left corner 8 pixels in from its left and bottom edges, as the house's does, the seat gate's and the training ground's included.
 - Ground decorations are tiles laid over the terrain and under everything standing; the banner stands and is sorted with bodies and buildings.
 
 A sect's seat is a village of its own (ADR 0026), laid out with the village's buildings and these of its own, so that a seat reads apart from a farming village at a glance:
@@ -222,7 +227,7 @@ A sect's seat is a village of its own (ADR 0026), laid out with the village's bu
 | Sect banner | Decoration | one cell | A tall pole on a stone foot with a crossbar, a long paper-white streamer edged in the owner's accent, two ink characters down it and a swallowtail with tassels; the faction's banner is a short pennant of the accent itself |
 
 - The training ground is laid with the ground, over the terrain and under everything standing, so people stand and spar on it. What on it rises more than a few pixels, the racks and the dummies, stands along its back row, where anyone in front of it is drawn over it.
-- The seat gate rises 32 rows above its one-row footprint, so its frame holds the footprint at (8, 40), its bottom margin 8 rows as every frame's. Its pillars stand on its two end cells and the middle cell is the opening.
+- The seat gate's pillars stand on its two end cells and the middle cell is the opening.
 - The stone curb, the platform and the gate's bases stay in every stage, as the plinth does.
 - The court before the halls is paved, and a road runs down from it to the gate's opening; both are ground decorations, laid as a village's paving and road are.
 
@@ -230,10 +235,25 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 
 | Prop | Kind | Footprint | Look |
 |---|---|---|---|
-| Smithy (대장간) | Structure | 3 x 2 | A forge shed on a stone plinth under a low slate roof, its left bay open on a stone hearth of white-hot coals whose glow is dithered over the dark inside and the plinth, bellows beside it, a stone chimney rising from the hearth through the roof; a plank wall hung with tongs and hammers in its right bay; an anvil on a stump, a quench tub of water and a heap of charcoal before it; damaged holes the roof, knocks the chimney's crown off, scorches the planks and dims the coals, destroyed drops the roof into the shed, breaks the chimney half down and burns the plank wall to stumps with a few embers left, rubble is a heap with the hearth and the chimney's stub standing out of it |
+| Smithy (대장간) | Structure | 3 x 2 | A forge shed on a stone plinth at the back of its apron, under a slate roof running back over its footprint, its left bay open on a stone hearth of white-hot coals whose glow is dithered over the dark inside and the plinth, bellows beside it, a stone chimney rising from the hearth through the roof; a plank wall hung with tongs and hammers in its right bay; an anvil on a stump, a quench tub of water and a heap of charcoal before it; damaged holes the roof, knocks the chimney's crown off, scorches the planks and dims the coals, destroyed drops the roof into the shed, breaks the chimney half down and burns the plank wall to stumps with a few embers left, rubble is a heap with the hearth and the chimney's stub standing out of it |
 | Apothecary (약방) | Structure | 4 x 2 | A plastered shop on a stone plinth under a slate roof over its left three cells: a counter window on a cabinet of small drawers with gold pulls, jars and a mortar on the sill, herbs hung under the eave, a door under a split cloth curtain and a name board; in the yard at its right a herb rack of two posts and two bars hung with bundles, a drying tray of woven bamboo on trestles and a round tray on the ground, herbs spread on both; damaged holes the roof, scorches the wall, pulls drawers out and snaps the rack's lower bar onto the ground, destroyed drops the roof in and burns the walls to stumps, the rack to two posts and the tray where it fell, rubble is a heap on the plinth and ash in the yard |
 
 - The anvil outlasts the smithy: it stands on its stump intact and damaged and lies on its side, destroyed and rubble.
+
+A walled town (#200) encloses a real town, at least about 40 x 30 cells inside its wall, with streets, wards, a market square, a hall, temples and courtyard houses; a village stays unwalled. The game does not lay one yet: the town's template and its growth are #169's. Its pieces, each in the four stages:
+
+| Piece | Footprint | Look |
+|---|---|---|
+| Wall, south and north | 1 x 2 | A face of stone courses a level high under a paved walkway two cells deep, merlons along its outer edge and a low parapet along its inner one; laid a piece a cell, its sides outlined only at a run's ends, so a run reads as one wall |
+| Wall, west and east | 2 x 1 | The walkway two cells wide seen from above, merlons down its outer edge, over the face that shows where its run ends |
+| Corner tower | 3 x 3 | Two levels of stone courses, crenellated all round, a small watch pavilion on its top |
+| Gate tower | 5 x 2 | The wall raised over a road, the passage through its middle cell dark under its arch with its doors open, a gold name board over it, a gate house of plaster and lacquered pillars on its top under a broad slate roof |
+| Steps | 1 x 2 | Eight treads, each three rows deep over a riser two rows high, between plain cheeks, up to the walkway behind them |
+| Temple | 4 x 3 | Lacquered walls on a high plinth with steps, under a skirt roof and an upper roof, a gold plaque between them |
+| Market stall | 2 x 1 | A striped awning of paper and crimson on four posts over a table of pots, greens and bolts of cloth |
+| Courtyard house | 5 x 5 | A grey wall round a paved court with a tree, the main hall across its back, a wing down each side, a gate in its front wall under a small roof |
+
+- What is built is drawn crisp: its edges run along the pixel grid, and where the ground round it is flat, the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam; on a slope's edge the ground is drawn as any other, so no cliff stands where nothing blocks the way.
 
 ## Effects and HUD
 
