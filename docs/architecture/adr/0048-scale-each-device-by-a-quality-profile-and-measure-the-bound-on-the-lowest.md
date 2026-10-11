@@ -1,6 +1,6 @@
 # ADR 0048: Scale each device by a quality profile, and measure the population bound on the lowest
 
-> Status: proposed
+> Status: proposed; its bound measured on ADR 0047's 4,096 map superseded by ADR-0070, under which it is measured on the 8,192 map
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
