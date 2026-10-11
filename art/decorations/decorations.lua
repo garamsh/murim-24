@@ -118,7 +118,7 @@ local function sect_banner(cv, ramp)
   cv:hline(x + 5, 8, 3, c("ink", 1)); cv:vline(x + 6, 7, 5, c("ink", 1)); cv:set(x + 5, 11, c("ink", 1))
   cv:hline(x + 5, 14, 3, c("ink", 1)); cv:vline(x + 5, 15, 3, c("ink", 1)); cv:vline(x + 7, 15, 3, c("ink", 1))
   cv:hline(x + 5, 17, 3, c("ink", 1))
-  cv:outline(0, 0, T, 32, c("ink", 1))
+  cv:selout(0, 0, T, 32)
 end
 local sects, sect_tags = {}, {}
 for n, f in ipairs({ { "orthodox", "azure" }, { "demonic", "crimson" }, { "unorthodox", "amber" } }) do

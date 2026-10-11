@@ -14,7 +14,6 @@
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
 local px = dofile(here .. "/../pixel.lua")
 local c = px.c
-local INK = c("ink", 1)
 
 local CW, CD = 16, 12
 
@@ -232,11 +231,12 @@ local function rubble(intact, w, d, seed)
   return cv
 end
 
--- Outlines a finished frame in ink.
-local function save_frame(cv) cv:outline(0, 0, cv.w, cv.h, INK) end
+-- Outlines a finished frame sel-out.
+local function save_frame(cv) cv:selout(0, 0, cv.w, cv.h) end
 
 -- Saves the intact frame and, given its footprint, the three damage stages after it. `trim`, for
--- a piece laid end to end in a run, takes the outline off each frame where the next piece meets it.
+-- a piece laid end to end in a run, takes the outline off each frame where the next piece meets it;
+-- it also runs before the outline, so nothing drawn where it trims leaves an outline behind.
 local function save(name, cv, w, d, trim)
   local frames = { cv }
   if w then
@@ -246,7 +246,8 @@ local function save(name, cv, w, d, trim)
     frames[4] = rubble(cv, w, d, seed)
   end
   for _, f in ipairs(frames) do
-    f:outline(0, 0, f.w, f.h, INK)
+    if trim then trim(f) end
+    f:selout(0, 0, f.w, f.h)
     if trim then trim(f) end
   end
   local tags = { { "intact", 1, 1, 1000 } }

@@ -89,7 +89,7 @@ local function stained(cv, spread)
     for _, d in ipairs(STAIN[n]) do
       local x, y = 6 + d[1], 16 + d[2]
       local i = out:get(x, y)
-      if i ~= 0 and i ~= c("ink", 1) then out:set(x, y, c("crimson", d[3])) end
+      if i ~= 0 and not edge(cv, x, y) then out:set(x, y, c("crimson", d[3])) end
     end
   end
   return out

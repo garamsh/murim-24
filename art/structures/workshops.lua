@@ -15,7 +15,6 @@ local px = dofile(here .. "/../pixel.lua")
 local c = px.c
 local R = dofile(here .. "/ruin.lua")(px)
 local hole, scorch, heap = R.hole, R.scorch, R.heap
-local INK = c("ink", 1)
 local STAGES = { "intact", "damaged", "destroyed", "rubble" }
 
 -- A low slate roof from `top` to the eave at `bottom`, `w` wide from x0, hipped above `ridge`.
@@ -260,7 +259,7 @@ local function smithy(cv, stage, seed)
     end)
     if stage == "intact" then cv:rect(cx + 3, y + 26, 4, 3, c("earth", 4)); cv:hline(cx + 3, y + 26, 4, c("earth", 5)) end
   end
-  cv:outline(0, 0, cv.w, cv.h, INK)
+  cv:selout(0, 0, cv.w, cv.h)
 end
 
 
@@ -409,7 +408,7 @@ local function apothecary(cv, stage, seed)
     litter(cv, r, yard, y + 24, 18, 7, 6, "ink", { 4, 5 })
     litter(cv, r, yard, y + 22, 18, 9, 4, "grass", { 4, 5 })
   end
-  cv:outline(0, 0, cv.w, cv.h, INK)
+  cv:selout(0, 0, cv.w, cv.h)
 end
 
 local buildings = {

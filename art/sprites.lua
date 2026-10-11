@@ -4,7 +4,6 @@
 return function(px)
   local c = px.c
   local S = {}
-  local INK = c("ink", 1)
 
   -- Body parts are fills only; the outline is added around the finished silhouette, so a
   -- weapon or a hat changes the outline with it.
@@ -144,7 +143,7 @@ return function(px)
     cv:sprite(hx, hy, heads[spec.head or "topknot"], map)
     if spec.hat then cv:sprite(hx - 3 + 1, hy - 3, hats[spec.hat], map) end
     if spec.weapon then weapons[spec.weapon](cv, bx + bw - 1, by + 3) end
-    cv:outline(0, 0, 16, 18, INK)
+    cv:selout(0, 0, 16, 18)
     return cv
   end
 
@@ -163,7 +162,7 @@ return function(px)
     end
     -- A glyph-like mark, a stroke and a dot.
     cv:vline(x + 5, y - 13, 5, c("paper", 6)); cv:hline(x + 4, y - 11, 3, c("paper", 6))
-    cv:outline(x - 1, y - 18, 12, 20, INK)
+    cv:selout(x - 1, y - 18, 12, 20)
   end
 
   -- The aggregate-army marker: one block standing for a whole army, packed with heads of
@@ -192,7 +191,7 @@ return function(px)
         cv:set(bx + 2, by + 1, c("stone", 6))
       end
     end
-    cv:outline(x, y - 3, w + 2, h + 4, INK)
+    cv:selout(x, y - 3, w + 2, h + 4)
     S.banner(cv, x + w // 2 - 4, y + 1, ramp)
     -- Bracket corners frame the block as one marker.
     local bc = c(ramp, 5)
