@@ -244,6 +244,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Insights.** Each person holds a set of insights, gained from manuals, from natural conditions, or by repeating actions counted in up to 16 practices, each rolled daily once its conditions or threshold hold, the same for NPCs.
   - **Requirements.** An art needs insights, a realm rank and prerequisite arts. A manual's reading fails without them, for its cost and 30 days, and the store notes what was missing.
   - **Passives.** An art's passive skills give regeneration, qi recovery, damage by family, sight, stamina, climb cost and descent, folded into cached totals that strikes, recovery, sight and leaps read. Footwork's climbing effect is one of them.
+  - **The soul and scrolls.** The player's soul holds its insights, known arts and scrolls, so a reborn body keeps them, its arts sealed until its realm and, under model B as proposed, its qi nature fit. Scroll kinds are pack data, held per soul and hung when first earned.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.
