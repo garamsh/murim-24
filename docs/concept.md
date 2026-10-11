@@ -41,6 +41,8 @@ Each section carries one of the following statuses.
   2. **A wuxia story of one life**: the starting point and the path differ by origin.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on). The one exception is caves, which only the player enters (§Gear, wealth and livelihoods).
+- **Principle: simple rules, complex consequences.** Decided by the owner on 2026-10-10 (issue #229). The world runs on simple rules whose consequences combine into complex cause and effect, the way money shapes villages' forms, their growth and each person's life. Our job is to tune the balance, not to script outcomes.
+  - **Population has no separate limit: it is bounded by the food that can be had.** Fruit, game and fish regrow, fields yield, and how fast they regrow is what governs how many people the world feeds.
 - **Genre and engine**: 2D RPG, Godot 4.7.
 - **Perspective and combat**: a three-quarter top-down view, with combat in real time (`docs/architecture/adr/0012-present-the-world-in-a-three-quarter-top-down-view.md`).
 - **Art direction**: pixel art on a 16-pixel tile grid (`docs/art-direction.md`).
@@ -145,9 +147,9 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Genealogy and families.** Every NPC has parents and belongs to a family (clan), and the genealogy is kept in the world.
 - **Every NPC is an individual person**, with a name, parents, a family, talent and a lifespan.
 - **An army is a roster** of the NPCs conscripted into it, never a count of soldiers.
-- **Population caps.** Each village's population is capped by its own housing, food and storage (`docs/architecture/adr/0022-cap-each-village-by-its-housing-food-and-storage.md`):
-  - A village's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, derived from its structures, with what each kind holds given as data.
-  - Growth slows as the population nears the cap.
+- **Population follows food.** Revised by the owner, 2026-10-10 (#229), in place of a cap on each village by its housing, food and storage (`docs/architecture/adr/0022-cap-each-village-by-its-housing-food-and-storage.md`):
+  - A village's population follows the food it can have. No number stops it.
+  - Housing and storage limit people only through what they cause: crowding and a full store.
   - A shortage brings starvation or migration.
 - **Nature grows on its own.** Decided by the owner on 2026-10-09 (issue #187). ADR 0056 (`docs/architecture/adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed, designs it.
   - Terrain is a biome, and the trees and fruit on it grow naturally. Today's forest is ground on which trees grow, spread and can be felled.
@@ -161,7 +163,13 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - settlers carrying a first house's materials
   - hunting waiting for animals (#171)
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
-- **A hard upper bound.** A world's population never exceeds a bound. That bound is a ceiling, not a target: the caps below it set the actual population. It is about 500 until it is measured for the larger world (§World and scale).
+- **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
+- **[proposed]** ADR 0063's details (`docs/architecture/adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`):
+  - births scaled by a household's days of food, from its purse and its village's stock, and slowed by crowding past housing
+  - a village's housing and food caps kept only as consequences, read by growth and migration, with no birth stopping at them
+  - the core's people storage a technical capacity, measured as ADR 0048 measures the bound, which the balance must never reach
+  - field and wild food yields by biome and season in pack data, as the levers
+  - `make sweep` reporting population, food, money, villages and hunger against target bands over 100 years
 - **[proposed]** Expansion (building, new villages, territory, raids) is the motive for war.
 - **[proposed]** Building kinds beyond the current set. The current set, in `core/region.cpp`, is houses and halls (housing), fields (harvest), granaries and storehouses (storage), and wells, barrels and fences, which hold nothing. Proposed additions:
   - Smithy: makes and mends weapons.

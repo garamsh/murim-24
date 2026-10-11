@@ -1,6 +1,6 @@
 # ADR 0021: Let people marry, have children and bear family names
 
-> Status: accepted; its one family per army the world starts with superseded by ADR-0025 for the families of a village's households; its sex drawn at even odds for every birth superseded by ADR-0027 for children where kinship balances sexes; its names held in Korean and romanised forms in the core superseded by ADR-0049, which makes them text keys
+> Status: accepted; its one family per army the world starts with superseded by ADR-0025 for the families of a village's households; its sex drawn at even odds for every birth superseded by ADR-0027 for children where kinship balances sexes; its names held in Korean and romanised forms in the core superseded by ADR-0049, which makes them text keys; its births while fewer than 500 live superseded by ADR-0063, under which a birth is refused only at the technical capacity and counted as a failure
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
