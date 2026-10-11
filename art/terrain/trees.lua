@@ -94,7 +94,7 @@ end
 -- Poplar: the oases' tree, a tall narrow crown of yellow-green on a pale trunk.
 local function poplar(seed)
   local cv = px.canvas(32, 40)
-  cv:rect(15, 28, 2, 9, c("paper", 1)); cv:vline(15, 28, 9, c("paper", 2))
+  cv:rect(15, 28, 2, 9, c("paper", 3)); cv:vline(15, 28, 9, c("paper", 4))
   cv:each_ellipse(16, 16, 5, 14, function(x, y)
     local n = px.noise(x, y, 2, seed)
     local light = -(x - 16) / 5 * 0.6 - (y - 16) / 14 * 0.4 + (n - 0.5) * 0.8
@@ -110,7 +110,7 @@ local function snow_pine(seed)
     for x = 0, 31 do
       local i = cv:get(x, y)
       if i ~= 0 and i ~= c("leaf", 1) and cv:get(x, y - 1) == c("leaf", 1) and px.hash(x, y, seed) > 0.25 then
-        cv:set(x, y, x < 16 and c("robe", 3) or c("robe", 2))
+        cv:set(x, y, x < 16 and c("robe", 7) or c("robe", 4))
       end
     end
   end

@@ -33,7 +33,7 @@ local function roof(cv, x0, w, top, ridge, bottom)
     end
   end
   cv:hline(x0 + 1, ridge, w - 2, c("ink", 2)); cv:hline(x0 + 1, ridge - 1, w - 2, c("stone", 2))
-  for xx = x0 - 3, x0 + w + 2 do cv:set(xx, bottom, ((xx - x0) % 3 == 1) and c("stone", 5) or c("stone", 1)) end
+  for xx = x0 - 3, x0 + w + 2 do cv:set(xx, bottom, ((xx - x0) % 3 == 1) and c("stone", 6) or c("stone", 1)) end
   cv:set(x0 - 4, bottom - 1, c("stone", 2)); cv:set(x0 + w + 3, bottom - 1, c("stone", 2))
 end
 
@@ -43,7 +43,7 @@ local function charred(cv, x, y, w, h, seed)
     for xx = x, x + w - 1 do
       if cv:get(xx, yy) ~= 0 and yy - y > px.noise(xx, yy, 3, seed) * 5 then
         local n = px.noise(xx, yy, 4, seed + 1)
-        cv:set(xx, yy, n > 0.62 and c("ink", 3) or (n > 0.35 and c("ink", 2) or c("wood", 1)))
+        cv:set(xx, yy, n > 0.62 and c("ink", 4) or (n > 0.35 and c("ink", 2) or c("wood", 1)))
       elseif cv:get(xx, yy) ~= 0 then
         cv:clear(xx, yy)
       end
@@ -58,13 +58,13 @@ local function stumps(cv, x, y, w, h, seed)
     for yy = y, y + h - 1 - stump do
       if cv:get(xx, yy) ~= 0 then cv:clear(xx, yy) end
     end
-    cv:set(xx, y + h - stump, c("ink", 3))
+    cv:set(xx, y + h - stump, c("ink", 4))
   end
 end
 
--- Litter of `n` pixels from `ramp` in a box.
-local function litter(cv, r, x, y, w, h, n, ramp, lo, hi)
-  for k = 1, n do cv:set(r.int(x, x + w - 1), r.int(y, y + h - 1), c(ramp, r.int(lo, hi))) end
+-- Litter of `n` pixels in a box, each of a step of `ramp` picked from `steps`.
+local function litter(cv, r, x, y, w, h, n, ramp, steps)
+  for k = 1, n do cv:set(r.int(x, x + w - 1), r.int(y, y + h - 1), c(ramp, r.pick(steps))) end
 end
 
 -- Firelight on what is drawn round (cx, cy), dithered: darks warm to amber, the rest lifts a step.
@@ -76,7 +76,7 @@ local function glow(cv, cx, cy, rx, ry, strength)
     if ramp == "ink" then
       cv:set(xx, yy, c("amber", d < 0.45 and 2 or 1))
     elseif ramp == "earth" then
-      cv:set(xx, yy, d < 0.4 and c("amber", 3) or px.shift(i, 1))
+      cv:set(xx, yy, d < 0.4 and c("amber", 4) or px.shift(i, 1))
     elseif ramp ~= "fire" and ramp ~= "amber" then
       cv:shade_at(xx, yy, 1)
     end
@@ -106,19 +106,19 @@ end
 local function anvil(cv, ax, base, tipped)
   if tipped then
     cv:rect(ax + 10, base - 4, 5, 4, c("wood", 3)); cv:hline(ax + 10, base - 4, 5, c("wood", 5))
-    cv:rect(ax, base - 5, 3, 5, c("ink", 3)); cv:vline(ax, base - 5, 5, c("stone", 3))
-    cv:rect(ax + 3, base - 4, 2, 3, c("ink", 3)); cv:rect(ax + 5, base - 5, 3, 5, c("ink", 4))
-    cv:set(ax + 1, base - 6, c("ink", 3))
+    cv:rect(ax, base - 5, 3, 5, c("ink", 4)); cv:vline(ax, base - 5, 5, c("stone", 3))
+    cv:rect(ax + 3, base - 4, 2, 3, c("ink", 4)); cv:rect(ax + 5, base - 5, 3, 5, c("ink", 5))
+    cv:set(ax + 1, base - 6, c("ink", 4))
     return
   end
   cv:rect(ax + 3, base - 3, 6, 3, c("wood", 3)); cv:vline(ax + 3, base - 3, 3, c("wood", 4))
   cv:hline(ax + 3, base - 1, 6, c("wood", 2))
-  cv:hline(ax + 2, base - 4, 8, c("ink", 3))
-  cv:rect(ax + 4, base - 6, 4, 2, c("ink", 3)); cv:vline(ax + 4, base - 6, 2, c("ink", 4))
-  cv:rect(ax + 1, base - 9, 10, 3, c("ink", 3))
-  cv:hline(ax + 1, base - 9, 10, c("stone", 5)); cv:hline(ax + 1, base - 7, 10, c("ink", 2))
+  cv:hline(ax + 2, base - 4, 8, c("ink", 4))
+  cv:rect(ax + 4, base - 6, 4, 2, c("ink", 4)); cv:vline(ax + 4, base - 6, 2, c("ink", 5))
+  cv:rect(ax + 1, base - 9, 10, 3, c("ink", 4))
+  cv:hline(ax + 1, base - 9, 10, c("stone", 6)); cv:hline(ax + 1, base - 7, 10, c("ink", 2))
   cv:hline(ax - 1, base - 9, 2, c("stone", 3)); cv:set(ax - 2, base - 9, c("stone", 3))
-  cv:set(ax - 1, base - 8, c("ink", 3))
+  cv:set(ax - 1, base - 8, c("ink", 4))
 end
 
 -- `y` is 32 rows above the footprint's front edge: the shed stands 6 rows behind it, on the apron's
@@ -129,7 +129,7 @@ local function smithy(cv, stage, seed)
   local x, y, w = 8, cv.h - 8 - 32, 48
   -- The stone plinth under the shed, in every stage.
   cv:rect(x + 1, y + 22, w - 2, 4, c("stone", 4))
-  cv:hline(x + 1, y + 22, w - 2, c("stone", 5)); cv:hline(x + 1, y + 25, w - 2, c("stone", 2))
+  cv:hline(x + 1, y + 22, w - 2, c("stone", 6)); cv:hline(x + 1, y + 25, w - 2, c("stone", 2))
 
   local bay = { x + 3, x + 25 } -- the open front, from its left post to its middle one
   local hearth = { x + 5, y + 14 } -- its stone block's top-left; the chimney rises from it
@@ -157,11 +157,11 @@ local function smithy(cv, stage, seed)
       end
     end
     cv:hline(bay[2] + 2, y + 11, x + w - 5 - bay[2] - 1, c("wood", 2))
-    cv:line(x + 30, y + 13, x + 32, y + 19, c("ink", 3)); cv:line(x + 32, y + 13, x + 30, y + 19, c("ink", 3))
+    cv:line(x + 30, y + 13, x + 32, y + 19, c("ink", 4)); cv:line(x + 32, y + 13, x + 30, y + 19, c("ink", 4))
     for _, hx in ipairs({ x + 35, x + 39 }) do
-      cv:vline(hx + 1, y + 14, 6, c("wood", 5)); cv:rect(hx, y + 13, 3, 2, c("ink", 3)); cv:set(hx, y + 13, c("stone", 3))
+      cv:vline(hx + 1, y + 14, 6, c("wood", 5)); cv:rect(hx, y + 13, 3, 2, c("ink", 4)); cv:set(hx, y + 13, c("stone", 3))
     end
-    cv:set(x + 42, y + 14, c("ink", 3)); cv:vline(x + 41, y + 15, 2, c("ink", 3)); cv:vline(x + 43, y + 15, 2, c("ink", 3))
+    cv:set(x + 42, y + 14, c("ink", 4)); cv:vline(x + 41, y + 15, 2, c("ink", 4)); cv:vline(x + 43, y + 15, 2, c("ink", 4))
     for _, p in ipairs({ x + 1, bay[2] + 1, x + w - 3 }) do
       cv:vline(p, y + 11, 11, c("wood", 4)); cv:vline(p + 1, y + 11, 11, c("wood", 2))
     end
@@ -172,7 +172,7 @@ local function smithy(cv, stage, seed)
     for yy = top, hearth[2] - 1 do
       for xx = chimney_x, chimney_x + 6 do
         local course = (yy - top) % 3 == 2
-        local col = xx == chimney_x and c("stone", 5) or (xx == chimney_x + 6 and c("stone", 2) or c("stone", 4))
+        local col = xx == chimney_x and c("stone", 6) or (xx == chimney_x + 6 and c("stone", 2) or c("stone", 4))
         if course or ((xx - chimney_x + ((yy - top) // 3) * 3) % 6 == 0) then col = c("stone", 2) end
         cv:set(xx, yy, col)
       end
@@ -184,7 +184,7 @@ local function smithy(cv, stage, seed)
     coals(cv, hearth[1] + 3, hearth[2] + 1, 7, 3, stage == "intact" and 1 or 0.55, seed)
     roof(cv, x, w, y - 10, y - 4, y + 10)
     chimney(stack_top)
-    cv:rect(chimney_x - 1, stack_top - 1, 9, 2, c("stone", 4)); cv:hline(chimney_x - 1, stack_top - 1, 9, c("stone", 5))
+    cv:rect(chimney_x - 1, stack_top - 1, 9, 2, c("stone", 4)); cv:hline(chimney_x - 1, stack_top - 1, 9, c("stone", 6))
     cv:rect(chimney_x + 1, stack_top - 1, 5, 1, c("ink", 1))
   end
   if stage == "intact" then
@@ -201,7 +201,7 @@ local function smithy(cv, stage, seed)
     end
     scorch(cv, bay[2] + 2, y + 11, 18, 11, 0.45, seed + 1)
     glow(cv, hearth[1] + 6, hearth[2] + 2, 11, 8, 0.7)
-    litter(cv, r, x + 2, y + 26, w - 4, 5, 8, "stone", 2, 4)
+    litter(cv, r, x + 2, y + 26, w - 4, 5, 8, "stone", { 2, 3, 4 })
   elseif stage == "destroyed" then
     -- The roof fallen into the shed, the plank wall burnt to stumps, the stack broken half down;
     -- the hearth holds, a few embers in it.
@@ -229,15 +229,15 @@ local function smithy(cv, stage, seed)
       local drop = math.floor(px.noise(xx, 0, 2, seed + 6) * 4)
       for yy = broken, broken + drop - 1 do cv:clear(xx, yy) end
     end
-    litter(cv, r, x + 2, y + 26, w - 4, 5, 14, "ink", 2, 4)
-    litter(cv, r, x + 2, y + 26, w - 4, 5, 6, "stone", 2, 4)
+    litter(cv, r, x + 2, y + 26, w - 4, 5, 14, "ink", { 2, 4, 5 })
+    litter(cv, r, x + 2, y + 26, w - 4, 5, 6, "stone", { 2, 3, 4 })
   elseif stage == "rubble" then
     -- A heap on the sill; the stub of the stack and the hearth's block standing out of it.
     heap(cv, x + w / 2, y + 18, w / 2 - 1, 6, seed, r)
     cv:rect(hearth[1], hearth[2] + 3, 13, 5, c("stone", 3)); cv:hline(hearth[1], hearth[2] + 3, 13, c("stone", 4))
     chimney(hearth[2] - 2)
-    cv:hline(chimney_x, hearth[2] - 2, 7, c("ink", 3))
-    litter(cv, r, x + 2, y + 26, w - 4, 5, 6, "ink", 3, 4)
+    cv:hline(chimney_x, hearth[2] - 2, 7, c("ink", 4))
+    litter(cv, r, x + 2, y + 26, w - 4, 5, 6, "ink", { 4, 5 })
   end
 
   -- Before the shed: the anvil in front of the hearth, a quench tub of water, a heap of charcoal. The
@@ -249,14 +249,14 @@ local function smithy(cv, stage, seed)
       cv:rect(tx - 1, ty - 1, 7, 3, c("ink", 2)); cv:hline(tx - 1, ty - 1, 7, c("wood", 1))
     else
       cv:rect(tx - 1, ty - 2, 7, 5, c("wood", 3)); cv:vline(tx - 1, ty - 2, 5, c("wood", 4))
-      cv:vline(tx + 2, ty - 2, 5, c("wood", 2)); cv:hline(tx - 1, ty, 7, c("ink", 3))
+      cv:vline(tx + 2, ty - 2, 5, c("wood", 2)); cv:hline(tx - 1, ty, 7, c("ink", 4))
       cv:rect(tx, ty - 3, 5, 2, c("water", 3)); cv:set(tx + 1, ty - 3, c("water", 5))
       cv:hline(tx - 1, ty - 4, 7, c("wood", 4))
     end
     local cx = x + 41
     local spill = stage == "intact" and 0 or 2
     cv:each_ellipse(cx, y + 29, 4 + spill, 2.5 - spill / 2, function(xx, yy, d)
-      cv:set(xx, yy, (px.hash(xx, yy, seed) > 0.6) and c("ink", 4) or (d < 0.5 and c("ink", 3) or c("ink", 2)))
+      cv:set(xx, yy, (px.hash(xx, yy, seed) > 0.6) and c("ink", 5) or (d < 0.5 and c("ink", 4) or c("ink", 2)))
     end)
     if stage == "intact" then cv:rect(cx + 3, y + 26, 4, 3, c("earth", 4)); cv:hline(cx + 3, y + 26, 4, c("earth", 5)) end
   end
@@ -264,12 +264,12 @@ local function smithy(cv, stage, seed)
 end
 
 
-local HERBS = { { "grass", 4 }, { "leaf", 4 }, { "amber", 3 }, { "earth", 5 }, { "grass", 3 }, { "leaf", 5 } }
+local HERBS = { { "grass", 4 }, { "leaf", 4 }, { "amber", 4 }, { "earth", 5 }, { "grass", 3 }, { "leaf", 5 } }
 
 -- A bundle of herbs hung head down from (bx, by): a tie, then leaves fanning out below it.
 local function bundle(cv, bx, by, k, burnt)
   local h = HERBS[(k - 1) % #HERBS + 1]
-  local col = burnt and c("ink", 3) or c(h[1], h[2])
+  local col = burnt and c("ink", 4) or c(h[1], h[2])
   local dark = burnt and c("ink", 2) or px.shift(col, -1)
   cv:set(bx + 1, by, c("earth", 3))
   cv:hline(bx, by + 1, 3, col); cv:hline(bx, by + 2, 3, dark); cv:set(bx + 1, by + 2, col)
@@ -279,12 +279,12 @@ end
 -- A drying tray of woven bamboo, `w` wide, at (tx, ty), herbs spread on it.
 local function tray(cv, tx, ty, w, seed, burnt)
   cv:rect(tx, ty, w, 4, burnt and c("ink", 2) or c("earth", 5))
-  cv:hline(tx, ty, w, burnt and c("ink", 3) or c("earth", 6)); cv:hline(tx, ty + 3, w, burnt and c("ink", 1) or c("earth", 3))
+  cv:hline(tx, ty, w, burnt and c("ink", 4) or c("earth", 6)); cv:hline(tx, ty + 3, w, burnt and c("ink", 1) or c("earth", 3))
   for xx = tx + 1, tx + w - 2 do
     for yy = ty + 1, ty + 2 do
       local n = px.hash(xx, yy, seed)
       if burnt then
-        if n > 0.6 then cv:set(xx, yy, c("ink", 4)) end
+        if n > 0.6 then cv:set(xx, yy, c("ink", 5)) end
       elseif n > 0.45 then
         local h = HERBS[math.floor(px.hash(xx, yy, seed + 1) * #HERBS) + 1]
         cv:set(xx, yy, c(h[1], h[2]))
@@ -302,35 +302,35 @@ local function apothecary(cv, stage, seed)
   local yard = x + sw + 2
   -- The plinth, in every stage.
   cv:rect(x + 1, y + 27, sw - 2, 5, c("stone", 4))
-  cv:hline(x + 1, y + 27, sw - 2, c("stone", 5)); cv:hline(x + 1, y + 31, sw - 2, c("stone", 2))
-  cv:rect(x + 23, y + 29, 10, 2, c("stone", 5)); cv:hline(x + 23, y + 30, 10, c("stone", 3))
+  cv:hline(x + 1, y + 27, sw - 2, c("stone", 6)); cv:hline(x + 1, y + 31, sw - 2, c("stone", 2))
+  cv:rect(x + 23, y + 29, 10, 2, c("stone", 6)); cv:hline(x + 23, y + 30, 10, c("stone", 3))
 
   if stage == "intact" or stage == "damaged" or stage == "destroyed" then
     -- Plaster between lacquered pillars.
-    cv:rect(x + 3, y + 14, sw - 6, 13, c("paper", 2))
-    cv:hline(x + 3, y + 25, sw - 6, c("paper", 1))
+    cv:rect(x + 3, y + 14, sw - 6, 13, c("paper", 4))
+    cv:hline(x + 3, y + 25, sw - 6, c("paper", 3))
     -- The counter window: a cabinet of drawers behind it, jars and a mortar on the sill.
     cv:rect(x + 6, y + 17, 13, 7, c("ink", 2))
     for row = 0, 2 do
       for col = 0, 3 do
         local dx, dy = x + 7 + col * 3, y + 18 + row * 2
-        cv:hline(dx, dy, 2, c("wood", 3)); cv:set(dx + 1, dy, c("gold", 3))
+        cv:hline(dx, dy, 2, c("wood", 3)); cv:set(dx + 1, dy, c("gold", 4))
       end
     end
     cv:rect(x + 5, y + 24, 15, 2, c("wood", 4)); cv:hline(x + 5, y + 25, 15, c("wood", 2))
-    cv:rect(x + 7, y + 22, 2, 2, c("paper", 3)); cv:set(x + 7, y + 22, c("stone", 6))
+    cv:rect(x + 7, y + 22, 2, 2, c("paper", 6)); cv:set(x + 7, y + 22, c("stone", 7))
     cv:rect(x + 11, y + 22, 2, 2, c("earth", 3)); cv:set(x + 11, y + 22, c("earth", 5))
     cv:rect(x + 15, y + 23, 3, 1, c("stone", 3)); cv:set(x + 16, y + 22, c("wood", 5))
     -- The door under a cloth curtain split down the middle, the name board above it.
     cv:rect(x + 24, y + 18, 8, 9, c("ink", 2))
-    cv:rect(x + 24, y + 18, 8, 5, c("cloth", 2)); cv:vline(x + 28, y + 19, 4, c("ink", 2))
-    cv:hline(x + 24, y + 18, 8, c("cloth", 3))
+    cv:rect(x + 24, y + 18, 8, 5, c("cloth", 3)); cv:vline(x + 28, y + 19, 4, c("ink", 2))
+    cv:hline(x + 24, y + 18, 8, c("cloth", 4))
     cv:rect(x + 23, y + 14, 10, 3, c("wood", 2)); cv:hline(x + 23, y + 14, 10, c("wood", 4))
-    cv:hline(x + 25, y + 15, 2, c("paper", 3)); cv:hline(x + 29, y + 15, 2, c("paper", 3))
+    cv:hline(x + 25, y + 15, 2, c("paper", 6)); cv:hline(x + 29, y + 15, 2, c("paper", 6))
     -- A second window, shuttered.
     cv:rect(x + 35, y + 18, 4, 5, c("wood", 3)); cv:vline(x + 37, y + 18, 5, c("wood", 2))
     for _, pxx in ipairs({ x + 3, x + 21, x + sw - 5 }) do
-      cv:vline(pxx, y + 14, 13, c("lacquer", 3)); cv:vline(pxx + 1, y + 14, 13, c("lacquer", 2))
+      cv:vline(pxx, y + 14, 13, c("lacquer", 5)); cv:vline(pxx + 1, y + 14, 13, c("lacquer", 4))
     end
   end
   if stage == "intact" or stage == "damaged" then
@@ -346,7 +346,7 @@ local function apothecary(cv, stage, seed)
     scorch(cv, x + 22, y + 14, sw - 25, 13, 0.45, seed + 1)
     -- Drawers pulled out and spilled on the sill.
     cv:set(x + 10, y + 20, c("ink", 1)); cv:set(x + 11, y + 20, c("ink", 1)); cv:set(x + 16, y + 18, c("ink", 1))
-    litter(cv, r, x + 2, y + 28, sw - 4, 4, 8, "stone", 2, 3)
+    litter(cv, r, x + 2, y + 28, sw - 4, 4, 8, "stone", { 2, 3 })
   elseif stage == "destroyed" then
     stumps(cv, x + 3, y + 14, sw - 6, 13, seed + 3)
     for _, pxx in ipairs({ x + 3, x + 21, x + sw - 5 }) do
@@ -367,10 +367,10 @@ local function apothecary(cv, stage, seed)
       local bx = x + 12 + k * 10
       cv:line(bx, y + 8 + r.int(0, 2), bx + r.int(-4, 4), y + 24, c("wood", 1))
     end
-    litter(cv, r, x + 2, y + 27, sw - 4, 5, 12, "ink", 2, 4)
+    litter(cv, r, x + 2, y + 27, sw - 4, 5, 12, "ink", { 2, 4, 5 })
   elseif stage == "rubble" then
     heap(cv, x + sw / 2, y + 23, sw / 2 - 2, 6, seed, r)
-    litter(cv, r, x + 4, y + 26, sw - 8, 4, 4, "paper", 1, 2)
+    litter(cv, r, x + 4, y + 26, sw - 8, 4, 4, "paper", { 3, 4 })
   end
 
   -- The yard: a herb rack of two posts and two bars hung with bundles, a drying tray on trestles
@@ -400,14 +400,14 @@ local function apothecary(cv, stage, seed)
     end
   elseif stage == "destroyed" then
     -- The rack burnt to two stumps; the tray charred where it fell.
-    cv:rect(p1, y + 17, 2, 7, c("ink", 2)); cv:set(p1, y + 16, c("ink", 3))
+    cv:rect(p1, y + 17, 2, 7, c("ink", 2)); cv:set(p1, y + 16, c("ink", 4))
     cv:rect(p2, y + 20, 2, 4, c("ink", 2))
     tray(cv, yard + 1, y + 27, 16, seed + 7, true)
-    litter(cv, r, yard, y + 24, 18, 7, 8, "ink", 2, 4)
+    litter(cv, r, yard, y + 24, 18, 7, 8, "ink", { 2, 4, 5 })
   elseif stage == "rubble" then
     cv:line(yard + 1, y + 27, yard + 14, y + 25, c("ink", 2)); cv:line(yard + 2, y + 29, yard + 16, y + 28, c("wood", 1))
-    litter(cv, r, yard, y + 24, 18, 7, 6, "ink", 3, 4)
-    litter(cv, r, yard, y + 22, 18, 9, 4, "grass", 4, 5)
+    litter(cv, r, yard, y + 24, 18, 7, 6, "ink", { 4, 5 })
+    litter(cv, r, yard, y + 22, 18, 9, 4, "grass", { 4, 5 })
   end
   cv:outline(0, 0, cv.w, cv.h, INK)
 end

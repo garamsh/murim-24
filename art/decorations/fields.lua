@@ -47,8 +47,8 @@ local states = {
     for y = 0, D - 1 do
       for x = 0, W - 1 do
         local soilrow = x % 4 == 0
-        local col = soilrow and c("earth", 2) or (((y + x // 4 + v) % 3 == 0) and c("amber", 5) or c("amber", 4))
-        if not soilrow and px.hash(x, y, 100 + v) > 0.85 then col = c("amber", 3) end
+        local col = soilrow and c("earth", 2) or (((y + x // 4 + v) % 3 == 0) and c("amber", 7) or c("amber", 5))
+        if not soilrow and px.hash(x, y, 100 + v) > 0.85 then col = c("amber", 4) end
         cv:set(x, y, col)
       end
     end
@@ -71,7 +71,7 @@ local states = {
     for y = 0, D - 1 do
       for x = 0, W - 1 do
         local n = px.tile_noise(x, y * 4 // 3, 4, T, 120 + v)
-        local col = n > 0.6 and c("stone", 3) or (n > 0.3 and c("ink", 3) or c("ink", 2))
+        local col = n > 0.6 and c("stone", 3) or (n > 0.3 and c("ink", 4) or c("ink", 2))
         if x % 4 == 1 and y % 3 ~= 0 then col = c("wood", 1) end
         cv:set(x, y, col)
       end
@@ -91,7 +91,7 @@ local function finish(cv, v, winter)
     for y = 0, D - 1 do
       for x = 0, W - 1 do
         local n = px.tile_noise(x, y * 4 // 3, 4, T, 130 + v) + (x % 4 == 0 and 0.2 or 0)
-        if n > 0.7 then cv:set(x, y, n > 0.85 and c("stone", 6) or c("stone", 5)) end
+        if n > 0.7 then cv:set(x, y, n > 0.85 and c("stone", 7) or c("stone", 6)) end
       end
     end
   end

@@ -31,7 +31,7 @@ return function(px)
     cv:each_ellipse(cx, cy, rx, ry, function(xx, yy, d)
       if d < 0.8 + px.noise(xx, yy, 3, seed) * 0.35 then
         local n = px.noise(xx, yy, 2, seed + 1)
-        local col = n > 0.68 and c("stone", 4) or (n > 0.45 and c("stone", 3) or (n > 0.25 and c("wood", 1) or c("ink", 3)))
+        local col = n > 0.68 and c("stone", 4) or (n > 0.45 and c("stone", 3) or (n > 0.25 and c("wood", 1) or c("ink", 4)))
         if yy - cy < -ry * 0.4 and n > 0.45 then col = px.shift(col, 1) end
         cv:set(xx, yy, col)
       end

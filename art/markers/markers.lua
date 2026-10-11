@@ -26,10 +26,10 @@ px.save_frames(64, 48, frames, tags, here .. "/army_marker.aseprite")
 
 -- The player: a jade ring round the feet and a gold chevron over the head.
 local ring = px.canvas(16, 24)
-ring:each_ellipse(8, 21, 7, 2.6, function(x, y, d) if d > 0.68 then ring:set(x, y, c("jade", 3)) end end)
+ring:each_ellipse(8, 21, 7, 2.6, function(x, y, d) if d > 0.68 then ring:set(x, y, c("jade", 4)) end end)
 local function chevron(dy)
   local cv = px.canvas(16, 24)
-  cv:sprite(6, 2 + dy, { "#####", ".###.", "..#.." }, { ["#"] = c("gold", 4) })
+  cv:sprite(6, 2 + dy, { "#####", ".###.", "..#.." }, { ["#"] = c("gold", 6) })
   cv:outline(5, 1 + dy, 7, 5, c("ink", 1))
   return cv
 end

@@ -62,14 +62,15 @@ end
 ramps:saveAs(here .. "/ramps.aseprite")
 ramps:close()
 
--- Detail, each mark as { dx, dy, colour } from its root at (2, 3); a step of the ground's ramp is
--- the ink ramp's colour of that step.
-local function step(n) return c("ink", n + 1) end
+-- Detail, each mark as { dx, dy, colour } from its root at (2, 3); step n of the ground's ramp,
+-- from 0, is the ink ramp's colour INK_STEPS[n + 1], which world_art/ground.gd reads back.
+local INK_STEPS = { 1, 2, 4, 5 }
+local function step(n) return c("ink", INK_STEPS[n + 1]) end
 local marks = {
   { "tuft", { { 0, 0, step(0) }, { -1, -1, step(0) }, { 1, -1, step(0) }, { 0, -1, step(3) } } },
-  { "flower", { { 0, 0, c("violet", 4) }, { 0, 1, step(0) } },
-    { { 0, 0, c("amber", 5) }, { 0, 1, step(0) } },
-    { { 0, 0, c("robe", 3) }, { 0, 1, step(0) } } },
+  { "flower", { { 0, 0, c("violet", 5) }, { 0, 1, step(0) } },
+    { { 0, 0, c("amber", 7) }, { 0, 1, step(0) } },
+    { { 0, 0, c("robe", 7) }, { 0, 1, step(0) } } },
   { "litter", { { 0, 0, step(0) }, { 1, -1, step(0) }, { -1, -1, step(2) } } },
   { "reed", { { 0, 0, step(1) }, { 0, -1, step(1) }, { 0, -2, step(1) }, { 0, -3, step(3) } } },
 }

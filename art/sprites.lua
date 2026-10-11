@@ -37,26 +37,26 @@ return function(px)
   -- and the robe value; the hair and skin ramps are shared.
   S.schemes = {
     orthodox = {
-      R = c("robe", 3), M = c("robe", 2), D = c("robe", 1), A = c("azure", 3), P = c("stone", 3),
-      F = c("ink", 2), X = c("azure", 3), x = c("azure", 2), Y = c("azure", 1),
+      R = c("robe", 7), M = c("robe", 4), D = c("robe", 3), A = c("azure", 4), P = c("stone", 3),
+      F = c("ink", 2), X = c("azure", 4), x = c("azure", 2), Y = c("azure", 1),
     },
     demonic = {
-      R = c("ink", 4), M = c("ink", 3), D = c("ink", 2), A = c("crimson", 4), P = c("ink", 2),
-      F = c("ink", 1), X = c("crimson", 4), x = c("crimson", 3), Y = c("crimson", 2),
-      E = c("crimson", 5),
+      R = c("ink", 5), M = c("ink", 4), D = c("ink", 2), A = c("crimson", 5), P = c("ink", 2),
+      F = c("ink", 1), X = c("crimson", 5), x = c("crimson", 4), Y = c("crimson", 2),
+      E = c("crimson", 6),
     },
     unorthodox = {
-      R = c("earth", 4), M = c("earth", 3), D = c("earth", 2), A = c("amber", 4), P = c("wood", 3),
-      F = c("ink", 2), X = c("earth", 6), x = c("earth", 5), Y = c("amber", 3),
+      R = c("earth", 4), M = c("earth", 3), D = c("earth", 2), A = c("amber", 5), P = c("wood", 3),
+      F = c("ink", 2), X = c("earth", 6), x = c("earth", 5), Y = c("amber", 4),
     },
     villager = {
-      R = c("cloth", 3), M = c("cloth", 2), D = c("cloth", 1), A = c("wood", 4), P = c("cloth", 1),
-      F = c("wood", 2), X = c("cloth", 4), x = c("cloth", 3), Y = c("wood", 3),
+      R = c("cloth", 4), M = c("cloth", 3), D = c("cloth", 2), A = c("wood", 4), P = c("cloth", 2),
+      F = c("wood", 2), X = c("cloth", 6), x = c("cloth", 4), Y = c("wood", 3),
     },
   }
   local shared = {
-    H = c("ink", 2), h = c("ink", 1), S = c("skin", 4), s = c("skin", 3), E = c("ink", 1),
-    W = c("stone", 5), w = c("stone", 4),
+    H = c("ink", 2), h = c("ink", 1), S = c("skin", 6), s = c("skin", 4), E = c("ink", 1),
+    W = c("stone", 6), w = c("stone", 4),
   }
 
   local function scheme(name, over)
@@ -70,47 +70,47 @@ return function(px)
 
   local weapons = {
     sword = function(cv, x, y)
-      cv:vline(x, y - 7, 7, c("stone", 6)); cv:vline(x + 1, y - 6, 6, c("stone", 4))
-      cv:hline(x - 1, y, 4, c("gold", 3))
+      cv:vline(x, y - 7, 7, c("stone", 7)); cv:vline(x + 1, y - 6, 6, c("stone", 4))
+      cv:hline(x - 1, y, 4, c("gold", 4))
     end,
     sword_strike = function(cv, x, y)
-      for k = 0, 7 do cv:set(x + 1 + k, y - k // 2, c("stone", 6)); cv:set(x + 1 + k, y - k // 2 + 1, c("stone", 4)) end
-      cv:vline(x, y - 1, 3, c("gold", 3))
+      for k = 0, 7 do cv:set(x + 1 + k, y - k // 2, c("stone", 7)); cv:set(x + 1 + k, y - k // 2 + 1, c("stone", 4)) end
+      cv:vline(x, y - 1, 3, c("gold", 4))
     end,
     saber = function(cv, x, y)
-      cv:vline(x, y - 6, 6, c("stone", 5)); cv:vline(x + 1, y - 7, 6, c("stone", 4))
-      cv:set(x + 1, y - 8, c("stone", 5)); cv:hline(x - 1, y, 3, c("crimson", 3))
+      cv:vline(x, y - 6, 6, c("stone", 6)); cv:vline(x + 1, y - 7, 6, c("stone", 4))
+      cv:set(x + 1, y - 8, c("stone", 6)); cv:hline(x - 1, y, 3, c("crimson", 4))
     end,
     saber_strike = function(cv, x, y)
       for k = 0, 6 do
-        cv:set(x + 1 + k, y - 2 + (k * k) // 12, c("stone", 6))
+        cv:set(x + 1 + k, y - 2 + (k * k) // 12, c("stone", 7))
         cv:set(x + 1 + k, y - 1 + (k * k) // 12, c("stone", 4))
       end
-      cv:vline(x, y - 1, 3, c("crimson", 3))
+      cv:vline(x, y - 1, 3, c("crimson", 4))
     end,
     spear = function(cv, x, y)
-      cv:vline(x, y - 9, 13, c("wood", 4)); cv:set(x, y - 10, c("stone", 6)); cv:set(x, y - 11, c("stone", 5))
-      cv:set(x - 1, y - 9, c("crimson", 4))
+      cv:vline(x, y - 9, 13, c("wood", 4)); cv:set(x, y - 10, c("stone", 7)); cv:set(x, y - 11, c("stone", 6))
+      cv:set(x - 1, y - 9, c("crimson", 5))
     end,
     staff = function(cv, x, y) cv:vline(x, y - 9, 14, c("wood", 4)); cv:vline(x, y - 9, 2, c("wood", 5)) end,
-    knife = function(cv, x, y) cv:vline(x, y - 3, 3, c("stone", 6)); cv:set(x, y, c("wood", 3)) end,
+    knife = function(cv, x, y) cv:vline(x, y - 3, 3, c("stone", 7)); cv:set(x, y, c("wood", 3)) end,
     knife_strike = function(cv, x, y)
-      cv:hline(x + 1, y - 1, 4, c("stone", 6)); cv:set(x, y - 1, c("wood", 3))
+      cv:hline(x + 1, y - 1, 4, c("stone", 7)); cv:set(x, y - 1, c("wood", 3))
     end,
     fan = function(cv, x, y)
-      cv:hline(x, y - 2, 4, c("amber", 5)); cv:hline(x, y - 1, 4, c("amber", 4)); cv:set(x, y, c("wood", 3))
+      cv:hline(x, y - 2, 4, c("amber", 7)); cv:hline(x, y - 1, 4, c("amber", 5)); cv:set(x, y, c("wood", 3))
     end,
     torch = function(cv, x, y)
       cv:vline(x, y - 5, 7, c("wood", 3)); cv:rect(x - 1, y - 8, 3, 3, c("fire", 3))
       cv:set(x, y - 7, c("fire", 5)); cv:set(x, y - 9, c("fire", 4)); cv:set(x - 1, y - 8, c("fire", 2))
     end,
     palm = function(cv, x, y)
-      cv:hline(x + 1, y - 1, 3, c("skin", 4)); cv:hline(x + 1, y, 3, c("skin", 3))
-      cv:set(x + 4, y - 1, c("skin", 4))
+      cv:hline(x + 1, y - 1, 3, c("skin", 6)); cv:hline(x + 1, y, 3, c("skin", 4))
+      cv:set(x + 4, y - 1, c("skin", 6))
     end,
     bow = function(cv, x, y)
       for k = -5, 5 do cv:set(x + 2 - (k * k) // 10, y + k, c("wood", 4)) end
-      cv:vline(x - 1, y - 5, 11, c("paper", 2))
+      cv:vline(x - 1, y - 5, 11, c("paper", 4))
     end,
   }
 
@@ -151,18 +151,18 @@ return function(px)
   -- A faction banner on a pole, base at (x, y).
   function S.banner(cv, x, y, ramp)
     cv:vline(x, y - 16, 17, c("wood", 4)); cv:vline(x + 1, y - 16, 17, c("wood", 2))
-    cv:set(x, y - 17, c("gold", 4))
+    cv:set(x, y - 17, c("gold", 6))
     for yy = 0, 9 do
       local w = 7 - (yy > 6 and (yy - 6) * 2 or 0)
       for xx = 0, w - 1 do
-        local col = c(ramp, 3)
-        if xx == 0 or yy == 0 then col = c(ramp, 4) end
+        local col = c(ramp, 4)
+        if xx == 0 or yy == 0 then col = c(ramp, 5) end
         if xx >= w - 2 then col = c(ramp, 2) end
         cv:set(x + 2 + xx, y - 15 + yy + (xx // 4), col)
       end
     end
     -- A glyph-like mark, a stroke and a dot.
-    cv:vline(x + 5, y - 13, 5, c("paper", 3)); cv:hline(x + 4, y - 11, 3, c("paper", 3))
+    cv:vline(x + 5, y - 13, 5, c("paper", 6)); cv:hline(x + 4, y - 11, 3, c("paper", 6))
     cv:outline(x - 1, y - 18, 12, 20, INK)
   end
 
@@ -189,13 +189,13 @@ return function(px)
         end
         cv:rect(bx, by + 1, 2, 2, map.R)
         cv:set(bx + 1, by + 2, map.A)
-        cv:set(bx + 2, by + 1, c("stone", 5))
+        cv:set(bx + 2, by + 1, c("stone", 6))
       end
     end
     cv:outline(x, y - 3, w + 2, h + 4, INK)
     S.banner(cv, x + w // 2 - 4, y + 1, ramp)
     -- Bracket corners frame the block as one marker.
-    local bc = c(ramp, 4)
+    local bc = c(ramp, 5)
     for _, p in ipairs({ { x - 3, y - 5, 1, 1 }, { x + w + 2, y - 5, -1, 1 }, { x - 3, y + h + 3, 1, -1 }, { x + w + 2, y + h + 3, -1, -1 } }) do
       cv:hline(math.min(p[1], p[1] + p[3] * 3), p[2], 4, bc)
       cv:vline(p[1], math.min(p[2], p[2] + p[4] * 3), 4, bc)

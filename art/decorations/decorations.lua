@@ -24,7 +24,7 @@ local function paving(cv, v)
       local col = c("stone", 4)
       if sx == 0 or y % 6 == 0 then col = c("stone", 3) end
       local slab = px.hash((x + (course % 2) * 4) // 8, course, 40 + v)
-      if sx ~= 0 and y % 6 ~= 0 and slab > 0.75 then col = c("stone", 5) end
+      if sx ~= 0 and y % 6 ~= 0 and slab > 0.75 then col = c("stone", 6) end
       if sx ~= 0 and y % 6 ~= 0 and px.hash(x, y, 41 + v) > 0.96 then col = c("stone", 3) end
       cv:set(x, y, col)
     end
@@ -51,8 +51,8 @@ local function field(cv, v, crop)
       local soil = x % 4 == 0
       local col
       if crop == "millet" then
-        col = soil and c("earth", 2) or (((y + x // 4 + v) % 3 == 0) and c("amber", 5) or c("amber", 4))
-        if not soil and px.hash(x, y, 60 + v) > 0.85 then col = c("amber", 3) end
+        col = soil and c("earth", 2) or (((y + x // 4 + v) % 3 == 0) and c("amber", 7) or c("amber", 5))
+        if not soil and px.hash(x, y, 60 + v) > 0.85 then col = c("amber", 4) end
       else
         col = soil and c("water", 3) or (((y + x // 4 + v) % 3 == 0) and c("grass", 6) or c("grass", 5))
       end
@@ -93,27 +93,27 @@ px.save_frames(T, 24, banners, banner_tags, here .. "/banner.aseprite")
 -- two read apart at a glance.
 local function sect_banner(cv, ramp)
   local x = 3
-  cv:rect(x - 1, 29, 4, 3, c("stone", 4)); cv:hline(x - 1, 29, 4, c("stone", 5))
+  cv:rect(x - 1, 29, 4, 3, c("stone", 4)); cv:hline(x - 1, 29, 4, c("stone", 6))
   cv:vline(x, 2, 27, c("wood", 4)); cv:vline(x + 1, 2, 27, c("wood", 2))
-  cv:set(x, 0, c("stone", 6)); cv:set(x, 1, c("stone", 5)); cv:set(x + 1, 1, c("stone", 4))
+  cv:set(x, 0, c("stone", 7)); cv:set(x, 1, c("stone", 6)); cv:set(x + 1, 1, c("stone", 4))
   cv:hline(x, 3, 10, c("wood", 4)); cv:hline(x + 2, 4, 8, c("wood", 2))
-  cv:set(x + 9, 2, c("gold", 4))
+  cv:set(x + 9, 2, c("gold", 6))
   local top, bottom = 5, 21
   for yy = top, bottom do
     for xx = x + 3, x + 9 do
-      local col = c("paper", 3)
-      if xx == x + 3 or yy == top then col = c(ramp, 4) end
+      local col = c("paper", 6)
+      if xx == x + 3 or yy == top then col = c(ramp, 5) end
       if xx == x + 9 or yy == bottom then col = c(ramp, 2) end
-      if xx == x + 8 and yy > top and yy < bottom then col = c("paper", 2) end
+      if xx == x + 8 and yy > top and yy < bottom then col = c("paper", 4) end
       cv:set(xx, yy, col)
     end
   end
   -- The swallowtail: the cloth's foot cut in two points.
   for xx = x + 3, x + 9 do
-    if xx ~= x + 6 then cv:set(xx, bottom + 1, xx < x + 6 and c(ramp, 3) or c(ramp, 2)) end
+    if xx ~= x + 6 then cv:set(xx, bottom + 1, xx < x + 6 and c(ramp, 4) or c(ramp, 2)) end
   end
-  cv:set(x + 3, bottom + 2, c(ramp, 3)); cv:set(x + 9, bottom + 2, c(ramp, 2))
-  cv:set(x + 3, bottom + 3, c("gold", 3)); cv:set(x + 9, bottom + 3, c("gold", 3))
+  cv:set(x + 3, bottom + 2, c(ramp, 4)); cv:set(x + 9, bottom + 2, c(ramp, 2))
+  cv:set(x + 3, bottom + 3, c("gold", 4)); cv:set(x + 9, bottom + 3, c("gold", 4))
   -- Two characters, brushed in ink.
   cv:hline(x + 5, 8, 3, c("ink", 1)); cv:vline(x + 6, 7, 5, c("ink", 1)); cv:set(x + 5, 11, c("ink", 1))
   cv:hline(x + 5, 14, 3, c("ink", 1)); cv:vline(x + 5, 15, 3, c("ink", 1)); cv:vline(x + 7, 15, 3, c("ink", 1))
