@@ -50,7 +50,7 @@ const CULT_VILLAGE := 1
 # The region's first Unorthodox village.
 const UNORTHODOX_VILLAGE := 2
 const VILLAGE_TICKS := 600
-# Years the region is lived, in five-tick days, before its rumours are read.
+# Years the region is lived, in five-tick days, before its realms, arts and rumours are read.
 const LIVED_YEARS := 10
 # Ticks in a day of the region's calendar.
 const TICKS_PER_DAY := 1800
@@ -119,23 +119,25 @@ func run() -> bool:
 	var kin_pass := _kin_pass()
 	var economy_pass := _economy_pass()
 	var sects_pass := _sects_pass()
-	var play_loop_pass := _play_loop_pass()
-	var qi_pass := _qi_pass()
-	var lessons_pass := _lessons_pass()
+	# Lived once for the three checks that read it, none of which ticks it further.
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
+	for i in LIVED_YEARS * 120 * 5:
+		lived.tick()
+	var play_loop_pass := _play_loop_pass(lived)
+	var qi_pass := _qi_pass(lived)
+	var lessons_pass := _lessons_pass(lived)
 	var event_people_pass := _event_people_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
 
-# A region lived ten years of five-tick days reads its realms, and a person who knows an art reads its
-# qi within its store, a realm among them, its nature, and its skills: its army's first, priced at no qi,
-# then its art skills, named, with their cost and nature. Control: a world from create() has no realms,
-# and its people hold no qi, know no art and read only their army's skills.
-func _qi_pass() -> bool:
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
-		lived.tick()
+# `lived`, a region lived ten years of five-tick days, reads its realms, and a person who knows an
+# art reads its qi within its store, a realm among them, its nature, and its skills: its army's
+# first, priced at no qi, then its art skills, named, with their cost and nature. Control: a world
+# from create() has no realms, and its people hold no qi, know no art and read only their army's
+# skills.
+func _qi_pass(lived: WorldAdapter) -> bool:
 	var realms := lived.realms()
 	var learned := -1
 	for army in lived.army_count():
@@ -195,15 +197,12 @@ func _event_people_pass() -> bool:
 	return passed
 
 
-# A region lived ten years of five-tick days reads its arts, each named with its skills, and a person's
-# art skill names its index among its art's skills, the skill arts() names alike. Its progress gives
-# each skill learned with its person, art, skill and how it was learned, and each realm gained with
-# its person and a rank the person has reached, while none of its events names an art. Control: a
-# world from create() has no arts.
-func _lessons_pass() -> bool:
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
-		lived.tick()
+# `lived`, a region lived ten years of five-tick days, reads its arts, each named with its skills,
+# and a person's art skill names its index among its art's skills, the skill arts() names alike. Its
+# progress gives each skill learned with its person, art, skill and how it was learned, and each
+# realm gained with its person and a rank the person has reached, while none of its events names an
+# art. Control: a world from create() has no arts.
+func _lessons_pass(lived: WorldAdapter) -> bool:
 	var arts := lived.arts()
 	var right: bool = arts.size() == 3 and arts[0].korean == "매화검법" and arts[0].romanised == "Plum Blossom Sword" \
 			and arts[0].skills.size() == 3 and arts[0].skills[1].korean == "이십사수매화검법" and arts[0].skills[1].rank == 3 \
@@ -565,12 +564,12 @@ func _core_run() -> PackedStringArray:
 # Born into the region's Cult village 1, the player may join its sect: application_refusal reads
 # APPLICATION_NONE, apply makes it a member and applying again reads APPLICATION_IN_A_SECT and is
 # refused. Control: born into Unorthodox village 2, the player is refused as APPLICATION_UNPROVEN
-# and stays out. Lived ten years of five-tick days, the region's rumours reach the player, newest
-# first, each of a kind the adapter names, at a cell of the map, and naming records the world holds:
-# a birth one no older than the years lived, a death one with no health. Attainment reads
-# one value per discipline the region names, the five of its rules of life, and a sect's founding
-# master 120 in one; a world from create() names no discipline.
-func _play_loop_pass() -> bool:
+# and stays out. In `lived`, the region lived ten years of five-tick days, its rumours reach the
+# player, newest first, each of a kind the adapter names, at a cell of the map, and naming records
+# the world holds: a birth one no older than the years lived, a death one with no health. Attainment
+# reads one value per discipline the region names, the five of its rules of life, and a sect's
+# founding master 120 in one; a world from create() names no discipline.
+func _play_loop_pass(lived: WorldAdapter) -> bool:
 	var world := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
 	var player := world.roster(world.army_count() - 1)[0]
 	var sect := -1
@@ -596,9 +595,6 @@ func _play_loop_pass() -> bool:
 	var refused := set_up \
 			and other.application_refusal(outsider, other_sect) == WorldAdapter.APPLICATION_UNPROVEN \
 			and not other.apply(outsider, other_sect) and other.person_sect(outsider) == -1
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in LIVED_YEARS * 120 * 5:
-		lived.tick()
 	var heard := lived.rumours(lived.roster(lived.army_count() - 1)[0])
 	var kinds := ["founded", "raided", "ruined", "sect_fell", "leader_changed", "born", "died"]
 	var rows := lived.map_rows()
