@@ -686,15 +686,15 @@ TEST(World, InputJustPastALimitIsRefused) {
 }
 
 // Whether a world of `people` people, standing on a map twice as wide as
-// the open one, is created.
-bool populated(std::size_t people) {
+// the open one, is created under `rules`.
+bool populated(std::size_t people, const Rules& rules = peaceful(0)) {
   const std::vector<std::string> rows = open_map(OPEN_SIDE * 2);
   try {
     const World world{Seed{1},
                       Map{rows},
                       {army(rows, {0, 0}, {0, 0}, people, 1, 0, {IDLE})},
                       {},
-                      peaceful(0)};
+                      rules};
   } catch (const std::invalid_argument&) {
     return false;
   }
@@ -705,6 +705,45 @@ TEST(World, AWorldHoldsNoMoreThanMaxPeople) {
   EXPECT_FALSE(populated(MAX_PEOPLE + 1));
   // Control: as many as a world may hold are accepted.
   EXPECT_TRUE(populated(MAX_PEOPLE));
+}
+
+// peaceful(0) with a capacity of `capacity` people.
+Rules with_capacity(std::size_t capacity) {
+  Rules rules = peaceful(0);
+  rules.people_capacity = capacity;
+  return rules;
+}
+
+TEST(World, AWorldHoldsNoMoreThanTheCapacityItsRulesSet) {
+  constexpr std::size_t CAPACITY = MAX_PEOPLE + 10;
+  EXPECT_FALSE(populated(CAPACITY + 1, with_capacity(CAPACITY)));
+  // Control: as many as the capacity are accepted, past MAX_PEOPLE.
+  EXPECT_TRUE(populated(CAPACITY, with_capacity(CAPACITY)));
+  // A capacity past the ceiling is refused, however few live.
+  EXPECT_FALSE(populated(1, with_capacity(PEOPLE_CEILING + 1)));
+  // Control: the ceiling itself is accepted.
+  EXPECT_TRUE(populated(1, with_capacity(PEOPLE_CEILING)));
+}
+
+TEST(World, ACapacityOtherThanMaxPeopleChangesTheHash) {
+  const std::vector<std::string> rows = open_map(OPEN_SIDE);
+  const auto hashed = [&rows](std::size_t capacity) {
+    return World{Seed{1},
+                 Map{rows},
+                 {army(rows, {0, 0}, {0, 0}, 1, 1, 0, {IDLE})},
+                 {},
+                 with_capacity(capacity)}
+        .hash();
+  };
+  EXPECT_NE(hashed(MAX_PEOPLE + 1), hashed(MAX_PEOPLE));
+  // Control: the default capacity hashes as a world whose rules never set one.
+  EXPECT_EQ(hashed(MAX_PEOPLE),
+            (World{Seed{1},
+                   Map{rows},
+                   {army(rows, {0, 0}, {0, 0}, 1, 1, 0, {IDLE})},
+                   {},
+                   peaceful(0)}
+                 .hash()));
 }
 
 TEST(World, AreaSkillWalksAStructureThroughEveryStage) {

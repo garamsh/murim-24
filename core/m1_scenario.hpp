@@ -12,8 +12,13 @@ namespace murim {
 /// Ticks the simulation runs per second.
 constexpr int TICKS_PER_SECOND = 30;
 
+/// The capacity the M1 scenario's rules set: MAX_PEOPLE with a quarter more
+/// for headroom, so the bench can tell a world that fills it from one that
+/// fits.
+constexpr std::size_t M1_CAPACITY = 625;
+
 /// The M1 benchmark scenario, built from a fixed seed: the worst case for
-/// the tick budget, as many people as a world may hold, MAX_PEOPLE, every
+/// the tick budget, MAX_PEOPLE people under a capacity of M1_CAPACITY, every
 /// one of them in one battle of two hostile lines of armies with a barricade
 /// between them, and two caster armies whose area strikes break it.
 struct M1Scenario {

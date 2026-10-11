@@ -640,8 +640,13 @@ enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
 /// units; it keeps the products of their squares within 64 bits.
 constexpr std::int32_t MAX_REACH = std::int32_t{1} << 26;
 
-/// The most living people a world may hold.
+/// The most living people a world holds unless its rules set another
+/// capacity (ADR 0017).
 constexpr std::size_t MAX_PEOPLE = 500;
+
+/// The highest capacity for the living a world's rules may set: every
+/// person's strike landing on one body in a tick still fits 64 bits.
+constexpr std::size_t PEOPLE_CEILING = std::size_t{1} << 20;
 
 /// The most health one person may have.
 constexpr std::uint64_t MAX_HEALTH = std::uint64_t{1} << 43;
@@ -1018,6 +1023,10 @@ struct Rules {
   /// reach, closes on the nearest foe: at home, one inside its village's
   /// claim, and on the march any; 0 for none.
   std::int32_t sight = 0;
+  /// The core's capacity for the living, the most people the world holds,
+  /// up to PEOPLE_CEILING: a storage and performance limit, not a rule of
+  /// play. Births stop at it, and a world or save with more is refused.
+  std::size_t people_capacity = MAX_PEOPLE;
 };
 
 /// Sub-cell units a person moves per tick.

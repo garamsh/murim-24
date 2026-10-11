@@ -485,6 +485,28 @@ World talkers(std::int32_t reach) {
       rules};
 }
 
+// talkers(3) with a capacity of `capacity` people.
+World with_capacity(std::size_t capacity) {
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.talk_reach = 3;
+  rules.people_capacity = capacity;
+  return World{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}},
+       ArmySpec{{3, 1}, {Recruit{{3, 1}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      rules};
+}
+
+TEST(Save, ALoadedWorldKeepsItsPeopleCapacity) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, with_capacity(2)}, store, SLOT));
+  EXPECT_EQ(loaded(load(store, SLOT)).world.hash(), with_capacity(2).hash());
+  // Control: the capacity is what tells the two apart.
+  EXPECT_NE(with_capacity(2).hash(), with_capacity(MAX_PEOPLE).hash());
+}
+
 TEST(Save, ALoadedWorldKeepsItsTalkReach) {
   MemorySaves store;
   ASSERT_TRUE(save(Saved{std::nullopt, talkers(3)}, store, SLOT));

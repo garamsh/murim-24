@@ -1105,6 +1105,44 @@ TEST(Region, BirthsStopOnceMaxPeopleLive) {
   EXPECT_LT(lived(grown(), SEED, GENERATIONS_YEARS).peak, MAX_PEOPLE);
 }
 
+TEST(Region, BirthsStopAtTheCapacityTheRulesSet) {
+  // As fertile as above, for a few years under a capacity a little above the
+  // founders.
+  RegionData fertile = grown();
+  fertile.life.husbandry.reset();
+  ASSERT_TRUE(fertile.life.kinship.has_value());
+  Kinship kinship = fertile.life.kinship.value_or(Kinship{});
+  kinship.marriage_chance = PER_MILLE;
+  kinship.birth_chance = PER_MILLE;
+  kinship.birth_spacing = 0;
+  fertile.life.kinship = kinship;
+  constexpr std::uint64_t YEARS = 5;
+  constexpr std::size_t ROOM = 20;
+  const auto peak = [&fertile](std::optional<std::size_t> room) {
+    Region region = generate_region(SEED, fertile);
+    region.rules.ticks_per_day = 1;
+    std::size_t founders = 0;
+    for (const ArmySpec& army : region.armies) {
+      founders += army.members.size();
+    }
+    if (room) {
+      region.rules.people_capacity = founders + *room;
+    }
+    World world = world_of(region);
+    std::size_t most = world.living();
+    for (std::uint64_t day = 0; day < YEARS * DAYS_PER_YEAR; ++day) {
+      world.tick();
+      most = std::max(most, world.living());
+    }
+    return std::pair<std::size_t, std::size_t>{founders, most};
+  };
+  const auto [founders, most] = peak(ROOM);
+  // The bound was met and never passed.
+  EXPECT_EQ(most, founders + ROOM);
+  // Control: under the default capacity the same years pass it.
+  EXPECT_GT(peak(std::nullopt).second, founders + ROOM);
+}
+
 // Whether every child born to a couple bears its father's surname.
 bool fathers_surnames(const Lived& region) {
   for (std::size_t person = 0; person < region.people.size(); ++person) {
