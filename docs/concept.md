@@ -161,6 +161,25 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Nature grows on its own.** Decided by the owner on 2026-10-09 (issue #187). ADR 0056 (`docs/architecture/adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed, designs it.
   - Terrain is a biome, and the trees and fruit on it grow naturally. Today's forest is ground on which trees grow, spread and can be felled.
   - NPCs move, gather and hunt on their own, and can found new villages.
+- **Animals arise where they can live.** Decided by the owner on 2026-10-10 (issue #171). ADR 0067 (`docs/architecture/adr/0067-let-animals-arise-where-food-feeds-them-hunt-them-for-meat-and-materials-and-let-spirit-beasts-hold-territories.md`), proposed, designs it.
+  - An animal appears on its own where its kind can live, at a rate set by the food there: forage for grazers, prey for predators. There are no fixed spawn points, and none appear in deserts without forage or in towns.
+  - Animals do not mate or raise young. Grazers crop forage, which regrows, and predators hunt grazers. Their numbers follow food: a balance of predators, prey and forage, not a cap.
+  - Spirit beasts (영수) are rare, strong animals that hold a territory, attack anyone entering it and never roam beyond it. A spirit beast arises the same way, in a suitable territory left empty, so killing one leaves it empty for a while.
+  - A spirit beast leaves a spirit core (영단), a cultivation item consumed or refined for qi or realm progress, and materials worth more than an ordinary animal's.
+  - Every animal leaves materials when killed, by species as pack data. Meat is food: it feeds the hunter's household and counts as food. Hide, bone and horn feed crafting.
+  - Hunters are a trade, and NPCs hunt for food and materials as the player does.
+  - Decided by the owner on 2026-10-11 (#171): many kinds of creatures, as pack data: grazers, browsers, small game, predators of several sizes, birds and fish where cheap, and spirit beasts. Some kinds move and graze in herds, as one, by simple flocking behind a leader or centre that follows forage. Prey that sees a predator flees toward its group or cover, and predators hunt, chase and give up after a while. The ecosystem balances from forage to grazers to predators, bounded by food with no caps, with no extinction everywhere and no explosion over 100 years. Animals avoid predators and larger groups, giving way when outnumbered, by the same threat appraisal people use.
+- **[proposed]** ADR 0067's details:
+  - grass as a forage slot, a grazer needing 3 of them
+  - predators eating every 16 days, starving after 3 cycles unfed
+  - herds of up to 12 behind their lowest-index member, flocking within 4 cells of their centre
+  - a predator's chase budget of 10 seconds, and in areas not simulated in full a kill chance from the two kinds' speeds
+  - birds and fish as gathered slots, not animals
+  - an appearance chance scaled by the spare food: forage over the grazers' need, prey over the predators'
+  - none appearing in an area holding a village structure
+  - hunting as a livelihood for idle earners within 32 cells, not paid by a treasury, meat eaten at home first
+  - spirit beasts at least 48 cells from every village and 128 from another, holding 12 cells
+  - a spirit core adding its qi up to the talent's limit, or refined by an apothecary into pills
 - **Villages are built from trees and stones.** Trees and stones are world objects, and NPCs build villages from them, automatically. Construction stays NPC-only: the player may gather, but never builds.
 - **Villages grow like WorldBox,** with people and resources: centre first, houses placed outward into suitable ground, expanding, and founding new villages. Villages are larger by default.
 - **[proposed]** ADR 0056's details:
@@ -168,7 +187,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - a village's materials account, with its idle earners assigned to gather what its next building lacks and paid from the treasury
   - buildings rising only as far as their materials are delivered
   - settlers carrying a first house's materials
-  - hunting waiting for animals (#171)
+  - hunting by ADR 0067's animals
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
 - **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
 - **[proposed]** ADR 0063's details (`docs/architecture/adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`):
