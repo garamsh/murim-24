@@ -639,14 +639,14 @@ void validate(const RegionData& data) {
 }  // namespace
 
 RegionData region_data() {
-  // A guard's strike, sweeping an arc at arm's length; a mend that restores
+  // A guard's strike, at one foe at arm's length; a mend that restores
   // the structures within ten cells of where it is used, a village's from its
   // centre; and a torch that burns them, where they belong to a faction its
   // user is hostile to.
   constexpr std::uint64_t GUARD_COOLDOWN = 15;
-  constexpr std::uint64_t GUARD_DAMAGE = 10;
-  constexpr Skill GUARD{MELEE,          0, GUARD_DAMAGE, 0,
-                        GUARD_COOLDOWN, 0, Shape::ARC};
+  constexpr std::uint64_t GUARD_DAMAGE = 15;
+  constexpr Skill GUARD{MELEE,          0, GUARD_DAMAGE,   0,
+                        GUARD_COOLDOWN, 0, Shape::TARGETED};
   constexpr std::int32_t MEND_REACH = 10;
   constexpr std::int32_t MEND_REPAIR = -5;
   constexpr std::uint64_t MEND_COOLDOWN = 30;

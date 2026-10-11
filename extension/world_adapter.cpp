@@ -543,7 +543,7 @@ std::size_t WorldAdapter::structure_index(std::int64_t structure) const {
 
 bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
                          const godot::PackedInt64Array& skills,
-                         std::int64_t challenge) {
+                         std::int64_t challenge, std::int64_t target) {
   // The one handler for the core's refusal: it must not cross into Godot.
   try {
     const godot::Variant cell = objective;
@@ -555,17 +555,52 @@ bool WorldAdapter::order(std::int64_t army, const godot::Vector2i& objective,
     if (challenge >= 0) {
       challenged = narrow<std::size_t>(challenge, "challenge");
     }
+    std::optional<std::size_t> attacked;
+    if (target >= 0) {
+      attacked = narrow<std::size_t>(target, "target");
+    }
     world().order(
         narrow<std::size_t>(army, "army"),
         murim::Order{murim::Cell{narrow<std::int32_t>(cell.get("x"), "x"),
                                  narrow<std::int32_t>(cell.get("y"), "y")},
-                     std::move(chosen)},
+                     std::move(chosen), attacked},
         challenged);
     return true;
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.order: ", error.what());
     return false;
   }
+}
+
+std::int64_t WorldAdapter::attack_refusal(std::int64_t army,
+                                          std::int64_t person) const {
+  if (person < 0) {
+    return static_cast<std::int64_t>(murim::AttackRefusal::NO_TARGET);
+  }
+  return static_cast<std::int64_t>(world().attack_refusal(
+      army_index(army), static_cast<std::size_t>(person)));
+}
+
+std::int64_t WorldAdapter::target(std::int64_t army) const {
+  const std::optional<std::size_t> aimed = world().target(army_index(army));
+  return aimed ? static_cast<std::int64_t>(*aimed) : -1;
+}
+
+void WorldAdapter::end_intent(std::int64_t army) {
+  world().end_intent(army_index(army));
+}
+
+godot::Vector2i WorldAdapter::objective(std::int64_t army) const {
+  const murim::Cell cell = world().objective(army_index(army));
+  return godot::Vector2i{cell.x, cell.y};
+}
+
+godot::PackedInt64Array WorldAdapter::foes_in_sight(std::int64_t person) const {
+  godot::PackedInt64Array seen;
+  for (const std::size_t foe : world().foes_in_sight(person_index(person))) {
+    seen.push_back(static_cast<std::int64_t>(foe));
+  }
+  return seen;
 }
 
 void WorldAdapter::tick() { world().tick(); }
@@ -1282,6 +1317,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::person_skills(
     fields.set("structure_damage", used.structure_damage);
     fields.set("cooldown", static_cast<std::int64_t>(used.cooldown));
     fields.set("qi_cost", used.qi_cost);
+    fields.set("shape", static_cast<std::int64_t>(used.shape));
     fields.set("ready_at",
                static_cast<std::int64_t>(core.ready_at(index, skill)));
     fields.set("art", -1);
@@ -1441,9 +1477,20 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::player_army);
   godot::ClassDB::bind_method(godot::D_METHOD("region_seed"),
                               &WorldAdapter::region_seed);
+  godot::ClassDB::bind_method(godot::D_METHOD("order", "army", "objective",
+                                              "skills", "challenge", "target"),
+                              &WorldAdapter::order, DEFVAL(-1), DEFVAL(-1));
   godot::ClassDB::bind_method(
-      godot::D_METHOD("order", "army", "objective", "skills", "challenge"),
-      &WorldAdapter::order, DEFVAL(-1));
+      godot::D_METHOD("attack_refusal", "army", "person"),
+      &WorldAdapter::attack_refusal);
+  godot::ClassDB::bind_method(godot::D_METHOD("target", "army"),
+                              &WorldAdapter::target);
+  godot::ClassDB::bind_method(godot::D_METHOD("objective", "army"),
+                              &WorldAdapter::objective);
+  godot::ClassDB::bind_method(godot::D_METHOD("end_intent", "army"),
+                              &WorldAdapter::end_intent);
+  godot::ClassDB::bind_method(godot::D_METHOD("foes_in_sight", "person"),
+                              &WorldAdapter::foes_in_sight);
   godot::ClassDB::bind_method(godot::D_METHOD("faction_count"),
                               &WorldAdapter::faction_count);
   godot::ClassDB::bind_method(godot::D_METHOD("leader", "faction"),
@@ -1743,6 +1790,17 @@ void WorldAdapter::_bind_methods() {
       {"TALK_HOSTILE", murim::TalkRefusal::HOSTILE},
   }};
   for (const auto& [constant, refusal] : talks) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(refusal));
+  }
+  const std::array<std::pair<const char*, murim::AttackRefusal>, 5> attacks{{
+      {"ATTACK_NONE", murim::AttackRefusal::NONE},
+      {"ATTACK_NO_MEMBER", murim::AttackRefusal::NO_MEMBER},
+      {"ATTACK_NO_TARGET", murim::AttackRefusal::NO_TARGET},
+      {"ATTACK_NOT_A_FOE", murim::AttackRefusal::NOT_A_FOE},
+      {"ATTACK_OUT_OF_SIGHT", murim::AttackRefusal::OUT_OF_SIGHT},
+  }};
+  for (const auto& [constant, refusal] : attacks) {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }

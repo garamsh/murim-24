@@ -17,11 +17,14 @@ const LONG_NAME_SEED := 18
 # The keys a label shows besides the text it is built with, by its name in `labels`; the notice
 # also shows every challenge verdict, every reason a cast is refused and whether an autosave was
 # written.
+# The widest health the target frame shows, four digits: more than any person of a region has.
+const WIDEST_HEALTH := 9999
 const SHOWN := {
 	"faction": ["FACTION_ORTHODOX", "FACTION_DEMONIC", "FACTION_UNORTHODOX"],
 	"leader_value": ["HUD_LEADER_NONE", "HUD_LEADER_YOU"],
 	"duel_challenger": ["HUD_LEADER_YOU"],
 	"duel_leader": ["HUD_LEADER_YOU"],
+	"target_faction": ["FACTION_ORTHODOX", "FACTION_DEMONIC", "FACTION_UNORTHODOX"],
 	"notice": ["HUD_DUEL_NEW_LEADER", "HUD_DUEL_LEADER_HELD", "HUD_AUTOSAVED", "HUD_AUTOSAVE_FAILED"],
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
@@ -265,6 +268,7 @@ func _layout_pass() -> bool:
 	hud.show_player(world, world.army_count() - 1)
 	hud.show_shortcuts(Play.SHORTCUTS)
 	hud.duel_panel.visible = true
+	hud.target_panel.visible = true
 	var faults := []
 	var checks := 0
 	var moved := true
@@ -533,9 +537,12 @@ func _texts(hud: CanvasLayer, name: String, label: Label, measured: Dictionary) 
 			measured["SEASON_%d" % season] = true
 			seasons.append(hud.season_text({"year": LATEST_YEAR, "season": season}))
 		return seasons
+	if name == "target_health":
+		measured["HUD_TARGET_HEALTH"] = true
+		return [hud.tr("HUD_TARGET_HEALTH") % WIDEST_HEALTH]
 	var keys: Array = SHOWN.get(name, [])
 	if name == "notice":
-		keys = keys + hud.CHALLENGE_KEYS.values() + hud.CAST_KEYS.values()
+		keys = keys + hud.CHALLENGE_KEYS.values() + hud.CAST_KEYS.values() + hud.ATTACK_KEYS.values()
 	elif keys.is_empty() and label.auto_translate_mode != Node.AUTO_TRANSLATE_MODE_DISABLED \
 			and label.text != "":
 		keys = [label.text]

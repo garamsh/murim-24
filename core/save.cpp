@@ -1014,6 +1014,7 @@ class SaveCodec {
               [&out](const Skill& skill) { put_skill(out, skill); });
       put_cell(out, army.order.objective);
       put_sizes(out, army.order.skills);
+      put_index(out, army.order.target);
       put_sizes(out, army.roster);
       out.flag(army.steered);
     });
@@ -1092,13 +1093,14 @@ class SaveCodec {
           get_all<Skill>(input, [&input] { return get_skill(input); });
       const Cell objective = get_cell(input);
       std::vector<std::size_t> order_skills = get_sizes(input);
+      const std::optional<std::size_t> target = get_index(input);
       if (!world.map_.passable(objective)) {
         throw Refusal{LoadError::CORRUPTED};
       }
       std::vector<std::size_t> roster = get_sizes(input);
       return World::Army{faction,
                          std::move(skills),
-                         Order{objective, std::move(order_skills)},
+                         Order{objective, std::move(order_skills), target},
                          FlowField{world.map_, objective},
                          std::move(roster),
                          input.flag()};

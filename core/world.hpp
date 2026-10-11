@@ -567,10 +567,16 @@ struct ArmySpec {
 /// What an army does: march toward `objective`, and at each strike use one
 /// of `skills`, indices into the army's own skills, drawn by the seed. An
 /// army created from an ArmySpec follows its objective with all its skills
-/// until it is given another order.
+/// until it is given another order. With a `target`, an attack intent, its
+/// members close on that person and aim every automatic strike at it. The
+/// core ends the intent when the target dies, stops being a foe of the army's
+/// lead, or leaves every member's sight, and the army then holds where its
+/// lead stands, as it does when a driver ends the intent through
+/// World::end_intent; an order without a target, a move order, replaces it.
 struct Order {
   Cell objective;
   std::vector<std::size_t> skills;
+  std::optional<std::size_t> target = std::nullopt;
 };
 
 /// A breakable object covering `footprint` from `cell`, its top-left cell.
@@ -846,6 +852,21 @@ enum class CastRefusal : std::uint8_t {
   OUT_OF_RANGE,
 };
 
+/// Why an army may not take a person as its attack intent's target, the first
+/// that holds in this order; `NONE` when it may.
+enum class AttackRefusal : std::uint8_t {
+  NONE,
+  /// The army has no living member.
+  NO_MEMBER,
+  /// The person is one the world lacks, or dead.
+  NO_TARGET,
+  /// The person is no foe of the army's lead: an ally, a neutral or one of
+  /// its own.
+  NOT_A_FOE,
+  /// No member of the army has the person within the rules' sight.
+  OUT_OF_SIGHT,
+};
+
 /// Why a person may not talk to another, the first that holds in this order;
 /// `NONE` when it may.
 enum class TalkRefusal : std::uint8_t {
@@ -1100,9 +1121,39 @@ class World {
   /// or the skills are empty or name one the army lacks; or it challenges a
   /// faction with no duel succession or no leader, from an army with no
   /// members, an army of another faction where the duel takes members only,
-  /// with the leader as its lead, or while that faction's duel is fought.
+  /// with the leader as its lead, or while that faction's duel is fought; or
+  /// it names a target attack_refusal() refuses.
   void order(std::size_t army, Order order,
              std::optional<std::size_t> challenge = std::nullopt);
+
+  /// Returns why army `army` may not take person `person` as its attack
+  /// intent's target, which is why order() would refuse that target, or
+  /// AttackRefusal::NONE when it may. Throws std::invalid_argument when there
+  /// is no such army.
+  [[nodiscard]] AttackRefusal attack_refusal(std::size_t army,
+                                             std::size_t person) const;
+
+  /// Returns the person army `army`'s attack intent targets, if it holds
+  /// one. Throws std::out_of_range when there is no such army.
+  [[nodiscard]] std::optional<std::size_t> target(std::size_t army) const;
+
+  /// Returns the cell army `army`'s order marches it toward, which an ended
+  /// attack intent sets to where its lead stands. Throws std::out_of_range
+  /// when there is no such army.
+  [[nodiscard]] Cell objective(std::size_t army) const;
+
+  /// Ends army `army`'s attack intent, if it holds one, as a driver does when
+  /// its player clears the target: the army holds where its lead stands, its
+  /// objective that cell, as when the core ends the intent. Throws
+  /// std::out_of_range when there is no such army.
+  void end_intent(std::size_t army);
+
+  /// Returns the living foes within the rules' sight of person `person`,
+  /// nearest first, the first in index order among equals: those its army
+  /// may take as a target. Empty when the person is dead or serves in no
+  /// army. Throws std::invalid_argument when there is no such person.
+  [[nodiscard]] std::vector<std::size_t> foes_in_sight(
+      std::size_t person) const;
 
   /// Has person `person` use skill `skill`, by index among its skills, its
   /// army's followed by those it knows, at `target` on the next tick, in place
@@ -1514,18 +1565,26 @@ class World {
     bool steered = false;
   };
 
+  /// A crowd slot no person holds.
+  static constexpr std::size_t ABSENT = std::numeric_limits<std::size_t>::max();
+
   /// Every living person as the tick began, indexed together, with the
   /// person and the army of each.
   struct Crowd {
     SpatialHash hash;
     std::vector<std::size_t> people;
     std::vector<std::size_t> armies;
+    /// Each person's index in the crowd, or ABSENT for one not in it.
+    std::vector<std::size_t> slot;
   };
 
   [[nodiscard]] std::uint64_t next_random();
   [[nodiscard]] bool within_reach(const Army& army, const VillageSpec& spec,
                                   std::int32_t reach) const;
   bool shift(std::size_t structure, Destroyer striker, std::int64_t effect);
+  [[nodiscard]] std::optional<std::size_t> aim_of(std::size_t user,
+                                                  const Skill& skill,
+                                                  const Crowd& crowd) const;
   void strike(std::size_t user, const Crowd& crowd,
               const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
@@ -1569,6 +1628,10 @@ class World {
   [[nodiscard]] bool claims(std::size_t village, Cell cell) const;
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
                                             const Crowd& crowd) const;
+  [[nodiscard]] bool sighted(const std::vector<std::size_t>& roster,
+                             Position point) const;
+  void end_intents(const Crowd& crowd);
+  void hold(Army& chasing);
   [[nodiscard]] bool held(std::size_t index, Step pull,
                           const std::vector<bool>& standing,
                           const Crowd& crowd) const;

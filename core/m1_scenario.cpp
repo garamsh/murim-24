@@ -29,12 +29,12 @@ constexpr std::uint32_t DURABILITY = 3'000;
 constexpr std::size_t FACTION_WEST = 0;
 constexpr std::size_t FACTION_EAST = 1;
 
-// A melee strike every half second, sweeping an arc at arm's length, a body
-// and a half, and an area strike every second whose disc reaches the
-// barricade: two caster armies of 25 people make 50 area strikes a second.
+// A melee strike every half second at one foe at arm's length, a body and a
+// half, and an area strike every second whose disc reaches the barricade: two
+// caster armies of 25 people make 50 area strikes a second.
 constexpr std::uint64_t JAB_DAMAGE = 10;
-constexpr Skill JAB{3 * CELL_SIZE / 2,    0, JAB_DAMAGE, 0,
-                    TICKS_PER_SECOND / 2, 0, Shape::ARC};
+constexpr Skill JAB{3 * CELL_SIZE / 2,    0, JAB_DAMAGE,     0,
+                    TICKS_PER_SECOND / 2, 0, Shape::TARGETED};
 constexpr Skill SWEEP{3 * CELL_SIZE, (3 * CELL_SIZE) / 2, JAB_DAMAGE, 1,
                       TICKS_PER_SECOND};
 

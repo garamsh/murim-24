@@ -10,11 +10,16 @@
 ## of its skills, Q to T put it on that slot and Delete takes it off its slot, and F the faction
 ## window, where the arrows choose a faction and an order, Enter gives a leader's order, war asked
 ## again first, through the core's declare port, and C challenges the faction's leader to a duel,
-## with the same order every army follows, when the core allows it. Space talks to the person the
-## HUD's prompt names, the nearest within the core's talk reach, in the dialogue window, where the
-## arrows choose what to ask, Enter asks it and Escape goes back or ends the talk; a person the core
-## says is hostile refuses, as the prompt shows, and the window closes once the core refuses the
-## talk. The loadout is
+## with the same order every army follows, when the core allows it. A left click on a foe selects it
+## as the target, marking it, and on anyone else the core lets the person talk to opens the talk;
+## a left click on the ground or Escape clears the selection, and Tab selects the next foe in sight,
+## nearest first. Space sets an attack intent, as the person's order, on the selection or, with
+## none, the nearest foe in sight: the core has it chase the target and strike it until it dies or
+## leaves sight, a move order, Escape or another selection ends or moves it, and the person stops
+## where it stands once it ends. C talks to the person the HUD's prompt names, the nearest within
+## the core's talk reach, in the dialogue window, where the arrows choose what to ask, Enter asks it
+## and Escape goes back or ends the talk; a person the core says is hostile refuses, as the prompt
+## shows, and the window closes once the core refuses the talk. The loadout is
 ## written beside the save whenever the world is saved, and read with it. The person is the one
 ## the core says carries the player's soul,
 ## found again after a rebirth or a load; when it dies and its soul is born again, the rebirth
@@ -62,8 +67,17 @@ const FACTIONS_KEY := KEY_F
 ## The keys that open a panel over the world and close it again, by the HUD's name for the panel
 ## each opens, which the touch controls' button for it bears too.
 const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions"}
-## The key that talks to the person the prompt names.
-const TALK_KEY := KEY_SPACE
+## The key that talks to the person the prompt names; inside the faction window it challenges.
+const TALK_KEY := KEY_C
+## The key that sets an attack intent on the selected person, or the nearest foe in sight.
+const ATTACK_KEY := KEY_SPACE
+## The key that selects the next foe in sight, nearest first.
+const CYCLE_KEY := KEY_TAB
+## The button that selects the person under the cursor, or talks to it.
+const SELECT_BUTTON := MOUSE_BUTTON_LEFT
+## The box round where a person stands that its body is drawn in, in pixels, as combat.gd brackets
+## it.
+const BODY_BOX := Rect2(-9, -13, 18, 21)
 ## The keys that consume the wares, by their index in WorldAdapter.wares.
 const WARE_KEYS := [KEY_Z, KEY_X]
 ## The key that takes the skill chosen on the arts panel off its slot.
@@ -127,6 +141,10 @@ var _stick_from := Vector2i.ZERO
 var _view_origin := Vector2.ZERO
 # Whether the settings were opened from the pause panel, which going back from them returns to.
 var _settings_from_pause := false
+## The person selected as the target, marked on the HUD and in the world, or -1 for none.
+var selected := -1
+# The person the steered army's attack intent was last read to target, or -1.
+var _intent := -1
 ## The person the talk prompt names, or -1 for none, and whether the core refuses the talk for
 ## hostility, as last read.
 var talk_to := -1
@@ -261,7 +279,8 @@ func navigate(event: InputEvent) -> bool:
 	var tapped := event as InputEventScreenTouch
 	var open: Control = _hud.screen()
 	if open == null:
-		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.panel() != null or _aiming != KEY_NONE:
+		if key == null or not key.pressed or key.keycode != PAUSE_KEY or _hud.panel() != null or _aiming != KEY_NONE \
+				or selected >= 0:
 			return false
 		pause()
 		return true
@@ -393,10 +412,10 @@ func controls() -> Array[Dictionary]:
 		wares += OS.get_keycode_string(keycode)
 	var rows: Array[Dictionary] = [
 		{"keys": ["CONTROLS_CLICK"], "does": "CONTROLS_CLICK_MOVE"},
+		{"keys": ["CONTROLS_LEFT_CLICK", OS.get_keycode_string(TALK_KEY)], "does": "CONTROLS_SELECT"},
+		{"keys": [OS.get_keycode_string(ATTACK_KEY), OS.get_keycode_string(CYCLE_KEY)], "does": "CONTROLS_ATTACK"},
 		{"keys": [casts], "does": "CONTROLS_CAST"},
-		{"keys": [skills], "does": "CONTROLS_SKILL"},
-		{"keys": [OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_ALL_SKILLS"},
-		{"keys": [OS.get_keycode_string(TALK_KEY)], "does": "CONTROLS_TALK"},
+		{"keys": [skills, OS.get_keycode_string(ALL_SKILLS_KEY)], "does": "CONTROLS_SKILL"},
 		{"keys": [wares], "does": "CONTROLS_WARES"},
 	]
 	for row: Dictionary in SHORTCUTS:
@@ -422,6 +441,7 @@ func _process(delta: float) -> void:
 	_view_origin = view.position
 	_hud.touch.body_at = _hud.from_window((drawn_lead() - view.position) * _camera.zoom).round()
 	_hud.refresh(world, steered, _skills)
+	_hud.show_target(world, selected, steered)
 	show_talk()
 	show_names()
 
@@ -449,6 +469,8 @@ func command(event: InputEvent) -> bool:
 	if mouse != null and mouse.button_index == MOVE_BUTTON:
 		_moving = mouse.pressed
 		return mouse.pressed and follow(_cursor)
+	elif mouse != null and mouse.button_index == SELECT_BUTTON:
+		return mouse.pressed and pick(_cursor)
 	elif motion != null:
 		return _moving and follow(_cursor)
 	elif key != null and key.pressed and _hud.panel() != null:
@@ -465,11 +487,19 @@ func command(event: InputEvent) -> bool:
 		_aiming = KEY_NONE
 		_show_aim()
 		return false
+	elif key != null and key.pressed and key.keycode == PAUSE_KEY:
+		select(-1)
+		return false
+	elif key != null and key.pressed and not key.echo and key.keycode == ATTACK_KEY:
+		return attack()
+	elif key != null and key.pressed and key.keycode == CYCLE_KEY:
+		return cycle()
 	elif key != null and key.pressed and (SKILL_KEYS.has(key.keycode) or key.keycode == ALL_SKILLS_KEY):
 		skills = _all_skills() if key.keycode == ALL_SKILLS_KEY else PackedInt64Array([SKILL_KEYS.find(key.keycode)])
 	else:
 		return false
-	if not world.order(steered, objective, skills):
+	# A change of skills keeps the attack intent; only a move order ends it.
+	if not world.order(steered, objective, skills, -1, world.target(steered)):
 		return false
 	_objective = objective
 	_skills = skills
@@ -477,14 +507,114 @@ func command(event: InputEvent) -> bool:
 
 
 ## Orders the person toward the cell under `at`, a position in this node's pixels, keeping its
-## skills, unless it is ordered there already. Returns whether the core accepted an order.
+## skills, unless it is ordered there already and holds no attack intent, which the order ends.
+## Returns whether the core accepted an order.
 func follow(at: Vector2) -> bool:
 	var objective: Vector2i = _art.cell_at(at)
-	if objective == _objective:
+	if objective == _objective and world.target(steered) < 0:
 		return false
 	if not world.order(steered, objective, _skills):
 		return false
 	_objective = objective
+	return true
+
+
+## Works a left click at `at`, a position in this node's pixels: on a foe it selects it, as select()
+## does; on anyone else the core lets the steered person talk to, it opens the talk; on anyone else,
+## it selects them, marking them; and on the ground it clears the selection. Returns whether it
+## selected someone or opened a talk.
+func pick(at: Vector2) -> bool:
+	var person := person_at(at)
+	var roster := world.roster(steered)
+	if person < 0 or roster.is_empty():
+		select(-1)
+		return false
+	var foe := world.attack_refusal(steered, person) != WorldAdapter.ATTACK_NOT_A_FOE
+	if not foe and world.talk_refusal(roster[0], person) == WorldAdapter.TALK_NONE:
+		return talk_with(person)
+	select(person)
+	return true
+
+
+## Returns the living person other than the steered one whose body is drawn under `at`, a position
+## in this node's pixels, the one standing nearest it among several, or -1 for none.
+func person_at(at: Vector2) -> int:
+	var roster := world.roster(steered)
+	var own := roster[0] if not roster.is_empty() else -1
+	var found := -1
+	var nearest := INF
+	for army in world.army_count():
+		for person in world.roster(army):
+			if person == own:
+				continue
+			# The box combat.gd brackets a target's body with, round where it stands.
+			var stands := _to_pixels(world.person_position(person))
+			if not Rect2(stands + BODY_BOX.position, BODY_BOX.size).has_point(at):
+				continue
+			var apart := at.distance_squared_to(stands)
+			if apart < nearest:
+				nearest = apart
+				found = person
+	return found
+
+
+## Selects `person` as the target, or with -1 clears the selection. While the steered army holds
+## an attack intent, the intent moves to the person when the core lets the army attack it, and
+## otherwise the core ends it, the person holding where it stands.
+func select(person: int) -> void:
+	selected = person
+	_art.get_node("Combat").selected = person
+	if world.target(steered) < 0:
+		return
+	if person >= 0 and world.attack_refusal(steered, person) == WorldAdapter.ATTACK_NONE:
+		world.order(steered, _objective, _skills, -1, person)
+		return
+	world.end_intent(steered)
+	_objective = world.objective(steered)
+
+
+## Sets an attack intent on the selected person or, with none, the nearest foe in sight, which it
+## selects, as the steered army's order; the HUD names the core's reason when it refuses the
+## target. Does nothing with no one selected or in sight. Returns whether the core accepted it.
+func attack() -> bool:
+	var roster := world.roster(steered)
+	if roster.is_empty():
+		return false
+	var target := selected
+	if target < 0:
+		var seen := world.foes_in_sight(roster[0])
+		if seen.is_empty():
+			return false
+		target = seen[0]
+	var refusal := world.attack_refusal(steered, target)
+	if refusal != WorldAdapter.ATTACK_NONE:
+		_hud.show_attack(refusal)
+		return false
+	select(target)
+	return world.order(steered, _objective, _skills, -1, target)
+
+
+## Selects the foe in sight after the one selected, nearest first, or the nearest when the one
+## selected is not among them, as select() does. Returns whether it selected anyone.
+func cycle() -> bool:
+	var roster := world.roster(steered)
+	if roster.is_empty():
+		return false
+	var seen := world.foes_in_sight(roster[0])
+	if seen.is_empty():
+		return false
+	select(seen[(seen.find(selected) + 1) % seen.size()])
+	return true
+
+
+## Opens the dialogue window on `person` when the core lets the steered person talk to it.
+## Returns whether it opened.
+func talk_with(person: int) -> bool:
+	var roster := world.roster(steered)
+	if person < 0 or roster.is_empty() or world.talk_refusal(roster[0], person) != WorldAdapter.TALK_NONE:
+		return false
+	_hud.dialogue.open(world, person)
+	_sound.ui("open")
 	return true
 
 
@@ -516,7 +646,24 @@ func cast_at(slot: int, at: Vector2) -> int:
 	if skill < 0:
 		_hud.show_cast(WorldAdapter.CAST_NO_SKILL)
 		return WorldAdapter.CAST_NO_SKILL
-	return cast(skill, _art.to_sub(at))
+	var point: Vector2 = _art.to_sub(at)
+	return cast(skill, _aimed(skill, point - lead()) if _targeted(skill) else point)
+
+
+# Whether the steered person's skill `skill` is targeted, cast at a person alone.
+func _targeted(skill: int) -> bool:
+	var roster := world.roster(steered)
+	return not roster.is_empty() and world.person_skills(roster[0])[skill].shape == WorldAdapter.SHAPE_TARGETED
+
+
+# The person a targeted skill `skill` is cast at: the one selected, or with none, the hostile person
+# the core's aim finds `way`, a direction in sub-cell units; null, which the core refuses as no
+# target, when there is neither.
+func _aimed(skill: int, way: Vector2) -> Variant:
+	if selected >= 0:
+		return selected
+	var aimed := world.aim(world.roster(steered)[0], skill, way.round())
+	return aimed if aimed >= 0 else null
 
 
 # Shows the aimed skill's range round the person and its area at the cursor while a cast key is held
@@ -554,8 +701,9 @@ func _steer(way: Vector2i) -> bool:
 ## Works the HUD's touch controls with `event`, a touch or a drag, while they are shown and a world
 ## is played: the joystick steers the person the nearest of the eight ways it points, a skill button
 ## casts as cast_skill() does, the HUD's buttons do what shortcut() does with their names, opening
-## the genealogy, sect or arts panel or the faction window, or pausing, and where the settings ask, a tap on the ground orders the person to
-## that cell. While a panel is open, a tap works it as its tap() reads it; while the arts panel is,
+## the genealogy, sect or arts panel or the faction window, or pausing, the attack button does what
+## Space does and the next button what Tab does, a tap on a person does what a left click on it
+## does, and where the settings ask, a tap on the ground orders the person to that cell. While a panel is open, a tap works it as its tap() reads it; while the arts panel is,
 ## a tap on a tile chooses its skill, a skill button tapped then puts it on that button's slot, a
 ## finger moved up or down scrolls the tiles and the close button closes it. Returns whether the
 ## touch controls took the event.
@@ -584,11 +732,20 @@ func touch(event: InputEvent) -> bool:
 		"cast":
 			cast_skill(action.slot, action.how, action.get("aim", Vector2.ZERO))
 		"button":
-			shortcut(action.button)
+			match action.button:
+				"attack":
+					attack()
+				"cycle":
+					cycle()
+				_:
+					shortcut(action.button)
 		"world":
-			if _hud.settings.tap_to_move():
-				var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom
-				var cell: Vector2i = _art.cell_at(_view_origin + on_view)
+			var on_view: Vector2 = _hud.to_window(action.at) / _camera.zoom
+			var tapped: Vector2 = _view_origin + on_view
+			# A person tapped is selected or talked to; the ground, cleared of a selection, is walked
+			# to where the settings ask.
+			if not pick(tapped) and person_at(tapped) < 0 and _hud.settings.tap_to_move():
+				var cell: Vector2i = _art.cell_at(tapped)
 				if world.order(steered, cell, _skills):
 					_objective = cell
 	return true
@@ -616,10 +773,13 @@ func cast_skill(slot: int, how: String, aim := Vector2.ZERO) -> int:
 	match how:
 		"tap":
 			# The core reads a facing in whole sub-cell units, so it is given a cell long.
-			var aimed := world.aim(person, skill, (facing.normalized() * WorldAdapter.CELL_SIZE).round())
+			var way := (facing.normalized() * WorldAdapter.CELL_SIZE).round()
+			var aimed := world.aim(person, skill, way)
 			target = aimed if aimed >= 0 else (at + facing.normalized() * reach).floor()
+			if _targeted(skill):
+				target = _aimed(skill, way)
 		"point":
-			target = (at + aim * reach).floor()
+			target = _aimed(skill, aim * reach) if _targeted(skill) else (at + aim * reach).floor()
 	return cast(skill, target)
 
 
@@ -686,15 +846,16 @@ func show_talk() -> void:
 
 
 ## Names the people world_art.gd finds within its reach of the steered person over their heads,
-## while no panel is open; the HUD keeps the talk prompt's slip, over the head of the one it names,
-## clear of names.
+## while no panel is open, the selected one and the one under the cursor first and marked; the HUD
+## keeps the talk prompt's slip, over the head of the one it names, clear of names.
 func show_names() -> void:
 	var people: Array[Dictionary] = []
 	if _hud.panel() == null:
 		for person: Dictionary in _art.near:
 			people.append({"person": person.person, "relation": person.relation,
 				"head": _hud.from_window((person.head - _view_origin) * _camera.zoom).floor()})
-	_hud.show_names(world, people)
+	var hovered := person_at(_cursor) if not _hud.touch.visible and _hud.panel() == null else -1
+	_hud.show_names(world, people, selected, hovered)
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
@@ -719,9 +880,7 @@ func open_panel(keycode: Key) -> bool:
 		FACTIONS_KEY:
 			_hud.factions.show_factions(world, steered, _hud.touch.visible)
 		TALK_KEY:
-			if talk_to < 0 or world.talk_refusal(roster[0], talk_to) != WorldAdapter.TALK_NONE:
-				return false
-			_hud.dialogue.open(world, talk_to)
+			return talk_with(talk_to)
 		_:
 			return false
 	_sound.ui("open")
@@ -847,6 +1006,7 @@ func step() -> void:
 	# reaches.
 	if _stick != Vector2i.ZERO and Vector2i((lead() / WorldAdapter.CELL_SIZE).floor()) != _stick_from:
 		_steer(_stick)
+	_note_intent()
 	var army := world.player_army()
 	# While no body carries the soul, the camera keeps the army it last served in.
 	if army >= 0 and army != steered:
@@ -874,6 +1034,17 @@ func step() -> void:
 		_hud.show_player(world, steered)
 		_hud.rebirth.open(world, _body, roster[0])
 	_body = roster[0]
+
+
+# Clears the selection once its person has died, and once the core has ended the steered army's
+# attack intent, takes the objective the core left it holding, so a move order compares against it.
+func _note_intent() -> void:
+	if selected >= 0 and world.person_health(selected) == 0:
+		select(-1)
+	var intent := world.target(steered)
+	if _intent >= 0 and intent < 0:
+		_objective = world.objective(steered)
+	_intent = intent
 
 
 ## Returns the steered person's position, in sub-cell units, or where it last stood while it has
