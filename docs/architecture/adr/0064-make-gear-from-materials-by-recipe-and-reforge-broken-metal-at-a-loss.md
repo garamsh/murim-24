@@ -146,7 +146,7 @@ Options weighed:
   - **The ground's bound holds.** A break replaces one stack with at most one stack, so no person ever holds or drops more than ADR 0051's 13 stacks, and the worst day stays 985,872 piles under 1,048,576.
   - **Making.** About 1,500 workshops each run at most a batch a worker a day over at most 16 kinds, about 100,000 comparisons a day, about 60 a tick spread over 1,800 ticks.
   - **Memory.** A workshop's carried batch is 4 bytes, about 6 KB. Orders are at most 8 of 8 bytes for each of 512 markets, 32 KB. Recipes are pack data, read at load.
-  - **Markets' kinds.** The base pack's materials and scrap are 12 kinds, within a market's 64.
+  - **Markets' kinds.** The base pack's materials and scrap are 18 kinds, within a market's 64.
 - **Bounds, with refusals.** These are core bounds. A pack past any of them is refused at load with a `ContentRefusal` naming the bound (ADR 0049):
   - at most 8 materials in a recipe
   - at most one scrap kind an item, its count at most the units of its metal in the item's recipe
@@ -176,7 +176,7 @@ The implementation, in order, each a pull request with its acceptance, after ADR
 
 ## Decision
 
-Materials are stacking item kinds of the pack, each naming its metal or none: ore, wood, charcoal, iron, steel, bronze, hide, leather, cloth, and the scrap of each metal. Ore comes from ore veins, a natural-object kind the build tool places at the map's mine sites, gathered by ADR 0056's rule.
+Materials are stacking item kinds of the pack, each naming its metal or none: ore, wood, charcoal, iron, steel, bronze, hide, bone, horn, claw, the spirit beasts' hide, bone and claw, leather, cloth, and the scrap of each metal. Animal and spirit-beast parts are fittings on gear and break into nothing of their own, as the owner decided they are materials. Ore comes from ore veins, a natural-object kind the build tool places at the map's mine sites, gathered by ADR 0056's rule.
 
 Every made kind carries a recipe: its workshop, its materials, its labour in tenths of a worker's day, and its output. Each day a workshop makes, of the kinds it lists, the one lowest against its market's target whose materials are in stock, carrying an unfinished batch over. A village with a market gathers for its market's shortfall as for its own building. A faction's treasury orders gear at its capital's market, which raises the kind's target until the order is filled.
 
@@ -191,7 +191,7 @@ This supersedes ADR 0050's item at no durability being gone, now scrap of its me
 - Smithies, leatherworks and tailors become steady employers, so a town's workshops grow with its wars.
 - Leather and cloth come only by import until #171's game and a fibre crop exist, a cost to every town that the sweep shows.
 - The sum test and the core's recipe check keep metal bounded, whatever a pack's recipes say.
-- The market window lists materials and scrap, which adds 12 rows to a smithy town's market.
+- The market window lists materials and scrap, which adds 18 rows to a smithy town's market.
 
 ## Signs the decision was wrong
 
