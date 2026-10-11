@@ -41,6 +41,13 @@ Each section carries one of the following statuses.
   2. **A wuxia story of one life**: the starting point and the path differ by origin.
   3. **Reincarnation**: the world is never reset.
 - **Principle: the player is also one of the world's NPCs.** There are no player-only rules; the same rules as for NPCs apply (talent, lifespan, and so on). The one exception is caves, which only the player enters (§Gear, wealth and livelihoods).
+- **Principle: realistic scale.** Decided by the owner on 2026-10-10 (issue #227, from #200 and #169). Places, buildings and land follow real proportions, measured against a person, who fills a cell.
+  - **Settlements.** A walled town encloses a real town: at least about 40 × 30 cells inside thick, tall walls, with corner towers, a gate tower over each gate and 2 to 4 gates, around streets, wards, a market square, a hall or yamen, temples and courtyard houses. A major city is larger again, about 80 × 60 cells or more, with inner wards. A village stays unwalled and smaller.
+  - **What the principle covers.** It covers the size of villages, towns and cities and their walls, fields per household, roads by class, river widths, bridges and ferries, sect seats as compounds rather than a hall, and a household's house against a hall.
+  - **Exaggeration** is allowed only where a rule needs it, and is stated where it is made.
+  - **Two scales.** The li of ADR 0047 measures the distance between places. A place's layout patch carries the size of what stands there, at a person's scale. A town of 40 × 30 cells does not move its neighbours 40 li away.
+  - **[proposed]** The reference sizes in `docs/art-direction.md` §Scale, the base pack's proposals in pack data.
+  - **Fields and their yield.** Decided by the PM on #242, 2026-10-11: a household's fields stay at 4 to 8 cells, and the base pack's yield is lowered to about 1 person a cell, so food binds the population.
 - **Principle: simple rules, complex consequences.** Decided by the owner on 2026-10-10 (issue #229). The world runs on simple rules whose consequences combine into complex cause and effect, the way money shapes villages' forms, their growth and each person's life. Our job is to tune the balance, not to script outcomes.
   - **Population has no separate limit: it is bounded by the food that can be had.** Fruit, game and fish regrow, fields yield, and how fast they regrow is what governs how many people the world feeds.
 - **Genre and engine**: 2D RPG, Godot 4.7.
@@ -312,3 +319,9 @@ The items below are not yet decided.
 - The realm names and thresholds, which are data.
 - How much an art of a mismatched nature costs: how much harder to learn, how much weaker to use.
 - Whether a lost manual can be copied.
+- **Realistic scale (#227), for the owner.** Each has options and a recommendation:
+  - **What a cell is at a person's scale.** (a) About 2 metres, a person's height and reach, which the reference sizes assume; (b) about 1.5 metres. Recommended: (a), so a 4 x 3 house is about 8 x 6 m, a rural house of three bays.
+  - **Great rivers.** A real Yellow River or Yangtze is hundreds of cells wide. (a) 16 to 40 cells, crossed by ferries and fords; (b) the real width. Recommended: (a), so the river still reads on one screen.
+  - **Today's house and hall.** The drawn house is 3 x 3 and the hall 5 x 3, against the reference 4 x 3 and 6 x 4. (a) Grow them in the next structure art round; (b) keep them as stated exceptions. Recommended: (a).
+  - **When a village becomes a town.** (a) Only when its growth reaches the walled town's size, as #169's comment says; (b) by population alone. Recommended: (a), which #169 designs.
+  - **Climbing walls.** A town's wall of 2 levels is a drop every realm can climb under ADR 0058, proposed in #223. (a) Walls are structures, never climbed, entered at gates or breached; (b) walls climbed as cliffs of their height. Recommended: (a), so a wall still holds a siege.
