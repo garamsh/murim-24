@@ -21,9 +21,15 @@
 #include <variant>
 #include <vector>
 
+#include "arts.hpp"
+#include "calendar.hpp"
+#include "diplomacy.hpp"
+#include "growth.hpp"
 #include "json_packs.hpp"
 #include "map.hpp"
+#include "person.hpp"
 #include "region.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {

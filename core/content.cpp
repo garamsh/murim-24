@@ -14,9 +14,18 @@
 #include <utility>
 #include <vector>
 
+#include "arts.hpp"
+#include "diplomacy.hpp"
+#include "growth.hpp"
+#include "kinship.hpp"
+#include "leadership.hpp"
 #include "map.hpp"
+#include "names.hpp"
 #include "region.hpp"
-#include "world.hpp"
+#include "skill.hpp"
+#include "talent.hpp"
+#include "trade.hpp"
+#include "village.hpp"
 
 namespace murim {
 namespace {

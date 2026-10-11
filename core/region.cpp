@@ -11,8 +11,13 @@
 #include <utility>
 #include <vector>
 
+#include "calendar.hpp"
+#include "growth.hpp"
+#include "life.hpp"
 #include "map.hpp"
 #include "random.hpp"
+#include "sect.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {

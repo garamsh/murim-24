@@ -18,9 +18,26 @@
 #include <variant>
 #include <vector>
 
+#include "arts.hpp"
+#include "calendar.hpp"
+#include "diplomacy.hpp"
+#include "event.hpp"
 #include "flow_field.hpp"
+#include "growth.hpp"
+#include "kinship.hpp"
+#include "leadership.hpp"
+#include "life.hpp"
+#include "limits.hpp"
 #include "map.hpp"
+#include "person.hpp"
+#include "progress.hpp"
+#include "sect.hpp"
+#include "skill.hpp"
 #include "spatial_hash.hpp"
+#include "talent.hpp"
+#include "talk.hpp"
+#include "trade.hpp"
+#include "village.hpp"
 
 namespace murim {
 namespace {

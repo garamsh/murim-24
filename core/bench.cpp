@@ -14,9 +14,11 @@
 #include <string>
 #include <vector>
 
+#include "limits.hpp"
 #include "live_scenario.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {

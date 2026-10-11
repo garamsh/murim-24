@@ -29,14 +29,30 @@
 #include <variant>
 #include <vector>
 
+#include "arts.hpp"
+#include "calendar.hpp"
 #include "content.hpp"
+#include "diplomacy.hpp"
+#include "event.hpp"
 #include "file_saves.hpp"
 #include "flow_field.hpp"
+#include "growth.hpp"
 #include "json_packs.hpp"
+#include "leadership.hpp"
+#include "life.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "names.hpp"
+#include "person.hpp"
+#include "progress.hpp"
 #include "region.hpp"
 #include "save.hpp"
+#include "sect.hpp"
+#include "skill.hpp"
+#include "talent.hpp"
+#include "talk.hpp"
+#include "trade.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim_godot {

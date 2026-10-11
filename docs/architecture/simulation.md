@@ -5,6 +5,27 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ## Current decisions
 
 - The simulation core is a C++ library in `core/`, with no engine dependency.
+- Its data and the checks on them sit in one file pair per unit, flat in `core/` (ADR 0010), each named for what it holds:
+  - `limits` the bounds a world accepts;
+  - `calendar` the days, seasons and years;
+  - `skill` skills, strikes, casts and their refusals;
+  - `talent` talent and its draws, and souls;
+  - `names` names;
+  - `kinship` marriage and births;
+  - `village` villages, their structures and what they hold;
+  - `growth` how villages grow;
+  - `arts` arts, realms, cultivation, learning and manuals;
+  - `diplomacy` relations, declarations and their refusals;
+  - `trade` wares and trade;
+  - `talk` talk and what a person offers;
+  - `leadership` a faction's lead, duels, admission and elections;
+  - `sect` sects as created, and applying to one;
+  - `event` the world's events;
+  - `progress` people's steps in the martial arts;
+  - `person` a person;
+  - `life` the rules of life that gather the rest.
+
+  `world` holds the World, which keeps the state and runs the rules on each tick, and the rules data it reads.
 - A world is created from a seed, a map of buildable, rough and blocked cells, armies, structures, rules, villages, each faction's leadership and its rules of life. The rules are data: the separation people keep, the hostility between factions by their stances, the floors of the structure stages, the ticks in a day, the sight within which people close on a foe, and the core's capacity for the living. The capacity is a storage and performance limit, not a rule of play: it is ADR 0017's 500, `MAX_PEOPLE`, unless the rules set another, up to `PEOPLE_CEILING`, the most whose strikes on one body in a tick fit 64 bits. Only a scenario measuring a larger world sets it, as a measurement aid; every region keeps 500, until an ADR raises the default with the measurements. It advances one `tick()` at a time.
 - Every NPC is a person: a position, health, a cooldown and a home village or none, its qi, its store of qi and the art skills it knows, the people it married and the children born to it, and what its birth gave it: the tick it was born, its family, its parents, its sex, its given name, its talent and attainment per discipline, its cultivation, a lifespan, and a soul or none; and the silver and wares it holds. A person's identity is its index among the world's people, kept for as long as the world runs, through every army it serves in and after it dies. A world holds at most its rules' capacity of living people, `MAX_PEOPLE`, 500, by default. That is a hard upper bound, not a target.
 - An army is a roster of the living people serving in it, never a count, with an objective, a faction and skills. Every living person stands on exactly one roster. A person who dies leaves its roster but keeps its record, so the dead cost no work on a tick and stay out of the spatial index.
