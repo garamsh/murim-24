@@ -1,11 +1,13 @@
 -- Draws the materials world_art/ground.gd draws the ground from at the 2.5D angle (ADR 0059):
---   ramps.aseprite: a 4 x 1 frame for each kind of ground, in the order world_art/relief.gd's KINDS
---     gives them and tagged by its name, its four colours dark to light, then bank, the earth of a
---     bank's face. Each ramp is stepped from a hue, saturation and lightness by shifting the hue
---     toward blue in the dark steps and toward yellow in the light ones (#212).
+--   ramps.aseprite: a 7 x 1 frame for each kind of ground, in the order world_art/relief.gd's KINDS
+--     gives them and tagged by its name, its seven colours dark to light, then bank, the earth of a
+--     bank's face. Each ramp is built by pixel.lua's build_ramp (ADR 0069) from the colour of its
+--     hue, saturation and lightness, over a narrower span of lightness than a material's, 0.13
+--     down and 0.12 up, and a third of its cool and warm mix, so the ground stays calm under what
+--     stands on it.
 --   detail.aseprite: 5 x 5 frames of the small detail scattered over the ground, its root at (2, 3):
 --     tuft, flower (violet, yellow, white: no red, which on the ground means blood), litter and
---     reed. A pixel in the ink ramp's colours stands for that step, 0 to 3, of the ramp of the
+--     reed. A pixel in INK_STEPS's colours stands for that step, 0, 2, 4 or 6, of the ramp of the
 --     ground the view draws it on; any other colour is drawn as it is.
 -- Run: aseprite --batch --script art/terrain/ground.lua
 
@@ -14,25 +16,24 @@ local px = dofile(here .. "/../pixel.lua")
 local c = px.c
 
 local KINDS = {
-  { "water", { 205, 0.45, 0.42 } },
+  { "water", { 192, 0.42, 0.42 } },
   { "plain", { 100, 0.42, 0.42 } },
-  { "hills", { 80, 0.36, 0.5 } },
+  { "hills", { 72, 0.36, 0.5 } },
   { "forest", { 130, 0.38, 0.27 } },
   { "rock", { 220, 0.12, 0.46 } },
   { "bank", { 28, 0.35, 0.36 } },
 }
 
-local function clamp(v) return math.max(0, math.min(1, v)) end
+-- How far a ground ramp's darkest step lies below its colour in lightness, and its lightest above;
+-- and how far its shadows and lights are mixed toward the cool and warm tints, a third of a
+-- material's, so the ground keeps its own hue.
+local DOWN, UP = 0.13, 0.12
+local COOL, WARM = 0.18, 0.12
+local REACH = 6 / 7
 
--- Step `step`, 0 to 3, of a ramp given as hue, saturation and lightness, as RGB from 0 to 1. A
--- ramp of saturation under 0.1, grey, shifts its hue half as far.
-local function step_of(spec, step)
-  local hue = spec[1] + ({ -22, -8, 6, 14 })[step + 1] * (spec[2] < 0.1 and 0.5 or 1)
-  local s = clamp(spec[2] + ({ 0.04, 0, 0.02, -0.04 })[step + 1])
-  local l = clamp(spec[3] + ({ -0.13, -0.05, 0.04, 0.12 })[step + 1])
+local function hsl_hex(h, s, l)
   local q = l < 0.5 and l * (1 + s) or l + s - l * s
   local p = 2 * l - q
-  local h = (hue % 360) / 360
   local function channel(t)
     t = t % 1
     if t < 1 / 6 then return p + (q - p) * 6 * t end
@@ -40,19 +41,21 @@ local function step_of(spec, step)
     if t < 2 / 3 then return p + (q - p) * (2 / 3 - t) * 6 end
     return p
   end
-  return channel(h + 1 / 3), channel(h), channel(h - 1 / 3)
+  local hue = (h % 360) / 360
+  local function byte(v) return math.floor(v * 255 + 0.5) end
+  return string.format("%02x%02x%02x", byte(channel(hue + 1 / 3)), byte(channel(hue)), byte(channel(hue - 1 / 3)))
 end
 
-local function byte(v) return math.floor(v * 255 + 0.5) end
-
--- Ramps are drawn in RGB: they are hue-shifted, outside the master palette.
-local ramps = Sprite(4, 1, ColorMode.RGB)
+-- Ramps are drawn in RGB: they are outside the master palette.
+local ramps = Sprite(px.STEPS, 1, ColorMode.RGB)
 for n, kind in ipairs(KINDS) do
   if n > 1 then ramps:newEmptyFrame() end
-  local image = Image(4, 1, ColorMode.RGB)
-  for step = 0, 3 do
-    local r, g, b = step_of(kind[2], step)
-    image:drawPixel(step, 0, Color { r = byte(r), g = byte(g), b = byte(b), a = 255 })
+  local h, s, l = kind[2][1], kind[2][2], kind[2][3]
+  local ramp = px.build_ramp(hsl_hex(h, s, l), DOWN / (l * REACH), UP / ((1 - l) * REACH), COOL, WARM)
+  local image = Image(px.STEPS, 1, ColorMode.RGB)
+  for step, hex in ipairs(ramp) do
+    image:drawPixel(step - 1, 0, Color { r = tonumber(hex:sub(1, 2), 16), g = tonumber(hex:sub(3, 4), 16),
+      b = tonumber(hex:sub(5, 6), 16), a = 255 })
   end
   if n == 1 then ramps:deleteCel(ramps.layers[1], 1) end
   ramps:newCel(ramps.layers[1], n, image, Point(0, 0))
@@ -62,8 +65,8 @@ end
 ramps:saveAs(here .. "/ramps.aseprite")
 ramps:close()
 
--- Detail, each mark as { dx, dy, colour } from its root at (2, 3); step n of the ground's ramp,
--- from 0, is the ink ramp's colour INK_STEPS[n + 1], which world_art/ground.gd reads back.
+-- Detail, each mark as { dx, dy, colour } from its root at (2, 3); step 2n of the ground's ramp is
+-- the ink ramp's colour INK_STEPS[n + 1], which world_art/ground.gd reads back.
 local INK_STEPS = { 1, 2, 4, 5 }
 local function step(n) return c("ink", INK_STEPS[n + 1]) end
 local marks = {
