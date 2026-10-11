@@ -1,18 +1,14 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <godot_cpp/classes/font.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
-#include <godot_cpp/variant/array.hpp>
-#include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
-#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
-#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
-#include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -46,12 +42,13 @@ class BodyView : public godot::RefCounted {
  public:
   /// Sets the body atlas: its size in pixels, the first frame of each body
   /// tag in `frames` and of its outline in `outlines`, both in the order
-  /// world_art.gd's BODY_TAGS names them, the atlas's width for one
-  /// faction, where the shadow's slot starts, the sprite set of each
-  /// faction, and the accent of each sprite set.
-  void set_atlas(godot::Vector2 size, const godot::PackedInt64Array& frames,
+  /// world_art.gd's BODY_TAGS names them, then the atlas's width for one
+  /// faction and where the shadow's slot starts, in `slots`, the sprite set
+  /// of each faction, and the accent of each sprite set.
+  void set_atlas(const godot::Vector2& size,
+                 const godot::PackedInt64Array& frames,
                  const godot::PackedInt64Array& outlines,
-                 std::int64_t faction_width, std::int64_t shadow_x,
+                 const godot::Vector2i& slots,
                  const godot::PackedInt64Array& sprite_of_faction,
                  const godot::PackedColorArray& accents);
 
@@ -70,15 +67,15 @@ class BodyView : public godot::RefCounted {
   void set_viewer(std::int64_t army,
                   const godot::PackedInt64Array& relation_of_faction);
 
+  /// Sets the army whose lead carries the player's markers, or -1 for none.
+  void set_steered(std::int64_t army);
   /// Sets whose losses float up: 0 none, 1 the steered person's own and
   /// those its uses struck, 2 every loss.
   void set_damage_numbers(std::int64_t which);
-  /// Sets the army whose lead carries the player's markers, or -1 for none.
-  void set_steered(std::int64_t army);
   /// Sets whether a hit draws blood and whether a hit on or from the
   /// steered person holds bodies and shakes the screen.
-  void set_blood(bool on);
-  void set_hit_stop(bool on);
+  void set_blood(bool shown);
+  void set_hit_stop(bool shown);
   /// Sets the person the player selected, or -1 for none.
   void set_selected(std::int64_t person);
   /// Sets the font damage numbers are drawn in, and its size.
@@ -93,9 +90,10 @@ class BodyView : public godot::RefCounted {
   /// (-1 for none). Returns what GDScript lays as blood: each hit that
   /// bleeds, `bleed_at`, `bleed_dir` and `bleed_seed`, and each drop a
   /// maimed body on screen lets fall, `drip_at` and `drip_shape`.
-  [[nodiscard]] godot::Dictionary note_tick(
-      const godot::Dictionary& snapshot, const godot::PackedInt64Array& died,
-      std::int64_t steered_army, std::int64_t now);
+  [[nodiscard]] godot::Dictionary note_tick(const godot::Dictionary& snapshot,
+                                            const godot::PackedInt64Array& died,
+                                            std::int64_t steered_army,
+                                            std::int64_t now);
 
   /// Packs the bodies within `view`, in pixels, `between` of the way from
   /// the tick before last to the last, at `now` in milliseconds, into
@@ -105,12 +103,12 @@ class BodyView : public godot::RefCounted {
   /// `near_head`, `near_relation` and `near_cells`, and where the steered
   /// lead and the target are drawn, `lead_at` and `target_at`, with `lead`
   /// and `target` false when there is none.
-  [[nodiscard]] godot::Dictionary fill(godot::Rect2 view, double between,
+  [[nodiscard]] godot::Dictionary fill(const godot::Rect2& view, double between,
                                        std::int64_t now);
 
   /// Draws on `canvas_item` the uses of skills, the target's brackets and
   /// the damage numbers shown at the last fill.
-  void draw_effects(godot::RID canvas_item) const;
+  void draw_effects(const godot::RID& canvas_item) const;
 
   /// Returns where body `body` of army `army` stands as drawn, its feet, in
   /// pixels, `between` of the way from where the tick before last left it
@@ -118,7 +116,7 @@ class BodyView : public godot::RefCounted {
   [[nodiscard]] godot::Vector2 body_at(std::int64_t army, std::int64_t body,
                                        double between) const;
   /// Returns where a point in sub-cell units is drawn, in pixels.
-  [[nodiscard]] godot::Vector2 to_screen(godot::Vector2 sub) const;
+  [[nodiscard]] godot::Vector2 to_screen(const godot::Vector2& sub) const;
 
   /// Returns the share of `person`'s pixels drawn white at `now`, how far it
   /// is knocked, in pixels, and how wounded it is drawn: 0, 1 or 2.
@@ -155,20 +153,40 @@ class BodyView : public godot::RefCounted {
   [[nodiscard]] godot::TypedArray<godot::Dictionary> numbers() const;
   [[nodiscard]] godot::TypedArray<godot::Dictionary> shown_numbers(
       std::int64_t now) const;
-  /// Adds a damage number, as a hit at `ms` adds one.
-  void add_number(std::int64_t ms, const godot::String& text, godot::Vector2 at,
-                  bool own, bool mine);
+  /// Adds a damage number, as a hit at `when` adds one.
+  void add_number(std::int64_t when, const godot::String& text,
+                  const godot::Vector2& where, bool own, bool mine);
   /// Sets the view and the time the shown effects are taken at, and where
   /// the target is drawn, as fill() sets them.
-  void show_at(godot::Rect2 view, std::int64_t now, godot::Vector2 target_at);
+  void show_at(const godot::Rect2& view, std::int64_t now,
+               const godot::Vector2& target_at);
   /// Returns the view effects were last shown in, in pixels.
   [[nodiscard]] godot::Rect2 view() const;
 
-  /// Returns a number in [0, 1) from `seed` and `k`, the same for the same
-  /// pair.
-  [[nodiscard]] static double unit(std::int64_t seed, std::int64_t k);
+  /// Returns a number in [0, 1) from `seed` and `salt`, the same for the
+  /// same pair.
+  [[nodiscard]] static double unit(std::int64_t seed, std::int64_t salt);
   /// Returns the offsets a shaken screen steps through, one each step.
   [[nodiscard]] static godot::TypedArray<godot::Vector2i> shake_pattern();
+
+  /// A point or a size in pixels or sub-cell units, in single precision as
+  /// Godot's Vector2 holds it.
+  struct Point {
+    float x = 0.0F;
+    float y = 0.0F;
+  };
+  /// A rectangle, as Godot's Rect2 holds it.
+  struct Box {
+    Point position;
+    Point size;
+  };
+  /// A colour, as Godot's Color holds it.
+  struct Rgba {
+    float red = 0.0F;
+    float green = 0.0F;
+    float blue = 0.0F;
+    float alpha = 1.0F;
+  };
 
  protected:
   static void _bind_methods();
@@ -180,24 +198,24 @@ class BodyView : public godot::RefCounted {
     std::int64_t range = 0;
     std::int64_t radius = 0;
     std::int64_t body_damage = 0;
-    godot::Vector2 origin;
-    godot::Vector2 toward;
-    godot::Vector2 end;
-    godot::PackedInt64Array struck;
+    Point origin;
+    Point toward;
+    Point end;
+    std::vector<std::int64_t> struck;
     std::int64_t ms = 0;
     bool steered = false;
   };
   struct Death {
     std::int64_t person = -1;
     std::int64_t army = -1;
-    godot::Vector2 at;
-    godot::Vector2 ground;
+    Point at;
+    Point ground;
     std::int64_t ms = 0;
   };
   struct Number {
     std::int64_t ms = 0;
     godot::String text;
-    godot::Vector2 at;
+    Point at;
     bool own = false;
     bool mine = false;
     double width = 0.0;
@@ -206,68 +224,135 @@ class BodyView : public godot::RefCounted {
     std::int64_t person = -1;
     std::int64_t frames = 0;
   };
-  // A body a hit stop holds: the view frames it still holds, and from its
-  // first drawn frame on, what that frame drew.
-  struct Hold {
-    std::int64_t left = 0;
-    bool drawn = false;
-    godot::Vector2 at;
+  // A frame of the body atlas, its flip, and how far toward white it is
+  // drawn.
+  struct Look {
     std::int64_t tag = 0;
-    godot::Rect2 frame;
+    Box frame;
     double white = 0.0;
     bool flip = false;
   };
+  // A body a hit stop holds: the view frames it still holds, and from its
+  // first drawn frame on, where and how that frame drew it.
+  struct Hold {
+    std::int64_t left = 0;
+    bool drawn = false;
+    Point at;
+    Look look;
+  };
   struct Occluder {
-    godot::Rect2 rect;
+    Box rect;
     double sort_y = 0.0;
   };
   // An army's bodies on the last tick and the one before it, and whether its
   // roster stayed the same between them.
   struct Army {
-    godot::PackedInt64Array roster;
-    godot::PackedVector2Array now;
-    godot::PackedVector2Array before;
+    std::vector<std::int64_t> roster;
+    std::vector<Point> now;
+    std::vector<Point> before;
     bool same = true;
     std::int64_t faction = 0;
   };
+  // A sprite to pack: its frame in the atlas, its centre, its flip, how far
+  // toward white and how opaque it is drawn, how far it is turned about its
+  // bottom edge, and for an outline, where the body it outlines lies.
+  struct Sprite {
+    Box frame;
+    Point centre;
+    bool flip = false;
+    double white = 0.0;
+    double alpha = 1.0;
+    double turn = 0.0;
+    Point outline_of{-1.0F, -1.0F};
+  };
+  // What a frame packs into, and how it is laid out in rows.
+  struct Frame {
+    Box shown;
+    std::int64_t first_row = 0;
+    std::int64_t last_row = 0;
+    std::int64_t now = 0;
+    float share = 0.0F;
+    std::vector<std::vector<float>> shadows;
+    std::vector<std::vector<float>> bodies;
+    std::vector<float> outlines;
+    std::int64_t drawn = 0;
+    std::int64_t outlined = 0;
+  };
+  struct Near {
+    std::int64_t person = -1;
+    Point head;
+    std::int64_t relation = -1;
+    double cells = 0.0;
+  };
+  // The arrays of a snapshot the bodies are read from.
+  struct Read {
+    std::vector<std::int64_t> first;
+    std::vector<std::int64_t> persons;
+    std::vector<Point> positions;
+    std::vector<std::int64_t> healths;
+    std::vector<std::int64_t> factions;
+  };
 
-  void read_armies(const godot::Dictionary& snapshot);
-  void read_bodies(const godot::Dictionary& snapshot, bool compare);
+  static Read read(const godot::Dictionary& snapshot);
+  void read_armies(const Read& snapshot);
+  void read_bodies(const Read& snapshot, bool compare);
+  void read_strikes(const godot::Dictionary& snapshot,
+                    const std::vector<std::vector<Point>>& stood);
   void note_struck(const Strike& strike,
-                   const std::vector<godot::PackedVector2Array>& stood);
-  void hit(std::int64_t person, std::int64_t lost, godot::Vector2 at);
+                   const std::vector<std::vector<Point>>& stood);
+  void note_deaths(const godot::PackedInt64Array& died,
+                   const std::vector<std::vector<Point>>& stood);
+  void hit(std::int64_t person, std::int64_t lost, Point where);
+  void bleed(std::int64_t person, Point where, bool mine);
+  // A hit's person and the health it lost.
+  struct Loss {
+    std::int64_t person = -1;
+    std::int64_t lost = 0;
+  };
+  void stop_hit(const Loss& loss);
+  void start_holds();
+  [[nodiscard]] godot::Dictionary drips() const;
   void grow(std::size_t size);
   void forget(std::int64_t now);
   void clear_people();
   [[nodiscard]] bool alive(std::int64_t person) const;
-  [[nodiscard]] godot::Vector2 sub_at(std::int64_t army, std::int64_t body,
-                                      double between) const;
-  [[nodiscard]] double lift_at(godot::Vector2 point) const;
-  [[nodiscard]] double height_at(godot::Vector2 point) const;
-  [[nodiscard]] std::int64_t cell_index(godot::Vector2i at) const;
-  [[nodiscard]] godot::Vector2 warped(godot::Vector2 point) const;
-  [[nodiscard]] bool hidden(godot::Rect2 rect, double sort_y) const;
-  [[nodiscard]] std::int64_t sprite_of(std::int64_t army) const;
-  [[nodiscard]] godot::Color accent(std::int64_t person) const;
-  void pack(godot::PackedFloat32Array& buffer, godot::Rect2 frame,
-            godot::Vector2 centre, bool flip, double white = 0.0,
-            double alpha = 1.0, double turn = 0.0,
-            godot::Vector2 outline_of = godot::Vector2(-1, -1)) const;
-  void draw_strike(godot::RID canvas_item, const Strike& strike,
+  [[nodiscard]] static Point sub_at(const Army& army, std::size_t body,
+                                    double between);
+  [[nodiscard]] Point screen_point(Point sub) const;
+  [[nodiscard]] double lift_at(Point point) const;
+  [[nodiscard]] double height_at(Point point) const;
+  [[nodiscard]] std::size_t cell_index(std::int64_t column,
+                                       std::int64_t row) const;
+  [[nodiscard]] bool hidden(Box rect, double sort_y) const;
+  [[nodiscard]] std::int64_t sprite_of(std::size_t army) const;
+  [[nodiscard]] std::int64_t sprite_for(std::int64_t faction) const;
+  [[nodiscard]] Rgba accent(std::int64_t person) const;
+  [[nodiscard]] Point knocked(std::int64_t person, std::int64_t now) const;
+  [[nodiscard]] Look look_of(const Frame& frame, const Army& army,
+                             std::size_t body) const;
+  void pack(std::vector<float>& buffer, const Sprite& sprite) const;
+  void pack_body(Frame& frame, const Army& army, std::size_t body);
+  void pack_dead(Frame& frame) const;
+  void count_holds();
+  [[nodiscard]] std::vector<Near> near(double between) const;
+  void draw_strike(const godot::RID& canvas_item, const Strike& strike,
                    double left) const;
-  void draw_target(godot::RID canvas_item, godot::Vector2 at) const;
+  static void draw_target(const godot::RID& canvas_item, Point where);
+  [[nodiscard]] bool shows(const Strike& strike, std::int64_t now) const;
 
   // The atlas: until it is set, every frame is its first.
   static constexpr std::size_t TAGS = 8;
-  godot::Vector2 atlas_size_{1, 1};
+  Point atlas_size_{1.0F, 1.0F};
   std::vector<std::int64_t> frames_ = std::vector<std::int64_t>(TAGS, 0);
-  std::vector<std::int64_t> outline_frames_ = std::vector<std::int64_t>(TAGS, 0);
+  std::vector<std::int64_t> outline_frames_ =
+      std::vector<std::int64_t>(TAGS, 0);
   std::int64_t faction_width_ = 0;
   std::int64_t shadow_x_ = 0;
   std::vector<std::int64_t> sprite_of_faction_;
-  std::vector<godot::Color> accents_;
+  std::vector<Rgba> accents_;
   // The relief.
-  godot::Vector2i relief_size_;
+  std::int64_t relief_width_ = 0;
+  std::int64_t relief_height_ = 0;
   std::vector<std::int32_t> levels_;
   std::vector<std::uint8_t> slopes_;
   std::vector<std::int32_t> flat_;
@@ -282,7 +367,7 @@ class BodyView : public godot::RefCounted {
   bool hit_stop_ = true;
   std::int64_t selected_ = -1;
   godot::Ref<godot::Font> font_;
-  std::int64_t font_size_ = 10;
+  std::int64_t font_size_ = 0;
 
   // The armies, and the people, by person: the tick each was last read
   // alive, its health and the most it has had, its army and body index
@@ -301,7 +386,7 @@ class BodyView : public godot::RefCounted {
   std::vector<double> nearest_;
   std::vector<std::int64_t> striker_;
   std::vector<std::int64_t> hit_ms_;
-  std::vector<godot::Vector2> away_;
+  std::vector<Point> away_;
   std::vector<std::int64_t> struck_at_;
   std::unordered_map<std::int64_t, Hold> held_;
 
@@ -318,14 +403,14 @@ class BodyView : public godot::RefCounted {
   std::vector<Death> deaths_;
   std::vector<Number> numbers_;
   std::vector<Stop> hit_stops_;
-  godot::PackedVector2Array bleed_at_;
-  godot::PackedVector2Array bleed_dir_;
-  godot::PackedInt64Array bleed_seed_;
+  std::vector<Point> bleed_at_;
+  std::vector<Point> bleed_dir_;
+  std::vector<std::int64_t> bleed_seed_;
 
   // What the last fill showed.
-  godot::Rect2 view_;
+  Box view_;
   std::int64_t now_ = 0;
-  godot::Vector2 target_at_;
+  Point target_at_;
 };
 
 }  // namespace murim_godot

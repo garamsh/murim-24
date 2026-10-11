@@ -534,7 +534,7 @@ func _build_body_atlas() -> void:
 	for tag in BODY_TAGS:
 		frames.append(_body_frames[tag])
 		outlines.append(_body_frames[tag + "_xray"])
-	combat.bodies.set_atlas(Vector2(_atlas.get_size()), frames, outlines, _faction_width, _shadow_x,
+	combat.bodies.set_atlas(Vector2(_atlas.get_size()), frames, outlines, Vector2i(_faction_width, _shadow_x),
 			_sprite_of_faction, PackedColorArray(ACCENTS))
 
 

@@ -75,7 +75,7 @@ func _begin_pass() -> bool:
 func _hit_view() -> BodyView:
 	var view := BodyView.new()
 	view.set_atlas(Vector2(64, 24), PackedInt64Array([0, 1, 1, 2, 0, 1, 0, 1]), PackedInt64Array([2, 3, 3, 3, 2, 3, 2, 3]),
-			48, 48, PackedInt64Array([0, 0]), PackedColorArray([Color.WHITE]))
+			Vector2i(48, 48), PackedInt64Array([0, 0]), PackedColorArray([Color.WHITE]))
 	view.set_damage_numbers(2)
 	view.begin(_snapshot(HEALTH, false))
 	view.show_at(VIEW, NOW, Vector2.ZERO)
