@@ -1,0 +1,179 @@
+[
+  {
+    "id": "plum_blossom_sword",
+    "name": {
+      "korean": "매화검법",
+      "romanised": "Plum Blossom Sword"
+    },
+    "discipline": "sword",
+    "nature": {
+      "orientation": "orthodox",
+      "polarity": "yang"
+    },
+    "skills": [
+      {
+        "name": {
+          "korean": "매화일검",
+          "romanised": "Plum Blossom Strike"
+        },
+        "range": 384,
+        "radius": 0,
+        "body_damage": 20,
+        "structure_damage": 0,
+        "cooldown": 90,
+        "qi_cost": 100,
+        "shape": "arc",
+        "rank": 1,
+        "comprehensible": false
+      },
+      {
+        "name": {
+          "korean": "이십사수매화검법",
+          "romanised": "Twenty-Four Plum Blossoms"
+        },
+        "range": 384,
+        "radius": 512,
+        "body_damage": 15,
+        "structure_damage": 0,
+        "cooldown": 300,
+        "qi_cost": 400,
+        "shape": "area",
+        "rank": 3,
+        "comprehensible": true
+      },
+      {
+        "name": {
+          "korean": "매화낙영",
+          "romanised": "Falling Plum Blossoms"
+        },
+        "range": 384,
+        "radius": 768,
+        "body_damage": 30,
+        "structure_damage": 0,
+        "cooldown": 600,
+        "qi_cost": 1200,
+        "shape": "area",
+        "rank": 5,
+        "comprehensible": true
+      }
+    ]
+  },
+  {
+    "id": "heavenly_demon_saber",
+    "name": {
+      "korean": "천마도법",
+      "romanised": "Heavenly Demon Saber"
+    },
+    "discipline": "saber",
+    "nature": {
+      "orientation": "demonic",
+      "polarity": "yang"
+    },
+    "skills": [
+      {
+        "name": {
+          "korean": "천마일도",
+          "romanised": "Heavenly Demon Cut"
+        },
+        "range": 384,
+        "radius": 0,
+        "body_damage": 20,
+        "structure_damage": 0,
+        "cooldown": 90,
+        "qi_cost": 100,
+        "shape": "arc",
+        "rank": 1,
+        "comprehensible": false
+      },
+      {
+        "name": {
+          "korean": "천마혈풍",
+          "romanised": "Heavenly Demon Blood Wind"
+        },
+        "range": 384,
+        "radius": 512,
+        "body_damage": 15,
+        "structure_damage": 0,
+        "cooldown": 300,
+        "qi_cost": 400,
+        "shape": "area",
+        "rank": 3,
+        "comprehensible": true
+      },
+      {
+        "name": {
+          "korean": "천마군림",
+          "romanised": "Heavenly Demon Descends"
+        },
+        "range": 384,
+        "radius": 768,
+        "body_damage": 30,
+        "structure_damage": 0,
+        "cooldown": 600,
+        "qi_cost": 1200,
+        "shape": "area",
+        "rank": 5,
+        "comprehensible": true
+      }
+    ]
+  },
+  {
+    "id": "black_fang_darts",
+    "name": {
+      "korean": "흑아비도술",
+      "romanised": "Black Fang Darts"
+    },
+    "discipline": "hidden_weapons",
+    "nature": {
+      "orientation": "unorthodox",
+      "polarity": "yin"
+    },
+    "skills": [
+      {
+        "name": {
+          "korean": "흑아표",
+          "romanised": "Black Fang Dart"
+        },
+        "range": 2048,
+        "radius": 128,
+        "body_damage": 20,
+        "structure_damage": 0,
+        "cooldown": 90,
+        "qi_cost": 100,
+        "shape": "line",
+        "rank": 1,
+        "comprehensible": false
+      },
+      {
+        "name": {
+          "korean": "만천화우",
+          "romanised": "Rain of Flowers"
+        },
+        "range": 2048,
+        "radius": 512,
+        "body_damage": 15,
+        "structure_damage": 0,
+        "cooldown": 300,
+        "qi_cost": 400,
+        "shape": "area",
+        "rank": 3,
+        "comprehensible": true
+      },
+      {
+        "name": {
+          "korean": "흑아폭우",
+          "romanised": "Black Fang Storm"
+        },
+        "range": 2048,
+        "radius": 768,
+        "body_damage": 30,
+        "structure_damage": 0,
+        "cooldown": 600,
+        "qi_cost": 1200,
+        "shape": "area",
+        "rank": 5,
+        "comprehensible": true
+      }
+    ]
+  }
+]

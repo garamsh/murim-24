@@ -6,16 +6,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(murim_core flow_field.cpp live_scenario.cpp m1_scenario.cpp map.cpp random.cpp region.cpp save.cpp spatial_hash.cpp world.cpp)
+add_library(murim_core content.cpp flow_field.cpp live_scenario.cpp m1_scenario.cpp map.cpp random.cpp region.cpp save.cpp spatial_hash.cpp world.cpp)
 target_include_directories(murim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(murim_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+
+# The packs the game's content is loaded from, read by the tools and tests
+# through the JSON adapter.
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../packs_json ${CMAKE_CURRENT_BINARY_DIR}/packs_json)
+set(MURIM_PACKS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packs")
 
 add_executable(murim_core_bench bench.cpp)
 target_link_libraries(murim_core_bench PRIVATE murim_core)
 target_compile_options(murim_core_bench PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
 add_executable(murim_core_sweep sweep.cpp)
-target_link_libraries(murim_core_sweep PRIVATE murim_core)
+target_link_libraries(murim_core_sweep PRIVATE murim_core murim_packs_json)
+target_compile_definitions(murim_core_sweep PRIVATE MURIM_PACKS_DIR="${MURIM_PACKS_DIR}")
 target_compile_options(murim_core_sweep PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
 include(FetchContent)
@@ -30,7 +36,8 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)
 
-add_executable(murim_core_test flow_field_test.cpp region_test.cpp save_test.cpp spatial_hash_test.cpp world_test.cpp)
-target_link_libraries(murim_core_test PRIVATE murim_core GTest::gtest_main)
+add_executable(murim_core_test content_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../packs_json/json_packs_test.cpp flow_field_test.cpp region_test.cpp save_test.cpp spatial_hash_test.cpp world_test.cpp)
+target_link_libraries(murim_core_test PRIVATE murim_core murim_packs_json GTest::gtest_main)
+target_compile_definitions(murim_core_test PRIVATE MURIM_PACKS_DIR="${MURIM_PACKS_DIR}")
 target_compile_options(murim_core_test PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 gtest_discover_tests(murim_core_test)

@@ -1,7 +1,6 @@
 #include "region.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -33,13 +32,8 @@ constexpr std::int32_t VILLAGE_COUNTS = 3;
 
 // People stand a cell apart, as wide as a body is drawn.
 constexpr std::int32_t SEPARATION = CELL_SIZE;
-// Arm's length, the reach of a blade or a fist: a body and a half, so a foe
-// at the separation, straight or diagonal, lies within it.
-constexpr std::int32_t MELEE = 3 * CELL_SIZE / 2;
-// Combat is paced by this data at 30 ticks a second: a duel to the death in
-// 10 to 30 seconds, twenty a side in 10 seconds to 2 minutes, and a band of
-// twenty raiders leaving a hamlet in ruins in 1 to 5 minutes. Health is eight
-// to twelve guard strikes; durability sets the raid.
+// A structure's durability when intact, which the stages' floors divide, and
+// the health a village's residents start with.
 constexpr std::uint32_t DURABILITY = 10'000;
 constexpr std::uint64_t HEALTH = 120;
 // An event reaches everyone within 32 cells of it as a rumour, a quarter of
@@ -51,217 +45,8 @@ constexpr std::int32_t TALK_REACH = 2;
 // A person closes on a foe within 6 cells while none is within its reach,
 // as far as two bands meeting in the open start apart.
 constexpr std::int32_t SIGHT = 6;
-// The rules of life in region_data().
-constexpr std::uint32_t GROWTH = 10;
-constexpr std::uint32_t GROWTH_SPREAD = 5;
-constexpr std::uint32_t LIMIT = 500;
-constexpr std::uint32_t LIMIT_SPREAD = 200;
-constexpr std::uint32_t LIFESPAN_DAYS = 60 * 120;
-constexpr std::uint32_t LIFESPAN_SPREAD_DAYS = 15 * 120;
-constexpr std::uint32_t DISCIPLINE_WIDENING = 200;
-constexpr std::uint32_t UPPER_WIDENING = 100;
-// Kinship in region_data(), ages in days.
-constexpr std::uint32_t YEAR = 120;
-constexpr std::uint32_t FOUNDING_AGE = 22 * YEAR;
-constexpr std::uint32_t FOUNDING_SPREAD = 6 * YEAR;
-constexpr std::uint32_t MARRYING_FROM = 16 * YEAR;
-constexpr std::uint32_t MARRYING_TO = 40 * YEAR;
-constexpr std::int32_t NEIGHBOURHOOD = 80;
-constexpr std::uint32_t MARRIAGE_CHANCE = 500;
-constexpr std::uint32_t BEARING_FROM = 18 * YEAR;
-constexpr std::uint32_t BEARING_TO = 40 * YEAR;
-constexpr std::uint32_t BIRTH_CHANCE = 400;
-constexpr std::uint32_t BIRTH_SPACING = 2 * YEAR;
-// Husbandry and the structure kinds in region_data().
-constexpr std::uint32_t HUNGER_DAYS = 10;
-constexpr std::int32_t MIGRATION_REACH = 48;
-constexpr std::uint32_t HOUSE_HOUSING = 8;
-constexpr std::uint32_t HALL_HOUSING = 12;
-constexpr std::uint32_t GRANARY_STORAGE = 2'400;
-constexpr std::uint32_t STOREHOUSE_STORAGE = 3'600;
-constexpr std::uint32_t FIELD_YIELD = 600;
-constexpr std::uint32_t WORKSHOP_SERVES = 40;
-constexpr std::uint32_t SMITHY_EDGE = 250;
-constexpr std::uint32_t APOTHECARY_HEALING = 12;
-// Growth in region_data(), distances in cells.
-constexpr std::uint32_t GROWTH_INTERVAL_DAYS = 30;
-constexpr std::uint32_t GROWTH_PRESSURE = 200;
-constexpr std::int32_t GROWTH_REACH = 40;
-constexpr std::int32_t BUILD_VICINITY = 8;
-constexpr std::int32_t SETTLEMENT_SPACING = 3;
-constexpr std::int32_t TERRITORY_CLAIM = 16;
-constexpr std::uint32_t SETTLERS = 6;
-constexpr std::uint32_t RAIDERS = 10;
-constexpr std::uint32_t SELF_RELIANCE = 20;
-// Sects in region_data(), ages in days and chances per mille a year.
-constexpr std::uint32_t ADMISSION_AGE = 12 * YEAR;
-constexpr std::uint32_t ASSESSED_TALENT = 550;
-constexpr std::uint32_t PROVEN_ATTAINMENT = 20;
-constexpr std::int32_t ADMISSION_REACH = 48;
-constexpr std::uint32_t ADMISSION_CHANCE = 300;
-constexpr std::uint32_t ELDER_SHARE = 333;
+// The attainment a sect's first founder starts with, so it is its master.
 constexpr std::uint32_t FOUNDER_ATTAINMENT = 120;
-constexpr std::uint32_t HALL_PUPILS = 4;
-constexpr std::uint32_t MANUAL_HALL_PUPILS = 4;
-constexpr std::uint32_t TRAINING_GROUND_PUPILS = 12;
-constexpr std::uint32_t SCATTER_CHANCE = 500;
-constexpr std::int32_t SCATTER_REACH = 16;
-constexpr std::uint32_t QI_GROWTH = 1;
-constexpr std::uint32_t QI_GROWTH_SPREAD = 1;
-constexpr std::uint32_t QI_LIMIT = 8'000;
-constexpr std::uint32_t QI_LIMIT_SPREAD = 7'000;
-constexpr std::uint32_t QI_RECOVERY = 10;
-constexpr std::uint64_t QI_RECOVERY_TICKS = 30;
-constexpr std::uint32_t COMPREHENSION = 300;
-constexpr std::uint32_t TEACHING = 200;
-constexpr std::uint32_t READING_COST = 500;
-constexpr std::uint32_t HALF = 500;
-constexpr std::uint32_t SEVEN_TENTHS = 700;
-constexpr std::uint32_t NINE_TENTHS = 900;
-
-// Diplomacy in region_data(): war on a faction at peace, outnumbering it by
-// half again, at 1 in 10 a year; peace while outnumbered in a declared war at
-// 1 in 5 a year; a declaration holding 5 years.
-constexpr std::uint32_t WAR_MARGIN = 1'500;
-constexpr std::uint32_t WAR_CHANCE = 100;
-constexpr std::uint32_t PEACE_CHANCE = 200;
-constexpr std::uint32_t HOLD_DAYS = 5 * 120;
-constexpr std::uint64_t HERB_PRICE = 10;
-constexpr std::uint64_t HERB_HEALTH = 30;
-constexpr std::uint64_t ELIXIR_PRICE = 60;
-constexpr std::uint32_t ELIXIR_QI = 2'000;
-constexpr std::uint64_t PURSE = 30;
-constexpr std::uint64_t WAGE = 1;
-constexpr std::uint32_t QUARTER = 250;
-// The discipline of medicine, the fifth drawn.
-constexpr std::size_t MEDICINE = 4;
-
-// The realms of cultivation, from third-rate to life-and-death, each
-// reached at a store of qi and striking a tenth harder than the last.
-std::vector<Realm> realms() {
-  constexpr std::uint32_t STEP = 100;
-  const std::vector<std::pair<NameEntry, std::uint32_t>> ladder{
-      {{"삼류", "Third-rate"}, 1'000},
-      {{"이류", "Second-rate"}, 3'000},
-      {{"일류", "First-rate"}, 6'000},
-      {{"절정", "Peak"}, 10'000},
-      {{"초절정", "Beyond peak"}, 15'000},
-      {{"화경", "Transformation"}, 21'000},
-      {{"현경", "Mystery"}, 28'000},
-      {{"생사경", "Life and death"}, 36'000},
-  };
-  std::vector<Realm> realms;
-  realms.reserve(ladder.size());
-  for (const auto& [name, threshold] : ladder) {
-    realms.push_back(Realm{
-        name, threshold,
-        PER_MILLE + (STEP * static_cast<std::uint32_t>(realms.size() + 1))});
-  }
-  return realms;
-}
-
-// The sects' arts, one for each manual: Hwasan's plum-blossom sword,
-// orthodox and yang; the Heavenly Demon's saber, demonic and yang; and the
-// Black Fang's hidden weapons, unorthodox and yin. Each has a strike at
-// the third-rate realm, taught or read only, a wider one at first-rate and
-// the widest at beyond peak, both of which comprehension unlocks too. A
-// blade's strike sweeps an arc at arm's length and a dart flies along a
-// line; the wider two land as discs at a point within the art's range.
-std::vector<Art> arts() {
-  constexpr std::uint32_t FIRST = 1;
-  constexpr std::uint32_t THIRD = 3;
-  constexpr std::uint32_t FIFTH = 5;
-  constexpr std::uint64_t STRIKE_DAMAGE = 20;
-  constexpr std::uint64_t SWEEP_DAMAGE = 15;
-  constexpr std::uint64_t FORM_DAMAGE = 30;
-  constexpr std::uint64_t STRIKE_COOLDOWN = 90;
-  constexpr std::uint64_t SWEEP_COOLDOWN = 300;
-  constexpr std::uint64_t FORM_COOLDOWN = 600;
-  constexpr std::uint32_t STRIKE_QI = 100;
-  constexpr std::uint32_t SWEEP_QI = 400;
-  constexpr std::uint32_t FORM_QI = 1'200;
-  constexpr std::int32_t FAR = 8 * CELL_SIZE;
-  constexpr std::int32_t WIDE = 2 * CELL_SIZE;
-  constexpr std::int32_t WIDEST = 3 * CELL_SIZE;
-  // A blade sweeps an arc at arm's length; a dart flies along a line half
-  // a body wide, far.
-  constexpr Skill BLADE{MELEE, 0, 0, 0, 0, 0, Shape::ARC};
-  constexpr Skill DART{FAR, CELL_SIZE / 2, 0, 0, 0, 0, Shape::LINE};
-  const auto art = [&](NameEntry name, std::size_t discipline, Nature nature,
-                       Skill strike, std::array<NameEntry, 3> skills) {
-    const std::int32_t range = strike.range;
-    return Art{
-        std::move(name),
-        discipline,
-        nature,
-        {ArtSkill{std::move(skills.at(0)),
-                  Skill{range, strike.radius, STRIKE_DAMAGE, 0, STRIKE_COOLDOWN,
-                        STRIKE_QI, strike.shape},
-                  FIRST, false},
-         ArtSkill{std::move(skills.at(1)),
-                  Skill{range, WIDE, SWEEP_DAMAGE, 0, SWEEP_COOLDOWN, SWEEP_QI},
-                  THIRD, true},
-         ArtSkill{std::move(skills.at(2)),
-                  Skill{range, WIDEST, FORM_DAMAGE, 0, FORM_COOLDOWN, FORM_QI},
-                  FIFTH, true}}};
-  };
-  return {
-      art({"매화검법", "Plum Blossom Sword"}, 0,
-          Nature{Orientation::ORTHODOX, Polarity::YANG}, BLADE,
-          {NameEntry{"매화일검", "Plum Blossom Strike"},
-           NameEntry{"이십사수매화검법", "Twenty-Four Plum Blossoms"},
-           NameEntry{"매화낙영", "Falling Plum Blossoms"}}),
-      art({"천마도법", "Heavenly Demon Saber"}, 1,
-          Nature{Orientation::DEMONIC, Polarity::YANG}, BLADE,
-          {NameEntry{"천마일도", "Heavenly Demon Cut"},
-           NameEntry{"천마혈풍", "Heavenly Demon Blood Wind"},
-           NameEntry{"천마군림", "Heavenly Demon Descends"}}),
-      art({"흑아비도술", "Black Fang Darts"}, 3,
-          Nature{Orientation::UNORTHODOX, Polarity::YIN}, DART,
-          {NameEntry{"흑아표", "Black Fang Dart"},
-           NameEntry{"만천화우", "Rain of Flowers"},
-           NameEntry{"흑아폭우", "Black Fang Storm"}}),
-  };
-}
-
-// Surnames of the murim's clans, common and of the old houses, and given
-// names for women and men, in Korean with their romanised forms.
-Names names() {
-  return Names{
-      {{"김", "Kim"},       {"이", "Lee"},     {"박", "Park"},
-       {"최", "Choi"},      {"정", "Jeong"},   {"강", "Kang"},
-       {"조", "Jo"},        {"윤", "Yun"},     {"장", "Jang"},
-       {"임", "Im"},        {"한", "Han"},     {"오", "O"},
-       {"서", "Seo"},       {"신", "Sin"},     {"권", "Gwon"},
-       {"황", "Hwang"},     {"송", "Song"},    {"백", "Baek"},
-       {"남궁", "Namgung"}, {"제갈", "Jegal"}, {"독고", "Dokgo"},
-       {"모용", "Moyong"},  {"사마", "Sama"},  {"황보", "Hwangbo"}},
-      {{"설화", "Seolhwa"},
-       {"연화", "Yeonhwa"},
-       {"소연", "Soyeon"},
-       {"하린", "Harin"},
-       {"은비", "Eunbi"},
-       {"매화", "Maehwa"},
-       {"수련", "Suryeon"},
-       {"서희", "Seohui"},
-       {"지아", "Jia"},
-       {"채원", "Chaewon"},
-       {"월향", "Wolhyang"},
-       {"예린", "Yerin"}},
-      {{"무진", "Mujin"},
-       {"태산", "Taesan"},
-       {"청운", "Cheongun"},
-       {"현", "Hyeon"},
-       {"도윤", "Doyun"},
-       {"진혁", "Jinhyeok"},
-       {"소운", "Soun"},
-       {"천명", "Cheonmyeong"},
-       {"강호", "Gangho"},
-       {"백랑", "Baengnang"},
-       {"일검", "Ilgeom"},
-       {"우진", "Ujin"}},
-  };
-}
 
 // A point a partition is made around, and the value its cells take.
 struct Site {
@@ -425,26 +210,17 @@ Plan plan_of(const RegionData& data, const Building& building) {
               holding_of(kind, footprint)};
 }
 
-// Growth that builds `builds` and lays out `settlement`'s buildings for a
-// new village, each a plan from what its kind holds: the builds' plans
-// first, then the settlement's, in order.
-Growth growth_of(const RegionData& data, const std::vector<Building>& builds,
-                 const VillageTemplate& settlement) {
-  Growth growth{GROWTH_INTERVAL_DAYS,
-                GROWTH_PRESSURE,
-                GROWTH_REACH,
-                BUILD_VICINITY,
-                SETTLEMENT_SPACING,
-                TERRITORY_CLAIM,
-                {},
-                {},
-                settlement.area,
-                settlement.name,
-                {},
-                SETTLERS,
-                RAIDERS,
-                {},
-                SELF_RELIANCE};
+}  // namespace
+
+Growth growth_for(const RegionData& data, Growth rules,
+                  const std::vector<Building>& builds,
+                  const VillageTemplate& settlement) {
+  Growth growth = std::move(rules);
+  growth.plans.clear();
+  growth.builds.clear();
+  growth.layout.clear();
+  growth.settlement = settlement.area;
+  growth.settlement_kind = settlement.name;
   for (const Building& building : builds) {
     growth.builds.push_back(growth.plans.size());
     growth.plans.push_back(plan_of(data, building));
@@ -456,6 +232,8 @@ Growth growth_of(const RegionData& data, const std::vector<Building>& builds,
   }
   return growth;
 }
+
+namespace {
 
 // The data's rules of life, its growth taking each faction's stance.
 Life life_of(const RegionData& data) {
@@ -638,287 +416,13 @@ void validate(const RegionData& data) {
 
 }  // namespace
 
-RegionData region_data() {
-  // A guard's strike, at one foe at arm's length; a mend that restores
-  // the structures within ten cells of where it is used, a village's from its
-  // centre; and a torch that burns them, where they belong to a faction its
-  // user is hostile to.
-  constexpr std::uint64_t GUARD_COOLDOWN = 15;
-  constexpr std::uint64_t GUARD_DAMAGE = 15;
-  constexpr Skill GUARD{MELEE,          0, GUARD_DAMAGE,   0,
-                        GUARD_COOLDOWN, 0, Shape::TARGETED};
-  constexpr std::int32_t MEND_REACH = 10;
-  constexpr std::int32_t MEND_REPAIR = -5;
-  constexpr std::uint64_t MEND_COOLDOWN = 30;
-  constexpr Skill MEND{
-      0, MEND_REACH * CELL_SIZE, 0, MEND_REPAIR, MEND_COOLDOWN, 0, Shape::SELF};
-  constexpr std::int32_t TORCH_DAMAGE = 10;
-  constexpr Skill TORCH{
-      0,          MEND_REACH * CELL_SIZE, 0, TORCH_DAMAGE, MEND_COOLDOWN, 0,
-      Shape::SELF};
-  constexpr Footprint HOUSE{3, 3};
-  constexpr Footprint HALL{5, 3};
-  constexpr Footprint WELL{2, 2};
-  constexpr Footprint BARRELS{1, 1};
-  constexpr Footprint FENCE{5, 1};
-  constexpr Footprint MILLET{2, 2};
-  constexpr Footprint RICE{3, 2};
-  constexpr Footprint GRANARY{2, 2};
-  constexpr Footprint STOREHOUSE{3, 2};
-  constexpr Footprint SMITHY{3, 2};
-  constexpr Footprint APOTHECARY{4, 2};
-  constexpr std::int32_t MILLET_EAST = 5;
-  constexpr std::int32_t RICE_EAST = 7;
-  constexpr std::int32_t GRANARY_EAST = 12;
-  constexpr std::int32_t GRANARY_ROW = 4;
-  constexpr std::uint32_t FOUNDING_HOUSEHOLDS = 1;
-  constexpr std::int32_t HAMLET_WIDTH = 7;
-  constexpr std::int32_t VILLAGE_WIDTH = 17;
-  constexpr std::int32_t VILLAGE_HEIGHT = 9;
-  constexpr std::int32_t ROAD_ROW = 3;
-  constexpr std::int32_t SOUTH_ROW = 6;
-  constexpr std::int32_t FENCE_ROW = 8;
-  constexpr std::int32_t HALL_EAST = 10;
-  constexpr std::int32_t FAR_EAST = 14;
-  constexpr std::int32_t SOUTH_EAST = 11;
-  constexpr std::int32_t WELL_EAST = 6;
-  constexpr std::int32_t FENCE_EAST = 5;
-  constexpr std::int32_t PLAIN_WEIGHT = 10;
-  constexpr Footprint MANUAL_HALL{4, 3};
-  constexpr Footprint TRAINING_GROUND{6, 4};
-  constexpr Footprint SEAT_GATE{3, 1};
-  constexpr std::int32_t SEAT_WIDTH = 12;
-  constexpr std::int32_t SEAT_HEIGHT = 9;
-  constexpr std::int32_t SEAT_HALL_EAST = 7;
-  constexpr std::int32_t SEAT_YARD_ROW = 5;
-  constexpr std::int32_t SEAT_GRANARY_EAST = 6;
-  constexpr std::int32_t SEAT_FIELD_EAST = 9;
-  constexpr std::int32_t SEAT_GATE_EAST = 7;
-  constexpr std::int32_t SEAT_COURT_ROW = 3;
-  constexpr std::int32_t SEAT_PATH_EAST = SEAT_GATE_EAST + 1;
-  const auto building = [](Cell cell, Footprint footprint, const char* kind,
-                           std::uint32_t households) {
-    return Building{Structure{cell, DURABILITY, footprint}, kind, households};
-  };
-  RegionData data{
-      {
-          // Villages build on the plain and in forest; bodies cross hills,
-          // where landforms stand, but nothing is built there.
-          {"plain", Footing::BUILDABLE, PLAIN_WEIGHT},
-          {"forest", Footing::BUILDABLE, 3},
-          {"hills", Footing::ROUGH, 2},
-          {"water", Footing::BLOCKED, 1},
-          {"mountain", Footing::BLOCKED, 1},
-      },
-      {
-          // The Orthodox and Unorthodox mend villages; the Demonic Cult burns
-          // them and rebuilds nothing.
-          // The Demonic Cult changes leader by duel, to the death, and the
-          // old leader's allies turn on the winner.
-          // As their villages press against their caps, the Orthodox build
-          // first, then found and raid; the Unorthodox found first; the
-          // Demonic Cult, which raises nothing, raids.
-          // Sects admit their faction's people of 12 within 48 cells of the
-          // seat at 3 in 10 a year: the Orthodox and the Cult assess a
-          // talent limit of 550, the Unorthodox proof of usefulness, an
-          // attainment of 20. The third of a sect's members of the highest
-          // attainment are its elders, at least one. The Orthodox elect their
-          // leader among their sects' masters.
-          {"Orthodox",
-           {1},
-           {GUARD, MEND},
-           std::nullopt,
-           {Expansion::BUILD, Expansion::FOUND, Expansion::RAID},
-           Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_SHARE},
-           Election{0}},
-          {"Demonic",
-           {0, 2},
-           {GUARD, TORCH},
-           Duel{true, 0, true},
-           {Expansion::RAID},
-           Admission{ADMISSION_AGE, ASSESSED_TALENT, 0, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_SHARE},
-           std::nullopt},
-          {"Unorthodox",
-           {1},
-           {GUARD, MEND},
-           std::nullopt,
-           {Expansion::FOUND, Expansion::RAID, Expansion::BUILD},
-           Admission{ADMISSION_AGE, 0, PROVEN_ATTAINMENT, ADMISSION_REACH,
-                     ADMISSION_CHANCE, ELDER_SHARE},
-           std::nullopt},
-      },
-      // The approved target mockup's village: houses of 3 by 3 cells and a
-      // hall of 5 by 3 north of the road through its centre, more houses
-      // south of it, a well in the square before the hall, barrels at the
-      // road's ends and a fence along the field between the southern houses.
-      // The hamlet keeps its west end. Wells, barrels and fences block and
-      // break like any structure, and house no one. Fields of millet and rice
-      // lie where the mockup sows them, a granary stands east of the square
-      // and a storehouse in the south-east corner; the hamlet keeps its
-      // millet and a granary in its south-west corner. Each starts with one
-      // household, a married man and woman: the village in its hall, the
-      // hamlet in its first house.
-      {
-          {"hamlet",
-           {HAMLET_WIDTH, VILLAGE_HEIGHT},
-           {building({0, 0}, HOUSE, "house", FOUNDING_HOUSEHOLDS),
-            building({4, 0}, HOUSE, "house", 0),
-            building({2, SOUTH_ROW}, HOUSE, "house", 0),
-            building({HAMLET_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
-            building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
-            building({0, SOUTH_ROW}, GRANARY, "granary", 0)},
-           {}},
-          {"village",
-           {VILLAGE_WIDTH, VILLAGE_HEIGHT},
-           {building({0, 0}, HOUSE, "house", 0),
-            building({4, 0}, HALL, "hall", FOUNDING_HOUSEHOLDS),
-            building({HALL_EAST, 0}, HOUSE, "house", 0),
-            building({FAR_EAST, 0}, HOUSE, "house", 0),
-            building({1, SOUTH_ROW}, HOUSE, "house", 0),
-            building({SOUTH_EAST, SOUTH_ROW}, HOUSE, "house", 0),
-            building({WELL_EAST, ROAD_ROW}, WELL, "well", 0),
-            building({0, ROAD_ROW}, BARRELS, "barrels", 0),
-            building({VILLAGE_WIDTH - 1, ROAD_ROW}, BARRELS, "barrels", 0),
-            building({FENCE_EAST, FENCE_ROW}, FENCE, "fence", 0),
-            building({MILLET_EAST, SOUTH_ROW}, MILLET, "field", 0),
-            building({RICE_EAST, SOUTH_ROW}, RICE, "field", 0),
-            building({GRANARY_EAST, GRANARY_ROW}, GRANARY, "granary", 0),
-            building({FAR_EAST, SOUTH_ROW}, STOREHOUSE, "storehouse", 0)},
-           {}},
-      },
-      // Five disciplines, each drawn the same way: growth of 5 to 15 a use,
-      // a limit of 300 to 700. People live 45 to 75 years of 120 days, a
-      // day longer for each point of attainment; a soul's past lives widen a
-      // practised discipline's limit by 200, and every limit's top by 100,
-      // each over the lives lived.
-      Life{{{"sword", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
-            {"saber", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
-            {"fist", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
-            {"hidden weapons", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}},
-            {"medicine", {GROWTH, GROWTH_SPREAD}, {LIMIT, LIMIT_SPREAD}}},
-           HEALTH,
-           Spread{LIFESPAN_DAYS, LIFESPAN_SPREAD_DAYS},
-           1,
-           DISCIPLINE_WIDENING,
-           UPPER_WIDENING,
-           // The people the region starts with are 16 to 28 years old. A
-           // person of 16 to 40 marries, at even odds a year, someone of
-           // another family from a village whose centre lies within 80
-           // cells; a wife of 18 to 40 bears a child at 2 in 5 a year, two
-           // years apart at least, into her husband's family, of the sex
-           // fewer among her village's unmarried.
-           Spread{FOUNDING_AGE, FOUNDING_SPREAD},
-           Kinship{{MARRYING_FROM, MARRYING_TO},
-                   NEIGHBOURHOOD,
-                   MARRIAGE_CHANCE,
-                   {BEARING_FROM, BEARING_TO},
-                   BIRTH_CHANCE,
-                   BIRTH_SPACING,
-                   true,
-                   true},
-           names(),
-           // Each person eats a measure of food a day. Unfed for ten days,
-           // a person moves to a village within 48 cells with room and food,
-           // or dies.
-           Husbandry{1, HUNGER_DAYS, MIGRATION_REACH},
-           std::nullopt,
-           // Each sect holds the manual of its faction's art (arts()):
-           // Hwasan the sword, the Heavenly Demon the saber, the Black Fang
-           // hidden weapons. A fallen sect's manuals scatter at even odds
-           // within 16 cells of its seat, and are otherwise lost.
-           Manuals{{{0}, {1}, {2}}, SCATTER_CHANCE, SCATTER_REACH},
-           // People cultivate 0 to 2 qi a day, up to a limit of 1,000 to
-           // 15,000, and recover a hundredth of their store a second.
-           Cultivation{{QI_GROWTH, QI_GROWTH_SPREAD},
-                       {QI_LIMIT, QI_LIMIT_SPREAD},
-                       QI_RECOVERY,
-                       QI_RECOVERY_TICKS},
-           realms(),
-           arts(),
-           // A realm gained comprehends a skill at 3 in 10 at a
-           // discipline's mean talent; a sect teaches at 1 in 5 a year for
-           // each rank of its best elder; a manual costs 500 qi to read from
-           // within a cell. An art of another orientation is learned at half
-           // the chance and strikes at seven tenths; of another polarity, at
-           // seven tenths and with nine tenths.
-           Learning{COMPREHENSION, TEACHING, READING_COST, CELL_SIZE, HALF,
-                    SEVEN_TENTHS, SEVEN_TENTHS, NINE_TENTHS},
-           // A leader declares war on a faction at peace with its own,
-           // outnumbering it by half again, at 1 in 10 a year, and one
-           // outnumbered in a declared war makes peace at 1 in 5 a year; a
-           // declaration holds 5 years.
-           Diplomacy{WAR_MARGIN, WAR_CHANCE, PEACE_CHANCE, HOLD_DAYS},
-           // People whose best discipline is medicine sell a healing herb
-           // for 10 silver, restoring 30 health, a quarter of a newborn's,
-           // and the Lesser Return Pill for 60, restoring 2,000 qi. Everyone
-           // is born with 30 silver and earns 1 a day at home; people use a
-           // herb at half health and a pill at a quarter of their store.
-           Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, MEDICINE},
-                  Ware{"elixir", ELIXIR_PRICE, 0, ELIXIR_QI, MEDICINE}},
-                 PURSE,
-                 WAGE,
-                 HALF,
-                 QUARTER}},
-      // What each kind of structure holds: a house shelters 8 and a hall 12,
-      // a granary stores 2,400 measures and a storehouse 3,600, and each
-      // cell of a field yields 600 a harvest. A field never blocks. A village
-      // is capped at 50 people, a hamlet at 20. A seat's hall and manual
-      // hall each teach 4 pupils and its training ground 12, on which people
-      // stand, so it blocks nothing. A smithy arms 40 people, who strike a
-      // quarter harder, and an apothecary tends 40, who recover 12 health a
-      // day, a tenth of theirs.
-      {{"house", HOUSE_HOUSING, 0, 0, true, 0},
-       {"hall", HALL_HOUSING, 0, 0, true, HALL_PUPILS},
-       {"well", 0, 0, 0, true, 0},
-       {"barrels", 0, 0, 0, true, 0},
-       {"fence", 0, 0, 0, true, 0},
-       {"granary", 0, GRANARY_STORAGE, 0, true, 0},
-       {"storehouse", 0, STOREHOUSE_STORAGE, 0, true, 0},
-       {"field", 0, 0, FIELD_YIELD, false, 0},
-       {"training_ground", 0, 0, 0, false, TRAINING_GROUND_PUPILS},
-       {"manual_hall", 0, 0, 0, true, MANUAL_HALL_PUPILS},
-       {"seat_gate", 0, 0, 0, true, 0},
-       {"smithy", 0, 0, 0, true, 0, WORKSHOP_SERVES, 0, SMITHY_EDGE, 0},
-       {"apothecary", 0, 0, 0, true, 0, 0, WORKSHOP_SERVES, 0,
-        APOTHECARY_HEALING}},
-      // A sect's seat of 12 by 9 cells, which every one of 200 seeds has room
-      // for: a house for its founding household, a manual hall and a
-      // hall along its north side, a training ground in its south-west
-      // corner, a granary and a field of rice east of it, and the seat gate
-      // on its south edge below them. Growth keeps clear its court, the two
-      // rows before the halls, the path down from it between the granary and
-      // the field to the gate, and two rows before the gate outside.
-      {"seat",
-       {SEAT_WIDTH, SEAT_HEIGHT},
-       {building({0, 0}, HOUSE, "house", FOUNDING_HOUSEHOLDS),
-        building({3, 0}, MANUAL_HALL, "manual_hall", 0),
-        building({SEAT_HALL_EAST, 0}, HALL, "hall", 0),
-        building({0, SEAT_YARD_ROW}, TRAINING_GROUND, "training_ground", 0),
-        building({SEAT_GRANARY_EAST, SEAT_YARD_ROW}, GRANARY, "granary", 0),
-        building({SEAT_FIELD_EAST, SEAT_YARD_ROW}, RICE, "field", 0),
-        building({SEAT_GATE_EAST, SEAT_HEIGHT - 1}, SEAT_GATE, "seat_gate", 0)},
-       {Clearing{{0, SEAT_COURT_ROW}, {SEAT_WIDTH, 2}},
-        Clearing{{SEAT_PATH_EAST, SEAT_YARD_ROW}, {1, 3}},
-        Clearing{{SEAT_GATE_EAST, SEAT_HEIGHT}, {SEAT_GATE.width, 2}}}},
-      {{"Hwasan", 0}, {"Heavenly Demon", 1}, {"Black Fang", 2}},
-  };
-  // Villages pressing against a fifth of their caps grow, checked every 30
-  // days. They build a house, a field of rice, a granary, a smithy or an
-  // apothecary within 8 cells of their centre, or send 6 settlers to lay out
-  // a hamlet within 40 cells, 3 cells clear of any structure, or 10 raiders
-  // against a hostile village within 40 cells. A village holds the land
-  // within 16 cells. It arms and tends 20 people with no workshop, so a
-  // hamlet, capped at 20, builds neither, and a village, at 50, builds both.
-  data.life.growth = growth_of(
-      data,
-      {building({0, 0}, HOUSE, "house", 0), building({0, 0}, RICE, "field", 0),
-       building({0, 0}, GRANARY, "granary", 0),
-       building({0, 0}, SMITHY, "smithy", 0),
-       building({0, 0}, APOTHECARY, "apothecary", 0)},
-      data.villages.front());
-  return data;
+bool consistent(const RegionData& data) {
+  try {
+    validate(data);
+  } catch (const std::invalid_argument&) {
+    return false;
+  }
+  return true;
 }
 
 Region generate_region(Seed seed, const RegionData& data) {

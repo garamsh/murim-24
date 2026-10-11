@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/error_macros.hpp>
@@ -27,8 +29,10 @@
 #include <variant>
 #include <vector>
 
+#include "content.hpp"
 #include "file_saves.hpp"
 #include "flow_field.hpp"
+#include "json_packs.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "region.hpp"
@@ -227,10 +231,44 @@ godot::PackedInt64Array indices(const std::vector<std::size_t>& people) {
   return result;
 }
 
+// The base pack's tables, read once from `res://packs/` through Godot's file
+// access, which reads inside an export where a path names no file. Throws
+// std::invalid_argument naming the first error when the pack is refused.
+const murim::RegionData& base_data() {
+  static const murim::RegionData data = [] {
+    const std::string base = murim_packs::BASE_PACK;
+    const godot::String root =
+        godot::String("res://packs/") + godot::String(base.c_str()) + "/";
+    const auto bytes_of = [](const godot::String& path) {
+      return std::string(
+          godot::FileAccess::get_file_as_string(path).utf8().get_data());
+    };
+    murim_packs::BytePacks packs;
+    packs.add(base, "pack.json", bytes_of(root + godot::String("pack.json")));
+    for (const godot::String& file :
+         godot::DirAccess::get_files_at(root + godot::String("data"))) {
+      if (file.ends_with(".json")) {
+        packs.add(base, "data/" + std::string(file.utf8().get_data()),
+                  bytes_of(root + godot::String("data/") + file));
+      }
+    }
+    murim::LoadedContent loaded = murim::load_content(packs, base, {});
+    if (!loaded.data) {
+      const murim::ContentError first =
+          loaded.errors.empty() ? murim::ContentError{} : loaded.errors.front();
+      throw std::invalid_argument("the base pack is refused: " + first.pack +
+                                  " " + first.document + " " + first.entry +
+                                  " " + first.path);
+    }
+    return std::move(*loaded.data);
+  }();
+  return data;
+}
+
 // Returns the region the core generates from `seed`, its days `ticks_per_day`
 // ticks long.
 murim::Region region_of(murim::Seed seed, std::uint64_t ticks_per_day) {
-  murim::Region region = murim::generate_region(seed, murim::region_data());
+  murim::Region region = murim::generate_region(seed, base_data());
   region.rules.ticks_per_day = ticks_per_day;
   return region;
 }
@@ -359,7 +397,7 @@ godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
 
 void WorldAdapter::show(murim::Region& region, murim::Origin origin) {
   structure_kinds_ = std::move(region.structure_kinds);
-  region_data_ = murim::region_data();
+  region_data_ = base_data();
   terrain_ = std::move(region.terrain);
   villages_ = std::move(region.villages);
   origin_ = origin;

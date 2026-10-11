@@ -1,0 +1,115 @@
+[
+  {
+    "id": "life",
+    "newborn_health": 120,
+    "lifespan": {
+      "mean": 7200,
+      "spread": 1800
+    },
+    "days_per_attainment": 1,
+    "discipline_widening": 200,
+    "upper_widening": 100,
+    "founding_age": {
+      "mean": 2640,
+      "spread": 720
+    },
+    "kinship": {
+      "marrying_age": {
+        "low": 1920,
+        "high": 4800
+      },
+      "neighbourhood": 80,
+      "marriage_chance": 500,
+      "bearing_age": {
+        "low": 2160,
+        "high": 4800
+      },
+      "birth_chance": 400,
+      "birth_spacing": 240,
+      "fathers_family": true,
+      "balanced_sexes": true
+    },
+    "husbandry": {
+      "consumption": 1,
+      "hunger_days": 10,
+      "migration_reach": 48
+    },
+    "growth": {
+      "interval": 30,
+      "pressure": 200,
+      "reach": 40,
+      "vicinity": 8,
+      "spacing": 3,
+      "claim": 16,
+      "builds": [
+        {
+          "kind": "house",
+          "width": 3,
+          "height": 3
+        },
+        {
+          "kind": "field",
+          "width": 3,
+          "height": 2
+        },
+        {
+          "kind": "granary",
+          "width": 2,
+          "height": 2
+        },
+        {
+          "kind": "smithy",
+          "width": 3,
+          "height": 2
+        },
+        {
+          "kind": "apothecary",
+          "width": 4,
+          "height": 2
+        }
+      ],
+      "settlement": "hamlet",
+      "settlers": 6,
+      "raiders": 10,
+      "self_reliance": 20
+    },
+    "manuals": {
+      "scatter_chance": 500,
+      "scatter_reach": 16
+    },
+    "cultivation": {
+      "growth": {
+        "mean": 1,
+        "spread": 1
+      },
+      "limit": {
+        "mean": 8000,
+        "spread": 7000
+      },
+      "recovery": 10,
+      "recovery_ticks": 30
+    },
+    "learning": {
+      "comprehension": 300,
+      "teaching": 200,
+      "reading_cost": 500,
+      "reading_reach": 256,
+      "orientation_ease": 500,
+      "polarity_ease": 700,
+      "orientation_potency": 700,
+      "polarity_potency": 900
+    },
+    "diplomacy": {
+      "war_margin": 1500,
+      "war_chance": 100,
+      "peace_chance": 200,
+      "hold_days": 600
+    },
+    "trade": {
+      "purse": 30,
+      "wage": 1,
+      "wounded": 500,
+      "drained": 250
+    }
+  }
+]

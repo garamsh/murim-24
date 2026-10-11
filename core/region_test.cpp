@@ -15,12 +15,19 @@
 #include <utility>
 #include <vector>
 
+#include "json_packs.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "world.hpp"
 
 namespace murim {
 namespace {
+
+// The base pack's tables, read once from the packs directory.
+const RegionData& base_data() {
+  static const RegionData data = murim_packs::load_base(MURIM_PACKS_DIR);
+  return data;
+}
 
 constexpr std::uint64_t SEEDS = 200;
 constexpr int TICKS = 300;
@@ -247,14 +254,14 @@ bool populated(const Region& region, std::size_t factions) {
 }
 
 TEST(Region, SameSeedGivesTheSameRegionAndWorld) {
-  const Region first = generate_region(SEED, region_data());
-  const Region second = generate_region(SEED, region_data());
+  const Region first = generate_region(SEED, base_data());
+  const Region second = generate_region(SEED, base_data());
   EXPECT_EQ(flatten(first), flatten(second));
   EXPECT_EQ(hash_after_ticks(first), hash_after_ticks(second));
 
   // Control: another seed's region, given this seed so that only what was
   // generated from the seed differs, is another region and another world.
-  Region other = generate_region(OTHER_SEED, region_data());
+  Region other = generate_region(OTHER_SEED, base_data());
   other.seed = SEED;
   EXPECT_NE(flatten(first), flatten(other));
   EXPECT_NE(hash_after_ticks(first), hash_after_ticks(other));
@@ -262,7 +269,7 @@ TEST(Region, SameSeedGivesTheSameRegionAndWorld) {
 
 TEST(Region, HasThreeFactionsWithTerritoryAndSixToEightVillages) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    const Region region = generate_region(Seed{seed}, region_data());
+    const Region region = generate_region(Seed{seed}, base_data());
     EXPECT_TRUE(populated(region, 3)) << "seed " << seed;
 
     // Control: a region of three factions is not one of four.
@@ -283,7 +290,7 @@ Region marked(const Region& region, Cell cell, Footing footing) {
 
 TEST(Region, VillagesStandOnBuildableCells) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    const Region region = generate_region(Seed{seed}, region_data());
+    const Region region = generate_region(Seed{seed}, base_data());
     EXPECT_TRUE(villages_on_buildable_cells(region)) << "seed " << seed;
     EXPECT_TRUE(builds_a_world(region)) << "seed " << seed;
 
@@ -303,7 +310,7 @@ TEST(Region, VillagesStandOnBuildableCells) {
 
 TEST(Region, VillagesLieInTheirOwnersTerritory) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    const Region region = generate_region(Seed{seed}, region_data());
+    const Region region = generate_region(Seed{seed}, base_data());
     EXPECT_TRUE(villages_in_owner_territory(region)) << "seed " << seed;
 
     // Control: handing a village to another faction breaks it.
@@ -317,7 +324,7 @@ TEST(Region, VillagesLieInTheirOwnersTerritory) {
 
 TEST(Region, VillagesDoNotOverlap) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    const Region region = generate_region(Seed{seed}, region_data());
+    const Region region = generate_region(Seed{seed}, base_data());
     EXPECT_TRUE(villages_disjoint(region)) << "seed " << seed;
 
     // Control: moving one village onto another breaks it.
@@ -328,7 +335,7 @@ TEST(Region, VillagesDoNotOverlap) {
 }
 
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
-  RegionData data = region_data();
+  RegionData data = base_data();
   data.factions.push_back(Faction{"Martial clans",
                                   {1},
                                   data.factions.at(0).skills,
@@ -356,34 +363,34 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
 }
 
 TEST(Region, RejectsInconsistentData) {
-  EXPECT_NO_THROW(static_cast<void>(generate_region(SEED, region_data())));
+  EXPECT_NO_THROW(static_cast<void>(generate_region(SEED, base_data())));
 
-  RegionData unknown_enemy = region_data();
+  RegionData unknown_enemy = base_data();
   unknown_enemy.factions.at(0).hostile_to.push_back(3);
   EXPECT_THROW(static_cast<void>(generate_region(SEED, unknown_enemy)),
                std::invalid_argument);
 
-  RegionData weightless = region_data();
+  RegionData weightless = base_data();
   for (TerrainKind& kind : weightless.terrain) {
     kind.weight = 0;
   }
   EXPECT_THROW(static_cast<void>(generate_region(SEED, weightless)),
                std::invalid_argument);
 
-  RegionData outside = region_data();
+  RegionData outside = base_data();
   VillageTemplate& beyond = outside.villages.at(0);
   beyond.buildings.push_back(
       Building{Structure{{beyond.area.width - 1, 0}, 1, {2, 1}}, "house", 1});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, outside)),
                std::invalid_argument);
 
-  RegionData overlapping = region_data();
+  RegionData overlapping = base_data();
   VillageTemplate& doubled = overlapping.villages.at(0);
   doubled.buildings.push_back(doubled.buildings.front());
   EXPECT_THROW(static_cast<void>(generate_region(SEED, overlapping)),
                std::invalid_argument);
 
-  RegionData over_centre = region_data();
+  RegionData over_centre = base_data();
   VillageTemplate& central = over_centre.villages.at(0);
   central.buildings.push_back(Building{
       Structure{{central.area.width / 2, central.area.height / 2}, 1, {1, 1}},
@@ -391,7 +398,7 @@ TEST(Region, RejectsInconsistentData) {
   EXPECT_THROW(static_cast<void>(generate_region(SEED, over_centre)),
                std::invalid_argument);
 
-  RegionData empty = region_data();
+  RegionData empty = base_data();
   for (Building& building : empty.villages.at(0).buildings) {
     building.households = 0;
   }
@@ -453,7 +460,7 @@ bool follows_its_template(const RegionData& data, const Region& region,
 }
 
 TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheHouseholds) {
-  const RegionData data = region_data();
+  const RegionData& data = base_data();
   const Region region = generate_region(SEED, data);
   EXPECT_EQ(region.structure_kinds.size(), region.structures.size());
   for (const Village& village : region.villages) {
@@ -462,7 +469,7 @@ TEST(Region, StructuresCarryTheirKindAndBuildingsHouseTheHouseholds) {
 }
 
 TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
-  const Region region = generate_region(SEED, region_data());
+  const Region region = generate_region(SEED, base_data());
   const std::vector<VillageSpec> specs = village_specs(region);
   ASSERT_FALSE(region.sects.empty());
   for (const SectSpec& sect : region.sects) {
@@ -470,7 +477,7 @@ TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
     const std::vector<Clearing>& clearings = specs.at(sect.seat).clearings;
     // The world keeps clear what the seat's template does, from its corner,
     // and every cell of it inside the seat is open, as a court is.
-    ASSERT_EQ(clearings.size(), region_data().seat.clearings.size());
+    ASSERT_EQ(clearings.size(), base_data().seat.clearings.size());
     const std::vector<Cell> open = open_cells(region, seat);
     for (const Clearing& clearing : clearings) {
       for (const Cell cell : cells_of(clearing.corner, clearing.area)) {
@@ -490,7 +497,7 @@ TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
 }
 
 TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
-  Region region = generate_region(SEED, region_data());
+  Region region = generate_region(SEED, base_data());
   const Village& village = region.villages.at(1);
   const ArmySpec& residents = region.armies.at(village.army);
   const ArmySpec born = born_in(region, 1);
@@ -528,7 +535,7 @@ std::size_t sect_of_faction(const World& world, std::size_t faction) {
 constexpr Seed MARRYING_SEED{7};
 
 World born_and_lived(std::size_t village, bool homeless, std::uint64_t days) {
-  RegionData data = region_data();
+  RegionData data = base_data();
   data.life.diplomacy.reset();
   Region region = generate_region(MARRYING_SEED, data);
   region.rules.ticks_per_day = 1;
@@ -602,8 +609,8 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   constexpr std::uint64_t LIMIT = 20'000;
   constexpr std::size_t RAIDERS = 12;
   constexpr std::size_t REBUILDERS = 12;
-  Region region = generate_region(SEED, region_data());
-  const RegionData data = region_data();
+  Region region = generate_region(SEED, base_data());
+  const RegionData& data = base_data();
   const std::size_t target = first_of(region, ORTHODOX);
   const Cell centre =
       region.armies.at(region.villages.at(target).army).objective;
@@ -665,7 +672,7 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
 }
 
 TEST(Region, EachFactionIsLedByTheFirstResidentOfItsFirstVillage) {
-  const Region region = generate_region(SEED, region_data());
+  const Region region = generate_region(SEED, base_data());
   const World world = world_of(region);
   for (std::size_t faction = 0; faction < region.leadership.size(); ++faction) {
     const std::size_t first = first_of(region, faction);
@@ -680,7 +687,7 @@ TEST(Region, EachFactionIsLedByTheFirstResidentOfItsFirstVillage) {
   EXPECT_FALSE(region.leadership.at(2).succession.has_value());
 }
 
-// Combat pace, in ticks: the targets region_data() is tuned to.
+// Combat pace, in ticks: the targets base_data() is tuned to.
 constexpr std::uint64_t SECOND = TICKS_PER_SECOND;
 constexpr std::uint64_t MINUTE = 60 * SECOND;
 constexpr std::uint64_t DUEL_LEAST = 10 * SECOND;
@@ -868,11 +875,11 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   return Raided{ticks, world.roster(residents).size()};
 }
 
-// region_data() with every village starting as full as a grown one, as the
+// base_data() with every village starting as full as a grown one, as the
 // combat targets and caps are measured against: the hamlet with 6
 // households, 12 people, and the walled village with 13, 26 people.
 RegionData grown() {
-  RegionData data = region_data();
+  RegionData data = base_data();
   for (VillageTemplate& kind : data.villages) {
     const std::uint32_t households = kind.name == "village" ? 13 : 6;
     for (Building& building : kind.buildings) {
@@ -882,10 +889,10 @@ RegionData grown() {
   return data;
 }
 
-// region_data() with the Demonic Cult's first skill, its strike, doing
+// base_data() with the Demonic Cult's first skill, its strike, doing
 // `damage` to a person.
 RegionData striking(std::uint64_t damage) {
-  RegionData data = region_data();
+  RegionData data = base_data();
   data.factions.at(DEMONIC).skills.front().body_damage = damage;
   data.factions.at(0).skills.front().body_damage = damage;
   return data;
@@ -893,8 +900,8 @@ RegionData striking(std::uint64_t damage) {
 
 TEST(Region, ADuelEndsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
-    EXPECT_TRUE(within(duel_ticks(region_data(), seed, DUEL_MOST + 1),
-                       DUEL_LEAST, DUEL_MOST))
+    EXPECT_TRUE(within(duel_ticks(base_data(), seed, DUEL_MOST + 1), DUEL_LEAST,
+                       DUEL_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
   // Control: the placeholder strike of 1 leaves the duel fought past it.
@@ -903,7 +910,7 @@ TEST(Region, ADuelEndsWithinItsTargetTime) {
 
 TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
-    EXPECT_TRUE(within(skirmish_ticks(region_data(), seed, SKIRMISH_MOST + 1),
+    EXPECT_TRUE(within(skirmish_ticks(base_data(), seed, SKIRMISH_MOST + 1),
                        SKIRMISH_LEAST, SKIRMISH_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
@@ -918,7 +925,7 @@ TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
 // foe in sight.
 std::uint64_t struck_from(std::int32_t apart) {
   constexpr std::uint64_t SECOND = 30;
-  const RegionData data = region_data();
+  const RegionData& data = base_data();
   Region region = generate_region(SEED, data);
   region.rules.sight = 0;
   const Cell corner = open_field(region).value_or(Cell{0, 0});
@@ -1063,14 +1070,14 @@ bool born_in_wedlock(const Lived& lived) {
 }
 
 TEST(Region, FamiliesReachAThirdGenerationWithinThirtyYears) {
-  const Lived region = lived(region_data(), SEED, GENERATIONS_YEARS);
+  const Lived region = lived(base_data(), SEED, GENERATIONS_YEARS);
   const std::vector<int> generation = generations(region.people);
   EXPECT_GE(*std::max_element(generation.begin(), generation.end()), 3);
   EXPECT_LE(region.peak, MAX_PEOPLE);
   EXPECT_TRUE(born_in_wedlock(region));
   // Control: without kinship no one marries but the households the world
   // starts with, and the world starts with the only generation it has.
-  RegionData unwed = region_data();
+  RegionData unwed = base_data();
   unwed.life.kinship.reset();
   const Lived control = lived(unwed, SEED, GENERATIONS_YEARS);
   const std::vector<int> only = generations(control.people);
@@ -1159,7 +1166,7 @@ bool fathers_surnames(const Lived& region) {
 }
 
 TEST(Region, EveryPersonBearsTheirFamilySurnameAndAGivenName) {
-  const Lived region = lived(region_data(), SEED, GENERATIONS_YEARS);
+  const Lived region = lived(base_data(), SEED, GENERATIONS_YEARS);
   const auto named = [](const std::optional<Name>& name) {
     return name && !name->surname.korean.empty() &&
            !name->surname.romanised.empty() && !name->given.korean.empty() &&
@@ -1177,10 +1184,10 @@ TEST(Region, EveryPersonBearsTheirFamilySurnameAndAGivenName) {
     }
     return spellings;
   };
-  EXPECT_EQ(spelled(lived(region_data(), SEED, 0)),
-            spelled(lived(region_data(), SEED, 0)));
-  EXPECT_NE(spelled(lived(region_data(), SEED, 0)),
-            spelled(lived(region_data(), OTHER_SEED, 0)));
+  EXPECT_EQ(spelled(lived(base_data(), SEED, 0)),
+            spelled(lived(base_data(), SEED, 0)));
+  EXPECT_NE(spelled(lived(base_data(), SEED, 0)),
+            spelled(lived(base_data(), OTHER_SEED, 0)));
 }
 
 // The most people above its cap any village of the region `data` generates
@@ -1297,7 +1304,7 @@ Grew grew(const RegionData& data, Seed seed,
 }
 
 TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
-  const Grew region = grew(region_data(), NEIGHBOURLY);
+  const Grew region = grew(base_data(), NEIGHBOURLY);
   // Villages were founded, and one came to house its settlers; a building
   // was raised; a raiding party, an army housing no village, was sent; the
   // factions' territories changed; the living stayed within the bound.
@@ -1308,12 +1315,12 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_NE(region.territory_after, region.territory_before);
   EXPECT_LE(region.peak, MAX_PEOPLE);
   // The same seed grows the same way; control: another seed does not.
-  EXPECT_EQ(static_cast<std::uint64_t>(grew(region_data(), NEIGHBOURLY).hash),
+  EXPECT_EQ(static_cast<std::uint64_t>(grew(base_data(), NEIGHBOURLY).hash),
             static_cast<std::uint64_t>(region.hash));
-  EXPECT_NE(static_cast<std::uint64_t>(grew(region_data(), OTHER_SEED).hash),
+  EXPECT_NE(static_cast<std::uint64_t>(grew(base_data(), OTHER_SEED).hash),
             static_cast<std::uint64_t>(region.hash));
   // Control: with no faction taking a stance, no village is founded.
-  RegionData still = region_data();
+  RegionData still = base_data();
   for (Faction& faction : still.factions) {
     faction.stance.clear();
   }
@@ -1366,7 +1373,7 @@ void hold_in_first(Region& region, std::size_t village, const RegionData& data,
 constexpr std::uint64_t WORKSHOP_YEARS = 40;
 
 Workshops workshops_raised(std::uint32_t cap) {
-  const RegionData data = region_data();
+  const RegionData& data = base_data();
   Region region = generate_region(NEIGHBOURLY, data);
   region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
   const Growth growth = data.life.growth.value_or(Growth{});
@@ -1431,7 +1438,7 @@ Workshops workshops_raised(std::uint32_t cap) {
 
 TEST(Region, VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary) {
   const std::uint32_t reliance =
-      region_data().life.growth.value_or(Growth{}).self_reliance;
+      base_data().life.growth.value_or(Growth{}).self_reliance;
   const Workshops past = workshops_raised(reliance + 4);
   // Setup: the village's cap is past its self-reliance, its people pressed
   // against it before it laid a workshop, and it held none.
@@ -1462,7 +1469,7 @@ std::uint32_t most_households(const RegionData& data, Seed seed) {
 TEST(Region, EachFactionStartsWithAtMostFourHouseholds) {
   constexpr std::uint32_t MOST = 4;
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    EXPECT_LE(most_households(region_data(), Seed{seed}), MOST)
+    EXPECT_LE(most_households(base_data(), Seed{seed}), MOST)
         << "seed " << seed;
   }
   // Control: villages as full as grown ones start with more.
@@ -1583,23 +1590,23 @@ Century century(const RegionData& data, Seed seed) {
 }
 
 TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
-  const Century grew = century(region_data(), NEIGHBOURLY);
+  const Century grew = century(base_data(), NEIGHBOURLY);
   // The living at least triple and the villages, founded ones included, at
   // least double; every faction keeps a peopled village, and the living stay
   // within the bound.
   EXPECT_GE(grew.living_after, 3 * grew.living_before);
   EXPECT_GE(grew.villages_after, 2 * grew.villages_before);
-  EXPECT_EQ(grew.fewest_factions, region_data().factions.size());
+  EXPECT_EQ(grew.fewest_factions, base_data().factions.size());
   EXPECT_LE(grew.peak, MAX_PEOPLE);
 
   // Control: without growth no village is founded, although births still
   // fill the villages there are.
-  RegionData still = region_data();
+  RegionData still = base_data();
   still.life.growth.reset();
   const Century kept = century(still, NEIGHBOURLY);
   EXPECT_LE(kept.villages_after, kept.villages_before);
   // Control: without kinship no one is born, and the living do not rise.
-  RegionData unwed = region_data();
+  RegionData unwed = base_data();
   unwed.life.kinship.reset();
   const Century barren = century(unwed, NEIGHBOURLY);
   EXPECT_LE(barren.living_after, barren.living_before);
@@ -1609,12 +1616,12 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
 // even odds: their faction's founders aged out with no son to marry them.
 constexpr Seed SONLESS{9};
 
-// region_data() with no sects, whose seats would change the region SONLESS
+// base_data() with no sects, whose seats would change the region SONLESS
 // was chosen on, no cultivation, whose draws at birth would change its
 // people, and no diplomacy, whose draws and wars would change its history;
 // ADR 0027's rule depends on none of them.
 RegionData sectless() {
-  RegionData data = region_data();
+  RegionData data = base_data();
   data.sects.clear();
   data.life.manuals.reset();
   data.life.cultivation.reset();
@@ -1624,7 +1631,7 @@ RegionData sectless() {
 
 TEST(Region, ChildrenOfTheScarcerSexKeepEveryFactionPeopled) {
   const Century balanced = century(sectless(), SONLESS);
-  EXPECT_EQ(balanced.fewest_factions, region_data().factions.size());
+  EXPECT_EQ(balanced.fewest_factions, base_data().factions.size());
   EXPECT_GE(balanced.living_after, 2 * balanced.living_before);
   // Control: with sexes drawn at even odds, a faction dies out.
   RegionData drawn = sectless();
@@ -1636,9 +1643,9 @@ TEST(Region, ChildrenOfTheScarcerSexKeepEveryFactionPeopled) {
   EXPECT_LT(unbalanced.living_after, 2 * unbalanced.living_before);
 }
 
-// region_data() with no faction's sects admitting anyone.
+// base_data() with no faction's sects admitting anyone.
 RegionData closed() {
-  RegionData data = region_data();
+  RegionData data = base_data();
   for (Faction& faction : data.factions) {
     faction.admission.reset();
   }
@@ -1652,7 +1659,7 @@ std::array<std::size_t, 3> sect_deeds(const Century& lived) {
 }
 
 TEST(Region, SectsAdmitChangeMastersAndElectOverACentury) {
-  const Century lived = century(region_data(), NEIGHBOURLY);
+  const Century lived = century(base_data(), NEIGHBOURLY);
   // Sects admit members beyond their founders, a master changes, and the
   // Orthodox, who elect, are led by another after their leader dies.
   EXPECT_GT(lived.admitted, 0U);

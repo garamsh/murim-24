@@ -1,0 +1,110 @@
+[
+  {
+    "id": "house",
+    "housing": 8,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "hall",
+    "housing": 12,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 4
+  },
+  {
+    "id": "well",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "barrels",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "fence",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "granary",
+    "housing": 0,
+    "storage": 2400,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "storehouse",
+    "housing": 0,
+    "storage": 3600,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "field",
+    "housing": 0,
+    "storage": 0,
+    "yield": 600,
+    "blocks": false,
+    "pupils": 0
+  },
+  {
+    "id": "training_ground",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": false,
+    "pupils": 12
+  },
+  {
+    "id": "manual_hall",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 4
+  },
+  {
+    "id": "seat_gate",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0
+  },
+  {
+    "id": "smithy",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "arms": 40,
+    "edge": 250
+  },
+  {
+    "id": "apothecary",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "tends": 40,
+    "healing": 12
+  }
+]

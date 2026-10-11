@@ -23,7 +23,7 @@ set(GODOTCPP_DISABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(godot-cpp)
 
 add_library(murim_extension SHARED extension.cpp file_saves.cpp world_adapter.cpp)
-target_link_libraries(murim_extension PRIVATE murim_core godot-cpp)
+target_link_libraries(murim_extension PRIVATE murim_core murim_packs_json godot-cpp)
 target_compile_options(murim_extension PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)
 set_target_properties(murim_extension PROPERTIES PREFIX "lib" OUTPUT_NAME "murim${GODOTCPP_SUFFIX}")

@@ -1,0 +1,81 @@
+[
+  {
+    "id": "orthodox",
+    "name": "Orthodox",
+    "hostile_to": [
+      "demonic"
+    ],
+    "skills": [
+      "guard",
+      "mend"
+    ],
+    "stance": [
+      "build",
+      "found",
+      "raid"
+    ],
+    "admission": {
+      "age": 1440,
+      "talent": 550,
+      "attainment": 0,
+      "reach": 48,
+      "chance": 300,
+      "elder_share": 333
+    },
+    "election": {
+      "term": 0
+    }
+  },
+  {
+    "id": "demonic",
+    "name": "Demonic",
+    "hostile_to": [
+      "orthodox",
+      "unorthodox"
+    ],
+    "skills": [
+      "guard",
+      "torch"
+    ],
+    "succession": {
+      "members_only": true,
+      "yield_health": 0,
+      "allies_turn_hostile": true
+    },
+    "stance": [
+      "raid"
+    ],
+    "admission": {
+      "age": 1440,
+      "talent": 550,
+      "attainment": 0,
+      "reach": 48,
+      "chance": 300,
+      "elder_share": 333
+    }
+  },
+  {
+    "id": "unorthodox",
+    "name": "Unorthodox",
+    "hostile_to": [
+      "demonic"
+    ],
+    "skills": [
+      "guard",
+      "mend"
+    ],
+    "stance": [
+      "found",
+      "raid",
+      "build"
+    ],
+    "admission": {
+      "age": 1440,
+      "talent": 0,
+      "attainment": 20,
+      "reach": 48,
+      "chance": 300,
+      "elder_share": 333
+    }
+  }
+]

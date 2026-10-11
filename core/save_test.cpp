@@ -13,12 +13,19 @@
 #include <variant>
 #include <vector>
 
+#include "json_packs.hpp"
 #include "map.hpp"
 #include "region.hpp"
 #include "world.hpp"
 
 namespace murim {
 namespace {
+
+// The base pack's tables, read once from the packs directory.
+const RegionData& base_data() {
+  static const RegionData data = murim_packs::load_base(MURIM_PACKS_DIR);
+  return data;
+}
 
 constexpr std::uint64_t TICKS_PER_SHORT_DAY = 5;
 constexpr std::uint64_t YEARS = 10;
@@ -62,7 +69,7 @@ class MemorySaves : public SaveStore {
 // The generated region of `seed`, with days of five ticks and a player born
 // into its first village carrying a soul, lived `YEARS` years.
 Saved lived_region(Seed seed) {
-  Region region = generate_region(seed, region_data());
+  Region region = generate_region(seed, base_data());
   region.rules.ticks_per_day = TICKS_PER_SHORT_DAY;
   region.armies.push_back(born_in(region, 0));
   World world{region.seed,       Map{region.map_rows}, region.armies,

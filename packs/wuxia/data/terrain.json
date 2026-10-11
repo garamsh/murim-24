@@ -1,0 +1,27 @@
+[
+  {
+    "id": "plain",
+    "footing": "buildable",
+    "weight": 10
+  },
+  {
+    "id": "forest",
+    "footing": "buildable",
+    "weight": 3
+  },
+  {
+    "id": "hills",
+    "footing": "rough",
+    "weight": 2
+  },
+  {
+    "id": "water",
+    "footing": "blocked",
+    "weight": 1
+  },
+  {
+    "id": "mountain",
+    "footing": "blocked",
+    "weight": 1
+  }
+]

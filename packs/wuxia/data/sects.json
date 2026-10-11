@@ -1,0 +1,26 @@
+[
+  {
+    "id": "hwasan",
+    "name": "Hwasan",
+    "faction": "orthodox",
+    "manuals": [
+      "plum_blossom_sword"
+    ]
+  },
+  {
+    "id": "heavenly_demon",
+    "name": "Heavenly Demon",
+    "faction": "demonic",
+    "manuals": [
+      "heavenly_demon_saber"
+    ]
+  },
+  {
+    "id": "black_fang",
+    "name": "Black Fang",
+    "faction": "unorthodox",
+    "manuals": [
+      "black_fang_darts"
+    ]
+  }
+]
