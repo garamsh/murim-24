@@ -268,6 +268,12 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - Learning an art has requirements: certain insights, a minimum realm, and sometimes a lower art learned first. If any is missing, learning fails, and the attempt says what was missing.
   - An art grants several skills. Some are active casts, and some are passive and always on, such as regeneration, damage by family, sight and stamina.
   - The arts' lineage is visible at a glance. The window's layout is the owner's to choose.
+- **[proposed]** ADR 0072's details:
+  - up to 256 insights and 16 practices counted on each person, each insight rolled daily once its practice passes a threshold or its conditions hold
+  - a failed manual reading costing its qi and 30 days before the same manual
+  - teaching and synthesis rolled only for arts whose requirements hold
+  - passives adding where they add, taking the strongest where they multiply
+  - footwork's climbing effect carried as a footwork passive
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
 
 ## Arts that reshape the world [agreed]
