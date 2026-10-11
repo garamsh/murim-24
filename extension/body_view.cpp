@@ -230,8 +230,14 @@ void BodyView::set_atlas(Vector2 size, const godot::PackedInt64Array& frames,
                          const godot::PackedInt64Array& sprite_of_faction,
                          const godot::PackedColorArray& accents) {
   atlas_size_ = size;
-  frames_.assign(frames.ptr(), frames.ptr() + frames.size());
-  outline_frames_.assign(outlines.ptr(), outlines.ptr() + outlines.size());
+  // A tag the atlas does not name takes the first frame.
+  frames_.assign(TAGS, 0);
+  outline_frames_.assign(TAGS, 0);
+  std::copy_n(frames.ptr(), std::min<std::size_t>(TAGS, static_cast<std::size_t>(frames.size())),
+              frames_.begin());
+  std::copy_n(outlines.ptr(),
+              std::min<std::size_t>(TAGS, static_cast<std::size_t>(outlines.size())),
+              outline_frames_.begin());
   faction_width_ = faction_width;
   shadow_x_ = shadow_x;
   sprite_of_faction_.assign(sprite_of_faction.ptr(),

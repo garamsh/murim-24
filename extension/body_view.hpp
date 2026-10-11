@@ -257,10 +257,11 @@ class BodyView : public godot::RefCounted {
                    double left) const;
   void draw_target(godot::RID canvas_item, godot::Vector2 at) const;
 
-  // The atlas.
-  godot::Vector2 atlas_size_;
-  std::vector<std::int64_t> frames_;
-  std::vector<std::int64_t> outline_frames_;
+  // The atlas: until it is set, every frame is its first.
+  static constexpr std::size_t TAGS = 8;
+  godot::Vector2 atlas_size_{1, 1};
+  std::vector<std::int64_t> frames_ = std::vector<std::int64_t>(TAGS, 0);
+  std::vector<std::int64_t> outline_frames_ = std::vector<std::int64_t>(TAGS, 0);
   std::int64_t faction_width_ = 0;
   std::int64_t shadow_x_ = 0;
   std::vector<std::int64_t> sprite_of_faction_;

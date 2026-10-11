@@ -184,6 +184,8 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_factions = snapshot.faction
 	combat.begin(world, snapshot)
 	combat.bodies.set_steered(steered)
+	$Drops.rebuild(combat)
+	$Sprays.rebuild(combat)
 	_occluders_for = Vector3i(-1, -1, -1)
 	name_around(steered)
 
