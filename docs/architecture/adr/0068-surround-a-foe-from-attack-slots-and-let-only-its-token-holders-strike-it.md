@@ -57,6 +57,7 @@ Facts from `core/` at `c86b08d`, and from ADR 0066 and #233, which have since me
 
 - **It holds on a waiting ring outside the foe's reach and circles, until a token frees.** Chosen.
   - The waiting ring's radius is the striker's reach plus the separation plus two steps: 672 units, 2.6 cells, for the basic strike. Its slots are spaced by the same rule, up to 16.
+  - A foe has one waiting ring, shared by both reach classes. Its radius comes from the longest reach among the people waiting on it that tick, so every waiter stands outside its own reach. A striker beyond 4 cells does not wait on a ring: it holds where it stands, outside its range, until it has a token.
   - A waiter takes a waiting slot as an attacker takes a slot. Every 30 ticks it moves on to the next free waiting slot, clockwise for an even person index and counter-clockwise for an odd one, so a ring of waiters circles in both directions.
   - Waiters queue in the order they began to wait, then by person index. A waiter already queued comes before one who starts waiting on the same tick. When a token frees, the head of the queue takes it and walks to the slot nearest it.
   - When two circlers move on toward the same free waiting slot, the one earlier in the queue takes it, and the other keeps its slot until the next period.
@@ -89,7 +90,7 @@ Facts from `core/` at `c86b08d`, and from ADR 0066 and #233, which have since me
 
 ### How it fits what exists
 
-- **ADR 0066.** An intent's target is the foe its members engage. The members close on their slots, not on the target, and strike it only with its token. Waiting with an intent keeps the intent. Everything that ends an intent frees its slots and tokens.
+- **ADR 0066.** An intent's target is the foe its members engage. The members close on their slots, not on the target. An NPC member strikes it only with one of its tokens, while the steered body strikes it regardless, taking a token with priority. Waiting with an intent keeps the intent. Everything that ends an intent frees its slots and tokens.
 - **ADR 0046.**
   - The engage search keeps its sight and claim rules and gains the free-token preference above.
   - A person engaging steps toward its slot or waiting slot by the same open step, an intent's chase keeping its axis step around a shut corner. It stands to fight while on its slot, within a quarter cell, with the token.
@@ -142,7 +143,7 @@ Combat gains attack slots and attack tokens, the same for every person.
 **Freeing.** Slots and tokens free when the holder dies, chooses another foe, ends or moves its intent, starts a leap, or lies beyond the waiting ring; when the foe dies; and after a lease of 90 ticks while someone waits.
 
 **Where it fits.**
-- ADR 0066's intent: members close on slots around its target and strike it with its tokens.
+- ADR 0066's intent: members close on slots around its target, and NPC members strike it with its tokens.
 - ADR 0046's engage rule: steps toward a slot instead of the foe.
 - ADR 0058: offers no slot a leap away.
 
