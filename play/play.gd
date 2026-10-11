@@ -139,6 +139,9 @@ var _stick := Vector2i.ZERO
 var _stick_from := Vector2i.ZERO
 # Where the view's top-left corner is in the world, in pixels, for a tap on the ground.
 var _view_origin := Vector2.ZERO
+# The part of the world the camera may show, in pixels: the map's, its bottom raised to where the
+# ground along its last row is drawn, so no void shows past it.
+var _bounds := Rect2()
 # Whether the settings were opened from the pause panel, which going back from them returns to.
 var _settings_from_pause := false
 ## The person selected as the target, marked on the HUD and in the world, or -1 for none.
@@ -241,6 +244,28 @@ func save() -> bool:
 	return world.save(SAVE_SLOT, save_directory) and _hud.loadout.write(save_directory.path_join(LOADOUT_FILE))
 
 
+## Returns where the camera centres to show `at` on a screen `screen` wide and high, in pixels, with
+## nothing past `bounds`: `at` itself, moved in only as far as an edge needs; or, along an axis on
+## which `bounds` is narrower than the screen, the middle of `bounds`.
+static func view_centre(at: Vector2, screen: Vector2, bounds: Rect2) -> Vector2:
+	# Whole pixels inside the edges, so a centre rounded to the pixel still shows nothing past them.
+	var low := (bounds.position + screen / 2.0).ceil()
+	var high := (bounds.end - screen / 2.0).floor()
+	var centre := bounds.get_center()
+	return Vector2(clampf(at.x, low.x, high.x) if low.x <= high.x else centre.x,
+			clampf(at.y, low.y, high.y) if low.y <= high.y else centre.y)
+
+
+## Returns the part of a map `size` pixels across and down, on the unraised ground, that the view
+## draws ground over: all of it, but where raised ground along its last row is drawn above the
+## map's bottom edge, the bottom comes up to the highest of it, since nothing is drawn below.
+static func drawn_bounds(size: Vector2, relief: Relief) -> Rect2:
+	var lift := 0.0
+	for x in int(size.x):
+		lift = maxf(lift, relief.lift_at(Vector2(x + 0.5, size.y - 0.5)))
+	return Rect2(Vector2.ZERO, size - Vector2(0, lift))
+
+
 # Plays `made`, steering the person carrying the player's soul, and closes the title screen.
 func _play(made: WorldAdapter) -> void:
 	world = made
@@ -260,10 +285,7 @@ func _play(made: WorldAdapter) -> void:
 	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
 	var rows := world.map_rows()
-	_camera.limit_left = 0
-	_camera.limit_top = 0
-	_camera.limit_right = int(rows[0].length() * _art.CELL.x)
-	_camera.limit_bottom = int(rows.size() * _art.CELL.y)
+	_bounds = drawn_bounds(Vector2(rows[0].length(), rows.size()) * _art.CELL, _art.relief)
 	_hud.title_screen.close()
 	_hud.new_game.close()
 
@@ -431,12 +453,14 @@ func _process(delta: float) -> void:
 	advance(delta)
 	if world == null or _hud.screen() != null:
 		return
-	_camera.position = drawn_lead().round()
 	var screen := get_viewport_rect().size / _camera.zoom
-	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
+	_camera.position = view_centre(drawn_lead().round(), screen, _bounds).round()
+	var view := Rect2(_camera.position - screen / 2.0, screen)
 	_art.refresh(view, _between())
-	# A hit on or from the player shakes the screen by whole screen pixels.
-	_camera.offset = Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
+	# A hit on or from the player shakes the screen by whole screen pixels, never past the bounds.
+	var shake := Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
+	_camera.offset = shake.clamp((_bounds.position - view.position).min(Vector2.ZERO),
+			(_bounds.end - view.end).max(Vector2.ZERO))
 	_sound.hearing = view
 	# The cursor stays on the screen while the camera moves, so it moves over the world.
 	_cursor = get_local_mouse_position()
