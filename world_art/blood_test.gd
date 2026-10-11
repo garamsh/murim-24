@@ -101,12 +101,12 @@ func _drip_pass() -> bool:
 	for damage: int in [80, 60]:
 		var fight := _fight(BESIDE, damage, true)
 		var combat: Combat = fight.art.combat
-		var bled := combat.drops.size()
+		var bled := combat.drops_fallen
 		for i in Combat.DRIP_TICKS:
 			fight.world.tick()
 			fight.art.note_tick()
 			fight.art.refresh(_view())
-		counts.append(combat.drops.size() - bled)
+		counts.append(combat.drops_fallen - bled)
 		fight.art.free()
 	var passed: bool = counts[0] > 0 and counts[1] == 0
 	print("blood_test: over %d ticks a maimed foe dripped %d drop(s), a hurt one %d: %s" % [

@@ -43,7 +43,7 @@ const MAIMED := 250
 const SPRAY_MS := 300
 const DROP_MS := 3000
 const DRIP_TICKS := 45
-const MOST_DROPS := 1200
+const MOST_DROPS := 600
 ## How many view frames a hit stop holds its bodies, by the health the hit took: under the first of
 ## each pair, the second; any more, HIT_STOP_MOST.
 const HIT_STOP := [[20, 2], [60, 3]]
@@ -78,8 +78,14 @@ var blood := true
 ## Each spray of blood flying, in order: `ms`, when, `at`, the struck body's middle in pixels, `dir`,
 ## the blow's direction, and `seed`.
 var sprays: Array[Dictionary] = []
-## Each drop of blood on the ground, in order: `ms`, when it fell, and `at`, where, in pixels.
-var drops: Array[Dictionary] = []
+## The drops of blood on the ground, a ring of at most MOST_DROPS, a new drop taking the oldest's
+## place: where each fell, in pixels, when, and its shade of BLOOD. Read by drops.gd as they are,
+## so a frame builds nothing; a drop older than DROP_MS shows no more.
+var drop_at := PackedVector2Array()
+var drop_ms := PackedInt64Array()
+var drop_shade := PackedByteArray()
+## How many drops have fallen, the ring's next place being this modulo MOST_DROPS.
+var drops_fallen := 0
 ## Whether a hit on or from the steered person holds the struck and the striker still a few frames
 ## and shakes the screen; the settings' hit stop row sets it.
 var hit_stop := true
@@ -273,9 +279,9 @@ func shown_sprays(now: int) -> Array[Dictionary]:
 ## of its time it has left, from 1 as it falls to 0.
 func shown_drops(now: int) -> Array[Dictionary]:
 	var shown: Array[Dictionary] = []
-	for drop: Dictionary in drops:
-		if now - drop.ms < DROP_MS and view.has_point(drop.at):
-			shown.append({"at": drop.at, "left": 1.0 - float(now - drop.ms) / DROP_MS, "shade": drop.shade})
+	for i in drop_at.size():
+		if now - drop_ms[i] < DROP_MS and view.has_point(drop_at[i]):
+			shown.append({"at": drop_at[i], "left": 1.0 - float(now - drop_ms[i]) / DROP_MS, "shade": drop_shade[i]})
 	return shown
 
 
@@ -308,9 +314,16 @@ func _drip() -> void:
 
 
 func _drop(at: Vector2, shade: int) -> void:
-	drops.append({"ms": _ms, "at": at.round(), "shade": shade % BLOOD.size()})
-	if drops.size() > MOST_DROPS:
-		drops = drops.slice(drops.size() - MOST_DROPS)
+	if drop_at.size() < MOST_DROPS:
+		drop_at.append(at.round())
+		drop_ms.append(_ms)
+		drop_shade.append(shade % BLOOD.size())
+	else:
+		var i := drops_fallen % MOST_DROPS
+		drop_at[i] = at.round()
+		drop_ms[i] = _ms
+		drop_shade[i] = shade % BLOOD.size()
+	drops_fallen += 1
 
 
 # A number in [0, 1) from `seed` and `k`, the same for the same pair.
@@ -338,7 +351,11 @@ func shown_strikes(now: int) -> Array[Dictionary]:
 
 
 func _draw() -> void:
-	for spray: Dictionary in shown_sprays(_now):
+	# Looped over as they are kept, so a frame filters no copy of them.
+	var near := view.grow(8.0)
+	for spray: Dictionary in sprays:
+		if _now - spray.ms >= SPRAY_MS or not near.has_point(spray.at):
+			continue
 		var left := 1.0 - float(_now - spray.ms) / SPRAY_MS
 		for k in 6:
 			var turn := (_unit(spray.seed, k) - 0.5) * 1.2
@@ -511,7 +528,6 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 func _forget(now: int) -> void:
 	strikes = strikes.filter(func(strike: Dictionary) -> bool: return now - strike.ms < STRIKE_MS)
 	sprays = sprays.filter(func(spray: Dictionary) -> bool: return now - spray.ms < SPRAY_MS)
-	drops = drops.filter(func(drop: Dictionary) -> bool: return now - drop.ms < DROP_MS)
 	deaths = deaths.filter(func(death: Dictionary) -> bool: return now - death.ms < DEATH_MS)
 	numbers = numbers.filter(func(number: Dictionary) -> bool: return now - number.ms < NUMBER_MS)
 
