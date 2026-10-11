@@ -39,15 +39,17 @@ const NUMBER_RISE := 12.0
 const WOUNDED := 500
 const MAIMED := 250
 ## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
-## apart a maimed person drips; and the most drops kept, the oldest going first.
+## apart a maimed person drips; and the most drops kept, the oldest going first: every drop kept is
+## drawn on every frame, and drawing them is what blood costs.
 const SPRAY_MS := 400
 const DROP_MS := 3000
 const DRIP_TICKS := 45
-const MOST_DROPS := 600
-## The pixels a spray throws, and the most kept, the oldest going first; and how far each flies
+const MOST_DROPS := 200
+## The pixels a spray throws, and the most kept, the oldest going first, as many as MOST_BLEEDS and
+## a hit of the steered person's throw over SPRAY_MS; and how far each flies
 ## from the struck body's side facing the blow, in pixels, between the two, a cell or more.
 const SPRAY_PIXELS := 8
-const MOST_SPRAY_PIXELS := 1200
+const MOST_SPRAY_PIXELS := 320
 const SPRAY_REACH := Vector2(12.0, 22.0)
 ## The drops a hit lets fall beyond the struck body's feet in the blow's direction, and those it
 ## pools under them; and the shapes a drop takes, of the pixel clusters blood_pixels.gd draws.
