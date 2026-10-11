@@ -1,0 +1,72 @@
+== main round 2
+Mon Oct 12 02:14:55 KST 2026
+{ 3.77 5.39 9.03 }
+Now drawing from 'AC Power'
+/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/build
+/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/ninja -DPython3_EXECUTABLE=/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/python3
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: /private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/build/extension
+/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake -S core -B build/bench -G Ninja -DCMAKE_MAKE_PROGRAM=/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/build/bench
+/private/tmp/claude-501/-Users-sauce-orca-workspaces-murim-24-m8-linux/11b8dc98-dd86-420a-888f-93143eb07166/scratchpad/wt-main/.venv/bin/cmake --build build/bench --target murim_core_bench
+ninja: no work to do.
+scenario: M1 (core/m1_scenario.cpp), seed 2026, 128x128 cells, 20 armies, 10 structures
+ticks: 60 warm-up, then 600 timed, at 30 ticks per second
+people: 500, all in one battle; 499 alive when timing ended; at most 500 alive at once, under a capacity of 625
+strikes per tick: 18.040, of which area 1.077 (32.300 per second)
+structures broken: 3 of 10
+tick time: p50 0.597 ms, p99 0.634 ms, max 0.689 ms
+PASS: p99 0.634 ms against a 4.000 ms budget
+scenario: live (core/live_scenario.cpp), seed 2026, 256x256 cells, 68 armies
+ticks: 60 warm-up, then 600 timed, at 30 ticks per second
+people: 5000, 2000 in two battles, the rest in villages and on roads; 4998 alive when timing ended; at most 5000 alive at once, under a capacity of 6250
+strikes per tick: 68.903, of which in battle 68.903
+tick time: p50 3.823 ms, p99 4.803 ms, max 5.287 ms
+TARGET MISSED: p99 4.803 ms against a 4.000 ms target, not yet in force (#216; ADR 0053 makes it binding), so it does not decide the exit status
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 343 ticks in 11.3 s timed (30 per second set)
+bodies: 500 in the world, 397 on screen drawn as sprites through MultiMesh bands
+outlines: 124.4 bodies outlined over what hides them a frame on average, 128 in the last frame
+names: 8 shown over the 153 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 41.0 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 8.838 ms, p99 15.948 ms, max 16.959 ms
+PASS: p99 15.948 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+make bench ran the tick benchmark (exit 0) and the frame benchmark (exit 0)
+make bench exit 0
+-- village
+{ 3.63 5.21 8.86 }
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village bench: region of seed 2026, steered army 10, 5 bodies drawn in the last frame, 168 ticks, window (1920, 1080), Apple M1
+village frame time: p50 3.468 ms, p99 8.761 ms, max 14.406 ms
+village exit 0
