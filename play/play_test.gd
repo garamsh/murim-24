@@ -35,7 +35,8 @@
 # Space then sets an attack intent on it, which the person chases, until a move order ends it; Tab
 # selects the next foe and Escape clears the selection; Space on an ally is refused, and with no
 # foe in sight does nothing; the touch controls' next and attack buttons do what Tab and Space do. The people near the person are named over their heads, the person itself and the one the
-# talk prompt names left out, and no name shows while a panel is open.
+# talk prompt names left out, and no name shows while a panel is open. The camera stops at the
+# map's bounds, its bottom raised under raised ground, and centres a map narrower than the screen.
 extends RefCounted
 
 const SCENE := "res://play/play.tscn"
@@ -121,7 +122,35 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass()
+
+
+# The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom
+# edge under raised ground, it shows no pixel past them, and on a map narrower than the screen it
+# shows the map's middle. Control: on a person in the map's middle it centres on the person. The
+# bounds are drawn_bounds(): a map whose last row is raised four levels ends 64 pixels higher.
+# Control: a flat one ends at its edge.
+func _camera_pass() -> bool:
+	var Play := preload("res://play/play.gd")
+	var screen := Vector2(640, 360)
+	var size := Vector2(128, 128) * Relief.CELL
+	var flat := Relief.new(Vector2i(128, 128))
+	var raised := Relief.new(Vector2i(128, 128))
+	for x in 128:
+		raised.lay(Vector2i(x, 127), "rock", 4, "rock_face", false)
+	var flat_bounds: Rect2 = Play.drawn_bounds(size, flat)
+	var raised_bounds: Rect2 = Play.drawn_bounds(size, raised)
+	var corner := Rect2(Play.view_centre(Vector2(3, 3), screen, raised_bounds).round() - screen / 2.0, screen)
+	var bottom := Rect2(Play.view_centre(Vector2(1000, size.y), screen, raised_bounds).round() - screen / 2.0, screen)
+	var middle: Vector2 = Play.view_centre(Vector2(1000, 700), screen, raised_bounds)
+	var small: Vector2 = Play.view_centre(Vector2(10, 10), screen, Rect2(0, 0, 320, 200))
+	var passed: bool = flat_bounds == Rect2(Vector2.ZERO, size) \
+			and raised_bounds == Rect2(Vector2.ZERO, size - Vector2(0, 4 * Relief.LEVEL_PX)) \
+			and raised_bounds.encloses(corner) and raised_bounds.encloses(bottom) \
+			and middle == Vector2(1000, 700) and small == Vector2(160, 100)
+	print("play_test: bounds flat %s, raised %s; the view at the corner %s and at the bottom %s; centred on the middle at %s, on a small map at %s: %s" % [
+		flat_bounds, raised_bounds, corner, bottom, middle, small, "pass" if passed else "FAIL"])
+	return passed
 
 
 # With the touch controls shown, a thumb on the joystick held pushed a way passable for three times
