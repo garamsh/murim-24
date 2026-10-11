@@ -74,7 +74,7 @@ Options weighed:
   - **Sailing.** It moves along the river's cells at the boat's speed for its direction, waits a quarter of a day at each landing, and carries its passengers and cargo as an army carries a roster. Passengers neither strike nor are struck while aboard.
   - **Boarding** is an order through the port for anyone at a landing, bound for a later landing on that route. It pays the owner a fare of 1 copper for each cell to that landing, refused when the boat is full, or the purse short. The passenger steps off at its landing.
   - **NPCs.** Paths take a boat's legs as edges of the coarse graph between landings, at the sailing time plus half the wait. People no driver steers board when that path is shorter. Caravans load cargo onto boats on their routes, paying a fare by lot.
-  - **The Three Gorges** are a river leg like any other: downstream at 2,500 and upstream at 800, so the gorges take about a third of walking's time down and three times a boat's down time up, on the map as built. On ADR 0047's 4,096 cells that was 5.3 minutes down and 16.7 up.
+  - **The Three Gorges** are a river leg like any other: downstream at 2,500 and upstream at 800, so the gorges take 40 to 50% of walking's time down, against walking by road or open ground, and about three times a boat's down time up, on the map as built. On ADR 0047's 4,096 cells that was 5.3 minutes down and 16.7 up.
   - **Ferries** stay ADR 0047's rule, with a fare of 20 copper a crossing paid to the village holding the landing. A person who cannot pay waits, so it does not cross. NPCs' paths count the fare as a cost only for those who can pay.
   - Rejected: boats as a faster ground class on water cells for anyone. Every person would then swim at a boat's speed, and nothing would own or pay for a boat.
 - **Couriers** do not exist yet, and are named so their means is decided: a courier is a person riding a horse on an objective, under these rules.
@@ -148,7 +148,7 @@ This supersedes ADR 0047's single speed for every person on a class, now a speed
 
 ## Consequences
 
-- Long journeys take a third to half the time by horse, and rivers become highways for those who can pay, so wealth buys distance.
+- Long journeys take 45 to 50% of walking's time by horse on roads and open ground, and the same time on rough ground, where a horse is no faster, and rivers become highways for those who can pay, so wealth buys distance.
 - Horses are a steady expense, a sink ADR 0052's balance gains.
 - Cavalry moves armies fast but fights only with basic strikes, so a mixed force must choose between speed and arts.
 - Fields double where riders go.
