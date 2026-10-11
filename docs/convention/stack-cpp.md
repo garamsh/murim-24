@@ -1,6 +1,6 @@
 # C++ stack
 
-The concrete C++ form of naming, file layout, tests, comments and the check entry points, for the code under `core/` and `extension/`.
+The concrete C++ form of naming, file layout, tests, comments and the check entry points, for the code under `core/`, `packs_json/` and `extension/`.
 
 Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1.8 (clang-format, clang-tidy), GoogleTest 1.18.0 and godot-cpp 10.0.0.
 
@@ -16,7 +16,7 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | File | `snake_case`, header `.hpp`, source `.cpp`, both named for the unit | `world.hpp`, `world.cpp` |
 
 - `readability-identifier-naming` in `core/.clang-tidy` enforces the identifier forms, so `make lint` fails on a name in the wrong form.
-- Code under `core/` lives in the `murim` namespace, and code under `extension/` in `murim_godot`; a helper used by one source file goes in an unnamed namespace inside it.
+- Code under `core/` lives in the `murim` namespace, code under `packs_json/` (the JSON adapter for content packs, ADR 0049) in `murim_packs`, and code under `extension/` in `murim_godot`; a helper used by one source file goes in an unnamed namespace inside it.
 - A class registered with Godot is named as GDScript sees it, since godot-cpp's `GDCLASS` registers the C++ name.
 - `_bind_methods` keeps the name godot-cpp requires.
 
