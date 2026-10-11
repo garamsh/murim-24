@@ -31,16 +31,26 @@ func _initialize() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	_view = load(SCENE).instantiate()
 	root.add_child(_view)
+
+
+# Lays the town round the camera once the scene is ready, on the second frame, long before the
+# warm-up ends; it fails the run when no piece was laid.
+func _lay_town() -> void:
 	var art: Node2D = _view.get_node("WorldArt")
 	var camera: Camera2D = _view._camera
 	var corner := Vector2i((camera.position / Vector2(art.CELL)).floor()) - TownLayout.SIZE / 2
 	var laid := TownLayout.lay(art, corner)
-	print("town: %d pieces laid at %s round the camera at %s" % [laid.size(), corner, camera.position])
+	print("town: %d pieces laid at %s round the camera at %s, %d standing sprites in all" % [
+		laid.size(), corner, camera.position, art.get_node("Standing").get_child_count()])
+	if laid.is_empty():
+		_fail("the town must be laid")
 
 
 func _process(_delta: float) -> bool:
 	var now := Time.get_ticks_usec()
 	_frame += 1
+	if _frame == 2:
+		_lay_town()
 	if _frame == WARM_UP_FRAMES:
 		_check_setup()
 		_ticks_before = _view.ticks
