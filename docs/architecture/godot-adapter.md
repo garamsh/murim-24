@@ -22,6 +22,8 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - A world from `create` or `create_m1` has no region: no terrain kinds, villages, sects, manuals, realms, arts or names, and it cannot be saved.
 - The adapter keeps what the view draws of a region and the world does not hold: each cell's terrain kind, the kinds' and factions' names, and the villages with their templates. `load` regenerates it from the region's seed and the player's birth village, which the save holds.
 - Reads give back what the core holds or derives, by subject: the world's hash, date and tick; armies, rosters, bodies and structures; leadership, duels, relations and declarations; names and kin; villages, fields and territory; sects and manuals; qi, realms, arts and a person's skills; rumours and attainment; talking and trade; and the last tick's strikes, the events and the steps of progress kept from a sequence on.
+- `snapshot` gives in one call, as packed arrays, what a view reads after a tick: every living body with its person, position, health and ready tick, each army's faction, each structure's stage, and the tick's strikes with whom each struck. The world art and the sound read one snapshot a tick between them (ADR 0075).
+- The library also registers `BodyView`, the view's native module, which keeps the bodies and what the fighting did to them by person, packs the bodies on screen into the rows' buffers each frame and draws the strikes, the target's brackets and the numbers in one call. It holds no game rule; its timings and buffer layout cross as its constants (ADR 0075).
 - Orders go to the core through the port: `order`, `end_intent`, `steer`, `declare`, `apply`, `cast`, `buy` and `consume`.
 - `attack_refusal`, `challenge_refusal`, `declaration_refusal`, `application_refusal`, `cast_refusal`, `talk_refusal`, `buy_refusal` and `consume_refusal` give the core's verdict before an order is made, as one of the class's constants.
 - An order the core refuses is reported with `push_error`, and the call returns false; a factory that fails returns null after `push_error`.
@@ -51,24 +53,25 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - Each structure is drawn over the footprint the core gives it, in its stage's frame of its kind's art, with a shadow while it stands. A structure from `create` has no kind and is not drawn.
 - Each village's paving, roads and banners come from `world_art/villages.json` by its template's name. They never block or break, and a founded village's are laid on the tick that finds it.
 - Each field is tiled by the state the core gives it, and re-tiled when its state or the season changes.
-- Bodies are drawn only on screen, through one `MultiMesh` per row of cells. Every body is one person, drawn as its faction's sprite, walking, facing and striking as the core's positions and strikes show.
+- Bodies are drawn only on screen, through one `MultiMesh` per row of cells, whose buffers `BodyView` packs from the tick's snapshot, so no frame loops over every person in GDScript. Every body is one person, drawn as its faction's sprite, walking, facing and striking as the core's positions and strikes show.
 - A body is drawn between where the last two ticks left it, as far as the frame lies between ticks, so it moves on every frame; the core's positions stay the only ones there are.
 - A body hidden behind a structure, a tree or raised ground is outlined through `world_art/outline.gdshader`.
-- Names are read round a viewer, the steered army in `play.tscn`, with how each person's faction stands toward the viewer's, through `relation`. No body is ringed: the hostile are told by their red names alone (#236).
-- `world_art/combat.gd` draws what the fighting did from the core's `strikes` and `events` and from what changed since the tick before, in palette colours only:
+- Names are read round a viewer, the steered army in `play.tscn`, with how each person's faction stands toward the viewer's, through `relation`. No body is ringed: the hostile are told by their red names alone (#236). The people near the viewer are listed as packed arrays, so no frame makes a Dictionary per person.
+- `world_art/combat.gd` shows what the fighting did, from the tick's snapshot and the core's `events` and from what changed since the tick before, through `BodyView`; it keeps the blood itself. In palette colours only:
   - each use that deals body damage flashes its shape, in its user's faction's accent
   - a struck person flashes, is knocked back, and its loss floats up for the people the settings name
-  - a hit on or from the steered person holds the bodies involved for a few view frames and shakes the camera, while the settings' hit stop is on; view time only, the ticks go on
+  - a hit on or from the steered person holds the bodies involved for a few view frames and shakes the camera, while the settings' hit stop is on; view time only, the ticks go on, a hold counting down whether or not its body is drawn and holding no one dead
+  - a world shown anew on the same art, as a load shows one, starts with no blood, hit stop or held body
   - a person a use hit bleeds while the settings' blood is on, drawn by `world_art/blood_pixels.gd`; a loss of hunger or age does not bleed
   - a person low on health is drawn hurt, and lower maimed, read from the core's health each tick, so wounds clear as health recovers
   - a person a use killed falls and fades; one who died of hunger or age is not drawn falling
   - the steered person's last target is marked while it lives
-- The thresholds, durations and sizes of what `world_art` draws are constants of its scripts.
+- The thresholds, durations and sizes of what `world_art` draws are constants of its scripts, and of `BodyView` for what it decides.
 
 ### Sound
 
 - `sound/sound.tscn` plays what the core reports, as `docs/audio.md` sets out its sounds, their sources and their mixing.
-- After each tick it reads the core's `events` recorded since the last. What the core records no event of, a strike, a hit, a fire or a mend, it finds by comparing what the adapter reads with what it read on the tick before.
+- After each tick it reads the core's `events` recorded since the last. What the core records no event of, a strike, a hit, a fire or a mend, it finds by comparing the tick's snapshot with the one before.
 - Each sound is heard where it happened, when that lies on screen, through a bounded pool of voices on the Effects bus; what finds no free voice is dropped.
 - The music on the Music bus is the battle track while strikes were heard recently, and the explore track otherwise.
 - The buses are laid out in `default_bus_layout.tres`.
@@ -76,7 +79,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 
 ### Scenes
 
-- `world_view/world_view.tscn` shows and sounds the M1 scenario through `world_art.tscn` and `sound/sound.tscn`, ticking at the core's tick rate whatever the frame rate, with names shown, so `make bench` measures a frame with names on. `make bench` renders it at the PC's scale.
+- `world_view/world_view.tscn` shows and sounds the M1 scenario through `world_art.tscn` and `sound/sound.tscn`, ticking at the core's tick rate whatever the frame rate, with names shown, so `make bench` measures a frame with names on. `make bench` renders it at the PC's scale and prints where a frame's time goes: the core's tick, the adapter's snapshot, the view's scripts with the native code they call, and rendering. `world_view/village_bench.gd`, run by hand, times a frame in a generated region's village.
 - The view fills the window at a whole-pixel scale, drawing textures without filtering, as `view_scale.gd` sets it, with a smaller least view on touch than on a PC. Bodies stand on whole world pixels.
 - `play/play.tscn`, the project's main scene, opens on the title screen. A new game has `create_region` make the region of a seed typed or drawn at random, and Continue resumes the world saved in slot 0.
 - The play scene steers the army `player_army` names, re-read when the world is made or loaded and after every tick, so it follows the soul after a rebirth.
@@ -146,6 +149,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - Every body one person, read and drawn one by one, and no focus to set: ADR 0017 (`adr/0017-make-every-npc-an-individual-and-every-army-a-roster.md`).
 - Saving through the core's save port, served by files under `user://saves/`, and what the adapter regenerates from the region's origin on load: ADR 0030 (`adr/0030-save-a-world-through-a-save-port-in-the-cores-own-versioned-encoding.md`).
 - Cross-building the Windows library with a pinned llvm-mingw, and the alternatives weighed: ADR 0033 (`adr/0033-cross-build-the-windows-extension-with-a-pinned-llvm-mingw.md`).
+- One packed read of the world a tick, and the bodies and the fighting kept, packed and drawn natively in the adapter: ADR 0075 (`adr/0075-read-the-world-once-a-tick-and-draw-bodies-and-the-fighting-natively.md`).
 - Cross-building the Linux library against a pinned glibc 2.31 sysroot, the floor it sets, and the alternatives weighed: ADR 0074 (`adr/0074-cross-build-the-linux-extension-against-a-pinned-glibc-2-31-sysroot.md`).
 - Applying to a sect through the core's thresholds, and the rumours read from the core's ring of events: ADR 0031 (`adr/0031-let-a-person-apply-to-a-sect-by-the-admissions-thresholds.md`) and ADR 0032 (`adr/0032-keep-a-bounded-ring-of-world-events-and-read-rumours-from-it.md`).
 - Steering through the orders every army follows: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`).
