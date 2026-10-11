@@ -10,6 +10,7 @@
 
 #include "arts.hpp"
 #include "calendar.hpp"
+#include "chronicle.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -858,10 +859,10 @@ class World {
   /// index times the factions plus the higher's; the rest stay empty.
   std::vector<std::optional<Declared>> declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.
-  std::vector<Event> events_;
+  Chronicle<Event, EVENT_CAPACITY> events_;
   std::vector<Strike> strikes_;
   /// The latest steps of progress, oldest first, at most PROGRESS_CAPACITY.
-  std::vector<Progress> progress_;
+  Chronicle<Progress, PROGRESS_CAPACITY> progress_;
   Life life_;
   std::vector<Soul> souls_;
   /// Each family's surname, by index among the life's surnames.

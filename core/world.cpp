@@ -1113,16 +1113,9 @@ bool World::events_kept() const {
     const auto* died = std::get_if<Died>(&what);
     return died == nullptr || died->person >= people;
   };
-  bool bad_events = events_.size() > EVENT_CAPACITY;
-  for (std::size_t index = 0; index < events_.size(); ++index) {
-    const Event& event = events_.at(index);
-    const bool unordered =
-        index > 0 && (event.sequence != events_.at(index - 1).sequence + 1 ||
-                      event.tick < events_.at(index - 1).tick);
-    bad_events = bad_events || unordered || event.tick > tick_count_ ||
-                 stray_happening(event.what);
-  }
-  return !bad_events;
+  return events_.kept(tick_count_, [&stray_happening](const Event& event) {
+    return !stray_happening(event.what);
+  });
 }
 
 // Whether every army's faction, skills, order and roster name what the world
@@ -1413,12 +1406,7 @@ void World::apply(std::size_t person, std::size_t sect) {
 // Records `what`, which happened at `cell` on this tick, letting the oldest
 // event go once EVENT_CAPACITY are kept.
 void World::record(Cell cell, Happening what) {
-  const std::uint64_t sequence =
-      events_.empty() ? 0 : events_.back().sequence + 1;
-  if (events_.size() == EVENT_CAPACITY) {
-    events_.erase(events_.begin());
-  }
-  events_.push_back(Event{sequence, tick_count_, cell, what});
+  events_.add(Event{0, tick_count_, cell, what});
 }
 
 // Records the fall of each of `sects` that no longer stands, once each; a
@@ -1452,19 +1440,16 @@ std::vector<std::size_t> World::record_deaths() {
   return bereft;
 }
 
-const std::vector<Event>& World::events() const { return events_; }
+const std::vector<Event>& World::events() const { return events_.entries(); }
 
-const std::vector<Progress>& World::progress() const { return progress_; }
+const std::vector<Progress>& World::progress() const {
+  return progress_.entries();
+}
 
 // Notes `what`, a step of progress on this tick, letting the oldest go once
 // PROGRESS_CAPACITY are kept.
 void World::note(Advance what) {
-  const std::uint64_t sequence =
-      progress_.empty() ? 0 : progress_.back().sequence + 1;
-  if (progress_.size() == PROGRESS_CAPACITY) {
-    progress_.erase(progress_.begin());
-  }
-  progress_.push_back(Progress{sequence, tick_count_, what});
+  progress_.add(Progress{0, tick_count_, what});
 }
 
 // Whether the progress kept is as note() keeps it: at most
@@ -1472,16 +1457,9 @@ void World::note(Advance what) {
 // than the world's tick, each naming a person, art, skill or realm the world
 // holds.
 bool World::progress_kept() const {
-  bool bad = progress_.size() > PROGRESS_CAPACITY;
-  for (std::size_t index = 0; index < progress_.size(); ++index) {
-    const Progress& step = progress_.at(index);
-    const bool unordered =
-        index > 0 && (step.sequence != progress_.at(index - 1).sequence + 1 ||
-                      step.tick < progress_.at(index - 1).tick);
-    bad = bad || unordered || step.tick > tick_count_ ||
-          stray_advance(step.what, people_.size(), life_);
-  }
-  return !bad;
+  return progress_.kept(tick_count_, [this](const Progress& step) {
+    return !stray_advance(step.what, people_.size(), life_);
+  });
 }
 
 // Whether `other` is `one`'s kin: itself, of its family, its spouse, parent
@@ -1532,7 +1510,8 @@ std::vector<Event> World::rumours(std::size_t person) const {
   }
   const std::optional<std::size_t> faction = faction_of(person);
   std::vector<Event> heard;
-  for (auto event = events_.rbegin(); event != events_.rend(); ++event) {
+  const std::vector<Event>& events = events_.entries();
+  for (auto event = events.rbegin(); event != events.rend(); ++event) {
     if (heard_by(*event, person, faction)) {
       heard.push_back(*event);
     }
@@ -2459,11 +2438,11 @@ StateHash World::hash() const {
   }
   fold_reaches(fold, rules_);
   fold_trade(fold, life_.trade);
-  for (const Event& event : events_) {
+  for (const Event& event : events_.entries()) {
     fold_event(fold, event);
   }
   // Folded only when held, so a world where no one learns keeps its hash.
-  for (const Progress& step : progress_) {
+  for (const Progress& step : progress_.entries()) {
     fold_progress(fold, step);
   }
   return StateHash{digest};

@@ -23,6 +23,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `leadership` a faction's lead, duels, admission and elections;
   - `sect` sects as created, and applying to one;
   - `event` the world's events;
+  - `chronicle` the bounded, numbered record that keeps the latest events and steps of progress, and checks a saved one;
   - `progress` people's steps in the martial arts;
   - `person` a person;
   - `life` the rules of life that gather the rest.
