@@ -27,12 +27,12 @@ The issue asks the design to decide these:
 - materials and money staying bounded, and scrap never letting gear grow from nothing
 - the supersessions, and the memory and cost at the bound
 
-What this builds on, from `main` at `c86b08d` and the open PRs it cites:
+What this builds on, from `main` at `c4e24a7` and the open PRs it cites:
 - **ADR 0050.** Items are pack data: kinds with a family, tier, material, worth, durability or a stack size, price and effects. Materials are a family of kinds that stack. Weapons wear by hits made, armour by hits taken, tools by days worked. A broken piece leaves its slot empty, and the item is gone. Repair is a sale: a worn item sold goes to the market's worn pool, and a smithy restores it from materials.
 - **ADR 0051.** Every item has one holder, a person, a warehouse lot or a pile on the ground, and moves by four verbs. A cell holds 16 piles, and the world 1,048,576, above the worst day's drops of 985,872, every person dying with 13 stacks among them. A soldier at war picks up drops of its foes as loot for its faction.
 - **ADR 0052.** A market holds stock, a worn pool, a price, a 30-day demand and a till for each of at most 64 kinds. Its price moves 5% a day against its target. A workshop makes up to its workers' output each day from materials in its market's stock, and pays its workers' households a share of the price. A market imports below a tenth of its target at the ceiling and exports above four times it at the floor. The treasury buys its soldiers' slots and spares at its capital's market and sells its loot there. A household of two field workers earns about 225 to 250 copper a day, so a worker's day is about 110 copper.
 - **ADR 0056,** proposed, merged in #220. Natural objects are slots the map's build tool places, with kinds as pack data. A village's account holds the materials its next plan needs, gathered by its idle earners and paid from the treasury, and sells what passes twice its target to the market. Trees yield 4 wood, rocks 3 stone, and a stump regrows on its kind's days.
-- **ADR 0063, proposed in the open PR #243** for #229. The world runs by simple rules whose consequences combine, balanced by tuning pack data against the sweep's bands, not by scripted outcomes.
+- **ADR 0063,** proposed, merged in #243 for #229. The world runs by simple rules whose consequences combine, balanced by tuning pack data against the sweep's bands, not by scripted outcomes.
 - **ADR 0057,** proposed, merged in #222. Changes to the ground conserve mass, and a sum test counts every unit before and after.
 - **ADR 0065, proposed in the open PR #248** for #230. It sets a faction's spending priorities, arms among them.
 - **ADR 0067, proposed in the open PR #241** for #171. Animals drop hide, bone, horn and claw by species, and spirit beasts rarer parts.
