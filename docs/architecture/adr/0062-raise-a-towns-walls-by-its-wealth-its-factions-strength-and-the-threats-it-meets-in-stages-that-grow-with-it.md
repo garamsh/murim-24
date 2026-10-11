@@ -26,7 +26,7 @@ The issue asks the design to decide these:
 It also asks how a wall's plan follows the village's footprint, and what is kept or reused.
 
 What this builds on, from `main` at `c4e24a7` and the open PRs it cites:
-- **ADR 0056** (#220, on which this branch is stacked). Structures cost materials as pack data, gathered into a village's account and carried to the site. The repair rule raises a structure only as far as its materials are delivered. Gatherers and builders are paid from the owning faction's treasury, at most a third of earners each and half together.
+- **ADR 0056,** proposed, merged in #220. Structures cost materials as pack data, gathered into a village's account and carried to the site. The repair rule raises a structure only as far as its materials are delivered. Gatherers and builders are paid from the owning faction's treasury, at most a third of earners each and half together.
 - **ADR 0052.**
   - The NPC leader's daily rule weighs the treasury against 60 days of its needs.
   - Discontent per household rises with tax, hunger and kin killed, and households flee past 800.
@@ -79,7 +79,7 @@ Options weighed:
   - The costs and durabilities are pack data.
 - **Labour, and corvée.** Builders are ADR 0056's, paid from the treasury, at most a third of the village's earners. A faction may also levy corvée while the village's threat is at least 400, pack data:
   - each household sends one earner unpaid one day in ten
-  - each day of corvée raises that household's discontent by 3 (ADR 0052)
+  - each day of corvée raises that household's discontent by 3 (ADR 0052). Against ADR 0052's decay of 2 on a good day that alone nets 1, so #248's ADR 0065 suspends the decay on a corvée day, and the 3 is net
 
   So a threatened town walls itself faster at the cost of its people's mood. Whether corvée is allowed at all is listed for the owner.
 - **What a wall does.**
