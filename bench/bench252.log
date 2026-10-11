@@ -1,0 +1,13 @@
+round 1 base start load 3.30, Now drawing from AC Power 19:30:14
+round 1 base exit 0 19:30:29
+round 1 head start load 3.33, Now drawing from AC Power 19:30:29
+round 1 head exit 0 19:30:44
+round 2 base start load 3.33, Now drawing from AC Power 19:30:44
+round 2 base exit 0 19:30:58
+round 2 head start load 3.49, Now drawing from AC Power 19:30:58
+round 2 head exit 0 19:31:13
+round 3 base start load 3.24, Now drawing from AC Power 19:31:13
+round 3 base exit 0 19:31:29
+round 3 head start load 3.10, Now drawing from AC Power 19:31:29
+round 3 head exit 0 19:31:44
+series done 19:31:44
