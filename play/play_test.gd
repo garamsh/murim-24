@@ -781,7 +781,7 @@ func _save_pass() -> bool:
 	for i in GROWN_TICKS:
 		grown.tick()
 	var player := grown.player_army()
-	var grown_past := player >= 0 and grown.army_count() > player + 1 and grown.save(0, TestSaves.DIRECTORY)
+	var grown_past := player >= 0 and grown.army_count() > player + 1 and grown.save(0, TestSaves.directory)
 	var continued := _title()
 	continued.navigate(_key(KEY_DOWN))
 	continued.navigate(_key(KEY_ENTER))
@@ -815,7 +815,7 @@ func _autosave_pass() -> bool:
 			date = scene.world.date()
 			days += 1
 		early = early or (days < every and FileAccess.file_exists(TestSaves.path(0)))
-	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.DIRECTORY)
+	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.directory)
 	var saved: bool = loaded != null and loaded.hash() == scene.world.hash()
 	var ticks: int = scene.ticks
 	scene.free()
@@ -1405,7 +1405,7 @@ func _loadout_save_pass() -> bool:
 func _scene(village: int) -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
 	scene.birth_village = village
-	scene.save_directory = TestSaves.DIRECTORY
+	scene.save_directory = TestSaves.directory
 	# The runner has no running tree to add the scene to, so it is readied directly.
 	scene.notification(Node.NOTIFICATION_READY)
 	scene.start(SEED)
@@ -1416,7 +1416,7 @@ func _scene(village: int) -> Node2D:
 # the tests' own directory.
 func _title() -> Node2D:
 	var scene: Node2D = load(SCENE).instantiate()
-	scene.save_directory = TestSaves.DIRECTORY
+	scene.save_directory = TestSaves.directory
 	scene.notification(Node.NOTIFICATION_READY)
 	return scene
 

@@ -29,8 +29,8 @@ func run() -> bool:
 	var player := world.player_army()
 	# The player is found from the core, not as the last army: growth has formed armies after it.
 	var grown := player >= 0 and world.army_count() > player + 1
-	var saved := world.save(SLOT, TestSaves.DIRECTORY)
-	var loaded := WorldAdapter.load(SLOT, TestSaves.DIRECTORY)
+	var saved := world.save(SLOT, TestSaves.directory)
+	var loaded := WorldAdapter.load(SLOT, TestSaves.directory)
 	var same := loaded != null and loaded.hash() == world.hash() \
 			and loaded.player_army() == player and loaded.villages() == world.villages() \
 			and loaded.terrain() == world.terrain() and loaded.date() == world.date() \
@@ -43,25 +43,25 @@ func run() -> bool:
 	# Control: another region saved in another slot loads as itself, so equality is not every
 	# load giving one world.
 	var other := WorldAdapter.create_region(OTHER_SEED, 0, TICKS_PER_DAY)
-	var other_saved := other.save(OTHER_SLOT, TestSaves.DIRECTORY)
-	var other_loaded := WorldAdapter.load(OTHER_SLOT, TestSaves.DIRECTORY)
+	var other_saved := other.save(OTHER_SLOT, TestSaves.directory)
+	var other_loaded := WorldAdapter.load(OTHER_SLOT, TestSaves.directory)
 	var distinct := other_loaded != null and other_loaded.hash() == other.hash() \
 			and other_loaded.hash() != world.hash()
 	# An empty slot loads nothing, and a world without a region is not saved; control: the region
 	# above was saved and loaded, so these refusals are the slot's and the world's.
-	var empty_refused := WorldAdapter.load(EMPTY_SLOT, TestSaves.DIRECTORY) == null \
-			and WorldAdapter.load_refusal(EMPTY_SLOT, TestSaves.DIRECTORY) == WorldAdapter.LOAD_MISSING
+	var empty_refused := WorldAdapter.load(EMPTY_SLOT, TestSaves.directory) == null \
+			and WorldAdapter.load_refusal(EMPTY_SLOT, TestSaves.directory) == WorldAdapter.LOAD_MISSING
 	# The refusal is the bytes', not every slot's: the slot saved above reads, and the same slot of
 	# other bytes does not.
-	var read := WorldAdapter.load_refusal(SLOT, TestSaves.DIRECTORY) == WorldAdapter.LOAD_NONE
+	var read := WorldAdapter.load_refusal(SLOT, TestSaves.directory) == WorldAdapter.LOAD_NONE
 	var garbage := FileAccess.open(TestSaves.path(OTHER_SLOT), FileAccess.WRITE)
 	garbage.store_string("not a save")
 	garbage.close()
-	var garbage_refused := WorldAdapter.load_refusal(OTHER_SLOT, TestSaves.DIRECTORY) == WorldAdapter.LOAD_NOT_A_SAVE \
-			and WorldAdapter.load(OTHER_SLOT, TestSaves.DIRECTORY) == null
+	var garbage_refused := WorldAdapter.load_refusal(OTHER_SLOT, TestSaves.directory) == WorldAdapter.LOAD_NOT_A_SAVE \
+			and WorldAdapter.load(OTHER_SLOT, TestSaves.directory) == null
 	var plain := WorldAdapter.create(1, PackedStringArray(["....", "...."]), [], [],
 			{"separation": 0, "hostile": [[false]], "stage_floors": STAGE_FLOORS})
-	var plain_refused := plain != null and not plain.save(EMPTY_SLOT, TestSaves.DIRECTORY) and WorldAdapter.load(EMPTY_SLOT, TestSaves.DIRECTORY) == null
+	var plain_refused := plain != null and not plain.save(EMPTY_SLOT, TestSaves.directory) and WorldAdapter.load(EMPTY_SLOT, TestSaves.directory) == null
 	TestSaves.clear()
 	# Every slot above was the test directory's: the game's own slot 0 is as it was.
 	var untouched := TestSaves.game_slot() == game_slot
