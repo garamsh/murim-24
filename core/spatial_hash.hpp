@@ -149,9 +149,11 @@ class SpatialHash {
   Cell first_;
   Cell last_;
   std::size_t slot_mask_;
+  std::size_t block_mask_;
   std::vector<std::size_t> slot_starts_;
   std::vector<std::size_t> entries_;
-  // The kinds held in each slot of cells and each slot of blocks.
+  // The kinds held in each slot of cells, and in each slot of blocks, a table
+  // of its own, sized for the blocks there can be.
   std::vector<std::uint64_t> slot_kinds_;
   std::vector<std::uint64_t> block_kinds_;
 };
