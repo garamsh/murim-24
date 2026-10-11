@@ -26,15 +26,15 @@ class BaseAndMods : public PackSource {
       : base_(MURIM_PACKS_DIR), mods_(&mods) {}
 
   [[nodiscard]] ContentRead read(const std::string& pack,
-                                 const std::string& path) const override {
-    return pack == murim_packs::BASE_PACK ? base_.read(pack, path)
-                                          : mods_->read(pack, path);
+                                 const std::string& document) const override {
+    return pack == murim_packs::BASE_PACK ? base_.read(pack, document)
+                                          : mods_->read(pack, document);
   }
 
-  [[nodiscard]] std::vector<std::string> data_documents(
+  [[nodiscard]] std::vector<std::string> documents(
       const std::string& pack) const override {
-    return pack == murim_packs::BASE_PACK ? base_.data_documents(pack)
-                                          : mods_->data_documents(pack);
+    return pack == murim_packs::BASE_PACK ? base_.documents(pack)
+                                          : mods_->documents(pack);
   }
 
  private:
@@ -260,7 +260,7 @@ TEST(Content, ADocumentNotWellFormedRefusesItsPack) {
   EXPECT_TRUE(std::any_of(loaded.errors.begin(), loaded.errors.end(),
                           [](const ContentError& error) {
                             return error.pack == "broken" &&
-                                   error.document == "data/terrain.json" &&
+                                   error.document == "terrain" &&
                                    error.reason == ContentRefusal::UNREADABLE;
                           }));
   EXPECT_EQ(loaded.refused, std::vector<std::string>{"broken"});

@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -18,8 +20,8 @@ using Kind = ContentNode::Kind;
 
 TEST(JsonPacks, AnIntegerIsReadExactlyAndAFractionIsMarked) {
   const ContentRead read =
-      parse_document(R"({"whole": 9007199254740993, "part": 1.5,
-                         "power": 1e3})");
+      parse_document(R"({"whole": 9007199254740993, "below": -9007199254740993,
+                         "part": 1.5, "power": 1e3})");
   ASSERT_TRUE(read.tree.has_value());
   const murim::ContentTree tree = read.tree.value_or(murim::ContentTree{});
   const auto kind_of = [&tree](const std::string& key) {
@@ -30,6 +32,9 @@ TEST(JsonPacks, AnIntegerIsReadExactlyAndAFractionIsMarked) {
   EXPECT_EQ(kind_of("whole"), Kind::INTEGER);
   EXPECT_EQ(tree.nodes.at(murim::member(tree, 0, "whole").value_or(0)).integer,
             9007199254740993);
+  EXPECT_EQ(kind_of("below"), Kind::INTEGER);
+  EXPECT_EQ(tree.nodes.at(murim::member(tree, 0, "below").value_or(0)).integer,
+            -9007199254740993);
   EXPECT_EQ(kind_of("part"), Kind::FRACTION);
   EXPECT_EQ(kind_of("power"), Kind::FRACTION);
 }
@@ -50,18 +55,44 @@ TEST(JsonPacks, ADocumentItCannotTakeIsRefusedWithItsReason) {
       parse_document(R"({"huge": 9223372036854775807})").tree.has_value());
 }
 
-TEST(JsonPacks, BytePacksServeTheirDataDocumentsInPathOrder) {
+TEST(JsonPacks, BytePacksServeEachDataFileAsTheDocumentItNames) {
   BytePacks packs;
   packs.add("one", "data/villages.json", "[]");
-  packs.add("one", "pack.json", "{}");
+  packs.add("one", "pack.json", R"({"id": "one"})");
   packs.add("one", "data/factions.json", "[]");
+  packs.add("one", "data/notes.txt", "[]");
   packs.add("two", "data/terrain.json", "[]");
-  EXPECT_EQ(
-      packs.data_documents("one"),
-      (std::vector<std::string>{"data/factions.json", "data/villages.json"}));
-  EXPECT_TRUE(packs.data_documents("three").empty());
-  EXPECT_EQ(packs.read("one", "data/absent.json").refusal,
-            ContentRefusal::UNREADABLE);
+  // A file of another type keeps its whole name, which names no kind.
+  EXPECT_EQ(packs.documents("one"),
+            (std::vector<std::string>{"factions", "notes.txt", "villages"}));
+  EXPECT_TRUE(packs.documents("three").empty());
+  EXPECT_TRUE(packs.read("one", murim::MANIFEST).tree.has_value());
+  EXPECT_TRUE(packs.read("one", "factions").tree.has_value());
+  EXPECT_EQ(packs.read("one", "terrain").refusal, ContentRefusal::UNREADABLE);
+}
+
+TEST(JsonPacks, ADirectoryFilePastTheLimitIsRefusedAsTooLarge) {
+  const std::filesystem::path root =
+      std::filesystem::path{testing::TempDir()} / "json_packs_limit";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directories(root / "big" / "data");
+  const std::string document = R"([{"id": "plain"}])";
+  const auto write = [&root, &document](const std::string& kind,
+                                        std::size_t size) {
+    std::ofstream file(root / "big" / "data" / (kind + ".json"),
+                       std::ios::binary);
+    file << document << std::string(size - document.size(), ' ');
+  };
+  write("terrain", DOCUMENT_LIMIT + 1);
+  // Control: the same document padded to the limit exactly is read.
+  write("villages", DOCUMENT_LIMIT);
+  ASSERT_EQ(std::filesystem::file_size(root / "big" / "data" / "terrain.json"),
+            DOCUMENT_LIMIT + 1);
+  const DirectoryPacks source{root};
+  EXPECT_EQ(source.read("big", "terrain").refusal, ContentRefusal::TOO_LARGE);
+  EXPECT_TRUE(source.read("big", "villages").tree.has_value());
+  EXPECT_EQ(source.read("big", "absent").refusal, ContentRefusal::UNREADABLE);
+  std::filesystem::remove_all(root);
 }
 
 TEST(JsonPacks, TheBasePackLoadsFromItsDirectoryWithNoError) {

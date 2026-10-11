@@ -1,15 +1,17 @@
 #include "json_packs.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -88,6 +90,21 @@ std::optional<ContentRefusal> convert(const Json& root, ContentTree& tree) {
   return std::nullopt;
 }
 
+constexpr std::string_view MANIFEST_FILE = "pack.json";
+constexpr std::string_view DATA_DIRECTORY = "data";
+constexpr std::string_view EXTENSION = ".json";
+constexpr std::size_t READ_CHUNK = std::size_t{64} << 10U;
+
+// The document a file under `data/` named `name` holds: its name without
+// `.json`, or, for a file of another type, its whole name, which names no
+// kind.
+std::string document_of(const std::string& name) {
+  const bool json = name.size() > EXTENSION.size() &&
+                    name.compare(name.size() - EXTENSION.size(),
+                                 EXTENSION.size(), EXTENSION) == 0;
+  return json ? name.substr(0, name.size() - EXTENSION.size()) : name;
+}
+
 ContentRead refused(ContentRefusal reason) {
   return ContentRead{std::nullopt, reason};
 }
@@ -109,62 +126,79 @@ ContentRead parse_document(const std::string& bytes) {
   return ContentRead{std::move(tree), ContentRefusal::UNREADABLE};
 }
 
+std::string file_of(const std::string& document) {
+  return document == murim::MANIFEST ? std::string{MANIFEST_FILE}
+                                     : std::string{DATA_DIRECTORY} + "/" +
+                                           document + std::string{EXTENSION};
+}
+
 DirectoryPacks::DirectoryPacks(std::filesystem::path root)
     : root_(std::move(root)) {}
 
 ContentRead DirectoryPacks::read(const std::string& pack,
-                                 const std::string& path) const {
-  const std::filesystem::path file = root_ / pack / path;
-  std::error_code error;
-  const std::uintmax_t size = std::filesystem::file_size(file, error);
-  if (error) {
-    return refused(ContentRefusal::UNREADABLE);
-  }
-  if (size > DOCUMENT_LIMIT) {
-    return refused(ContentRefusal::TOO_LARGE);
-  }
-  std::ifstream input(file, std::ios::binary);
+                                 const std::string& document) const {
+  std::ifstream input(root_ / pack / file_of(document), std::ios::binary);
   if (!input) {
     return refused(ContentRefusal::UNREADABLE);
   }
-  std::ostringstream bytes;
-  bytes << input.rdbuf();
-  return parse_document(bytes.str());
+  // Reads no more than one byte past the limit, which parse_document
+  // refuses, so a huge file is never held whole.
+  std::string bytes;
+  std::array<char, READ_CHUNK> chunk{};
+  while (input && bytes.size() <= DOCUMENT_LIMIT) {
+    input.read(chunk.data(), chunk.size());
+    bytes.append(chunk.data(), static_cast<std::size_t>(input.gcount()));
+  }
+  if (input.bad()) {
+    return refused(ContentRefusal::UNREADABLE);
+  }
+  return parse_document(bytes);
 }
 
-std::vector<std::string> DirectoryPacks::data_documents(
+std::vector<std::string> DirectoryPacks::documents(
     const std::string& pack) const {
-  std::vector<std::string> paths;
+  std::vector<std::string> names;
   std::error_code error;
-  const std::filesystem::path data = root_ / pack / "data";
+  const std::filesystem::path data = root_ / pack / DATA_DIRECTORY;
   for (const auto& entry : std::filesystem::directory_iterator(data, error)) {
     if (entry.is_regular_file(error)) {
-      paths.push_back("data/" + entry.path().filename().string());
+      names.push_back(document_of(entry.path().filename().string()));
     }
   }
-  std::sort(paths.begin(), paths.end());
-  return paths;
+  std::sort(names.begin(), names.end());
+  return names;
 }
 
 void BytePacks::add(const std::string& pack, const std::string& path,
                     std::string bytes) {
-  documents_.erase(std::remove_if(documents_.begin(), documents_.end(),
-                                  [&](const Document& document) {
-                                    return document.pack == pack &&
-                                           document.path == path;
-                                  }),
-                   documents_.end());
-  documents_.push_back(Document{pack, path, std::move(bytes)});
+  files_.erase(std::remove_if(files_.begin(), files_.end(),
+                              [&](const File& file) {
+                                return file.pack == pack && file.path == path;
+                              }),
+               files_.end());
+  files_.push_back(File{pack, path, std::move(bytes)});
 }
 
 ContentRead BytePacks::read(const std::string& pack,
-                            const std::string& path) const {
+                            const std::string& document) const {
+  const std::string path = file_of(document);
   const auto found = std::find_if(
-      documents_.begin(), documents_.end(), [&](const Document& document) {
-        return document.pack == pack && document.path == path;
-      });
-  return found == documents_.end() ? refused(ContentRefusal::UNREADABLE)
-                                   : parse_document(found->bytes);
+      files_.begin(), files_.end(),
+      [&](const File& file) { return file.pack == pack && file.path == path; });
+  return found == files_.end() ? refused(ContentRefusal::UNREADABLE)
+                               : parse_document(found->bytes);
+}
+
+std::vector<std::string> BytePacks::documents(const std::string& pack) const {
+  std::vector<std::string> names;
+  const std::string prefix = std::string{DATA_DIRECTORY} + "/";
+  for (const File& file : files_) {
+    if (file.pack == pack && file.path.compare(0, prefix.size(), prefix) == 0) {
+      names.push_back(document_of(file.path.substr(prefix.size())));
+    }
+  }
+  std::sort(names.begin(), names.end());
+  return names;
 }
 
 murim::RegionData load_base(const std::filesystem::path& root) {
@@ -178,20 +212,6 @@ murim::RegionData load_base(const std::filesystem::path& root) {
                              first.path);
   }
   return std::move(*loaded.data);
-}
-
-std::vector<std::string> BytePacks::data_documents(
-    const std::string& pack) const {
-  std::vector<std::string> paths;
-  const std::string prefix = "data/";
-  for (const Document& document : documents_) {
-    if (document.pack == pack &&
-        document.path.compare(0, prefix.size(), prefix) == 0) {
-      paths.push_back(document.path);
-    }
-  }
-  std::sort(paths.begin(), paths.end());
-  return paths;
 }
 
 }  // namespace murim_packs

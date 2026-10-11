@@ -23,10 +23,6 @@ namespace {
 
 using Kind = ContentNode::Kind;
 
-constexpr std::string_view MANIFEST = "pack.json";
-constexpr std::string_view DATA_PREFIX = "data/";
-constexpr std::string_view DATA_SUFFIX = ".json";
-
 constexpr std::array<std::string_view, 3> FOOTINGS{"buildable", "rough",
                                                    "blocked"};
 constexpr std::array<std::string_view, 5> SHAPES{"area", "arc", "line", "self",
@@ -52,23 +48,9 @@ bool well_formed_id(const std::string& name) {
   });
 }
 
-// The path of kind `kind`'s document.
-std::string document_of(std::string_view kind) {
-  std::string path{DATA_PREFIX};
-  path += kind;
-  path += DATA_SUFFIX;
-  return path;
-}
-
-// The kind of content document `path` holds, its name between `data/` and
-// `.json`, if it is one the core knows.
-std::optional<std::string> kind_of_document(const std::string& path) {
-  for (const std::string_view kind : KINDS) {
-    if (path == document_of(kind)) {
-      return std::string{kind};
-    }
-  }
-  return std::nullopt;
+// Whether `name` is the name of a kind of content the core knows.
+bool known_kind(const std::string& name) {
+  return std::find(KINDS.begin(), KINDS.end(), name) != KINDS.end();
 }
 
 // Where a reader reports what it finds, and how it treats what it reads: in
@@ -733,19 +715,19 @@ struct PackEntry {
   std::size_t node = 0;
 };
 
-// A pack as read: its manifest, its documents' trees and paths, and its
-// entries.
+// A pack as read: its manifest, its documents' trees and the kinds they
+// hold, and its entries.
 struct ReadPack {
   Manifest manifest;
   std::vector<ContentTree> documents;
-  std::vector<std::string> paths;
+  std::vector<std::string> kinds;
   std::vector<PackEntry> entries;
 };
 
 // An error at the manifest of pack `pack`.
 ContentError manifest_error(const std::string& pack, const std::string& path,
                             ContentRefusal reason) {
-  return ContentError{pack, std::string{MANIFEST}, "", path, reason};
+  return ContentError{pack, MANIFEST, "", path, reason};
 }
 
 // Reads pack `pack`'s manifest `tree` into `manifest`, recording each error.
@@ -763,7 +745,7 @@ void read_manifest(const ContentTree& tree, const std::string& pack,
   context.order = &order;
   context.ids = &none;
   context.pack = pack;
-  context.document = std::string{MANIFEST};
+  context.document = MANIFEST;
   Reader reader(tree, 0, context, "");
   if (reader.text("id") != pack) {
     errors.push_back(manifest_error(pack, "id", ContentRefusal::OUT_OF_RANGE));
@@ -801,7 +783,7 @@ void check_entry(const ReadPack& read, const PackEntry& entry,
   Context context;
   context.errors = &errors;
   context.pack = pack;
-  context.document = read.paths.at(entry.document);
+  context.document = read.kinds.at(entry.document);
   context.entry = entry.name;
   Reader reader(tree, entry.node, context, "");
   reader.skip("id");
@@ -816,13 +798,12 @@ void check_entry(const ReadPack& read, const PackEntry& entry,
   reader.finish();
 }
 
-// Records the entries of document `document` of kind `kind` of `read`, and
-// an error for each item that is not a map with a well-formed id, or whose
-// id comes twice.
-void list_entries(ReadPack& read, std::size_t document, const std::string& kind,
-                  std::vector<ContentError>& errors, const std::string& pack) {
+// Records the entries of document `document` of `read`, and an error for
+// each item that is not a map with a well-formed id, or whose id comes twice.
+void list_entries(ReadPack& read, std::size_t document, const std::string& pack,
+                  std::vector<ContentError>& errors) {
   const ContentTree& tree = read.documents.at(document);
-  const std::string& path = read.paths.at(document);
+  const std::string kind = read.kinds.at(document);
   std::set<std::string> seen;
   for (const std::size_t item : tree.nodes.front().children) {
     const ContentNode& value = tree.nodes.at(item);
@@ -830,16 +811,16 @@ void list_entries(ReadPack& read, std::size_t document, const std::string& kind,
         value.kind == Kind::MAP ? member(tree, item, "id") : std::nullopt;
     if (value.kind != Kind::MAP) {
       errors.push_back(
-          ContentError{pack, path, "", "", ContentRefusal::WRONG_TYPE});
+          ContentError{pack, kind, "", "", ContentRefusal::WRONG_TYPE});
     } else if (!name) {
       errors.push_back(
-          ContentError{pack, path, "", "id", ContentRefusal::MISSING_FIELD});
+          ContentError{pack, kind, "", "id", ContentRefusal::MISSING_FIELD});
     } else if (const ContentNode& named = tree.nodes.at(*name);
                named.kind != Kind::STRING || !well_formed_id(named.text)) {
       errors.push_back(
-          ContentError{pack, path, "", "id", ContentRefusal::BAD_ID});
+          ContentError{pack, kind, "", "id", ContentRefusal::BAD_ID});
     } else if (!seen.insert(named.text).second) {
-      errors.push_back(ContentError{pack, path, named.text, "id",
+      errors.push_back(ContentError{pack, kind, named.text, "id",
                                     ContentRefusal::DUPLICATE_ID});
     } else {
       read.entries.push_back(PackEntry{kind, named.text, document, item});
@@ -847,34 +828,31 @@ void list_entries(ReadPack& read, std::size_t document, const std::string& kind,
   }
 }
 
-// Reads every data document of pack `pack` from `source` into `read`,
+// Reads every content document of pack `pack` from `source` into `read`,
 // recording each error.
 void read_documents(const PackSource& source, const std::string& pack,
                     ReadPack& read, std::vector<ContentError>& errors) {
-  std::vector<std::string> paths = source.data_documents(pack);
-  std::sort(paths.begin(), paths.end());
-  std::vector<std::string> kinds;
-  for (const std::string& path : paths) {
-    const std::optional<std::string> kind = kind_of_document(path);
-    if (!kind) {
+  std::vector<std::string> names = source.documents(pack);
+  std::sort(names.begin(), names.end());
+  for (const std::string& kind : names) {
+    if (!known_kind(kind)) {
       errors.push_back(
-          ContentError{pack, path, "", "", ContentRefusal::UNKNOWN_FIELD});
+          ContentError{pack, kind, "", "", ContentRefusal::UNKNOWN_FIELD});
       continue;
     }
-    ContentRead document = source.read(pack, path);
+    ContentRead document = source.read(pack, kind);
     if (!document.tree) {
-      errors.push_back(ContentError{pack, path, "", "", document.refusal});
+      errors.push_back(ContentError{pack, kind, "", "", document.refusal});
     } else if (document.tree->nodes.front().kind != Kind::LIST) {
       errors.push_back(
-          ContentError{pack, path, "", "", ContentRefusal::WRONG_TYPE});
+          ContentError{pack, kind, "", "", ContentRefusal::WRONG_TYPE});
     } else {
       read.documents.push_back(std::move(*document.tree));
-      read.paths.push_back(path);
-      kinds.push_back(*kind);
+      read.kinds.push_back(kind);
     }
   }
   for (std::size_t document = 0; document < read.documents.size(); ++document) {
-    list_entries(read, document, kinds.at(document), errors, pack);
+    list_entries(read, document, pack, errors);
   }
   for (const PackEntry& entry : read.entries) {
     check_entry(read, entry, pack, errors);
@@ -998,7 +976,7 @@ RegionData build_tables(const std::map<std::string, Merged>& merged,
       context.building = true;
       context.order = &order;
       context.ids = &ids;
-      context.document = document_of(kind);
+      context.document = std::string{kind};
       context.entry = name;
       context.pack = order.at(tree.nodes.front().pack);
       Reader reader(tree, 0, context, "");
@@ -1009,9 +987,8 @@ RegionData build_tables(const std::map<std::string, Merged>& merged,
   }
   const std::size_t seats = ids.at("seats").size();
   if (built.lives != 1 || seats > 1) {
-    errors.push_back(ContentError{order.back(),
-                                  document_of(seats > 1 ? "seats" : "life"), "",
-                                  "", ContentRefusal::INCONSISTENT});
+    errors.push_back(ContentError{order.back(), seats > 1 ? "seats" : "life",
+                                  "", "", ContentRefusal::INCONSISTENT});
   }
   return built.data;
 }
@@ -1097,7 +1074,7 @@ void refuse_unmet(const std::vector<std::string>& wanted,
 bool read_pack(const PackSource& source, const std::string& pack, bool is_base,
                ReadPack& made, std::vector<ContentError>& errors) {
   const std::size_t before = errors.size();
-  const ContentRead manifest = source.read(pack, std::string{MANIFEST});
+  const ContentRead manifest = source.read(pack, MANIFEST);
   if (!manifest.tree) {
     errors.push_back(manifest_error(pack, "", manifest.refusal));
   } else {

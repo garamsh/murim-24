@@ -96,9 +96,12 @@ struct ContentRead {
   ContentRefusal refusal = ContentRefusal::UNREADABLE;
 };
 
+/// The name of a pack's manifest among its documents.
+constexpr const char* MANIFEST = "manifest";
+
 /// The port through which the core receives content packs (ADR 0049). A pack
-/// is a manifest, `pack.json`, and documents under `data/`, one per kind of
-/// content, each a list of entries. The source serves them as the core's
+/// is a manifest and content documents, one per kind of content and named
+/// for it, each a list of entries. The source serves them as the core's
 /// value trees; how they are stored and parsed is the adapter's.
 class PackSource {
  public:
@@ -109,14 +112,14 @@ class PackSource {
   PackSource& operator=(PackSource&&) = default;
   virtual ~PackSource() = default;
 
-  /// Returns the document at `path` within pack `pack`, such as `pack.json`
-  /// or `data/factions.json`.
+  /// Returns pack `pack`'s document `document`: MANIFEST, or a kind's name
+  /// such as `factions`.
   [[nodiscard]] virtual ContentRead read(const std::string& pack,
-                                         const std::string& path) const = 0;
+                                         const std::string& document) const = 0;
 
-  /// Returns the paths of pack `pack`'s data documents, each `data/` and a
-  /// kind's name with `.json`; none for a pack the source lacks.
-  [[nodiscard]] virtual std::vector<std::string> data_documents(
+  /// Returns the names of pack `pack`'s content documents; none for a pack
+  /// the source lacks.
+  [[nodiscard]] virtual std::vector<std::string> documents(
       const std::string& pack) const = 0;
 };
 

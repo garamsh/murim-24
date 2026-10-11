@@ -23,17 +23,21 @@ constexpr std::size_t DOCUMENT_LIMIT = std::size_t{4} << 20U;
 /// bits as of the wrong type.
 [[nodiscard]] murim::ContentRead parse_document(const std::string& bytes);
 
-/// A pack source reading pack directories under a root: `<root>/<pack>/
-/// pack.json` and `<root>/<pack>/data/*.json`. The sweep, the bench and the
-/// core's tests read the base pack through it.
+/// The file within a pack of document `document`: `pack.json` for the
+/// manifest, and `data/<kind>.json` for a kind's content.
+[[nodiscard]] std::string file_of(const std::string& document);
+
+/// A pack source reading pack directories under a root, each document from
+/// its file_of under `<root>/<pack>/`. The sweep, the bench and the core's
+/// tests read the base pack through it.
 class DirectoryPacks : public murim::PackSource {
  public:
   explicit DirectoryPacks(std::filesystem::path root);
 
-  [[nodiscard]] murim::ContentRead read(const std::string& pack,
-                                        const std::string& path) const override;
+  [[nodiscard]] murim::ContentRead read(
+      const std::string& pack, const std::string& document) const override;
 
-  [[nodiscard]] std::vector<std::string> data_documents(
+  [[nodiscard]] std::vector<std::string> documents(
       const std::string& pack) const override;
 
  private:
@@ -44,23 +48,23 @@ class DirectoryPacks : public murim::PackSource {
 /// its files by path reads them, such as Godot inside an export.
 class BytePacks : public murim::PackSource {
  public:
-  /// Adds the document `bytes` at `path` of pack `pack`, `pack.json` or
-  /// `data/` and a kind's name with `.json`.
+  /// Adds the file `bytes` at `path` within pack `pack`, as file_of names
+  /// a document's.
   void add(const std::string& pack, const std::string& path, std::string bytes);
 
-  [[nodiscard]] murim::ContentRead read(const std::string& pack,
-                                        const std::string& path) const override;
+  [[nodiscard]] murim::ContentRead read(
+      const std::string& pack, const std::string& document) const override;
 
-  [[nodiscard]] std::vector<std::string> data_documents(
+  [[nodiscard]] std::vector<std::string> documents(
       const std::string& pack) const override;
 
  private:
-  struct Document {
+  struct File {
     std::string pack;
     std::string path;
     std::string bytes;
   };
-  std::vector<Document> documents_;
+  std::vector<File> files_;
 };
 
 /// Loads the base pack, BASE_PACK, from pack directories under `root`, and
