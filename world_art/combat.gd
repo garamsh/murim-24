@@ -40,13 +40,20 @@ const WOUNDED := 500
 const MAIMED := 250
 ## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
 ## apart a maimed person drips; and the most drops kept, the oldest going first.
-const SPRAY_MS := 300
-## The pixels a spray throws, and the most kept, the oldest going first.
-const SPRAY_PIXELS := 6
-const MOST_SPRAY_PIXELS := 900
+const SPRAY_MS := 400
 const DROP_MS := 3000
 const DRIP_TICKS := 45
 const MOST_DROPS := 600
+## The pixels a spray throws, and the most kept, the oldest going first; and how far each flies
+## from the struck body's side facing the blow, in pixels, between the two, a cell or more.
+const SPRAY_PIXELS := 8
+const MOST_SPRAY_PIXELS := 1200
+const SPRAY_REACH := Vector2(12.0, 22.0)
+## The drops a hit lets fall beyond the struck body's feet in the blow's direction, and those it
+## pools under them; and the shapes a drop takes, of the pixel clusters blood_pixels.gd draws.
+const HIT_DROPS := 3
+const POOL_DROPS := 2
+const DROP_SHAPES := 3
 ## How many view frames a hit stop holds its bodies, by the health the hit took: under the first of
 ## each pair, the second; any more, HIT_STOP_MOST.
 const HIT_STOP := [[20, 2], [60, 3]]
@@ -58,9 +65,11 @@ const SHAKE := [[20, 1], [60, 2]]
 const SHAKE_MOST := 3
 const SHAKE_MS := 150
 const SHAKE_STEP_MS := 30
-const SHAKE_PATTERN: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 0)]
-## Blood, the crimson ramp's second and third steps: its first is too near black to read on the
-## ground, and its fourth stays for hostility.
+const SHAKE_PATTERN: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 0),
+]
+## Blood, the crimson ramp's third and second steps, a drop's edge and its core: its first is too
+## near black to read on the ground, and its fourth stays for hostility.
 const BLOOD := [Color("9c1f24"), Color("5c1418")]
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
@@ -78,20 +87,22 @@ const NEVER := -(1 << 40)
 var damage_numbers := "mine"
 ## Whether a hit draws blood; the settings' blood row sets it. Off, a hit shows only its flash.
 var blood := true
-## Each spray of blood flying, in order: `ms`, when, `at`, the struck body's middle in pixels, `dir`,
-## the blow's direction, and `seed`.
+## Each spray of blood flying, in order: `ms`, when, `at`, where it is thrown from in pixels, the
+## struck body's side facing the blow, `dir`, the blow's direction, and `seed`.
 var sprays: Array[Dictionary] = []
 ## The drops of blood on the ground, a ring of at most MOST_DROPS, a new drop taking the oldest's
-## place: where each fell, in pixels, when, and its shade of BLOOD. Read by blood_pixels.gd as they are,
-## so a frame builds nothing; a drop older than DROP_MS shows no more.
+## place: where each fell, in pixels, when, and its shape, below DROP_SHAPES. Read by
+## blood_pixels.gd as they are, so a frame builds nothing; a drop older than DROP_MS shows no more.
 var drop_at := PackedVector2Array()
 var drop_ms := PackedInt64Array()
-var drop_shade := PackedByteArray()
+var drop_shape := PackedByteArray()
 ## How many drops have fallen, the ring's next place being this modulo MOST_DROPS.
 var drops_fallen := 0
-## The sprays' pixels, a ring of at most MOST_SPRAY_PIXELS like the drops': where each was thrown,
-## halfway along its flight, when, and its shade; and how many have been thrown.
+## The sprays' pixels, a ring of at most MOST_SPRAY_PIXELS like the drops': where each was thrown
+## from, the struck body's middle, and how far it flies from there, in pixels, when, and its shade
+## of BLOOD, the lighter, which reads on the ground; and how many have been thrown.
 var spray_pixel_at := PackedVector2Array()
+var spray_pixel_reach := PackedVector2Array()
 var spray_pixel_ms := PackedInt64Array()
 var spray_pixel_shade := PackedByteArray()
 var spray_pixels_thrown := 0
@@ -258,8 +269,6 @@ func place_of(person: int) -> Vector2i:
 	return Vector2i(_army[person], _body[person])
 
 
-## Draws what shows at `now` within `shown`, the part of the world on screen in pixels, with the
-## steered person's target at `target_at`.
 ## Returns how wounded person `person` is drawn: 0 not, 1 wounded, below WOUNDED of the most health
 ## it has had, and 2 maimed, below MAIMED.
 func wound(person: int) -> int:
@@ -278,12 +287,12 @@ func shake(now: int) -> Vector2i:
 	return SHAKE_PATTERN[((now - _shake_ms) / SHAKE_STEP_MS) % SHAKE_PATTERN.size()] * _shake_pixels
 
 
-## Returns where pixel `k` of `spray` is at `now`, in pixels: thrown along the blow's direction,
-## turned a little by the spray's seed, flying a few pixels further as it fades.
-static func spray_pixel(spray: Dictionary, k: int, now: int) -> Vector2:
+## Returns how far pixel `k` of `spray` flies from where it is thrown, in pixels: along the blow's
+## direction turned a little by the spray's seed, SPRAY_REACH's span away.
+static func spray_reach(spray: Dictionary, k: int) -> Vector2:
 	var turn := (_unit(spray.seed, k) - 0.5) * 1.2
-	var reach := 2.0 + k + clampf(float(now - spray.ms) / SPRAY_MS, 0.0, 1.0) * 4.0
-	return (spray.at + (spray.dir as Vector2).rotated(turn) * reach).round()
+	var reach := lerpf(SPRAY_REACH.x, SPRAY_REACH.y, _unit(spray.seed, 40 + k))
+	return (spray.dir as Vector2).rotated(turn) * reach
 
 
 ## Returns the sprays of blood flying at `now` within the view.
@@ -298,24 +307,30 @@ func shown_drops(now: int) -> Array[Dictionary]:
 	var shown: Array[Dictionary] = []
 	for i in drop_at.size():
 		if now - drop_ms[i] < DROP_MS and view.has_point(drop_at[i]):
-			shown.append({"at": drop_at[i], "left": 1.0 - float(now - drop_ms[i]) / DROP_MS, "shade": drop_shade[i]})
+			var left := 1.0 - float(now - drop_ms[i]) / DROP_MS
+			shown.append({"at": drop_at[i], "left": left, "shape": drop_shape[i]})
 	return shown
 
 
-# A use struck `person`, standing at `at` in pixels: a spray from its middle in the blow's direction,
-# and three drops on the ground beyond its feet that way.
+# A use struck `person`, standing at `at` in pixels: a spray from its side facing the blow, in the
+# blow's direction, HIT_DROPS drops on the ground beyond its feet that way, and POOL_DROPS under them.
 func _bleed(person: int, at: Vector2) -> void:
 	var seed := person * 7919 + _tick
 	var dir: Vector2 = _away[person]
 	if dir == Vector2.ZERO:
 		dir = Vector2.RIGHT.rotated(_unit(seed, 9) * TAU)
-	var spray := {"ms": _ms, "at": at - Vector2(0, BODY_HEIGHT / 2.0), "dir": dir, "seed": seed}
+	var from := at - Vector2(0, BODY_HEIGHT / 2.0) + dir * 4.0
+	var spray := {"ms": _ms, "at": from, "dir": dir, "seed": seed}
 	sprays.append(spray)
 	for k in SPRAY_PIXELS:
-		_throw(spray_pixel(spray, k, _ms + SPRAY_MS / 2), k % BLOOD.size())
-	for k in 3:
+		_throw(spray.at, spray_reach(spray, k), 0)
+	for k in HIT_DROPS:
 		var aside := Vector2(_unit(seed, 20 + k) * 4.0 - 2.0, _unit(seed, 30 + k) * 2.0 - 1.0)
 		_drop(at + Vector2(dir.x, dir.y * 0.75) * (3.0 + k * 2.5) + aside, k)
+	# Pooled just below the feet, where the body standing on them does not hide them.
+	for k in POOL_DROPS:
+		var side := 1.0 if k % 2 == 0 else -1.0
+		_drop(at + Vector2(side * (1.0 + _unit(seed, 50 + k) * 3.0), 2.0 + _unit(seed, 60 + k)), seed + k)
 
 
 # Each maimed person on screen drips a drop at its feet every DRIP_TICKS ticks, its own tick apart.
@@ -333,29 +348,31 @@ func _drip() -> void:
 				_drop(at + Vector2(_unit(person, _tick) * 4.0 - 2.0, 0.0), person)
 
 
-func _throw(at: Vector2, shade: int) -> void:
+func _throw(at: Vector2, reach: Vector2, shade: int) -> void:
 	if spray_pixel_at.size() < MOST_SPRAY_PIXELS:
 		spray_pixel_at.append(at)
+		spray_pixel_reach.append(reach)
 		spray_pixel_ms.append(_ms)
 		spray_pixel_shade.append(shade)
 	else:
 		var i := spray_pixels_thrown % MOST_SPRAY_PIXELS
 		spray_pixel_at[i] = at
+		spray_pixel_reach[i] = reach
 		spray_pixel_ms[i] = _ms
 		spray_pixel_shade[i] = shade
 	spray_pixels_thrown += 1
 
 
-func _drop(at: Vector2, shade: int) -> void:
+func _drop(at: Vector2, shape: int) -> void:
 	if drop_at.size() < MOST_DROPS:
 		drop_at.append(at.round())
 		drop_ms.append(_ms)
-		drop_shade.append(shade % BLOOD.size())
+		drop_shape.append(posmod(shape, DROP_SHAPES))
 	else:
 		var i := drops_fallen % MOST_DROPS
 		drop_at[i] = at.round()
 		drop_ms[i] = _ms
-		drop_shade[i] = shade % BLOOD.size()
+		drop_shape[i] = posmod(shape, DROP_SHAPES)
 	drops_fallen += 1
 
 
@@ -366,6 +383,8 @@ static func _unit(seed: int, k: int) -> float:
 	return float(absi(h ^ (h >> 16)) % 10007) / 10007.0
 
 
+## Draws what shows at `now` within `shown`, the part of the world on screen in pixels, with the
+## steered person's target at `target_at`.
 func show_at(shown: Rect2, now: int, target_at: Vector2) -> void:
 	view = shown
 	_now = now

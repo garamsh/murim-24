@@ -13,6 +13,7 @@ extends RefCounted
 const SCENE := "res://world_art/world_art.tscn"
 const Combat := preload("res://world_art/combat.gd")
 const WorldArt := preload("res://world_art/world_art.gd")
+const BloodPixels := preload("res://world_art/blood_pixels.gd")
 const MAP_ROWS: Array[String] = [
 	"................",
 	"................",
@@ -38,9 +39,10 @@ func run() -> bool:
 			and _shake_pass()
 
 
-# On the hit tick the foe bleeds: one spray from its middle and three drops beyond its feet in the
-# blow's direction, away from the striker, given to the blood MultiMeshes as six pixels and three.
-# Control: the foe out of reach is struck by nothing and bleeds nothing.
+# On the hit tick the foe bleeds: one spray from its middle, and drops on the ground, two or more of
+# them beyond its feet in the blow's direction, away from the striker, and two or more pooled just
+# below them; given to the blood MultiMeshes as the spray's pixels and each drop's cluster. Control: the
+# foe out of reach is struck by nothing and bleeds nothing.
 func _blood_pass() -> bool:
 	var near := _fight(BESIDE, 60, true)
 	var far := _fight(OUT_OF_REACH, 60, true)
@@ -49,17 +51,21 @@ func _blood_pass() -> bool:
 	var sprays := combat.shown_sprays(now)
 	var drops := combat.shown_drops(now)
 	var foe_at: Vector2 = near.art.body_at(1, 0, 1.0)
-	var beyond := drops.all(func(drop: Dictionary) -> bool: return drop.at.x > foe_at.x - 3.0)
+	var beyond := drops.filter(func(drop: Dictionary) -> bool: return drop.at.x > foe_at.x + 3.0).size()
+	var pooled := drops.filter(func(drop: Dictionary) -> bool:
+		return absf(drop.at.x - foe_at.x) <= 4.0 and drop.at.y - foe_at.y >= 1.0 and drop.at.y - foe_at.y <= 4.0).size()
 	var far_combat: Combat = far.art.combat
 	# What the blood's MultiMeshes are given to draw: a pixel an instance.
 	var drawn := [_pixels(near.art, "Sprays"), _pixels(near.art, "Drops")]
 	var far_drawn := [_pixels(far.art, "Sprays"), _pixels(far.art, "Drops")]
-	var passed: bool = near.tick >= 0 and sprays.size() == 1 and drops.size() == 3 and beyond \
-			and (sprays[0].dir as Vector2).x > 0.0 and drawn == [Combat.SPRAY_PIXELS, 3] and far.tick < 0 \
+	var dropped := Combat.HIT_DROPS + Combat.POOL_DROPS
+	var passed: bool = near.tick >= 0 and sprays.size() == 1 and drops.size() == dropped and beyond >= 2 \
+			and pooled >= 2 and (sprays[0].dir as Vector2).x > 0.0 \
+			and drawn == [Combat.SPRAY_PIXELS, dropped * BloodPixels.DROP_PIXELS] and far.tick < 0 \
 			and far_combat.shown_sprays(now).is_empty() and far_combat.shown_drops(now).is_empty() \
 			and far_drawn == [0, 0]
-	print("blood_test: on the hit tick %d, %d spray(s) toward %s and %d drop(s), beyond the foe's feet %s, given to draw as %d and %d pixels; out of reach, a use by tick %d, %d spray(s) and %d drop(s), %d and %d pixels: %s" % [
-		near.tick, sprays.size(), sprays[0].dir if not sprays.is_empty() else Vector2.ZERO, drops.size(), beyond,
+	print("blood_test: on the hit tick %d, %d spray(s) toward %s and %d drop(s), %d beyond the foe's feet and %d pooled at them, given to draw as %d and %d pixels; out of reach, a use by tick %d, %d spray(s) and %d drop(s), %d and %d pixels: %s" % [
+		near.tick, sprays.size(), sprays[0].dir if not sprays.is_empty() else Vector2.ZERO, drops.size(), beyond, pooled,
 		drawn[0], drawn[1], far.tick, far_combat.shown_sprays(now).size(), far_combat.shown_drops(now).size(),
 		far_drawn[0], far_drawn[1], "pass" if passed else "FAIL"])
 	near.art.free()
