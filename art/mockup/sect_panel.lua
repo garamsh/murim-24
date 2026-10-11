@@ -44,7 +44,7 @@ local font = bdf.load(here .. "/../../hud/fonts/Galmuri9.bdf", texts)
 
 local background = ui.backdrop(here .. "/target_screen.aseprite", W, H)
 local panel = px.canvas(W, H)
-local body = px.load_frames(here .. "/../bodies/orthodox.aseprite")[1]
+local body = px.load_frames(here .. "/frozen/bodies/orthodox.aseprite")[1]
 
 -- A word on a filled slip, its text in paper; returns the slip's width.
 local function tag(x, y, text, ramp)
@@ -78,7 +78,7 @@ for x = LX + 6, LX + SW - 7 do
     if px.hash(x, y, 26) < 0.08 then panel:set(x, y, c("grass", 4)) end
   end
 end
-local gate = px.load_frames(here .. "/../structures/seat_gate.aseprite")[1]
+local gate = px.load_frames(here .. "/frozen/structures/seat_gate.aseprite")[1]
 for k, i in pairs(gate.p) do
   local gx, gy = k % gate.w, k // gate.w
   panel:set(LX + (SW - gate.w) // 2 + gx, TOP + 6 + gy, i)

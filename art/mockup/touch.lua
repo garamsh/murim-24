@@ -118,7 +118,7 @@ return function(px, bdf, ui, here)
   -- The icons, each a canvas: the production set's strike and burst, and the target screen's
   -- lightness skill, meditation and medicine.
   local icons = {}
-  local skill_icons = px.load_frames(here .. "/../icons/skill_icons.aseprite")
+  local skill_icons = px.load_frames(here .. "/frozen/icons/skill_icons.aseprite")
   icons.strike, icons.burst = skill_icons[1], skill_icons[2]
   icons.feather = px.canvas(20, 20)
   icons.feather:line(5, 15, 14, 4, c("paper", 3)); icons.feather:line(6, 13, 13, 4, c("jade", 3))
