@@ -1,0 +1,13 @@
+round 1 main start load 2.55 busy 0 14:12:41
+round 1 main exit 0 14:12:54
+round 1 head start load 2.69 busy 0 14:13:04
+round 1 head exit 0 14:13:17
+round 2 main start load 3.00 busy 0 14:13:27
+round 2 main exit 0 14:13:40
+round 2 head start load 2.86 busy 0 14:13:50
+round 2 head exit 0 14:14:03
+round 3 main start load 2.63 busy 0 14:14:13
+round 3 main exit 0 14:14:25
+round 3 head start load 2.40 busy 0 14:14:36
+round 3 head exit 0 14:14:49
+series done 14:14:49
