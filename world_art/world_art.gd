@@ -62,7 +62,9 @@ const HEAD := 23.0
 const STRIKE_MS := 200
 # The frames of a faction's body sheet, `<tag>` and `<tag>_xray` for each of these, by its tags; and
 # the atlas slot after the factions' frames that holds the shadow, centred in it.
-const BODY_TAGS := ["idle", "walk", "back", "strike"]
+const BODY_TAGS := ["idle", "walk", "back", "strike", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed"]
+# The suffix of a body's idle and walk tags by how wounded Combat.wound() says it is.
+const WOUND_TAGS := ["", "_hurt", "_maimed"]
 const SHADOW := "markers/shadow"
 ## Pixels a band's bodies are bucketed by for the test of what stands in front of them.
 const BUCKET := 32.0
@@ -363,6 +365,9 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			elif heading != Vector2.ZERO:
 				tag = "back" if heading.y < 0.0 and -heading.y > absf(heading.x) else "walk"
 				index = walk
+			# Facing the viewer, standing or walking, a wounded body stoops and is stained.
+			if tag == "idle" or tag == "walk":
+				tag += WOUND_TAGS[combat.wound(person)]
 			var centre := Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0)
 			var frame := Rect2(Vector2(sprite * _faction_width + (_body_frames[tag] + index) * BODY_FRAME.x, 0), BODY_FRAME)
 			var band := row - first_row

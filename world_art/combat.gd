@@ -6,9 +6,10 @@
 ## back from the nearest use that struck it, its loss floating up while the damage numbers row
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
-## struck by nothing, of hunger or age, is not drawn falling; and the person the player selected is
-## marked while it lives, or with none selected, the person the steered person's last use struck
-## nearest where it went. Like sound.gd, it keeps what it
+## struck by nothing, of hunger or age, is not drawn falling; a person below WOUNDED or MAIMED of
+## the most health it has had is wounded; and the person the player selected is marked while it
+## lives, or with none selected, the person the steered person's last use struck nearest where it
+## went. Like sound.gd, it keeps what it
 ## compares by person in packed arrays. world_art.gd draws the bodies with what it gives. It reads
 ## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
@@ -28,6 +29,10 @@ const TARGET_MS := 2000
 ## How far the struck are knocked back, and a number rises, in pixels.
 const KNOCK_PIXELS := 2.0
 const NUMBER_RISE := 12.0
+## The shares, per mille of the most health a person has had, below which its body is drawn
+## wounded, then maimed: view data read from the core's health.
+const WOUNDED := 500
+const MAIMED := 250
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
 const PAPER := Color("efe3c2")
@@ -81,6 +86,8 @@ var _positions: Array[PackedVector2Array] = []
 # in sub-cell units squared.
 var _seen := PackedInt64Array()
 var _health := PackedInt64Array()
+# The most health each person has had, by person.
+var _peak := PackedInt64Array()
 var _army := PackedInt64Array()
 var _body := PackedInt64Array()
 var _struck_tick := PackedInt64Array()
@@ -190,6 +197,15 @@ func place_of(person: int) -> Vector2i:
 
 ## Draws what shows at `now` within `shown`, the part of the world on screen in pixels, with the
 ## steered person's target at `target_at`.
+## Returns how wounded person `person` is drawn: 0 not, 1 wounded, below WOUNDED of the most health
+## it has had, and 2 maimed, below MAIMED.
+func wound(person: int) -> int:
+	if person >= _peak.size() or _peak[person] <= 0:
+		return 0
+	var share := _health[person] * 1000 / _peak[person]
+	return 2 if share < MAIMED else (1 if share < WOUNDED else 0)
+
+
 func show_at(shown: Rect2, now: int, target_at: Vector2) -> void:
 	view = shown
 	_now = now
@@ -327,6 +343,7 @@ func _read_bodies(world: WorldAdapter, rosters: Array[PackedInt64Array],
 				_hit(person, _health[person] - healths[body], _pixels(positions[army][body]))
 			_seen[person] = _tick
 			_health[person] = healths[body]
+			_peak[person] = maxi(_peak[person], healths[body])
 			_army[person] = army
 			_body[person] = body
 	_positions = positions.duplicate()
@@ -362,11 +379,13 @@ func _grow(size: int) -> void:
 		_seen[person] = -2
 		_struck_tick[person] = -1
 		_hit_ms[person] = NEVER
+		_peak[person] = 0
 
 
 func _resize(to: int) -> void:
 	_seen.resize(to)
 	_health.resize(to)
+	_peak.resize(to)
 	_army.resize(to)
 	_body.resize(to)
 	_struck_tick.resize(to)
