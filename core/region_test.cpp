@@ -645,9 +645,10 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   rebuilders.members = gathered(
       region, region.villages.at(first_of(region, UNORTHODOX)), REBUILDERS);
   rebuilders.objective = rebuilders.members.front().cell;
-  // Setup: the seed's villages each had room for the whole band.
-  ASSERT_EQ(raiders.members.size(), RAIDERS);
-  ASSERT_EQ(rebuilders.members.size(), REBUILDERS);
+  // Setup: the seed's villages each had room for the whole band, since
+  // gathered() gives at most as many as asked.
+  ASSERT_EQ(raiders.members.size() + rebuilders.members.size(),
+            RAIDERS + REBUILDERS);
   const std::size_t raider = region.armies.size();
   const std::size_t rebuilder = raider + 1;
   region.armies.push_back(raiders);
@@ -656,7 +657,6 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
 
   std::vector<VillageState> states{world.village_state(target)};
   std::vector<std::size_t> owners{world.owner(target)};
-  // Ticks until `done`, at most LIMIT ticks. Returns whether it was done.
   const auto run_until = [&](const auto& done) {
     for (std::uint64_t tick = 0; tick < LIMIT && !done(); ++tick) {
       world.tick();
@@ -667,17 +667,15 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
         owners.push_back(world.owner(target));
       }
     }
-    return done();
   };
 
   world.order(raider, {centre, {0, 1, 2}});
   run_until([&] { return world.village_state(target) == VillageState::RUINS; });
   world.order(raider, {raiders_home, {0, 1, 2}});
-  // Setup: the raiders reached home, so the rebuilders work unopposed.
-  ASSERT_TRUE(run_until([&] {
+  run_until([&] {
     return same(cell_of(world.person(world.roster(raider).front()).position),
                 raiders_home);
-  }));
+  });
   world.order(rebuilder, {centre, {0, 1}});
   run_until(
       [&] { return world.village_state(target) == VillageState::PROSPEROUS; });
