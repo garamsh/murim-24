@@ -101,6 +101,9 @@ var _bands: Array[MultiMeshInstance2D] = []
 var _body_frames := {}
 var _faction_width := 0
 var _shadow_x := 0
+# The people a hit stop holds, by person: `left`, the view frames it still holds, and from its first
+# held frame on, what that frame drew: `at`, `tag`, `frame`, `white` and `flip`.
+var _held := {}
 # When each person last struck, in milliseconds, by person; never, for one past its end.
 var _struck_at := PackedInt64Array()
 ## Bodies drawn over what stands in front of them as an outline in the last refresh.
@@ -227,6 +230,10 @@ func note_tick() -> void:
 	_read_relations()
 	var ms := Time.get_ticks_msec()
 	combat.note_tick(world, steered, ms, _rosters, _tick_positions)
+	# A hit stop starts holding its person afresh from the next refresh.
+	for stop: Dictionary in combat.hit_stops:
+		if stop.person >= 0:
+			_held[stop.person] = {"left": maxi(stop.frames, _held.get(stop.person, {}).get("left", 0))}
 	for strike: Dictionary in combat.strikes:
 		if strike.ms == ms:
 			if strike.person >= _struck_at.size():
@@ -342,6 +349,10 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			var sub := before[body].lerp(positions[body], share) if moving and body < before.size() else positions[body]
 			var on_ground := sub * pixels
 			var at := on_ground - Vector2(0, relief.lift_at(on_ground)) + combat.knock(person, now)
+			# A body a hit stop holds stays where its first held frame drew it.
+			var held: Dictionary = _held.get(person, {})
+			if held.has("at"):
+				at = held.at
 			if not shown.has_point(at):
 				continue
 			var cells := (sub - named_from).length() / WorldAdapter.CELL_SIZE
@@ -372,11 +383,23 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			# every band.
 			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false)
 			var white := combat.flash(person, now)
-			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, white)
+			var flip := heading.x < 0.0
+			if not held.is_empty():
+				if held.has("at"):
+					tag = held.tag
+					frame = held.frame
+					white = held.white
+					flip = held.flip
+				else:
+					held.merge({"at": at, "tag": tag, "frame": frame, "white": white, "flip": flip})
+				held.left -= 1
+				if held.left <= 0:
+					_held.erase(person)
+			_pack(buffers[band], frame, centre.round() - origin, flip, white)
 			if _hidden(Rect2(centre - Vector2(BODY_FRAME) / 2.0, BODY_FRAME).grow(-2), origin.y):
 				var outline := frame
 				outline.position.x += (_body_frames[tag + "_xray"] - _body_frames[tag]) * BODY_FRAME.x
-				_pack(outlines, outline, centre, heading.x < 0.0, white, 1.0, 0.0, frame.position)
+				_pack(outlines, outline, centre, flip, white, 1.0, 0.0, frame.position)
 				outlined += 1
 			drawn += 1
 	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as

@@ -6,7 +6,9 @@
 ## back from the nearest use that struck it, its loss floating up while the damage numbers row
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
-## struck by nothing, of hunger or age, is not drawn falling; a person a use struck bleeds, a spray
+## struck by nothing, of hunger or age, is not drawn falling; a hit on or from the steered person
+## holds the struck and the striker still a few view frames while the ticks go on (hit_stops); a
+## person a use struck bleeds, a spray
 ## from its middle in the blow's direction and drops on the ground that fade, while blood is on; a
 ## person below WOUNDED or MAIMED of the most health it has had is wounded, and a maimed one on
 ## screen drips now and then; and the person the player selected is marked while it lives, or with
@@ -41,6 +43,10 @@ const SPRAY_MS := 300
 const DROP_MS := 3000
 const DRIP_TICKS := 45
 const MOST_DROPS := 1200
+## How many view frames a hit stop holds its bodies, by the health the hit took: under the first of
+## each pair, the second; any more, HIT_STOP_MOST.
+const HIT_STOP := [[20, 2], [60, 3]]
+const HIT_STOP_MOST := 4
 ## Blood, the crimson ramp's second and third steps: its first is too near black to read on the
 ## ground, and its fourth stays for hostility.
 const BLOOD := [Color("9c1f24"), Color("5c1418")]
@@ -65,6 +71,11 @@ var blood := true
 var sprays: Array[Dictionary] = []
 ## Each drop of blood on the ground, in order: `ms`, when it fell, and `at`, where, in pixels.
 var drops: Array[Dictionary] = []
+## Whether a hit on or from the steered person holds the struck and the striker still a few frames;
+## the settings' hit stop row sets it.
+var hit_stop := true
+## The hit stops of the last tick: each `person` held and for how many view `frames`.
+var hit_stops: Array[Dictionary] = []
 ## Each army's faction accent, by army index; world_art.gd keeps it as armies form.
 var accents: Array[Color] = []
 ## Each use shown, as WorldAdapter.strikes() gives it, with `ms`, when it was recorded, and
@@ -113,6 +124,8 @@ var _body := PackedInt64Array()
 var _struck_tick := PackedInt64Array()
 var _struck_by_lead := PackedByteArray()
 var _nearest := PackedFloat64Array()
+# The person whose use struck each person nearest on the tick it was struck.
+var _striker := PackedInt64Array()
 # By person: when it last lost health, in milliseconds, and the way it is knocked, as a unit.
 var _hit_ms := PackedInt64Array()
 var _away := PackedVector2Array()
@@ -147,6 +160,7 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 		positions: Array[PackedVector2Array]) -> void:
 	_tick += 1
 	_ms = now
+	hit_stops.clear()
 	_lead = -1
 	if steered_army >= 0 and steered_army < rosters.size() and not rosters[steered_army].is_empty():
 		_lead = rosters[steered_army][0]
@@ -406,6 +420,7 @@ func _note_struck(strike: Dictionary) -> void:
 		if near < _nearest[person]:
 			_nearest[person] = near
 			_away[person] = (stood - strike.origin).normalized()
+			_striker[person] = strike.person
 		if strike.steered:
 			_struck_by_lead[person] = 1
 			if stood.distance_squared_to(strike.toward) < best:
@@ -447,6 +462,15 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 		_bleed(person, at)
 	var own := person == _lead
 	var mine := own or (struck and _struck_by_lead[person] == 1)
+	# A hit on or from the steered person holds the struck, and the one whose use struck it nearest.
+	if hit_stop and struck and (own or _struck_by_lead[person] == 1):
+		var frames := HIT_STOP_MOST
+		for step: Array in HIT_STOP:
+			if lost < step[0]:
+				frames = step[1]
+				break
+		hit_stops.append({"person": person, "frames": frames})
+		hit_stops.append({"person": _striker[person], "frames": frames})
 	if damage_numbers == "everyone" or (damage_numbers == "mine" and mine):
 		var text := str(lost)
 		numbers.append({"ms": _ms, "text": text, "at": at, "own": own, "mine": mine,
@@ -482,6 +506,7 @@ func _resize(to: int) -> void:
 	_struck_tick.resize(to)
 	_struck_by_lead.resize(to)
 	_nearest.resize(to)
+	_striker.resize(to)
 	_hit_ms.resize(to)
 	_away.resize(to)
 
