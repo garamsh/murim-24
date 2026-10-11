@@ -83,18 +83,18 @@ How the owner's four example forms arise under the chosen rule:
   - **Houses on rough cells.** Rejected. Every rule that reads footing for building would change with it, ADR 0062's walls included, for a look the fields alone give.
   - **A later issue.** Rejected. The owner names terraces among this issue's forms, and the change is one footing test for one role.
 - **Crossroads market.** From a market plan of the square role, laid by a village of the village tier or above whose square lies within 3 cells of where two roads meet. It waits for two things:
-  - roads in the core: ADR 0047's authored roads, from ADR 0077's step 2 on the map, or ADR 0056's trodden roads;
+  - roads in the core: ADR 0047's authored roads, once a world is built on its map, or ADR 0056's trodden roads;
   - a market structure kind: ADR 0052's town market.
 
   Until both land, no village takes the form. That is listed under what this leaves to other work, not designed twice.
 
 ## Decision
 
-**Spacing.** Growth data gains `apart`, cells between two villages' centres. A site is open to a village only where no village's centre lies within `apart` of its own. Every village counts: sect seats, villages in ruins, and villages still being settled.
+**Spacing.** Growth data gains `apart`, cells between two villages' centres. It is held in `growth` in `packs/wuxia/data/life.json`, beside `spacing` and `claim`, as are the tiers' thresholds, squares and vicinities and `terrace`. The templates in `packs/wuxia/data/villages.json` become lists of what a village starts with. A site is open to a village only where no village's centre lies within `apart` of its own. Every village counts: sect seats, villages in ruins, and villages still being settled.
 - **Generation** draws each starting village's site, seats included, among the open corners.
 - **Founding** draws among the open sites within `reach`.
 - **No room.** A region that leaves a starting village no room is refused, as today.
-- **Authored places.** On ADR 0047's map, every named settlement is a centre in the test: cities, towns, seats and ADR 0070's inns. The map's validator refuses two closer than `apart`, as ADR 0077 has it.
+- **Authored places.** On ADR 0047's map, every named settlement is a centre in the test: cities, towns, seats and ADR 0070's inns. ADR 0047's validator refuses two closer than `apart`, as it refuses a map whose places fail its other checks.
 - **The value.** The implementing pull request measures 20, 24, 28 and 32 on today's region. It chooses the largest at which `make sweep` keeps at least 48 of 50 seeds and seeds 0 to 999 all generate. The expected value is 24, one and a half claims.
 
 **Tiers.** A village's tier is read from its residents against thresholds in pack data: a hamlet below 20, a village from 20, a town from 150, ADR 0062's scale. A tier, once reached, is kept, so a village near a threshold does not flip between forms as people are born and die. Each tier gives:
@@ -115,7 +115,7 @@ How the owner's four example forms arise under the chosen rule:
 - **Founding** lays a core alone: the square, the hall or a first house, and a well. Growth builds the rest, from ADR 0056's materials once they land.
 - **Generation** lays each starting village's core on its site, then places the rest of what it starts with by the same roles. A template becomes a list of what a village starts with, not where each building stands.
 - **Authored patches.** On ADR 0047's map, a city's or a town's layout patch is laid as authored and names its square. Growth extends it from that square by the same roles, so roles govern only what grows after the patch.
-- **Far villages.** In ADR 0042's far tier, a village builds in aggregate as ADR 0056 has it. Its placements run in plan order when its area next becomes stepped or live, through the same draw, so the layout does not depend on when it was seen.
+- **Far villages.** In ADR 0042's far tier, a village builds in aggregate as ADR 0056 has it. Its placements run in plan order when its area next becomes stepped or live, through the same draw and within the catch-up bound under Consequences, so the layout does not depend on when it was seen.
 
 **What this leaves to other work.**
 - **Walls.** A town's walls are ADR 0062's, planned around this ADR's built cells once the town tier is reached. Its square is the town's market.
@@ -126,7 +126,7 @@ This supersedes:
 - ADR 0009's villages placed among every corner that fits;
 - ADR 0013's village templates laid out from the mockup;
 - ADR 0023's founding laying the settlement's layout, and its building nearest the centre within one vicinity;
-- ADR 0024's rough cells bearing nothing, for fields laid by the edge role, which may terrace them.
+- ADR 0024's rough cells bearing nothing, for terraced fields, which the edge role may lay on them.
 
 ## Consequences
 
@@ -145,8 +145,8 @@ Households count about 3.5 residents each, the PM's estimate on #276, which the 
 - **Variety comes from ground and seed.** Two villages of one tier on different sites differ, and the same site and seed give the same layout.
 - **Cost per placement.** A placement builds a flow field over the vicinity: at most 25 × 25 cells on today's region, and 41 × 41, 1,681 cells, for a town on #173's map. It then scans the vicinity's corners. This runs once per growth check of a pressing village, every 30 days, and generation does the same for each starting building. Nothing runs per tick.
   - **At 500 living**, today's region, the measured year-100 average is about 20 villages a seed. At most 20 placements fall due in 30 days.
-  - **At 5,000 live,** with ADR 0062's town of 150 as the largest, at most about 250 live villages, so about 8 placements a day, spread over the day's ticks as ADR 0048 spreads daily rules.
-  - **Far villages on the 8,192 map** place nothing until their area is stepped or live. A village returning to view places what it built in aggregate, at most one vicinity's field per plan, spread the same way.
+  - **At 5,000 live,** at the measured median of 7 residents a village at year 100, about 714 villages, so about 24 placements a day, spread over the day's ticks as ADR 0048 spreads daily rules.
+  - **Far villages on the 8,192 map** place nothing until their area is stepped or live. A village returning to view places at most one plan a tick, and at most 16 placements run in any tick world-wide, nearest area first. So a backlog of B plans settles within B ticks of its area coming into view, and no tick pays for more than 16 fields over a vicinity.
 - **Saves.** Saves gain nothing, since the square derives from the seat and the tier from residents.
 - **Art.** House materials by tier, such as thatch, tile and stone, and regional styles wait for #200's look to be approved, as the owner decided on 2026-10-09. The view will choose a house's look from its village's tier.
 - **Building it is one pull request:**

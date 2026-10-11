@@ -1,6 +1,6 @@
 # ADR 0024: Build only on terrain whose kind bears buildings
 
-> Status: accepted; its rough cells bearing nothing superseded by ADR-0076 for fields, which a village's edge role may lay on them as terraces at a higher labour cost
+> Status: accepted; its rough cells bearing nothing superseded by ADR-0076 for terraced fields, which a village's edge role may lay on them as terraces at a higher labour cost
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
