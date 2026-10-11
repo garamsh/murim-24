@@ -5,11 +5,12 @@
 --   lists every line naming a step it cannot rewrite, one computed or shifted, for a hand to fix,
 --   and prints each former colour beside the one it maps to, for the colours the view names.
 -- Run: aseprite --batch --script art/palette_map.lua --script-param files="<script> ..."
--- [--script-param write=1]; without write it only reports. It stops itself after 60 seconds.
+-- [--script-param write=1]; without write it only reports. It stops itself after 60 seconds of
+-- wall-clock time.
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
 local px = dofile(here .. "/pixel.lua")
-local started = os.clock()
+local started = os.time()
 
 local FORMER = {
   ink = { "14101a", "2a2433", "3d3647", "524a5e" },
@@ -86,7 +87,7 @@ end
 
 local total, manual = 0, 0
 for path in (params.files or ""):gmatch("%S+") do
-  assert(os.clock() - started < 60, "palette_map: past 60 seconds, stopped")
+  assert(os.time() - started < 60, "palette_map: past 60 seconds of wall-clock time, stopped")
   local f = assert(io.open(path, "r"))
   local text = f:read("a")
   f:close()
