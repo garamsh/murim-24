@@ -121,41 +121,41 @@ Each material's ramp is built from its base colour, its middle step, by `art/pix
 | How far the hue turns | at most half the way at 0.43 `u`, and at most 30° `u` | the same |
 | Saturation | the base's times 1.06, raised by 0.285 `u` | the base's times 1.06, lowered by 0.2375 `u` |
 
-A grey base takes saturation 0.114 `u` of the target hue. Fire is an emitter's ramp and is drawn by hand.
+A grey base takes saturation 0.114 `u` of the target hue. Then, at the step's own lightness, a shadow is mixed toward a blue-violet, `3a2a7a`, by 0.55 `u`, and a light toward a warm yellow, `ffe7a0`, by 0.35 `u`. So even a grey material's shadows read cool and its lights warm. Fire is an emitter's ramp and is drawn by hand.
 
 | Ramp | Base | Hex, dark to light | Use |
 |---|---|---|---|
-| ink | `3d3647` | `1b1823` `26222f` `322b3b` `3d3548` `6c5c79` `9c89a4` `c7bcc9` | Hair, HUD panels, the HUD's outlines |
-| stone | `8a94a0` | `3c414f` `545b6d` `6c7789` `8994a1` `a5afb6` `c0c8cb` `dbe0e1` | Roofs, rock, mountains, smoke |
-| grass | `4f7a3f` | `193e1f` `245325` `376830` `4e7c3d` `77a95a` `a5c18d` `cedabe` | Plains, hills |
-| leaf | `284536` | `112221` `182f29` `1f3b30` `274636` `4a7f5c` `78ad82` `b2ceb3` | Forest canopy |
-| earth | `8c6d4a` | `47221e` `5f382b` `775139` `8e6d48` `b0926a` `c5b498` `ddd5c4` | Roads, banks, straw hats |
-| wood | `5c3d2a` | `2f1011` `3f1b17` `4f2b20` `5e3d29` `976a45` `bc9a76` `d7c7b1` | Doors, beams, hafts |
-| water | `3d7a8f` | `162b49` `214362` `2d5e7b` `3b7b91` `5aadb8` `8dcbc9` `bfdfda` | Water, ripples |
-| crimson | `9c1f24` | `520529` `6e0b2b` `881228` `a01b21` `d53d30` `dd8672` `e9c1b0` | Demonic Cult accent, HP |
-| azure | `2f63b8` | `0c1b60` `142f81` `1e47a0` `2b62bc` `5496d2` `8ac1dc` `bde1e9` | Orthodox accent, QI |
-| amber | `b07418` | `5e1100` `7d2b04` `9a4d0b` `b57513` `e1a12e` `e5c070` `eedcaf` | Unorthodox accent |
-| skin | `c48a62` | `6e1c1d` `94372a` `b85b3a` `c7895f` `d1a986` `ddc6ac` `eae0d0` | Skin |
-| cloth | `b4a68a` | `603f35` `82604b` `a28464` `b5a689` `c5bba5` `d5d0c0` `e6e4db` | Villagers' clothes |
-| robe | `c8ccd0` | `565b69` `788090` `a0a7b0` `c8ccd0` `d5d9db` `e1e4e5` `eef0f0` | Orthodox white robes |
+| ink | `3d3647` | `171229` `221b35` `2f273f` `3d3548` `716273` `a28b93` `d2c0b3` | Hair, HUD panels, the HUD's outlines |
+| stone | `8a94a0` | `36315b` `4d4d73` `69708d` `8994a1` `aab1b0` `caccbf` `e9e5d3` | Roofs, rock, mountains, smoke |
+| grass | `4f7a3f` | `1f2838` `2d4a43` `39603d` `4e7c3d` `7eab58` `b2c489` `dedfb9` | Plains, hills |
+| leaf | `284536` | `111122` `181f2e` `213538` `274636` `517856` `83ae76` `c8d5ab` | Forest canopy |
+| earth | `8c6d4a` | `3a2242` `563545` `6d4b43` `8e6d48` `b39467` `cdb991` `e7daba` | Roads, banks, straw hats |
+| wood | `5c3d2a` | `22132c` `391d32` `46282b` `5e3d29` `946c48` `c39f6f` `e1cea7` | Doors, beams, hafts |
+| water | `3d7a8f` | `1c1e44` `25355f` `2f5579` `3b7b91` `61aeb1` `91c7b4` `cbddc0` | Water, ripples |
+| crimson | `9c1f24` | `3d1344` `631648` `831738` `a01b21` `d6422e` `e1906e` `efcca9` | Demonic Cult accent, HP |
+| azure | `2f63b8` | `1a1a53` `1e2b77` `23439b` `2b62bc` `5c99ca` `9ac4cd` `c9decb` | Orthodox accent, QI |
+| amber | `b07418` | `441933` `5d2625` `89461c` `b57513` `e2a32c` `e9c36d` `f3dfaa` | Unorthodox accent |
+| skin | `c48a62` | `622854` `85394b` `ab5747` `c7895f` `d4ac84` `e3cba6` `f2e5c8` | Skin |
+| cloth | `b4a68a` | `54395c` `765763` `987d6e` `b5a689` `c9bda1` `ddd4b9` `f0e9d1` | Villagers' clothes |
+| robe | `c8ccd0` | `4d4878` `717197` `9ea0b2` `c8ccd0` `d9dad5` `eae8dc` `f7f4e6` | Orthodox white robes |
 | fire | by hand | `9c1f24` `f06a3c` `f5a33c` `fbe37a` `fff8dc` | Flames, impact cores |
-| jade | `4fc49a` | `16656b` `228f87` `31b296` `4bc89b` `78d1a4` `a2dcb7` `cbead1` | The player's ring, selection |
-| gold | `c99a3c` | `6b250f` `8f4619` `b16f26` `cd9b38` `d5b469` `decb98` `ebe2c5` | HUD trim, the player's chevron |
-| paper | `d9c9a3` | `8a4328` `ba703c` `cba26d` `dbcaa1` `e1d6b8` `e9e3ce` `f2efe3` | Plaster walls, HUD text |
-| lacquer | `7a2a24` | `400a1e` `551120` `6a181e` `7d2821` `b74d37` `cf8a70` `e1c2ae` | Pillars, HUD corners |
-| violet | `6a3290` | `2a104a` `3e1964` `54237c` `6b2f93` `a14bbf` `c683cf` `e2b9e1` | Demonic Cult body outline |
+| jade | `4fc49a` | `213e60` `2b7287` `37ab9f` `4bc89b` `7acf9b` `a8d9a5` `deebc9` | The player's ring, selection |
+| gold | `c99a3c` | `532741` `723c37` `a36734` `cd9b38` `d7b667` `e3ce93` `f2e5be` | HUD trim, the player's chevron |
+| paper | `d9c9a3` | `733f5a` `9f6357` `bc9a7d` `dbcaa1` `e4d8b5` `efe5c9` `f8f2dd` | Plaster walls, HUD text |
+| lacquer | `7a2a24` | `2e1337` `4d193c` `661c2e` `7d2821` `b2563d` `d4926b` `e9cba6` | Pillars, HUD corners |
+| violet | `6a3290` | `241546` `371c61` `4f247b` `6b2f93` `a652b9` `cb88bd` `e4b6bf` | Demonic Cult body outline |
 
-- **Outlines are sel-out.** A body, a structure, a banner, a tree or the army marker has a one-pixel ring round its silhouette. Each of its pixels is the darkest step of the ramp of the pixel it borders. Where the ring lies left of that pixel or above it, toward the light, it is the second step instead. The HUD's pieces, the icons, the player's markers, the title and the application icon keep an outline in ink, `1b1823`, so they read against anything. `art/selout_test.gd` reads every world sheet exported and refuses an edge in that ink where it borders no ink, such as hair.
+- **Outlines are sel-out.** A structure, a banner, a tree or the army marker has a one-pixel ring round its silhouette. Each of its pixels is the darkest step of the ramp of the pixel it borders. Where the ring lies left of that pixel or above it, toward the light, it is the second step instead. A body's whole ring is the darkest step of its garment's ramp, robe, ink or earth by faction, so no edge takes a step of its skin or hair and the figure stays dark against the ground. The HUD's pieces, the icons, the player's markers, the title and the application icon keep an outline in ink, `171229`, so they read against anything. `art/selout_test.gd` reads every world sheet exported and refuses an edge in that ink where it borders no ink, such as hair.
 - **The former palette.** The former ramps, of three to six steps with a single ink outline, were mapped to these by `art/palette_map.lua`: each former step went to the new step nearest it in lightness, keeping the steps in order. The view's and the HUD's colours moved by the same map.
-- **The mockups.** They draw from `art/mockup/pixel.lua` and `art/mockup/sprites.lua`, frozen copies of the former palette and body template, so they redraw as they were approved.
+- **The mockups.** They draw from `art/mockup/pixel.lua` and `art/mockup/sprites.lua`, frozen copies of the former palette and body template. The production sheets five of them read, the bodies, the seat gate, the skill icons and the title backdrop, are frozen whole under `art/mockup/frozen/`, copied from main at 1aa9509.
 
 Faction accents, chosen to stay apart at one cell and against every terrain kind:
 
 | Faction | Accent | Body value |
 |---|---|---|
 | Orthodox | azure `2b62bc` | Light: white robes |
-| Demonic Cult | crimson `d53d30` | Dark: charcoal clothes |
-| Unorthodox | amber `e1a12e` | Middle: brown clothes under straw |
+| Demonic Cult | crimson `d6422e` | Dark: charcoal clothes |
+| Unorthodox | amber `e2a32c` | Middle: brown clothes under straw |
 | Player | jade `4bc89b`, in its markers only | Its faction's body, unchanged |
 
 ## Terrain
@@ -185,7 +185,7 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 - The body faces the viewer, turned to the right; the view mirrors it to face left.
 - Walk: a step, a passing frame a pixel higher, the other step, a passing frame, at 150 ms a frame. Idle is the standing frame. A body walking more away from the viewer than across shows its back, the head seen from behind; one that has just struck shows the weapon swung, then the standing frame, for 200 ms.
 - Every standing body casts `art/markers/shadow` on the ground under its feet; a falling body casts none.
-- A body something standing in front of it hides, a building, a tree or a raised row of the ground, is drawn behind it, and its outline frame is drawn over what hides it, only where the body itself does not show, even while it flashes struck. The outline is the faction's light accent, azure `5496d2` and amber `e1a12e`, and for the Demonic Cult violet `a14bbf`: crimson stays for hostility, so an outline never reads as the hostile ring.
+- A body something standing in front of it hides, a building, a tree or a raised row of the ground, is drawn behind it, and its outline frame is drawn over what hides it, only where the body itself does not show, even while it flashes struck. The outline is the faction's light accent, azure `5c99ca` and amber `e2a32c`, and for the Demonic Cult violet `a652b9`: crimson stays for hostility, so an outline never reads as the hostile ring.
 - Villagers wear the cloth ramp and carry no faction accent (approved line-up; not yet in the production set).
 - A knocked-down body is the same sprite lying on its side, without a shadow (approved line-up; not yet in the production set).
 - The player is a body like any other (`docs/concept.md` §Identity), drawn with its faction's sprite. Two markers tell it apart: the jade `ring`, drawn under the body round its feet, and the gold `chevron`, drawn over it above the head and bobbing a pixel every 400 ms.
@@ -311,9 +311,9 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 ## Effects and HUD
 
 - A hit on or from the player holds the struck and the striker still for 2 to 4 frames by the damage, a hit stop, and shakes the screen by 1 to 3 whole screen pixels for 150 ms, unless the settings turn both off; the world's time runs on.
-- A hit draws blood, unless the settings turn it off, in the crimson ramp's second and fourth steps, `6e0b2b` and `a01b21`, dithered as it fades: its first is too near black to read on the ground, and `d53d30` stays for hostility.
+- A hit draws blood, unless the settings turn it off, in the crimson ramp's second and fourth steps, `631648` and `a01b21`, dithered as it fades: its first is too near black to read on the ground, and `d6422e` stays for hostility.
   - A spray of eight pixels, in `a01b21`, flies from the struck body's side facing the blow along it, 12 to 22 pixels out, about a cell, in its first 120 ms, falling a little, and fades by 400 ms.
-  - Five drops fall, three beyond its feet in the blow's direction and two pooled just below them, and fade over 3 s. A drop is a cluster of two or three pixels, a `6e0b2b` core with a `a01b21` edge.
+  - Five drops fall, three beyond its feet in the blow's direction and two pooled just below them, and fade over 3 s. A drop is a cluster of two or three pixels, a `631648` core with a `a01b21` edge.
   - Nothing else on the ground is red, so red there means blood: the grass's flowers are violet, yellow and white.
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
@@ -322,7 +322,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 - The economy icons, at the technique icons' scale: food is a lacquered bowl of rice with chopsticks, stock a tied sack of grain, housing a house under its slate roof.
 - The ware icons, at the same scale: herb is a sprig of three jade leaves on a pale root, elixir a round crimson pill lit at its top left, silver an ingot with its two ends raised.
 - A technique slot shows its key, Q, W, E, R or T, in a column of its own left of an icon of the skill's shape: a blade with an arc of sword qi for a strike at one body, an open palm in a ring of force for a burst that reaches the bodies round its target.
-- The people near the player are named over their heads in the HUD's font, outlined in ink: own and allied in jade `228f87`, neutral in paper `cba26d`, and hostile or at war in crimson `d53d30`, the loudest. A few names show at once, the hostile first, never over one another or a panel.
+- The people near the player are named over their heads in the HUD's font, outlined in ink: own and allied in jade `2b7287`, neutral in paper `bc9a7d`, and hostile or at war in crimson `d6422e`, the loudest. A few names show at once, the hostile first, never over one another or a panel.
 - UI text is Korean first, with English supported (ADR 0012). Text is drawn in paper on ink. The game's text is Galmuri9 at 10 pixels, a pixel font that carries Hangul and Latin (`hud/fonts/`); the mockup's 5-pixel capital font draws English and numerals only. Every panel is laid out for the longer of the two strings.
 
 ## Do and don't
