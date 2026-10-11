@@ -3,9 +3,9 @@
 ## aimed, and its area there in jade. It holds no game rule: the range and area are the core's.
 extends Node2D
 
-const PAPER := Color("e9e3ce")
+const PAPER := Color("efe5c9")
 const JADE := Color("4bc89b")
-const JADE_DARK := Color("228f87")
+const JADE_DARK := Color("2b7287")
 # Pixels between the dots of the line out to the aim, and in each dash of the range's ring.
 const DOT_STEP := 5.0
 const DASH := 4.0

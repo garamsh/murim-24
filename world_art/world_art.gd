@@ -23,7 +23,7 @@ const ART := "res://art/"
 # Sprite sets by faction name; a world without faction names takes them in this order.
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 # The faction accents of docs/art-direction.md §Palette, in the order of FACTIONS.
-const ACCENTS: Array[Color] = [Color("2b62bc"), Color("d53d30"), Color("e1a12e")]
+const ACCENTS: Array[Color] = [Color("2b62bc"), Color("d6422e"), Color("e2a32c")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
 # The art for each kind of structure; its frames hold the bottom-left corner of the structure's
 # footprint FOOTPRINT_INSET in from their left and bottom edges.

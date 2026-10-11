@@ -76,13 +76,13 @@ const SHAKE_PATTERN: Array[Vector2i] = [
 ]
 ## Blood, the crimson ramp's fourth and second steps, a drop's edge and its core: its first is too
 ## near black to read on the ground, and its fifth stays for hostility.
-const BLOOD := [Color("a01b21"), Color("6e0b2b")]
+const BLOOD := [Color("a01b21"), Color("631648")]
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
-const PAPER := Color("e9e3ce")
-const INK := Color("1b1823")
+const PAPER := Color("efe5c9")
+const INK := Color("171229")
 const JADE := Color("4bc89b")
-const CRIMSON := Color("d53d30")
+const CRIMSON := Color("d6422e")
 const FONT := preload("res://hud/fonts/Galmuri9.ttf")
 const FONT_SIZE := 10
 # When a person not yet struck was last struck, in milliseconds: long enough ago to show nothing.

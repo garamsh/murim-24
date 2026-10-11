@@ -9,7 +9,7 @@ extends Node2D
 
 ## How wide a standing structure's shadow is, in pixels, by stage.
 const SHADOW_REACH := [6, 6, 3, 0]
-const SHADOW_INK := Color("1b1823")
+const SHADOW_INK := Color("171229")
 ## The 4x4 Bayer matrix the band is dithered by, and how much of it is ink against the wall and at
 ## the band's far edge.
 const BAYER := [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
