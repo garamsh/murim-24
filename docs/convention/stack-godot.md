@@ -31,7 +31,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 ## File layout
 
 - The repository root is the Godot project: `project.godot` and `murim.gdextension` sit there.
-- `murim.gdextension` names, per platform, the library each entry point writes: `make build`'s debug libraries in `build/extension/`, `make android`'s in `build/android/`, and `make export`'s release libraries in `build/macos/` and `build/windows/`.
+- `murim.gdextension` names, per platform, the library each entry point writes: `make build`'s debug libraries in `build/extension/`, `make android`'s in `build/android/`, and `make export`'s release libraries in `build/macos/`, `build/windows/` and `build/linux/`.
 - A scene is `<name>/<name>.tscn` in a folder at the repository root named for it, with its script `<name>.gd` beside it, such as `world_view/world_view.tscn`. The scene keeps the scripts and resources only it uses in that folder; a resource two scenes share sits in the nearest folder both are under.
 - Aseprite sources sit under `art/` at the repository root, each beside the script that draws it and its exports.
 - Every `.uid` file Godot writes beside a script or resource is committed with it, and so is the `.import` file it writes beside each texture, font or translation a scene loads.
@@ -58,7 +58,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 | `make test` | After `ctest`, `godot --headless --path . --script res://run_tests.gd` runs every `*_test.gd`. |
 | `make bench` | After the tick benchmark, `godot --path . --script res://world_view/frame_bench.gd` renders `world_view/world_view.tscn` in a window with vsync off. It checks the scenario first, then prints p50, p99 and max frame time over its timed frames, and PASS or FAIL against a 16.7 ms p99. It needs a display, so it runs on a developer's machine only, and says so. `make bench` exits non-zero when either benchmark fails. |
 | `make android` | After the C++ build for Android, `godot --headless --path . --export-debug Android build/android/murim.apk` and `godot --headless --path . --export-debug "Android bench" build/android/murim_bench.apk` export the `Android` and `Android bench` presets in `export_presets.cfg`. It needs the prerequisites in §Android export, so it is not part of `make ci`. |
-| `make export` | After the C++ builds for macOS and Windows, `godot --headless --path . --export-release macOS build/export/macos/Murim24.app` and `godot --headless --path . --export-release Windows build/export/windows/Murim24.exe` export the `macOS` and `Windows` presets in `export_presets.cfg`. It needs the prerequisites in §PC export, so it is not part of `make ci`. |
+| `make export` | After the C++ builds for macOS, Windows and Linux, `godot --headless --path . --export-release macOS build/export/macos/Murim24.app`, `godot --headless --path . --export-release Windows build/export/windows/Murim24.exe` and `godot --headless --path . --export-release Linux build/export/linux/Murim24.x86_64` export the `macOS`, `Windows` and `Linux` presets in `export_presets.cfg`. It needs the prerequisites in §PC export, so it is not part of `make ci`. |
 
 `make` runs the `godot` on `PATH`; `make GODOT=<path>` runs another. It must be Godot 4.7.2: locally any 4.7.2 install, in CI the Linux release archive that `.github/scripts/install-godot.sh <dir>` downloads, checks against its pinned SHA-512 and installs as `<dir>/godot`.
 
@@ -103,17 +103,18 @@ What Godot 4.7's "Exporting for Android" (`tutorials/export/exporting_for_androi
 
 ## PC export
 
-What Godot 4.7's "Exporting for macOS" (`tutorials/export/exporting_for_macos.html`) and "Exporting for Windows" (`tutorials/export/exporting_for_windows.html`) require on the exporting machine:
+What Godot 4.7's "Exporting for macOS" (`tutorials/export/exporting_for_macos.html`), "Exporting for Windows" (`tutorials/export/exporting_for_windows.html`) and "Exporting for Linux" (`tutorials/export/exporting_for_linux.html`) require on the exporting machine:
 
 | Prerequisite | Version |
 |---|---|
 | Host | A Mac with the Xcode command line tools, for `xcrun` and the macOS SDK |
 | Export templates | Godot 4.7.2's, as §Android export names them |
 
-- `make export` writes `build/export/macos/Murim24.app`, and `build/export/windows/Murim24.exe` with `Murim24.pck` and the extension's DLL beside it.
-- The `macOS` preset exports a universal app; the `Windows` preset exports x86_64, its pack beside the executable. Both export the release template, leave `*_test.gd`, `*_probe.gd` and `run_tests.gd` out of the pack by `exclude_filter`, and scale `application/config/icon`, `art/icon/icon.png`, by nearest neighbour.
+- `make export` writes `build/export/macos/Murim24.app`, `build/export/windows/Murim24.exe` with `Murim24.pck` and the extension's DLL beside it, and `build/export/linux/Murim24.x86_64` with `Murim24.pck` and the extension's shared library beside it.
+- The `macOS` preset exports a universal app; the `Windows` and `Linux` presets export x86_64, each pack beside its executable. All three export the release template and leave `*_test.gd`, `*_probe.gd` and `run_tests.gd` out of the pack by `exclude_filter`. The `macOS` and `Windows` presets scale `application/config/icon`, `art/icon/icon.png`, by nearest neighbour.
 - The window title is `application/config/name`.
 - The bundle identifier is the placeholder `com.example.murim24`, as Android's package name is, and changes in `export_presets.cfg` alone once the game's name is chosen.
 - The macOS app is signed ad hoc, Godot's default, and not notarized. Its entitlements disable library validation, which the guide asks of an app loading a GDExtension or signed ad hoc. A copy downloaded to another Mac is refused on first launch until it is opened once from System Settings, Privacy & Security, Open Anyway.
 - A release for others is signed with a Developer ID Application certificate and notarized with an Apple Developer account, both the account holder's: set `codesign/codesign`, `codesign/identity` and `notarization/notarization` in the preset on the signing machine, and never commit the certificate or credentials.
 - The Windows executable is not signed, so SmartScreen warns on first launch; More info, Run anyway opens it.
+- The Linux executable runs on x86_64 with glibc 2.31 or newer, and is not signed.
