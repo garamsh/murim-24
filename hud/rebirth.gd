@@ -86,23 +86,23 @@ func _draw() -> void:
 	_dialog(DIALOG, tr("REBIRTH_TITLE"), tr("REBIRTH_CLOSE"), tr("REBIRTH_KEYS"))
 	var left := DIALOG.position.x + 10
 	_side(left, "REBIRTH_PAST", past, past_rows, true)
-	draw_rect(Rect2(left + COLUMN_WIDTH + COLUMN_GAP / 2.0, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), Palette.INK_3)
+	draw_rect(Rect2(left + COLUMN_WIDTH + COLUMN_GAP / 2.0, DIALOG.position.y + 26, 1, DIALOG.size.y - 52), Palette.INK_4)
 	_side(left + COLUMN_WIDTH + COLUMN_GAP, "REBIRTH_NEXT", next, next_rows, false)
 
 
 # One side from `x`: its heading, the person's card, and its rows, each label against the left and
 # its value, cut short where it would reach the label, against the right.
 func _side(x: float, heading: String, person: int, rows: Array[Dictionary], dead: bool) -> void:
-	_text(Vector2(x, DIALOG.position.y + 26), tr(heading), Palette.GOLD_3)
-	draw_rect(Rect2(x, DIALOG.position.y + 39, COLUMN_WIDTH, 1), Palette.INK_3)
+	_text(Vector2(x, DIALOG.position.y + 26), tr(heading), Palette.GOLD_4)
+	draw_rect(Rect2(x, DIALOG.position.y + 39, COLUMN_WIDTH, 1), Palette.INK_4)
 	_person_card(Rect2(Vector2(x, DIALOG.position.y + CARD_Y), CARD), person,
 			PersonName.of(_world, person, true), tr("GENEALOGY_DEAD") if dead else "",
-			dead, Palette.GOLD_3 if not dead else Palette.INK_1, Palette.GOLD_2 if not dead else Palette.INK_3)
+			dead, Palette.GOLD_4 if not dead else Palette.INK_1, Palette.GOLD_3 if not dead else Palette.INK_4)
 	for n in rows.size():
 		var y := DIALOG.position.y + ROWS_Y + n * ROW_STEP
 		if n > 0:
-			draw_rect(Rect2(x, y - 4, COLUMN_WIDTH, 1), Palette.INK_3)
+			draw_rect(Rect2(x, y - 4, COLUMN_WIDTH, 1), Palette.INK_4)
 		var label := tr(rows[n].label)
-		_text(Vector2(x + 2, y), label, Palette.GOLD_3)
+		_text(Vector2(x + 2, y), label, Palette.GOLD_4)
 		var value := fit(rows[n].value, COLUMN_WIDTH - 4 - _width(label) - 4)
-		_text(Vector2(x + COLUMN_WIDTH - 2 - _width(value), y), value, Palette.PAPER_3)
+		_text(Vector2(x + COLUMN_WIDTH - 2 - _width(value), y), value, Palette.PAPER_6)

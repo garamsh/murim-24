@@ -267,8 +267,8 @@ func _draw() -> void:
 	if not aimed.is_empty():
 		_draw_aim(aimed)
 	elif on_self:
-		_ground_ring(body_at, 16, Palette.JADE_3, false, Palette.JADE_2)
-		_ground_ring(body_at, 14, Palette.JADE_4, false, null)
+		_ground_ring(body_at, 16, Palette.JADE_4, false, Palette.JADE_2)
+		_ground_ring(body_at, 14, Palette.JADE_7, false, null)
 	for button: String in BUTTONS:
 		_square(BUTTONS[button], button)
 	_pause_button()
@@ -281,8 +281,8 @@ func _draw() -> void:
 		_cancel(aimed.cancel)
 	elif on_self:
 		var s: Dictionary = SKILLS[_self_slot()]
-		draw_arc(s.at, s.r + 3, 0, TAU, 48, Palette.JADE_4, 2.0)
-		_word_slip("TOUCH_SELF", Vector2(s.at.x, s.at.y - s.r - 22), Palette.JADE_3)
+		draw_arc(s.at, s.r + 3, 0, TAU, 48, Palette.JADE_7, 2.0)
+		_word_slip("TOUCH_SELF", Vector2(s.at.x, s.at.y - s.r - 22), Palette.JADE_4)
 
 
 # The arc while the arts panel is open: each button ringed in jade while a skill waits to be placed,
@@ -291,11 +291,11 @@ func _draw_placing() -> void:
 	for slot in skill_count:
 		_skill(slot, "jade" if waiting else "")
 	if waiting:
-		_word_slip("TOUCH_PLACE", PLACE_SLIP, Palette.JADE_3)
+		_word_slip("TOUCH_PLACE", PLACE_SLIP, Palette.JADE_4)
 	_trim(PAUSE)
 	for k in range(-6, 7):
-		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 + k), Vector2(2, 2)), Palette.PAPER_3)
-		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 - k), Vector2(2, 2)), Palette.PAPER_3)
+		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 + k), Vector2(2, 2)), Palette.PAPER_6)
+		draw_rect(Rect2(PAUSE.position + Vector2(20 + k, 20 - k), Vector2(2, 2)), Palette.PAPER_6)
 
 
 func _self_slot() -> int:
@@ -315,14 +315,14 @@ func _draw_aim(aimed: Dictionary) -> void:
 		_ground_ring(body_at, skill.range, Palette.STONE_3, true, null)
 		_ground_ring(target, area, Palette.STONE_3, true, null)
 		return
-	_ground_ring(body_at, skill.range, Palette.PAPER_3, true, null)
+	_ground_ring(body_at, skill.range, Palette.PAPER_6, true, null)
 	var length := body_at.distance_to(target)
 	var t := 0.0
 	while t < length:
-		draw_rect(Rect2((body_at + (target - body_at) * t / length).floor(), Vector2(2, 2)), Palette.JADE_3)
+		draw_rect(Rect2((body_at + (target - body_at) * t / length).floor(), Vector2(2, 2)), Palette.JADE_4)
 		t += 5.0
-	_ground_ring(target, area, Palette.JADE_3, false, Palette.JADE_2)
-	_ground_ring(target, area - 2.0, Palette.JADE_4, false, null)
+	_ground_ring(target, area, Palette.JADE_4, false, Palette.JADE_2)
+	_ground_ring(target, area - 2.0, Palette.JADE_7, false, null)
 
 
 # A ring on the ground round `at`, `radius` pixels across: its rim in `colour`, every other run of
@@ -345,16 +345,16 @@ func _draw_stick() -> void:
 	var held := _knob != Vector2.ZERO or _fingers.values().any(func(f: Dictionary) -> bool: return f.kind == "stick")
 	draw_circle(_stick_base, STICK_RADIUS, Palette.SHADE)
 	draw_arc(_stick_base, STICK_RADIUS - 0.5, 0, TAU, 64, Palette.INK_1, 1.0)
-	draw_arc(_stick_base, STICK_RADIUS - 1.5, 0, TAU, 64, Palette.GOLD_2, 1.0)
+	draw_arc(_stick_base, STICK_RADIUS - 1.5, 0, TAU, 64, Palette.GOLD_3, 1.0)
 	# A chevron at each of the four ways.
 	for way: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
 		var tip := _stick_base + way * (STICK_RADIUS - 5)
 		var across := Vector2(way.y, way.x)
 		for k in 3:
 			var row := tip - way * k
-			draw_rect(Rect2((row - across * k).floor(), Vector2.ONE + across.abs() * 2 * k), Palette.GOLD_3)
+			draw_rect(Rect2((row - across * k).floor(), Vector2.ONE + across.abs() * 2 * k), Palette.GOLD_4)
 	_disc(_stick_base + _knob, KNOB_RADIUS, "jade" if held else "gold")
-	draw_circle(_stick_base + _knob - Vector2(3, 3), 3, Palette.INK_3)
+	draw_circle(_stick_base + _knob - Vector2(3, 3), 3, Palette.INK_4)
 
 
 # Skill button `slot`, its rim in `rim`'s ramp or gold, its icon, and while the body cools down,
@@ -363,7 +363,7 @@ func _skill(slot: int, rim: String) -> void:
 	var s: Dictionary = SKILLS[slot]
 	_disc(s.at, s.r, "gold" if rim.is_empty() else rim)
 	if slot < reach.size() and reach[slot].is_empty():
-		var cross := Palette.JADE_2 if rim == "jade" else Palette.INK_4
+		var cross := Palette.JADE_2 if rim == "jade" else Palette.INK_5
 		draw_rect(Rect2(s.at + Vector2(-4, 0), Vector2(9, 1)), cross)
 		draw_rect(Rect2(s.at + Vector2(0, -4), Vector2(1, 9)), cross)
 		return
@@ -386,7 +386,7 @@ func _skill(slot: int, rim: String) -> void:
 	for offset: Vector2 in [Vector2(-1, -1), Vector2(0, -1), Vector2(1, -1), Vector2(-1, 0), Vector2(1, 0),
 			Vector2(-1, 1), Vector2(0, 1), Vector2(1, 1)]:
 		_text(at + offset, text, Palette.INK_1)
-	_text(at, text, Palette.PAPER_3)
+	_text(at, text, Palette.PAPER_6)
 
 
 # The pad round a dragged skill button, its reach dashed, the button lit in jade, or in crimson
@@ -398,7 +398,7 @@ func _pad(aimed: Dictionary) -> void:
 	var dashes := int(TAU * PAD / 6.0)
 	for n in dashes:
 		var from := TAU * n / dashes
-		draw_arc(s.at, PAD, from, from + TAU / dashes / 2.0, 3, Palette.CRIMSON_4 if aimed.cancel else Palette.JADE_4, 1.0)
+		draw_arc(s.at, PAD, from, from + TAU / dashes / 2.0, 3, Palette.CRIMSON_5 if aimed.cancel else Palette.JADE_7, 1.0)
 	_skill(aimed.slot, ramp)
 	if not aimed.cancel:
 		_disc((s.at + aimed.aim * PAD).floor(), 6, ramp)
@@ -410,11 +410,11 @@ func _cancel(hot: bool) -> void:
 	_disc(at, CANCEL.r, "crimson")
 	if hot:
 		draw_circle(at, CANCEL.r - 2, Palette.CRIMSON_2)
-	var mark := Palette.PAPER_3 if hot else Palette.CRIMSON_4
+	var mark := Palette.PAPER_6 if hot else Palette.CRIMSON_5
 	for k in range(-5, 6):
 		draw_rect(Rect2(at + Vector2(k, k), Vector2(2, 2)), mark)
 		draw_rect(Rect2(at + Vector2(k, -k - 1), Vector2(2, 2)), mark)
-	_word_slip("TOUCH_CANCEL", Vector2(at.x, at.y + CANCEL.r + 3), Palette.CRIMSON_3 if hot else Palette.INK_3)
+	_word_slip("TOUCH_CANCEL", Vector2(at.x, at.y + CANCEL.r + 3), Palette.CRIMSON_4 if hot else Palette.INK_4)
 
 
 # A round button at `at` of radius `r`: an ink well in a rim of `ramp`, lit from the upper left.
@@ -429,28 +429,28 @@ func _word_slip(key: String, top: Vector2, rule: Color) -> void:
 	var left := top.x - floorf(w / 2.0)
 	draw_rect(Rect2(left, top.y, w, 14), Palette.INK_1)
 	draw_rect(Rect2(left, top.y, w, 1), rule)
-	_text(Vector2(left + 4, top.y + 1), text, Palette.PAPER_3)
+	_text(Vector2(left + 4, top.y + 1), text, Palette.PAPER_6)
 
 
 # A square button in the HUD's frame with its icon over its word.
 func _square(rect: Rect2, button: String) -> void:
 	_trim(rect)
 	if icons.has(button):
-		var colour := Palette.PAPER_3 if icons[button] == "arts" else Palette.GOLD_3
+		var colour := Palette.PAPER_6 if icons[button] == "arts" else Palette.GOLD_4
 		_pixel_icon(Shortcuts.ICONS[icons[button]], rect.position + Vector2(floorf((rect.size.x - 9) / 2.0), 7), colour)
 	var text := tr(BUTTON_KEYS[button])
-	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), rect.position.y + 24), text, Palette.PAPER_3)
+	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), rect.position.y + 24), text, Palette.PAPER_6)
 
 
 func _pause_button() -> void:
 	_trim(PAUSE)
-	draw_rect(Rect2(PAUSE.position + Vector2(15, 13), Vector2(4, 16)), Palette.PAPER_3)
-	draw_rect(Rect2(PAUSE.position + Vector2(23, 13), Vector2(4, 16)), Palette.PAPER_3)
+	draw_rect(Rect2(PAUSE.position + Vector2(15, 13), Vector2(4, 16)), Palette.PAPER_6)
+	draw_rect(Rect2(PAUSE.position + Vector2(23, 13), Vector2(4, 16)), Palette.PAPER_6)
 
 
 # A HUD panel's frame, as the HUD's panels are drawn: ink with a gold trim.
 func _trim(rect: Rect2) -> void:
-	draw_rect(rect, Palette.GOLD_2)
+	draw_rect(rect, Palette.GOLD_3)
 	draw_rect(Rect2(rect.position + Vector2(1, 2), rect.size - Vector2(2, 3)), Palette.INK_2)
 
 
@@ -460,7 +460,7 @@ func _disc_texture(r: int, ramp: String) -> ImageTexture:
 	var key := "%d %s" % [r, ramp]
 	if _discs.has(key):
 		return _discs[key]
-	var ramps := {"gold": [Palette.GOLD_2, Palette.GOLD_3], "jade": [Palette.JADE_3, Palette.JADE_4], "crimson": [Palette.CRIMSON_3, Palette.CRIMSON_4]}
+	var ramps := {"gold": [Palette.GOLD_3, Palette.GOLD_4], "jade": [Palette.JADE_4, Palette.JADE_7], "crimson": [Palette.CRIMSON_4, Palette.CRIMSON_5]}
 	var side := 2 * r + 5
 	var image := Image.create_empty(side, side, false, Image.FORMAT_RGBA8)
 	var centre := r + 2

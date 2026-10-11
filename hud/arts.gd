@@ -58,9 +58,9 @@ const ROOM := {"ARTS_TITLE": 40, "ARTS_CLOSE": 50, "ARTS_REALM": 40, "ARTS_NEXT"
 		"ARTS_MEND": NAME_ROOM, "ARTS_TORCH": NAME_ROOM}
 # Each orientation's ramp, dark and light, by WorldAdapter.ORIENTATION_* constant.
 const NATURE_RAMPS := {
-	WorldAdapter.ORIENTATION_ORTHODOX: [Palette.AZURE_2, Palette.AZURE_4],
-	WorldAdapter.ORIENTATION_UNORTHODOX: [Palette.AMBER_2, Palette.AMBER_4],
-	WorldAdapter.ORIENTATION_DEMONIC: [Palette.CRIMSON_2, Palette.CRIMSON_4],
+	WorldAdapter.ORIENTATION_ORTHODOX: [Palette.AZURE_2, Palette.AZURE_5],
+	WorldAdapter.ORIENTATION_UNORTHODOX: [Palette.AMBER_2, Palette.AMBER_5],
+	WorldAdapter.ORIENTATION_DEMONIC: [Palette.CRIMSON_2, Palette.CRIMSON_5],
 }
 const ORIENTATION_KEYS := {
 	WorldAdapter.ORIENTATION_ORTHODOX: "ARTS_ORTHODOX",
@@ -391,28 +391,28 @@ func _draw_pc() -> void:
 	_dialog(DIALOG, tr("ARTS_TITLE"), tr("ARTS_CLOSE"), tr("ARTS_KEYS"))
 	var y := _status(COLUMN, COLUMN_WIDTH)
 	var x := COLUMN.x
-	draw_rect(Rect2(x, y + 4, COLUMN_WIDTH, 1), Palette.INK_3)
-	_text(Vector2(x, y + 8), tr("ARTS_HEART"), Palette.GOLD_3)
+	draw_rect(Rect2(x, y + 4, COLUMN_WIDTH, 1), Palette.INK_4)
+	_text(Vector2(x, y + 8), tr("ARTS_HEART"), Palette.GOLD_4)
 	if shown.heart.is_empty():
 		_text(Vector2(x, y + 22), "—", Palette.STONE_4)
 	else:
-		_text(Vector2(x, y + 22), fit(shown.heart.name, COLUMN_WIDTH), Palette.PAPER_3)
+		_text(Vector2(x, y + 22), fit(shown.heart.name, COLUMN_WIDTH), Palette.PAPER_6)
 		var tags: PackedStringArray = shown.heart.nature.split(" · ")
 		var tx := x
 		for tag in tags:
 			tx += _tag_at(Vector2(tx, y + 37), tag, shown.heart.ramp[0]) + 3
-	draw_rect(Rect2(x, y + 54, COLUMN_WIDTH, 1), Palette.INK_3)
+	draw_rect(Rect2(x, y + 54, COLUMN_WIDTH, 1), Palette.INK_4)
 	draw_rect(Rect2(x, y + 62, 6, 6), Palette.STONE_3)
 	_text(Vector2(x + 10, y + 58), tr("ARTS_UNLEARNED"), Palette.STONE_4)
-	draw_rect(Rect2(x, y + 76, 6, 6), Palette.CRIMSON_4)
+	draw_rect(Rect2(x, y + 76, 6, 6), Palette.CRIMSON_5)
 	_text(Vector2(x + 10, y + 72), tr("ARTS_LOCKED"), Palette.STONE_4)
-	draw_rect(Rect2(DIVIDER_X, LIST_TOP, 1, 160), Palette.INK_3)
+	draw_rect(Rect2(DIVIDER_X, LIST_TOP, 1, 160), Palette.INK_4)
 
 	_text(Vector2(NAME_X, LIST_TOP), tr("ARTS_SKILL"), Palette.STONE_4)
 	_right(COST_RIGHT, LIST_TOP, tr("ARTS_COST"), Palette.STONE_4)
 	_right(REALM_RIGHT, LIST_TOP, tr("ARTS_REALM_COLUMN"), Palette.STONE_4)
 	_right(COOLDOWN_RIGHT, LIST_TOP, tr("ARTS_COOLDOWN"), Palette.STONE_4)
-	draw_rect(Rect2(LIST_LEFT, LIST_TOP + 13, LIST_RIGHT - LIST_LEFT, 1), Palette.INK_3)
+	draw_rect(Rect2(LIST_LEFT, LIST_TOP + 13, LIST_RIGHT - LIST_LEFT, 1), Palette.INK_4)
 	var rows := _rows()
 	for n in mini(LIST_ROWS, rows.size() - _first_row):
 		var row := rows[_first_row + n]
@@ -426,8 +426,8 @@ func _draw_pc() -> void:
 	if _first_row + LIST_ROWS < rows.size():
 		_text(Vector2(LIST_RIGHT - 6, LIST_TOP + LIST_ROWS * ROW), "▼", Palette.STONE_4)
 
-	draw_rect(Rect2(DIALOG.position.x + 3, FOOT_Y - 4, DIALOG.size.x - 6, 1), Palette.INK_3)
-	_text(Vector2(x, FOOT_Y + 14), tr("ARTS_LOADOUT"), Palette.GOLD_3)
+	draw_rect(Rect2(DIALOG.position.x + 3, FOOT_Y - 4, DIALOG.size.x - 6, 1), Palette.INK_4)
+	_text(Vector2(x, FOOT_Y + 14), tr("ARTS_LOADOUT"), Palette.GOLD_4)
 	var first := LIST_LEFT + floori((LIST_RIGHT - LIST_LEFT - (4 * SLOT_STEP + SLOT_TILE)) / 2.0)
 	for slot in Loadout.SLOTS:
 		var sx := first + slot * SLOT_STEP
@@ -436,15 +436,15 @@ func _draw_pc() -> void:
 		var skill := _skill_of(held)
 		_tile(Rect2(sx, FOOT_Y + 15, SLOT_TILE, SLOT_TILE), skill.get("icon", ""), slot == just, false, false)
 		if skill.is_empty():
-			draw_rect(Rect2(sx + 11, FOOT_Y + 30, 9, 1), Palette.INK_4)
-			draw_rect(Rect2(sx + 15, FOOT_Y + 26, 1, 9), Palette.INK_4)
+			draw_rect(Rect2(sx + 11, FOOT_Y + 30, 9, 1), Palette.INK_5)
+			draw_rect(Rect2(sx + 15, FOOT_Y + 26, 1, 9), Palette.INK_5)
 
 
 # An art's header in the list: its name, its nature and its tag.
 func _art_header(ly: float, group: Dictionary) -> void:
 	var faction: bool = group.has("faction")
 	var hx := LIST_LEFT + _width(group.name) + 6
-	_text(Vector2(LIST_LEFT, ly), group.name, Palette.STONE_4 if faction else Palette.GOLD_3)
+	_text(Vector2(LIST_LEFT, ly), group.name, Palette.STONE_4 if faction else Palette.GOLD_4)
 	if faction:
 		return
 	_text(Vector2(hx, ly), group.nature, group.ramp[1])
@@ -458,22 +458,22 @@ func _art_header(ly: float, group: Dictionary) -> void:
 func _skill_row(ly: float, skill: Dictionary, faction: bool) -> void:
 	var chosen: bool = skill.held == selected
 	if chosen:
-		draw_rect(Rect2(LIST_LEFT, ly - 1, LIST_RIGHT - LIST_LEFT + 2, ROW), Palette.INK_3)
-		draw_rect(Rect2(LIST_LEFT, ly - 1, 1, ROW), Palette.JADE_3)
+		draw_rect(Rect2(LIST_LEFT, ly - 1, LIST_RIGHT - LIST_LEFT + 2, ROW), Palette.INK_4)
+		draw_rect(Rect2(LIST_LEFT, ly - 1, 1, ROW), Palette.JADE_4)
 		for k in 4:
-			draw_rect(Rect2(LIST_LEFT + 3 + k, ly + 3 + k, 1, 7 - 2 * k), Palette.GOLD_4)
-	var value := Palette.PAPER_3 if skill.known else Palette.STONE_3
+			draw_rect(Rect2(LIST_LEFT + 3 + k, ly + 3 + k, 1, 7 - 2 * k), Palette.GOLD_6)
+	var value := Palette.PAPER_6 if skill.known else Palette.STONE_3
 	_text(Vector2(NAME_X, ly), fit(skill.name, COST_RIGHT - 4 - _width(skill.cost) - NAME_X),
-			Palette.GOLD_4 if chosen else value)
+			Palette.GOLD_6 if chosen else value)
 	_right(COST_RIGHT, ly, skill.cost, value)
-	_right(REALM_RIGHT, ly, skill.realm, Palette.CRIMSON_4 if skill.locked and not faction else value)
+	_right(REALM_RIGHT, ly, skill.realm, Palette.CRIMSON_5 if skill.locked and not faction else value)
 	_right(COOLDOWN_RIGHT, ly, skill.cooldown, value)
 	var slot := loadout.slot_of(skill.held)
 	if slot >= 0:
 		var lit := slot == just
-		draw_rect(Rect2(KEY_X, ly, 11, 12), Palette.JADE_2 if lit else Palette.INK_4)
-		draw_rect(Rect2(KEY_X, ly, 11, 11), Palette.JADE_3 if lit else Palette.INK_3)
-		_text(Vector2(KEY_X + floori((11 - _width(SLOT_KEYS[slot])) / 2.0), ly), SLOT_KEYS[slot], Palette.PAPER_3)
+		draw_rect(Rect2(KEY_X, ly, 11, 12), Palette.JADE_2 if lit else Palette.INK_5)
+		draw_rect(Rect2(KEY_X, ly, 11, 11), Palette.JADE_4 if lit else Palette.INK_4)
+		_text(Vector2(KEY_X + floori((11 - _width(SLOT_KEYS[slot])) / 2.0), ly), SLOT_KEYS[slot], Palette.PAPER_6)
 
 
 func _draw_touch() -> void:
@@ -487,7 +487,7 @@ func _draw_touch() -> void:
 		for tag: Dictionary in group.tags:
 			room -= _width(tag.text) + 6 + 4
 		var name := fit(group.name, room)
-		_text(Vector2(GROUPS_LEFT, gy), name, Palette.STONE_4 if group.has("faction") else Palette.GOLD_3)
+		_text(Vector2(GROUPS_LEFT, gy), name, Palette.STONE_4 if group.has("faction") else Palette.GOLD_4)
 		var hx := GROUPS_LEFT + _width(name) + 4
 		for tag: Dictionary in group.tags:
 			hx += _tag_at(Vector2(hx, gy + 1), tag.text, tag.fill) + 3
@@ -496,24 +496,24 @@ func _draw_touch() -> void:
 		var rect: Rect2 = tile.rect
 		_tile(rect, skill.icon, skill.held == selected, loadout.slot_of(skill.held) >= 0, not skill.known)
 		if skill.locked:
-			draw_rect(Rect2(rect.position.x + 8, rect.end.y - 6, TILE - 16, 1), Palette.CRIMSON_4)
+			draw_rect(Rect2(rect.position.x + 8, rect.end.y - 6, TILE - 16, 1), Palette.CRIMSON_5)
 	if _first_group > 0:
 		_text(Vector2(TOUCH_DIVIDER_X - 10, GROUPS_TOP), "▲", Palette.STONE_4)
 	if _first_group + GROUPS_SHOWN < groups.size():
 		_text(Vector2(TOUCH_DIVIDER_X - 10, TOUCH_DIALOG.end.y - 34), "▼", Palette.STONE_4)
 	var bottom := TOUCH_DIALOG.end.y - 22
-	draw_rect(Rect2(TOUCH_DIVIDER_X, GROUPS_TOP, 1, bottom - GROUPS_TOP), Palette.INK_3)
+	draw_rect(Rect2(TOUCH_DIVIDER_X, GROUPS_TOP, 1, bottom - GROUPS_TOP), Palette.INK_4)
 	var y := _status(DETAIL.position, DETAIL.size.x)
 	var x := DETAIL.position.x
 	var w := DETAIL.size.x
-	draw_rect(Rect2(x, y + 3, w, 1), Palette.INK_3)
+	draw_rect(Rect2(x, y + 3, w, 1), Palette.INK_4)
 	var skill := _skill_of(selected)
 	if skill.is_empty():
 		return
 	var group := _group_of(selected)
 	y += 7
-	_text(Vector2(x, y), fit(skill.name, w), Palette.GOLD_4)
-	_text(Vector2(x, y + 13), fit(group.name, w), Palette.PAPER_3)
+	_text(Vector2(x, y), fit(skill.name, w), Palette.GOLD_6)
+	_text(Vector2(x, y + 13), fit(group.name, w), Palette.PAPER_6)
 	var tx := x
 	if not group.has("faction"):
 		for tag in String(group.nature).split(" · "):
@@ -526,7 +526,7 @@ func _draw_touch() -> void:
 			["ARTS_COOLDOWN", skill.cooldown], ["ARTS_RANGE", skill.range], ["ARTS_AREA", skill.area]]
 	for n in rows.size():
 		_text(Vector2(x, y + n * 13), tr(rows[n][0]), Palette.STONE_4)
-		_right(x + w, y + n * 13, rows[n][1], Palette.CRIMSON_4 if n == 1 and skill.locked else Palette.PAPER_3)
+		_right(x + w, y + n * 13, rows[n][1], Palette.CRIMSON_5 if n == 1 and skill.locked else Palette.PAPER_6)
 
 
 # The realm and qi block in a column `width` wide from `at`: the realm by name, a pip for each realm,
@@ -535,35 +535,35 @@ func _draw_touch() -> void:
 func _status(at: Vector2, width: float) -> float:
 	var x := at.x
 	var y := at.y
-	_text(Vector2(x, y), tr("ARTS_REALM"), Palette.GOLD_3)
-	_right(x + width, y, shown.realm, Palette.PAPER_3)
+	_text(Vector2(x, y), tr("ARTS_REALM"), Palette.GOLD_4)
+	_right(x + width, y, shown.realm, Palette.PAPER_6)
 	var realms: int = maxi(shown.realms, 1)
 	var pip := floori((width + 2) / realms)
 	for n in realms:
 		var px := x + n * pip
 		if n + 1 < shown.rank:
-			draw_rect(Rect2(px, y + 15, pip - 2, 5), Palette.GOLD_2)
-			draw_rect(Rect2(px, y + 15, pip - 2, 1), Palette.GOLD_4)
+			draw_rect(Rect2(px, y + 15, pip - 2, 5), Palette.GOLD_3)
+			draw_rect(Rect2(px, y + 15, pip - 2, 1), Palette.GOLD_6)
 		elif n + 1 == shown.rank:
 			draw_rect(Rect2(px, y + 15, pip - 2, 5), Palette.JADE_2)
-			draw_rect(Rect2(px, y + 15, pip - 2, 1), Palette.JADE_4)
+			draw_rect(Rect2(px, y + 15, pip - 2, 1), Palette.JADE_7)
 		else:
-			draw_rect(Rect2(px, y + 15, pip - 2, 5), Palette.INK_3)
-			draw_rect(Rect2(px, y + 19, pip - 2, 1), Palette.INK_4)
+			draw_rect(Rect2(px, y + 15, pip - 2, 5), Palette.INK_4)
+			draw_rect(Rect2(px, y + 19, pip - 2, 1), Palette.INK_5)
 	# The next realm and the qi that reaches it, or the qi alone where both overrun the column.
 	var next: String = ("%s %s" % [shown.next, shown.next_qi]).strip_edges()
 	if _width(tr("ARTS_NEXT")) + 4 + _width(next) > width:
 		next = shown.next_qi
 	_text(Vector2(x, y + 24), tr("ARTS_NEXT"), Palette.STONE_4)
 	_right(x + width, y + 24, next, Palette.STONE_4)
-	draw_rect(Rect2(x, y + 40, width, 1), Palette.INK_3)
-	_text(Vector2(x, y + 44), tr("ARTS_QI"), Palette.AZURE_4)
-	_right(x + width, y + 44, "%s / %s" % [grouped(shown.qi), grouped(shown.capacity)], Palette.PAPER_3)
+	draw_rect(Rect2(x, y + 40, width, 1), Palette.INK_4)
+	_text(Vector2(x, y + 44), tr("ARTS_QI"), Palette.AZURE_5)
+	_right(x + width, y + 44, "%s / %s" % [grouped(shown.qi), grouped(shown.capacity)], Palette.PAPER_6)
 	draw_rect(Rect2(x, y + 58, width, 5), Palette.INK_1)
 	var fill := floori((width - 2) * shown.qi / maxf(shown.capacity, 1))
-	draw_rect(Rect2(x + 1, y + 59, fill, 3), Palette.AZURE_3)
-	draw_rect(Rect2(x + 1, y + 59, fill, 1), Palette.AZURE_4)
-	draw_rect(Rect2(x + 1 + fill, y + 59, width - 2 - fill, 3), Palette.INK_3)
+	draw_rect(Rect2(x + 1, y + 59, fill, 3), Palette.AZURE_4)
+	draw_rect(Rect2(x + 1, y + 59, fill, 1), Palette.AZURE_5)
+	draw_rect(Rect2(x + 1 + fill, y + 59, width - 2 - fill, 3), Palette.INK_4)
 	return y + 64
 
 
@@ -571,8 +571,8 @@ func _status(at: Vector2, width: float) -> float:
 # `chosen`, gold when `lit`, and the icon dimmed when `dim`.
 func _tile(rect: Rect2, tag: String, chosen: bool, lit: bool, dim: bool) -> void:
 	draw_rect(rect, Palette.INK_1)
-	draw_rect(rect.grow(-1), Palette.JADE_3 if chosen else (Palette.GOLD_3 if lit else Palette.INK_4))
-	draw_rect(rect.grow(-2), Palette.INK_3 if chosen else Palette.INK_2)
+	draw_rect(rect.grow(-1), Palette.JADE_4 if chosen else (Palette.GOLD_4 if lit else Palette.INK_5))
+	draw_rect(rect.grow(-2), Palette.INK_4 if chosen else Palette.INK_2)
 	var at := (rect.position + (rect.size - Vector2(16, 16)) / 2.0).floor()
 	_draw_icon("skill_icons", tag, Rect2(at, Vector2(16, 16)), Palette.DIM_TINT if dim else Color.WHITE)
 

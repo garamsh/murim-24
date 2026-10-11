@@ -249,40 +249,40 @@ func _draw() -> void:
 	var faction := _world.person_faction(person)
 	var faction_colour := _faction_colour(faction) if faction >= 0 else Palette.STONE_4
 	_text(Vector2(card.position.x, card.position.y + 54), fit(said[0], card.size.x), faction_colour)
-	_text(Vector2(card.position.x, card.position.y + 68), fit(said[1], card.size.x), Palette.JADE_3 if not _sold().is_empty() else Palette.STONE_4)
+	_text(Vector2(card.position.x, card.position.y + 68), fit(said[1], card.size.x), Palette.JADE_4 if not _sold().is_empty() else Palette.STONE_4)
 	_text(Vector2(card.position.x, card.position.y + 82), fit(said[2], card.size.x), Palette.STONE_4)
-	draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_3)
+	draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_4)
 	var room := line_room()
 	if trading:
 		_draw_wares(room)
 		return
 	if not showing_news:
-		_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_GREETING"), room), Palette.GOLD_4)
+		_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_GREETING"), room), Palette.GOLD_6)
 		var items: Array[Dictionary] = []
 		for row in rows:
 			items.append({"text": fit(tr("DIALOGUE_FAREWELL" if row == FAREWELL else OFFER_KEYS[row]), room - 16)})
 		_menu(Vector2(SAY_X, SAY_Y + 22), room, items, chosen)
 		return
-	_text(Vector2(SAY_X, SAY_Y), tr("DIALOGUE_HEARD"), Palette.GOLD_4)
+	_text(Vector2(SAY_X, SAY_Y), tr("DIALOGUE_HEARD"), Palette.GOLD_6)
 	if news.is_empty():
-		_text(Vector2(SAY_X, SAY_Y + 18), fit(tr("DIALOGUE_NONE"), room), Palette.PAPER_3)
+		_text(Vector2(SAY_X, SAY_Y + 18), fit(tr("DIALOGUE_NONE"), room), Palette.PAPER_6)
 		return
 	var count := "%d / %d" % [mini(first + NEWS_LINES, news.size()), news.size()]
 	_text(Vector2(RECT.end.x - 12 - _width(count), SAY_Y), count, Palette.STONE_3)
 	for n in mini(NEWS_LINES, news.size() - first):
 		var y := SAY_Y + 18 + n * LINE
-		draw_rect(Rect2(SAY_X, y + 5, 3, 3), Palette.GOLD_2)
-		_text(Vector2(SAY_X + 8, y), fit(news[first + n], room - 8), Palette.PAPER_3 if first + n == 0 else Palette.PAPER_2)
+		draw_rect(Rect2(SAY_X, y + 5, 3, 3), Palette.GOLD_3)
+		_text(Vector2(SAY_X + 8, y), fit(news[first + n], room - 8), Palette.PAPER_6 if first + n == 0 else Palette.PAPER_4)
 
 
 # The wares, from the greeting down: the buyer's silver at the right, a row for each ware, and the
 # line for what came of the last purchase.
 func _draw_wares(room: float) -> void:
-	_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_TRADE_GREETING"), room - 80), Palette.GOLD_4)
+	_text(Vector2(SAY_X, SAY_Y), fit(tr("DIALOGUE_TRADE_GREETING"), room - 80), Palette.GOLD_6)
 	var right := RECT.end.x - 12
 	var silver := _world.person_silver(buyer)
 	var purse := tr("SILVER") % silver
-	_text(Vector2(right - _width(purse), SAY_Y), purse, Palette.PAPER_3)
+	_text(Vector2(right - _width(purse), SAY_Y), purse, Palette.PAPER_6)
 	_ware_icon("silver", Vector2(right - _width(purse) - 18, SAY_Y - 2))
 	var wares := _world.wares()
 	var held := _world.person_held(buyer)
@@ -290,18 +290,18 @@ func _draw_wares(room: float) -> void:
 		var shown: Dictionary = wares[n]
 		var y := SAY_Y + 22 + n * WARE_ROW
 		if n > 0:
-			draw_rect(Rect2(SAY_X, y - 3, room, 1), Palette.INK_3)
+			draw_rect(Rect2(SAY_X, y - 3, room, 1), Palette.INK_4)
 		var on := n == ware
 		if on:
 			draw_rect(Rect2(SAY_X, y - 2, room, WARE_ROW - 2), Palette.INK_2)
-			draw_rect(Rect2(SAY_X, y - 2, 1, WARE_ROW - 2), Palette.JADE_3)
+			draw_rect(Rect2(SAY_X, y - 2, 1, WARE_ROW - 2), Palette.JADE_4)
 		_ware_icon(shown.name, Vector2(SAY_X + 4, y - 1))
-		_text(Vector2(SAY_X + 24, y + 1), fit(ware_name(shown), 104), Palette.GOLD_4 if on else Palette.PAPER_3)
+		_text(Vector2(SAY_X + 24, y + 1), fit(ware_name(shown), 104), Palette.GOLD_6 if on else Palette.PAPER_6)
 		_text(Vector2(SAY_X + 132, y + 1), fit(ware_effect(shown), 70),
-				Palette.CRIMSON_4 if int(shown.health) > 0 else Palette.AZURE_4)
+				Palette.CRIMSON_5 if int(shown.health) > 0 else Palette.AZURE_5)
 		_text(Vector2(SAY_X + 204, y + 1), fit(tr("WARE_HELD") % held[n], 44), Palette.STONE_4)
 		var price := tr("SILVER") % int(shown.price)
-		_text(Vector2(right - 4 - _width(price), y + 1), price, Palette.GOLD_3 if silver >= int(shown.price) else Palette.STONE_3)
+		_text(Vector2(right - 4 - _width(price), y + 1), price, Palette.GOLD_4 if silver >= int(shown.price) else Palette.STONE_3)
 	if not line.is_empty():
 		var y := SAY_Y + 22 + wares.size() * WARE_ROW + 6
-		_text(Vector2(SAY_X, y), fit(line, room), Palette.CRIMSON_4 if refused else Palette.JADE_3)
+		_text(Vector2(SAY_X, y), fit(line, room), Palette.CRIMSON_5 if refused else Palette.JADE_4)

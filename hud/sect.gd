@@ -229,10 +229,10 @@ func _draw() -> void:
 	# Title bar: the panel's name, the sect's, its faction, and whether it is the player's.
 	var x := PANEL.position.x + 8
 	var title := tr("SECT_TITLE")
-	_text(Vector2(x, PANEL.position.y + 4), title, Palette.PAPER_3, true)
+	_text(Vector2(x, PANEL.position.y + 4), title, Palette.PAPER_6, true)
 	x += _width(title) + 10
 	if sect >= 0:
-		_text(Vector2(x, PANEL.position.y + 4), details.name, Palette.GOLD_4, true)
+		_text(Vector2(x, PANEL.position.y + 4), details.name, Palette.GOLD_6, true)
 		x += _width(details.name) + 8
 		_text(Vector2(x, PANEL.position.y + 4), details.faction, _faction_colour(_world.sect_faction(sect)))
 		x += _width(details.faction) + 10
@@ -247,7 +247,7 @@ func _draw() -> void:
 		_draw_cards()
 	if not verdict.is_empty():
 		var said := fit(tr(verdict), FIGURES.end.x - SEAT.position.x)
-		_text(Vector2(SEAT.position.x, VERDICT_Y), said, Palette.JADE_4 if verdict == "APPLICATION_NONE" else Palette.CRIMSON_4)
+		_text(Vector2(SEAT.position.x, VERDICT_Y), said, Palette.JADE_7 if verdict == "APPLICATION_NONE" else Palette.CRIMSON_5)
 	else:
 		_text(SEAT.position + Vector2(8, 8), tr("SECT_NONE"), Palette.STONE_4)
 	_draw_column()
@@ -264,25 +264,25 @@ func _draw_seat() -> void:
 	# The gate's frames are its stages, side by side.
 	draw_texture_rect_region(_gate, Rect2(SEAT.position + Vector2((SEAT.size.x - side) / 2.0, 6),
 			Vector2(side, side)), Rect2(_gate_frame * side, 0, side, side))
-	_text(SEAT.position + Vector2(8, 80), tr("SECT_SEAT"), Palette.GOLD_3)
+	_text(SEAT.position + Vector2(8, 80), tr("SECT_SEAT"), Palette.GOLD_4)
 	var state: String = details.seat
-	var fill := Palette.JADE_2 if state == "held" else (Palette.CRIMSON_3 if state == "lost" else Palette.INK_3)
+	var fill := Palette.JADE_2 if state == "held" else (Palette.CRIMSON_4 if state == "lost" else Palette.INK_4)
 	_tag(SEAT.position + Vector2(SEAT.size.x - 8, 81), tr("SECT_" + state.to_upper()), fill)
 
 
 func _draw_figures() -> void:
 	var rows := [
 		["SECT_FACTION", details.faction, _faction_colour(_world.sect_faction(sect))],
-		["SECT_MASTER", details.master, Palette.PAPER_3],
-		["SECT_ELDERS", details.elders, Palette.PAPER_3],
-		["SECT_MEMBERS", "%d / %d" % [details.members, details.cap], Palette.PAPER_3],
+		["SECT_MASTER", details.master, Palette.PAPER_6],
+		["SECT_ELDERS", details.elders, Palette.PAPER_6],
+		["SECT_MEMBERS", "%d / %d" % [details.members, details.cap], Palette.PAPER_6],
 	]
 	for n in rows.size():
 		var y := FIGURES.position.y + 4 + n * FIGURE_STEP
 		if n > 0:
-			draw_rect(Rect2(FIGURES.position.x, y - 4, FIGURES.size.x, 1), Palette.INK_3)
+			draw_rect(Rect2(FIGURES.position.x, y - 4, FIGURES.size.x, 1), Palette.INK_4)
 		var label := tr(rows[n][0])
-		_text(Vector2(FIGURES.position.x + 2, y), label, Palette.GOLD_3)
+		_text(Vector2(FIGURES.position.x + 2, y), label, Palette.GOLD_4)
 		# The value keeps 4 pixels from its label.
 		var value := fit(rows[n][1], FIGURES.size.x - 4 - _width(label) - 4)
 		_text(Vector2(FIGURES.end.x - 2 - _width(value), y), value, rows[n][2])
@@ -294,25 +294,25 @@ func _draw_figures() -> void:
 		var pip := Rect2(left + n * step, PIPS_Y, step - 2, 8)
 		if n < details.members:
 			draw_rect(pip, Palette.JADE_2)
-			draw_rect(Rect2(pip.position, Vector2(pip.size.x, 1)), Palette.JADE_4)
-			draw_rect(Rect2(pip.position + Vector2(0, 1), Vector2(1, 7)), Palette.JADE_3)
+			draw_rect(Rect2(pip.position, Vector2(pip.size.x, 1)), Palette.JADE_7)
+			draw_rect(Rect2(pip.position + Vector2(0, 1), Vector2(1, 7)), Palette.JADE_4)
 		else:
-			draw_rect(pip, Palette.INK_3)
-			draw_rect(Rect2(pip.position + Vector2(0, 7), Vector2(pip.size.x, 1)), Palette.INK_4)
+			draw_rect(pip, Palette.INK_4)
+			draw_rect(Rect2(pip.position + Vector2(0, 7), Vector2(pip.size.x, 1)), Palette.INK_5)
 
 
 func _draw_cards() -> void:
-	_text(Vector2(SEAT.position.x, RANKS_Y), tr("SECT_RANKS"), Palette.GOLD_3)
+	_text(Vector2(SEAT.position.x, RANKS_Y), tr("SECT_RANKS"), Palette.GOLD_4)
 	var width := FIGURES.end.x - SEAT.position.x
-	draw_rect(Rect2(SEAT.position.x, RANKS_Y + 13, width, 1), Palette.INK_3)
+	draw_rect(Rect2(SEAT.position.x, RANKS_Y + 13, width, 1), Palette.INK_4)
 	var gap := floorf((width - (MAX_ELDER_CARDS + 1) * CARD.x) / MAX_ELDER_CARDS)
 	for n in cards.size():
 		var card: Dictionary = cards[n]
 		var rect := Rect2(Vector2(SEAT.position.x + n * (CARD.x + gap), CARDS_Y), CARD)
 		_person_card(rect, card.person, card.name, card.line, false,
-				Palette.GOLD_3 if card.master else Palette.INK_1, Palette.GOLD_2 if card.master else Palette.INK_3)
+				Palette.GOLD_4 if card.master else Palette.INK_1, Palette.GOLD_3 if card.master else Palette.INK_4)
 		if card.master:
-			_tag(Vector2(rect.end.x - 3, CARDS_Y - 9), tr("SECT_MASTER"), Palette.GOLD_2)
+			_tag(Vector2(rect.end.x - 3, CARDS_Y - 9), tr("SECT_MASTER"), Palette.GOLD_3)
 
 
 func _draw_column() -> void:
@@ -322,46 +322,46 @@ func _draw_column() -> void:
 	for index in column.tabs.size():
 		var tab: String = column.tabs[index]
 		var x: float = COLUMN.position.x + TAB_INSET + index * (w + TAB_GAP)
-		draw_rect(Rect2(x, top, w, 14), Palette.JADE_2 if index == faction else Palette.INK_3)
+		draw_rect(Rect2(x, top, w, 14), Palette.JADE_2 if index == faction else Palette.INK_4)
 		if index == faction:
-			draw_rect(Rect2(x, top, w, 1), Palette.JADE_3)
-		_text(Vector2(x + floorf((w - _width(tab)) / 2.0), top + 1), tab, Palette.PAPER_3 if index == faction else Palette.STONE_4)
+			draw_rect(Rect2(x, top, w, 1), Palette.JADE_4)
+		_text(Vector2(x + floorf((w - _width(tab)) / 2.0), top + 1), tab, Palette.PAPER_6 if index == faction else Palette.STONE_4)
 	draw_rect(Rect2(COLUMN.position.x + 6, top + 14, COLUMN.size.x - 12, 1), Palette.JADE_2)
 	var at := COLUMN.position
-	_text(at + Vector2(8, 28), tr("HUD_LEADER"), Palette.GOLD_3)
+	_text(at + Vector2(8, 28), tr("HUD_LEADER"), Palette.GOLD_4)
 	if column.elects:
 		_tag(at + Vector2(COLUMN.size.x - 8, 29), tr("SECT_ELECTED"), Palette.AZURE_2)
 	elif column.duel:
-		_tag(at + Vector2(COLUMN.size.x - 8, 29), tr("HUD_DUEL"), Palette.CRIMSON_3)
+		_tag(at + Vector2(COLUMN.size.x - 8, 29), tr("HUD_DUEL"), Palette.CRIMSON_4)
 	draw_rect(Rect2(at + Vector2(8, 44), Vector2(16, 16)), Palette.GRASS_3)
 	draw_rect(Rect2(at + Vector2(8, 44), Vector2(16, 1)), Palette.GRASS_4)
 	var leader := _world.leader(faction)
 	if leader >= 0:
 		_portrait(leader, Rect2(at + Vector2(8, 36), Vector2(16, 24)), false)
 	var room := COLUMN.size.x - LEADER_TEXT_X - 8
-	_text(at + Vector2(LEADER_TEXT_X, 46), fit(column.leader, room), Palette.PAPER_3)
+	_text(at + Vector2(LEADER_TEXT_X, 46), fit(column.leader, room), Palette.PAPER_6)
 	_text(at + Vector2(LEADER_TEXT_X, 58), fit(column.leader_sect, room), Palette.STONE_4)
-	draw_rect(Rect2(at.x + 6, LIST_Y - 4, COLUMN.size.x - 12, 1), Palette.INK_3)
-	_text(Vector2(at.x + 8, LIST_Y), tr("SECT_TITLE"), Palette.GOLD_3)
+	draw_rect(Rect2(at.x + 6, LIST_Y - 4, COLUMN.size.x - 12, 1), Palette.INK_4)
+	_text(Vector2(at.x + 8, LIST_Y), tr("SECT_TITLE"), Palette.GOLD_4)
 	var sects: Array = column.sects
 	for n in mini(sects.size(), MAX_SECT_ROWS):
 		var row: Dictionary = sects[n]
 		var y := LIST_Y + 4 + (n + 1) * ROW_STEP
-		draw_rect(Rect2(at.x + 6, y - 4, COLUMN.size.x - 12, 1), Palette.INK_3)
+		draw_rect(Rect2(at.x + 6, y - 4, COLUMN.size.x - 12, 1), Palette.INK_4)
 		var chosen: bool = row.sect == sect
 		if chosen:
 			draw_rect(Rect2(at.x + 4, y - 3, COLUMN.size.x - 8, 16), Palette.INK_2)
-			draw_rect(Rect2(at.x + 4, y - 3, 1, 16), Palette.JADE_3)
+			draw_rect(Rect2(at.x + 4, y - 3, 1, 16), Palette.JADE_4)
 		var right: String = row.count
 		var colour := Palette.STONE_4
 		if row.state == "lost":
 			right = tr("SECT_LOST")
-			colour = Palette.CRIMSON_4
+			colour = Palette.CRIMSON_5
 		elif row.state == "fallen":
 			right = tr("SECT_FALLEN")
 			colour = Palette.STONE_3
 		_text(Vector2(COLUMN.end.x - 8 - _width(right), y), right, colour)
 		# The name keeps 4 pixels from what stands right of it.
 		var name := fit(row.name, COLUMN.size.x - 18 - _width(right) - 4)
-		var name_colour := Palette.STONE_3 if row.state == "fallen" else (Palette.GOLD_4 if chosen else Palette.PAPER_3)
+		var name_colour := Palette.STONE_3 if row.state == "fallen" else (Palette.GOLD_6 if chosen else Palette.PAPER_6)
 		_text(Vector2(at.x + 10, y), name, name_colour)

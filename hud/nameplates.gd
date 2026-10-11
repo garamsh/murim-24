@@ -15,9 +15,9 @@ const NAME_CAP := 8
 const COLOURS := {
 	WorldAdapter.RELATION_OWN: Palette.JADE_2,
 	WorldAdapter.RELATION_ALLY: Palette.JADE_2,
-	WorldAdapter.RELATION_NEUTRAL: Palette.PAPER_1,
-	WorldAdapter.RELATION_HOSTILE: Palette.CRIMSON_4,
-	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_4,
+	WorldAdapter.RELATION_NEUTRAL: Palette.PAPER_3,
+	WorldAdapter.RELATION_HOSTILE: Palette.CRIMSON_5,
+	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_5,
 }
 const HOSTILE_RELATIONS := [WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
 
@@ -92,6 +92,6 @@ func _draw() -> void:
 		draw_string(_font, baseline, plate.text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, plate.colour)
 		match plate.mark:
 			"selected":
-				draw_rect(rect, Palette.GOLD_3, false, 1.0)
+				draw_rect(rect, Palette.GOLD_4, false, 1.0)
 			"hovered":
-				draw_line(Vector2(rect.position.x, rect.end.y), rect.end, Palette.PAPER_3, 1.0)
+				draw_line(Vector2(rect.position.x, rect.end.y), rect.end, Palette.PAPER_6, 1.0)

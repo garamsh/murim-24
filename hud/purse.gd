@@ -50,7 +50,7 @@ func _draw() -> void:
 	_frame(strip, Palette.INK_2)
 	_ware_icon("silver", strip.position + Vector2(4, 1))
 	var text := tr("SILVER") % silver
-	_text(Vector2(strip.end.x - 6 - _width(text), strip.position.y + 3), fit(text, strip.size.x - 28), Palette.PAPER_3)
+	_text(Vector2(strip.end.x - 6 - _width(text), strip.position.y + 3), fit(text, strip.size.x - 28), Palette.PAPER_6)
 	if not belt or _wares.is_empty():
 		return
 	var rect := belt_rect()
@@ -62,6 +62,6 @@ func _draw() -> void:
 		var none := held[n] == 0
 		_ware_icon(_wares[n].name, cell.position + Vector2(12, 2), none)
 		if n < keys.size():
-			_text(cell.position + Vector2(2, 3), keys[n], Palette.STONE_3 if none else Palette.GOLD_3)
+			_text(cell.position + Vector2(2, 3), keys[n], Palette.STONE_3 if none else Palette.GOLD_4)
 		var count := str(held[n])
-		_text(cell.end - Vector2(_width(count) + 1, 12), count, Palette.STONE_3 if none else Palette.PAPER_3, true)
+		_text(cell.end - Vector2(_width(count) + 1, 12), count, Palette.STONE_3 if none else Palette.PAPER_6, true)

@@ -31,7 +31,7 @@ const DETAIL := "res://art/terrain/detail"
 const RAMP_TAGS := ["water", "plain", "hills", "forest", "rock", "bank"]
 const DETAIL_ROOT := Vector2i(2, 3)
 # The ink ramp, whose colours in a detail frame stand for steps 0 to 3 of the ground's ramp.
-const INK := [Color("14101a"), Color("2a2433"), Color("3d3647"), Color("524a5e")]
+const INK := [Color("1b1823"), Color("26222f"), Color("3d3548"), Color("6c5c79")]
 ## Cells a chunk is wide and deep: ADR 0042's areas.
 const CHUNK := 32
 ## Pixels past the screen within which chunks are shown.

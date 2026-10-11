@@ -94,8 +94,8 @@ func _draw() -> void:
 		var on: bool = row.action == lit
 		if on or n == hovered:
 			draw_rect(cell, Palette.INK_1)
-			draw_rect(Rect2(cell.position, Vector2(1, cell.size.y)), Palette.JADE_3 if on else Palette.GOLD_3)
+			draw_rect(Rect2(cell.position, Vector2(1, cell.size.y)), Palette.JADE_4 if on else Palette.GOLD_4)
 		_pixel_icon(ICONS[row.icon], cell.position + Vector2(ICON_X, 3),
-				Palette.JADE_4 if on else (Palette.PAPER_3 if row.icon == "arts" else Palette.GOLD_3))
-		_text(cell.position + Vector2(WORD_X, 2), tr(row.label), Palette.JADE_4 if on else Palette.PAPER_3)
-		_right(cell.end.x - 3, cell.position.y + 2, row.key, Palette.GOLD_3)
+				Palette.JADE_7 if on else (Palette.PAPER_6 if row.icon == "arts" else Palette.GOLD_4))
+		_text(cell.position + Vector2(WORD_X, 2), tr(row.label), Palette.JADE_7 if on else Palette.PAPER_6)
+		_right(cell.end.x - 3, cell.position.y + 2, row.key, Palette.GOLD_4)

@@ -54,7 +54,7 @@ func _draw() -> void:
 	var slip := slip_rect()
 	var width := slip.size.x
 	var at := slip.position
-	var edge := Palette.CRIMSON_3 if refused else Palette.GOLD_2
+	var edge := Palette.CRIMSON_4 if refused else Palette.GOLD_3
 	draw_rect(Rect2(at, Vector2(width, 17)), edge)
 	draw_rect(Rect2(at + Vector2.ONE, Vector2(width - 2, 15)), Palette.INK_2)
 	# A tick under the slip points at the person.
@@ -62,4 +62,4 @@ func _draw() -> void:
 	draw_rect(Rect2(head.x, at.y + 18, 1, 1), edge)
 	if not refused:
 		_keycap(at + Vector2(4, 2), key)
-	_text(at + Vector2(4 + cap, 2), word, Palette.CRIMSON_4 if refused else Palette.PAPER_3)
+	_text(at + Vector2(4 + cap, 2), word, Palette.CRIMSON_5 if refused else Palette.PAPER_6)
