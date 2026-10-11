@@ -61,7 +61,8 @@ static func paved() -> Array[Vector2i]:
 
 
 # Lays the town at `corner` in `art`, a world_art.tscn shown: marks its footprints and paving built,
-# paves its streets, and stands each piece as world_art.gd stands a structure, with its shadow. It
+# paves its streets, and stands each piece as world_art.gd stands a structure, its shadow in the
+# Shadows node with the world's. It
 # returns the sprites laid.
 static func lay(art: Node2D, corner: Vector2i) -> Array:
 	var cell := Vector2(art.CELL)
@@ -94,11 +95,8 @@ static func lay(art: Node2D, corner: Vector2i) -> Array:
 		art.get_node("Standing").add_child(sprite)
 		laid.append(sprite)
 		if not name.begins_with("town_wall") and name != "town_steps":
-			var shadow := Sprite2D.new()
-			shadow.centered = false
-			shadow.position = Vector2(at) * cell
-			shadow.texture = art._shadow(footprint, 0)
-			art.get_node("Laid").add_child(shadow)
+			# Ids past any the world's structures take, in the one node that draws every shadow.
+			art.get_node("Shadows").set_shadow(1000000 + laid.size(), Vector2(at) * cell, footprint, 0)
 	return laid
 
 
