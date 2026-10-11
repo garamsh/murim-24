@@ -4,6 +4,10 @@
 --   higher), facing the viewer turned to the right,
 --   back (four) walking away from the viewer, the head seen from behind,
 --   strike (two): the weapon swung, then the standing frame,
+--   idle_hurt and walk_hurt (one and four), the body below half its health: a blood stain on its
+--   chest, stooping forward,
+--   idle_maimed and walk_maimed (one and four), below a quarter: the stain spread down its side
+--   and leg, stooping, and limping, the last step dragged,
 -- and each again with _xray after it: only the silhouette's outline, which the view draws over
 -- whatever hides the body, in the Orthodox's and the Unorthodox's light accent and in violet for
 -- the Demonic Cult, whose crimson stays for hostility. The view mirrors a body to face left.
@@ -70,6 +74,41 @@ local function back(cv)
   return out
 end
 
+-- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only, so
+-- the outline stays whole; `spread` 1 is a stain on the chest, 2 runs it down the side and the leg.
+local STAIN = {
+  { { 0, 0, 3 }, { 1, 0, 2 }, { 0, 1, 2 }, { 1, 1, 3 }, { 2, 1, 2 } },
+  { { 2, 2, 3 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 3 }, { 2, 5, 2 }, { -1, 2, 2 } },
+}
+local function stained(cv, spread)
+  local out = px.canvas(W, H)
+  for k, i in pairs(cv.p) do out:set(k % W, k // W, i) end
+  for n = 1, spread do
+    for _, d in ipairs(STAIN[n]) do
+      local x, y = 6 + d[1], 16 + d[2]
+      local i = out:get(x, y)
+      if i ~= 0 and i ~= c("ink", 1) then out:set(x, y, c("crimson", d[3])) end
+    end
+  end
+  return out
+end
+
+-- The body stooping: everything above the legs, rows HEAD_BOTTOM + 4 and up, a pixel forward and a
+-- pixel lower, over the top of the legs.
+local function stooped(cv)
+  local out = px.canvas(W, H)
+  local hips = HEAD_BOTTOM + 4
+  for k, i in pairs(cv.p) do
+    local x, y = k % W, k // W
+    if y > hips then out:set(x, y, i) end
+  end
+  for k, i in pairs(cv.p) do
+    local x, y = k % W, k // W
+    if y <= hips then out:set(x + 1, y + 1, i) end
+  end
+  return out
+end
+
 -- Only the silhouette's outline, in `colour`.
 local function xray(cv, colour)
   local out = px.canvas(W, H)
@@ -91,12 +130,19 @@ for name, f in pairs(factions) do
     { "back", { back(walk[1]), back(walk[2]), back(walk[3]), back(walk[4]) } },
     { "strike", { frame(copy(spec, { body = "run", weapon = spec.weapon .. "_strike" })), frame(spec) } },
   }
+  local hurt = function(cv) return stooped(stained(cv, 1)) end
+  local maimed = function(cv) return stooped(stained(cv, 2)) end
+  sets[#sets + 1] = { "idle_hurt", { hurt(frame(spec)) } }
+  sets[#sets + 1] = { "walk_hurt", { hurt(walk[1]), hurt(walk[2]), hurt(walk[3]), hurt(walk[4]) } }
+  sets[#sets + 1] = { "idle_maimed", { maimed(frame(spec)) } }
+  -- The limp: a step, a pass, then the hurt leg dragged as the body stands on the other, a pass.
+  sets[#sets + 1] = { "walk_maimed", { maimed(walk[1]), maimed(walk[2]), maimed(frame(spec)), maimed(walk[4]) } }
   local frames, tags = {}, {}
   for _, suffix in ipairs({ "", "_xray" }) do
     for _, set in ipairs(sets) do
       local first = #frames + 1
       for _, cv in ipairs(set[2]) do frames[#frames + 1] = suffix == "" and cv or xray(cv, f.xray) end
-      tags[#tags + 1] = { set[1] .. suffix, first, #frames, set[1] == "idle" and 1000 or 150 }
+      tags[#tags + 1] = { set[1] .. suffix, first, #frames, set[1]:sub(1, 4) == "idle" and 1000 or 150 }
     end
   end
   px.save_frames(W, H, frames, tags, here .. "/" .. name .. ".aseprite")
