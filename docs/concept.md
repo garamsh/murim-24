@@ -272,6 +272,16 @@ Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 a
   - A martial art needs its weapon: a sword art a sword, a fist art bare hands or gauntlets.
 - **Gear wears out and breaks.** A broken weapon or armour leaves the slot empty, and nothing is given for free. One fights bare-handed or unarmoured until one equips something one owns.
   - People carry spares where they can, and take up better gear they find, buy or are issued. What a soldier at war loots goes to its faction, which may issue it to its soldiers or sell it.
+- **Gear is made from materials, and broken gear can be recycled.** Decided by the owner on 2026-10-10 (issue #231). ADR 0064 (`docs/architecture/adr/0064-make-gear-from-materials-by-recipe-and-reforge-broken-metal-at-a-loss.md`), proposed, designs it.
+  - Weapons and armour take resources to make: iron, steel, leather, wood and cloth.
+  - A broken piece can be recycled, with materials conserved.
+  - Decided by the owner on 2026-10-10 (#231's comment): animal and spirit-beast parts are crafting materials. Hide, bone, horn and claw come from every animal, and rarer parts from spirit beasts (#171).
+- **[proposed]** ADR 0064's details, after the PM's direction:
+  - metals recycled but not for free: a smith reforges scrap with charcoal and labour, and half the metal is lost as slag
+  - organic materials, leather, wood and cloth, lost when a piece breaks
+  - scrap as loot, so a faction short of iron arms itself from its battlefields
+  - recipes of materials and labour as pack data, with ore from mines on the map
+  - workshops making what their market lacks most, and treasuries ordering gear
 - **Every item has one owner:** a person, a warehouse, a faction or the ground. There are four ways to move one: pick it up, deposit or withdraw it, buy it and sell it.
   - The dead drop what they carried, for anyone to pick up.
 - **Warehouses.** Villages keep warehouses run by keepers, sects keep vaults, and factions keep treasuries. A destroyed warehouse scatters its contents on the ground, and whoever picks an item up owns it. A soldier at war picks it up as loot for its faction, which sells it.

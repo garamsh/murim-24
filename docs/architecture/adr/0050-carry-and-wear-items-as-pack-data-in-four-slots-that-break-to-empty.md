@@ -1,6 +1,6 @@
 # ADR 0050: Carry and wear items as pack data, in four slots that break to empty
 
-> Status: proposed
+> Status: proposed; its item at no durability gone superseded by ADR-0064, under which a broken item becomes scrap of its main metal, one unit for each unit in its recipe
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
