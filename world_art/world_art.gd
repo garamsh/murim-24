@@ -398,6 +398,9 @@ func refresh(view: Rect2, between := 1.0) -> void:
 					flip = held.flip
 				else:
 					held.merge({"at": at, "tag": tag, "frame": frame, "white": white, "flip": flip})
+				# A hold counts down only on frames that draw its body, so one held off screen holds
+				# on as it comes into view; a hit stop's bodies are the steered person and those it
+				# strikes or is struck by, on screen.
 				held.left -= 1
 				if held.left <= 0:
 					_held.erase(person)

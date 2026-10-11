@@ -4,8 +4,8 @@
 ## its release, the touch controls, on a phone or a tablet, forced on, forced on with a tap on the
 ## ground walking there, or off, and whose damage floats up as numbers over the struck, no one's,
 ## the player's own or everyone's, whether a hit draws blood, and whether a hit on or from the
-## player holds the frame a moment and shakes the screen, each a row of its choices with the chosen one in jade, and a line
-## saying what the row being changed sets. The choices are the player's preferences, not the world's
+## player holds the frame a moment and shakes the screen, each a row of its choices with the chosen
+## one in jade, and a line saying what the row being changed sets. The choices are the player's preferences, not the world's
 ## state: they are kept in a file under user:// and applied to the window, the translations, the
 ## audio buses, the HUD's layout, the play scene's pace and the world's drawing. A row's choice is
 ## chosen by a tap as well as by the keys. Every word comes from hud.csv through Godot's
@@ -37,7 +37,8 @@ const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW
 		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
 		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
 		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT", "touch": "SETTINGS_TOUCH_ABOUT",
-		"numbers": "SETTINGS_NUMBERS_ABOUT", "blood": "SETTINGS_BLOOD_ABOUT", "hitstop": "SETTINGS_HITSTOP_ABOUT"}
+		"numbers": "SETTINGS_NUMBERS_ABOUT", "blood": "SETTINGS_BLOOD_ABOUT",
+		"hitstop": "SETTINGS_HITSTOP_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
