@@ -64,6 +64,11 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 - **Made by hand, the same in every game.** The map is authored, not generated, and every player gets the same one. No seed shapes the terrain; a new game's seed draws only the simulation's randomness: who is born with what talent, and what happens.
 - **Physical distance.** In the heartland a cell is a li, 500 metres between places, so travel takes the time the real distance suggests. At 1x, Luoyang to Chang'an is about 6 minutes on foot, a region about 12, and edge to edge about 36. The outer lands are compressed toward the map's edge. Roads are faster than open ground; horses and river boats are planned.
 - **Physical distance.** Revised by the owner, 2026-10-11 (#255): the world is vaster, so travel takes at least twice as long as on the 4,096-cell map. At 1x, Luoyang to Chang'an takes at least 12 minutes on foot, a region at least 24, and edge to edge at least 72. The owner chose a bigger world over the same size made emptier, and over building the 4,096 map sooner. Distances between places stay physical, and the outer lands are compressed toward the map's edge. Roads are faster than open ground; horses and river boats are planned.
+- **[proposed]** ADR 0070's details (`docs/architecture/adr/0070-double-the-map-to-8192-cells-of-half-a-li-so-every-journey-takes-twice-as-long.md`):
+  - a map of 8,192 x 8,192 cells, a cell half a li, 250 metres, between places in the heartland, so every journey is twice as long
+  - towns, fields and roads keeping their sizes at a person's scale
+  - elevation, biome and region painted per 16 x 16 cells, the same hand work as before
+  - inns on the roads a day's walk apart, and caves in the wilderness
   - **[proposed]** ADR 0061 (`docs/architecture/adr/0061-travel-on-foot-by-horse-or-by-boat-at-speeds-set-by-travel-class-and-means.md`), for issue #207: horses as items in a mount slot, bought at towns with a stable, fed a ration a day, and ridden at about twice walking pace, striking only with a weapon's basic strike; boats owned by merchant houses and villages, sailing river and canal routes between landings for a fare, fast downstream and slow upstream; ferries charging a fare.
 - **An offline game.** There is no online play, and none is planned.
 - **The regions.** Ten regions, each with its real basis:
