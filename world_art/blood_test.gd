@@ -5,7 +5,9 @@
 # below half its health stands in its hurt frame and one below a quarter in its maimed frame, where
 # one left above half stands as it was; a maimed foe drips as it stands, where a hurt one does
 # not; and the steered person's hit holds the struck foe's drawn flash for its hit stop, where with
-# the settings' hit stop off it fades, and a foe out of reach starts no hit stop.
+# the settings' hit stop off it fades, and a foe out of reach starts no hit stop; and the same hit
+# shakes the screen by whole pixels, as far as its size, until it ends, where with the hit stop off
+# or out of reach it does not.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -32,7 +34,8 @@ const HELD_MS := 60
 
 
 func run() -> bool:
-	return _blood_pass() and _off_pass() and _wound_pass() and _drip_pass() and _hit_stop_pass()
+	return _blood_pass() and _off_pass() and _wound_pass() and _drip_pass() and _hit_stop_pass() \
+			and _shake_pass()
 
 
 # On the hit tick the foe bleeds: one spray from its middle and three drops beyond its feet in the
@@ -133,6 +136,25 @@ func _hit_stop_pass() -> bool:
 	print("blood_test: held, the struck foe's white %.2f then %.2f, %d hit stop(s); hit stop off %.2f then %.2f, %d; out of reach %d: %s" % [
 		whites[0][0], whites[0][1], stops[0], whites[1][0], whites[1][1], stops[1], far_stops,
 		"pass" if passed else "FAIL"])
+	return passed
+
+
+# Right after the steered person's hit of 60, the screen is shaken by a step of the pattern 3 whole
+# pixels far, and by nothing once Combat.SHAKE_MS has passed. Control: with the hit stop off, and
+# out of reach, no shake.
+func _shake_pass() -> bool:
+	var shakes := []
+	for case: Array in [[BESIDE, true], [BESIDE, false], [OUT_OF_REACH, true]]:
+		var fight := _fight(case[0], 60, true, case[1])
+		var now := Time.get_ticks_msec()
+		shakes.append([fight.art.combat.shake(now), fight.art.combat.shake(now + Combat.SHAKE_MS)])
+		fight.art.free()
+	var first: Vector2i = shakes[0][0]
+	var stepped := Combat.SHAKE_PATTERN.any(func(step: Vector2i) -> bool: return step * 3 == first)
+	var passed: bool = first != Vector2i.ZERO and stepped and shakes[0][1] == Vector2i.ZERO \
+			and shakes[1][0] == Vector2i.ZERO and shakes[2][0] == Vector2i.ZERO
+	print("blood_test: the hit of 60 shook the screen %s, a step of the pattern 3 pixels far %s, then %s after %d ms; hit stop off %s; out of reach %s: %s" % [
+		first, stepped, shakes[0][1], Combat.SHAKE_MS, shakes[1][0], shakes[2][0], "pass" if passed else "FAIL"])
 	return passed
 
 
