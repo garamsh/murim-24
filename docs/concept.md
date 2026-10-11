@@ -194,6 +194,17 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - a village's materials account, with its idle earners assigned to gather what its next building lacks and paid from the treasury
   - buildings rising only as far as their materials are delivered
   - settlers carrying a first house's materials
+  - hunting waiting for animals (#171)
+- **Walls grow with a village.** Decided by the owner on 2026-10-10 (issue #228). ADR 0062 (`docs/architecture/adr/0062-raise-a-towns-walls-by-its-wealth-its-factions-strength-and-the-threats-it-meets-in-stages-that-grow-with-it.md`), proposed, designs it.
+  - A village becomes a walled town as it and its faction grow. Whether it has walls, and how great they are, depends on the faction's strength and the village's wealth.
+  - Building walls, like building the village itself, takes materials and labour.
+  - Walls are part of the village and grow with it. When the town expands past its walls, suburbs come first, and a new, larger circuit follows once wealth and labour allow. The old wall stays as an inner wall or is taken down and its stone reused.
+- **[proposed]** ADR 0062's details:
+  - a circuit planned when a village reaches a town's scale and wealth, its faction is strong, and threats have pressed it
+  - earthwork, then stone, then towers, over about ten years
+  - corvée for a threatened town, at a cost in discontent
+  - gates that close before a hostile army
+  - upkeep and decay
   - hunting by ADR 0067's animals
 - **Construction is the NPCs', never the player's.** As a village grows, its NPCs decide what to build and build it: houses, fields, granaries, and later workshops such as a smithy. The player never places or orders a building. Growth lays structures and residents raise them by the repair rule (`docs/architecture/adr/0023-let-villages-build-found-and-raid-as-they-press-their-caps.md`).
 - **No separate limit.** Revised by the owner on 2026-10-10 (issue #229): population is bounded by the food that can be had, not by a limit of its own (§Identity).
