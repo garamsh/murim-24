@@ -227,6 +227,13 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 | Walled town | at least 40 x 30 inside the wall | Owner: streets, wards, market, hall, temples, courtyard houses |
 | Major city | at least 80 x 60 inside the wall | Owner: with inner wards |
 | Sect seat | 24 x 16 to 40 x 30 | A compound of gate, halls, training grounds and quarters, not a single hall |
+
+**[proposed]** ADR 0076 gives a village its look by growth rather than by template:
+- a paved square at its centre, with the hall, the well and the workshops on its edges;
+- houses around it along lanes a cell wide, following the ground nearest the square;
+- fields and pens beyond the houses.
+
+A house's material by tier, such as thatch, tile and stone, and regional styles are drawn after #200's look is approved.
 | Field, one household's | 4 to 8 cells | Exaggerated small: a real household farmed several thousand cells' worth. The base pack's yield is about 1 person a cell, below |
 | Track | 1 cell wide | |
 | Road | 2 cells wide | |

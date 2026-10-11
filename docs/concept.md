@@ -207,6 +207,11 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - a spirit core adding its qi up to the talent's limit, or refined by an apothecary into pills
 - **Villages are built from trees and stones.** Trees and stones are world objects, and NPCs build villages from them, automatically. Construction stays NPC-only: the player may gather, but never builds.
 - **Villages grow like WorldBox,** with people and resources: centre first, houses placed outward into suitable ground, expanding, and founding new villages. Villages are larger by default.
+- **[proposed]** ADR 0076's details (#169):
+  - villages kept a spacing apart in cells, the same for the starting villages and for those founded
+  - tiers by residents, hamlet, village and town, each with a square and a reach to build in
+  - houses around the square along lanes, the hall and workshops on the square, fields and pens at the edge, each placed by the ground nearest the square, so two villages on different ground differ
+  - walls left to ADR 0062, and roads to the paths people walk
 - **[proposed]** ADR 0056's details:
   - natural objects in fixed slots the map places, with fruit trees, bushes, rocks and herbs beside trees
   - a village's materials account, with its idle earners assigned to gather what its next building lacks and paid from the treasury
