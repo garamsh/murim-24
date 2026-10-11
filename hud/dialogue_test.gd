@@ -50,10 +50,14 @@ func _news_pass(world: WorldAdapter, panel: Control, near: int, far: int) -> boo
 	for event: Dictionary in heard:
 		expected.append(panel.rumour_text(world, event))
 	var newest_first: bool = heard.size() >= 2 and heard[0].sequence > heard[1].sequence
+	# Setup: a birth or a death is among them.
+	var births_deaths := 0
 	var named := true
 	for event: Dictionary in heard:
 		if event.kind == "born" or event.kind == "died":
+			births_deaths += 1
 			named = named and panel.rumour_text(world, event).contains(PersonName.of(world, event.person, true))
+	named = named and births_deaths > 0
 	var near_news: Array[String] = panel.news.duplicate()
 	# Scrolling stops at the last screenful.
 	for step in heard.size():
@@ -70,8 +74,8 @@ func _news_pass(world: WorldAdapter, panel: Control, near: int, far: int) -> boo
 	var shared := near_news.filter(func(line: String) -> bool: return far_news.has(line)).size()
 	var passed := menu_first and near_news == expected and newest_first and named and scrolled and went_back \
 			and set_up and near_news != far_news
-	print("dialogue_test: person %d tells its %d rumours newest first %s, worded as rumour_text words them %s, births and deaths named %s; scrolled to %d; back to the menu %s; person %d, %s cells away, tells %d, %d of them shared: %s" % [
-		near, near_news.size(), newest_first, near_news == expected, named, last, went_back, far, apart,
+	print("dialogue_test: person %d tells its %d rumours newest first %s, worded as rumour_text words them %s, %d births and deaths named %s; scrolled to %d; back to the menu %s; person %d, %s cells away, tells %d, %d of them shared: %s" % [
+		near, near_news.size(), newest_first, near_news == expected, births_deaths, named, last, went_back, far, apart,
 		far_news.size(), shared, "pass" if passed else "FAIL"])
 	return passed
 

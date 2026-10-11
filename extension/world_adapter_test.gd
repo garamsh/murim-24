@@ -48,6 +48,8 @@ const ORDER_TICKS := 800
 const REGION_SEED := 2026
 const CULT_VILLAGE := 1
 const VILLAGE_TICKS := 600
+# Years the region is lived, in five-tick days, before its rumours are read.
+const LIVED_YEARS := 10
 # Ticks in a day of the region's calendar.
 const TICKS_PER_DAY := 1800
 const HOME := Vector2i(1, 1)
@@ -562,7 +564,8 @@ func _core_run() -> PackedStringArray:
 # APPLICATION_NONE, apply makes it a member and applying again reads APPLICATION_IN_A_SECT and is
 # refused. Control: born into Unorthodox village 2, the player is refused as APPLICATION_UNPROVEN
 # and stays out. Lived ten years of five-tick days, the region's rumours reach the player, newest
-# first, each of a kind the adapter names and naming records the world holds. Attainment reads
+# first, each of a kind the adapter names, at a cell of the map, and naming records the world holds:
+# a birth one no older than the years lived, a death one with no health. Attainment reads
 # one value per discipline the region names, the five of its rules of life, and a sect's founding
 # master 120 in one; a world from create() names no discipline.
 func _play_loop_pass() -> bool:
@@ -581,17 +584,28 @@ func _play_loop_pass() -> bool:
 	var refused := other.application_refusal(outsider, 2) == WorldAdapter.APPLICATION_UNPROVEN \
 			and not other.apply(outsider, 2) and other.person_sect(outsider) == -1
 	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
+	for i in LIVED_YEARS * 120 * 5:
 		lived.tick()
 	var heard := lived.rumours(lived.roster(lived.army_count() - 1)[0])
 	var kinds := ["founded", "raided", "ruined", "sect_fell", "leader_changed", "born", "died"]
+	var rows := lived.map_rows()
+	var map := Rect2i(0, 0, rows[0].length(), rows.size())
 	var rumours_right := heard.size() > 0
+	# Births and deaths heard: one born is no older than the years lived, and one who died has no
+	# health. Setup: some were heard.
+	var of_people := 0
 	for n in heard.size():
 		var event: Dictionary = heard[n]
-		rumours_right = rumours_right and kinds.has(event.kind) and event.cell is Vector2i \
+		rumours_right = rumours_right and kinds.has(event.kind) and map.has_point(event.cell) \
 				and (n == 0 or event.sequence < heard[n - 1].sequence) \
-				and (not event.has("person") or lived.person_family(event.person) >= 0) \
 				and (not event.has("village") or event.village < lived.villages().size())
+		if event.kind == "born":
+			of_people += 1
+			rumours_right = rumours_right and lived.person_age(event.person) <= LIVED_YEARS
+		elif event.kind == "died":
+			of_people += 1
+			rumours_right = rumours_right and lived.person_health(event.person) == 0
+	rumours_right = rumours_right and of_people > 0
 	var names := world.discipline_names()
 	var master := world.sect_master(0)
 	var attained := world.person_attainment(master)
@@ -601,8 +615,8 @@ func _play_loop_pass() -> bool:
 	var bare := _create(SEED, _armies, RULES)
 	var bare_right := bare.discipline_names().is_empty() and bare.person_attainment(0).is_empty()
 	var passed := open and applied and again and refused and rumours_right and attainment_right and bare_right
-	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused as unproven %s; %d rumours after ten years, newest first and well formed %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
-		sect, open, applied, again, refused, heard.size(), rumours_right, heard[0] if heard.size() > 0 else {},
+	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused as unproven %s; %d rumours after ten years, newest first, within the map and %d of them naming the born or the dead rightly %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
+		sect, open, applied, again, refused, heard.size(), of_people, rumours_right, heard[0] if heard.size() > 0 else {},
 		names, master, attained, attainment_right, bare_right, "pass" if passed else "FAIL"])
 	return passed
 

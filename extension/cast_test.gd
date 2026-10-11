@@ -1,8 +1,8 @@
 # Checks that a cast passes through the adapter as the core takes it: a tap's aim favours the
-# facing, a cast at a person lands on it, one at a point past the range lands at the range, and
-# one at itself centres on the caster. Control: a cast on cooldown, out of range or at a target
-# of another type is refused, and the nearer people a cast passes over are untouched. tick_count
-# gives the tick the caster's readiness is counted against.
+# facing and reaches no farther than the skill, a cast at a person lands on it, one at a point
+# past the range lands at the range, and one at itself centres on the caster. Control: a cast on
+# cooldown, out of range or at a target of another type is refused, and the nearer people a cast
+# passes over are untouched. tick_count gives the tick the caster's readiness is counted against.
 extends RefCounted
 
 const CASTER := 0
@@ -21,11 +21,13 @@ func run() -> bool:
 	var aimed := _world()
 	var ahead := aimed.aim(CASTER, 1, Vector2(1, 0))
 	var behind := aimed.aim(CASTER, 1, Vector2(-1, 0))
+	# The aim reaches no farther than the skill: the idle skill, of no range, aims at no one, though
+	# every foe stands within the bolt's.
+	var idle := aimed.aim(CASTER, 0, Vector2(1, 0))
 	var skill: Dictionary = aimed.skills(CASTER)[1]
-	var aim_right: bool = ahead == NEAR_FOE and behind == BEHIND_FOE and skill["range"] == 1024 \
-			and skill["cooldown"] == 30
-	print("cast_test: aim east %d, west %d; the bolt's range %d and cooldown %d: %s" % [
-		ahead, behind, skill["range"], skill["cooldown"], "pass" if aim_right else "FAIL"])
+	var aim_right: bool = ahead == NEAR_FOE and behind == BEHIND_FOE and idle == -1
+	print("cast_test: the bolt aims east at %d, west at %d; the idle skill east at %d: %s" % [
+		ahead, behind, idle, "pass" if aim_right else "FAIL"])
 
 	var at_person := _world()
 	var ticks_before := at_person.tick_count()
