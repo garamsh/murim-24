@@ -121,6 +121,7 @@ export: build
 		-DCMAKE_CXX_COMPILER=$(CURDIR)/$(MINGW_DIR)/bin/clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu \
 		-DCMAKE_SYSROOT=$(CURDIR)/$(LINUX_SYSROOT_DIR) -DCMAKE_LINKER_TYPE=LLD
 	$(TOOLS)/cmake --build $(LINUX_BUILD_DIR) --target murim_extension
+	./linux-elf-check.sh $(MINGW_DIR)/bin $(BUILD_DIR)/linux-check $(LINUX_BUILD_DIR)/libmurim.linux.template_release.x86_64.so
 	rm -rf $(EXPORT_DIR) && mkdir -p $(EXPORT_DIR)/macos $(EXPORT_DIR)/windows $(EXPORT_DIR)/linux
 	$(GODOT) --headless --path . --export-release macOS $(EXPORT_DIR)/macos/Murim24.app
 	$(GODOT) --headless --path . --export-release Windows $(EXPORT_DIR)/windows/Murim24.exe
