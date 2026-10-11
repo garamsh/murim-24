@@ -435,6 +435,8 @@ func _process(delta: float) -> void:
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
 	_art.refresh(view, _between())
+	# A hit on or from the player shakes the screen by whole screen pixels.
+	_camera.offset = Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
 	_sound.hearing = view
 	# The cursor stays on the screen while the camera moves, so it moves over the world.
 	_cursor = get_local_mouse_position()

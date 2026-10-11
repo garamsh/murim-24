@@ -4,7 +4,7 @@
 ## its release, the touch controls, on a phone or a tablet, forced on, forced on with a tap on the
 ## ground walking there, or off, and whose damage floats up as numbers over the struck, no one's,
 ## the player's own or everyone's, whether a hit draws blood, and whether a hit on or from the
-## player holds the frame a moment, each a row of its choices with the chosen one in jade, and a line
+## player holds the frame a moment and shakes the screen, each a row of its choices with the chosen one in jade, and a line
 ## saying what the row being changed sets. The choices are the player's preferences, not the world's
 ## state: they are kept in a file under user:// and applied to the window, the translations, the
 ## audio buses, the HUD's layout, the play scene's pace and the world's drawing. A row's choice is
@@ -58,7 +58,8 @@ const NUMBERS_MODES := ["off", "mine", "everyone"]
 const NUMBERS_KEYS := ["SETTINGS_NUMBERS_OFF", "SETTINGS_NUMBERS_MINE", "SETTINGS_NUMBERS_EVERYONE"]
 ## Whether a hit draws blood, or shows only its flash.
 const BLOOD_KEYS := ["SETTINGS_BLOOD_ON", "SETTINGS_BLOOD_OFF"]
-## Whether a hit on or from the player holds the struck and the striker a few frames.
+## Whether a hit on or from the player holds the struck and the striker a few frames and shakes the
+## screen.
 const HITSTOP_KEYS := ["SETTINGS_HITSTOP_ON", "SETTINGS_HITSTOP_OFF"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
 ## the music sits under the effects, a cast key casts on its press, as Albion Online's quick
@@ -183,7 +184,8 @@ func blood() -> bool:
 	return chosen.blood == 0
 
 
-## Returns whether a hit on or from the steered person holds the frame a moment.
+## Returns whether a hit on or from the steered person holds the frame a moment and shakes the
+## screen.
 func hit_stop() -> bool:
 	return chosen.hitstop == 0
 

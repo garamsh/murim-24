@@ -7,7 +7,8 @@
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
 ## struck by nothing, of hunger or age, is not drawn falling; a hit on or from the steered person
-## holds the struck and the striker still a few view frames while the ticks go on (hit_stops); a
+## holds the struck and the striker still a few view frames while the ticks go on (hit_stops) and
+## shakes the screen by whole pixels (shake); a
 ## person a use struck bleeds, a spray
 ## from its middle in the blow's direction and drops on the ground that fade, while blood is on; a
 ## person below WOUNDED or MAIMED of the most health it has had is wounded, and a maimed one on
@@ -47,6 +48,14 @@ const MOST_DROPS := 1200
 ## each pair, the second; any more, HIT_STOP_MOST.
 const HIT_STOP := [[20, 2], [60, 3]]
 const HIT_STOP_MOST := 4
+## How far the screen shakes on such a hit, in whole screen pixels, by the health the hit took, as
+## HIT_STOP steps it; for how long, in milliseconds; and the offsets it steps through, one each
+## SHAKE_STEP_MS.
+const SHAKE := [[20, 1], [60, 2]]
+const SHAKE_MOST := 3
+const SHAKE_MS := 150
+const SHAKE_STEP_MS := 30
+const SHAKE_PATTERN: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 0)]
 ## Blood, the crimson ramp's second and third steps: its first is too near black to read on the
 ## ground, and its fourth stays for hostility.
 const BLOOD := [Color("9c1f24"), Color("5c1418")]
@@ -71,8 +80,8 @@ var blood := true
 var sprays: Array[Dictionary] = []
 ## Each drop of blood on the ground, in order: `ms`, when it fell, and `at`, where, in pixels.
 var drops: Array[Dictionary] = []
-## Whether a hit on or from the steered person holds the struck and the striker still a few frames;
-## the settings' hit stop row sets it.
+## Whether a hit on or from the steered person holds the struck and the striker still a few frames
+## and shakes the screen; the settings' hit stop row sets it.
 var hit_stop := true
 ## The hit stops of the last tick: each `person` held and for how many view `frames`.
 var hit_stops: Array[Dictionary] = []
@@ -126,6 +135,9 @@ var _struck_by_lead := PackedByteArray()
 var _nearest := PackedFloat64Array()
 # The person whose use struck each person nearest on the tick it was struck.
 var _striker := PackedInt64Array()
+# When the screen last began to shake, in milliseconds, and how far, in screen pixels.
+var _shake_ms := NEVER
+var _shake_pixels := 0
 # By person: when it last lost health, in milliseconds, and the way it is knocked, as a unit.
 var _hit_ms := PackedInt64Array()
 var _away := PackedVector2Array()
@@ -240,6 +252,15 @@ func wound(person: int) -> int:
 		return 0
 	var share := _health[person] * 1000 / _peak[person]
 	return 2 if share < MAIMED else (1 if share < WOUNDED else 0)
+
+
+## Returns how far, in whole screen pixels, the screen is shaken at `now` by the last hit on or from
+## the steered person: a step of SHAKE_PATTERN, as far as the hit's size, for SHAKE_MS; none with
+## the hit stop off.
+func shake(now: int) -> Vector2i:
+	if not hit_stop or now - _shake_ms >= SHAKE_MS or now < _shake_ms:
+		return Vector2i.ZERO
+	return SHAKE_PATTERN[((now - _shake_ms) / SHAKE_STEP_MS) % SHAKE_PATTERN.size()] * _shake_pixels
 
 
 ## Returns the sprays of blood flying at `now` within the view.
@@ -471,6 +492,15 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 				break
 		hit_stops.append({"person": person, "frames": frames})
 		hit_stops.append({"person": _striker[person], "frames": frames})
+		var pixels := SHAKE_MOST
+		for step: Array in SHAKE:
+			if lost < step[0]:
+				pixels = step[1]
+				break
+		if _shake_ms != _ms:
+			_shake_pixels = 0
+		_shake_ms = _ms
+		_shake_pixels = maxi(_shake_pixels, pixels)
 	if damage_numbers == "everyone" or (damage_numbers == "mine" and mine):
 		var text := str(lost)
 		numbers.append({"ms": _ms, "text": text, "at": at, "own": own, "mine": mine,
