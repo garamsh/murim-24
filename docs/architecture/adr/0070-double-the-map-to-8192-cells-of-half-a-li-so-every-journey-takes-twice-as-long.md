@@ -18,7 +18,7 @@ The issue asks the design to compare the ways to double travel time or more, wit
 
 For each, it asks for the map's bytes on disk and in memory, the authoring cost by hand with ADR 0047's tools, streaming and the tiers, the live tier's budget, the far tier's cost, save size and load time, and the effect on travel. It also asks what fills the space so it does not feel empty, and for the steps to build it. The bigger map replaces the 4,096 target of #173's steps; it does not add a second map. The mobile quality profiles of ADR 0048 must still fit.
 
-What this builds on, from `main` at `df30616` and the open PRs it cites:
+What this builds on, from `main` at `3dfecbb` and the open PRs it cites:
 - **ADR 0047,** proposed. One hand-made map of 4,096 × 4,096 cells, 16,777,216 cells in 16,384 areas of 32 cells.
   - A cell is a li, 500 metres, between places in the heartland, and the outer lands are compressed toward an impassable frame at least 128 cells deep.
   - Elevation, biome and region are painted at one value per 8 × 8 cells, and a deterministic build tool compiles four bytes a cell by area, with the bare map's coarse graph. The compiled map was projected at 2.8 to 5.2 MiB on disk, 64 MiB raw.
@@ -36,7 +36,7 @@ What this builds on, from `main` at `df30616` and the open PRs it cites:
 - **Open PRs.**
   - #254's ADR 0061 gives travel by foot, horse and boat at speeds per mille of walking, and recomputes ADR 0047's route table.
   - #242 records realistic scale: a person fills a cell, a walled town is at least 40 × 30 cells, and its "two scales" bullet says the li measures distance between places while a place's layout patch carries the size of what stands there.
-  - #243's ADR 0063 bounds the population by the food that can be had.
+  - ADR 0063, merged in #243, bounds the population by the food that can be had.
   - #241's ADR 0067 puts animals and herds in the wilderness, with a capacity sized on ADR 0056's slots.
 
 Options weighed. Every figure is for the whole map:
@@ -73,7 +73,7 @@ The chosen design, in detail:
 - **Areas and slots.** 65,536 areas of 32 cells. ADR 0056's 64 slots an area stay, since trees and rocks are person-scale, so the map holds at most 4,194,304 slots, 8 MiB at run time. ADR 0056's 8-day cycle now visits about 4.6 areas a tick: 65,536 areas over 14,400 ticks, about 290 slots a tick.
 - **The tiers** keep their radii in areas (ADR 0042, ADR 0048), so the live and stepped tiers cost what they did: the live tier's 5,000 and its budget are untouched. Only the far tier holds more areas, and the far tier's daily rules are per village and per army, not per area, beside the slot cycle above.
 - **What fills the space.**
-  - **Villages.** Growth founds villages between the starting places (#169, #187). Under #243's ADR 0063, four times the land is more forage and more fields, so more people live, up to the measured bound.
+  - **Villages.** Growth founds villages between the starting places (#169, #187). Under ADR 0063, four times the land is more forage and more fields, so more people live, up to the measured bound.
   - **Wilderness.** #241's ADR 0067 fills it with herds, predators and spirit beasts' territories, which need ground far from villages.
   - **Inns and outposts.** A new kind of named place, authored on the map's highways and roads about a day's walk apart: 140 cells on a road, a day of 60 seconds at 2.34 cells a second. Luoyang to Chang'an holds about 9. An inn is a small layout patch with a household, so growth may grow it into a village.
   - **Caves.** ADR 0051's caves, which only a steered body opens, are placed in the wilderness by the map's authoring, in ranges and hills far from roads.
@@ -135,7 +135,7 @@ This supersedes ADR 0047's 4,096 × 4,096 cells, its cell of a li between places
 - The map's core memory rises from about 20 MiB to about 79 MiB, and the compiled map on disk to about 11 to 21 MiB.
 - The hand work of painting stays the same, and the build tool's run and the map's hash cover four times the cells.
 - The far tier holds four times the areas, and paths need the region level.
-- Four times the land feeds more people under #243's food bound, so the measured bound may be met sooner.
+- Four times the land feeds more people under ADR 0063's food bound, so the measured bound may be met sooner.
 - #241's capacity for animals, sized on 1,048,576 slots, scales with the slots.
 
 ## Signs the decision was wrong
