@@ -41,8 +41,9 @@ const MAIMED := 250
 ## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
 ## apart a maimed person drips; and the most drops kept, the oldest going first.
 const SPRAY_MS := 300
-## The pixels a spray throws.
+## The pixels a spray throws, and the most kept, the oldest going first.
 const SPRAY_PIXELS := 6
+const MOST_SPRAY_PIXELS := 900
 const DROP_MS := 3000
 const DRIP_TICKS := 45
 const MOST_DROPS := 600
@@ -88,6 +89,12 @@ var drop_ms := PackedInt64Array()
 var drop_shade := PackedByteArray()
 ## How many drops have fallen, the ring's next place being this modulo MOST_DROPS.
 var drops_fallen := 0
+## The sprays' pixels, a ring of at most MOST_SPRAY_PIXELS like the drops': where each was thrown,
+## halfway along its flight, when, and its shade; and how many have been thrown.
+var spray_pixel_at := PackedVector2Array()
+var spray_pixel_ms := PackedInt64Array()
+var spray_pixel_shade := PackedByteArray()
+var spray_pixels_thrown := 0
 ## Whether a hit on or from the steered person holds the struck and the striker still a few frames
 ## and shakes the screen; the settings' hit stop row sets it.
 var hit_stop := true
@@ -302,7 +309,10 @@ func _bleed(person: int, at: Vector2) -> void:
 	var dir: Vector2 = _away[person]
 	if dir == Vector2.ZERO:
 		dir = Vector2.RIGHT.rotated(_unit(seed, 9) * TAU)
-	sprays.append({"ms": _ms, "at": at - Vector2(0, BODY_HEIGHT / 2.0), "dir": dir, "seed": seed})
+	var spray := {"ms": _ms, "at": at - Vector2(0, BODY_HEIGHT / 2.0), "dir": dir, "seed": seed}
+	sprays.append(spray)
+	for k in SPRAY_PIXELS:
+		_throw(spray_pixel(spray, k, _ms + SPRAY_MS / 2), k % BLOOD.size())
 	for k in 3:
 		var aside := Vector2(_unit(seed, 20 + k) * 4.0 - 2.0, _unit(seed, 30 + k) * 2.0 - 1.0)
 		_drop(at + Vector2(dir.x, dir.y * 0.75) * (3.0 + k * 2.5) + aside, k)
@@ -321,6 +331,19 @@ func _drip() -> void:
 			var at := _pixels(positions[body])
 			if view.has_point(at):
 				_drop(at + Vector2(_unit(person, _tick) * 4.0 - 2.0, 0.0), person)
+
+
+func _throw(at: Vector2, shade: int) -> void:
+	if spray_pixel_at.size() < MOST_SPRAY_PIXELS:
+		spray_pixel_at.append(at)
+		spray_pixel_ms.append(_ms)
+		spray_pixel_shade.append(shade)
+	else:
+		var i := spray_pixels_thrown % MOST_SPRAY_PIXELS
+		spray_pixel_at[i] = at
+		spray_pixel_ms[i] = _ms
+		spray_pixel_shade[i] = shade
+	spray_pixels_thrown += 1
 
 
 func _drop(at: Vector2, shade: int) -> void:

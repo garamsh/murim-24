@@ -233,8 +233,8 @@ func note_tick() -> void:
 	var ms := Time.get_ticks_msec()
 	combat.note_tick(world, steered, ms, _rosters, _tick_positions)
 	# Blood is laid out once a tick, so a frame draws it with no work a pixel.
-	$Drops.rebuild(combat, ms)
-	$Sprays.rebuild(combat, ms)
+	$Drops.rebuild(combat)
+	$Sprays.rebuild(combat)
 	# A hit stop starts holding its person afresh from the next refresh.
 	for stop: Dictionary in combat.hit_stops:
 		if stop.person >= 0:
