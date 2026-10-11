@@ -295,6 +295,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 
 ## Effects and HUD
 
+- A hit on or from the player holds the struck and the striker still for 2 to 4 frames by the damage, a hit stop, unless the settings turn it off; the world's time runs on.
 - A hit draws blood, unless the settings turn it off: a spray of six pixels from the struck body's middle along the blow, fading in 300 ms, and three drops on the ground beyond its feet that fade over 3 s, in the crimson ramp's second and third steps, `5c1418` and `9c1f24`, dithered as they fade: its first is too near black to read on the ground, and `d63a2f` stays for hostility.
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
