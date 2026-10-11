@@ -41,8 +41,9 @@ const SPRAY_MS := 300
 const DROP_MS := 3000
 const DRIP_TICKS := 45
 const MOST_DROPS := 1200
-## Blood, the crimson ramp's three darkest steps: its lightest stays for hostility.
-const BLOOD := [Color("3d0d14"), Color("5c1418"), Color("9c1f24")]
+## Blood, the crimson ramp's second and third steps: its first is too near black to read on the
+## ground, and its fourth stays for hostility.
+const BLOOD := [Color("9c1f24"), Color("5c1418")]
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
 const PAPER := Color("efe3c2")
