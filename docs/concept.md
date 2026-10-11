@@ -275,6 +275,7 @@ Decided by the owner on 2026-10-09 (issue #211). The design is ADRs 0050, 0051 a
 - **Gear is made from materials, and broken gear can be recycled.** Decided by the owner on 2026-10-10 (issue #231). ADR 0064 (`docs/architecture/adr/0064-make-gear-from-materials-by-recipe-and-reforge-broken-metal-at-a-loss.md`), proposed, designs it.
   - Weapons and armour take resources to make: iron, steel, leather, wood and cloth.
   - A broken piece can be recycled, with materials conserved.
+  - Decided by the owner on 2026-10-10 (#231's comment): animal and spirit-beast parts are crafting materials. Hide, bone, horn and claw come from every animal, and rarer parts from spirit beasts (#171).
 - **[proposed]** ADR 0064's details, after the PM's direction:
   - metals recycled but not for free: a smith reforges scrap with charcoal and labour, and half the metal is lost as slag
   - organic materials, leather, wood and cloth, lost when a piece breaks
