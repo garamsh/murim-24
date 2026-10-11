@@ -1,5 +1,5 @@
-# Checks that the settings persist: choices changed on the panel are kept in its file under
-# user://, and a panel that reads the file back holds the same choices, its speed, casting on
+# Checks that the settings persist: choices changed on the panel are kept in its file, here one in
+# the test run's own directory, and a panel that reads the file back holds the same choices, its speed, casting on
 # release and everyone's damage numbers among them. Each volume chosen is applied to its audio bus, and a
 # volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
 # row's default. Controls: a panel reading a file that does not exist holds every default, casting
@@ -11,14 +11,17 @@ extends RefCounted
 const Settings := preload("res://hud/settings.gd")
 const Hud := preload("res://hud/hud.gd")
 const WordFit := preload("res://hud/word_fit.gd")
-const PATH := "user://settings_test.cfg"
-const MISSING := "user://settings_test_missing.cfg"
+const TestSaves := preload("res://extension/test_saves.gd")
+# The settings files this test writes and leaves missing, in the run's own directory, not the
+# user:// every worktree shares.
+var _path := TestSaves.file("settings_test.cfg")
+var _missing := TestSaves.file("settings_test_missing.cfg")
 
 
 func run() -> bool:
-	_remove(PATH)
-	_remove(MISSING)
-	var panel := _panel(PATH)
+	_remove(_path)
+	_remove(_missing)
+	var panel := _panel(_path)
 	# Right twice on the first row, the speed; down and right on the window; down to the
 	# resolution and left; down to the language and right; down and left once on the master
 	# volume, twice on the effects and three times on the music; down and right on the casting; down
@@ -42,10 +45,10 @@ func run() -> bool:
 	# Setup: the file holds what was chosen, read back without the panel.
 	var file := ConfigFile.new()
 	var on_disk := {}
-	if file.load(PATH) == OK:
+	if file.load(_path) == OK:
 		for row: String in Settings.ROWS:
 			on_disk[row] = file.get_value(Settings.SECTION, row)
-	var reread := _panel(PATH)
+	var reread := _panel(_path)
 	var read: bool = reread.read()
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
@@ -53,7 +56,7 @@ func run() -> bool:
 			and reread.damage_numbers() == "everyone"
 
 	# Control: a file that does not exist reads as every default.
-	var missing := _panel(MISSING)
+	var missing := _panel(_missing)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
 			and not missing.cast_on_release() and missing.damage_numbers() == "mine"
 
@@ -61,13 +64,13 @@ func run() -> bool:
 	file = ConfigFile.new()
 	file.set_value(Settings.SECTION, "speed", 1)
 	file.set_value(Settings.SECTION, "resolution", Settings.RESOLUTIONS.size())
-	file.save(PATH)
-	var ranged := _panel(PATH)
+	file.save(_path)
+	var ranged := _panel(_path)
 	ranged.read()
 	var refused: bool = ranged.chosen.resolution == Settings.DEFAULTS.resolution and ranged.chosen.speed == 1
 
 	TranslationServer.set_locale(Hud.LOCALES[0])
-	_remove(PATH)
+	_remove(_path)
 	var passed := kept and defaults and refused
 	# The defaults restored, so the buses are left as the game starts them.
 	missing.apply()
@@ -84,8 +87,8 @@ func run() -> bool:
 # auto shows them only on a phone or a tablet. A tap outside the panel goes back. Control: a
 # tap on the row's label, off every slip, chooses nothing and sends nothing.
 func _tap_pass() -> bool:
-	_remove(PATH)
-	var panel := _panel(PATH)
+	_remove(_path)
+	var panel := _panel(_path)
 	var sent := [0]
 	panel.applied.connect(func() -> void: sent[0] += 1)
 	panel.open()
@@ -108,7 +111,7 @@ func _tap_pass() -> bool:
 			and outside == "back" and not panel.visible
 	print("settings_test: the touch row's choices tapped, each [chosen, shown, tap-to-move]: %s, on a phone or tablet %s; applied sent %d times; a tap on the label chose nothing %s; outside goes %s: %s" % [
 		shown, mobile, after_slips, label_ignored, outside, "pass" if passed else "FAIL"])
-	_remove(PATH)
+	_remove(_path)
 	panel.free()
 	return passed
 
@@ -119,7 +122,7 @@ func _tap_pass() -> bool:
 func _fit_pass() -> bool:
 	var fit := WordFit.new()
 	var dialog := Settings.DIALOG
-	var panel := _panel(MISSING)
+	var panel := _panel(_missing)
 	for locale: String in Hud.LOCALES:
 		TranslationServer.set_locale(locale)
 		var title := fit.say("SETTINGS_TITLE")
