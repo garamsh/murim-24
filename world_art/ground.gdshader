@@ -211,9 +211,10 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	ivec2 sx = ivec2(floor(screen));
 	float tex = 0.62 * vnoise(screen / 2.3 + 5.0, 21) + 0.38 * hash01(sx.x, sx.y, 22);
 	float macro = (fbm(screen / 48.0 + vec2(11.0, 3.0), 23) - 0.5) * 0.5;
-	// Five tones of grain from the ramp's dark half up to its middle-light step.
+	// Four tones of grain on adjacent steps about the ramp's middle, so the ground reads as one
+	// surface under what stands on it.
 	float t = tex - macro * 0.5;
-	int step = t < 0.3 ? 0 : (t < 0.45 ? 1 : (t < 0.6 ? 2 : (t < 0.74 ? 3 : 4)));
+	int step = t < 0.3 ? 1 : (t < 0.52 ? 2 : (t < 0.74 ? 3 : 4));
 	if (kind == WATER) {
 		float ripple = vnoise(p / 9.0, 24);
 		step = ripple > 0.62 ? 3 : (ripple > 0.48 ? 2 : 1);
