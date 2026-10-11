@@ -65,7 +65,7 @@ The region's guard strike does 15 damage. This supersedes the following parts of
 
 - Without an intent, the automatic strike stays for everyone, the steered body included. The owner's comments add the intent and remove nothing. With an intent, the strike aims only at the target, and when the target is out of range it does not swing at anyone else.
 - `World.HashAfterTenThousandTicksIsTheSameOnEveryPlatform` is unchanged: its crossing strikes with areas and holds no intent, and a target is folded only when set. The region's worlds are not pinned, and they now fight otherwise.
-- A save holds the order's target, so `SAVE_VERSION` rises to 10 and every earlier save is refused.
+- A save holds the order's target, so `SAVE_VERSION` rises to 11, after #233's 10, and every earlier save is refused.
 - The M1 scenario's lines strike one foe each too. `make bench` still finds 18.0 strikes a tick, above its floor of 16.
 - A targeted hit finds its person through the crowd's slot table, where it had scanned the whole crowd. The scan would have cost every basic strike a pass over every living person.
 - The view passes the intent as input: Space or the touch attack button sets it on the selection, or on the nearest foe in sight with none, and the view decides nothing about the chase. Selection by click, Tab or tap, the target frame, and talk moving to a click and C land in the same pull request.
