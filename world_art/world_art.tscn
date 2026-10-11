@@ -6,7 +6,7 @@
 [ext_resource type="Shader" path="res://world_art/combat.gdshader" id="4"]
 [ext_resource type="Script" path="res://world_art/ground.gd" id="5"]
 [ext_resource type="Script" path="res://world_art/structure_shadows.gd" id="6"]
-[ext_resource type="Script" path="res://world_art/drops.gd" id="7"]
+[ext_resource type="Script" path="res://world_art/blood_pixels.gd" id="7"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_combat"]
 shader = ExtResource("4")
@@ -22,8 +22,7 @@ script = ExtResource("5")
 [node name="Shadows" type="Node2D" parent="."]
 script = ExtResource("6")
 
-[node name="Drops" type="Node2D" parent="."]
-material = SubResource("ShaderMaterial_combat")
+[node name="Drops" type="MultiMeshInstance2D" parent="."]
 script = ExtResource("7")
 
 [node name="Territory" type="Node2D" parent="."]
@@ -35,6 +34,10 @@ offset = Vector2(-8, -22)
 
 [node name="Standing" type="Node2D" parent="."]
 y_sort_enabled = true
+
+[node name="Sprays" type="MultiMeshInstance2D" parent="."]
+script = ExtResource("7")
+sprays = true
 
 [node name="Outlines" type="MultiMeshInstance2D" parent="."]
 

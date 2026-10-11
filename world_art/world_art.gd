@@ -232,6 +232,9 @@ func note_tick() -> void:
 	_read_relations()
 	var ms := Time.get_ticks_msec()
 	combat.note_tick(world, steered, ms, _rosters, _tick_positions)
+	# Blood is laid out once a tick, so a frame draws it with no work a pixel.
+	$Drops.rebuild(combat, ms)
+	$Sprays.rebuild(combat, ms)
 	# A hit stop starts holding its person afresh from the next refresh.
 	for stop: Dictionary in combat.hit_stops:
 		if stop.person >= 0:
@@ -434,7 +437,8 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
 	var aimed: Vector2i = combat.place_of(combat.target)
 	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
-	$Drops.show_drops(combat, now, view.grow(MARGIN))
+	$Drops.show_at(now)
+	$Sprays.show_at(now)
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map

@@ -41,6 +41,8 @@ const MAIMED := 250
 ## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
 ## apart a maimed person drips; and the most drops kept, the oldest going first.
 const SPRAY_MS := 300
+## The pixels a spray throws.
+const SPRAY_PIXELS := 6
 const DROP_MS := 3000
 const DRIP_TICKS := 45
 const MOST_DROPS := 600
@@ -79,7 +81,7 @@ var blood := true
 ## the blow's direction, and `seed`.
 var sprays: Array[Dictionary] = []
 ## The drops of blood on the ground, a ring of at most MOST_DROPS, a new drop taking the oldest's
-## place: where each fell, in pixels, when, and its shade of BLOOD. Read by drops.gd as they are,
+## place: where each fell, in pixels, when, and its shade of BLOOD. Read by blood_pixels.gd as they are,
 ## so a frame builds nothing; a drop older than DROP_MS shows no more.
 var drop_at := PackedVector2Array()
 var drop_ms := PackedInt64Array()
@@ -269,6 +271,14 @@ func shake(now: int) -> Vector2i:
 	return SHAKE_PATTERN[((now - _shake_ms) / SHAKE_STEP_MS) % SHAKE_PATTERN.size()] * _shake_pixels
 
 
+## Returns where pixel `k` of `spray` is at `now`, in pixels: thrown along the blow's direction,
+## turned a little by the spray's seed, flying a few pixels further as it fades.
+static func spray_pixel(spray: Dictionary, k: int, now: int) -> Vector2:
+	var turn := (_unit(spray.seed, k) - 0.5) * 1.2
+	var reach := 2.0 + k + clampf(float(now - spray.ms) / SPRAY_MS, 0.0, 1.0) * 4.0
+	return (spray.at + (spray.dir as Vector2).rotated(turn) * reach).round()
+
+
 ## Returns the sprays of blood flying at `now` within the view.
 func shown_sprays(now: int) -> Array[Dictionary]:
 	return sprays.filter(func(spray: Dictionary) -> bool:
@@ -351,17 +361,6 @@ func shown_strikes(now: int) -> Array[Dictionary]:
 
 
 func _draw() -> void:
-	# Looped over as they are kept, so a frame filters no copy of them.
-	var near := view.grow(8.0)
-	for spray: Dictionary in sprays:
-		if _now - spray.ms >= SPRAY_MS or not near.has_point(spray.at):
-			continue
-		var left := 1.0 - float(_now - spray.ms) / SPRAY_MS
-		for k in 6:
-			var turn := (_unit(spray.seed, k) - 0.5) * 1.2
-			var reach := 2.0 + k + (1.0 - left) * 4.0
-			var p: Vector2 = (spray.at + (spray.dir as Vector2).rotated(turn) * reach).round()
-			draw_rect(Rect2(p, Vector2.ONE), Color(BLOOD[k % BLOOD.size()], left))
 	for strike: Dictionary in shown_strikes(_now):
 		_draw_strike(strike, 1.0 - float(_now - strike.ms) / STRIKE_MS)
 	if target >= 0:
