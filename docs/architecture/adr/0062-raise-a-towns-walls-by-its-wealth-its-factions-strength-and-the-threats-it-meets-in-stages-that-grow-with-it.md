@@ -25,18 +25,19 @@ The issue asks the design to decide these:
 
 It also asks how a wall's plan follows the village's footprint, and what is kept or reused.
 
-What this builds on, from `main` at `031cd31` and the open PRs it cites:
+What this builds on, from `main` at `c86b08d` and the open PRs it cites:
 - **ADR 0056** (#220, on which this branch is stacked). Structures cost materials as pack data, gathered into a village's account and carried to the site. The repair rule raises a structure only as far as its materials are delivered. Gatherers and builders are paid from the owning faction's treasury, at most a third of earners each and half together.
 - **ADR 0052.**
   - The NPC leader's daily rule weighs the treasury against 60 days of its needs.
   - Discontent per household rises with tax, hunger and kin killed, and households flee past 800.
   - Upkeep of a faction's own structures is a sink.
 - **ADR 0023.** Growth lays a plan as rubble when a village presses its cap, by its faction's stance. A blocking structure triggers path rebuilds (ADR 0043).
-- **#227, the open PR for realistic scale.** It proposes these reference sizes:
+- **The open PR #242, for realistic scale (#227).** Its reference sizes, with the PM's decisions on it:
   - a walled town of at least 40 × 30 cells inside the wall, and a city of at least 80 × 60
   - a wall 2 cells thick and 2 levels high for a town, and 3 and 3 for a city
-  - corner towers of 3 × 3, and 2 to 4 gates under 4 × 3 gate towers
-- **ADR 0057** (#222). It proposes materials that absorb strikes, rammed earth and stone wall among them, and breaches.
+  - corner towers of 3 × 3, and 2 to 4 gates, each 2 to 3 cells wide under a 5 × 2 gate tower over a road of 3 cells, as #239 draws it
+  - #239 has drawn the walled town's pieces as art, in the view only: wall runs, corner towers, gate towers and steps. Its wall is one level high for now, an exception the art will raise to #242's 2 levels.
+- **ADR 0057,** proposed, merged in #222. Materials absorb strikes, rammed earth and stone wall among them, and breaches.
 - **ADR 0058,** proposed, merged in #223. Every cliff is crossed by a leap: a person leaps up a cliff within its climb height, set by realm and footwork and paid in stamina, and jumps down one within twice it. Rank 0 leaps up 2 levels.
 - **Bandits** are #172's, not yet designed.
 - **Scale.** The bound is measured between 10,000 and 50,000 (ADR 0048), and #216's live tier holds 5,000.
@@ -46,7 +47,7 @@ Options weighed:
 - **Walls as structures.** A wall is laid as segments: structures of 4 cells along it by its thickness, so a town's circuit is about 40 segments. Corner towers and gate towers are structures of their own, and a gate is a gate tower's passage. Every segment is laid as rubble and raised by ADR 0056's rule, so a partial wall stands and blocks where its segments stand.
   - Rejected: a wall as one structure for the whole circuit. A breach anywhere would bring it all down, and none of it would count until all of it stood.
 - **When a village plans walls.** Every 30 days, with growth (ADR 0023), a village with no circuit plans one when all four of these hold. The thresholds are pack data:
-  1. **Scale.** It has at least 150 residents, and its built cells span at least a town's 40 × 30 (#227).
+  1. **Scale.** It has at least 150 residents, and its built cells span at least a town's 40 × 30 (#242).
   2. **Wealth.** Its households' mean purse is above 30 days of their needs (ADR 0052), and its account holds the first stage's materials for a tenth of the circuit.
   3. **Its faction's strength.** The owning faction's treasury holds 60 days of its needs plus the first stage's wages, and the faction has at least 3 villages.
   4. **Threat.** Its threat is at least 200.
@@ -68,7 +69,7 @@ Options weighed:
   | Towers and gate towers | stone wall | a tower 200 stone and 60 wood, a gate tower 300 and 100 | 20,000 | about a year more |
 
   - **The crew.** At most 6 builders work on a village's walls at once, pack data, beside its builders for other plans.
-  - **Where the figures come from.** A circuit of a 40 × 30 town is about 40 segments: about 4,800 stone and 4 to 8 towers. At ADR 0056's 5 durability every 30 ticks a builder, a day of 1,800 ticks raises 300.
+  - **Where the figures come from.** A circuit of a 40 × 30 town is about 40 segments: about 4,800 stone and 4 to 8 towers. At the repair rule's 5 durability every 30 ticks a builder (ADR 0023), which ADR 0056 keeps, a day of 1,800 ticks raises 300.
     - Earthwork: 40 segments of 8,000 are about 1,070 builder-days, about 180 days for 6, a year and a half at 120 days a year.
     - Stone: 40 of 40,000 are about 5,330 builder-days, about 890 days for 6, over 7 years.
     - Towers: about 10 of 20,000 are about 670 builder-days, about 110 days for 6.
@@ -84,7 +85,7 @@ Options weighed:
 - **What a wall does.**
   - **Blocking.** Segments and towers block movement (ADR 0013).
   - **Gates.** A gate tower's passage stays open, except that it closes while a hostile army, one whose faction `hostile` reads, stands within 16 cells of it. A closed gate blocks like a segment. The town's residents assigned as guards stand in its passage, paid as soldiers (ADR 0052), 2 a gate.
-  - **Absorbing.** A segment absorbs strikes by its material, rammed earth or stone wall, as #222's ADR 0057 decides.
+  - **Absorbing.** A segment absorbs strikes by its material, rammed earth or stone wall, as ADR 0057 decides.
   - **Breaching.** Besiegers breach a segment by bringing it to its destroyed stage by the strike rule. A destroyed segment no longer blocks, so the breach is a way in.
   - **Climbing.** Walls are never climbed. A segment is a structure, not a level of the ground, so ADR 0058 does not see it as a cliff. Under that ADR's numbers every realm leaps up a 2-level drop, so a wall leapt as a cliff would stop no one. Climbing walls is listed for the owner.
     - Rejected: a wall of 2 or 3 levels as a cliff of that height. Levies would leap a town's wall as easily as masters.
@@ -117,8 +118,10 @@ The implementation, in order, each a pull request with its acceptance, after ADR
    - Acceptance, each with a control: a village planning a circuit only when all four conditions hold; the octagon and gates following its footprint and roads; earthwork, then stone, then towers, each waiting for the last.
    - Acceptance: `make sweep` showing towns walling over decades and not years.
 2. **Gates, guards, breaches, upkeep and decay.** Acceptance, each with a control: a gate closing before a hostile army within 16 cells; a breached segment letting people through; walls decaying unpaid.
-3. **Corvée and growing outward.** Acceptance: a new circuit planned after suburbs; an old wall kept or taken down with its materials returned, by a sum test.
-4. **Far aggregation and the view's walls**, drawn at their height in levels (#227, ADR 0058's compression).
+3. **Corvée and growing outward.** Acceptance, each with a control: corvée raising its households' discontent where a town without it raises none; a new circuit planned once a fifth of the houses stand outside, and not before; an old wall kept or taken down with its materials returned, by a sum test.
+4. **Far aggregation and the view's walls**, drawn at their height in levels (#242, ADR 0058's compression), from #239's pieces.
+   - Acceptance, with a control: a far town's circuit rising by a day of its builders' repair, the same stages in the same order as a live town of the same seed.
+   - Acceptance: captures (ko) of a town's wall in each stage, a closed gate and a breach.
 
 ## Decision
 
