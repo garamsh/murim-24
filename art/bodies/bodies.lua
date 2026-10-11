@@ -75,10 +75,12 @@ local function back(cv)
 end
 
 -- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only, so
--- the outline stays whole; `spread` 1 is a stain on the chest, 2 runs it down the side and the leg.
+-- the outline stays whole; `spread` 1 is a stain on the chest, 2 runs it down the side, the leg and
+-- the arm.
 local STAIN = {
   { { 0, 0, 3 }, { 1, 0, 2 }, { 0, 1, 2 }, { 1, 1, 3 }, { 2, 1, 2 } },
-  { { 2, 2, 3 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 3 }, { 2, 5, 2 }, { -1, 2, 2 } },
+  { { 2, 2, 3 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 3 }, { 2, 5, 2 }, { -1, 2, 2 },
+    { 3, 3, 3 }, { 2, 4, 3 }, { 3, 5, 2 }, { 3, 6, 3 }, { -1, 3, 3 }, { -2, 2, 2 }, { 4, 1, 3 } },
 }
 local function stained(cv, spread)
   local out = px.canvas(W, H)
@@ -136,13 +138,15 @@ for name, f in pairs(factions) do
   sets[#sets + 1] = { "walk_hurt", { hurt(walk[1]), hurt(walk[2]), hurt(walk[3]), hurt(walk[4]) } }
   sets[#sets + 1] = { "idle_maimed", { maimed(frame(spec)) } }
   -- The limp: a step, a pass, then the hurt leg dragged as the body stands on the other, a pass.
-  sets[#sets + 1] = { "walk_maimed", { maimed(walk[1]), maimed(walk[2]), maimed(frame(spec)), maimed(walk[4]) } }
+  sets[#sets + 1] = { "walk_maimed",
+    { maimed(walk[1]), maimed(walk[2]), maimed(frame(spec)), maimed(walk[4]) } }
   local frames, tags = {}, {}
   for _, suffix in ipairs({ "", "_xray" }) do
     for _, set in ipairs(sets) do
       local first = #frames + 1
       for _, cv in ipairs(set[2]) do frames[#frames + 1] = suffix == "" and cv or xray(cv, f.xray) end
-      tags[#tags + 1] = { set[1] .. suffix, first, #frames, set[1]:sub(1, 4) == "idle" and 1000 or 150 }
+      local ms = set[1]:sub(1, 4) == "idle" and 1000 or 150
+      tags[#tags + 1] = { set[1] .. suffix, first, #frames, ms }
     end
   end
   px.save_frames(W, H, frames, tags, here .. "/" .. name .. ".aseprite")
