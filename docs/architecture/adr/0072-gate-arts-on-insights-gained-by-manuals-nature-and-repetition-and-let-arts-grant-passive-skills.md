@@ -15,7 +15,7 @@ The owner decided on 2026-10-11, in issue #257, extending ADR 0055:
 
 The issue also asks for repetition counters that are deterministic and seeded, their cost at 500 and 5,000 living, and NPCs gaining insights by the same rules; passives' stacking and their fold into strike resolution (ADR 0046) and movement (ADR 0058); and `make sweep` 48/50 and `make bench` in each rule step.
 
-What this builds on, from `main` at `df30616`:
+What this builds on, from `main` at `3dfecbb`:
 - **ADR 0035.** Qi is a current amount and a store. The store grows daily by cultivation, 0 to 2 qi a day, up to a talent limit of 1,000 to 15,000, and qi recovers a hundredth of the store a second. Realms are thresholds on the store, each with a might on body damage. A manual lying on a cell is read by the nearest person within reach who has the rank and the qi, spending a reading cost. Sect teaching gives a yearly chance. A person's nature is its first art's, and `Life.learning` gives an ease per mille that multiplies learning chances.
 - **ADR 0055,** proposed, merged in #218. Arts have a family, naming a discipline and a weapon family, and a tier of five. Each known art carries a mastery to 10,000 in five stages, raised by hits, training and teaching and capped by talent. Forms open by stage and realm. Higher arts come by a daily synthesis chance over a lineage graph of pack data. The soul keeps a bit for each art it knows of, and the lineage window on L shows ??? for the rest. What footwork and heart-method arts do beyond their skills is left open.
 - **ADR 0036.** The core notes each skill learned, with how, and each realm reached, in a store of the latest 32, which the HUD's notices read.
