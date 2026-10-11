@@ -188,9 +188,11 @@ func fit_view() -> void:
 	_hud.fit(Vector2i(window), touch_shown)
 
 
-## Shows the damage the struck take as numbers over them, or not, as the settings choose.
+## Shows the damage the struck take as numbers over them, or not, and blood on a hit, or not, as
+## the settings choose.
 func show_numbers() -> void:
 	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
+	_art.get_node("Combat").blood = _hud.settings.blood()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from

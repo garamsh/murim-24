@@ -207,6 +207,10 @@ SETTINGS_NUMBERS_OFF,끔,Off
 SETTINGS_NUMBERS_MINE,내 것,Mine
 SETTINGS_NUMBERS_EVERYONE,모두,Everyone
 SETTINGS_NUMBERS_ABOUT,맞은 이 위로 피해를 숫자로 띄운다. 내 것은 내가 주고 받은 피해만.,Float damage over the struck. Mine: what you deal and take.
+SETTINGS_BLOOD,피,Blood
+SETTINGS_BLOOD_ON,켬,On
+SETTINGS_BLOOD_OFF,끔,Off
+SETTINGS_BLOOD_ABOUT,맞으면 피가 튀고 땅에 떨어진다. 끄면 번쩍임만.,A hit sprays blood onto the ground. Off: the flash alone.
 NOTICE_COMPREHENDED,깨달음: %s,Comprehended: %s
 NOTICE_READ,비급 독파: %s,Read from a manual: %s
 NOTICE_TAUGHT,사문 전수: %s,Taught by the sect: %s

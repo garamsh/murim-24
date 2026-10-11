@@ -25,14 +25,14 @@ func run() -> bool:
 	# Right twice on the first row, the speed; down and right on the window; down to the
 	# resolution and left; down to the language and right; down and left once on the master
 	# volume, twice on the effects and three times on the music; down and right on the casting; down
-	# past the touch and right on the damage numbers.
+	# past the touch and right on the damage numbers; down and right on the blood, turning it off.
 	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
 			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT,
-			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT]:
+			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1, "touch": 0, "numbers": 2}
+		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -53,12 +53,12 @@ func run() -> bool:
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
 			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied \
-			and reread.damage_numbers() == "everyone"
+			and reread.damage_numbers() == "everyone" and not reread.blood()
 
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(_missing)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
-			and not missing.cast_on_release() and missing.damage_numbers() == "mine"
+			and not missing.cast_on_release() and missing.damage_numbers() == "mine" and missing.blood()
 
 	# A resolution out of range is refused; the speed beside it in range is read.
 	file = ConfigFile.new()
@@ -74,7 +74,7 @@ func run() -> bool:
 	var passed := kept and defaults and refused
 	# The defaults restored, so the buses are left as the game starts them.
 	missing.apply()
-	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, casting on release and everyone's damage numbers, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
+	print("settings_test: chosen %s, on disk %s, read back %s with speed %dx, casting on release, everyone's damage numbers and the blood off, the music muted and the master and effects at 0.75 and 0.5 unmuted %s: %s; a missing file reads the defaults %s; a resolution out of range refused, the speed beside it read %s: %s" % [
 		chosen, on_disk, read_back, reread.speed(), volumes_applied, kept, defaults, refused,
 		"pass" if passed else "FAIL"])
 	for each: Control in [panel, reread, missing, ranged]:
@@ -129,7 +129,8 @@ func _fit_pass() -> bool:
 		var back := fit.say("SETTINGS_BACK")
 		fit.check(title, 8 + fit.width(title) + 10 + fit.width(back) + 8, dialog.size.x)
 		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "SETTINGS_CAST_PRESS",
-				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS + Settings.NUMBERS_KEYS:
+				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS + Settings.NUMBERS_KEYS \
+				+ Settings.BLOOD_KEYS:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)
