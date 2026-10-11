@@ -116,6 +116,7 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
   - the drawn height compressed above three levels, its numbers as pack data
 - **The map is the player's own.** Decided by the owner on 2026-10-08 (issue #168): the map completes and updates as the player moves, and does not update a place until the player has looked at it again. ADR 0073 (`docs/architecture/adr/0073-chart-the-land-a-soul-has-seen-and-show-each-village-as-it-was-last-seen.md`), proposed, designs it.
 - **[proposed]** ADR 0073's details:
+  - a view of what the steered body has seen, which no rule reads (§Identity)
   - the chart kept by the soul, so a body born again keeps it, and a new game starts blank
   - a map sight of its own, 15 cells in the region, wider than the 6 cells within which people close on a foe
   - a village shown with its owner, residents and stage as last seen, and borders drawn from the villages remembered

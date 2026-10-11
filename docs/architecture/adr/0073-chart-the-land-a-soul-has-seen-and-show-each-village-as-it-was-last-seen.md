@@ -21,6 +21,8 @@ Facts from `main` at `1c4bb7f`:
 - The save holds the world's whole state in the core's own encoding at `SAVE_VERSION` 11, and refuses any other version (ADR 0030).
 - The loadout is the player's choice and lives in the view, beside the save as `loadout_0.cfg`.
 - `concept.md` §Reputation and rumors: a reborn body starts with no standing, while warehouses and caves stay with the soul.
+- `concept.md` §Identity [agreed]: there are no player-only rules, and the one exception is caves. The PM ruled on PR #270 (2026-10-11) that the chart is not a rule: it is the steered body's remembered view, as the camera and the HUD are. Nothing in the simulation reads it, and it changes no outcome for anyone, so it needs no second exception.
+- The owner decided on #257 (2026-10-11) that on rebirth what the soul knew carries over to the new body, while standing (ADR 0054) belongs to the body and resets.
 
 Options weighed for where the record lives:
 - **In the core, one chart per soul, saved and hashed with the world.** Chosen.
@@ -48,7 +50,7 @@ Options weighed for how far the player sees:
 - **A map sight of its own, rules data, 15 cells in the region.** Chosen. That is half the 30 rows the PC's least view shows. Once ADR 0058 lands, a cell within it is seen only where `sees`'s cliff test does not hide it.
 
 Options weighed for a body born again:
-- **The soul keeps its chart.** Chosen. Knowledge of the land is the player's, as caves and warehouses stay with the soul. A body born far from the last one finds the map as its last life left it, stale where the world moved on.
+- **The soul keeps its chart.** Chosen. Knowledge of the land is the soul's, as the owner decided for what it knew on #257, and as caves and warehouses stay with the soul. A body born far from the last one finds the map as its last life left it, stale where the world moved on.
 - **A blank chart.** Rejected. Every life would explore the same land again.
 - **The family's chart.** Rejected. No NPC keeps a chart, so a family has none to pass on, and keeping one for every household would cost memory for a record no rule reads.
 
@@ -66,7 +68,7 @@ The chart is the soul's. A body born again keeps it, and a new game starts blank
 It is saved and hashed with its soul:
 - **Saved.** For each seen area, its index and its 128 bytes, in order of index. For each remembered village, its index, owner and flags. `SAVE_VERSION` rises to 12, and older saves are refused as before.
 - **Refused as `CORRUPTED`.** An area outside the map, areas out of order or repeated, a block with no seen cell, a village index past the villages, an owner past the factions, or a stage that does not exist.
-- **Hashed.** The hash folds the same values in the same order.
+- **Hashed.** The hash folds the same values in the same order, and folds a soul's chart only while it holds a seen cell or a remembered village, as ADR 0038 folds steered marks and declarations only while held. A world with no chart keeps its hash, so the pinned determinism hash is unchanged until a chart is held.
 
 The core keeps a revision per chart that rises when a cell is first seen or a memory changes. It is for the view, and it is neither saved nor hashed.
 
@@ -79,8 +81,8 @@ The core-to-view boundary is four reads of the chart of the soul the player carr
 These are whole-map reads, as `terrain` and `territory` are. At ADR 0047's size they move to reads by area with the view's chunks, together with those.
 
 The view draws only the chart:
-- **The minimap** draws seen cells as now, from the remembered borders and villages, a ruined village in stone, and unseen cells in fog. It is redrawn when `chart_revision` changes, in place of `world_art`'s change signal.
-- **The map window** is `hud/map_window.gd`. N opens and closes it, as the panel keys do, and the shortcut rail and the pause guide list it. It draws the minimap's own image, at the largest whole multiple at which the whole map fits the HUD's room inside the panels' frame, with the player's position and the season. Its touch button waits with the other deferred touch controls.
+- **The minimap** draws the map around the player, as it does today: seen cells from the remembered borders and villages, a ruined village in stone, and unseen cells in fog. It is redrawn when `chart_revision` changes, in place of `world_art`'s change signal.
+- **The map window** is `hud/map_window.gd`. N opens and closes it, as the panel keys do, and the shortcut rail and the pause guide list it. It draws the minimap's own image, at the largest whole multiple at which the whole map fits the HUD's room inside the panels' frame, with the player's position and the season. At ADR 0047's size it draws from that ADR's prebuilt downscaled images instead, with unseen land in fog. Its touch button waits with the other deferred touch controls.
 - **The mockup** of both, at PC and touch layouts, goes to the PM before the view is built.
 
 ## Consequences
@@ -91,10 +93,10 @@ Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8
 |---|---|---|---|
 | Areas | 16 | 16,384 | 65,536 |
 | Index, held from the start | 64 B | 64 KiB | 256 KiB |
-| A walk along one axis from edge to edge, at most 2 areas wide | 2 KiB | 32.25 KiB, 258 areas | 64.25 KiB, 514 areas |
+| A walk along one axis from edge to edge, 2 areas wide | 1 KiB, 8 areas | 32 KiB, 256 areas | 64 KiB, 512 areas |
 | Every cell seen | 2 KiB | 2 MiB | 8 MiB |
 | In the save, every cell seen | 2.06 KiB | 2.06 MiB | 8.25 MiB |
-| Village memory | 4 B a village | 40 KiB per 10,000 villages | the same |
+| Village memory | 4 B a village | 39.06 KiB per 10,000 villages | the same |
 
 - **Memory.** Only souls of steered armies chart, one today. The index is saved only as the list of seen areas, so it costs nothing on disk.
 - **Per tick, for each charting person:**
@@ -111,6 +113,7 @@ Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8
   - the adapter's four reads
   - the minimap's fog and the map window, after the mockup
   - tests of a remembered village against the same change in sight as its control, of a save round-trip, of rebirth keeping the chart, and of each refusal
+  - a test that a world run with an empty chart and the same world with a full one stay hash-identical in everything but the chart, so no outcome reads it
   - captures, `make ci`, `make sweep` and `make bench`
 
 ## Signs the decision was wrong
