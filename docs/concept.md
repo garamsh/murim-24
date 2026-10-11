@@ -16,6 +16,7 @@ This document is the single reference for the game concept agreed with the user.
 - Lifespan [settled]
 - Martial arts [draft]
 - Qi and martial arts [agreed]
+- Fighting in a crowd [agreed]
 - Arts that reshape the world [agreed]
 - Mods and re-theming [agreed]
 - Gear, wealth and livelihoods [agreed]
@@ -316,6 +317,14 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - a sealed art's skills and passives off, unsealed when the body's realm rank or nature changes
   - the path scrolls read from the righteous-to-demonic band
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
+
+## Fighting in a crowd [agreed]
+
+Decided by the owner on 2026-10-11 (issue #247). ADR 0068 (`docs/architecture/adr/0068-surround-a-foe-from-attack-slots-and-let-only-its-token-holders-strike-it.md`), proposed, designs it.
+
+- **Attack slots.** Around each foe stand a few positions at arm's length. A person closing to strike goes to a free slot, not straight at the foe, so a crowd spreads around its target instead of piling onto one point.
+- **Attack tokens.** Each foe grants a small number of tokens, and only a token holder strikes it. The rest hold on a ring just outside, circling and waiting, and take a token when one frees, so one against many reads as a wuxia brawl rather than a pile-on.
+- **One rule for everyone.** It holds the same for NPCs and for attacks on the player.
 
 ## Arts that reshape the world [agreed]
 
