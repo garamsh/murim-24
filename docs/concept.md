@@ -215,6 +215,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 - On death, one is reborn in the same world into a random faction and into a family of its genealogy (§Growing civilization).
 - The deeds of a past life remain in the world (legends, infamy, hidden secret manuals, and so on).
+- **Arts carry over, sealed.** Decided by the owner on 2026-10-11 (#257): insights and learned arts carry to the new body, sealed until its realm and qi nature fit them again (§Qi and martial arts).
 - **Meta progression = widening the talent distribution.** It is not a guaranteed power-up. Even a first-time player can be born a genius with luck.
 - How it widens
   - **Mainly by discipline**: aptitude for the disciplines learned in a past life comes up more readily in the next life.
@@ -263,6 +264,23 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - A manual teaches only its art's first-stage forms.
   - Mastery is raised by training at a sect's training ground and by sect teaching.
   - Tier 3 arts start with no manual.
+- **Insight is separate from arts.** Decided by the owner on 2026-10-11 (issue #257). ADR 0072 (`docs/architecture/adr/0072-gate-arts-on-insights-gained-by-manuals-nature-and-repetition-and-let-arts-grant-passive-skills.md`), proposed, designs it.
+  - An insight (kkaedareum) is gained from a manual, naturally over time and conditions such as meditation, seasons or a place, or by repeating an action: sword strikes, swimming in rapids, chopping wood, leaping cliffs, or surviving a near death.
+  - Learning an art has requirements: certain insights, a minimum realm, and sometimes a lower art learned first. If any is missing, learning fails, and the attempt says what was missing.
+  - An art grants several skills. Some are active casts, and some are passive and always on, such as regeneration, damage by family, sight and stamina.
+  - The arts' lineage is visible at a glance.
+  - Decided by the owner on 2026-10-11 (#257): on rebirth, insights and learned arts and skills carry over to the new body, since knowledge belongs to the soul. The new body starts at a low realm, so a carried art is known but sealed, and shown as such, until the body meets its realm and its qi's nature again.
+  - Decided by the owner on 2026-10-11 (#257): qi has natures, and some arts need a special qi, such as demonic qi. A system that manages qi's nature is needed.
+  - Decided by the owner on 2026-10-11 (#257): the arts window is built from scrolls. It opens on a shelf of the scrolls one holds, and a chosen scroll opens as a vertical hanging landscape, entry arts at the foot and its peak at the top. Every person holds the humble base scroll 입문. Path scrolls, 정도, 사도 and 마도, appear when one first starts an art on that path, and insight scrolls, 자연, 수련 and 서, when their first insight is gained. Requirements from another scroll are labels, not lines. Higher scrolls, 태극 and 무극, are left for later.
+- **[proposed]** ADR 0072's details:
+  - up to 256 insights and 16 practices counted on each person, each insight rolled daily once its practice passes a threshold or its conditions hold
+  - a failed manual reading costing its qi and 30 days before the same manual
+  - teaching and synthesis rolled only for arts whose requirements hold
+  - passives adding where they add, taking the strongest where they multiply
+  - footwork's climbing effect carried as a footwork passive
+  - qi nature as a point on two axes, righteous to demonic and yin to yang, pulled daily by the heart method, with each art requiring a range on both (the PM's model B, its options the owner's to choose)
+  - a sealed art's skills and passives off, unsealed when the body's realm rank or nature changes
+  - the path scrolls read from the righteous-to-demonic band
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
 
 ## Arts that reshape the world [agreed]
