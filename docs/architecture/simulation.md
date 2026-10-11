@@ -217,6 +217,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Slots.** Natural objects are slots the map places, 64 an area, that grow, spread and regrow every 8 days and block nothing.
   - **Gathering.** People gather from them by one order. Villages assign their idle earners to gather what their next plan lacks, paid from the treasury.
   - **Building.** A structure rises only as far as its materials are delivered, which supersedes ADR 0023's raising by repair alone above, and settlers carry a first house's cost.
+- **World-scale arts, materials and terrain change.** ADR 0057 (`adr/0057-resolve-world-scale-arts-as-waves-over-area-indexes-absorbed-by-materials-and-reshape-terrain-in-a-conserving-delta-layer.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **Materials.** Every strike walks a line of effect through materials that absorb or break, which supersedes the shape hitting every target it covers above.
+  - **Waves.** A `WAVE` shape resolves ring by ring through per-area indexes.
+  - **Terrain.** Skills gated by realm and power change terrain in a delta layer that conserves elevation units, with footing and paths following the next tick.
 - **Cliffs, leaps and sight by height.** ADR 0058 (`adr/0058-leap-up-and-down-cliffs-by-realm-and-stamina-and-veil-a-cliffs-top-from-those-who-cannot-leap-it.md`), proposed; nothing above changes until the map's levels reach the core.
   - **Levels and cliffs.** The core holds a level per cell. A one-level drop is a step, and higher drops are cliffs, crossed by a leap. A person leaps up a cliff within its climb height, set by realm and footwork and paid in stamina, and jumps down one within twice it. A leap it cannot make is refused, so nobody falls.
   - **Paths.** Climb classes on the coarse graph let NPCs leap only drops their weakest member's class covers, up and down, and leap up only with the stamina for the whole drop.

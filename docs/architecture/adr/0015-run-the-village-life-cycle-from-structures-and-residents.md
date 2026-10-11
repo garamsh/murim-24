@@ -1,6 +1,6 @@
 # ADR 0015: Run the village life cycle from structures and residents
 
-> Status: accepted
+> Status: accepted; its structure damage from a skill's structure damage alone superseded by ADR-0057, under which a structure also takes the energy it absorbs
 > Date: 2026-10-06
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

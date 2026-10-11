@@ -1,6 +1,6 @@
 # ADR 0043: Find paths over a coarse graph of areas, and step by fields within them
 
-> Status: proposed; its graph built at the world's creation superseded by ADR-0047; its graph without climb edges superseded by ADR-0058, which adds leap edges and fields by climb class
+> Status: proposed; its graph built at the world's creation superseded by ADR-0047; its graph without climb edges superseded by ADR-0058, which adds leap edges and fields by climb class; its graph rebuilt only for structures superseded by ADR-0057, which also rebuilds it for terrain changes
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
