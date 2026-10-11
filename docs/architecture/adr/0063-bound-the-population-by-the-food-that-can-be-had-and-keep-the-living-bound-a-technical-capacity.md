@@ -18,7 +18,7 @@ The issue asks the design to decide these:
 - the balance loop: `make sweep` reporting population, food, money, villages founded and starved over 100 years per seed, with target bands, tuned by pack data
 - which fixed caps it supersedes, and how they become consequences
 
-What this builds on, from `main` at `c86b08d` and the open PRs it cites:
+What this builds on, from `main` at `1b18c01` and the open PRs it cites:
 - **Births today** (ADR 0021, ADR 0022, `core/region.cpp`).
   - A wife of bearing age, 18 to 40 in the region, whose husband lives, bears with a chance of 400 per mille a year, no sooner than 2 years after her last child.
   - The chance is scaled by her village's headroom, (cap − population) / cap, so births slow near the cap and stop at it.
@@ -28,7 +28,7 @@ What this builds on, from `main` at `c86b08d` and the open PRs it cites:
 - **Growth** (ADR 0023, ADR 0025). Every 30 days a village whose people reach a fifth of its cap lays the plan that most raises its scarcest holding, within 8 cells of its centre.
 - **Wild food** (ADR 0056, merged in #220). A fruit tree yields 6 fruit each season but winter, and a bush 3 berries, both sold to the granary as measures. Slot kinds, their biomes, growth and regrowth are pack data.
 - **Game and fish** wait for animals, #171, which ADR 0056 says will be gathering from a slot that moves, with its yield as pack data.
-- **The bound.** ADR 0045 and ADR 0048 measure it on the low profile between 10,000 and 50,000, and it stays 500 until then. ADR 0048 estimates 20,000 to 40,000 living once growth has filled ADR 0047's map. The open PR #233, for #216, makes the bound rules data, `people_capacity`, `MAX_PEOPLE`'s 500 by default and at most `PEOPLE_CEILING`, 2^20. The PM ruled there that it is a storage and performance limit, not a rule of play. Each bench scenario sets its capacity a quarter above the people it holds, 625 for M1 and 6,250 for the live scenario, and the bench fails a run whose living ever reach it.
+- **The bound.** ADR 0045 and ADR 0048 measure it on the low profile between 10,000 and 50,000, and it stays 500 until then. ADR 0048 estimates 20,000 to 40,000 living once growth has filled ADR 0047's map. #233, for #216, merged as df30616, makes the bound rules data, `people_capacity`, `MAX_PEOPLE`'s 500 by default and at most `PEOPLE_CEILING`, 2^20. The PM ruled there that it is a storage and performance limit, not a rule of play. Each bench scenario sets its capacity a quarter above the people it holds, 625 for M1 and 6,250 for the live scenario, and the bench fails a run whose living ever reach it.
 - **The yield, decided by the PM on #242 (2026-10-11).** Fields stay at a realistic 4 to 8 cells a household, and the base pack's yield is lowered to about 1 person a cell, so food binds the population. This ADR sets it as 120 measures a cell on plain and 60 on hills.
 - **The sweep.** `make sweep` lives seeds 0 to 49 for 100 years with days of five ticks, and every faction stays peopled on 48 of them. ADR 0052 adds the money supply, treasuries, food prices, hungry households and flight to it.
 
