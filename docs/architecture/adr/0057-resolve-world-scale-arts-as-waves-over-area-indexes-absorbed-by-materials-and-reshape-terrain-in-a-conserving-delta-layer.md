@@ -42,7 +42,7 @@ Facts from `main` at `aff1434`:
 - **Paths** (ADR 0043): a coarse graph of areas, rebuilt only where a blocking structure changes an area.
 - **Natural objects** are slots the map places, 64 an area, with a stage and a timer each, under ADR 0056 in the open PR #220 for #187.
 - **Tiers.** Every person keeps its record in every tier (ADR 0042), and far armies move on the coarse graph.
-- **Pending.** Sight blocked by height is #214's ADR 0058, the number the PM assigned it, in its own PR. The arts' tiers are ADR 0055 (#194), and the ground shader is #212.
+- **Sight by height.** #214's ADR 0058, proposed, merged in #223. It puts a level per cell in the core, which this ADR's level nibble is, and its `sees` walks the line this ADR proposes. The arts' tiers are ADR 0055 (#194), and the ground shader is #212.
 
 Decided by the PM on PR #222's review, 2026-10-10:
 - **Absorption on every strike** is the owner's own rule, "the same rule at every scale", and stays. Its effect on raids and melee against structures is stated under Consequences.
