@@ -164,6 +164,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **[proposed]** ADR 0067's details:
   - grass as a forage slot, a grazer needing 3 of them
   - predators eating every 16 days, starving after 3 cycles unfed
+  - an appearance chance scaled by the spare food: forage over the grazers' need, prey over the predators'
   - none appearing in an area holding a village structure
   - hunting as a livelihood for idle earners within 32 cells, not paid by a treasury, meat eaten at home first
   - spirit beasts at least 48 cells from every village and 128 from another, holding 12 cells

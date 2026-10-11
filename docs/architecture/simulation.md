@@ -236,7 +236,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Sources.** Ore comes from ore veins at the map's mine sites, gathered as ADR 0056 gathers, and a village gathers for its market's shortfall.
   - **Scrap.** A broken item becomes scrap of its main metal, which supersedes ADR 0050's item gone above, and organic parts leave nothing. A smith reforges 2 scrap into 1 metal, so metal is made only from ore and halves with each round.
 - **Animals and spirit beasts.** ADR 0067 (`adr/0067-let-animals-arise-where-food-feeds-them-hunt-them-for-meat-and-materials-and-let-spirit-beasts-hold-territories.md`), proposed; nothing above changes until the pull requests that build it land.
-  - **Animals.** Animals are records of their own, kept by home area. Grazers crop grass slots and predators kill grazers at each area's 8-day cycle, and each appears, with no breeding, only where its food feeds one more. Starving ones die.
+  - **Animals.** Animals are records of their own, kept by home area. Grazers crop grass slots and predators kill grazers at each area's 8-day cycle, and each appears, with no breeding, at a chance scaled by the spare food around it, none where its food is all used. Starving ones die.
   - **Hunting.** Strikes hit animals, whose drops fall as piles. Idle earners hunt game within 32 cells. Meat feeds their households first, and hide, horn and bone go to the market for the workshops.
   - **Spirit beasts.** They appear rarely in wild places, defend a territory, and drop a spirit core that adds qi up to the talent's limit.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
