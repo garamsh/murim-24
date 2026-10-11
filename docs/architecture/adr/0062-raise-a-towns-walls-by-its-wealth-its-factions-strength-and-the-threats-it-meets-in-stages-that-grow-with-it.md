@@ -37,7 +37,7 @@ What this builds on, from `main` at `031cd31` and the open PRs it cites:
   - a wall 2 cells thick and 2 levels high for a town, and 3 and 3 for a city
   - corner towers of 3 × 3, and 2 to 4 gates under 4 × 3 gate towers
 - **ADR 0057** (#222). It proposes materials that absorb strikes, rammed earth and stone wall among them, and breaches.
-- **ADR 0058** (#223). It proposes cliffs climbed by realm and stamina.
+- **ADR 0058,** proposed, merged in #223. Every cliff is crossed by a leap: a person leaps up a cliff within its climb height, set by realm and footwork and paid in stamina, and jumps down one within twice it. Rank 0 leaps up 2 levels.
 - **Bandits** are #172's, not yet designed.
 - **Scale.** The bound is measured between 10,000 and 50,000 (ADR 0048), and #216's live tier holds 5,000.
 
@@ -86,8 +86,8 @@ Options weighed:
   - **Gates.** A gate tower's passage stays open, except that it closes while a hostile army, one whose faction `hostile` reads, stands within 16 cells of it. A closed gate blocks like a segment. The town's residents assigned as guards stand in its passage, paid as soldiers (ADR 0052), 2 a gate.
   - **Absorbing.** A segment absorbs strikes by its material, rammed earth or stone wall, as #222's ADR 0057 decides.
   - **Breaching.** Besiegers breach a segment by bringing it to its destroyed stage by the strike rule. A destroyed segment no longer blocks, so the breach is a way in.
-  - **Climbing.** Walls are never climbed. A segment is a structure, not a level of the ground, so #223's ADR 0058 does not see it as a cliff. Under that ADR's numbers every realm climbs a 2-level drop, so a wall climbed as a cliff would stop no one. Climbing walls is listed for the owner.
-    - Rejected: a wall of 2 or 3 levels as a cliff of that height. Levies would scale a town's wall as easily as masters.
+  - **Climbing.** Walls are never climbed. A segment is a structure, not a level of the ground, so ADR 0058 does not see it as a cliff. Under that ADR's numbers every realm leaps up a 2-level drop, so a wall leapt as a cliff would stop no one. Climbing walls is listed for the owner.
+    - Rejected: a wall of 2 or 3 levels as a cliff of that height. Levies would leap a town's wall as easily as masters.
 - **Upkeep, decay and repair.**
   - Each standing segment and tower costs its owning faction 2 copper a day in upkeep, a sink under ADR 0052. A treasury that cannot pay lets its walls lose 2 durability a day.
   - Builders repair them by ADR 0056's rule when the village's account holds the materials.
