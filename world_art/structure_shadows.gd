@@ -1,7 +1,8 @@
 ## The shadows standing structures cast on the ground, all drawn by this one node from one atlas,
 ## so the renderer draws every structure's shadow in a single batch however many stand. A shadow
 ## lies past its structure's right and bottom edges: a band SHADOW_REACH[stage] pixels wide of ink
-## on every other pixel, shorter as the structure falls and none from rubble. Each footprint and
+## by the ordered dither, three pixels in four against the wall and one in five at its far edge,
+## shorter as the structure falls and none from rubble. Each footprint and
 ## stage's image is drawn into the atlas once; the node draws again only when a shadow is set or
 ## changes, since structures do not move. It decides nothing.
 extends Node2D
@@ -9,6 +10,11 @@ extends Node2D
 ## How wide a standing structure's shadow is, in pixels, by stage.
 const SHADOW_REACH := [6, 6, 3, 0]
 const SHADOW_INK := Color("14101a")
+## The 4x4 Bayer matrix the band is dithered by, and how much of it is ink against the wall and at
+## the band's far edge.
+const BAYER := [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+const NEAR := 0.75
+const FAR := 0.2
 ## A cell's width and depth on the ground, in pixels.
 const CELL := Relief.CELL
 
@@ -73,9 +79,13 @@ func _image(footprint: Vector2i, stage: int) -> Image:
 	var right := int(footprint.x * CELL.x)
 	var bottom := int(footprint.y * CELL.y)
 	var image := Image.create_empty(right + SHADOW_REACH[0], bottom + SHADOW_REACH[0], false, Image.FORMAT_RGBA8)
-	for band: Rect2i in [Rect2i(right, reach, reach, bottom - 2), Rect2i(reach, bottom, right, reach / 2)]:
-		for x in range(band.position.x, band.end.x):
-			for y in range(band.position.y, band.end.y):
-				if (x + y) % 2 == 0:
+	# The band past the right edge fades across from the wall, the one past the bottom edge down.
+	for band: Array in [[Rect2i(right, reach, reach, bottom - 2), true], [Rect2i(reach, bottom, right, reach / 2), false]]:
+		var rect: Rect2i = band[0]
+		for x in range(rect.position.x, rect.end.x):
+			for y in range(rect.position.y, rect.end.y):
+				var far := float(x - rect.position.x) / rect.size.x if band[1] \
+						else float(y - rect.position.y) / rect.size.y
+				if (BAYER[(y % 4) * 4 + x % 4] + 0.5) / 16.0 < lerpf(NEAR, FAR, far):
 					image.set_pixel(x, y, SHADOW_INK)
 	return image
