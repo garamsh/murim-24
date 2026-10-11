@@ -1,6 +1,6 @@
 # ADR 0058: Leap up and down cliffs by realm and stamina, and veil a cliff's top from those who cannot leap it
 
-> Status: proposed; its climb cost read from the best footwork stage superseded by ADR-0072, under which footwork arts carry it as a passive with the same numbers
+> Status: proposed; its climb cost read from the best footwork stage superseded by ADR-0072, under which footwork arts carry it as a passive with the same numbers; its explored map read at the rules' sight superseded by ADR-0073, which keeps the cliff test of `sees` at a map sight of its own
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
