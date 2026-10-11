@@ -29,7 +29,7 @@ Options weighed, on the development Mac (Apple Silicon) on 2026-10-11:
 - The exported Linux build runs where glibc is 2.31 or newer: Ubuntu 20.04, Debian 11 and later releases of each, among others. RHEL 8 and its rebuilds, on glibc 2.28, are refused.
 - The first `make export` downloads about 11 MB of packages and unpacks 73 MB under `build/linux-sysroot/`.
 - The snapshot date and hashes in `linux-sysroot.sh` are moved by hand, as `lint-sysroot.sh`'s are, since Dependabot does not watch them. Moving llvm-mingw's release moves the Linux compiler with it.
-- The Linux build is not run by any check: nothing here runs Linux. Running it is the owner's share.
+- `make export` checks the Linux library with `linux-elf-check.sh`: an x86_64 ELF shared object needing only glibc, libgcc_s and libstdc++, at glibc symbol versions up to 2.31. The script first refuses a control library needing `GLIBC_2.39`, so a check that passes everything fails the export. The floor is checked; the build is not run by any check, since nothing here runs Linux. Running it is the owner's share.
 
 ## Signs the decision was wrong
 
