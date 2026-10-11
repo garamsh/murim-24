@@ -1,0 +1,36 @@
+round 1 main start load 3.92, Now drawing from AC Power 17:19:21
+round 1 main exit 0 17:19:37
+round 1 head start load 3.93, Now drawing from AC Power 17:19:37
+round 2 main start load 3.93, Now drawing from AC Power 17:19:38
+round 1 head exit 1 17:19:57
+round 2 main exit 1 17:19:58
+round 1 noblood start load 3.80, Now drawing from AC Power 17:20:17
+round 2 head start load 3.80, Now drawing from AC Power 17:20:18
+round 1 noblood exit 1 17:20:37
+round 2 head exit 1 17:20:39
+round 1 nohitstop start load 3.83, Now drawing from AC Power 17:20:47
+round 2 noblood start load 3.83, Now drawing from AC Power 17:20:49
+round 1 nohitstop exit 1 17:21:07
+round 2 main start load 3.94, Now drawing from AC Power 17:21:07
+round 2 noblood exit 1 17:21:09
+round 2 nohitstop start load 3.94, Now drawing from AC Power 17:21:09
+round 2 main exit 1 17:21:28
+round 2 nohitstop exit 1 17:21:30
+round 2 head start load 3.96, Now drawing from AC Power 17:21:38
+round 3 main start load 3.96, Now drawing from AC Power 17:21:40
+round 2 head exit 1 17:21:59
+round 3 main exit 1 17:22:00
+round 2 noblood start load 3.94, Now drawing from AC Power 17:23:09
+round 3 head start load 3.94, Now drawing from AC Power 17:23:11
+round 2 noblood exit 1 17:23:30
+round 3 head exit 1 17:23:31
+round 2 nohitstop start load 3.85, Now drawing from AC Power 17:24:00
+round 3 noblood start load 3.85, Now drawing from AC Power 17:24:01
+round 2 nohitstop exit 1 17:24:20
+round 3 noblood exit 1 17:24:21
+round 3 main start load 3.83, Now drawing from AC Power 17:24:50
+round 3 nohitstop start load 3.83, Now drawing from AC Power 17:24:51
+round 3 main exit 1 17:25:10
+round 3 nohitstop exit 1 17:25:12
+series done 17:25:12
+round 3 head start  17:25:40
