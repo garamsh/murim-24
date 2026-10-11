@@ -43,7 +43,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
 | `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
 | `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
-| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
+| `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), `idle_hurt` and `walk_hurt` (one and four), `idle_maimed` and `walk_maimed` (one and four), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
 | `art/structures/house` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/hall` | 96 x 98 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/well` | 48 x 66 | `intact`, `damaged`, `destroyed`, `rubble` |
@@ -174,7 +174,8 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 - Villagers wear the cloth ramp and carry no faction accent (approved line-up; not yet in the production set).
 - A knocked-down body is the same sprite lying on its side, without a shadow (approved line-up; not yet in the production set).
 - The player is a body like any other (`docs/concept.md` §Identity), drawn with its faction's sprite. Two markers tell it apart: the jade `ring`, drawn under the body round its feet, and the gold `chevron`, drawn over it above the head and bobbing a pixel every 400 ms.
-- A body whose faction is hostile to the player's, or at war with it, carries a one-pixel crimson `d63a2f` ring outside its ink outline (`art/mockup/nameplates.gd`, evidence/pr-199).
+- A body whose faction is hostile to the player's, or at war with it, is not ringed: its red name tells it (§Effects and HUD), as the owner asked in #236. The only mark round another person is the target's.
+- A wounded body shows it. Below half of the most health it has had, it stands and walks stooping a pixel forward and down, a blood stain on its chest (`_hurt`). Below a quarter the stain runs down its side and leg, the last step of its walk drags as it limps, and it drips now and then (`_maimed`). The stain is the crimson ramp's darker steps, on solid pixels only, so the outline stays whole. Back and strike frames show no wound. Wounds clear as health recovers.
 
 An individual agent and an aggregate army read differently:
 
@@ -294,6 +295,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 
 ## Effects and HUD
 
+- A hit draws blood, unless the settings turn it off: a spray of six pixels from the struck body's middle along the blow, fading in 300 ms, and three drops on the ground beyond its feet that fade over 3 s, in the crimson ramp's three darkest steps, dithered as they fade. Crimson `d63a2f` itself stays for hostility.
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI, each under its label and its value.
