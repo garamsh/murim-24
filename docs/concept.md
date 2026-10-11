@@ -211,6 +211,8 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - villages kept a spacing apart in cells, the same for the starting villages and for those founded
   - tiers by residents, hamlet, village and town, each with a square and a reach to build in
   - houses around the square along lanes, the hall and workshops on the square, fields and pens at the edge, each placed by the ground nearest the square, so two villages on different ground differ
+  - terraced fields on hills beside a village, at a higher labour cost, while houses stay on buildable ground
+  - a market where two roads meet, once roads and markets are built
   - walls left to ADR 0062, and roads to the paths people walk
 - **[proposed]** ADR 0056's details:
   - natural objects in fixed slots the map places, with fruit trees, bushes, rocks and herbs beside trees
