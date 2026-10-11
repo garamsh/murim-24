@@ -58,11 +58,17 @@ Each section carries one of the following statuses.
 
 ## World and scale [agreed]
 
-Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026-10-09 (issue #201): one hand-made map, physical distances, an offline game. The design is ADR 0047 (`docs/architecture/adr/0047-author-one-continuous-map-of-4096-cells-by-hand-at-a-li-a-cell.md`), with the quality profiles of ADR 0048.
+Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026-10-09 (issue #201) and 2026-10-11 (issue #255): one hand-made map, physical distances, an offline game. The design is ADR 0047 (`docs/architecture/adr/0047-author-one-continuous-map-of-4096-cells-by-hand-at-a-li-a-cell.md`), with ADR 0070 (`docs/architecture/adr/0070-double-the-map-to-8192-cells-of-half-a-li-so-every-journey-takes-twice-as-long.md`), proposed, enlarging it, and the quality profiles of ADR 0048.
 
-- **One continuous map.** The world is one map of 4,096 x 4,096 cells, with no transitions between regional maps. The regions are named lands on it, and travel between them crosses the land itself: ranges and rivers block the way, and passes, fords and ferries are places one walks through.
+- **One continuous map.** The world is one map, vaster than the 4,096 x 4,096 cells first planned (revised by the owner, 2026-10-11, #255), with no transitions between regional maps. The regions are named lands on it, and travel between them crosses the land itself: ranges and rivers block the way, and passes, fords and ferries are places one walks through.
 - **Made by hand, the same in every game.** The map is authored, not generated, and every player gets the same one. No seed shapes the terrain; a new game's seed draws only the simulation's randomness: who is born with what talent, and what happens.
-- **Physical distance.** In the heartland a cell is a li, 500 metres between places, so travel takes the time the real distance suggests. At 1x, Luoyang to Chang'an is about 6 minutes on foot, a region about 12, and edge to edge about 36. The outer lands are compressed toward the map's edge. Roads are faster than open ground; horses and river boats are planned.
+- **Physical distance.** Revised by the owner, 2026-10-11 (#255): the world is vaster, so travel takes at least twice as long as before (about 12 minutes from Luoyang to Chang'an on foot at 1x). The owner chose a bigger world over the same size made emptier, and over building the 4,096 map sooner. Distances between places stay physical, and the outer lands are compressed toward the map's edge. Roads are faster than open ground; horses and river boats are planned.
+- **[proposed]** ADR 0070's details (`docs/architecture/adr/0070-double-the-map-to-8192-cells-of-half-a-li-so-every-journey-takes-twice-as-long.md`):
+  - a map of 8,192 x 8,192 cells, a cell half a li, 250 metres, between places in the heartland, so every journey is twice as long
+  - towns, fields and roads keeping their sizes at a person's scale
+  - elevation, biome and region painted per 16 x 16 cells, the same hand work as before
+  - inns on the roads a day's walk apart, and caves in the wilderness
+  - a core budget of 128 MiB on the low profile for the map, about 95 MiB at worst, and a load within 2 seconds
   - **[proposed]** ADR 0061 (`docs/architecture/adr/0061-travel-on-foot-by-horse-or-by-boat-at-speeds-set-by-travel-class-and-means.md`), for issue #207: horses as items in a mount slot, bought at towns with a stable, fed a ration a day, and ridden at about twice walking pace, striking only with a weapon's basic strike; boats owned by merchant houses and villages, sailing river and canal routes between landings for a fare, fast downstream and slow upstream; ferries charging a fare.
 - **An offline game.** There is no online play, and none is planned.
 - **The regions.** Ten regions, each with its real basis:
