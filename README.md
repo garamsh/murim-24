@@ -2,7 +2,7 @@
 
 The mockup of the player's map, which ADR 0073 proposed, for the PM's approval before the view is built.
 
-`map_mockup.gd` drew it over `play/play.tscn` at 7beb2d1. That is `main` 2cc1292 with the chart unit's commit, fa20c143. It used Godot 4.7.2 on macOS arm64, with the HUD's own panel frame, font and palette.
+`map_mockup.gd` drew it over `play/play.tscn` at fa20c14: `main` 2cc1292 plus the chart unit's commit. It used Godot 4.7.2 on macOS arm64, with the HUD's own panel frame, font and palette.
 
 The world is seed 2026's region, lived 10 years at 5 ticks a day. Then the player walks to the 3 villages nearest its home, and the world lives 10 more years out of sight.
 
