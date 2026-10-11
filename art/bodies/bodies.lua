@@ -74,13 +74,13 @@ local function back(cv)
   return out
 end
 
--- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only, so
--- the outline stays whole; `spread` 1 is a stain on the chest, 2 runs it down the side, the leg and
--- the arm.
+-- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only and
+-- clear of the boots in every frame, so the outline stays whole and keeps the colour of what it
+-- borders; `spread` 1 is a stain on the chest, 2 runs it down the side, the leg and the arm.
 local STAIN = {
   { { 0, 0, 4 }, { 1, 0, 2 }, { 0, 1, 2 }, { 1, 1, 4 }, { 2, 1, 2 } },
   { { 2, 2, 4 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 4 }, { 2, 5, 2 }, { -1, 2, 2 },
-    { 3, 3, 4 }, { 2, 4, 4 }, { 3, 5, 2 }, { 3, 6, 4 }, { -1, 3, 4 }, { -2, 2, 2 }, { 4, 1, 4 } },
+    { 3, 3, 4 }, { 2, 4, 4 }, { -1, 3, 4 }, { -2, 2, 2 }, { 4, 1, 4 } },
 }
 local function stained(cv, spread)
   local out = px.canvas(W, H)
