@@ -106,7 +106,7 @@ func run() -> bool:
 	region_art.show_world(region, region.army_count() - 1)
 	region_art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
 	var drawn := _placed(region, region_art)
-	var placed: int = drawn.placed
+	var placed: int = drawn.placed if drawn.batched else 0
 	var fields: int = drawn.fields
 	var kinds: Dictionary = drawn.kinds
 	var undrawn := _undrawn(region, region_art)
@@ -230,7 +230,7 @@ func _every_kind_pass() -> bool:
 	var drawn := _placed(region, art)
 	var every: bool = WorldArt.BUILDINGS.keys().all(func(kind: String) -> bool: return drawn.kinds.has(kind))
 	var passed: bool = at_start.is_empty() and held.call().size() == workshops.size() \
-			and drawn.placed + drawn.fields == region.structure_count() and every
+			and drawn.placed + drawn.fields == region.structure_count() and every and drawn.batched
 	print("world_art_test: after %d days, the workshops at the start %s and now %s; %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s): %s" % [
 		ticks / SHORT_DAY, at_start, held.call(), drawn.placed + drawn.fields, region.structure_count(), every,
 		drawn.kinds.keys(), "pass" if passed else "FAIL"])
@@ -243,7 +243,8 @@ func _every_kind_pass() -> bool:
 # and on the frame's, INSET in from its left and bottom edges, raised with the ground, holding each
 # stage's frame and showing its stage's, a training ground on the ground with no shadow and every
 # other kind standing with its shadow on the ground from its footprint's top-left; how many are
-# fields; and the kinds placed.
+# fields; the kinds placed; and whether every shadow is drawn by the Shadows node from one texture,
+# nothing but the ground's kinds laid beside it.
 func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var placed := 0
@@ -271,10 +272,10 @@ func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
 		var lift: float = art.relief.lift_at(bottom + Vector2(footprint.x * WorldArt.CELL.x / 2.0,
 				-WorldArt.CELL.y / 2.0))
 		var standing := sprite.position if kind != "training_ground" else bottom
-		var shadow: Sprite2D = sprite.get_meta("shadow") if sprite.has_meta("shadow") else null
-		var shadowed: bool = shadow == null if kind == "training_ground" else \
-				shadow != null and shadow.get_parent().name == "Laid" \
-				and shadow.position == Vector2(corner) * WorldArt.CELL - Vector2(0, lift)
+		var shadow: Dictionary = art.get_node("Shadows").shadow_of(structure)
+		var shadowed: bool = shadow.is_empty() if kind == "training_ground" else \
+				not shadow.is_empty() and shadow.at == Vector2(corner) * WorldArt.CELL - Vector2(0, lift) \
+				and shadow.footprint == footprint and shadow.stage == world.structure_stage(structure)
 		if standing == bottom and shadowed \
 				and sprite.position + sprite.offset + Vector2(INSET, frame.size.y - INSET) == bottom - Vector2(0, lift) \
 				and sprite.get_parent().name == layer and staged \
@@ -282,7 +283,12 @@ func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
 				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
 			placed += 1
 			kinds[kind] = true
-	return {"placed": placed, "fields": fields, "kinds": kinds}
+	# Every shadow is drawn by the one node, from one texture: no sprite is laid with the ground but
+	# a structure of the ground's kinds.
+	var laid_others := art.get_node("Laid").get_children().filter(func(node: Node) -> bool:
+			return node is Sprite2D and (node as Sprite2D).get_meta("frames", []) == [])
+	var batched: bool = art.get_node("Shadows").textures() == (1 if placed > 0 else 0) and laid_others.is_empty()
+	return {"placed": placed, "fields": fields, "kinds": kinds, "batched": batched}
 
 
 # A village the region founds is drawn as its template is: its structures stand at the offsets a
