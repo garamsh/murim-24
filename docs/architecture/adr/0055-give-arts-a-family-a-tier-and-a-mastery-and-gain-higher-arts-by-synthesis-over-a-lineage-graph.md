@@ -1,6 +1,6 @@
 # ADR 0055: Give arts a family, a tier and a mastery, and gain higher arts by synthesis over a lineage graph
 
-> Status: proposed
+> Status: proposed; its arts gained by manual, teaching or synthesis without requirements superseded by ADR-0072, under which an art requires insights, a realm rank and prerequisite arts, and a manual's reading fails without them
 > Date: 2026-10-10
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
