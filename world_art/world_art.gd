@@ -1,8 +1,8 @@
 ## Draws a WorldAdapter's world in the approved art (docs/art-direction.md) at the 2.5D angle of
 ## ADR 0059, a cell CELL wide and deep and raised by the relief's levels: the ground drawn off the
 ## cell grid by ground.gd, baked once from the relief.gd derives and streamed round the screen,
-## territory borders, buildings by stage, bodies by faction, the steered person's markers, a crimson ring round each body hostile
-## to the person names are read around, as WorldAdapter.relation says, and what the fighting did
+## territory borders, buildings by stage, bodies by faction, wounded below a share of their health,
+## the steered person's markers, and what the fighting did
 ## through combat.gd, the struck drawn in the impact colour and knocked back and the dead falling
 ## and fading. Bodies are drawn between the positions of the last two ticks, as far between as the
 ## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
@@ -72,9 +72,6 @@ const BUCKET := 32.0
 const NO_OCCLUDERS: Array[Ground.Occluder] = []
 ## How far from the person names are read around another person's name is drawn, in cells.
 const NAME_REACH := 8
-## The relations, as WorldAdapter.relation gives them, of a person drawn ringed in RING.
-const HOSTILE_RELATIONS := [WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
-const RING := Color("d63a2f")
 # Floats per body in a band's buffer: its 2D transform, its colour and its custom data.
 const BODY_FLOATS := 16
 
@@ -338,7 +335,6 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		var before := _last_positions[army]
 		var roster := _rosters[army]
 		var sprite := _army_sprites[army]
-		var tint := _tint(army)
 		var moving := _same_roster[army]
 		for body in positions.size():
 			var person := roster[body]
@@ -374,13 +370,13 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			var origin := Vector2(0, _band_y(row))
 			# Rounded before the band's origin is taken off, so a body stands on the same whole pixel in
 			# every band.
-			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false, Color.WHITE)
+			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false)
 			var white := combat.flash(person, now)
-			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, tint, white)
+			_pack(buffers[band], frame, centre.round() - origin, heading.x < 0.0, white)
 			if _hidden(Rect2(centre - Vector2(BODY_FRAME) / 2.0, BODY_FRAME).grow(-2), origin.y):
 				var outline := frame
 				outline.position.x += (_body_frames[tag + "_xray"] - _body_frames[tag]) * BODY_FRAME.x
-				_pack(outlines, outline, centre, heading.x < 0.0, Color.WHITE, white, 1.0, 0.0, frame.position)
+				_pack(outlines, outline, centre, heading.x < 0.0, white, 1.0, 0.0, frame.position)
 				outlined += 1
 			drawn += 1
 	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
@@ -391,7 +387,7 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			continue
 		var row := clampi(int(death.ground.y / CELL.y), first_row, last_row)
 		_pack(buffers[row - first_row], Rect2(Vector2(_army_sprites[death.army] * _faction_width, 0), BODY_FRAME),
-				Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0).round() - Vector2(0, _band_y(row)), false, _tint(death.army),
+				Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0).round() - Vector2(0, _band_y(row)), false,
 				death.flash, death.alpha, death.fallen * PI / 2.0)
 	for band in buffers.size():
 		shadows[band].append_array(buffers[band])
@@ -413,12 +409,6 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	var aimed: Vector2i = combat.place_of(combat.target)
 	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
 	$Drops.show_drops(combat.shown_drops(now))
-
-
-# The ring army `army`'s bodies are drawn in: RING while it is hostile to the person names are read
-# around, and otherwise white, no ring.
-func _tint(army: int) -> Color:
-	return RING if _relations[army] in HOSTILE_RELATIONS else Color.WHITE
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map
@@ -638,11 +628,11 @@ func _build_body_atlas() -> void:
 
 
 # Adds one sprite to `buffer`: `frame` is its rectangle in the atlas, BODY_FRAME in size, `centre`
-# its centre in the pixels of the node the buffer is drawn in, `flip` mirrors it, and a `tint`
-# other than white rings it in that colour; it is drawn `white` of the way to white, `alpha`
-# opaque, and turned `turn` radians about its bottom edge's middle. `outline_of`, for an outline, is
+# its centre in the pixels of the node the buffer is drawn in, and `flip` mirrors it; it is drawn
+# `white` of the way to white, `alpha` opaque, and turned `turn` radians about its bottom edge's
+# middle. `outline_of`, for an outline, is
 # where the body it outlines is in the atlas, and `white` is how far to white that body is drawn.
-func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, tint: Color, white := 0.0,
+func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, white := 0.0,
 		alpha := 1.0, turn := 0.0, outline_of := Vector2(-1, -1)) -> void:
 	var size := _atlas.get_size()
 	var width := frame.size.x * (-1.0 if flip else 1.0)
@@ -651,12 +641,12 @@ func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool
 	var sin_turn := sin(turn)
 	var local := centre.round() + Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
 	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
-	# transform's rows, the ring's colour, and the rectangle's position with the shares of white and
+	# transform's rows, white for a body, and the rectangle's position with the shares of white and
 	# of the body shown; or, for an outline, the body's share of white in the colour's red, and
 	# where the body it outlines is. Written in place, so no array is made per sprite.
 	var body := outline_of.x < 0.0
 	var custom := Vector2(white, alpha) if body else outline_of / size
-	var colour := tint if body else Color(white, 0.0, 0.0, 1.0)
+	var colour := Color.WHITE if body else Color(white, 0.0, 0.0, 1.0)
 	var at := buffer.size()
 	buffer.resize(at + BODY_FLOATS)
 	buffer[at] = width * cos_turn
