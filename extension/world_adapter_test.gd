@@ -47,7 +47,11 @@ const ORDER_TICKS := 800
 # The region the play scene opens on, its first Cult village, and how long it is watched.
 const REGION_SEED := 2026
 const CULT_VILLAGE := 1
+# The region's first Unorthodox village.
+const UNORTHODOX_VILLAGE := 2
 const VILLAGE_TICKS := 600
+# Years the region is lived, in five-tick days, before its realms, arts and rumours are read.
+const LIVED_YEARS := 10
 # Ticks in a day of the region's calendar.
 const TICKS_PER_DAY := 1800
 const HOME := Vector2i(1, 1)
@@ -115,23 +119,25 @@ func run() -> bool:
 	var kin_pass := _kin_pass()
 	var economy_pass := _economy_pass()
 	var sects_pass := _sects_pass()
-	var play_loop_pass := _play_loop_pass()
-	var qi_pass := _qi_pass()
-	var lessons_pass := _lessons_pass()
+	# Lived once for the three checks that read it, none of which ticks it further.
+	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
+	for i in LIVED_YEARS * 120 * 5:
+		lived.tick()
+	var play_loop_pass := _play_loop_pass(lived)
+	var qi_pass := _qi_pass(lived)
+	var lessons_pass := _lessons_pass(lived)
 	var event_people_pass := _event_people_pass()
 	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
 
-# A region lived ten years of five-tick days reads its realms, and a person who knows an art reads its
-# qi within its store, a realm among them, its nature, and its skills: its army's first, priced at no qi,
-# then its art skills, named, with their cost and nature. Control: a world from create() has no realms,
-# and its people hold no qi, know no art and read only their army's skills.
-func _qi_pass() -> bool:
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
-		lived.tick()
+# `lived`, a region lived ten years of five-tick days, reads its realms, and a person who knows an
+# art reads its qi within its store, a realm among them, its nature, and its skills: its army's
+# first, priced at no qi, then its art skills, named, with their cost and nature. Control: a world
+# from create() has no realms, and its people hold no qi, know no art and read only their army's
+# skills.
+func _qi_pass(lived: WorldAdapter) -> bool:
 	var realms := lived.realms()
 	var learned := -1
 	for army in lived.army_count():
@@ -191,15 +197,12 @@ func _event_people_pass() -> bool:
 	return passed
 
 
-# A region lived ten years of five-tick days reads its arts, each named with its skills, and a person's
-# art skill names its index among its art's skills, the skill arts() names alike. Its progress gives
-# each skill learned with its person, art, skill and how it was learned, and each realm gained with
-# its person and a rank the person has reached, while none of its events names an art. Control: a
-# world from create() has no arts.
-func _lessons_pass() -> bool:
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
-		lived.tick()
+# `lived`, a region lived ten years of five-tick days, reads its arts, each named with its skills,
+# and a person's art skill names its index among its art's skills, the skill arts() names alike. Its
+# progress gives each skill learned with its person, art, skill and how it was learned, and each
+# realm gained with its person and a rank the person has reached, while none of its events names an
+# art. Control: a world from create() has no arts.
+func _lessons_pass(lived: WorldAdapter) -> bool:
 	var arts := lived.arts()
 	var right: bool = arts.size() == 3 and arts[0].korean == "매화검법" and arts[0].romanised == "Plum Blossom Sword" \
 			and arts[0].skills.size() == 3 and arts[0].skills[1].korean == "이십사수매화검법" and arts[0].skills[1].rank == 3 \
@@ -561,11 +564,12 @@ func _core_run() -> PackedStringArray:
 # Born into the region's Cult village 1, the player may join its sect: application_refusal reads
 # APPLICATION_NONE, apply makes it a member and applying again reads APPLICATION_IN_A_SECT and is
 # refused. Control: born into Unorthodox village 2, the player is refused as APPLICATION_UNPROVEN
-# and stays out. Lived ten years of five-tick days, the region's rumours reach the player, newest
-# first, each of a kind the adapter names and naming records the world holds. Attainment reads
-# one value per discipline the region names, the five of its rules of life, and a sect's founding
-# master 120 in one; a world from create() names no discipline.
-func _play_loop_pass() -> bool:
+# and stays out. In `lived`, the region lived ten years of five-tick days, its rumours reach the
+# player, newest first, each of a kind the adapter names, at a cell of the map, and naming records
+# the world holds: a birth one no older than the years lived, a death one with no health. Attainment
+# reads one value per discipline the region names, the five of its rules of life, and a sect's
+# founding master 120 in one; a world from create() names no discipline.
+func _play_loop_pass(lived: WorldAdapter) -> bool:
 	var world := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
 	var player := world.roster(world.army_count() - 1)[0]
 	var sect := -1
@@ -576,22 +580,41 @@ func _play_loop_pass() -> bool:
 	var applied := world.apply(player, sect) and world.person_sect(player) == sect
 	var again := world.application_refusal(player, sect) == WorldAdapter.APPLICATION_IN_A_SECT \
 			and not world.apply(player, sect)
-	var other := WorldAdapter.create_region(REGION_SEED, 2)
+	var other := WorldAdapter.create_region(REGION_SEED, UNORTHODOX_VILLAGE)
 	var outsider := other.roster(other.army_count() - 1)[0]
-	var refused := other.application_refusal(outsider, 2) == WorldAdapter.APPLICATION_UNPROVEN \
-			and not other.apply(outsider, 2) and other.person_sect(outsider) == -1
-	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
-	for i in 10 * 120 * 5:
-		lived.tick()
+	var outsider_faction := other.army_faction(other.army_count() - 1)
+	var other_sect := -1
+	for index in other.sect_count():
+		if other.sect_faction(index) == outsider_faction:
+			other_sect = index
+	# Setup: the player was born Demonic in CULT_VILLAGE and Unorthodox in UNORTHODOX_VILLAGE, and
+	# each faction has a sect.
+	var set_up: bool = sect >= 0 and other_sect >= 0 \
+			and world.faction_names()[world.army_faction(world.army_count() - 1)] == "Demonic" \
+			and other.faction_names()[outsider_faction] == "Unorthodox"
+	var refused := set_up \
+			and other.application_refusal(outsider, other_sect) == WorldAdapter.APPLICATION_UNPROVEN \
+			and not other.apply(outsider, other_sect) and other.person_sect(outsider) == -1
 	var heard := lived.rumours(lived.roster(lived.army_count() - 1)[0])
 	var kinds := ["founded", "raided", "ruined", "sect_fell", "leader_changed", "born", "died"]
+	var rows := lived.map_rows()
+	var map := Rect2i(0, 0, rows[0].length(), rows.size())
 	var rumours_right := heard.size() > 0
+	# Births and deaths heard: one born is no older than the years lived, and one who died has no
+	# health. Setup: some were heard.
+	var of_people := 0
 	for n in heard.size():
 		var event: Dictionary = heard[n]
-		rumours_right = rumours_right and kinds.has(event.kind) and event.cell is Vector2i \
+		rumours_right = rumours_right and kinds.has(event.kind) and map.has_point(event.cell) \
 				and (n == 0 or event.sequence < heard[n - 1].sequence) \
-				and (not event.has("person") or lived.person_family(event.person) >= 0) \
 				and (not event.has("village") or event.village < lived.villages().size())
+		if event.kind == "born":
+			of_people += 1
+			rumours_right = rumours_right and lived.person_age(event.person) <= LIVED_YEARS
+		elif event.kind == "died":
+			of_people += 1
+			rumours_right = rumours_right and lived.person_health(event.person) == 0
+	rumours_right = rumours_right and of_people > 0
 	var names := world.discipline_names()
 	var master := world.sect_master(0)
 	var attained := world.person_attainment(master)
@@ -600,9 +623,9 @@ func _play_loop_pass() -> bool:
 			and world.person_attainment(player).size() == names.size()
 	var bare := _create(SEED, _armies, RULES)
 	var bare_right := bare.discipline_names().is_empty() and bare.person_attainment(0).is_empty()
-	var passed := open and applied and again and refused and rumours_right and attainment_right and bare_right
-	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused as unproven %s; %d rumours after ten years, newest first and well formed %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
-		sect, open, applied, again, refused, heard.size(), rumours_right, heard[0] if heard.size() > 0 else {},
+	var passed := set_up and open and applied and again and refused and rumours_right and attainment_right and bare_right
+	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused by sect %d as unproven %s (setup %s); %d rumours after ten years, newest first, within the map and %d of them naming the born or the dead rightly %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
+		sect, open, applied, again, other_sect, refused, set_up, heard.size(), of_people, rumours_right, heard[0] if heard.size() > 0 else {},
 		names, master, attained, attainment_right, bare_right, "pass" if passed else "FAIL"])
 	return passed
 

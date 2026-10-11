@@ -567,11 +567,26 @@ TEST(Region, APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith) {
   const World young = born_and_lived(VILLAGE, false, 0);
   const std::size_t body = young.population() - 1;
   ASSERT_EQ(young.person(body).home, std::optional<std::size_t>{VILLAGE});
+  const World homeless = born_and_lived(VILLAGE, true, YEARS * DAYS_PER_YEAR);
+  ASSERT_FALSE(homeless.person(body).home.has_value());
+  // Setup: where the body takes no one, partners for it, of the other sex and
+  // another family and unwed as the world began, married in its village.
+  const Person& self = young.person(body);
+  std::size_t partners_wed = 0;
+  for (std::size_t other = 0; other < homeless.population(); ++other) {
+    const Person& partner = homeless.person(other);
+    const bool unwed_at_start =
+        other >= young.population() || young.person(other).spouses.empty();
+    if (other != body && partner.sex != self.sex &&
+        partner.family != self.family && partner.home == self.home &&
+        unwed_at_start && !partner.spouses.empty()) {
+      ++partners_wed;
+    }
+  }
+  ASSERT_GT(partners_wed, 0U);
   const World world = born_and_lived(VILLAGE, false, YEARS * DAYS_PER_YEAR);
   EXPECT_FALSE(world.person(body).spouses.empty());
   // Control: the same body with no home never marries.
-  const World homeless = born_and_lived(VILLAGE, true, YEARS * DAYS_PER_YEAR);
-  ASSERT_FALSE(homeless.person(body).home.has_value());
   EXPECT_TRUE(homeless.person(body).spouses.empty());
   // It may apply to a sect as far as its home goes, where the homeless body
   // is refused for having none.
@@ -639,6 +654,10 @@ TEST(Region, AVillageRunsItsWholeLifeCycleInAGeneratedRegion) {
   rebuilders.members = gathered(
       region, region.villages.at(first_of(region, UNORTHODOX)), REBUILDERS);
   rebuilders.objective = rebuilders.members.front().cell;
+  // Setup: the seed's villages each had room for the whole band, since
+  // gathered() gives at most as many as asked.
+  ASSERT_EQ(raiders.members.size() + rebuilders.members.size(),
+            RAIDERS + REBUILDERS);
   const std::size_t raider = region.armies.size();
   const std::size_t rebuilder = raider + 1;
   region.armies.push_back(raiders);
@@ -1491,8 +1510,8 @@ TEST(Region, EachFactionStartsWithAtMostFourHouseholds) {
 // peopled village at the end of any year; whether its standing sects' elders
 // were few at the end; and, checked each day, the most
 // members its sects held together beyond their founders, how often a sect's
-// master changed, and how often the first faction's dead leader gave way to
-// another.
+// master changed, whether the first faction's leader ever died, and how often
+// its dead leader gave way to another.
 struct Century {
   std::size_t living_before;
   std::size_t living_after;
@@ -1503,6 +1522,7 @@ struct Century {
   std::size_t admitted;
   std::size_t master_changes;
   std::size_t successions;
+  bool leader_died;
   /// Whether, at the end, every standing sect has at least one elder and at
   /// most a third of its members, or one, as elders.
   bool elders_few;
@@ -1520,7 +1540,8 @@ struct SectWatch {
 };
 
 // Counts, into `result`, today's members beyond the founders, each sect whose
-// master changed, and the first faction's leader giving way after dying.
+// master changed, whether the first faction's leader has died, and its giving
+// way after dying.
 void watch_sects(const World& world, SectWatch& watch, Century& result) {
   std::size_t members = 0;
   for (std::size_t sect = 0; sect < world.sect_count(); ++sect) {
@@ -1534,6 +1555,9 @@ void watch_sects(const World& world, SectWatch& watch, Century& result) {
   }
   result.admitted =
       std::max(result.admitted, members - std::min(members, watch.founders));
+  if (watch.leader && world.person(*watch.leader).health == 0) {
+    result.leader_died = true;
+  }
   if (world.leader(0) != watch.leader) {
     if (watch.leader && world.person(*watch.leader).health == 0) {
       ++result.successions;
@@ -1573,6 +1597,7 @@ Century century(const RegionData& data, Seed seed) {
                  0,
                  0,
                  0,
+                 false,
                  false};
   for (std::uint64_t day = 0; day < CENTURY * DAYS_PER_YEAR; ++day) {
     for (std::uint64_t tick = 0; tick < GROWTH_TICKS_PER_DAY; ++tick) {
@@ -1669,6 +1694,8 @@ std::array<std::size_t, 3> sect_deeds(const Century& lived) {
 
 TEST(Region, SectsAdmitChangeMastersAndElectOverACentury) {
   const Century lived = century(base_data(), NEIGHBOURLY);
+  // Setup: the Orthodox leader died within the century.
+  ASSERT_TRUE(lived.leader_died);
   // Sects admit members beyond their founders, a master changes, and the
   // Orthodox, who elect, are led by another after their leader dies.
   EXPECT_GT(lived.admitted, 0U);
@@ -1679,9 +1706,11 @@ TEST(Region, SectsAdmitChangeMastersAndElectOverACentury) {
   // members.
   EXPECT_TRUE(lived.elders_few);
   // Control: without admission no sect admits anyone, no member is an elder,
-  // so no sect has a master to change or to elect.
-  EXPECT_EQ(sect_deeds(century(closed(), NEIGHBOURLY)),
-            (std::array<std::size_t, 3>{0, 0, 0}));
+  // so no sect has a master to change or to elect. Setup: its leader died
+  // too, so no election is for want of a death.
+  const Century shut = century(closed(), NEIGHBOURLY);
+  ASSERT_TRUE(shut.leader_died);
+  EXPECT_EQ(sect_deeds(shut), (std::array<std::size_t, 3>{0, 0, 0}));
 }
 
 }  // namespace

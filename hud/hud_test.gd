@@ -97,7 +97,8 @@ func run() -> bool:
 	# Each key as drawn, centred across its label from the label's top, one line of the HUD's font
 	# high, keeps clear of its slot's icon and within the slot.
 	var clear := []
-	var line: float = hud._theme.default_font.get_height(hud.FONT_SIZE)
+	var first_key: Label = hud.slot_icons[0].get_parent().get_child(1)
+	var line: float = first_key.theme.default_font.get_height(hud.FONT_SIZE)
 	for slot in hud.slot_icons.size():
 		var icon: TextureRect = hud.slot_icons[slot]
 		var key: Label = icon.get_parent().get_child(1)
@@ -222,7 +223,8 @@ func _purse_pass() -> bool:
 			var room := Rect2(Vector2.ZERO, hud.room)
 			var strip: Rect2 = hud.purse.strip_rect()
 			var belt: Rect2 = hud.purse.belt_rect()
-			var bar: Rect2 = hud._skill_bar.get_rect()
+			# The skill bar holds each slot's cell, which holds its icon.
+			var bar: Rect2 = (hud.slot_icons[0].get_parent().get_parent() as Control).get_rect()
 			if not hud.purse.belt or not room.encloses(strip) or not room.encloses(belt) or strip.intersects(belt) \
 					or belt.position.x < bar.end.x or belt.position.y != bar.position.y:
 				faults.append("%s %s: strip %s, belt %s beside the bar %s" % [window, locale, strip, belt, bar])
@@ -281,7 +283,9 @@ func _layout_pass() -> bool:
 			var room := Rect2(Vector2.ZERO, Vector2(ViewScale.hud_room(window, false).size))
 			if hud.transform.get_scale() != Vector2(scale, scale) or Rect2(Vector2.ZERO, hud.room) != room:
 				faults.append("%s: scale %s, room %s" % [at, hud.transform.get_scale(), hud.room])
-			moved = moved and hud._map_panel.position.x == hud.MAP_AT[false].x + room.size.x - hud.NATIVE.x
+			# The map's panel holds the season's label.
+			var map_panel: Control = hud.labels.season.get_parent()
+			moved = moved and map_panel.position.x == hud.MAP_AT[false].x + room.size.x - hud.NATIVE.x
 			var shown := _shown_panels(hud)
 			for n in shown.size():
 				checks += 1
@@ -316,7 +320,7 @@ func _layout_pass() -> bool:
 			checks += 1
 			var on_foot := Vector2(floorf((room.size.x - hud.NATIVE.x) / 2.0), room.size.y - hud.NATIVE.y)
 			var talk: Rect2 = Rect2(hud.dialogue.position + hud.dialogue.RECT.position, hud.dialogue.RECT.size)
-			if hud.dialogue.position != on_foot or not room.encloses(talk) or talk.intersects(hud._skill_bar.get_rect()):
+			if hud.dialogue.position != on_foot or not room.encloses(talk) or talk.intersects((hud.slot_icons[0].get_parent().get_parent() as Control).get_rect()):
 				faults.append("%s: the dialogue window at %s, not on the foot %s clear of the bar" % [at, talk, on_foot])
 	TranslationServer.set_locale(hud.LOCALES[0])
 	# The touch layout's places, unscaled, against those at each touch window.

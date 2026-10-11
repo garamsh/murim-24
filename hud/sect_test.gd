@@ -128,15 +128,18 @@ func _verdict_pass() -> bool:
 	var other := WorldAdapter.create_region(SEED, UNORTHODOX_VILLAGE)
 	var other_army := other.army_count() - 1
 	var other_person := other.roster(other_army)[0]
+	# Setup: the player was born Demonic in CULT_VILLAGE and Unorthodox in UNORTHODOX_VILLAGE.
+	var set_up: bool = world.faction_names()[world.army_faction(army)] == "Demonic" \
+			and other.faction_names()[other.army_faction(other_army)] == "Unorthodox"
 	var refused_panel: Control = Sect.new()
 	refused_panel.show_sect(other, other_army)
 	refused_panel.show_verdict(other.application_refusal(other_person, refused_panel.sect))
 	var refused: bool = refused_panel.verdict == "APPLICATION_UNPROVEN" and refused_panel.own_sect == -1 \
 			and other.person_sect(other_person) == -1
 	refused_panel.free()
-	var passed := admitted and again and cleared and refused
-	print("sect_test: born in village %d, the player applies to sect %d: admitted %s, again %s, cleared on Tab %s; born in village %d, refused as unproven %s: %s" % [
-		CULT_VILLAGE, sect, admitted, again, cleared, UNORTHODOX_VILLAGE, refused, "pass" if passed else "FAIL"])
+	var passed := set_up and admitted and again and cleared and refused
+	print("sect_test: born in village %d, the player applies to sect %d: admitted %s, again %s, cleared on Tab %s; born in village %d, refused as unproven %s (setup %s): %s" % [
+		CULT_VILLAGE, sect, admitted, again, cleared, UNORTHODOX_VILLAGE, refused, set_up, "pass" if passed else "FAIL"])
 	return passed
 
 
