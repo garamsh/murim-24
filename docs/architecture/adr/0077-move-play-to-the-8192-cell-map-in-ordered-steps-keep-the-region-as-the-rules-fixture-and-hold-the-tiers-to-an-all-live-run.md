@@ -38,13 +38,18 @@ Measured on `1e3179c`, by a scratch program over the core's public types and sav
 - a person's record, `sizeof(Person)`, is 352 bytes;
 - the live scenario's save, after 60 ticks, is 801,594 bytes for 5,000 people, 160 bytes a person, map rows included.
 
-`make bench` times are recorded in the pull request at an idle machine. A run at a load average of 73 over 8 cores gave the M1 battle a p99 of 47 ms, against its usual pass, so it measures nothing.
+`make bench` at `1e3179c` on the development Mac, at a load average of 3.3 over 8 cores:
+- the M1 battle of 500: p99 0.616 ms;
+- #216's live scenario of 5,000: p50 3.719 ms and p99 3.962 ms, within the 4 ms target by 0.04 ms, about 0.79 µs a person a tick at p99;
+- the frame: p99 14.3 ms against 16.7.
+
+An earlier run at a load average of 73 gave the M1 battle a p99 of 47 ms, so it measured the machine and is not used.
 
 Options weighed for the generated region once the map is built:
 - **Keep it as the rules' fixture.** Chosen.
   - It is a small, seeded world on which `make sweep` lives 50 seeds for 100 years in minutes, and the core's tests build worlds of tens of cells.
   - The map is one world, and a sweep has no steered army, so it runs every area live (ADR 0042). A projection, not a measurement:
-    - #216's target is 4 ms a tick for 5,000 live, so 50,000 live cost on the order of 40 ms a tick.
+    - At the measured 0.79 µs a person a tick, 50,000 live cost on the order of 40 ms a tick.
     - A 100-year sweep is 60,000 ticks a seed at 5 ticks a day: about 40 minutes a seed, and more than a day for 50 seeds.
   - Play, the bench's bound and the view move to the map.
 - **Retire it.** Rejected. The rules would lose their sweep, and every rule test would load a map of 67 million cells.
@@ -114,4 +119,4 @@ Play moves from the generated region to ADR 0070's map in the order below. The r
 - The region's sweep passes while the map's run fails a band. Then the fixture no longer stands for the world, and a reduced map, a few hundred areas, should replace it as the sweep's world.
 - The far tier cannot reach the bands without the live tier's cost. Then tiers by distance save less than the cap they cost, and the live radius should grow instead.
 - `apart` at 48 cells refuses settlements the map's history places closer, such as twin cities across a river. Then authored places need their own spacing, smaller than founding's.
-- #216's live scenario cannot reach 4 ms p99 at an idle machine. Then the live cap of 5,000 is the wrong standard, and ADR 0048's profiles set it lower.
+- #216's live scenario, at 3.962 ms p99 today, cannot stay within 4 ms once tiers and the far tier's bookkeeping are added. Then the live cap of 5,000 is the wrong standard, and ADR 0048's profiles set it lower.
