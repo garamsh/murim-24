@@ -77,6 +77,9 @@ Play moves from the generated region to ADR 0070's map in the order below. The r
 
   The far tier is retuned until it does.
 - Determinism holds within each run, and the hash folds tier state as ADR 0044 has it.
+- **What a tier change hands over.** It reads only saved state, so a loaded world hands over as the saved one would:
+  - **Live to far.** Every person keeps its whole record, as ADR 0042 has it: health, qi, cooldowns, home and household. Its army gains ADR 0044's far anchor, the area and coarse node its lead stands in, with far progress 0 along its coarse path to its objective. The area's fields are dropped.
+  - **Far to live.** The lead is placed on the entrance cell its far progress reached on its coarse path. The other members are placed in roster order on the nearest free cells by the separation rule, read in cell index order. Every record carries over unchanged. The area's fields are rebuilt, and a stepped area's phase is the tick modulo its stride.
 
 **Spacing.** ADR 0076's `apart` is checked by the map's validator for every authored settlement, inns included, and by founding in play.
 - The base pack's value on the map is measured in the step that compiles the first map's content.
@@ -95,11 +98,18 @@ Play moves from the generated region to ADR 0070's map in the order below. The r
 3. **Areas, tiers and profiles,** ADRs 0042 and 0048, with the tiers' state saved as ADR 0044 has it. Acceptance:
    - tiers recomputed with hysteresis, with a control of no steered army running live;
    - a save round-trip with the tiers' state;
+   - a run that goes live, far and live again, by the steered army walking away and back, hashing the same twice. Two controls: another seed gives another hash, and the same run with the far phase skipped, tiers off, gives another hash than the tiered one, so the far phase is seen to act. Step 5 runs the same test again with the far tier's rules;
    - #216's live scenario within 4 ms p99 at an idle machine.
-4. **The coarse graph with its level of regions:** ADR 0043 and ADR 0070's step 2. Acceptance: a path across the test map within a frame, with a control of the graph of areas alone.
+4. **The coarse graph with its level of regions:** ADR 0043 and ADR 0070's step 2. Acceptance: a path across the test map within 16 ms on the development Mac at an idle machine, with a control of the graph of areas alone missing it.
 5. **The far tier and the consistency check:** ADR 0042's far rules, and the test above. Acceptance: the bands, with a control in which a far tier that skips fights falls outside them.
-6. **The first map's content at 8,192:** ADR 0070's step 4, with `apart` measured and set.
-7. **The bound measured:** ADR 0048 on this map, on the low profile, from 10,000 to 50,000.
+6. **The first map's content at 8,192:** ADR 0070's step 4, with `apart` measured and set. Acceptance:
+   - the validator's checks on the first map, and Luoyang to Chang'an within ADR 0070's bounds;
+   - `apart` set to the largest of 32, 40, 48 and 56 at which every authored settlement passes the validator and `make sweep` keeps 48 of 50. Its control is the next larger value, shown refusing an authored pair or failing the sweep;
+   - a test map without inns still compiling and validating, as ADR 0070 has it.
+7. **The bound measured:** ADR 0048 on this map, on the low profile, from 10,000 to 50,000. Acceptance:
+   - the bound is the largest N, in steps of 5,000, at which the median p99 of three runs is within 4 ms and a day's tick within a frame, at an idle machine;
+   - its control is the next N above it, measured and shown failing, unless 50,000 itself passes;
+   - the save and the memory at the bound, against this ADR's 160 and 352 bytes a person.
 8. **The view at the map's scale.** Acceptance: captures in Korean of each.
    - ADR 0070's step 5;
    - #168's chart read by area, ADR 0073;
