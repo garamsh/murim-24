@@ -1,6 +1,6 @@
 # ADR 0052: Run the economy from households' needs through town markets, taxed by the power that holds the land
 
-> Status: proposed
+> Status: proposed; its field cell yielding 600 measures a harvest superseded by ADR-0063, under which yields are pack data by biome and season, 120 measures a cell on plain in the base pack
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

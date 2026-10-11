@@ -147,9 +147,9 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 - **Genealogy and families.** Every NPC has parents and belongs to a family (clan), and the genealogy is kept in the world.
 - **Every NPC is an individual person**, with a name, parents, a family, talent and a lifespan.
 - **An army is a roster** of the NPCs conscripted into it, never a count of soldiers.
-- **Population caps.** Each village's population is capped by its own housing, food and storage (`docs/architecture/adr/0022-cap-each-village-by-its-housing-food-and-storage.md`):
-  - A village's cap is the smallest of its housing capacity, its food supply divided by the food one person consumes, and its storage capacity, derived from its structures, with what each kind holds given as data.
-  - Growth slows as the population nears the cap.
+- **Population follows food.** Revised by the owner, 2026-10-10 (#229), in place of a cap on each village by its housing, food and storage (`docs/architecture/adr/0022-cap-each-village-by-its-housing-food-and-storage.md`):
+  - A village's population follows the food it can have. No number stops it.
+  - Housing and storage limit people only through what they cause: crowding and a full store.
   - A shortage brings starvation or migration.
 - **Nature grows on its own.** Decided by the owner on 2026-10-09 (issue #187). ADR 0056 (`docs/architecture/adr/0056-grow-natural-objects-in-slots-the-map-places-and-build-villages-from-what-people-gather.md`), proposed, designs it.
   - Terrain is a biome, and the trees and fruit on it grow naturally. Today's forest is ground on which trees grow, spread and can be felled.
