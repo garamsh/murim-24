@@ -6,8 +6,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -17,6 +19,7 @@
 #include <vector>
 
 #include "content.hpp"
+#include "region.hpp"
 
 namespace murim_packs {
 namespace {
@@ -171,30 +174,23 @@ std::vector<std::string> DirectoryPacks::documents(
 
 void BytePacks::add(const std::string& pack, const std::string& path,
                     std::string bytes) {
-  files_.erase(std::remove_if(files_.begin(), files_.end(),
-                              [&](const File& file) {
-                                return file.pack == pack && file.path == path;
-                              }),
-               files_.end());
-  files_.push_back(File{pack, path, std::move(bytes)});
+  files_[{pack, path}] = std::move(bytes);
 }
 
 ContentRead BytePacks::read(const std::string& pack,
                             const std::string& document) const {
-  const std::string path = file_of(document);
-  const auto found = std::find_if(
-      files_.begin(), files_.end(),
-      [&](const File& file) { return file.pack == pack && file.path == path; });
+  const auto found = files_.find({pack, file_of(document)});
   return found == files_.end() ? refused(ContentRefusal::UNREADABLE)
-                               : parse_document(found->bytes);
+                               : parse_document(found->second);
 }
 
 std::vector<std::string> BytePacks::documents(const std::string& pack) const {
   std::vector<std::string> names;
   const std::string prefix = std::string{DATA_DIRECTORY} + "/";
-  for (const File& file : files_) {
-    if (file.pack == pack && file.path.compare(0, prefix.size(), prefix) == 0) {
-      names.push_back(document_of(file.path.substr(prefix.size())));
+  for (const auto& [key, bytes] : files_) {
+    const auto& [owner, path] = key;
+    if (owner == pack && path.compare(0, prefix.size(), prefix) == 0) {
+      names.push_back(document_of(path.substr(prefix.size())));
     }
   }
   std::sort(names.begin(), names.end());

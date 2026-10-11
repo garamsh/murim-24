@@ -52,8 +52,8 @@ lint: build
 	$(TOOLS)/ninja -C $(LINT_DIR)/extension _deps/godot-cpp-build/generate_bindings
 	@files=$$($(CXX_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no C++ source was read" >&2; exit 1; }; \
-	$(TOOLS)/clang-tidy --quiet --header-filter='/(core|packs_json)/[^/]+\.hpp$$' -p $(LINT_DIR)/core $$files && \
-	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ and packs_json/ headers they include, selected by: $(CXX_SOURCE_SCOPE)"
+	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/(core|packs_json)/[^/]+\.hpp$$' -p $(LINT_DIR)/core $$files && \
+	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ and packs_json/ headers they include, with core/.clang-tidy, selected by: $(CXX_SOURCE_SCOPE)"
 	@files=$$($(EXTENSION_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no extension/ C++ source was read" >&2; exit 1; }; \
 	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/extension/[^/]+\.hpp$$' -p $(LINT_DIR)/extension $$files && \

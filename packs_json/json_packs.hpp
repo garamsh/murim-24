@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "content.hpp"
@@ -59,12 +61,8 @@ class BytePacks : public murim::PackSource {
       const std::string& pack) const override;
 
  private:
-  struct File {
-    std::string pack;
-    std::string path;
-    std::string bytes;
-  };
-  std::vector<File> files_;
+  // Each file's bytes, by its pack and its path within the pack.
+  std::map<std::pair<std::string, std::string>, std::string> files_;
 };
 
 /// Loads the base pack, BASE_PACK, from pack directories under `root`, and
