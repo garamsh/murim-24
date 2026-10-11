@@ -3901,6 +3901,7 @@ TEST(World, EndingAnIntentHoldsTheArmyWhereItsLeadStands) {
   World ordered = intent_world(APART);
   ordered.order(CHASER, Order{STAND, {0}, INTENT_FOE});
   run_ticks(ordered, APPROACH_TICKS);
+  ASSERT_FALSE(in(STAND, ordered.person(CHASER).position));
   ordered.order(CHASER, Order{STAND, {0}});
   run_ticks(ordered, AFTER_TICKS);
   EXPECT_TRUE(in(STAND, ordered.person(CHASER).position));
