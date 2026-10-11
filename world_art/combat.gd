@@ -6,10 +6,12 @@
 ## back from the nearest use that struck it, its loss floating up while the damage numbers row
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
-## struck by nothing, of hunger or age, is not drawn falling; a person below WOUNDED or MAIMED of
-## the most health it has had is wounded; and the person the player selected is marked while it
-## lives, or with none selected, the person the steered person's last use struck nearest where it
-## went. Like sound.gd, it keeps what it
+## struck by nothing, of hunger or age, is not drawn falling; a person a use struck bleeds, a spray
+## from its middle in the blow's direction and drops on the ground that fade, while blood is on; a
+## person below WOUNDED or MAIMED of the most health it has had is wounded, and a maimed one on
+## screen drips now and then; and the person the player selected is marked while it lives, or with
+## none selected, the person the steered person's last use struck nearest where it went. Like
+## sound.gd, it keeps what it
 ## compares by person in packed arrays. world_art.gd draws the bodies with what it gives. It reads
 ## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
@@ -33,6 +35,14 @@ const NUMBER_RISE := 12.0
 ## wounded, then maimed: view data read from the core's health.
 const WOUNDED := 500
 const MAIMED := 250
+## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
+## apart a maimed person drips; and the most drops kept, the oldest going first.
+const SPRAY_MS := 300
+const DROP_MS := 3000
+const DRIP_TICKS := 45
+const MOST_DROPS := 1200
+## Blood, the crimson ramp's three darkest steps: its lightest stays for hostility.
+const BLOOD := [Color("3d0d14"), Color("5c1418"), Color("9c1f24")]
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
 const PAPER := Color("efe3c2")
@@ -47,6 +57,13 @@ const NEVER := -(1 << 40)
 ## Whose losses float up as numbers: "off", none; "mine", the steered person's own and those its
 ## uses struck; "everyone", every loss. The settings' damage numbers row sets it.
 var damage_numbers := "mine"
+## Whether a hit draws blood; the settings' blood row sets it. Off, a hit shows only its flash.
+var blood := true
+## Each spray of blood flying, in order: `ms`, when, `at`, the struck body's middle in pixels, `dir`,
+## the blow's direction, and `seed`.
+var sprays: Array[Dictionary] = []
+## Each drop of blood on the ground, in order: `ms`, when it fell, and `at`, where, in pixels.
+var drops: Array[Dictionary] = []
 ## Each army's faction accent, by army index; world_art.gd keeps it as armies form.
 var accents: Array[Color] = []
 ## Each use shown, as WorldAdapter.strikes() gives it, with `ms`, when it was recorded, and
@@ -81,6 +98,8 @@ var _ms := 0
 var _lead := -1
 # Each army's bodies' positions on the tick last read.
 var _positions: Array[PackedVector2Array] = []
+# Each army's roster as the last tick read it, so a body's person is found again.
+var _rosters_read: Array[PackedInt64Array] = []
 # By person: the tick it was last read alive, its health, army and body index then, the tick a use
 # last struck it, whether one of the steered person's did, and how near the nearest that did stood,
 # in sub-cell units squared.
@@ -150,6 +169,8 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 			deaths.append({"person": person, "army": _army[person], "at": at,
 				"ground": stood * CELL / WorldAdapter.CELL_SIZE, "ms": now})
 	_read_bodies(world, rosters, positions, true)
+	if blood:
+		_drip()
 	if selected >= 0 and selected < _seen.size() and _seen[selected] == _tick:
 		target = selected
 	elif target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
@@ -206,6 +227,63 @@ func wound(person: int) -> int:
 	return 2 if share < MAIMED else (1 if share < WOUNDED else 0)
 
 
+## Returns the sprays of blood flying at `now` within the view.
+func shown_sprays(now: int) -> Array[Dictionary]:
+	return sprays.filter(func(spray: Dictionary) -> bool:
+		return now - spray.ms < SPRAY_MS and view.grow(8.0).has_point(spray.at))
+
+
+## Returns the drops of blood on the ground at `now` within the view, each with `left`, the share
+## of its time it has left, from 1 as it falls to 0.
+func shown_drops(now: int) -> Array[Dictionary]:
+	var shown: Array[Dictionary] = []
+	for drop: Dictionary in drops:
+		if now - drop.ms < DROP_MS and view.has_point(drop.at):
+			shown.append({"at": drop.at, "left": 1.0 - float(now - drop.ms) / DROP_MS, "shade": drop.shade})
+	return shown
+
+
+# A use struck `person`, standing at `at` in pixels: a spray from its middle in the blow's direction,
+# and three drops on the ground beyond its feet that way.
+func _bleed(person: int, at: Vector2) -> void:
+	var seed := person * 7919 + _tick
+	var dir: Vector2 = _away[person]
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT.rotated(_unit(seed, 9) * TAU)
+	sprays.append({"ms": _ms, "at": at - Vector2(0, BODY_HEIGHT / 2.0), "dir": dir, "seed": seed})
+	for k in 3:
+		var aside := Vector2(_unit(seed, 20 + k) * 4.0 - 2.0, _unit(seed, 30 + k) * 2.0 - 1.0)
+		_drop(at + Vector2(dir.x, dir.y * 0.75) * (3.0 + k * 2.5) + aside, k)
+
+
+# Each maimed person on screen drips a drop at its feet every DRIP_TICKS ticks, its own tick apart.
+func _drip() -> void:
+	for army in _positions.size():
+		var positions: PackedVector2Array = _positions[army]
+		for body in positions.size():
+			if army >= _rosters_read.size() or body >= _rosters_read[army].size():
+				continue
+			var person := _rosters_read[army][body]
+			if (person + _tick) % DRIP_TICKS != 0 or wound(person) < 2:
+				continue
+			var at := _pixels(positions[body])
+			if view.has_point(at):
+				_drop(at + Vector2(_unit(person, _tick) * 4.0 - 2.0, 0.0), person)
+
+
+func _drop(at: Vector2, shade: int) -> void:
+	drops.append({"ms": _ms, "at": at.round(), "shade": shade % BLOOD.size()})
+	if drops.size() > MOST_DROPS:
+		drops = drops.slice(drops.size() - MOST_DROPS)
+
+
+# A number in [0, 1) from `seed` and `k`, the same for the same pair.
+static func _unit(seed: int, k: int) -> float:
+	var h := (seed * 73856093) ^ (k * 19349663)
+	h = (h ^ (h >> 13)) * 1274126177
+	return float(absi(h ^ (h >> 16)) % 10007) / 10007.0
+
+
 func show_at(shown: Rect2, now: int, target_at: Vector2) -> void:
 	view = shown
 	_now = now
@@ -224,6 +302,13 @@ func shown_strikes(now: int) -> Array[Dictionary]:
 
 
 func _draw() -> void:
+	for spray: Dictionary in shown_sprays(_now):
+		var left := 1.0 - float(_now - spray.ms) / SPRAY_MS
+		for k in 6:
+			var turn := (_unit(spray.seed, k) - 0.5) * 1.2
+			var reach := 2.0 + k + (1.0 - left) * 4.0
+			var p: Vector2 = (spray.at + (spray.dir as Vector2).rotated(turn) * reach).round()
+			draw_rect(Rect2(p, Vector2.ONE), Color(BLOOD[k % BLOOD.size()], left))
 	for strike: Dictionary in shown_strikes(_now):
 		_draw_strike(strike, 1.0 - float(_now - strike.ms) / STRIKE_MS)
 	if target >= 0:
@@ -347,6 +432,7 @@ func _read_bodies(world: WorldAdapter, rosters: Array[PackedInt64Array],
 			_army[person] = army
 			_body[person] = body
 	_positions = positions.duplicate()
+	_rosters_read = rosters.duplicate()
 
 
 # Notes that `person`, standing at `at` in pixels, lost `lost` health on this tick: it flashes, is
@@ -356,6 +442,8 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 	_hit_ms[person] = _ms
 	if not struck:
 		_away[person] = Vector2.ZERO
+	if struck and blood:
+		_bleed(person, at)
 	var own := person == _lead
 	var mine := own or (struck and _struck_by_lead[person] == 1)
 	if damage_numbers == "everyone" or (damage_numbers == "mine" and mine):
@@ -367,6 +455,8 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 # Drops what no longer shows at `now`.
 func _forget(now: int) -> void:
 	strikes = strikes.filter(func(strike: Dictionary) -> bool: return now - strike.ms < STRIKE_MS)
+	sprays = sprays.filter(func(spray: Dictionary) -> bool: return now - spray.ms < SPRAY_MS)
+	drops = drops.filter(func(drop: Dictionary) -> bool: return now - drop.ms < DROP_MS)
 	deaths = deaths.filter(func(death: Dictionary) -> bool: return now - death.ms < DEATH_MS)
 	numbers = numbers.filter(func(number: Dictionary) -> bool: return now - number.ms < NUMBER_MS)
 

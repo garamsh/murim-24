@@ -412,6 +412,7 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
 	var aimed: Vector2i = combat.place_of(combat.target)
 	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
+	$Drops.show_drops(combat.shown_drops(now))
 
 
 # The ring army `army`'s bodies are drawn in: RING while it is hostile to the person names are read
