@@ -5,7 +5,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <optional>
+#include <set>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "json_packs.hpp"
@@ -15,14 +20,155 @@
 namespace murim {
 namespace {
 
-using murim_packs::BytePacks;
 using murim_packs::DirectoryPacks;
+using Kind = ContentNode::Kind;
+
+// Builds the fields of one map or the items of one list of a ContentTree,
+// one call a field.
+class Node {
+ public:
+  Node(ContentTree& tree, std::size_t node) : tree_(&tree), node_(node) {}
+
+  Node& set(const std::string& key, std::int64_t value) {
+    ContentNode made;
+    made.kind = Kind::INTEGER;
+    made.integer = value;
+    add(key, std::move(made));
+    return *this;
+  }
+
+  // A number with a fraction, as an adapter gives one.
+  Node& fraction(const std::string& key) {
+    ContentNode made;
+    made.kind = Kind::FRACTION;
+    add(key, std::move(made));
+    return *this;
+  }
+
+  Node& flag(const std::string& key, bool value) {
+    ContentNode made;
+    made.kind = Kind::BOOLEAN;
+    made.boolean = value;
+    add(key, std::move(made));
+    return *this;
+  }
+
+  Node& text(const std::string& key, std::string_view value) {
+    ContentNode made;
+    made.kind = Kind::STRING;
+    made.text = std::string{value};
+    add(key, std::move(made));
+    return *this;
+  }
+
+  // A list of strings.
+  Node& words(const std::string& key, const std::vector<std::string>& values) {
+    Node list = child(key, Kind::LIST);
+    for (const std::string& value : values) {
+      list.text("", value);
+    }
+    return *this;
+  }
+
+  Node map(const std::string& key) { return child(key, Kind::MAP); }
+
+  Node list(const std::string& key) { return child(key, Kind::LIST); }
+
+  // A new map at the end of this list.
+  Node item() { return child("", Kind::MAP); }
+
+ private:
+  Node child(const std::string& key, Kind kind) {
+    ContentNode made;
+    made.kind = kind;
+    return Node{*tree_, add(key, std::move(made))};
+  }
+
+  // Adds `made` under `key` of this map, or at the end of this list.
+  std::size_t add(const std::string& key, ContentNode made) {
+    const std::size_t index = tree_->nodes.size();
+    tree_->nodes.push_back(std::move(made));
+    ContentNode& parent = tree_->nodes.at(node_);
+    parent.children.push_back(index);
+    if (parent.kind == Kind::MAP) {
+      parent.keys.push_back(key);
+    }
+    return index;
+  }
+
+  ContentTree* tree_;
+  std::size_t node_;
+};
+
+// The in-memory pack source for tests: each pack's documents held as the
+// core's value trees, built a field at a time.
+class MemoryPacks : public PackSource {
+ public:
+  // The manifest of pack `pack` at `version`, with its id and name.
+  Node manifest(const std::string& pack, std::int64_t version) {
+    ContentTree& tree = document(pack, MANIFEST, Kind::MAP);
+    Node root{tree, 0};
+    root.text("id", pack)
+        .set("version", version)
+        .text("name", "pack." + pack + ".name");
+    return root;
+  }
+
+  // A new entry `name` of kind `kind` in pack `pack`.
+  Node entry(const std::string& pack, std::string_view kind,
+             const std::string& name) {
+    Node made = Node{document(pack, std::string{kind}, Kind::LIST), 0}.item();
+    made.text("id", name);
+    return made;
+  }
+
+  // Makes pack `pack`'s document of kind `kind` one the source cannot read.
+  void unreadable(const std::string& pack, std::string_view kind) {
+    unreadable_.emplace(pack, std::string{kind});
+    static_cast<void>(document(pack, std::string{kind}, Kind::LIST));
+  }
+
+  [[nodiscard]] ContentRead read(const std::string& pack,
+                                 const std::string& name) const override {
+    const auto found = documents_.find({pack, name});
+    if (found == documents_.end() || unreadable_.count({pack, name}) != 0) {
+      return ContentRead{std::nullopt, ContentRefusal::UNREADABLE};
+    }
+    return ContentRead{found->second, ContentRefusal::UNREADABLE};
+  }
+
+  [[nodiscard]] std::vector<std::string> documents(
+      const std::string& pack) const override {
+    std::vector<std::string> names;
+    for (const auto& [key, tree] : documents_) {
+      if (key.first == pack && key.second != MANIFEST) {
+        names.push_back(key.second);
+      }
+    }
+    return names;
+  }
+
+ private:
+  ContentTree& document(const std::string& pack, const std::string& name,
+                        Kind root) {
+    ContentTree& tree = documents_[{pack, name}];
+    if (tree.nodes.empty()) {
+      ContentNode made;
+      made.kind = root;
+      tree.nodes.push_back(std::move(made));
+    }
+    return tree;
+  }
+
+  std::map<std::pair<std::string, std::string>, ContentTree> documents_;
+  std::set<std::pair<std::string, std::string>> unreadable_;
+};
 
 // A pack source serving the base pack from the packs directory and every
 // other pack from `mods`.
 class BaseAndMods : public PackSource {
  public:
-  explicit BaseAndMods(const BytePacks& mods)
+  explicit BaseAndMods(const MemoryPacks& mods)
       : base_(MURIM_PACKS_DIR), mods_(&mods) {}
 
   [[nodiscard]] ContentRead read(const std::string& pack,
@@ -39,51 +185,71 @@ class BaseAndMods : public PackSource {
 
  private:
   DirectoryPacks base_;
-  const BytePacks* mods_;
+  const MemoryPacks* mods_;
 };
 
 // A base pack small enough to read, which the merged checks accept: one
 // terrain, one faction with one skill, one structure kind and a hamlet of
 // one house, and the rules of life.
 constexpr const char* TINY = "tiny";
+constexpr std::int64_t TINY_VERSION = 2;
+constexpr std::int64_t JAB_DAMAGE = 4;
+// The hamlet's area: room for its house and the army its household raises.
+constexpr std::int64_t HAMLET_WIDTH = 7;
+constexpr std::int64_t HAMLET_HEIGHT = 9;
 
-void add_tiny_base(BytePacks& packs) {
-  packs.add(TINY, "pack.json",
-            R"({"id": "tiny", "version": 2, "name": "pack.tiny.name",
-                "base": true})");
-  packs.add(TINY, "data/terrain.json",
-            R"([{"id": "plain", "footing": "buildable", "weight": 1}])");
-  packs.add(TINY, "data/skills.json",
-            R"([{"id": "jab", "range": 384, "radius": 0, "body_damage": 10,
-                 "structure_damage": 0, "cooldown": 15, "qi_cost": 0,
-                 "shape": "targeted"}])");
-  packs.add(TINY, "data/factions.json",
-            R"([{"id": "north", "name": "North", "hostile_to": [],
-                 "skills": ["jab"], "stance": []}])");
-  packs.add(TINY, "data/structure_kinds.json",
-            R"([{"id": "house", "housing": 8, "storage": 0, "yield": 0,
-                 "blocks": true, "pupils": 0}])");
-  packs.add(TINY, "data/villages.json",
-            R"([{"id": "hamlet", "width": 7, "height": 9,
-                 "buildings": [{"x": 0, "y": 0, "width": 3, "height": 3,
-                                "durability": 100, "kind": "house",
-                                "households": 1}]}])");
-  packs.add(TINY, "data/life.json",
-            R"([{"id": "life", "newborn_health": 120,
-                 "learning": {"comprehension": 0, "teaching": 0,
-                              "reading_cost": 0, "reading_reach": 0,
-                              "orientation_ease": 1000, "polarity_ease": 1000,
-                              "orientation_potency": 1000,
-                              "polarity_potency": 1000}}])");
+void add_tiny_base(MemoryPacks& packs) {
+  packs.manifest(TINY, TINY_VERSION).flag("base", true);
+  packs.entry(TINY, "terrain", "plain")
+      .text("footing", "buildable")
+      .set("weight", 1);
+  packs.entry(TINY, "skills", "jab")
+      .set("range", 4)
+      .set("radius", 0)
+      .set("body_damage", JAB_DAMAGE)
+      .set("structure_damage", 0)
+      .set("cooldown", 3)
+      .set("qi_cost", 0)
+      .text("shape", "targeted");
+  packs.entry(TINY, "factions", "north")
+      .text("name", "North")
+      .words("hostile_to", {})
+      .words("skills", {"jab"})
+      .words("stance", {});
+  packs.entry(TINY, "structure_kinds", "house")
+      .set("housing", 4)
+      .set("storage", 0)
+      .set("yield", 0)
+      .flag("blocks", true)
+      .set("pupils", 0);
+  Node hamlet = packs.entry(TINY, "villages", "hamlet")
+                    .set("width", HAMLET_WIDTH)
+                    .set("height", HAMLET_HEIGHT);
+  hamlet.list("buildings")
+      .item()
+      .set("x", 0)
+      .set("y", 0)
+      .set("width", 3)
+      .set("height", 3)
+      .set("durability", 4)
+      .text("kind", "house")
+      .set("households", 1);
+  packs.entry(TINY, "life", "life")
+      .set("newborn_health", 4)
+      .map("learning")
+      .set("comprehension", 0)
+      .set("teaching", 0)
+      .set("reading_cost", 0)
+      .set("reading_reach", 0)
+      .set("orientation_ease", 0)
+      .set("polarity_ease", 0)
+      .set("orientation_potency", 0)
+      .set("polarity_potency", 0);
 }
 
-// A mod pack `id` with the manifest fields `manifest` beside its id,
-// version and name.
-void add_mod(BytePacks& packs, const std::string& name,
-             const std::string& manifest) {
-  packs.add(name, "pack.json",
-            R"({"id": ")" + name + R"(", "version": 1, "name": "pack.)" + name +
-                R"(.name")" + (manifest.empty() ? "" : ", " + manifest) + "}");
+// The manifest of a mod pack `name` at version 1, for its further fields.
+Node add_mod(MemoryPacks& packs, const std::string& name) {
+  return packs.manifest(name, 1);
 }
 
 // Whether `loaded` holds an error of `reason` at `path` in pack `pack`.
@@ -97,26 +263,23 @@ bool refused_for(const LoadedContent& loaded, const std::string& pack,
 }
 
 TEST(Content, ATinyBasePackLoadsWithNoError) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
   const LoadedContent loaded = load_content(packs, TINY, {});
   EXPECT_TRUE(loaded.errors.empty());
   ASSERT_TRUE(loaded.data.has_value());
-  EXPECT_EQ(loaded.data.value_or(RegionData{}).factions.size(), 1U);
-  EXPECT_EQ(loaded.data.value_or(RegionData{})
-                .factions.front()
-                .skills.front()
-                .body_damage,
-            10U);
+  const RegionData data = loaded.data.value_or(RegionData{});
+  ASSERT_EQ(data.factions.size(), 1U);
+  EXPECT_EQ(data.factions.front().skills.front().body_damage,
+            static_cast<std::uint64_t>(JAB_DAMAGE));
   EXPECT_EQ(loaded.order, std::vector<std::string>{TINY});
 }
 
 TEST(Content, AnUnknownFieldRefusesItsPack) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "colours", "");
-  packs.add("colours", "data/factions.json",
-            R"([{"id": "north", "colour": 3}])");
+  add_mod(packs, "colours");
+  packs.entry("colours", "factions", "north").set("colour", 3);
   const LoadedContent loaded = load_content(packs, TINY, {"colours"});
   EXPECT_TRUE(
       refused_for(loaded, "colours", "colour", ContentRefusal::UNKNOWN_FIELD));
@@ -125,11 +288,10 @@ TEST(Content, AnUnknownFieldRefusesItsPack) {
   EXPECT_TRUE(loaded.data.has_value());
 
   // Control: the same mod giving a field the kind has loads.
-  BytePacks control;
+  MemoryPacks control;
   add_tiny_base(control);
-  add_mod(control, "colours", "");
-  control.add("colours", "data/factions.json",
-              R"([{"id": "north", "name": "Northmen"}])");
+  add_mod(control, "colours");
+  control.entry("colours", "factions", "north").text("name", "Northmen");
   const LoadedContent named = load_content(control, TINY, {"colours"});
   EXPECT_TRUE(named.errors.empty());
   ASSERT_TRUE(named.data.has_value());
@@ -138,22 +300,20 @@ TEST(Content, AnUnknownFieldRefusesItsPack) {
 }
 
 TEST(Content, AFractionIsRefused) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "heavier", "");
-  packs.add("heavier", "data/terrain.json",
-            R"([{"id": "plain", "weight": 1.5}])");
+  add_mod(packs, "heavier");
+  packs.entry("heavier", "terrain", "plain").fraction("weight");
   const LoadedContent loaded = load_content(packs, TINY, {"heavier"});
   EXPECT_TRUE(
       refused_for(loaded, "heavier", "weight", ContentRefusal::FRACTION));
   EXPECT_EQ(loaded.refused, std::vector<std::string>{"heavier"});
 
   // Control: the same weight as an integer loads.
-  BytePacks control;
+  MemoryPacks control;
   add_tiny_base(control);
-  add_mod(control, "heavier", "");
-  control.add("heavier", "data/terrain.json",
-              R"([{"id": "plain", "weight": 2}])");
+  add_mod(control, "heavier");
+  control.entry("heavier", "terrain", "plain").set("weight", 2);
   const LoadedContent whole = load_content(control, TINY, {"heavier"});
   EXPECT_TRUE(whole.errors.empty());
   ASSERT_TRUE(whole.data.has_value());
@@ -161,24 +321,25 @@ TEST(Content, AFractionIsRefused) {
 }
 
 TEST(Content, AnUnresolvedIdRefusesTheMergedSet) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "feud", "");
-  packs.add("feud", "data/factions.json",
-            R"([{"id": "north", "hostile_to": ["south"]}])");
+  add_mod(packs, "feud");
+  packs.entry("feud", "factions", "north").words("hostile_to", {"south"});
   const LoadedContent loaded = load_content(packs, TINY, {"feud"});
   EXPECT_TRUE(refused_for(loaded, "feud", "hostile_to.0",
                           ContentRefusal::UNRESOLVED_ID));
   EXPECT_FALSE(loaded.data.has_value());
 
   // Control: with the faction it names added, it resolves.
-  BytePacks control;
+  MemoryPacks control;
   add_tiny_base(control);
-  add_mod(control, "feud", "");
-  control.add("feud", "data/factions.json",
-              R"([{"id": "north", "hostile_to": ["south"]},
-                  {"id": "south", "name": "South", "hostile_to": ["north"],
-                   "skills": ["jab"], "stance": []}])");
+  add_mod(control, "feud");
+  control.entry("feud", "factions", "north").words("hostile_to", {"south"});
+  control.entry("feud", "factions", "south")
+      .text("name", "South")
+      .words("hostile_to", {"north"})
+      .words("skills", {"jab"})
+      .words("stance", {});
   const LoadedContent resolved = load_content(control, TINY, {"feud"});
   EXPECT_TRUE(resolved.errors.empty());
   ASSERT_TRUE(resolved.data.has_value());
@@ -187,20 +348,20 @@ TEST(Content, AnUnresolvedIdRefusesTheMergedSet) {
 }
 
 TEST(Content, PacksLoadingAfterEachOtherInACycleAreRefused) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "first", R"("after": ["second"])");
-  add_mod(packs, "second", R"("after": ["first"])");
+  add_mod(packs, "first").words("after", {"second"});
+  add_mod(packs, "second").words("after", {"first"});
   const LoadedContent loaded = load_content(packs, TINY, {"first", "second"});
   EXPECT_TRUE(refused_for(loaded, "first", "", ContentRefusal::CYCLE));
   EXPECT_TRUE(refused_for(loaded, "second", "", ContentRefusal::CYCLE));
   EXPECT_EQ(loaded.order, std::vector<std::string>{TINY});
 
   // Control: one way only, the order follows it, though asked otherwise.
-  BytePacks control;
+  MemoryPacks control;
   add_tiny_base(control);
-  add_mod(control, "first", R"("after": ["second"])");
-  add_mod(control, "second", "");
+  add_mod(control, "first").words("after", {"second"});
+  add_mod(control, "second");
   const LoadedContent ordered =
       load_content(control, TINY, {"first", "second"});
   EXPECT_TRUE(ordered.errors.empty());
@@ -208,10 +369,18 @@ TEST(Content, PacksLoadingAfterEachOtherInACycleAreRefused) {
 }
 
 TEST(Content, AMissingRequirementRefusesThePackAndThoseRequiringIt) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "needy", R"("requires": [{"id": "absent", "version": 1}])");
-  add_mod(packs, "needier", R"("requires": [{"id": "needy", "version": 1}])");
+  add_mod(packs, "needy")
+      .list("requires")
+      .item()
+      .text("id", "absent")
+      .set("version", 1);
+  add_mod(packs, "needier")
+      .list("requires")
+      .item()
+      .text("id", "needy")
+      .set("version", 1);
   const LoadedContent loaded = load_content(packs, TINY, {"needy", "needier"});
   EXPECT_TRUE(refused_for(loaded, "needy", "requires.absent",
                           ContentRefusal::MISSING_REQUIREMENT));
@@ -219,43 +388,55 @@ TEST(Content, AMissingRequirementRefusesThePackAndThoseRequiringIt) {
                           ContentRefusal::MISSING_REQUIREMENT));
   EXPECT_EQ(loaded.refused, (std::vector<std::string>{"needy", "needier"}));
   // A version above the base's is as missing.
-  BytePacks newer;
+  MemoryPacks newer;
   add_tiny_base(newer);
-  add_mod(newer, "needy", R"("requires": [{"id": "tiny", "version": 3}])");
+  add_mod(newer, "needy")
+      .list("requires")
+      .item()
+      .text("id", TINY)
+      .set("version", TINY_VERSION + 1);
   EXPECT_TRUE(refused_for(load_content(newer, TINY, {"needy"}), "needy",
                           "requires.tiny",
                           ContentRefusal::MISSING_REQUIREMENT));
 
   // Control: requiring the base at its version loads.
-  BytePacks control;
+  MemoryPacks control;
   add_tiny_base(control);
-  add_mod(control, "needy", R"("requires": [{"id": "tiny", "version": 2}])");
+  add_mod(control, "needy")
+      .list("requires")
+      .item()
+      .text("id", TINY)
+      .set("version", TINY_VERSION);
   const LoadedContent met = load_content(control, TINY, {"needy"});
   EXPECT_TRUE(met.errors.empty());
   EXPECT_EQ(met.order, (std::vector<std::string>{TINY, "needy"}));
 }
 
 TEST(Content, ARemovedEntryTakesNoIndex) {
-  BytePacks packs;
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "rocky", "");
-  packs.add("rocky", "data/terrain.json",
-            R"([{"id": "hills", "footing": "rough", "weight": 2},
-                {"id": "plain", "remove": true},
-                {"id": "meadow", "footing": "buildable", "weight": 3}])");
+  add_mod(packs, "rocky");
+  packs.entry("rocky", "terrain", "hills")
+      .text("footing", "rough")
+      .set("weight", 2);
+  packs.entry("rocky", "terrain", "plain").flag("remove", true);
+  packs.entry("rocky", "terrain", "meadow")
+      .text("footing", "buildable")
+      .set("weight", 3);
   const LoadedContent loaded = load_content(packs, TINY, {"rocky"});
   EXPECT_TRUE(loaded.errors.empty());
   ASSERT_TRUE(loaded.data.has_value());
-  ASSERT_EQ(loaded.data.value_or(RegionData{}).terrain.size(), 2U);
-  EXPECT_EQ(loaded.data.value_or(RegionData{}).terrain.at(0).name, "hills");
-  EXPECT_EQ(loaded.data.value_or(RegionData{}).terrain.at(1).name, "meadow");
+  const RegionData data = loaded.data.value_or(RegionData{});
+  ASSERT_EQ(data.terrain.size(), 2U);
+  EXPECT_EQ(data.terrain.at(0).name, "hills");
+  EXPECT_EQ(data.terrain.at(1).name, "meadow");
 }
 
-TEST(Content, ADocumentNotWellFormedRefusesItsPack) {
-  BytePacks packs;
+TEST(Content, ADocumentTheSourceCannotReadRefusesItsPack) {
+  MemoryPacks packs;
   add_tiny_base(packs);
-  add_mod(packs, "broken", "");
-  packs.add("broken", "data/terrain.json", R"([{"id": "plain", )");
+  add_mod(packs, "broken");
+  packs.unreadable("broken", "terrain");
   const LoadedContent loaded = load_content(packs, TINY, {"broken"});
   EXPECT_TRUE(std::any_of(loaded.errors.begin(), loaded.errors.end(),
                           [](const ContentError& error) {
@@ -264,16 +445,23 @@ TEST(Content, ADocumentNotWellFormedRefusesItsPack) {
                                    error.reason == ContentRefusal::UNREADABLE;
                           }));
   EXPECT_EQ(loaded.refused, std::vector<std::string>{"broken"});
+
+  // Control: the same document read loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "broken");
+  control.entry("broken", "terrain", "plain").set("weight", 2);
+  EXPECT_TRUE(load_content(control, TINY, {"broken"}).errors.empty());
 }
 
 // The damage the test mod gives the guard strike.
 constexpr std::uint64_t SHARPER_DAMAGE = 40;
 
 TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
-  BytePacks mods;
-  add_mod(mods, "sharper", "");
-  mods.add("sharper", "data/skills.json",
-           R"([{"id": "guard", "body_damage": 40}])");
+  MemoryPacks mods;
+  add_mod(mods, "sharper");
+  mods.entry("sharper", "skills", "guard")
+      .set("body_damage", static_cast<std::int64_t>(SHARPER_DAMAGE));
   const BaseAndMods source{mods};
   const LoadedContent base = load_content(source, murim_packs::BASE_PACK, {});
   const LoadedContent sharper =
