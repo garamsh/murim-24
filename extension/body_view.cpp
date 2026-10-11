@@ -155,11 +155,11 @@ constexpr float BRACKET_TOP = 3.0F;
 constexpr float BRACKET_W = 18.0F;
 constexpr float BRACKET_H = 21.0F;
 constexpr float BRACKET_ARM = 4.0F;
-// The palette's colours the fighting is drawn in.
-constexpr std::uint32_t PAPER = 0xefe3c2;
-constexpr std::uint32_t INK = 0x14101a;
-constexpr std::uint32_t JADE = 0x4fc49a;
-constexpr std::uint32_t CRIMSON = 0xd63a2f;
+// The palette's colours set_palette() takes, in its order.
+constexpr std::size_t PAPER = 0;
+constexpr std::size_t INK = 1;
+constexpr std::size_t JADE = 2;
+constexpr std::size_t CRIMSON = 3;
 // unit()'s hash, as combat.gd states it.
 constexpr std::uint64_t UNIT_X = 73856093;
 constexpr std::uint64_t UNIT_Y = 19349663;
@@ -282,18 +282,6 @@ godot::Vector2 vector_of(Point point) { return {point.x, point.y}; }
 
 godot::Color colour_of(Rgba colour) {
   return {colour.red, colour.green, colour.blue, colour.alpha};
-}
-
-// A colour of the palette, as GDScript's Color("rrggbb") reads it, `alpha`
-// opaque.
-Rgba rgb(std::uint32_t hex, double alpha = 1.0) {
-  constexpr std::uint32_t BYTE = 0xff;
-  constexpr float MOST = 255.0F;
-  constexpr int RED = 16;
-  constexpr int GREEN = 8;
-  return {static_cast<float>((hex >> RED) & BYTE) / MOST,
-          static_cast<float>((hex >> GREEN) & BYTE) / MOST,
-          static_cast<float>(hex & BYTE) / MOST, single(alpha)};
 }
 
 Rgba with_alpha(Rgba colour, double alpha) {
@@ -438,6 +426,14 @@ void BodyView::set_atlas(const godot::Vector2& size,
   shadow_x_ = static_cast<std::int64_t>(widths.y);
   sprite_of_faction_ = integers_of(sprite_of_faction);
   accents_ = items_of<Rgba>(accents.to_byte_array());
+}
+
+void BodyView::set_palette(const godot::PackedColorArray& colours) {
+  palette_ = items_of<Rgba>(colours.to_byte_array());
+}
+
+BodyView::Rgba BodyView::paint(std::size_t which) const {
+  return which < palette_.size() ? palette_.at(which) : Rgba{};
 }
 
 void BodyView::set_relief(const godot::Dictionary& cells) {
@@ -1101,11 +1097,11 @@ std::int64_t BodyView::sprite_for(std::int64_t faction) const {
 
 Rgba BodyView::accent(std::int64_t person) const {
   if (!alive(person)) {
-    return rgb(PAPER);
+    return paint(PAPER);
   }
   const std::size_t sprite =
       index_of(sprite_of(index_of(army_.at(index_of(person)))));
-  return sprite < accents_.size() ? accents_.at(sprite) : rgb(PAPER);
+  return sprite < accents_.size() ? accents_.at(sprite) : paint(PAPER);
 }
 
 bool BodyView::hidden(Box rect, double sort_y) const {
@@ -1450,10 +1446,11 @@ void BodyView::draw_effects(const godot::RID& canvas_item) const {
     const godot::String text = entry.get("text");
     const godot::Variant colour = entry.get("colour");
     const double alpha = colour.get("a");
-    font_->draw_string(
-        canvas_item, vector_of(point_of(spot) + Point{1.0F, 1.0F}), text,
-        godot::HORIZONTAL_ALIGNMENT_LEFT, -1,
-        static_cast<std::int32_t>(font_size_), colour_of(rgb(INK, alpha)));
+    font_->draw_string(canvas_item,
+                       vector_of(point_of(spot) + Point{1.0F, 1.0F}), text,
+                       godot::HORIZONTAL_ALIGNMENT_LEFT, -1,
+                       static_cast<std::int32_t>(font_size_),
+                       colour_of(with_alpha(paint(INK), alpha)));
     font_->draw_string(canvas_item, spot, text,
                        godot::HORIZONTAL_ALIGNMENT_LEFT, -1,
                        static_cast<std::int32_t>(font_size_), colour);
@@ -1463,7 +1460,7 @@ void BodyView::draw_effects(const godot::RID& canvas_item) const {
 void BodyView::draw_strike(const godot::RID& canvas_item, const Strike& strike,
                            double left) const {
   godot::RenderingServer* server = godot::RenderingServer::get_singleton();
-  const Rgba colour = strike.steered ? rgb(JADE) : accent(strike.person);
+  const Rgba colour = strike.steered ? paint(JADE) : accent(strike.person);
   const godot::Color fill = colour_of(with_alpha(colour, FILL_ALPHA * left));
   const godot::Color edge = colour_of(with_alpha(colour, EDGE_ALPHA * left));
   const Point origin = screen_point(strike.origin);
@@ -1530,14 +1527,14 @@ void BodyView::draw_strike(const godot::RID& canvas_item, const Strike& strike,
   }
 }
 
-void BodyView::draw_target(const godot::RID& canvas_item, Point where) {
+void BodyView::draw_target(const godot::RID& canvas_item, Point where) const {
   godot::RenderingServer* server = godot::RenderingServer::get_singleton();
   const Box box{where + Point{BRACKET_LEFT, BRACKET_TOP - single(BODY_HEIGHT)},
                 {BRACKET_W, BRACKET_H}};
   const Point end = end_of(box);
   const std::array<Point, 4> corners{box.position, Point{end.x, box.position.y},
                                      Point{box.position.x, end.y}, end};
-  const godot::Color crimson = colour_of(rgb(CRIMSON));
+  const godot::Color crimson = colour_of(paint(CRIMSON));
   for (const Point corner : corners) {
     const float across = corner.x == box.position.x ? 1.0F : -1.0F;
     const float down = corner.y == box.position.y ? 1.0F : -1.0F;
@@ -1663,7 +1660,8 @@ godot::TypedArray<godot::Dictionary> BodyView::shown_numbers(
     godot::Dictionary fields;
     fields.set("text", number.text);
     fields.set("colour",
-               colour_of(rgb(number.own ? CRIMSON : PAPER, 1.0 - (age * age))));
+               colour_of(with_alpha(paint(number.own ? CRIMSON : PAPER),
+                                    1.0 - (age * age))));
     fields.set(
         "at",
         vector_of(rounded(number.at +
@@ -1680,6 +1678,8 @@ void BodyView::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_atlas", "size", "frames", "outlines",
                                 "slots", "sprite_of_faction", "accents"),
                        &BodyView::set_atlas);
+  ClassDB::bind_method(D_METHOD("set_palette", "colours"),
+                       &BodyView::set_palette);
   ClassDB::bind_method(D_METHOD("set_relief", "cells"), &BodyView::set_relief);
   ClassDB::bind_method(D_METHOD("set_occluders", "occluders"),
                        &BodyView::set_occluders);

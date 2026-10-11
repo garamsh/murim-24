@@ -52,6 +52,12 @@ class BodyView : public godot::RefCounted {
                  const godot::PackedInt64Array& sprite_of_faction,
                  const godot::PackedColorArray& accents);
 
+  /// Sets the colours the fighting is drawn in: paper, for others' losses
+  /// and a use by an army of no accent; ink, for a number's shadow; jade,
+  /// for the steered person's uses; and crimson, for its own losses and the
+  /// target's brackets.
+  void set_palette(const godot::PackedColorArray& colours);
+
   /// Sets the ground bodies stand on, as Relief.view_cells() gives it: the
   /// cells' `size`, each cell's `level`, whether it rises as a `slope`,
   /// and its `flat` level plus one where the ground round it is flat, else
@@ -327,6 +333,7 @@ class BodyView : public godot::RefCounted {
   [[nodiscard]] std::int64_t sprite_of(std::size_t army) const;
   [[nodiscard]] std::int64_t sprite_for(std::int64_t faction) const;
   [[nodiscard]] Rgba accent(std::int64_t person) const;
+  [[nodiscard]] Rgba paint(std::size_t which) const;
   [[nodiscard]] Point knocked(std::int64_t person, std::int64_t now) const;
   [[nodiscard]] Look look_of(const Frame& frame, const Army& army,
                              std::size_t body) const;
@@ -337,7 +344,7 @@ class BodyView : public godot::RefCounted {
   [[nodiscard]] std::vector<Near> near(double between) const;
   void draw_strike(const godot::RID& canvas_item, const Strike& strike,
                    double left) const;
-  static void draw_target(const godot::RID& canvas_item, Point where);
+  void draw_target(const godot::RID& canvas_item, Point where) const;
   [[nodiscard]] bool shows(const Strike& strike, std::int64_t now) const;
 
   // The atlas: until it is set, every frame is its first.
@@ -350,6 +357,7 @@ class BodyView : public godot::RefCounted {
   std::int64_t shadow_x_ = 0;
   std::vector<std::int64_t> sprite_of_faction_;
   std::vector<Rgba> accents_;
+  std::vector<Rgba> palette_;
   // The relief.
   std::int64_t relief_width_ = 0;
   std::int64_t relief_height_ = 0;

@@ -49,6 +49,13 @@ const DROP_SHAPES := 3
 ## Blood, the crimson ramp's fourth and second steps, a drop's edge and its core: its first is too
 ## near black to read on the ground, and its fifth stays for hostility.
 const BLOOD := [Color("a01b21"), Color("631648")]
+## The palette's colours the fighting is drawn in, as BodyView takes them: paper, for others' losses;
+## ink, for a number's shadow; jade, for the steered person's uses; and crimson, for its own losses
+## and the target's brackets.
+const PAPER := Color("efe5c9")
+const INK := Color("171229")
+const JADE := Color("4bc89b")
+const CRIMSON := Color("d6422e")
 const FONT := preload("res://hud/fonts/Galmuri9.ttf")
 const FONT_SIZE := 10
 # damage_numbers' modes, in BodyView's order.
@@ -137,6 +144,7 @@ var _next_event := 0
 
 func _init() -> void:
 	bodies.set_font(FONT, FONT_SIZE)
+	bodies.set_palette(PackedColorArray([PAPER, INK, JADE, CRIMSON]))
 
 
 ## Starts on `world` as it stands, from its `snapshot` (read here when empty), showing nothing and
