@@ -87,7 +87,7 @@ Options weighed:
   - requirement edges, each from an insight or a prerequisite art to an art, with the stage needed for an art
   - a realm requirement on each art node, not an edge, since every art has one
 
-  The core exposes, for a person, each node's state, known, known of or unknown, and each edge's whether met. Any layout of the window, a tree, a grid by family and tier, or a radial map, reads the same nodes and edges and decides nothing itself.
+  The core exposes, for a person, each node's state, known, known of, sealed or unknown, and each edge's whether met, with the scroll each node lies in. The window is the owner's scroll layout, below, and it reads these nodes and edges and decides nothing itself.
 - **Qi nature, [proposed].** This ADR takes model B of the PM's qi report as a proposal, its owner's choices pending: whether to add the five elements, whether an art outside its range may be forced, how harsh demonic arts and deviation are, and what qi a reborn body has.
   - **A body's nature** is a point of two signed bytes, righteous to demonic and yin to yang, each −127 to 127, 2 bytes, saved and hashed. Once a day its heart method pulls it a whole step toward the method's target, pack data. Until model B is decided, ADR 0035's nature, derived from the first art learned, stands, and the point is not built.
   - **An art's nature requirement** is a range on each axis, 4 bytes of pack data. Once model B is built, it is one more requirement: a reading outside it fails as any missing requirement does, and the store notes the nature lacked.
