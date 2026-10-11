@@ -22,7 +22,7 @@ set(GODOTCPP_SYSTEM_HEADERS ON CACHE BOOL "" FORCE)
 set(GODOTCPP_DISABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(godot-cpp)
 
-add_library(murim_extension SHARED extension.cpp file_saves.cpp world_adapter.cpp)
+add_library(murim_extension SHARED body_view.cpp extension.cpp file_saves.cpp world_adapter.cpp)
 target_link_libraries(murim_extension PRIVATE murim_core murim_packs_json godot-cpp)
 target_compile_options(murim_extension PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 get_target_property(GODOTCPP_SUFFIX godot-cpp GODOTCPP_SUFFIX)

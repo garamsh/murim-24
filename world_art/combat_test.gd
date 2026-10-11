@@ -167,12 +167,7 @@ func _cause_pass() -> bool:
 		world.tick()
 		ran += 1
 		var now := ran * 1000
-		var rosters: Array[PackedInt64Array] = []
-		var positions: Array[PackedVector2Array] = []
-		for army in world.army_count():
-			rosters.append(world.roster(army))
-			positions.append(world.body_positions(army))
-		combat.note_tick(world, -1, now, rosters, positions)
+		combat.note_tick(world, world.snapshot(), -1, now)
 		var struck := {}
 		for strike: Dictionary in world.strikes():
 			for person: int in strike.struck:

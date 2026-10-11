@@ -1040,8 +1040,9 @@ func advance(delta: float) -> void:
 ## again as another.
 func step() -> void:
 	world.tick()
-	_art.note_tick()
-	_sound.note_tick()
+	var snapshot := world.snapshot()
+	_art.note_tick(snapshot)
+	_sound.note_tick(snapshot)
 	ticks += 1
 	# While the joystick is held, the person is ordered on its way again from each new cell it
 	# reaches.

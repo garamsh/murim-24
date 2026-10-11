@@ -8,7 +8,8 @@
 ## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
 ## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
 ## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings,
-## trees and the raised rows of the ground by the row they stand on. It reads the world and holds no
+## trees and the raised rows of the ground by the row they stand on, their buffers packed natively
+## by combat.gd's BodyView from one WorldAdapter.snapshot() a tick. It reads the world and holds no
 ## game rule.
 extends Node2D
 
@@ -48,35 +49,29 @@ const DECORATIONS := "res://world_art/villages.json"
 # The art of each kind of banner a template names, by the key it is named with.
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 const FOOTPRINT_INSET := 8
-const WALK_FRAME_MS := 150
 const CHEVRON_FRAME_MS := 400
-# Pixels past the screen's edge that are still drawn, for sprites that reach across it.
-const MARGIN := 64.0
 # Frame positions in the body atlas built at startup, in pixels.
-const BODY_FRAME := Vector2i(16, 24)
+const BODY_FRAME := Vector2i(BodyView.FRAME_WIDTH, BodyView.FRAME_HEIGHT)
 ## The row of a body's frame its feet stand on, and how far above where a person stands its name's
 ## anchor, over its head, is, in pixels.
-const FEET := 22
-const HEAD := 23.0
-## How long a body shows its strike frame after it struck, in milliseconds.
-const STRIKE_MS := 200
+const FEET := BodyView.FEET
+const HEAD := BodyView.HEAD
 # The frames of a faction's body sheet, `<tag>` and `<tag>_xray` for each of these, by its tags; and
 # the atlas slot after the factions' frames that holds the shadow, centred in it.
 const BODY_TAGS := ["idle", "walk", "back", "strike", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed"]
-# The suffix of a body's idle and walk tags by how wounded Combat.wound() says it is.
-const WOUND_TAGS := ["", "_hurt", "_maimed"]
 const SHADOW := "markers/shadow"
-## Pixels a band's bodies are bucketed by for the test of what stands in front of them.
-const BUCKET := 32.0
-# The bucket of a place nothing can hide a body in.
-const NO_OCCLUDERS: Array[Ground.Occluder] = []
 ## How far from the person names are read around another person's name is drawn, in cells.
-const NAME_REACH := 8
+const NAME_REACH := BodyView.NAME_REACH
 # Floats per body in a band's buffer: its 2D transform, its colour and its custom data.
-const BODY_FLOATS := 16
+const BODY_FLOATS := BodyView.BODY_FLOATS
 
 var world: WorldAdapter
-var steered := -1
+## The army whose lead body carries the player's markers, or -1 for none.
+var steered := -1:
+	set(value):
+		steered = value
+		if combat != null:
+			combat.bodies.set_steered(value)
 ## The army whose lead names are read around and relations read toward, or -1 for none.
 var viewer := -1
 ## The people within NAME_REACH of the viewer's lead in the last refresh, the lead itself left out,
@@ -101,30 +96,15 @@ var _bands: Array[MultiMeshInstance2D] = []
 var _body_frames := {}
 var _faction_width := 0
 var _shadow_x := 0
-# What a body no hit stop holds reads, so the loop over every body makes no dictionary for it.
-const NOT_HELD := {}
-# The people a hit stop holds, by person: `left`, the view frames it still holds, and from its first
-# held frame on, what that frame drew: `at`, `tag`, `frame`, `white` and `flip`.
-var _held := {}
-# When each person last struck, in milliseconds, by person; never, for one past its end.
-var _struck_at := PackedInt64Array()
 ## Bodies drawn over what stands in front of them as an outline in the last refresh.
 var outlined := 0
-# What can stand in front of a body, by BUCKET, rebuilt when the ground shows other areas, a
-# structure is laid or a structure's frame changes; and how many times a structure's frame changed.
-var _occluders: Dictionary[Vector2i, Array] = {}
+# What can stand in front of a body was last given to the bodies for: the areas the ground shows,
+# the structures laid and how many times a structure's frame changed.
 var _occluders_for := Vector3i(-1, -1, -1)
 var _structure_frames := 0
-# Bodies change only on a tick, so they are read once per tick: positions now and a tick ago,
-# whether each army's roster is the one it had a tick ago, and each army's sprite set. Every body
-# is one person.
-var _tick_positions: Array[PackedVector2Array] = []
-var _last_positions: Array[PackedVector2Array] = []
-var _rosters: Array[PackedInt64Array] = []
-var _same_roster: Array[bool] = []
-var _army_sprites := PackedInt64Array()
-# How each army's faction stands toward the viewer's, read once a tick.
-var _relations := PackedInt64Array()
+# Each structure's stage, and each army's faction, as the last tick left them.
+var _stages := PackedInt64Array()
+var _factions := PackedInt64Array()
 ## The layer of the villages' ground decorations, laid over the ground: paving and road.
 var built: TileMapLayer
 # How many villages have their decorations laid, the world's order kept.
@@ -198,9 +178,13 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_chevron_frames.append(_region(player, "chevron", 1))
 	_ring.visible = steered >= 0
 	_chevron.visible = steered >= 0
-	combat.to_screen = to_screen
-	combat.begin(world)
-	_add_armies()
+	combat.bodies.set_relief(relief.view_cells())
+	var snapshot := world.snapshot()
+	_stages = snapshot.stage
+	_factions = snapshot.faction
+	combat.begin(world, snapshot)
+	combat.bodies.set_steered(steered)
+	_occluders_for = Vector3i(-1, -1, -1)
 	name_around(steered)
 
 
@@ -211,39 +195,35 @@ func name_around(army: int) -> void:
 	_read_relations()
 
 
+# Gives the bodies how each faction an army fights for stands toward the viewer's, read once a tick.
 func _read_relations() -> void:
-	_relations.resize(_tick_positions.size())
-	var faction := world.army_faction(viewer) if viewer >= 0 else -1
-	for army in _relations.size():
-		_relations[army] = world.relation(faction, world.army_faction(army)) if faction >= 0 else -1
+	var relations := PackedInt64Array()
+	var faction := _factions[viewer] if viewer >= 0 and viewer < _factions.size() else -1
+	for other in _factions:
+		if other >= relations.size():
+			var from := relations.size()
+			relations.resize(other + 1)
+			for unread in range(from, other + 1):
+				relations[unread] = -2
+		if relations[other] == -2:
+			relations[other] = world.relation(faction, other) if faction >= 0 else -1
+	combat.bodies.set_viewer(viewer if faction >= 0 else -1, relations)
 
 
-## Records the bodies' positions as a tick leaves them, so a body that moved since the last
-## tick is drawn walking, facing the way it went; and redraws the borders and lays the new
-## villages' decorations when the tick changed the territory or founded a village.
-func note_tick() -> void:
-	for army in _tick_positions.size():
-		_last_positions[army] = _tick_positions[army]
-		_tick_positions[army] = world.body_positions(army)
-		var roster := world.roster(army)
-		_same_roster[army] = roster == _rosters[army]
-		_rosters[army] = roster
-	_add_armies()
+## Records the bodies as a tick leaves them, from `snapshot`, the world's after the tick (read
+## here when empty), so a body that moved since the last tick is drawn walking, facing the way it
+## went; and redraws the borders and lays the new villages' decorations when the tick changed the
+## territory or founded a village.
+func note_tick(snapshot := {}) -> void:
+	if snapshot.is_empty():
+		snapshot = world.snapshot()
+	_stages = snapshot.stage
+	_factions = snapshot.faction
 	_read_relations()
-	var ms := Time.get_ticks_msec()
-	combat.note_tick(world, steered, ms, _rosters, _tick_positions)
+	combat.note_tick(world, snapshot, steered, Time.get_ticks_msec())
 	# Blood is laid out once a tick, so a frame draws it with no work a pixel.
 	$Drops.rebuild(combat)
 	$Sprays.rebuild(combat)
-	# A hit stop starts holding its person afresh from the next refresh.
-	for stop: Dictionary in combat.hit_stops:
-		if stop.person >= 0:
-			_held[stop.person] = {"left": maxi(stop.frames, _held.get(stop.person, {}).get("left", 0))}
-	for strike: Dictionary in combat.strikes:
-		if strike.ms == ms:
-			if strike.person >= _struck_at.size():
-				_struck_at.resize(strike.person + 1)
-			_struck_at[strike.person] = ms
 	var now := world.territory()
 	var villages := world.villages()
 	if now == owners and villages.size() == _decorated:
@@ -254,33 +234,13 @@ func note_tick() -> void:
 	region_changed.emit()
 
 
-# Reads the armies the world formed since they were last read, settlers and raiding parties
-# among them: their positions and their sprite set.
-func _add_armies() -> void:
-	for army in range(_tick_positions.size(), world.army_count()):
-		_tick_positions.append(world.body_positions(army))
-		_last_positions.append(_tick_positions[army])
-		_rosters.append(world.roster(army))
-		_same_roster.append(true)
-		_army_sprites.append(_sprite_of_faction[world.army_faction(army) % _sprite_of_faction.size()])
-		combat.accents.append(ACCENTS[_army_sprites[army]])
-
-
 ## Returns where body `body` of army `army` stands as drawn, its feet, in pixels: `between` of the
 ## way from where the tick before last left it to where the last tick did, so a body moves on every
 ## frame and not only on a tick, raised with the ground under it. While the army's roster changed on
 ## the last tick, the bodies are drawn where it left them, since a body's index may then name
 ## another person than a tick before.
 func body_at(army: int, body: int, between: float) -> Vector2:
-	return to_screen(_sub_at(army, body, between))
-
-
-func _sub_at(army: int, body: int, between: float) -> Vector2:
-	var now := _tick_positions[army][body]
-	var before := _last_positions[army]
-	if _same_roster[army] and body < before.size():
-		now = before[body].lerp(now, clampf(between, 0.0, 1.0))
-	return now
+	return combat.bodies.body_at(army, body, between)
 
 
 ## Where a point in sub-cell units lies on the unraised ground, in pixels.
@@ -316,130 +276,39 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite != null:
-			var stage := world.structure_stage(structure)
+			var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
 			var texture: Texture2D = sprite.get_meta("frames")[stage]
 			if sprite.texture != texture:
 				sprite.texture = texture
 				_structure_frames += 1
 				if not GROUND_KINDS.has(world.structure_kind(structure)):
 					_shadow_of(structure)
-	var shown := view.grow(MARGIN)
-	# Raised ground draws its rows above where they lie, so the rows on screen reach further down.
-	var first_row := maxi(int(shown.position.y / CELL.y), 0)
-	var last_row := mini(int((shown.end.y + relief.highest() * Relief.LEVEL_PX) / CELL.y) + 1, _height + 1)
-	var buffers: Array[PackedFloat32Array] = []
-	buffers.resize(maxi(last_row - first_row + 1, 0))
-	# Each band's shadows, drawn before its bodies, and the outlines of the bodies something hides.
-	var shadows: Array[PackedFloat32Array] = []
-	shadows.resize(buffers.size())
-	var outlines := PackedFloat32Array()
 	_gather_occluders()
-	var walk := (now / WALK_FRAME_MS) % 4
-	drawn = 0
-	outlined = 0
-	near.clear()
-	var named := viewer >= 0 and not _tick_positions[viewer].is_empty()
-	var named_from := _sub_at(viewer, 0, between) if named else Vector2.ZERO
-	var share := clampf(between, 0.0, 1.0)
-	var pixels := CELL / WorldAdapter.CELL_SIZE
-	for army in _tick_positions.size():
-		var positions := _tick_positions[army]
-		var before := _last_positions[army]
-		var roster := _rosters[army]
-		var sprite := _army_sprites[army]
-		var moving := _same_roster[army]
-		for body in positions.size():
-			var person := roster[body]
-			# As _sub_at() gives it, written out: this loop runs for every body on every frame.
-			var sub := before[body].lerp(positions[body], share) if moving and body < before.size() else positions[body]
-			var on_ground := sub * pixels
-			var at := on_ground - Vector2(0, relief.lift_at(on_ground)) + combat.knock(person, now)
-			# A body a hit stop holds stays where its first held frame drew it.
-			var holding := _held.has(person)
-			var held: Dictionary = _held[person] if holding else NOT_HELD
-			if holding and held.has("at"):
-				at = held.at
-			if not shown.has_point(at):
-				continue
-			var cells := (sub - named_from).length() / WorldAdapter.CELL_SIZE
-			if named and cells <= NAME_REACH and (army != viewer or body > 0):
-				near.append({"person": person, "head": at - Vector2(0, HEAD),
-					"relation": _relations[army], "cells": cells})
-			var row := clampi(int(on_ground.y / CELL.y), first_row, last_row)
-			if buffers.is_empty():
-				continue
-			var heading := positions[body] - before[body] if body < before.size() else Vector2.ZERO
-			var tag := "idle"
-			var index := 0
-			var struck := _struck_at[person] if person < _struck_at.size() else -STRIKE_MS
-			if struck > 0 and now - struck < STRIKE_MS:
-				tag = "strike"
-				index = 0 if now - struck < STRIKE_MS / 2 else 1
-			elif heading != Vector2.ZERO:
-				tag = "back" if heading.y < 0.0 and -heading.y > absf(heading.x) else "walk"
-				index = walk
-			# Facing the viewer, standing or walking, a wounded body stoops and is stained.
-			if tag == "idle" or tag == "walk":
-				tag += WOUND_TAGS[combat.wound(person)]
-			var centre := Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0)
-			var frame := Rect2(Vector2(sprite * _faction_width + (_body_frames[tag] + index) * BODY_FRAME.x, 0), BODY_FRAME)
-			var band := row - first_row
-			var origin := Vector2(0, _band_y(row))
-			# Rounded before the band's origin is taken off, so a body stands on the same whole pixel in
-			# every band.
-			_pack(shadows[band], Rect2(Vector2(_shadow_x, 0), BODY_FRAME), at.round() - origin, false)
-			var white := combat.flash(person, now)
-			var flip := heading.x < 0.0
-			if holding:
-				if held.has("at"):
-					tag = held.tag
-					frame = held.frame
-					white = held.white
-					flip = held.flip
-				else:
-					held.merge({"at": at, "tag": tag, "frame": frame, "white": white, "flip": flip})
-				# A hold counts down only on frames that draw its body, so one held off screen holds
-				# on as it comes into view; a hit stop's bodies are the steered person and those it
-				# strikes or is struck by, on screen.
-				held.left -= 1
-				if held.left <= 0:
-					_held.erase(person)
-			_pack(buffers[band], frame, centre.round() - origin, flip, white)
-			if _hidden(Rect2(centre - Vector2(BODY_FRAME) / 2.0, BODY_FRAME).grow(-2), origin.y):
-				var outline := frame
-				outline.position.x += (_body_frames[tag + "_xray"] - _body_frames[tag]) * BODY_FRAME.x
-				_pack(outlines, outline, centre, flip, white, 1.0, 0.0, frame.position)
-				outlined += 1
-			drawn += 1
-	# The dead fall a quarter turn about their feet and fade where they last stood, flashing as
-	# their killing blow lands.
-	for death: Dictionary in combat.dying(now):
-		var at: Vector2 = death.at
-		if not shown.has_point(at) or buffers.is_empty():
-			continue
-		var row := clampi(int(death.ground.y / CELL.y), first_row, last_row)
-		_pack(buffers[row - first_row], Rect2(Vector2(_army_sprites[death.army] * _faction_width, 0), BODY_FRAME),
-				Vector2(at.x, at.y - FEET + BODY_FRAME.y / 2.0).round() - Vector2(0, _band_y(row)), false,
-				death.flash, death.alpha, death.fallen * PI / 2.0)
-	for band in buffers.size():
-		shadows[band].append_array(buffers[band])
-	_fill_bands(shadows, first_row)
+	var filled: Dictionary = combat.bodies.fill(view, between, now)
+	drawn = filled.drawn
+	outlined = filled.outlined
+	_fill_bands(filled.bands, filled.first_row)
 	# With nothing outlined the pass is not drawn, so the screen is not copied for it.
 	var outlining := _outlines()
 	outlining.visible = outlined > 0
-	_fill(outlining, outlines)
-	near.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.cells < b.cells)
+	_fill(outlining, filled.outlines)
+	near.clear()
+	var people: PackedInt64Array = filled.near_person
+	var heads: PackedVector2Array = filled.near_head
+	var relations: PackedInt64Array = filled.near_relation
+	var cells: PackedFloat64Array = filled.near_cells
+	for i in people.size():
+		near.append({"person": people[i], "head": heads[i], "relation": relations[i], "cells": cells[i]})
 	# The markers follow the steered person while it lives.
-	var alive := steered >= 0 and not _tick_positions[steered].is_empty()
+	var alive: bool = filled.lead
 	_ring.visible = alive
 	_chevron.visible = alive
 	if alive:
-		var lead := body_at(steered, 0, between).round()
+		var lead: Vector2 = filled.lead_at
 		_ring.position = lead
 		_chevron.position = lead
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
-	var aimed: Vector2i = combat.place_of(combat.target)
-	combat.show_at(view, now, body_at(aimed.x, aimed.y, between) if aimed.x >= 0 else Vector2.ZERO)
+	combat.queue_redraw()
 	$Drops.show_at(now)
 	$Sprays.show_at(now)
 
@@ -658,82 +527,35 @@ func _build_body_atlas() -> void:
 	image.blit_rect(shadow, Rect2i(Vector2i.ZERO, shadow.get_size()),
 			Vector2i(_shadow_x, (BODY_FRAME.y - shadow.get_height()) / 2))
 	_atlas = ImageTexture.create_from_image(image)
+	var frames := PackedInt64Array()
+	var outlines := PackedInt64Array()
+	for tag in BODY_TAGS:
+		frames.append(_body_frames[tag])
+		outlines.append(_body_frames[tag + "_xray"])
+	combat.bodies.set_atlas(Vector2(_atlas.get_size()), frames, outlines, _faction_width, _shadow_x,
+			_sprite_of_faction, PackedColorArray(ACCENTS))
 
 
-# Adds one sprite to `buffer`: `frame` is its rectangle in the atlas, BODY_FRAME in size, `centre`
-# its centre in the pixels of the node the buffer is drawn in, and `flip` mirrors it; it is drawn
-# `white` of the way to white, `alpha` opaque, and turned `turn` radians about its bottom edge's
-# middle. `outline_of`, for an outline, is
-# where the body it outlines is in the atlas, and `white` is how far to white that body is drawn.
-func _pack(buffer: PackedFloat32Array, frame: Rect2, centre: Vector2, flip: bool, white := 0.0,
-		alpha := 1.0, turn := 0.0, outline_of := Vector2(-1, -1)) -> void:
-	var size := _atlas.get_size()
-	var width := frame.size.x * (-1.0 if flip else 1.0)
-	var height := frame.size.y
-	var cos_turn := cos(turn)
-	var sin_turn := sin(turn)
-	var local := centre.round() + Vector2(height / 2.0 * sin_turn, height / 2.0 * (1.0 - cos_turn))
-	# A QuadMesh's top is +y; the negative height turns it to the canvas's downward y. Then the
-	# transform's rows, white for a body, and the rectangle's position with the shares of white and
-	# of the body shown; or, for an outline, the body's share of white in the colour's red, and
-	# where the body it outlines is. Written in place, so no array is made per sprite.
-	var body := outline_of.x < 0.0
-	var custom := Vector2(white, alpha) if body else outline_of / size
-	var colour := Color.WHITE if body else Color(white, 0.0, 0.0, 1.0)
-	var at := buffer.size()
-	buffer.resize(at + BODY_FLOATS)
-	buffer[at] = width * cos_turn
-	buffer[at + 1] = height * sin_turn
-	buffer[at + 3] = local.x
-	buffer[at + 4] = width * sin_turn
-	buffer[at + 5] = -height * cos_turn
-	buffer[at + 7] = local.y
-	buffer[at + 8] = colour.r
-	buffer[at + 9] = colour.g
-	buffer[at + 10] = colour.b
-	buffer[at + 11] = colour.a
-	buffer[at + 12] = frame.position.x / size.x
-	buffer[at + 13] = frame.position.y / size.y
-	buffer[at + 14] = custom.x
-	buffer[at + 15] = custom.y
-
-
-# Whether something standing in front of a body, sorted after `sort_y`, covers part of `rect`,
-# the body's frame on screen.
-func _hidden(rect: Rect2, sort_y: float) -> bool:
-	for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
-		for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
-			var bucket: Array = _occluders.get(Vector2i(bx, by), NO_OCCLUDERS)
-			for occluder: Ground.Occluder in bucket:
-				if occluder.sort_y > sort_y and occluder.rect.intersects(rect):
-					return true
-	return false
-
-
-# Buckets what can stand in front of a body: the ground's raised strips and trees shown now, and
-# every standing structure's frame, again whenever either changes.
+# Gives the bodies what can stand in front of them: the ground's raised strips and trees shown now,
+# and every standing structure's frame, again whenever either changes.
 func _gather_occluders() -> void:
 	var ground: Node2D = $Ground
 	var now := Vector3i(ground.shows, structure_sprites.size(), _structure_frames)
 	if now == _occluders_for:
 		return
 	_occluders_for = now
-	_occluders.clear()
 	var all: Array[Ground.Occluder] = ground.occluders()
 	for sprite in structure_sprites:
 		if sprite != null and sprite.get_parent() == _standing:
 			all.append(Ground.Occluder.new(Rect2(sprite.position + sprite.offset, sprite.texture.get_size()), sprite.position.y))
+	var packed := PackedFloat32Array()
 	for occluder in all:
-		var rect := occluder.rect
-		for bx in range(floori(rect.position.x / BUCKET), floori(rect.end.x / BUCKET) + 1):
-			for by in range(floori(rect.position.y / BUCKET), floori(rect.end.y / BUCKET) + 1):
-				var key := Vector2i(bx, by)
-				if not _occluders.has(key):
-					_occluders[key] = []
-				_occluders[key].append(occluder)
+		packed.append_array([occluder.rect.position.x, occluder.rect.position.y, occluder.rect.size.x,
+				occluder.rect.size.y, occluder.sort_y])
+	combat.bodies.set_occluders(packed)
 
 
-func _fill_bands(buffers: Array[PackedFloat32Array], first_row: int) -> void:
+func _fill_bands(buffers: Array, first_row: int) -> void:
 	while _bands.size() < buffers.size():
 		var band := MultiMeshInstance2D.new()
 		band.multimesh = MultiMesh.new()

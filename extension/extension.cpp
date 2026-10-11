@@ -4,6 +4,7 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
+#include "body_view.hpp"
 #include "world_adapter.hpp"
 
 namespace {
@@ -11,6 +12,7 @@ namespace {
 void initialize(godot::ModuleInitializationLevel level) {
   if (level == godot::MODULE_INITIALIZATION_LEVEL_SCENE) {
     GDREGISTER_ABSTRACT_CLASS(murim_godot::WorldAdapter);
+    GDREGISTER_CLASS(murim_godot::BodyView);
   }
 }
 

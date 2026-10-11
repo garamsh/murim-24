@@ -1512,8 +1512,7 @@ func _numbers_pass() -> bool:
 	var now := Time.get_ticks_msec()
 	combat.show_at(Rect2(0, 0, 64, 64), now, Vector2.ZERO)
 	for mine: bool in [true, false]:
-		combat.numbers.append({"ms": now, "text": "7" if mine else "9", "at": Vector2(32, 32),
-			"own": mine, "mine": mine, "width": 4.0})
+		combat.bodies.add_number(now, "7" if mine else "9", Vector2(32, 32), mine, mine)
 	var texts := func() -> Array: return combat.shown_numbers(now).map(
 			func(number: Dictionary) -> String: return number.text)
 	var at_start: Array = texts.call()
