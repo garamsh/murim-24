@@ -1,6 +1,6 @@
 # ADR 0054: Keep each group's standing toward a person, changed by deeds seen or heard
 
-> Status: proposed
+> Status: proposed; its witnesses within the sight's reach alone superseded by ADR-0058, under which a witness must also see past cliffs
 > Date: 2026-10-10
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

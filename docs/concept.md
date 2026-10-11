@@ -82,6 +82,21 @@ Decided by the user on 2026-10-08 (issue #173), and revised by the owner on 2026
 - **Sects on famous mountains.** Each sect's seat stands on a famous mountain: Hwasan on Hua Shan, the Black Fang in the Taihang, and the Demonic Cult on Tianshan in the far west, as Korean wuxia places it. Other famous mountains stand as landmarks until their sects are added.
 - **Villages grow.** The map places only the starting cities, major towns and sect seats. Every other village is founded and grows by the villages' own rules, the same way in every game.
 - **Distance level of detail.** Places near the player are simulated in full; far places are simulated coarsely. Every person stays an individual in every tier (§Growing civilization).
+- **Cliffs are terrain to climb.** Decided by the owner on 2026-10-09 (issue #214). ADR 0058 (`docs/architecture/adr/0058-leap-up-and-down-cliffs-by-realm-and-stamina-and-veil-a-cliffs-top-from-those-who-cannot-leap-it.md`), proposed, designs it.
+  - A person of a high realm climbs a cliff easily, and a low one less.
+  - A high cliff, not a hill or a low step, hides what is on top of it from those below. Low steps stay walkable and visible.
+  - A cliff's height shows by its size on screen.
+  - Decided by the owner on 2026-10-10 (#223's review): climbing spends a stamina of its own, not qi. A climber neither strikes nor casts, and a hit takes its stamina. Footwork arts' effect is climbing; whether they also give speed stays open.
+  - Revised by the owner on 2026-10-10 (#214), in place of a hand climb and a fall: every climb is a leap with a jump motion, and going down is a leap too. Only a drop the person can descend may be jumped down, so nobody leaps to their death. A leap's duration follows the height, the same for every realm.
+  - Decided by the owner on 2026-10-10 (#214): a cliff the viewer can climb shows its top, and the veil stays only on a cliff higher than the viewer can climb. From above, the ground below is visible. Clicking a cell on top of a climbable cliff walks to its foot and leaps up; a cell on a cliff too high is not a destination.
+  - Decided by the PM on 2026-10-10, delegated by the owner (#214): a person may jump down twice the height it can climb, a jump down costs no stamina, and a leap takes 0.2 seconds plus 0.2 seconds a level.
+- **[proposed]** ADR 0058's details:
+  - steps of one level walked, and cliffs of two levels or more leapt
+  - stamina recovering only on flat ground
+  - a band leaping only where its weakest member can
+  - a cliff of three levels hiding the ground above it from those who cannot leap it, drawn veiled, the three as pack data
+  - the veil and sight reading the height a person can climb on full stamina, not its current stamina
+  - the drawn height compressed above three levels, its numbers as pack data
 - **The same world on every device.** A quality profile, chosen by the device or the player, sets only how much is drawn and how far around the player people are simulated in full. The map, its villages and its people are the same on every profile. Far events may turn out differently on different profiles, which is accepted for an offline game.
 - **The population bound is measured.** The map needs far more people than the first region did to feel lived in. The bound is raised from about 500 to the largest number between 10,000 and 50,000 that keeps a tick's p99 within its 4 ms budget with the level of detail, measured on the lowest quality profile. It is measured on PC, macOS first and Linux when available.
 
