@@ -16,6 +16,7 @@ This document is the single reference for the game concept agreed with the user.
 - Lifespan [settled]
 - Martial arts [draft]
 - Qi and martial arts [agreed]
+- Arts that reshape the world [agreed]
 - Mods and re-theming [agreed]
 - Gear, wealth and livelihoods [agreed]
 - MVP scope [proposed]
@@ -228,6 +229,19 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - Mastery is raised by training at a sect's training ground and by sect teaching.
   - Tier 3 arts start with no manual.
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
+
+## Arts that reshape the world [agreed]
+
+Decided by the owner on 2026-10-09 (issue #203). ADR 0057 (`docs/architecture/adr/0057-resolve-world-scale-arts-as-waves-over-area-indexes-absorbed-by-materials-and-reshape-terrain-in-a-conserving-delta-layer.md`), proposed, designs it.
+
+- **The highest arts cover vast areas.** A single move can cover an area so wide that the player zooms out to aim it. Everything inside is struck: people, buildings, natural objects and the terrain itself. The cost scales with what lies inside, never with the map.
+- **Power reshapes terrain.** As a person's power grows, its arts can blast a crater, cut or level a cliff, fell a forest, or breach a wall or gate. The change is written to the world, and people, paths and sight follow it.
+- **Mass is conserved.** Earth blasted away lands elsewhere, at a crater's rim, as scree at a cliff's foot, or filling water. Felled trees leave logs and breached walls leave stones, which people may gather.
+- **Obstacles absorb blows by what they are made of.** A wall soaks up a strike, and those behind it are spared unless the blow breaks through, weakened. This holds for every strike, not only the greatest.
+- **[proposed]** ADR 0057's details:
+  - the wave spreading ring by ring from where it lands
+  - scorched ground healing and forests regrowing, while reshaped earth never heals and stays until someone reshapes it again
+  - the core holding elevation for every cell
 
 ## Mods and re-theming [agreed]
 
