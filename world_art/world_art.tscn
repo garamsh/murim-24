@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://world_art/world_art.gd" id="1"]
 [ext_resource type="Script" path="res://world_art/territory.gd" id="2"]
 [ext_resource type="Script" path="res://world_art/combat.gd" id="3"]
 [ext_resource type="Shader" path="res://world_art/combat.gdshader" id="4"]
 [ext_resource type="Script" path="res://world_art/ground.gd" id="5"]
+[ext_resource type="Script" path="res://world_art/structure_shadows.gd" id="6"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_combat"]
 shader = ExtResource("4")
@@ -16,6 +17,9 @@ script = ExtResource("1")
 script = ExtResource("5")
 
 [node name="Laid" type="Node2D" parent="."]
+
+[node name="Shadows" type="Node2D" parent="."]
+script = ExtResource("6")
 
 [node name="Territory" type="Node2D" parent="."]
 script = ExtResource("2")

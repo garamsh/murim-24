@@ -48,10 +48,6 @@ const DECORATIONS := "res://world_art/villages.json"
 # The art of each kind of banner a template names, by the key it is named with.
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 const FOOTPRINT_INSET := 8
-# A standing structure's shadow on the ground past its right and bottom edges, in pixels, by stage:
-# shorter as it falls, none from rubble; drawn in SHADOW_INK on every other pixel.
-const SHADOW_REACH := [6, 6, 3, 0]
-const SHADOW_INK := Color("14101a")
 const WALK_FRAME_MS := 150
 const CHEVRON_FRAME_MS := 400
 # Pixels past the screen's edge that are still drawn, for sprites that reach across it.
@@ -137,8 +133,6 @@ var _colours: Array[Color] = []
 var fields: TileMapLayer
 ## One sprite per structure, in the world's order; null for a structure with no art.
 var structure_sprites: Array[Sprite2D] = []
-# Each structure shadow's image, by footprint and stage.
-var _shadows := {}
 # Each building's frames by footprint, one per stage in the order of STAGES.
 var _stage_frames := {}
 var _field_sheet := {}
@@ -316,8 +310,8 @@ func refresh(view: Rect2, between := 1.0) -> void:
 			if sprite.texture != texture:
 				sprite.texture = texture
 				_structure_frames += 1
-			if sprite.has_meta("shadow"):
-				(sprite.get_meta("shadow") as Sprite2D).texture = _shadow(world.structure_footprint(structure), stage)
+				if not GROUND_KINDS.has(world.structure_kind(structure)):
+					_shadow_of(structure)
 	var shown := view.grow(MARGIN)
 	# Raised ground draws its rows above where they lie, so the rows on screen reach further down.
 	var first_row := maxi(int(shown.position.y / CELL.y), 0)
@@ -515,32 +509,19 @@ func _lay_structures() -> void:
 			_laid.add_child(sprite)
 		else:
 			_standing.add_child(sprite)
-			var shadow := Sprite2D.new()
-			shadow.centered = false
-			shadow.position = Vector2(corner) * CELL - Vector2(0, lift)
-			shadow.texture = _shadow(footprint, world.structure_stage(structure))
-			_laid.add_child(shadow)
-			sprite.set_meta("shadow", shadow)
 		structure_sprites[structure] = sprite
+		if not GROUND_KINDS.has(kind):
+			_shadow_of(structure)
 
 
-# The shadow a standing structure of `footprint` casts at `stage`, from its footprint's top-left: a
-# dithered band past its right and bottom edges, SHADOW_REACH[stage] pixels wide, one image for
-# each footprint and stage.
-func _shadow(footprint: Vector2i, stage: int) -> ImageTexture:
-	var key := Vector3i(footprint.x, footprint.y, stage)
-	if not _shadows.has(key):
-		var reach: int = SHADOW_REACH[stage]
-		var right := int(footprint.x * CELL.x)
-		var bottom := int(footprint.y * CELL.y)
-		var image := Image.create_empty(right + SHADOW_REACH[0], bottom + SHADOW_REACH[0], false, Image.FORMAT_RGBA8)
-		for band: Rect2i in [Rect2i(right, reach, reach, bottom - 2), Rect2i(reach, bottom, right, reach / 2)]:
-			for x in range(band.position.x, band.end.x):
-				for y in range(band.position.y, band.end.y):
-					if (x + y) % 2 == 0:
-						image.set_pixel(x, y, SHADOW_INK)
-		_shadows[key] = ImageTexture.create_from_image(image)
-	return _shadows[key]
+# Sets the shadow standing structure `structure` casts at its stage, from its footprint's top-left
+# raised with the ground, in the one node that draws every structure's shadow.
+func _shadow_of(structure: int) -> void:
+	var corner := world.structure_cell(structure)
+	var footprint := world.structure_footprint(structure)
+	var bottom := Vector2(corner.x, corner.y + footprint.y) * CELL
+	var lift := relief.lift_at(bottom + Vector2(footprint.x * CELL.x / 2.0, -CELL.y / 2.0))
+	$Shadows.set_shadow(structure, Vector2(corner) * CELL - Vector2(0, lift), footprint, world.structure_stage(structure))
 
 
 # A layer of tiles a cell each, from the 16 x 12 frames of `sheet`.
