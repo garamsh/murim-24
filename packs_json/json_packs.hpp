@@ -28,7 +28,7 @@ constexpr std::size_t DOCUMENT_LIMIT = std::size_t{4} << 20U;
 [[nodiscard]] std::string file_of(const std::string& document);
 
 /// A pack source reading pack directories under a root, each document from
-/// its file_of under `<root>/<pack>/`. The sweep, the bench and the core's
+/// its file_of under `<root>/<pack>/`. The sweep and the core's
 /// tests read the base pack through it.
 class DirectoryPacks : public murim::PackSource {
  public:

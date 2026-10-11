@@ -198,6 +198,22 @@ constexpr std::int64_t JAB_DAMAGE = 4;
 constexpr std::int64_t HAMLET_WIDTH = 7;
 constexpr std::int64_t HAMLET_HEIGHT = 9;
 
+// A complete set of rules of life, `name`, in pack `pack`.
+void add_life(MemoryPacks& packs, const std::string& pack,
+              const std::string& name) {
+  packs.entry(pack, "life", name)
+      .set("newborn_health", 4)
+      .map("learning")
+      .set("comprehension", 0)
+      .set("teaching", 0)
+      .set("reading_cost", 0)
+      .set("reading_reach", 0)
+      .set("orientation_ease", 0)
+      .set("polarity_ease", 0)
+      .set("orientation_potency", 0)
+      .set("polarity_potency", 0);
+}
+
 void add_tiny_base(MemoryPacks& packs) {
   packs.manifest(TINY, TINY_VERSION).flag("base", true);
   packs.entry(TINY, "terrain", "plain")
@@ -234,17 +250,7 @@ void add_tiny_base(MemoryPacks& packs) {
       .set("durability", 4)
       .text("kind", "house")
       .set("households", 1);
-  packs.entry(TINY, "life", "life")
-      .set("newborn_health", 4)
-      .map("learning")
-      .set("comprehension", 0)
-      .set("teaching", 0)
-      .set("reading_cost", 0)
-      .set("reading_reach", 0)
-      .set("orientation_ease", 0)
-      .set("polarity_ease", 0)
-      .set("orientation_potency", 0)
-      .set("polarity_potency", 0);
+  add_life(packs, TINY, "life");
 }
 
 // The manifest of a mod pack `name` at version 1, for its further fields.
@@ -452,6 +458,173 @@ TEST(Content, ADocumentTheSourceCannotReadRefusesItsPack) {
   add_mod(control, "broken");
   control.entry("broken", "terrain", "plain").set("weight", 2);
   EXPECT_TRUE(load_content(control, TINY, {"broken"}).errors.empty());
+}
+
+TEST(Content, AFieldOfTheWrongTypeIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "wordy");
+  packs.entry("wordy", "terrain", "plain").text("weight", "heavy");
+  const LoadedContent loaded = load_content(packs, TINY, {"wordy"});
+  EXPECT_TRUE(
+      refused_for(loaded, "wordy", "weight", ContentRefusal::WRONG_TYPE));
+  EXPECT_EQ(loaded.refused, std::vector<std::string>{"wordy"});
+
+  // Control: the same weight as a number loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "wordy");
+  control.entry("wordy", "terrain", "plain").set("weight", 2);
+  EXPECT_TRUE(load_content(control, TINY, {"wordy"}).errors.empty());
+}
+
+TEST(Content, AnIdTwiceInOneDocumentIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "twice");
+  packs.entry("twice", "terrain", "hills").set("weight", 2);
+  packs.entry("twice", "terrain", "hills").set("weight", 3);
+  const LoadedContent loaded = load_content(packs, TINY, {"twice"});
+  EXPECT_TRUE(refused_for(loaded, "twice", "id", ContentRefusal::DUPLICATE_ID));
+  EXPECT_EQ(loaded.refused, std::vector<std::string>{"twice"});
+
+  // Control: two ids, each once, load.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "twice");
+  control.entry("twice", "terrain", "hills")
+      .text("footing", "rough")
+      .set("weight", 2);
+  control.entry("twice", "terrain", "dunes")
+      .text("footing", "rough")
+      .set("weight", 3);
+  const LoadedContent once = load_content(control, TINY, {"twice"});
+  EXPECT_TRUE(once.errors.empty());
+  EXPECT_EQ(once.data.value_or(RegionData{}).terrain.size(), 3U);
+}
+
+TEST(Content, AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "shouty");
+  packs.entry("shouty", "terrain", "Hills")
+      .text("footing", "rough")
+      .set("weight", 2);
+  const LoadedContent loaded = load_content(packs, TINY, {"shouty"});
+  EXPECT_TRUE(refused_for(loaded, "shouty", "id", ContentRefusal::BAD_ID));
+  EXPECT_EQ(loaded.refused, std::vector<std::string>{"shouty"});
+
+  // Control: the same entry with its id in lowercase loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "shouty");
+  control.entry("shouty", "terrain", "hills_2")
+      .text("footing", "rough")
+      .set("weight", 2);
+  EXPECT_TRUE(load_content(control, TINY, {"shouty"}).errors.empty());
+}
+
+TEST(Content, ANewEntryMissingARequiredFieldRefusesTheMergedSet) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "south");
+  packs.entry("south", "factions", "south")
+      .words("hostile_to", {})
+      .words("skills", {"jab"})
+      .words("stance", {});
+  const LoadedContent loaded = load_content(packs, TINY, {"south"});
+  EXPECT_TRUE(
+      refused_for(loaded, "south", "name", ContentRefusal::MISSING_FIELD));
+  EXPECT_FALSE(loaded.data.has_value());
+
+  // Control: the same faction with its name loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "south");
+  control.entry("south", "factions", "south")
+      .text("name", "South")
+      .words("hostile_to", {})
+      .words("skills", {"jab"})
+      .words("stance", {});
+  const LoadedContent named = load_content(control, TINY, {"south"});
+  EXPECT_TRUE(named.errors.empty());
+  EXPECT_EQ(named.data.value_or(RegionData{}).factions.size(), 2U);
+}
+
+TEST(Content, AValueOutsideItsLimitsIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "flat");
+  packs.entry("flat", "terrain", "plain").set("weight", 0);
+  packs.entry("flat", "terrain", "plain_two")
+      .text("footing", "swampy")
+      .set("weight", 1);
+  const LoadedContent loaded = load_content(packs, TINY, {"flat"});
+  // A weight under its least, and a word not among its choices.
+  EXPECT_TRUE(
+      refused_for(loaded, "flat", "weight", ContentRefusal::OUT_OF_RANGE));
+  EXPECT_TRUE(
+      refused_for(loaded, "flat", "footing", ContentRefusal::OUT_OF_RANGE));
+  EXPECT_EQ(loaded.refused, std::vector<std::string>{"flat"});
+
+  // Control: the least weight and a word among the choices load.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "flat");
+  control.entry("flat", "terrain", "plain").set("weight", 1);
+  control.entry("flat", "terrain", "plain_two")
+      .text("footing", "blocked")
+      .set("weight", 1);
+  EXPECT_TRUE(load_content(control, TINY, {"flat"}).errors.empty());
+}
+
+TEST(Content, AModCallingItselfABaseIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "usurper").flag("base", true);
+  const LoadedContent loaded = load_content(packs, TINY, {"usurper"});
+  EXPECT_TRUE(refused_for(loaded, "usurper", "base", ContentRefusal::BASE));
+  EXPECT_EQ(loaded.refused, std::vector<std::string>{"usurper"});
+  // A base that does not call itself one is refused as well.
+  MemoryPacks unmarked;
+  unmarked.manifest(TINY, TINY_VERSION);
+  EXPECT_TRUE(refused_for(load_content(unmarked, TINY, {}), TINY, "base",
+                          ContentRefusal::BASE));
+
+  // Control: the same mod saying it is no base loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "usurper").flag("base", false);
+  const LoadedContent loaded_control = load_content(control, TINY, {"usurper"});
+  EXPECT_TRUE(loaded_control.errors.empty());
+  EXPECT_EQ(loaded_control.order, (std::vector<std::string>{TINY, "usurper"}));
+}
+
+TEST(Content, AMergedSetFailingTheRegionsChecksIsRefused) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "cramped");
+  // Too small to hold the hamlet's house and its household's army.
+  packs.entry("cramped", "villages", "hamlet").set("width", 4).set("height", 4);
+  const LoadedContent loaded = load_content(packs, TINY, {"cramped"});
+  EXPECT_TRUE(refused_for(loaded, "cramped", "", ContentRefusal::INCONSISTENT));
+  EXPECT_FALSE(loaded.data.has_value());
+  // A second set of rules of life is as inconsistent.
+  MemoryPacks lives;
+  add_tiny_base(lives);
+  add_mod(lives, "twin");
+  add_life(lives, "twin", "other_life");
+  EXPECT_TRUE(refused_for(load_content(lives, TINY, {"twin"}), "twin", "",
+                          ContentRefusal::INCONSISTENT));
+
+  // Control: the hamlet at its own size loads.
+  MemoryPacks control;
+  add_tiny_base(control);
+  add_mod(control, "cramped");
+  control.entry("cramped", "villages", "hamlet")
+      .set("width", HAMLET_WIDTH)
+      .set("height", HAMLET_HEIGHT);
+  EXPECT_TRUE(load_content(control, TINY, {"cramped"}).errors.empty());
 }
 
 // The damage the test mod gives the guard strike.
