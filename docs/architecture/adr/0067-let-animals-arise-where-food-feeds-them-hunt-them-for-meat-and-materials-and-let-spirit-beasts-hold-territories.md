@@ -73,26 +73,29 @@ Options weighed:
 - **Forage, on ADR 0056's slots.** Grass is a new slot kind of the base pack. Its biomes are plain 6, hills 4 and forest 2, it grows in 16 days, and its stump regrows in 8. A kind is forage when the pack marks it so; bushes are not, since people gather their berries.
   - **Grazing is a slot-stage change.** At its area's cycle, each grazer crops one grown forage slot of its home area, the lowest index first, setting it to stump. A cropped slot is a sapling 8 days later and grown 16 days after that, so it feeds again after 3 cycles.
   - **So a grazer needs 3 forage slots.** It eats one a cycle, and each slot feeds once in 3 cycles. That is the `forage_per_grazer` of the base pack, pack data.
-  - **Its share of the slots.** The build tool places grass among an area's 64 slots by the same affinity draw as every kind (ADR 0056). In the base pack a plain area weighs grass 6 against tree 2, fruit tree 3 and bush 4, so about 26 of its slots are grass; a hills area weighs it 4 of 17, about 15; a forest area 2 of 17, about 8.
+  - **Its share of the slots.** The build tool places grass and undergrowth among an area's 64 slots by the same affinity draw as every kind (ADR 0056). In the base pack:
+    - a plain area weighs grass 6 against tree 2, fruit tree 3, bush 4 and covey 2, 17 in all, so about 23 of its slots are grass
+    - a hills area weighs grass 4 and undergrowth 1 against tree 3, bush 2, rock 6 and herb 2, 18 in all: about 14 grass and 4 undergrowth
+    - a forest area weighs grass 2 and undergrowth 6 against tree 10, fruit tree 2 and herb 3, 23 in all: about 6 grass and 17 undergrowth
   - Grass costs no storage beyond its slots, and the map is rebuilt for it, as ADR 0056 says any change to natural-object kinds requires.
 - **Kinds.** Animal kinds are pack data: a name, a role (grazer, predator or spirit beast), the biomes it lives on with a weight each, its health, its speed, its strike, the kinds it preys on, and what it drops. The base pack's:
 
-  | Kind | Role | Lives on | Health | Speed | Drops |
-  |---|---|---|---|---|---|
-  | Deer | grazer, herds of 3 to 8 | plain 4, forest 3, hills 3 | 60 | 16 | 30 meat, 1 hide, 1 horn |
-  | Boar | grazer, herds of 2 to 6 | forest 4, hills 3 | 120 | 14 | 50 meat, 1 hide, 1 bone |
-  | Wolf | predator of deer, roe and boar, packs of 2 to 6 | forest 3, hills 4 | 90 | 18 | 10 meat, 1 hide, 1 bone |
-  | Tiger | predator of deer, roe, boar and wild horse, alone | forest 4 | 240 | 18 | 30 meat, 2 hide, 2 bone, 1 claw |
-  | Hare | grazer, small game, alone | plain 4, hills 3 | 10 | 20 | 4 meat, 1 hide |
-  | Wild horse | grazer, herds of 4 to 12 | plain 5 | 150 | 22 | 60 meat, 2 hide, 1 bone |
-  | Roe | browser, herds of 2 to 6 | forest 5 | 50 | 18 | 20 meat, 1 hide, 1 horn |
-  | Fox | predator of hare, alone | plain 3, forest 3 | 30 | 18 | 4 meat, 1 hide |
-  | Spirit tiger | spirit beast, predator of deer and boar | forest 4, hills 2 | 4,000 | 18 | 1 spirit core, 4 spirit hide, 4 spirit bone, 2 spirit claw, 40 meat |
+  | Kind | Role | Lives on | Health | Walk | Run | Sight, open / forest | Strike | Drops |
+  |---|---|---|---|---|---|---|---|---|
+  | Deer | grazer, herds of 3 to 8 | plain 4, forest 3, hills 3 | 60 | 16 | 32 | 10 / 4 | 3 | 30 meat, 1 hide, 1 horn |
+  | Boar | grazer, herds of 2 to 6 | forest 4, hills 3 | 120 | 14 | 28 | 6 / 3 | 10 | 50 meat, 1 hide, 1 bone |
+  | Wolf | predator of deer, roe and boar, packs of 2 to 6 | forest 3, hills 4 | 90 | 16 | 38 | 10 / 5 | 8 | 10 meat, 1 hide, 1 bone |
+  | Tiger | predator of deer, roe, boar and wild horse, alone | forest 4 | 240 | 16 | 40 | 8 / 4 | 20 | 30 meat, 2 hide, 2 bone, 1 claw |
+  | Hare | grazer, small game, alone | plain 4, hills 3 | 10 | 18 | 36 | 6 / 3 | 0 | 4 meat, 1 hide |
+  | Wild horse | grazer, herds of 4 to 12 | plain 5 | 150 | 18 | 44 | 12 / 5 | 6 | 60 meat, 2 hide, 1 bone |
+  | Roe | browser, herds of 2 to 6 | forest 5 | 50 | 16 | 34 | 8 / 4 | 2 | 20 meat, 1 hide, 1 horn |
+  | Fox | predator of hare, alone | plain 3, forest 3 | 30 | 16 | 40 | 8 / 4 | 4 | 4 meat, 1 hide |
+  | Spirit tiger | spirit beast, predator of deer and boar | forest 4, hills 2 | 4,000 | 16 | 44 | 12 / 6 | 40 | 1 spirit core, 4 spirit hide, 4 spirit bone, 2 spirit claw, 40 meat |
 
-  Speed is in sub-cell units a tick, beside a person's `SPEED` of 16. Meat is a food kind, a measure a unit. Hide, horn, bone, claw, spirit hide, spirit bone and spirit claw are #245's material kinds.
+  Speeds are in sub-cell units a tick, a cell being `CELL_SIZE`, 256 units (`core/map.hpp`), beside a person's `SPEED` of 16, 1.875 cells a second. An animal walks at its walk speed and runs, fleeing or chasing, at its run speed: a deer at 32, 3.75 cells a second, and a wolf at 38. Sight is in cells, the shorter where the watcher stands on forest. Strike is the damage of the kind's strike, which with health gives its strength. Meat is a food kind, a measure a unit. Hide, horn, bone, claw, spirit hide, spirit bone and spirit claw are #245's material kinds.
   - **Browsers** feed on undergrowth, a second forage kind of the base pack: forest 6, hills 1, growing in 16 days, its stump regrowing in 8. A kind names the forage kinds it eats, so roe crop undergrowth and deer and wild horses grass. Undergrowth is placed by the build tool as grass is.
   - **Small game** is a grazer alone, light and fast, eaten by small predators: hares and foxes run the same rules at a smaller scale.
-  - **Birds and fish** are not records. They are slot kinds of ADR 0056, a shoal on water cells and a covey on plain, gathered by the gathering order as fruit is, since chasing them would add cost and nothing a rule reads. This is the owner's "where cheap".
+  - **Birds and fish** are not records. They are slot kinds of ADR 0056, a shoal on water cells and a covey on plain, weighing 2, gathered by the gathering order as fruit is, since chasing them would add cost and nothing a rule reads. This is the owner's "where cheap".
   - The kinds above are the base pack's. A pack adds kinds as rows, within the bounds below.
 - **Appearance.** At each area's cycle, after grazing, one draw for each role, from `animal_stream`, a counter-based stream of the world's seed, the area's index, the cycle's number and the role. Like `slot_stream`, no other rule's draws shift it, and no order of visiting matters.
   - **Where nothing appears.** No animal appears in an area holding any structure of a village, so none appear in towns. An area whose biomes no kind lives on, or with no forage, has no grazers, and so no predators.
@@ -114,18 +117,21 @@ Options weighed:
     - The sum is clamped to the kind's speed. Herds are at most 12, so a member reads at most 11 mates, and needs no other search.
   - Packs of predators herd by the same rule, behind a leader that hunts.
 - **Flight and the chase.** In live areas, each tick:
-  - **Prey sees its predators.** A grazer that `sees` (ADR 0058) a predator of a kind that eats it within its kind's sight, 8 cells in the base pack, flees: it runs away from the predator toward its herd's centre, or toward the nearest forest cell when alone, and its herd's leader flees with it, so the herd turns as one. It grazes again 60 ticks after it last saw one.
-  - **A predator hunts** when hungry, from its cycle until it eats: it takes the nearest prey it sees and chases it at its speed, the chase budget counting down from its kind's, 300 ticks, 10 seconds, in the base pack. Reaching its prey within an arm's length, it strikes by its kind's strike, and a kill is its meal. With the budget spent it gives up and rests 600 ticks, then hunts again. A pack chases the leader's target together.
+  - **Prey sees its predators.** A predator stalks at its walk toward its prey. When it first comes within the prey's sight, a draw from `animal_stream` sets the distance at which the prey notices it, a whole number of cells from 1 to that sight, so a stalker sometimes comes close. A grazer that `sees` (ADR 0058) a predator of a kind that eats it within that distance flees: it runs away from the predator toward its herd's centre, or toward the nearest forest cell when alone, and its herd's leader flees with it, so the herd turns as one. It grazes again 60 ticks after it last saw one.
+  - **A predator hunts** when hungry, from its cycle until it eats: it takes the nearest prey it sees and chases it at its run speed, the chase budget counting down from its kind's, 300 ticks, 10 seconds, in the base pack. Reaching its prey within an arm's length, it strikes by its kind's strike, and a kill is its meal. With the budget spent it gives up and rests 600 ticks, then hunts again. A pack chases the leader's target together.
   - **The kill** removes the prey and drops nothing to people: the predator has eaten it. A predator struck by a person fights back until the person or it is 8 cells away.
-  - **Speed decides the chase.** A wolf at 18 gains a cell on a deer at 16 every 8 ticks, so it closes from 8 cells within its 300-tick budget unless the deer reaches its herd or cover. A tiger at 18 on a wild horse at 22 never closes on open plain and must ambush in forest.
+  - **Speed decides the chase.** In a budget of B ticks a predator gains C = (its run − the prey's run) × B / 256 cells. It catches its prey when C reaches the distance at which it was noticed, less the arm's length of a cell.
+    - A wolf on a deer: (38 − 32) × 300 / 256 = 7.0 cells, so it catches a deer that noticed it 8 cells away or nearer: 8 of the 10 draws on open ground, 800 per mille, and every draw in forest, where the deer sees 4.
+    - A tiger on a wild horse: 40 against 44 never gains, so it catches only a horse that noticed it within its arm's length, the pounce: 1 draw in 12 on open plain, 1 in 5 in forest. Tigers ambush in forest.
+    - A fox on a hare: (40 − 36) × 300 / 256 = 4.7 cells, 5 of 6 draws on open ground.
 - **Avoiding the stronger.** Animals give way by the threat appraisal people use, #256's, which the core worker designs as ADR 0071. This ADR gives it the animals' inputs:
   - **A side** is a herd, a pack or a lone animal.
   - **Strength** is the side's summed health × strike, by its kind's data. A grazer's strike is its kick or tusk, a small value in the kind's row.
   - **Temperament** is a kind's, pack data: timid for hares, deer and horses, wary for boar and wolves, bold for tigers and spirit beasts.
   - So a lone wolf gives way to a herd of six boar, a pack keeps clear of a band of armed people, and grazers keep away from a group of people larger than their herd. A spirit beast holds its territory whatever it faces, as the owner decided.
-  - Until #256's appraisal is built, an animal flees only predators that eat it and people within 4 cells, as the steps below order it.
-- **In stepped and far areas** animals stand where they last were, herds included, and the cycle settles what the chase does live: a hungry predator kills one prey of its kinds in its area or the 8 around it, the lowest index first, with a chance from its speed against its prey's, 500 per mille plus 100 per mille for each unit of speed it has over the prey, between 100 and 900. A wolf on a deer, 2 faster, kills at 700 per mille a cycle; a tiger on a wild horse, 4 slower, at 100.
-  - The two forms are one rule at two grains: the far chance is set so that a live area's kills over a cycle match it, which step 2 measures.
+  - Until #256's appraisal is built, an animal flees only predators that eat it and people within 4 cells, as step 4 orders it, and the same step hooks the appraisal in once #256 lands.
+- **In stepped and far areas** animals stand where they last were, herds included, and the cycle settles what the chase does live: a hungry predator kills one prey of its kinds in its area or the 8 around it, the lowest index first, with the chance the live chase gives: of the prey's sight S in the area's main cover, the share of draws from 1 to S that the chase reach C covers, min(S, ⌊C⌋ + 1) / S, or 1 / S when C is below 0, at most 900 per mille. A wolf on a deer on open ground kills at 800 per mille a cycle, in a forest area at 900; a tiger on a wild horse at 83 on plain.
+  - The two forms are one rule at two grains: the far chance is the live chase's own odds over the same draw, so a live area's kills over many cycles match it, which step 2 measures.
   - Rejected: predation settled only at the cycle, in every tier. The owner asked for prey that flees and predators that chase and give up, which only a live chase shows.
 - **Where the balance comes from.** Each grazer needs 3 forage slots, so grazers never outnumber their forage for long: past it they starve. A predator eats one grazer every 16 days at most, and grazers refill at most one an area every 32 days on average, so an area and its neighbours, 9 areas, refill about 4 grazers in the 16 days 1 predator eats 1. Predators past a sixth of the grazers around them find none to kill and starve. Fleeing and herding lower the predators' success, so their share settles lower than the cycle's arithmetic alone gives, which the sweep's bands bound. Hunting by people takes from the same refill.
 - **Movement.** In live areas, animals move tick by tick, straight toward a cell and stopped by blocked footing, within their home area and its 8 neighbours. They walk on no flow field. A grazer a person approaches within 4 cells, or that a strike hits, flees as from a predator.
@@ -185,11 +191,15 @@ The implementation, in order, each a pull request with its acceptance, after ADR
    - Acceptance, each with a control: a herd following its leader to forage and keeping within 4 cells of its centre, where a lone animal wanders; a deer fleeing a wolf it sees toward its herd, where one behind a cliff it cannot see does not; a wolf giving up when its budget is spent and resting; a pack chasing one target; predators appearing only near enough prey and starving where prey is hunted out.
    - Acceptance: a live area's kills over 50 cycles within a fifth of the far chance's for the same animals, so the two grains agree.
    - Acceptance: `make bench` within budget with the animals of the live tier, and `make sweep` within the bands.
-3. **Strikes on animals, flight and hunting.**
+3. **Strikes on animals and hunting.**
    - Acceptance, each with a control: a strike killing a deer and its drops as piles; a hunter assigned only while game stands within 32 cells; meat eaten by its household before rations, the rest sold to the granary; hide sold to the market and tanned at a leatherworks.
    - Acceptance: `make bench` within budget with the animals of the live tier.
-4. **Spirit beasts and spirit cores.** Acceptance, each with a control: a spirit beast appearing only in a territory meeting all three conditions; engaging a person inside and never stepping outside; its death recorded and its core consumed up to the talent's limit; an apothecary refining 3 pills from a core.
-5. **The view.** Animals drawn by kind and state, a spirit beast's territory shown only once the player has seen its beast, and the new items' sprites in the pack's `view/`. Acceptance: captures (ko) of grazing deer, a hunt and a spirit beast defending.
+4. **Avoiding the stronger.** The interim rule, then #256's appraisal.
+   - Acceptance, each with a control: before #256, a deer fleeing a person within 4 cells, where one 5 cells away grazes on.
+   - Acceptance, once #256's appraisal lands, each with a control: a lone wolf giving way to a herd of six boar, where it holds against two; grazers keeping clear of a band of people larger than their herd, where they ignore a smaller one; a spirit beast holding its territory whatever it faces.
+   - Acceptance: `make sweep` within the bands.
+5. **Spirit beasts and spirit cores.** Acceptance, each with a control: a spirit beast appearing only in a territory meeting all three conditions; engaging a person inside and never stepping outside; its death recorded and its core consumed up to the talent's limit; an apothecary refining 3 pills from a core.
+6. **The view.** Animals drawn by kind and state, a spirit beast's territory shown only once the player has seen its beast, and the new items' sprites in the pack's `view/`. Acceptance: captures (ko) of grazing deer, a hunt and a spirit beast defending.
 
 **The sweep's measure.** `make sweep` prints, per seed, at each decade: grazers, predators and spirit beasts by kind, the share of forage slots grown, the grazers the forage supports and the predators the prey supports, summed over areas, animals hunted that decade, and wild meat per living person. Target bands, over seeds 0 to 49 for 100 years:
 
