@@ -15,6 +15,9 @@
 #include <vector>
 
 #include "map.hpp"
+#include "person.hpp"
+#include "skill.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace {

@@ -15,6 +15,7 @@
 
 #include "json_packs.hpp"
 #include "region.hpp"
+#include "skill.hpp"
 #include "world.hpp"
 
 namespace murim {

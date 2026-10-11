@@ -16,9 +16,27 @@
 #include <variant>
 #include <vector>
 
+#include "arts.hpp"
+#include "calendar.hpp"
+#include "diplomacy.hpp"
+#include "event.hpp"
 #include "flow_field.hpp"
+#include "growth.hpp"
+#include "kinship.hpp"
+#include "leadership.hpp"
+#include "life.hpp"
+#include "limits.hpp"
 #include "map.hpp"
+#include "names.hpp"
+#include "person.hpp"
+#include "progress.hpp"
+#include "sect.hpp"
+#include "skill.hpp"
 #include "spatial_hash.hpp"
+#include "talent.hpp"
+#include "talk.hpp"
+#include "trade.hpp"
+#include "village.hpp"
 
 namespace murim {
 namespace {
@@ -57,9 +75,6 @@ std::int64_t distance_squared(Position origin, Position point) {
   const std::int64_t offset_y = std::int64_t{point.y} - origin.y;
   return (offset_x * offset_x) + (offset_y * offset_y);
 }
-
-// The range a separation, range or radius must lie in.
-bool reachable(std::int32_t units) { return units >= 0 && units <= MAX_REACH; }
 
 // The centre of each structure's footprint.
 std::vector<Position> centres_of(const std::vector<Structure>& structures) {
@@ -641,72 +656,6 @@ void fold_soul(const Fold& fold, const Soul& soul) {
   }
 }
 
-// Whether a footprint spans 1 to MAX_FOOTPRINT cells along each side.
-bool spans(Footprint footprint) {
-  const auto side = [](std::int32_t cells) {
-    return cells >= 1 && cells <= MAX_FOOTPRINT;
-  };
-  return side(footprint.width) && side(footprint.height);
-}
-
-// Whether `layout` places only known plans, inside `area`, over no other
-// placement and off the area's centre.
-bool lays_out(const Growth& growth) {
-  const Footprint area = growth.settlement;
-  std::vector<bool> covered(static_cast<std::size_t>(area.width) *
-                                static_cast<std::size_t>(area.height),
-                            false);
-  const auto cover = [&area, &covered](Cell cell) {
-    const bool inside = cell.x >= 0 && cell.y >= 0 && cell.x < area.width &&
-                        cell.y < area.height;
-    if (!inside) {
-      return false;
-    }
-    const std::size_t slot = (static_cast<std::size_t>(cell.y) *
-                              static_cast<std::size_t>(area.width)) +
-                             static_cast<std::size_t>(cell.x);
-    const bool free = !covered.at(slot);
-    covered.at(slot) = true;
-    return free;
-  };
-  const auto placed = [&growth, &cover](const Placement& placement) {
-    if (placement.plan >= growth.plans.size()) {
-      return false;
-    }
-    const std::vector<Cell> cells =
-        cells_of(placement.offset, growth.plans.at(placement.plan).footprint);
-    return std::all_of(cells.begin(), cells.end(), cover);
-  };
-  return std::all_of(growth.layout.begin(), growth.layout.end(), placed) &&
-         cover(Cell{area.width / 2, area.height / 2});
-}
-
-// Throws std::invalid_argument when `growth` checks at no interval, presses
-// above PER_MILLE, reaches outside [0, MAX_REACH], or lays a footprint or
-// placement it cannot.
-void check_growth(const Growth& growth) {
-  const auto unknown = [&growth](std::size_t plan) {
-    return plan >= growth.plans.size();
-  };
-  const bool reaches_out =
-      !reachable(growth.reach) || !reachable(growth.vicinity) ||
-      !reachable(growth.spacing) || !reachable(growth.claim);
-  const bool misshapen =
-      !spans(growth.settlement) ||
-      std::any_of(growth.plans.begin(), growth.plans.end(),
-                  [](const Plan& plan) { return !spans(plan.footprint); });
-  if (growth.interval == 0 || growth.pressure > PER_MILLE || reaches_out ||
-      misshapen ||
-      std::any_of(growth.builds.begin(), growth.builds.end(), unknown) ||
-      !lays_out(growth)) {
-    throw std::invalid_argument(
-        "growth must check at an interval, press within a thousand per "
-        "mille, reach within MAX_REACH, and lay footprints of 1 to "
-        "MAX_FOOTPRINT cells from known plans inside its settlement, apart "
-        "and off its centre");
-  }
-}
-
 // How many marked cells of a grid lie under a rectangle, read from a
 // summed-area table in four lookups.
 class Tally {
@@ -782,134 +731,6 @@ std::int64_t remoteness(Cell corner, Footprint area, Cell seat) {
 bool within(Cell here, Cell there, std::int32_t reach) {
   return std::abs(there.x - here.x) <= reach &&
          std::abs(there.y - here.y) <= reach;
-}
-
-// Whether a skill lies outside the limits a world accepts.
-bool invalid_skill(const Skill& skill) {
-  return !reachable(skill.range) || !reachable(skill.radius) ||
-         skill.body_damage > MAX_BODY_DAMAGE || skill.cooldown > MAX_COOLDOWN ||
-         skill.qi_cost > MAX_TALENT;
-}
-
-// Throws std::invalid_argument when `life`'s cultivation, realms, arts or
-// learning lie outside the limits the constructor documents.
-void check_arts(const Life& life) {
-  const auto excessive = [](Spread values) {
-    return std::uint64_t{values.mean} + values.spread > MAX_TALENT;
-  };
-  const bool bad_cultivation =
-      life.cultivation && (excessive(life.cultivation->growth) ||
-                           excessive(life.cultivation->limit) ||
-                           life.cultivation->recovery > PER_MILLE ||
-                           life.cultivation->recovery_ticks == 0);
-  bool unordered = false;
-  for (std::size_t realm = 0; realm < life.realms.size(); ++realm) {
-    unordered =
-        unordered || life.realms.at(realm).might > MAX_MIGHT ||
-        (realm > 0 && life.realms.at(realm).qi < life.realms.at(realm - 1).qi);
-  }
-  const auto stray_art = [&life](const Art& art) {
-    return art.discipline >= life.disciplines.size() ||
-           std::any_of(art.skills.begin(), art.skills.end(),
-                       [&life](const ArtSkill& taught) {
-                         return invalid_skill(taught.skill) ||
-                                taught.rank > life.realms.size();
-                       });
-  };
-  const Learning& learning = life.learning;
-  const bool bad_learning = learning.comprehension > PER_MILLE ||
-                            learning.teaching > PER_MILLE ||
-                            learning.reading_cost > MAX_TALENT ||
-                            !reachable(learning.reading_reach) ||
-                            learning.orientation_ease > PER_MILLE ||
-                            learning.polarity_ease > PER_MILLE ||
-                            learning.orientation_potency > PER_MILLE ||
-                            learning.polarity_potency > PER_MILLE;
-  if (bad_cultivation || unordered || bad_learning ||
-      std::any_of(life.arts.begin(), life.arts.end(), stray_art)) {
-    throw std::invalid_argument(
-        "cultivation must draw within MAX_TALENT and recover within PER_MILLE "
-        "on a tick or more, realms ascend with a might within MAX_MIGHT, arts "
-        "name known disciplines and hold valid skills of known ranks, and "
-        "learning's chances, eases and potencies lie within PER_MILLE");
-  }
-}
-
-// Throws std::invalid_argument when `trade` lies outside the limits the
-// constructor documents, given `disciplines` drawn.
-void check_trade(const Trade& trade, std::size_t disciplines) {
-  const auto stray_ware = [disciplines](const Ware& ware) {
-    return ware.price == 0 || ware.price > MAX_TALENT ||
-           ware.health > MAX_HEALTH || ware.qi > MAX_TALENT ||
-           ware.discipline >= disciplines;
-  };
-  if (std::any_of(trade.wares.begin(), trade.wares.end(), stray_ware) ||
-      trade.purse > MAX_TALENT || trade.wage > MAX_TALENT ||
-      trade.wounded > PER_MILLE || trade.drained > PER_MILLE) {
-    throw std::invalid_argument(
-        "a ware must cost 1 to MAX_TALENT silver, restore health within "
-        "MAX_HEALTH and qi within MAX_TALENT, and name a discipline drawn; a "
-        "purse and wage lie within MAX_TALENT and the shares within "
-        "PER_MILLE");
-  }
-}
-
-// Throws std::invalid_argument when `life` could draw a talent above
-// MAX_TALENT or a lifespan above MAX_LIFESPAN_DAYS, or gives a newborn no
-// health or more than MAX_HEALTH.
-void check_life(const Life& life) {
-  const auto too_talented = [&life](const DisciplineDraw& draw) {
-    return std::uint64_t{draw.growth.mean} + draw.growth.spread > MAX_TALENT ||
-           std::uint64_t{draw.limit.mean} + draw.limit.spread +
-                   life.discipline_widening + life.upper_widening >
-               MAX_TALENT;
-  };
-  const bool too_long = life.lifespan && std::uint64_t{life.lifespan->mean} +
-                                                 life.lifespan->spread >
-                                             MAX_LIFESPAN_DAYS;
-  if (std::any_of(life.disciplines.begin(), life.disciplines.end(),
-                  too_talented) ||
-      too_long || life.newborn_health == 0 ||
-      life.newborn_health > MAX_HEALTH) {
-    throw std::invalid_argument(
-        "life must draw talents and lifespans within their limits, and give "
-        "newborns health");
-  }
-  const bool too_old =
-      life.founding_age &&
-      std::uint64_t{life.founding_age->mean} + life.founding_age->spread >
-          MAX_LIFESPAN_DAYS;
-  const auto unkind = [](const Kinship& kinship) {
-    const auto inverted = [](Range range) { return range.low > range.high; };
-    return inverted(kinship.marrying_age) || inverted(kinship.bearing_age) ||
-           kinship.marriage_chance > PER_MILLE ||
-           kinship.birth_chance > PER_MILLE || kinship.neighbourhood < 0 ||
-           kinship.neighbourhood > MAX_REACH;
-  };
-  if (too_old || (life.kinship && unkind(*life.kinship))) {
-    throw std::invalid_argument(
-        "a founding age must lie within the longest lifespan, and kinship's "
-        "ages run upward, its chances within a thousand per mille and its "
-        "neighbourhood within reach");
-  }
-  if (life.growth) {
-    check_growth(*life.growth);
-  }
-  check_arts(life);
-  if (life.diplomacy && (life.diplomacy->war_chance > PER_MILLE ||
-                         life.diplomacy->peace_chance > PER_MILLE)) {
-    throw std::invalid_argument(
-        "diplomacy's chances must lie within a thousand per mille");
-  }
-  if (life.trade) {
-    check_trade(*life.trade, life.disciplines.size());
-  }
-}
-
-// The range a spread draws over.
-Range range_of(Spread values) {
-  return Range{values.mean - std::min(values.mean, values.spread),
-               values.mean + values.spread};
 }
 
 // Whether `what` names a person past `people`, an art or skill `life` lacks,
@@ -3487,18 +3308,6 @@ bool World::shift(std::size_t structure, Destroyer striker,
     }
   }
   return effect != 0;
-}
-
-Range limit_range(const Life& life, const Soul& soul, std::size_t discipline) {
-  const Spread& limit = life.disciplines.at(discipline).limit;
-  const std::uint32_t lives = std::max<std::uint32_t>(soul.lives, 1);
-  const bool practised =
-      discipline < soul.practised.size() && soul.practised.at(discipline);
-  const std::uint32_t wider = practised ? life.discipline_widening / lives : 0;
-  const std::uint32_t higher = soul.lives > 0 ? life.upper_widening / lives : 0;
-  const std::uint32_t reach = limit.spread + wider;
-  return Range{limit.mean - std::min(limit.mean, reach),
-               limit.mean + reach + higher};
 }
 
 // Draws `person`'s talent and lifespan, for a soul of `soul` history, and

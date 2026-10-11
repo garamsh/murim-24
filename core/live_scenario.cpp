@@ -8,6 +8,7 @@
 
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "skill.hpp"
 #include "world.hpp"
 
 namespace murim {

@@ -15,9 +15,18 @@
 #include <utility>
 #include <vector>
 
+#include "calendar.hpp"
+#include "growth.hpp"
 #include "json_packs.hpp"
+#include "kinship.hpp"
+#include "limits.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "names.hpp"
+#include "person.hpp"
+#include "sect.hpp"
+#include "skill.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {

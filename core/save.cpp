@@ -11,8 +11,22 @@
 #include <variant>
 #include <vector>
 
+#include "arts.hpp"
+#include "diplomacy.hpp"
+#include "event.hpp"
 #include "flow_field.hpp"
+#include "growth.hpp"
+#include "kinship.hpp"
+#include "leadership.hpp"
+#include "life.hpp"
 #include "map.hpp"
+#include "names.hpp"
+#include "person.hpp"
+#include "progress.hpp"
+#include "skill.hpp"
+#include "talent.hpp"
+#include "trade.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {
