@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "map.hpp"
-#include "world.hpp"
+#include "skill.hpp"
 
 namespace murim_godot {
 
