@@ -1,6 +1,6 @@
 # ADR 0059: Draw the world at Albion's angle, on cells 16 pixels wide and 12 deep raised by levels, its ground baked off the cell grid
 
-> Status: accepted; its lift of 16 pixels a level at every height superseded by ADR-0058, under which the lift is 16 pixels for the first 3 levels and 6 a level beyond
+> Status: accepted; its lift of 16 pixels a level at every height superseded by ADR-0058, under which the lift is 16 pixels for the first 3 levels and 6 a level beyond; its ground baked once and never redrawn extended by ADR-0057, under which an area is re-baked once after a terrain delta settles, spread over frames
 > Date: 2026-10-10
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

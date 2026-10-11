@@ -33,16 +33,16 @@ The owner's comments of the same day are binding:
   - This holds at every scale, ordinary strikes included.
   - The design states whether sight (#214) and strikes share one line walk, the cost bound, how ADR 0013's structure damage maps onto toughness, and the tests.
 
-Facts from `main` at `aff1434`:
+Facts from `main` at `8dcd7d3`:
 - **Shapes** (ADR 0046): area, arc, line, self and targeted. A use covers its shape and hits every hostile person in it once, with nothing between the user and a target considered. A structure takes a skill's separate structure damage where the shape reaches its footprint (ADR 0013, ADR 0015). Structures have 10,000 durability, with stage floors.
 - **The map** (ADR 0047). It is hand-made, in 16,384 areas of 32 cells.
   - Elevation tiers 0 to 7 are painted per 8 × 8 cells, and the build tool makes a cliff, with blocked footing, where a tier drops, and a slope between tiers.
   - The core holds a nibble a cell of footing and travel class, 8 MiB, and "never reads elevation". It says terrain never changes in play, so a save holds only the map's identity.
   - Its validation guarantees that the named places reach one another.
 - **Paths** (ADR 0043): a coarse graph of areas, rebuilt only where a blocking structure changes an area.
-- **Natural objects** are slots the map places, 64 an area, with a stage and a timer each, under ADR 0056 in the open PR #220 for #187.
+- **Natural objects** are slots the map places, 64 an area, with a stage and a timer each, under ADR 0056, proposed, merged in #220 for #187.
 - **Tiers.** Every person keeps its record in every tier (ADR 0042), and far armies move on the coarse graph.
-- **Sight by height.** #214's ADR 0058, proposed, merged in #223. It puts a level per cell in the core, which this ADR's level nibble is, and its `sees` walks the line this ADR proposes. The arts' tiers are ADR 0055 (#194), and the ground shader is #212.
+- **Sight by height.** #214's ADR 0058, proposed, merged in #223. It puts a level per cell in the core, which this ADR's level nibble is, and its `sees` walks the line this ADR proposes. The arts' tiers are ADR 0055, merged in #218. The ground is drawn by ADR 0059, accepted in #226: a shader baked once per area off the cell grid, and never redrawn.
 
 Decided by the PM on PR #222's review, 2026-10-10:
 - **Absorption on every strike** is the owner's own rule, "the same rule at every scale", and stays. Its effect on raids and melee against structures is stated under Consequences.
@@ -108,6 +108,7 @@ Options weighed:
   - After a change, the build tool's rule runs on the touched cells and their neighbours: a drop of a tier or more is a cliff, with blocked footing, and a one-tier step is a slope. So movement follows the next tick.
   - Rejected: loading elevation from the map through a port when an art lands. A wave crossing 120 areas would read from storage in the middle of a tick, which ADR 0047 rejected for daily rules.
 - **Damage below the threshold.** As the owner said, a cell a blow fails to break is damaged. Each cell of a block keeps a damage counter of 1 byte, in eighths of its material's toughness. A blow absorbed by a cell adds its energy to the counter. A counter reaching the threshold breaks the cell as a blow at the threshold would. Counters return to 0 with the ground's healing, after 120 days.
+  - **Water** never breaks. Its threshold is unbounded, so a blow it absorbs adds to its counter, which saturates at 255 and breaks nothing. The bound of 255 eighths below applies to materials that break.
 - **The delta layer.** A changed area holds a delta block of 1,024 cells: a fine elevation of 2 bytes, in 64ths of a tier, a ground-kind override of 1 byte and the damage counter of 1 byte, 4 KiB in all. Unchanged areas hold none.
   - At most 4,096 areas hold a block, 16 MiB. A change that would need a new block past the bound changes no terrain, though it still deals its damage.
   - Blocks are saved and hashed, so `SAVE_VERSION` rises and earlier saves are refused. ADR 0047's map identity still names the authored map, and the save holds the deltas over it.
@@ -130,7 +131,7 @@ Options weighed:
   - **The graph.** It is rebuilt area by area from a queue, at most 8 areas a tick, with the queue shared by every change. That is about 0.4 ms at about 50 µs an area, by this estimate. First come the areas people stand in, then those on an army's current coarse path, then the rest by index.
   - **The fields** crossing a rebuilt area are rebuilt within ADR 0043's per-tick limit.
   - An army whose objective a change has made unreachable holds the reachable cell nearest it until its order changes, since ADR 0013's reachability is checked when an order is given.
-  - **The true worst case.** A wave of R = 256 covers about 206,000 cells, about 201 areas. Its 16,384 changed cells may fall across all of them, and their neighbours for the graph's borders bring it to about 260 areas. At 8 a tick the queue empties in about 33 ticks, about a second, while movement has followed the cells from the first tick.
+  - **One wave.** A wave of R = 256 covers about 206,000 cells, about 201 areas. Its 16,384 changed cells may fall across all of them, and their neighbours for the graph's borders bring it to about 260 areas. At 8 a tick the queue empties in about 33 ticks, about a second, while movement has followed the cells from the first tick.
   - **Eight waves at once.** With the cap of 8 waves in flight, each of R = 256 changing its 16,384 cells across about 260 areas, the shared queue holds at most about 2,080 areas. At 8 a tick it empties in about 260 ticks, under 9 seconds, while movement follows the cells from the first tick.
 - **Validation after play.** ADR 0047's validation holds for the authored map and is not run on deltas. Cutting a pass shut or walling a city off is the kind of feat the owner asked for, and the world's rules already handle what is unreachable: orders are refused and armies hold. The map's guarantee is about its design, not about what players do to it.
 - **Healing.** Ground-kind overrides, scorched or churned earth, revert to the biome's ground after 120 days. Felled slots regrow by ADR 0056's rule, and villages rebuild by growth. Elevation changes stay. No rule moves earth back, and conserving mass while healing would be a second change of its own.
@@ -141,12 +142,13 @@ Options weighed:
 - **The view, with #200 and #212.**
   - **Zoom levels.** Beyond the 1x to 3x of today, the camera zooms out to a half, a quarter, an eighth and a sixteenth.
   - **Ground.** Zoomed out, the ground is drawn from prebuilt downscaled images per area, from the map's build, shared with the minimap. They are streamed by area as chunks are today. An area with a delta block redraws its images from the ground shader once its change settles.
+  - **Re-baking the ground.** ADR 0059 bakes each area's ground once and never redraws it. This ADR extends that: an area whose delta block changes is re-baked once after its change settles, spread over frames as the stream's bake is, with its downscaled images. An area no change touches is baked once, as before.
   - **People and objects.** People below a quarter are drawn as dots in their faction's colour, and below an eighth as one cluster mark per area with a count. Objects are drawn as clusters below a quarter.
   - **Aiming and casting.** Aiming a wave at any zoom shows its full disc. A cast pulls the camera back to frame the disc, then returns.
 - **Bounds, with refusals.** These are core bounds. A pack past any of them is refused at load with a `ContentRefusal` naming the bound (ADR 0049):
   - at most 64 materials
   - a toughness and a threshold each at most 2^20
-  - a threshold at most 255 eighths of its toughness, about 32 times it, so the 1-byte damage counter in eighths of toughness cannot overflow
+  - a breaking material's threshold at most 255 eighths of its toughness, about 32 times it, so the 1-byte damage counter in eighths of toughness cannot overflow; water, which never breaks, saturates its counter instead
   - a wave's radius at most 256 cells
   - a skill's terrain change at most 16,384 cells a cast
   - a wave's falloff per ring at most 1,000 per mille
@@ -180,9 +182,9 @@ Every strike walks a line of effect, shared with #214's sight, from its shape's 
 
 World-scale arts use a new `WAVE` shape: a disc resolved ring by ring at up to 4 cells a tick, carrying energy by 256 sectors so obstacles cast shadows. Every wave in the world shares one budget of 8,192 cells a tick, in cast order, and at most 8 waves fly at once, a ninth refused with `TOO_MANY_WAVES`. It reads people, structures and slots through per-area indexes, the same in every tier.
 
-The core holds an elevation tier per cell, and changed areas hold delta blocks of fine elevation and ground overrides, at most 4,096, saved and hashed. Skills gated by realm and power may crater, cut, level, fell or breach. Every change conserves elevation units, filling water and clamping onto the frame, and drops its debris as piles. Footing is recomputed by the build tool's rule, so movement follows the next tick, and the graph is rebuilt for the touched areas from one shared queue at 8 areas a tick, at most 16,384 changed cells a cast. A cell a blow fails to break keeps a damage counter toward its threshold.
+The core holds an elevation tier per cell, and changed areas hold delta blocks of fine elevation and ground overrides, at most 4,096, saved and hashed. Skills gated by realm and power may crater, cut, level, fell or breach. Every change conserves elevation units, filling water and clamping onto the frame, and drops its debris as piles. Footing is recomputed by the build tool's rule, so movement follows the next tick, and the graph is rebuilt for the touched areas from one shared queue at 8 areas a tick, which holds at most about 2,080 areas with 8 waves in flight. A cast changes at most 16,384 cells. A cell a blow fails to break keeps a damage counter toward its threshold.
 
-ADR 0047's validation is not run on deltas. Ground overrides heal in 120 days and elevation stays. Zooming out draws downscaled area images, dots and clusters.
+ADR 0047's validation is not run on deltas. Ground overrides heal in 120 days and elevation stays. Zooming out draws downscaled area images, dots and clusters. An area whose terrain changes is re-baked once after the change settles, which extends ADR 0059's ground baked once.
 
 This supersedes these:
 - ADR 0046's use hitting every target its shape covers whatever lies between
