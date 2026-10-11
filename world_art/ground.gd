@@ -23,14 +23,16 @@ class Occluder:
 
 const SHADER := preload("res://world_art/ground.gdshader")
 const TREES := "res://art/terrain/trees"
-## Each kind's ramp of four colours, dark to light, a frame tagged by its name, then the earth
+## Each kind's ramp of STEPS colours, dark to light, a frame tagged by its name, then the earth
 ## bank's; and the detail scattered over the ground, drawn in the ink ramp where it takes the
 ## ground's ramp.
 const RAMPS := "res://art/terrain/ramps"
 const DETAIL := "res://art/terrain/detail"
 const RAMP_TAGS := ["water", "plain", "hills", "forest", "rock", "bank"]
+const STEPS := 7
 const DETAIL_ROOT := Vector2i(2, 3)
-# The ink ramp, whose colours in a detail frame stand for steps 0 to 3 of the ground's ramp.
+# The four ink colours a detail frame is drawn in, standing for steps 0, 2, 4 and 6 of the ground's
+# ramp: art/terrain/ground.lua's INK_STEPS, the master ink ramp's steps 1, 2, 4 and 5.
 const INK := [Color("171229"), Color("221b35"), Color("3d3548"), Color("716273")]
 ## Cells a chunk is wide and deep: ADR 0042's areas.
 const CHUNK := 32
@@ -101,8 +103,8 @@ func prepare(relief: Relief, options := {}) -> void:
 	var sheet: Image = load(RAMPS + ".png").get_image()
 	var tags := _tags(RAMPS)
 	for tag: String in RAMP_TAGS:
-		for step in 4:
-			_ramps.append(sheet.get_pixel(tags[tag] * 4 + step, 0))
+		for step in STEPS:
+			_ramps.append(sheet.get_pixel(tags[tag] * STEPS + step, 0))
 	_read_detail()
 	if render.is_valid():
 		_asked_at = Engine.get_process_frames() - 2
@@ -138,7 +140,7 @@ func prepare(relief: Relief, options := {}) -> void:
 
 ## Colour `step`, 0 darkest, of kind `kind`'s ramp, an index of Relief.KINDS.
 func ramp_colour(kind: int, step: int) -> Color:
-	return _ramps[kind * 4 + clampi(step, 0, 3)]
+	return _ramps[kind * STEPS + clampi(step, 0, STEPS - 1)]
 
 
 ## Shows the chunks round `view`, the screen in pixels, baking every chunk first once the
@@ -531,7 +533,7 @@ func _read_detail() -> void:
 					if pixel.a == 0.0:
 						continue
 					var step := INK.find(Color(pixel, 1.0))
-					marks.append([Vector2i(x, y) - DETAIL_ROOT, step if step >= 0 else pixel])
+					marks.append([Vector2i(x, y) - DETAIL_ROOT, step * 2 if step >= 0 else pixel])
 			frames.append(marks)
 		_detail[tag.name] = frames
 
