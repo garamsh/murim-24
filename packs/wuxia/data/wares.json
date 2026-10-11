@@ -1,0 +1,16 @@
+[
+  {
+    "id": "herb",
+    "price": 10,
+    "health": 30,
+    "qi": 0,
+    "discipline": "medicine"
+  },
+  {
+    "id": "elixir",
+    "price": 60,
+    "health": 0,
+    "qi": 2000,
+    "discipline": "medicine"
+  }
+]

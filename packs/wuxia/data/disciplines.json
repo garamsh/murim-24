@@ -1,0 +1,62 @@
+[
+  {
+    "id": "sword",
+    "name": "sword",
+    "growth": {
+      "mean": 10,
+      "spread": 5
+    },
+    "limit": {
+      "mean": 500,
+      "spread": 200
+    }
+  },
+  {
+    "id": "saber",
+    "name": "saber",
+    "growth": {
+      "mean": 10,
+      "spread": 5
+    },
+    "limit": {
+      "mean": 500,
+      "spread": 200
+    }
+  },
+  {
+    "id": "fist",
+    "name": "fist",
+    "growth": {
+      "mean": 10,
+      "spread": 5
+    },
+    "limit": {
+      "mean": 500,
+      "spread": 200
+    }
+  },
+  {
+    "id": "hidden_weapons",
+    "name": "hidden weapons",
+    "growth": {
+      "mean": 10,
+      "spread": 5
+    },
+    "limit": {
+      "mean": 500,
+      "spread": 200
+    }
+  },
+  {
+    "id": "medicine",
+    "name": "medicine",
+    "growth": {
+      "mean": 10,
+      "spread": 5
+    },
+    "limit": {
+      "mean": 500,
+      "spread": 200
+    }
+  }
+]

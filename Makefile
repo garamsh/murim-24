@@ -13,8 +13,8 @@ MINGW_DIR := $(BUILD_DIR)/mingw
 EXPORT_DIR := $(BUILD_DIR)/export
 TOOLS := $(CURDIR)/.venv/bin
 GODOT ?= godot
-CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
-CXX_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp'
+CXX_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'packs_json/*.cpp' 'packs_json/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
+CXX_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'packs_json/*.cpp'
 EXTENSION_SOURCE_SCOPE := git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'
 GDEXTENSION_SCOPE := git ls-files --cached --others --exclude-standard -- '*.gdextension'
 GDSCRIPT_TEST_SCOPE := git ls-files --cached --others --exclude-standard -- '*_test.gd'
@@ -52,8 +52,8 @@ lint: build
 	$(TOOLS)/ninja -C $(LINT_DIR)/extension _deps/godot-cpp-build/generate_bindings
 	@files=$$($(CXX_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no C++ source was read" >&2; exit 1; }; \
-	$(TOOLS)/clang-tidy --quiet -p $(LINT_DIR)/core $$files && \
-	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ headers they include, selected by: $(CXX_SOURCE_SCOPE)"
+	$(TOOLS)/clang-tidy --quiet --header-filter='/(core|packs_json)/[^/]+\.hpp$$' -p $(LINT_DIR)/core $$files && \
+	echo "clang-tidy checked $$(echo $$files | wc -w | tr -d ' ') C++ sources and the core/ and packs_json/ headers they include, selected by: $(CXX_SOURCE_SCOPE)"
 	@files=$$($(EXTENSION_SOURCE_SCOPE)); \
 	test -n "$$files" || { echo "no extension/ C++ source was read" >&2; exit 1; }; \
 	$(TOOLS)/clang-tidy --quiet --config-file=core/.clang-tidy --header-filter='/extension/[^/]+\.hpp$$' -p $(LINT_DIR)/extension $$files && \

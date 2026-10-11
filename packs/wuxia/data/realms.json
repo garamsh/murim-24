@@ -1,0 +1,74 @@
+[
+  {
+    "id": "third_rate",
+    "name": {
+      "korean": "삼류",
+      "romanised": "Third-rate"
+    },
+    "qi": 1000,
+    "might": 1100
+  },
+  {
+    "id": "second_rate",
+    "name": {
+      "korean": "이류",
+      "romanised": "Second-rate"
+    },
+    "qi": 3000,
+    "might": 1200
+  },
+  {
+    "id": "first_rate",
+    "name": {
+      "korean": "일류",
+      "romanised": "First-rate"
+    },
+    "qi": 6000,
+    "might": 1300
+  },
+  {
+    "id": "peak",
+    "name": {
+      "korean": "절정",
+      "romanised": "Peak"
+    },
+    "qi": 10000,
+    "might": 1400
+  },
+  {
+    "id": "beyond_peak",
+    "name": {
+      "korean": "초절정",
+      "romanised": "Beyond peak"
+    },
+    "qi": 15000,
+    "might": 1500
+  },
+  {
+    "id": "transformation",
+    "name": {
+      "korean": "화경",
+      "romanised": "Transformation"
+    },
+    "qi": 21000,
+    "might": 1600
+  },
+  {
+    "id": "mystery",
+    "name": {
+      "korean": "현경",
+      "romanised": "Mystery"
+    },
+    "qi": 28000,
+    "might": 1700
+  },
+  {
+    "id": "life_and_death",
+    "name": {
+      "korean": "생사경",
+      "romanised": "Life and death"
+    },
+    "qi": 36000,
+    "might": 1800
+  }
+]

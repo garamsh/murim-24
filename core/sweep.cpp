@@ -21,6 +21,7 @@
 #include <variant>
 #include <vector>
 
+#include "json_packs.hpp"
 #include "map.hpp"
 #include "region.hpp"
 #include "world.hpp"
@@ -203,7 +204,7 @@ std::string households(const Region& region, std::size_t factions) {
 }
 
 int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
-  const RegionData data = region_data();
+  const RegionData data = murim_packs::load_base(MURIM_PACKS_DIR);
   std::cout
       << "| Seed | Households | Living | Peopled villages | Peak | "
          "Every faction peopled | Living by rank | Knowing an art | Manual "

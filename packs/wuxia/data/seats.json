@@ -1,0 +1,92 @@
+[
+  {
+    "id": "seat",
+    "width": 12,
+    "height": 9,
+    "buildings": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 3,
+        "height": 3,
+        "durability": 10000,
+        "kind": "house",
+        "households": 1
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "width": 4,
+        "height": 3,
+        "durability": 10000,
+        "kind": "manual_hall",
+        "households": 0
+      },
+      {
+        "x": 7,
+        "y": 0,
+        "width": 5,
+        "height": 3,
+        "durability": 10000,
+        "kind": "hall",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 5,
+        "width": 6,
+        "height": 4,
+        "durability": 10000,
+        "kind": "training_ground",
+        "households": 0
+      },
+      {
+        "x": 6,
+        "y": 5,
+        "width": 2,
+        "height": 2,
+        "durability": 10000,
+        "kind": "granary",
+        "households": 0
+      },
+      {
+        "x": 9,
+        "y": 5,
+        "width": 3,
+        "height": 2,
+        "durability": 10000,
+        "kind": "field",
+        "households": 0
+      },
+      {
+        "x": 7,
+        "y": 8,
+        "width": 3,
+        "height": 1,
+        "durability": 10000,
+        "kind": "seat_gate",
+        "households": 0
+      }
+    ],
+    "clearings": [
+      {
+        "x": 0,
+        "y": 3,
+        "width": 12,
+        "height": 2
+      },
+      {
+        "x": 8,
+        "y": 5,
+        "width": 1,
+        "height": 3
+      },
+      {
+        "x": 7,
+        "y": 9,
+        "width": 3,
+        "height": 2
+      }
+    ]
+  }
+]

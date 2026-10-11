@@ -81,7 +81,7 @@ struct Building {
 /// stands on the open cells nearest the area's centre.
 struct VillageTemplate {
   std::string name;
-  Footprint area;
+  Footprint area{};
   std::vector<Building> buildings;
   /// The land growth keeps clear, each corner an offset from the area's
   /// corner; it may reach past the area.
@@ -147,8 +147,15 @@ struct Region {
   std::vector<SectSpec> sects;
 };
 
-/// Returns the game's terrain kinds, factions, village templates and life.
-[[nodiscard]] RegionData region_data();
+/// Returns `rules` with the plans growth lays: a plan for each of `builds`,
+/// from what its kind holds in `data`, its builds, then one for each of
+/// `settlement`'s buildings, laid out for a new village of that template.
+[[nodiscard]] Growth growth_for(const RegionData& data, Growth rules,
+                                const std::vector<Building>& builds,
+                                const VillageTemplate& settlement);
+
+/// Returns whether `data` passes the checks generate_region makes of it.
+[[nodiscard]] bool consistent(const RegionData& data);
 
 /// Generates a region from `seed` and `data`: terrain and territories, six
 /// to eight villages owned in turn by each faction, and a seat for each sect

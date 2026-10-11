@@ -1,0 +1,32 @@
+[
+  {
+    "id": "guard",
+    "range": 384,
+    "radius": 0,
+    "body_damage": 15,
+    "structure_damage": 0,
+    "cooldown": 15,
+    "qi_cost": 0,
+    "shape": "targeted"
+  },
+  {
+    "id": "mend",
+    "range": 0,
+    "radius": 2560,
+    "body_damage": 0,
+    "structure_damage": -5,
+    "cooldown": 30,
+    "qi_cost": 0,
+    "shape": "self"
+  },
+  {
+    "id": "torch",
+    "range": 0,
+    "radius": 2560,
+    "body_damage": 0,
+    "structure_damage": 10,
+    "cooldown": 30,
+    "qi_cost": 0,
+    "shape": "self"
+  }
+]
