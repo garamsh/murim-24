@@ -54,17 +54,19 @@ Options weighed:
   | Law | lenient, ordinary or harsh | ADR 0054's changes for deeds against its people, and its guards | guards' wages |
 
 - **Tax.** The rate stays ADR 0052's, with its bounds and its NPC rule. The policy adds which kinds are on, three bits. A kind that is off is not collected.
-  - Discontent's rate input and ADR 0054's standing toward the leader read `r` while the levy or the trade share is on, since households pay those. A toll alone falls on caravans, so a faction taxing tolls alone takes no discontent from its rate.
+  - Discontent's rate input and ADR 0054's standing toward the leader read `r` while the levy or the trade share is on, since households pay those. A toll alone falls on caravans, so a faction taxing tolls alone takes no discontent from its rate, and ADR 0052's decay, which reads the rate, reads it as 0 then.
   - So a leader can trade revenue for mood. The levy at `r` 200 is 200 per mille of 10 days of a household's 200 copper of rations, 400 copper a season. A faction of 1,000 households with the levy off forgoes 4,000 silver a season, and its households still take 1 discontent a day from the trade share.
   - This narrows ADR 0052's rejection of a rate per tax: still one rate, so one NPC rule moves it, with on and off for each kind.
 - **Levy of soldiers.** A share `s` of the faction's earners, 0 to 250 per mille, base 50, may serve as soldiers.
   - A raid or army sent to war draws no more soldiers than `s` of the faction's earners, beside ADR 0052's cap of what the treasury pays for 30 days. The lower cap holds.
   - Soldiers are paid ADR 0052's wage and do not work the fields, so a faction of 1,000 earners at 100 per mille has 100 soldiers and a tenth less field work, which ADR 0022's harvest shows.
-  - Above the voluntary 50 per mille, each household with a member serving takes 2 discontent a day while it serves. So at a pressed household's 2 a day, one at 500 reaches ADR 0052's flight at 800 in 150 days unless the levy falls.
+  - Above the voluntary 50 per mille, each household with a member serving takes 2 discontent a day while it serves.
+  - **Decay is suspended on such a day.** ADR 0052 lowers a household's discontent by 2 a day while nobody in it is hungry and the rate is at most 100. On a day a household is pressed, or owes corvée, that decay does not apply, so the press's 2 and corvée's 3 are net. Otherwise a fed, pressed household would net 0 and the levy would cost nothing.
+  - So at a pressed household's net 2 a day, one at 500 reaches ADR 0052's flight at 800 in 150 days unless the levy falls.
 - **Corvée.**
   - **Off.** No corvée, even under threat.
   - **Walls under threat.** ADR 0062's rule as it stands: corvée for wall works while the village's threat is at least 400. The base setting.
-  - **All works.** Corvée raises any plan of ADR 0056 and ADR 0062 in the faction's villages, whatever the threat, at the same one earner a household one day in ten and 3 discontent a corvée day. Corvée workers take no wage, so the treasury pays for fewer builders.
+  - **All works.** Corvée raises any plan of ADR 0056 and ADR 0062 in the faction's villages, whatever the threat, at the same one earner a household one day in ten and 3 discontent a corvée day, net, since decay is suspended that day (above). Corvée workers take no wage, so the treasury pays for fewer builders.
 - **Spending.** Each day, the treasury first pays what is committed: soldiers' wages, guards, and ADR 0056's gatherers and builders. Then, while it holds more than its reserve, it pays the four priorities in the order the policy sets, each up to its daily target before the next:
   - **Arms:** ADR 0052's purchases for soldiers' slots and spares, and #231's ADR 0064 orders for gear its workshops make.
   - **Granaries:** food bought at the village's market into its granary, until each village holds 30 days of its people's rations. A village of 32 at a measure a person a day holds 960 measures, 480 silver at the base price of 50 copper. This feeds ADR 0022's food stock, so a village with a granary filled weathers a bad harvest without hunger or migration.
@@ -89,8 +91,9 @@ Options weighed:
 - **Law.**
   - **Weights.** For deeds whose victim is of the faction's people, ADR 0054's change to the victim's village is scaled by 500 per mille when lenient, 1,000 when ordinary and 2,000 when harsh, within standing's bounds. So under harsh law a theft from a village's warehouse, −200 at that village's weight of 1,000, costs the thief −400 of its standing there, where ordinary law costs −200.
   - **Guards.** Each of the faction's villages of at least 100 residents keeps guards paid as soldiers: none when lenient, one for each 100 residents when ordinary, one for each 50 when harsh. Guards are people no driver steers who engage whoever their village stands hostile toward, by ADR 0054's tiers and ADR 0046's engagement. ADR 0062's gate guards count among them.
+  - **A lenient village with gate guards.** Lenient law keeps no guards of its own, but ADR 0062's gate guards, 2 a gate, stand all the same: they are the wall's, paid as soldiers by ADR 0062, and they close the gate before a hostile army. They engage only whom `hostile` reads, as any guard does, so lenient law changes how much a deed costs, not whether a walled gate is held.
   - Rejected: punishment as a scripted penalty, such as a fine. A fine would move silver by no rule a household reads, and the owner asked for consequences of rules.
-- **Faction character.** Each faction has a character, pack data, defaulting from its growth stance's first entry so that today's factions diverge without new data:
+- **Faction character.** Each faction has a character, pack data, defaulting from its growth stance's first entry so that today's factions diverge without new data. Its growth stance, not ADR 0038's stances, gives the default: ADR 0038's stances are alignments, orthodox, unorthodox or demonic, that set how two factions stand toward each other in the relation matrix. They say nothing of how a faction runs itself, and two factions of one alignment may raid or build alike. ADR 0023's growth stance is already each faction's own choice of what to do first:
 
   | Character | From | Default diplomacy | Most levy | Default trade | Default law | Default spending order |
   |---|---|---|---|---|---|---|
@@ -134,6 +137,7 @@ Options weighed:
   - **Memory.** A faction's policy record is about 16 bytes, its eight policies' last change days 32, and its last two seasons' effects seen 128: about 180 bytes a faction, a few kilobytes for every faction a pack can hold.
   - **The daily rule** reads sums ADR 0052's household pass and ADR 0062's village pass already accumulate, so it is one pass over the factions and a granary purchase per village at most, beside ADR 0052's 14,000 households a day. That is negligible.
   - **Guards** are people already living. Harsh law at 50,000 people keeps at most one in 50, 1,000 guards, paid from treasuries.
+  - **At 500 and at 5,000 living.** At ADR 0017's 500, in a region of a few factions, the records are under a kilobyte and harsh law keeps at most 10 guards. At #216's live tier of 5,000, at most 100 guards stand in live areas, people the tick already moves, and the daily rule's pass is the same one over the factions.
 - **Bounds, with refusals.** These are core bounds. A pack past any of them is refused at load with a `ContentRefusal` naming the bound (ADR 0049):
   - a levy share of at most 500 per mille, and a character's most levy within it
   - a reserve of at most 255 days
@@ -152,7 +156,9 @@ The implementation, in order, each a pull request with its acceptance, after ADR
 1. **The policy record, tax kinds, levy, corvée, spending and the reserve.**
    - Acceptance, each with a control: a kind off collecting nothing; a toll alone adding no discontent; a raid capped by the levy share; pressed households taking discontent above 50 per mille; corvée on all works raising a house without wages; granaries filled to 30 days before walls when ordered first.
    - Acceptance: `make sweep` 48/50 or better.
-2. **Trade, diplomacy, settlement and law.** Acceptance, each with a control: a free faction drawing more caravans; a rival's caravan refused when closed; an aggressive faction's war chance and margin; a growth order without `RAID` sending no raid; harsh law doubling a theft's change to the village and keeping guards.
+2. **Trade, diplomacy, settlement and law.**
+   - Acceptance, each with a control: a free faction drawing more caravans; a rival's caravan refused when closed; an aggressive faction's war chance and margin; a growth order without `RAID` sending no raid; harsh law doubling a theft's change to the village and keeping guards.
+   - Acceptance: `make sweep` 48/50 or better, since these change rules.
 3. **Character and the NPC rule.** Acceptance, each with a control: each table row's steps; the minimum term; war ending terms; a return to the default after a quiet term. Acceptance: the sweep's balance report and its bands.
 4. **The faction management window**, after its mockup is approved. Acceptance: captures (ko) of each panel, and a change refused while its term runs.
 
@@ -164,7 +170,7 @@ An NPC leader adapts by one daily rule reading food per head, the treasury, thre
 
 The sweep reports policy mixes and outcomes, and no setting may dominate across seeds over 100 years.
 
-This supersedes ADR 0038's war and peace chances the same for every faction, now set by its diplomacy stance; ADR 0023's growth stance as fixed data, now a policy; ADR 0052's taxes always all collected and its purchases as the treasury's one spending, now kinds and priorities; and ADR 0054's deeds' changes the same under every law, now scaled by the victim's faction's law.
+This supersedes ADR 0038's war and peace chances the same for every faction, now set by its diplomacy stance; ADR 0023's growth stance as fixed data, now a policy; ADR 0052's taxes always all collected and its purchases as the treasury's one spending, now kinds and priorities; ADR 0054's deeds' changes the same under every law, now scaled by the victim's faction's law; and ADR 0052's daily decay of discontent on every good day, now suspended on a day a household is pressed or owes corvée.
 
 ## Consequences
 

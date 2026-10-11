@@ -1,6 +1,6 @@
 # ADR 0052: Run the economy from households' needs through town markets, taxed by the power that holds the land
 
-> Status: proposed; its field cell yielding 600 measures a harvest superseded by ADR-0063, under which yields are pack data by biome and season, 120 measures a cell on plain in the base pack; its taxes always all collected and its purchases as the treasury's one spending superseded by ADR-0065, under which a faction's tax policy turns each kind on or off and its spending policy orders arms, granaries, walls and sect support above a reserve
+> Status: proposed; its field cell yielding 600 measures a harvest superseded by ADR-0063, under which yields are pack data by biome and season, 120 measures a cell on plain in the base pack; its taxes always all collected and its purchases as the treasury's one spending superseded by ADR-0065, under which a faction's tax policy turns each kind on or off and its spending policy orders arms, granaries, walls and sect support above a reserve; its discontent decaying on every good day superseded by ADR-0065, under which decay is suspended on a day a household is pressed or owes corvée
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
