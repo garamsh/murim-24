@@ -40,7 +40,7 @@ Options weighed:
     - one of ADR 0054's deeds done to or by the other
 
     Three dealings within 30 days promote the other to a slot. A sect's master and its elders count their pupils' days of teaching. Rivals are those met as a foe in a duel or a feud.
-  - **A deed too strong to wait.** A deed whose change to the person would be 300 or more either way enters the actor at once: a kill of kin, an attack on oneself, a large gift. A grudge or a debt of gratitude needs no acquaintance.
+  - **A deed too strong to wait.** A deed whose change to the person would be 150 or more either way enters the actor at once: an attack on oneself, ADR 0054's −150 at a victim's weight of 1,000, or a kill of kin. A grudge needs no acquaintance. A gift moves standing by at most 100 a day for each group (ADR 0054), so it counts as a dealing and builds a debt of gratitude over days rather than at once.
   - Rejected: favor toward everyone met. At 50,000 people it is the full table ADR 0054 rejected for groups.
 - **The bound and eviction.** With all 8 slots full, a new entry replaces the non-kin slot nearest zero after decay. Ties go to the oldest change, then the lower index. If every non-kin slot is further from zero than the newcomer, the newcomer is dropped. A pending slot replaces the oldest pending one.
 - **What raises and lowers it.** Personal favor takes ADR 0054's deeds, seen first-hand, at their own weights. These are pack data, and the base pack's are:
@@ -75,8 +75,8 @@ Options weighed:
   - The hostile bit (ADR 0054) also marks a person someone holds a hostile favor toward, so the per-tick rules read favor only for those.
 - **Tiers.** Favor is held by everyone in every tier. Dealings and deeds in far areas count as anywhere. Far fights' kills record their deeds as ADR 0054's far witnesses do.
 - **Cost, at 50,000 people with #216's live tier of 5,000.**
-  - **Memory.** 8 slots of 8 bytes and 4 pending slots of 8 bytes, 96 bytes a person, 4.8 MB.
-  - **A dealing** finds or makes a pending slot among 4: a few reads, made only on a purchase, a talk, a day's teaching or a deed. A battle's deeds at the live tier are ADR 0054's worst case of about ten kills a tick. Each kill updates its victim's kin and witnesses, at most about 113 holders, each scanning 8 slots: about 9,000 slot reads a tick, a few hundredths of a millisecond.
+  - **Memory.** 8 slots of 8 bytes and 4 pending slots of 8 bytes, 96 bytes a person: 48 KB at ADR 0017's 500, 480 KB at #216's live tier of 5,000, and 4.8 MB at 50,000.
+  - **A dealing** finds or makes a pending slot among 4: a few reads, made only on a purchase, a talk, a day's teaching or a deed. A battle's deeds at the live tier are ADR 0054's worst case of about ten kills a tick. Each kill updates its victim's kin and witnesses, at most about 113 holders, each scanning 8 slots: about 9,000 slot reads a tick, a few hundredths of a millisecond by this estimate, which step 2's `make bench` measures, as ADR 0054 has its own measured.
   - **`hostile`.** Each check scans the holder's 8 slots when the bit is set, 8 reads, beside ADR 0054's 6 entries.
   - **The daily pass** over each person's 8 slots for the dead is 400,000 slot reads a day at 50,000, about 220 a tick.
 - **Bounds, with refusals.** These are core bounds. A pack past any of them is refused at load with a `ContentRefusal` naming the bound (ADR 0049):
@@ -93,11 +93,13 @@ The implementation, in order, each a pull request with its acceptance, after ADR
    - Acceptance: 96 bytes a person saved and hashed.
 2. **Deeds, decay and the combination.**
    - Acceptance, each with a control: a victim's, a kin's and a witness's favor changed by one kill; betrayal counting double; a friend in a hostile village not striking; a personal enemy in a friendly village striking; a master's favor in admission; kin decaying to their floor.
+   - Acceptance: `make bench` within budget with a battle's deeds updating favor at the live tier.
+   - Acceptance: `make sweep` 48/50 or better, since favor changes who strikes.
 3. **The view's favor tier** in the dialogue's card.
 
 ## Decision
 
-Each person holds favor toward at most 8 others: kin, up to 6, entered at birth or marriage and never evicted, those it has dealt with three times in 30 days, and anyone whose single deed moved it by 300 or more. Four pending slots count the dealings first. Favor takes ADR 0054's deeds first-hand, at full weight as victim, 600 per mille as kin and 200 as a witness, with gifts and help, betrayal doubled, and provoked deeds and duels as nothing. It decays 1 a day, computed and never written by a read, and kin only to a floor of 200.
+Each person holds favor toward at most 8 others: kin, up to 6, entered at birth or marriage and never evicted, those it has dealt with three times in 30 days, and anyone whose single deed moved it by 150 or more. Four pending slots count the dealings first. Favor takes ADR 0054's deeds first-hand, at full weight as victim, 600 per mille as kin and 200 as a witness, with gifts and help, betrayal doubled, and provoked deeds and duels as nothing. It decays 1 a day, computed and never written by a read, and kin only to a floor of 200.
 
 A person's own conduct follows its favor where it holds a slot, and its groups' tier otherwise. Its groups' acts, prices and admission follow standing, with the keeper's or master's favor as a modifier.
 
