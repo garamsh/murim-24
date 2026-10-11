@@ -2819,25 +2819,25 @@ bool World::ready(const Person& person, std::size_t skill, const Army& army,
 // its reach.
 bool World::held(std::size_t index, Step pull,
                  const std::vector<bool>& standing, const Crowd& crowd) const {
-  bool engaged = false;
   if (pull.x == 0 && pull.y == 0) {
-    return engaged;
+    return false;
   }
   const std::size_t member = crowd.people.at(index);
   const std::size_t army = crowd.armies.at(index);
   const Position from = crowd.hash.position(index);
-  crowd.hash.visit_within(
-      from, reach(people_.at(member), armies_.at(army)),
-      [&](std::size_t other) {
+  // Only people of a kind the person may strike can hold it, so the search
+  // passes over the places holding none.
+  return crowd.hash.any_within(
+      foe_kinds(member, armies_.at(army)), from,
+      reach(people_.at(member), armies_.at(army)), [&](std::size_t other) {
         const Position there = crowd.hash.position(other);
         const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
                                    ((std::int64_t{there.y} - from.y) * pull.y);
-        engaged = engaged || (ahead > 0 && !standing.at(other) &&
-                              people_.at(crowd.people.at(other)).health > 0 &&
-                              foes(member, army, crowd.people.at(other),
-                                   crowd.armies.at(other)));
+        return ahead > 0 && !standing.at(other) &&
+               people_.at(crowd.people.at(other)).health > 0 &&
+               foes(member, army, crowd.people.at(other),
+                    crowd.armies.at(other));
       });
-  return engaged;
 }
 
 // The foe the person at `index` of `crowd`, serving in `army`, engages, as
