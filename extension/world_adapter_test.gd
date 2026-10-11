@@ -47,6 +47,8 @@ const ORDER_TICKS := 800
 # The region the play scene opens on, its first Cult village, and how long it is watched.
 const REGION_SEED := 2026
 const CULT_VILLAGE := 1
+# The region's first Unorthodox village.
+const UNORTHODOX_VILLAGE := 2
 const VILLAGE_TICKS := 600
 # Years the region is lived, in five-tick days, before its rumours are read.
 const LIVED_YEARS := 10
@@ -579,10 +581,21 @@ func _play_loop_pass() -> bool:
 	var applied := world.apply(player, sect) and world.person_sect(player) == sect
 	var again := world.application_refusal(player, sect) == WorldAdapter.APPLICATION_IN_A_SECT \
 			and not world.apply(player, sect)
-	var other := WorldAdapter.create_region(REGION_SEED, 2)
+	var other := WorldAdapter.create_region(REGION_SEED, UNORTHODOX_VILLAGE)
 	var outsider := other.roster(other.army_count() - 1)[0]
-	var refused := other.application_refusal(outsider, 2) == WorldAdapter.APPLICATION_UNPROVEN \
-			and not other.apply(outsider, 2) and other.person_sect(outsider) == -1
+	var outsider_faction := other.army_faction(other.army_count() - 1)
+	var other_sect := -1
+	for index in other.sect_count():
+		if other.sect_faction(index) == outsider_faction:
+			other_sect = index
+	# Setup: the player was born Demonic in CULT_VILLAGE and Unorthodox in UNORTHODOX_VILLAGE, and
+	# each faction has a sect.
+	var set_up: bool = sect >= 0 and other_sect >= 0 \
+			and world.faction_names()[world.army_faction(world.army_count() - 1)] == "Demonic" \
+			and other.faction_names()[outsider_faction] == "Unorthodox"
+	var refused := set_up \
+			and other.application_refusal(outsider, other_sect) == WorldAdapter.APPLICATION_UNPROVEN \
+			and not other.apply(outsider, other_sect) and other.person_sect(outsider) == -1
 	var lived := WorldAdapter.create_region(REGION_SEED, 0, 5)
 	for i in LIVED_YEARS * 120 * 5:
 		lived.tick()
@@ -614,9 +627,9 @@ func _play_loop_pass() -> bool:
 			and world.person_attainment(player).size() == names.size()
 	var bare := _create(SEED, _armies, RULES)
 	var bare_right := bare.discipline_names().is_empty() and bare.person_attainment(0).is_empty()
-	var passed := open and applied and again and refused and rumours_right and attainment_right and bare_right
-	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused as unproven %s; %d rumours after ten years, newest first, within the map and %d of them naming the born or the dead rightly %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
-		sect, open, applied, again, refused, heard.size(), of_people, rumours_right, heard[0] if heard.size() > 0 else {},
+	var passed := set_up and open and applied and again and refused and rumours_right and attainment_right and bare_right
+	print("world_adapter_test: the Cult player may apply to sect %d %s, joins %s, is refused again %s; the Unorthodox player refused by sect %d as unproven %s (setup %s); %d rumours after ten years, newest first, within the map and %d of them naming the born or the dead rightly %s, the first %s; disciplines %s, master %d attained %s %s; a world from create() names none %s: %s" % [
+		sect, open, applied, again, other_sect, refused, set_up, heard.size(), of_people, rumours_right, heard[0] if heard.size() > 0 else {},
 		names, master, attained, attainment_right, bare_right, "pass" if passed else "FAIL"])
 	return passed
 

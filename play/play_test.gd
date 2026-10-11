@@ -1534,6 +1534,7 @@ func _apply_pass() -> bool:
 	var world: WorldAdapter = scene.world
 	var panel: Control = scene.get_node("Hud").sect
 	var person := world.roster(scene.steered)[0]
+	var cult_born: bool = world.faction_names()[world.army_faction(scene.steered)] == "Demonic"
 	var opened: bool = scene.command(_key(KEY_M)) and panel.sect >= 0 and world.person_sect(person) == -1
 	var entered: bool = scene.command(_key(KEY_ENTER))
 	var joined: bool = world.person_sect(person) == panel.sect and panel.verdict == "APPLICATION_NONE"
@@ -1542,14 +1543,16 @@ func _apply_pass() -> bool:
 	var other: WorldAdapter = refused_scene.world
 	var other_panel: Control = refused_scene.get_node("Hud").sect
 	var other_person := other.roster(refused_scene.steered)[0]
+	# Setup: the person was born Demonic in CULT_VILLAGE and Unorthodox in UNORTHODOX_VILLAGE.
+	var set_up: bool = cult_born and other.faction_names()[other.army_faction(refused_scene.steered)] == "Unorthodox"
 	refused_scene.command(_key(KEY_M))
 	var other_entered: bool = refused_scene.command(_key(KEY_ENTER))
 	var refused: bool = other_entered and other_panel.verdict == "APPLICATION_UNPROVEN" \
 			and other.person_sect(other_person) == -1
 	refused_scene.free()
-	var passed := opened and entered and joined and refused
-	print("play_test: M opens the sect panel %s; Enter applies %s and joins %s; from an Unorthodox village Enter is refused as unproven %s: %s" % [
-		opened, entered, joined, refused, "pass" if passed else "FAIL"])
+	var passed := set_up and opened and entered and joined and refused
+	print("play_test: M opens the sect panel %s; Enter applies %s and joins %s; from an Unorthodox village Enter is refused as unproven %s (setup %s): %s" % [
+		opened, entered, joined, refused, set_up, "pass" if passed else "FAIL"])
 	return passed
 
 
