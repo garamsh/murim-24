@@ -206,6 +206,9 @@ bool run_m1() {
 // timed, or they no longer bound two battles in play.
 constexpr std::uint64_t LEAST_BATTLE_STRIKES_PER_TICK = 16;
 
+// Times the live scenario against the tick budget as a target, printing
+// whether it meets it; it returns whether it did, which the exit status does
+// not read (exit_status()).
 bool run_live() {
   const LiveScenario scenario = live_scenario();
   const std::size_t armies = scenario.armies.size();
@@ -270,16 +273,36 @@ bool run_live() {
             << static_cast<double>(timed.area) / TIMED_TICKS << "\n"
             << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max "
             << max << " ms\n"
-            << (pass ? "PASS" : "FAIL") << ": p99 " << p99 << " ms against a "
-            << BUDGET_MS << " ms budget\n";
+            << "TARGET " << (pass ? "MET" : "MISSED") << ": p99 " << p99
+            << " ms against a " << BUDGET_MS
+            << " ms target, not yet in force (#216; ADR 0053 makes it "
+               "binding), so it does not decide the exit status\n";
   return pass;
 }
 
-// Runs both scenarios, each reporting before either decides the exit status.
+// Whether each scenario met the tick budget: M1's is in force, the live
+// scenario's a target #216 has not met yet.
+struct Met {
+  bool m1;
+  bool live;
+};
+
+// The bench's exit status: failure when a budget in force is missed. Only
+// M1's tick is in force; the live scenario's is a target until ADR 0053
+// binds it, so missing it leaves the status a success. A failed setup or a
+// world reaching its capacity exits 2 before this is read.
+int exit_status(Met met) { return met.m1 ? EXIT_SUCCESS : EXIT_FAILURE; }
+
+// Runs both scenarios, each reporting before either decides the exit status,
+// after checking the rule that decides it: a live miss alone leaves it at
+// success, and an M1 miss does not.
 int run() {
-  const bool m1_passed = run_m1();
-  const bool live_passed = run_live();
-  return m1_passed && live_passed ? EXIT_SUCCESS : EXIT_FAILURE;
+  require(exit_status(Met{true, false}) == EXIT_SUCCESS &&
+              exit_status(Met{false, true}) == EXIT_FAILURE,
+          "the exit status must follow M1's budget and not the live target");
+  const bool m1_met = run_m1();
+  const bool live_met = run_live();
+  return exit_status(Met{m1_met, live_met});
 }
 
 }  // namespace
