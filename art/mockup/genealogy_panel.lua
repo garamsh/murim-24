@@ -6,7 +6,7 @@
 -- Run: aseprite --batch --script art/mockup/genealogy_panel.lua (after target_screen.lua)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/../pixel.lua")
+local px = dofile(here .. "/pixel.lua")
 local bdf = dofile(here .. "/bdf.lua")
 local panel_ui = dofile(here .. "/panel.lua")(px, bdf)
 local c = px.c

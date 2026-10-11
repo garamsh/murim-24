@@ -19,7 +19,7 @@
 -- Run: aseprite --batch --script art/mockup/angle/buildings.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/../../pixel.lua")
+local px = dofile(here .. "/../pixel.lua")
 local c = px.c
 local INK = c("ink", 1)
 local CW, CD = 16, 12

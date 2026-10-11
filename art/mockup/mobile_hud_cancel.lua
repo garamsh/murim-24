@@ -5,7 +5,7 @@
 -- Run: aseprite --batch --script art/mockup/mobile_hud_cancel.lua (after target_screen.lua)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/../pixel.lua")
+local px = dofile(here .. "/pixel.lua")
 local bdf = dofile(here .. "/bdf.lua")
 local ui = dofile(here .. "/panel.lua")(px, bdf)
 local touch = dofile(here .. "/touch.lua")(px, bdf, ui, here)
