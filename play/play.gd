@@ -188,9 +188,12 @@ func fit_view() -> void:
 	_hud.fit(Vector2i(window), touch_shown)
 
 
-## Shows the damage the struck take as numbers over them, or not, as the settings choose.
+## Shows the damage the struck take as numbers over them, or not, blood on a hit and the hit stop, or
+## not, as the settings choose.
 func show_numbers() -> void:
 	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
+	_art.get_node("Combat").blood = _hud.settings.blood()
+	_art.get_node("Combat").hit_stop = _hud.settings.hit_stop()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from
@@ -432,6 +435,8 @@ func _process(delta: float) -> void:
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.get_screen_center_position() - screen / 2.0, screen)
 	_art.refresh(view, _between())
+	# A hit on or from the player shakes the screen by whole screen pixels.
+	_camera.offset = Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
 	_sound.hearing = view
 	# The cursor stays on the screen while the camera moves, so it moves over the world.
 	_cursor = get_local_mouse_position()

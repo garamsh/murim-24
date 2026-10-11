@@ -6,9 +6,15 @@
 ## back from the nearest use that struck it, its loss floating up while the damage numbers row
 ## names it, in crimson for the steered person's own; a person a use struck who died, by the core's
 ## events, falls and fades where it last stood, flashing with its last loss, while one who died
-## struck by nothing, of hunger or age, is not drawn falling; and the person the player selected is
-## marked while it lives, or with none selected, the person the steered person's last use struck
-## nearest where it went. Like sound.gd, it keeps what it
+## struck by nothing, of hunger or age, is not drawn falling; a hit on or from the steered person
+## holds the struck and the striker still a few view frames while the ticks go on (hit_stops) and
+## shakes the screen by whole pixels (shake); a
+## person a use struck bleeds, a spray
+## from its middle in the blow's direction and drops on the ground that fade, while blood is on; a
+## person below WOUNDED or MAIMED of the most health it has had is wounded, and a maimed one on
+## screen drips now and then; and the person the player selected is marked while it lives, or with
+## none selected, the person the steered person's last use struck nearest where it went. Like
+## sound.gd, it keeps what it
 ## compares by person in packed arrays. world_art.gd draws the bodies with what it gives. It reads
 ## the world and holds no game rule: who struck, what, where and whom is the core's.
 extends Node2D
@@ -28,6 +34,49 @@ const TARGET_MS := 2000
 ## How far the struck are knocked back, and a number rises, in pixels.
 const KNOCK_PIXELS := 2.0
 const NUMBER_RISE := 12.0
+## The shares, per mille of the most health a person has had, below which its body is drawn
+## wounded, then maimed: view data read from the core's health.
+const WOUNDED := 500
+const MAIMED := 250
+## How long a spray of blood flies, and a drop lies on the ground, in milliseconds; how many ticks
+## apart a maimed person drips; and the most drops kept, the oldest going first: every drop kept is
+## drawn on every frame, and drawing them is what blood costs.
+const SPRAY_MS := 400
+const DROP_MS := 3000
+const DRIP_TICKS := 45
+const MOST_DROPS := 200
+## The pixels a spray throws, and the most kept, the oldest going first, as many as MOST_BLEEDS and
+## a hit of the steered person's throw over SPRAY_MS; and how far each flies
+## from the struck body's side facing the blow, in pixels, between the two, a cell or more.
+const SPRAY_PIXELS := 8
+const MOST_SPRAY_PIXELS := 320
+const SPRAY_REACH := Vector2(12.0, 22.0)
+## The drops a hit lets fall beyond the struck body's feet in the blow's direction, and those it
+## pools under them; and the shapes a drop takes, of the pixel clusters blood_pixels.gd draws.
+const HIT_DROPS := 3
+const POOL_DROPS := 2
+const DROP_SHAPES := 3
+## How many hits a tick bleed beside those on or from the steered person, which always do: a battle
+## lands dozens a tick, and blood from a few of them reads as well as from all, at a fraction of
+## the work. A hit outside the view bleeds none.
+const MOST_BLEEDS := 4
+## How many view frames a hit stop holds its bodies, by the health the hit took: under the first of
+## each pair, the second; any more, HIT_STOP_MOST.
+const HIT_STOP := [[20, 2], [60, 3]]
+const HIT_STOP_MOST := 4
+## How far the screen shakes on such a hit, in whole screen pixels, by the health the hit took, as
+## HIT_STOP steps it; for how long, in milliseconds; and the offsets it steps through, one each
+## SHAKE_STEP_MS.
+const SHAKE := [[20, 1], [60, 2]]
+const SHAKE_MOST := 3
+const SHAKE_MS := 150
+const SHAKE_STEP_MS := 30
+const SHAKE_PATTERN: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 0),
+]
+## Blood, the crimson ramp's third and second steps, a drop's edge and its core: its first is too
+## near black to read on the ground, and its fourth stays for hostility.
+const BLOOD := [Color("9c1f24"), Color("5c1418")]
 ## The least radius a disc is drawn at, so a use of radius 0 still shows.
 const LEAST_RADIUS := 4.0
 const PAPER := Color("efe3c2")
@@ -42,6 +91,32 @@ const NEVER := -(1 << 40)
 ## Whose losses float up as numbers: "off", none; "mine", the steered person's own and those its
 ## uses struck; "everyone", every loss. The settings' damage numbers row sets it.
 var damage_numbers := "mine"
+## Whether a hit draws blood; the settings' blood row sets it. Off, a hit shows only its flash.
+var blood := true
+## Each spray of blood flying, in order: `ms`, when, `at`, where it is thrown from in pixels, the
+## struck body's side facing the blow, `dir`, the blow's direction, and `seed`.
+var sprays: Array[Dictionary] = []
+## The drops of blood on the ground, a ring of at most MOST_DROPS, a new drop taking the oldest's
+## place: where each fell, in pixels, when, and its shape, below DROP_SHAPES. Read by
+## blood_pixels.gd as they are, so a frame builds nothing; a drop older than DROP_MS shows no more.
+var drop_at := PackedVector2Array()
+var drop_ms := PackedInt64Array()
+var drop_shape := PackedByteArray()
+## How many drops have fallen, the ring's next place being this modulo MOST_DROPS.
+var drops_fallen := 0
+## The sprays' pixels, a ring of at most MOST_SPRAY_PIXELS like the drops': where each was thrown
+## from, the struck body's middle, and how far it flies from there, in pixels, when, and its shade
+## of BLOOD, the lighter, which reads on the ground; and how many have been thrown.
+var spray_pixel_at := PackedVector2Array()
+var spray_pixel_reach := PackedVector2Array()
+var spray_pixel_ms := PackedInt64Array()
+var spray_pixel_shade := PackedByteArray()
+var spray_pixels_thrown := 0
+## Whether a hit on or from the steered person holds the struck and the striker still a few frames
+## and shakes the screen; the settings' hit stop row sets it.
+var hit_stop := true
+## The hit stops of the last tick: each `person` held and for how many view `frames`.
+var hit_stops: Array[Dictionary] = []
 ## Each army's faction accent, by army index; world_art.gd keeps it as armies form.
 var accents: Array[Color] = []
 ## Each use shown, as WorldAdapter.strikes() gives it, with `ms`, when it was recorded, and
@@ -66,6 +141,8 @@ var view := Rect2()
 var to_screen := Callable()
 
 var _now := 0
+# How many hits not on or from the steered person bled this tick.
+var _bleeds := 0
 var _target_ms := 0
 var _target_at := Vector2.ZERO
 # The ticks read since begin(), the sequence of the next event to read, and the tick being read's
@@ -76,16 +153,25 @@ var _ms := 0
 var _lead := -1
 # Each army's bodies' positions on the tick last read.
 var _positions: Array[PackedVector2Array] = []
+# Each army's roster as the last tick read it, so a body's person is found again.
+var _rosters_read: Array[PackedInt64Array] = []
 # By person: the tick it was last read alive, its health, army and body index then, the tick a use
 # last struck it, whether one of the steered person's did, and how near the nearest that did stood,
 # in sub-cell units squared.
 var _seen := PackedInt64Array()
 var _health := PackedInt64Array()
+# The most health each person has had, by person.
+var _peak := PackedInt64Array()
 var _army := PackedInt64Array()
 var _body := PackedInt64Array()
 var _struck_tick := PackedInt64Array()
 var _struck_by_lead := PackedByteArray()
 var _nearest := PackedFloat64Array()
+# The person whose use struck each person nearest on the tick it was struck.
+var _striker := PackedInt64Array()
+# When the screen last began to shake, in milliseconds, and how far, in screen pixels.
+var _shake_ms := NEVER
+var _shake_pixels := 0
 # By person: when it last lost health, in milliseconds, and the way it is knocked, as a unit.
 var _hit_ms := PackedInt64Array()
 var _away := PackedVector2Array()
@@ -119,7 +205,9 @@ func begin(world: WorldAdapter) -> void:
 func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[PackedInt64Array],
 		positions: Array[PackedVector2Array]) -> void:
 	_tick += 1
+	_bleeds = 0
 	_ms = now
+	hit_stops.clear()
 	_lead = -1
 	if steered_army >= 0 and steered_army < rosters.size() and not rosters[steered_army].is_empty():
 		_lead = rosters[steered_army][0]
@@ -143,6 +231,8 @@ func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[
 			deaths.append({"person": person, "army": _army[person], "at": at,
 				"ground": stood * CELL / WorldAdapter.CELL_SIZE, "ms": now})
 	_read_bodies(world, rosters, positions, true)
+	if blood:
+		_drip()
 	if selected >= 0 and selected < _seen.size() and _seen[selected] == _tick:
 		target = selected
 	elif target >= 0 and (_seen[target] != _tick or now - _target_ms > TARGET_MS):
@@ -186,6 +276,120 @@ func place_of(person: int) -> Vector2i:
 	if person < 0 or person >= _seen.size() or _seen[person] != _tick:
 		return Vector2i(-1, -1)
 	return Vector2i(_army[person], _body[person])
+
+
+## Returns how wounded person `person` is drawn: 0 not, 1 wounded, below WOUNDED of the most health
+## it has had, and 2 maimed, below MAIMED.
+func wound(person: int) -> int:
+	if person >= _peak.size() or _peak[person] <= 0:
+		return 0
+	var share := _health[person] * 1000 / _peak[person]
+	return 2 if share < MAIMED else (1 if share < WOUNDED else 0)
+
+
+## Returns how far, in whole screen pixels, the screen is shaken at `now` by the last hit on or from
+## the steered person: a step of SHAKE_PATTERN, as far as the hit's size, for SHAKE_MS; none with
+## the hit stop off.
+func shake(now: int) -> Vector2i:
+	if not hit_stop or now - _shake_ms >= SHAKE_MS or now < _shake_ms:
+		return Vector2i.ZERO
+	return SHAKE_PATTERN[((now - _shake_ms) / SHAKE_STEP_MS) % SHAKE_PATTERN.size()] * _shake_pixels
+
+
+## Returns how far pixel `k` of `spray` flies from where it is thrown, in pixels: along the blow's
+## direction turned a little by the spray's seed, SPRAY_REACH's span away.
+static func spray_reach(spray: Dictionary, k: int) -> Vector2:
+	var turn := (_unit(spray.seed, k) - 0.5) * 1.2
+	var reach := lerpf(SPRAY_REACH.x, SPRAY_REACH.y, _unit(spray.seed, 40 + k))
+	return (spray.dir as Vector2).rotated(turn) * reach
+
+
+## Returns the sprays of blood flying at `now` within the view.
+func shown_sprays(now: int) -> Array[Dictionary]:
+	return sprays.filter(func(spray: Dictionary) -> bool:
+		return now - spray.ms < SPRAY_MS and view.grow(8.0).has_point(spray.at))
+
+
+## Returns the drops of blood on the ground at `now` within the view, each with `left`, the share
+## of its time it has left, from 1 as it falls to 0.
+func shown_drops(now: int) -> Array[Dictionary]:
+	var shown: Array[Dictionary] = []
+	for i in drop_at.size():
+		if now - drop_ms[i] < DROP_MS and view.has_point(drop_at[i]):
+			var left := 1.0 - float(now - drop_ms[i]) / DROP_MS
+			shown.append({"at": drop_at[i], "left": left, "shape": drop_shape[i]})
+	return shown
+
+
+# A use struck `person`, standing at `at` in pixels: a spray from its side facing the blow, in the
+# blow's direction, HIT_DROPS drops on the ground beyond its feet that way, and POOL_DROPS under them.
+func _bleed(person: int, at: Vector2) -> void:
+	var seed := person * 7919 + _tick
+	var dir: Vector2 = _away[person]
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT.rotated(_unit(seed, 9) * TAU)
+	var from := at - Vector2(0, BODY_HEIGHT / 2.0) + dir * 4.0
+	var spray := {"ms": _ms, "at": from, "dir": dir, "seed": seed}
+	sprays.append(spray)
+	for k in SPRAY_PIXELS:
+		_throw(spray.at, spray_reach(spray, k), 0)
+	for k in HIT_DROPS:
+		var aside := Vector2(_unit(seed, 20 + k) * 4.0 - 2.0, _unit(seed, 30 + k) * 2.0 - 1.0)
+		_drop(at + Vector2(dir.x, dir.y * 0.75) * (3.0 + k * 2.5) + aside, k)
+	# Pooled just below the feet, where the body standing on them does not hide them.
+	for k in POOL_DROPS:
+		var side := 1.0 if k % 2 == 0 else -1.0
+		_drop(at + Vector2(side * (1.0 + _unit(seed, 50 + k) * 3.0), 2.0 + _unit(seed, 60 + k)), seed + k)
+
+
+# Each maimed person on screen drips a drop at its feet every DRIP_TICKS ticks, its own tick apart.
+func _drip() -> void:
+	for army in _positions.size():
+		var positions: PackedVector2Array = _positions[army]
+		for body in positions.size():
+			if army >= _rosters_read.size() or body >= _rosters_read[army].size():
+				continue
+			var person := _rosters_read[army][body]
+			if (person + _tick) % DRIP_TICKS != 0 or wound(person) < 2:
+				continue
+			var at := _pixels(positions[body])
+			if view.has_point(at):
+				_drop(at + Vector2(_unit(person, _tick) * 4.0 - 2.0, 0.0), person)
+
+
+func _throw(at: Vector2, reach: Vector2, shade: int) -> void:
+	if spray_pixel_at.size() < MOST_SPRAY_PIXELS:
+		spray_pixel_at.append(at)
+		spray_pixel_reach.append(reach)
+		spray_pixel_ms.append(_ms)
+		spray_pixel_shade.append(shade)
+	else:
+		var i := spray_pixels_thrown % MOST_SPRAY_PIXELS
+		spray_pixel_at[i] = at
+		spray_pixel_reach[i] = reach
+		spray_pixel_ms[i] = _ms
+		spray_pixel_shade[i] = shade
+	spray_pixels_thrown += 1
+
+
+func _drop(at: Vector2, shape: int) -> void:
+	if drop_at.size() < MOST_DROPS:
+		drop_at.append(at.round())
+		drop_ms.append(_ms)
+		drop_shape.append(posmod(shape, DROP_SHAPES))
+	else:
+		var i := drops_fallen % MOST_DROPS
+		drop_at[i] = at.round()
+		drop_ms[i] = _ms
+		drop_shape[i] = posmod(shape, DROP_SHAPES)
+	drops_fallen += 1
+
+
+# A number in [0, 1) from `seed` and `k`, the same for the same pair.
+static func _unit(seed: int, k: int) -> float:
+	var h := (seed * 73856093) ^ (k * 19349663)
+	h = (h ^ (h >> 13)) * 1274126177
+	return float(absi(h ^ (h >> 16)) % 10007) / 10007.0
 
 
 ## Draws what shows at `now` within `shown`, the part of the world on screen in pixels, with the
@@ -304,6 +508,7 @@ func _note_struck(strike: Dictionary) -> void:
 		if near < _nearest[person]:
 			_nearest[person] = near
 			_away[person] = (stood - strike.origin).normalized()
+			_striker[person] = strike.person
 		if strike.steered:
 			_struck_by_lead[person] = 1
 			if stood.distance_squared_to(strike.toward) < best:
@@ -327,9 +532,11 @@ func _read_bodies(world: WorldAdapter, rosters: Array[PackedInt64Array],
 				_hit(person, _health[person] - healths[body], _pixels(positions[army][body]))
 			_seen[person] = _tick
 			_health[person] = healths[body]
+			_peak[person] = maxi(_peak[person], healths[body])
 			_army[person] = army
 			_body[person] = body
 	_positions = positions.duplicate()
+	_rosters_read = rosters.duplicate()
 
 
 # Notes that `person`, standing at `at` in pixels, lost `lost` health on this tick: it flashes, is
@@ -341,6 +548,28 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 		_away[person] = Vector2.ZERO
 	var own := person == _lead
 	var mine := own or (struck and _struck_by_lead[person] == 1)
+	if struck and blood and (mine or (_bleeds < MOST_BLEEDS and view.grow(CELL.x).has_point(at))):
+		if not mine:
+			_bleeds += 1
+		_bleed(person, at)
+	# A hit on or from the steered person holds the struck, and the one whose use struck it nearest.
+	if hit_stop and struck and (own or _struck_by_lead[person] == 1):
+		var frames := HIT_STOP_MOST
+		for step: Array in HIT_STOP:
+			if lost < step[0]:
+				frames = step[1]
+				break
+		hit_stops.append({"person": person, "frames": frames})
+		hit_stops.append({"person": _striker[person], "frames": frames})
+		var pixels := SHAKE_MOST
+		for step: Array in SHAKE:
+			if lost < step[0]:
+				pixels = step[1]
+				break
+		if _shake_ms != _ms:
+			_shake_pixels = 0
+		_shake_ms = _ms
+		_shake_pixels = maxi(_shake_pixels, pixels)
 	if damage_numbers == "everyone" or (damage_numbers == "mine" and mine):
 		var text := str(lost)
 		numbers.append({"ms": _ms, "text": text, "at": at, "own": own, "mine": mine,
@@ -350,6 +579,7 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 # Drops what no longer shows at `now`.
 func _forget(now: int) -> void:
 	strikes = strikes.filter(func(strike: Dictionary) -> bool: return now - strike.ms < STRIKE_MS)
+	sprays = sprays.filter(func(spray: Dictionary) -> bool: return now - spray.ms < SPRAY_MS)
 	deaths = deaths.filter(func(death: Dictionary) -> bool: return now - death.ms < DEATH_MS)
 	numbers = numbers.filter(func(number: Dictionary) -> bool: return now - number.ms < NUMBER_MS)
 
@@ -362,16 +592,19 @@ func _grow(size: int) -> void:
 		_seen[person] = -2
 		_struck_tick[person] = -1
 		_hit_ms[person] = NEVER
+		_peak[person] = 0
 
 
 func _resize(to: int) -> void:
 	_seen.resize(to)
 	_health.resize(to)
+	_peak.resize(to)
 	_army.resize(to)
 	_body.resize(to)
 	_struck_tick.resize(to)
 	_struck_by_lead.resize(to)
 	_nearest.resize(to)
+	_striker.resize(to)
 	_hit_ms.resize(to)
 	_away.resize(to)
 

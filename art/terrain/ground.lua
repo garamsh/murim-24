@@ -4,9 +4,9 @@
 --     bank's face. Each ramp is stepped from a hue, saturation and lightness by shifting the hue
 --     toward blue in the dark steps and toward yellow in the light ones (#212).
 --   detail.aseprite: 5 x 5 frames of the small detail scattered over the ground, its root at (2, 3):
---     tuft, flower (red, yellow, white), litter and reed. A pixel in the
---     ink ramp's colours stands for that step, 0 to 3, of the ramp of the ground the view draws it
---     on; any other colour is drawn as it is.
+--     tuft, flower (violet, yellow, white: no red, which on the ground means blood), litter and
+--     reed. A pixel in the ink ramp's colours stands for that step, 0 to 3, of the ramp of the
+--     ground the view draws it on; any other colour is drawn as it is.
 -- Run: aseprite --batch --script art/terrain/ground.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -67,7 +67,7 @@ ramps:close()
 local function step(n) return c("ink", n + 1) end
 local marks = {
   { "tuft", { { 0, 0, step(0) }, { -1, -1, step(0) }, { 1, -1, step(0) }, { 0, -1, step(3) } } },
-  { "flower", { { 0, 0, c("crimson", 4) }, { 0, 1, step(0) } },
+  { "flower", { { 0, 0, c("violet", 4) }, { 0, 1, step(0) } },
     { { 0, 0, c("amber", 5) }, { 0, 1, step(0) } },
     { { 0, 0, c("robe", 3) }, { 0, 1, step(0) } } },
   { "litter", { { 0, 0, step(0) }, { 1, -1, step(0) }, { -1, -1, step(2) } } },

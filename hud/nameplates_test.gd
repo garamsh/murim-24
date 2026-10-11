@@ -1,7 +1,7 @@
 # Checks the names over the people near the player. Drawn by world_art.tscn and named by hud.tscn,
 # each person within world_art.gd's NAME_REACH of the viewer is named in the colour of how its
-# faction stands toward the viewer's, as WorldAdapter.relation reads it, and a hostile body is
-# ringed in crimson; a person a cell past the reach is not named. Of more people than fit,
+# faction stands toward the viewer's, as WorldAdapter.relation reads it, a hostile one in red, and
+# no body is ringed, the hostile included; a person a cell past the reach is not named. Of more people than fit,
 # nameplates.gd names every hostile one before any other, then the nearest, no more than NAME_CAP,
 # none over another name, a place the HUD keeps clear or the room's edge; the HUD keeps the shortcut
 # rail clear. At each PC window in each locale, a crowd of the longest names across the room is
@@ -68,9 +68,9 @@ func run() -> bool:
 	return _colours_pass() and _order_pass() and _clear_pass() and _rail_pass() and _fit_pass()
 
 
-# Each person within the reach is named in its relation's colour and each hostile body ringed,
-# read through world_art.gd's near list and the HUD as the play scene passes it on. Control: person
-# 7, a cell past the reach and hostile, is ringed and not named. Setup: the relations stand as
+# Each person within the reach is named in its relation's colour, the hostile in red, and no body
+# is ringed, read through world_art.gd's near list and the HUD as the play scene passes it on.
+# Control: person 7, a cell past the reach and hostile, is not named. Setup: the relations stand as
 # asked, every body is drawn, and person 7 is on screen.
 func _colours_pass() -> bool:
 	var world := _world()
@@ -103,8 +103,9 @@ func _colours_pass() -> bool:
 		named[plate.person] = plate.colour
 	for person in range(1, PEOPLE.size()):
 		var relation: int = expected[person]
-		var ring := Color("d63a2f") if relation in WorldArt.HOSTILE_RELATIONS else Color.WHITE
-		if _tint(art, art.body_at(person, 0, 1.0)) != ring:
+		# No ring round any body: its band instance carries white, which body_band.gdshader draws
+		# as the body alone. The hostile are told by their red names.
+		if _tint(art, art.body_at(person, 0, 1.0)) != Color.WHITE:
 			faults.append("person %d tinted %s" % [person, _tint(art, art.body_at(person, 0, 1.0))])
 		if person == PAST_REACH:
 			continue
@@ -117,7 +118,7 @@ func _colours_pass() -> bool:
 	art.free()
 	hud.free()
 	var passed := setup and faults.is_empty() and control
-	print("nameplates_test: %d of %d within reach named %s; faults %s; person %d past the reach ringed and not named, nor the viewer, %s (setup %s): %s" % [
+	print("nameplates_test: %d of %d within reach named %s, none ringed; faults %s; person %d past the reach not named, nor the viewer, %s (setup %s): %s" % [
 		named.size(), near.size(), named.values(), faults, PAST_REACH,
 		control, setup, "pass" if passed else "FAIL"])
 	return passed
