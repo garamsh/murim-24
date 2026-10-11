@@ -571,7 +571,8 @@ struct ArmySpec {
 /// members close on that person and aim every automatic strike at it. The
 /// core ends the intent when the target dies, stops being a foe of the army's
 /// lead, or leaves every member's sight, and the army then holds where its
-/// lead stands; an order without a target, a move order, replaces it.
+/// lead stands, as it does when a driver ends the intent through
+/// World::end_intent; an order without a target, a move order, replaces it.
 struct Order {
   Cell objective;
   std::vector<std::size_t> skills;
@@ -1141,6 +1142,12 @@ class World {
   /// when there is no such army.
   [[nodiscard]] Cell objective(std::size_t army) const;
 
+  /// Ends army `army`'s attack intent, if it holds one, as a driver does when
+  /// its player clears the target: the army holds where its lead stands, its
+  /// objective that cell, as when the core ends the intent. Throws
+  /// std::out_of_range when there is no such army.
+  void end_intent(std::size_t army);
+
   /// Returns the living foes within the rules' sight of person `person`,
   /// nearest first, the first in index order among equals: those its army
   /// may take as a target. Empty when the person is dead or serves in no
@@ -1624,6 +1631,7 @@ class World {
   [[nodiscard]] bool sighted(const std::vector<std::size_t>& roster,
                              Position point) const;
   void end_intents(const Crowd& crowd);
+  void hold(Army& chasing);
   [[nodiscard]] bool held(std::size_t index, Step pull,
                           const std::vector<bool>& standing,
                           const Crowd& crowd) const;

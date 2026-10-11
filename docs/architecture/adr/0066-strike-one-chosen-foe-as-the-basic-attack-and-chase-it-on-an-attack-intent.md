@@ -52,7 +52,7 @@ Retuning, with the basic strike hitting one person instead of 1.7. `make sweep`,
 
 ## Decision
 
-The basic strike, the army's skill, is targeted. An army may hold an attack intent, a target given with its order. Its members close on the target and aim every automatic strike at it, whoever steers the army, until the target dies, stops being a foe, or leaves every member's sight, or an order without a target replaces it. An intent the core ends leaves the army holding where its lead stands, its objective that cell; the view issues no stop of its own.
+The basic strike, the army's skill, is targeted. An army may hold an attack intent, a target given with its order. Its members close on the target and aim every automatic strike at it, whoever steers the army, until the target dies, stops being a foe, or leaves every member's sight, or an order without a target replaces it. An intent the core ends leaves the army holding where its lead stands, its objective that cell, and so does one the driver ends through `end_intent`, as the view does on Escape or a cleared selection; the view issues no stop of its own and never re-sends an objective from before the chase.
 
 `attack_refusal` names why a person may not be the target: the army has no member, there is no such living person, the person is not a foe of the army's lead, or no member has it in sight. `order` refuses a target for the same reasons, and `foes_in_sight` lists a person's foes in sight, nearest first, for the view to cycle and to take when nothing is selected.
 

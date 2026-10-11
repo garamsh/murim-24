@@ -3879,6 +3879,33 @@ TEST(World, AMoveOrderGivenDuringAnIntentReachesItsCell) {
   EXPECT_FALSE(in(STAND, ended.person(CHASER).position));
 }
 
+TEST(World, EndingAnIntentHoldsTheArmyWhereItsLeadStands) {
+  constexpr std::int32_t APART = 4;
+  constexpr std::uint64_t APPROACH_TICKS = 10;
+  constexpr std::uint64_t AFTER_TICKS = 300;
+  World world = intent_world(APART);
+  world.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(world, APPROACH_TICKS);
+  ASSERT_FALSE(in(STAND, world.person(CHASER).position));
+  const Cell left = cell_of(world.person(CHASER).position);
+  world.end_intent(CHASER);
+  EXPECT_EQ(world.target(CHASER), std::nullopt);
+  EXPECT_EQ(world.objective(CHASER).x, left.x);
+  EXPECT_EQ(world.objective(CHASER).y, left.y);
+  run_ticks(world, AFTER_TICKS);
+  // It holds where it was, neither back at STAND nor on to the foe.
+  EXPECT_TRUE(in(left, world.person(CHASER).position));
+  EXPECT_EQ(world.person(INTENT_FOE).health, INTENT_FOE_HEALTH);
+
+  // Control: an order back to STAND, given at the same point, walks it back.
+  World ordered = intent_world(APART);
+  ordered.order(CHASER, Order{STAND, {0}, INTENT_FOE});
+  run_ticks(ordered, APPROACH_TICKS);
+  ordered.order(CHASER, Order{STAND, {0}});
+  run_ticks(ordered, AFTER_TICKS);
+  EXPECT_TRUE(in(STAND, ordered.person(CHASER).position));
+}
+
 TEST(World, AnAttackIntentStepsRoundACornerShuttingItsDiagonal) {
   constexpr std::uint64_t CHASE_TICKS = 300;
   // The foe stands two cells west and four north, so the step nearest the

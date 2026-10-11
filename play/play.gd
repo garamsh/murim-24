@@ -559,15 +559,18 @@ func person_at(at: Vector2) -> int:
 
 
 ## Selects `person` as the target, or with -1 clears the selection. While the steered army holds
-## an attack intent, the intent moves to the person when the core lets the army attack it, and ends
-## otherwise.
+## an attack intent, the intent moves to the person when the core lets the army attack it, and
+## otherwise the core ends it, the person holding where it stands.
 func select(person: int) -> void:
 	selected = person
 	_art.get_node("Combat").selected = person
 	if world.target(steered) < 0:
 		return
-	var moved := person >= 0 and world.attack_refusal(steered, person) == WorldAdapter.ATTACK_NONE
-	world.order(steered, _objective, _skills, -1, person if moved else -1)
+	if person >= 0 and world.attack_refusal(steered, person) == WorldAdapter.ATTACK_NONE:
+		world.order(steered, _objective, _skills, -1, person)
+		return
+	world.end_intent(steered)
+	_objective = world.objective(steered)
 
 
 ## Sets an attack intent on the selected person or, with none, the nearest foe in sight, which it

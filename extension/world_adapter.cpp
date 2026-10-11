@@ -586,6 +586,10 @@ std::int64_t WorldAdapter::target(std::int64_t army) const {
   return aimed ? static_cast<std::int64_t>(*aimed) : -1;
 }
 
+void WorldAdapter::end_intent(std::int64_t army) {
+  world().end_intent(army_index(army));
+}
+
 godot::Vector2i WorldAdapter::objective(std::int64_t army) const {
   const murim::Cell cell = world().objective(army_index(army));
   return godot::Vector2i{cell.x, cell.y};
@@ -1483,6 +1487,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::target);
   godot::ClassDB::bind_method(godot::D_METHOD("objective", "army"),
                               &WorldAdapter::objective);
+  godot::ClassDB::bind_method(godot::D_METHOD("end_intent", "army"),
+                              &WorldAdapter::end_intent);
   godot::ClassDB::bind_method(godot::D_METHOD("foes_in_sight", "person"),
                               &WorldAdapter::foes_in_sight);
   godot::ClassDB::bind_method(godot::D_METHOD("faction_count"),

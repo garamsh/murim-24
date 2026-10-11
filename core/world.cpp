@@ -2181,9 +2181,8 @@ bool World::sighted(const std::vector<std::size_t>& roster,
 }
 
 // Ends each attack intent whose target is dead, no foe of its army's lead,
-// or out of every member's sight, positions read as the tick began. The army
-// then holds where its lead stands, its objective that cell, rather than walk
-// back to the objective it chased from.
+// or out of every member's sight, positions read as the tick began, as hold()
+// does.
 void World::end_intents(const Crowd& crowd) {
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     Army& chasing = armies_.at(army);
@@ -2198,14 +2197,28 @@ void World::end_intents(const Crowd& crowd) {
         !roster.empty() &&
         foes(roster.front(), army, *order.target, crowd.armies.at(aimed)) &&
         sighted(roster, crowd.hash.position(aimed));
-    if (held) {
-      continue;
+    if (!held) {
+      hold(chasing);
     }
-    order.target.reset();
-    if (!roster.empty()) {
-      order.objective = cell_of(people_.at(roster.front()).position);
-      chasing.field = FlowField{map_, order.objective};
-    }
+  }
+}
+
+void World::end_intent(std::size_t army) {
+  Army& chasing = armies_.at(army);
+  if (chasing.order.target) {
+    hold(chasing);
+  }
+}
+
+// Drops army `chasing`'s attack intent and has it hold where its lead stands,
+// its objective that cell, rather than walk back to the objective it chased
+// from.
+void World::hold(Army& chasing) {
+  Order& order = chasing.order;
+  order.target.reset();
+  if (!chasing.roster.empty()) {
+    order.objective = cell_of(people_.at(chasing.roster.front()).position);
+    chasing.field = FlowField{map_, order.objective};
   }
 }
 
