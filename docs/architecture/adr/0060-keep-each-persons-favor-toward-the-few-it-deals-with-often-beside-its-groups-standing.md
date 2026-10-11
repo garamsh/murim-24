@@ -15,7 +15,7 @@ The owner keeps it agreed in `concept.md` (2026-10-10, PR #217) that, besides th
 - memory and tick cost at 50,000 people and 5,000 live
 - determinism, and that favor belongs to the body, as standing does
 
-Facts from `main` at `635c723`:
+Facts from `main` at `2462921`:
 - **ADR 0054's standing.**
   - Standing is held by a village, a sect and a faction toward a person, from −1,000 to 1,000, in non-zero entries, at most 262,144.
   - Its deeds are attack, kill, extort, threaten, help, gift and theft, each with a base and weights.
