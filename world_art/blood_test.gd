@@ -35,8 +35,8 @@ const HELD_MS := 60
 
 
 func run() -> bool:
-	return _blood_pass() and _off_pass() and _wound_pass() and _drip_pass() and _hit_stop_pass() \
-			and _shake_pass()
+	return _blood_pass() and _off_pass() and _cap_pass() and _wound_pass() and _drip_pass() \
+			and _hit_stop_pass() and _shake_pass()
 
 
 # On the hit tick the foe bleeds: one spray from its middle, and drops on the ground, two or more of
@@ -71,6 +71,50 @@ func _blood_pass() -> bool:
 	near.art.free()
 	far.art.free()
 	return passed
+
+
+# A burst striking more than MOST_BLEEDS foes at once, none of them on or from the steered person,
+# bleeds only MOST_BLEEDS of them. Control: the same burst made by the steered person bleeds all.
+func _cap_pass() -> bool:
+	var others := _burst(2)
+	var own := _burst(0)
+	var passed: bool = others.struck > Combat.MOST_BLEEDS and own.struck == others.struck \
+			and others.sprays == Combat.MOST_BLEEDS and own.sprays == own.struck
+	print("blood_test: a burst striking %d foes, by someone else, bled %d of them; by the steered person, striking %d, bled %d: %s" % [
+		others.struck, others.sprays, own.struck, own.sprays, "pass" if passed else "FAIL"])
+	return passed
+
+
+# One tick of a burst at a block of nine foes, with `steered` the steered army: 0 the striker's, 2
+# a bystander's far off. Returns how many were struck and how many sprays bled.
+func _burst(steered: int) -> Dictionary:
+	var burst := {"range": 768, "radius": 512, "body_damage": 10, "structure_damage": 0, "cooldown": 100000,
+		"shape": WorldAdapter.SHAPE_AREA}
+	var foes := []
+	for y in 3:
+		for x in 3:
+			foes.append({"cell": Vector2i(4 + x, 1 + y), "health": HEALTH})
+	var armies: Array[Dictionary] = [
+		{"objective": STRIKER_CELL, "faction": 0, "skills": [burst], "members": [{"cell": STRIKER_CELL, "health": HEALTH}]},
+		{"objective": Vector2i(5, 2), "faction": 1, "skills": [NO_REACH], "members": foes},
+		{"objective": Vector2i(14, 4), "faction": 0, "skills": [NO_REACH], "members": [{"cell": Vector2i(14, 4), "health": HEALTH}]},
+	]
+	var world := WorldAdapter.create(7, PackedStringArray(MAP_ROWS), armies, [], RULES)
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(world, steered)
+	# Drawn once before the first tick, as play draws a frame before it ticks, so combat knows the view.
+	art.refresh(_view())
+	var found := {"struck": 0, "sprays": 0}
+	for i in TICKS:
+		world.tick()
+		art.note_tick()
+		art.refresh(_view())
+		if not world.strikes().is_empty():
+			found.struck = world.strikes()[0].struck.size()
+			found.sprays = art.combat.shown_sprays(Time.get_ticks_msec()).size()
+			break
+	art.free()
+	return found
 
 
 # The pixels the blood node `name` of `art` is given to draw.

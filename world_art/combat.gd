@@ -54,6 +54,10 @@ const SPRAY_REACH := Vector2(12.0, 22.0)
 const HIT_DROPS := 3
 const POOL_DROPS := 2
 const DROP_SHAPES := 3
+## How many hits a tick bleed beside those on or from the steered person, which always do: a battle
+## lands dozens a tick, and blood from a few of them reads as well as from all, at a fraction of
+## the work. A hit outside the view bleeds none.
+const MOST_BLEEDS := 4
 ## How many view frames a hit stop holds its bodies, by the health the hit took: under the first of
 ## each pair, the second; any more, HIT_STOP_MOST.
 const HIT_STOP := [[20, 2], [60, 3]]
@@ -135,6 +139,8 @@ var view := Rect2()
 var to_screen := Callable()
 
 var _now := 0
+# How many hits not on or from the steered person bled this tick.
+var _bleeds := 0
 var _target_ms := 0
 var _target_at := Vector2.ZERO
 # The ticks read since begin(), the sequence of the next event to read, and the tick being read's
@@ -197,6 +203,7 @@ func begin(world: WorldAdapter) -> void:
 func note_tick(world: WorldAdapter, steered_army: int, now: int, rosters: Array[PackedInt64Array],
 		positions: Array[PackedVector2Array]) -> void:
 	_tick += 1
+	_bleeds = 0
 	_ms = now
 	hit_stops.clear()
 	_lead = -1
@@ -537,10 +544,12 @@ func _hit(person: int, lost: int, at: Vector2) -> void:
 	_hit_ms[person] = _ms
 	if not struck:
 		_away[person] = Vector2.ZERO
-	if struck and blood:
-		_bleed(person, at)
 	var own := person == _lead
 	var mine := own or (struck and _struck_by_lead[person] == 1)
+	if struck and blood and (mine or (_bleeds < MOST_BLEEDS and view.grow(CELL.x).has_point(at))):
+		if not mine:
+			_bleeds += 1
+		_bleed(person, at)
 	# A hit on or from the steered person holds the struck, and the one whose use struck it nearest.
 	if hit_stop and struck and (own or _struck_by_lead[person] == 1):
 		var frames := HIT_STOP_MOST
