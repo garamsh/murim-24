@@ -11,7 +11,7 @@ Issue #168. The owner decided on 2026-10-08: the map completes and updates as th
 
 Facts from `main` at `1c4bb7f`:
 - `hud/hud.gd`'s minimap draws the live world at a pixel a cell: every cell's terrain kind, the borders of `territory`, and every village in its owner's accent. It is redrawn whenever `world_art` signals a change to the territory or the villages.
-- The map is the generated region of 128 x 128 cells (`REGION_SIDE`), with 6 to 8 villages at its start. ADR 0047's map of 4,096 x 4,096 cells is agreed and not built. ADR 0070 (PR #267, open) proposes 8,192 x 8,192.
+- The map is the generated region of 128 x 128 cells (`REGION_SIDE`), with 6 to 8 villages at its start. ADR 0047's map of 4,096 x 4,096 cells is not built. ADR 0070, merged as proposed in #267, doubles it to 8,192 x 8,192, after the owner's revision of 2026-10-11 (#255).
 - `territory` is derived on each read: a cell is held by the owner of the nearest village with living residents whose seat lies within the growth's `claim`. Its inputs per village are its owner, whether it has living residents, and its seat.
 - `village_state` reads every army to tell whether a village is raided. Ruins and rebuilding are read from the village's own structures alone.
 - Villages are only appended, so a village's index is stable.
@@ -87,7 +87,7 @@ The view draws only the chart:
 
 ## Consequences
 
-Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8,192 (PR #267):
+Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8,192:
 
 | | 128 | 4,096 | 8,192 |
 |---|---|---|---|
