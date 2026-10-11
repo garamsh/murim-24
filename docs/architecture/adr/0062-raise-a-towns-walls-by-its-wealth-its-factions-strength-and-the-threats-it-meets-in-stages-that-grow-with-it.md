@@ -25,7 +25,7 @@ The issue asks the design to decide these:
 
 It also asks how a wall's plan follows the village's footprint, and what is kept or reused.
 
-What this builds on, from `main` at `c86b08d` and the open PRs it cites:
+What this builds on, from `main` at `c4e24a7` and the open PRs it cites:
 - **ADR 0056** (#220, on which this branch is stacked). Structures cost materials as pack data, gathered into a village's account and carried to the site. The repair rule raises a structure only as far as its materials are delivered. Gatherers and builders are paid from the owning faction's treasury, at most a third of earners each and half together.
 - **ADR 0052.**
   - The NPC leader's daily rule weighs the treasury against 60 days of its needs.
