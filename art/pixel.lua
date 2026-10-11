@@ -4,28 +4,96 @@
 
 local M = {}
 
--- Ramps run dark to light; shading moves along a ramp, never off it.
-M.ramps = {
-  ink = { "14101a", "2a2433", "3d3647", "524a5e" },
-  stone = { "3b4250", "4a5361", "66707d", "8a94a0", "b4bcc4", "dfe3e6" },
-  grass = { "1f3a2b", "2c4a32", "3b6138", "4f7a3f", "6b9447", "8fae5a" },
-  leaf = { "142a22", "1e3328", "284536", "35593d", "4a7044" },
-  earth = { "3a2c24", "4a3a2c", "6b523a", "8c6d4a", "b08d60", "d1b787" },
-  wood = { "2e1f1a", "3b2a22", "5c3d2a", "7d5535", "9c7048" },
-  water = { "1a2f40", "1f3a4d", "2b5770", "3d7a8f", "5fa3a8", "a6d4cf" },
-  crimson = { "3d0d14", "5c1418", "9c1f24", "d63a2f", "f06a3c" },
-  azure = { "152a55", "1f3d7a", "2f63b8", "5b9ae0", "a8d0f5" },
-  amber = { "4a2e0c", "6b4310", "b07418", "e8a830", "f5d27a" },
-  skin = { "5c3a28", "8a5a3c", "c48a62", "e8b98e" },
-  cloth = { "6b6052", "8c7f68", "b4a68a", "d9cdb0" },
-  robe = { "8a94a0", "c8ccd0", "f4f1e6" },
-  fire = { "9c1f24", "f06a3c", "f5a33c", "fbe37a", "fff8dc" },
-  jade = { "1f5c4a", "2f8c6e", "4fc49a", "a6f0cf" },
-  gold = { "5c4418", "8c6a2a", "c99a3c", "f0d080" },
-  paper = { "a8946c", "d9c9a3", "efe3c2" },
-  lacquer = { "3d1418", "7a2a24", "a83a2c" },
-  violet = { "2a1438", "46205e", "6a3290", "9a5cd0", "c99cf0" },
+-- Ramps run dark to light; shading moves along a ramp, never off it. Each material's ramp is
+-- built from its base colour by M.build_ramp (docs/art-direction.md §Palette); fire, an emitter's,
+-- is drawn by hand.
+M.STEPS = 7
+M.bases = {
+  ink = "3d3647", stone = "8a94a0", grass = "4f7a3f", leaf = "284536", earth = "8c6d4a",
+  wood = "5c3d2a", water = "3d7a8f", crimson = "9c1f24", azure = "2f63b8", amber = "b07418",
+  skin = "c48a62", cloth = "b4a68a", robe = "c8ccd0", jade = "4fc49a", gold = "c99a3c",
+  paper = "d9c9a3", lacquer = "7a2a24", violet = "6a3290",
 }
+M.hand_ramps = { fire = { "9c1f24", "f06a3c", "f5a33c", "fbe37a", "fff8dc" } }
+
+local function hex_rgb(hex)
+  return tonumber(hex:sub(1, 2), 16) / 255, tonumber(hex:sub(3, 4), 16) / 255, tonumber(hex:sub(5, 6), 16) / 255
+end
+
+local function rgb_hsl(r, g, b)
+  local hi, lo = math.max(r, g, b), math.min(r, g, b)
+  local h, s, l = 0, 0, (hi + lo) / 2
+  if hi ~= lo then
+    local d = hi - lo
+    s = l > 0.5 and d / (2 - hi - lo) or d / (hi + lo)
+    if hi == r then h = (g - b) / d + (g < b and 6 or 0)
+    elseif hi == g then h = (b - r) / d + 2
+    else h = (r - g) / d + 4 end
+    h = h * 60
+  end
+  return h, s, l
+end
+
+local function hsl_rgb(h, s, l)
+  local function f(t)
+    t = t % 1
+    local q = l < 0.5 and l * (1 + s) or l + s - l * s
+    local p = 2 * l - q
+    if t < 1 / 6 then return p + (q - p) * 6 * t end
+    if t < 1 / 2 then return q end
+    if t < 2 / 3 then return p + (q - p) * (2 / 3 - t) * 6 end
+    return p
+  end
+  h = (h % 360) / 360
+  if s <= 0 then return l, l, l end
+  return f(h + 1 / 3), f(h), f(h - 1 / 3)
+end
+
+local function rgb_hex(r, g, b)
+  return string.format("%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+
+local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+
+-- The signed turn from hue `h` to hue `to`, in degrees, the short way round.
+local function turn(h, to) return ((to - h) % 360 + 540) % 360 - 180 end
+
+-- Builds a ramp of M.STEPS colours, dark to light, from `base`, the material's middle step. A step
+-- `u` from the middle, -1 to 1, darkens toward black by DARKEN or lightens toward white by LIGHTEN,
+-- and turns its hue toward SHADOW_HUE (blue-violet) or LIGHT_HUE (yellow) by TURN, at most half
+-- the way and at most TURN_CAP degrees times |u|; shadows gain saturation and lights lose it. A
+-- grey base takes a little of either hue. Then a shadow is mixed toward SHADOW_TINT by COOL |u|,
+-- and a light toward LIGHT_TINT by WARM u, at its own lightness, so even a grey material's shadows
+-- read cool and its lights warm.
+M.DARKEN, M.LIGHTEN, M.TURN, M.TURN_CAP, M.SATURATE = 0.62, 0.8, 0.95, 30, 1.06
+M.SHADOW_HUE, M.LIGHT_HUE = 250, 55
+M.SHADOW_TINT, M.LIGHT_TINT, M.COOL, M.WARM = "3a2a7a", "ffe7a0", 0.55, 0.35
+function M.build_ramp(base)
+  local h, s, l = rgb_hsl(hex_rgb(base))
+  local grey = s < 0.06
+  local ramp = {}
+  for k = 0, M.STEPS - 1 do
+    local u = ((k + 0.5) / M.STEPS) * 2 - 1
+    local lightness = u < 0 and l * (1 + u * M.DARKEN) or l + (1 - l) * u * M.LIGHTEN
+    local to = u < 0 and M.SHADOW_HUE or M.LIGHT_HUE
+    local amount = math.abs(u) * M.TURN
+    local cap = M.TURN_CAP * math.abs(u)
+    local hue = grey and to or h + clamp(turn(h, to) * math.min(0.5, amount * 0.45), -cap, cap)
+    local sat = s * M.SATURATE * (u < 0 and 1 + 0.3 * math.abs(u) * M.TURN or 1 - 0.25 * u * M.TURN)
+    if grey then sat = 0.12 * math.abs(u) * M.TURN end
+    lightness = clamp(lightness, 0.02, 0.98)
+    local r, g, b = hsl_rgb(hue, clamp(sat, 0, 1), lightness)
+    local tr, tg, tb = hex_rgb(u < 0 and M.SHADOW_TINT or M.LIGHT_TINT)
+    local mix = math.abs(u) * (u < 0 and M.COOL or M.WARM)
+    local mh, ms = rgb_hsl(r + (tr - r) * mix, g + (tg - g) * mix, b + (tb - b) * mix)
+    ramp[#ramp + 1] = rgb_hex(hsl_rgb(mh, ms, lightness))
+  end
+  return ramp
+end
+
+M.ramps = {}
+for name, base in pairs(M.bases) do M.ramps[name] = M.build_ramp(base) end
+for name, ramp in pairs(M.hand_ramps) do M.ramps[name] = ramp end
 
 M.colours = {} -- index -> "rrggbb"
 M.index = {} -- "ramp" .. n -> index
@@ -231,6 +299,29 @@ function Canvas:outline(x0, y0, w, h, i)
     end
   end
   for _, p in ipairs(add) do self:set(p[1], p[2], i) end
+end
+
+-- Adds a one-pixel sel-out outline around every set pixel inside the given box: each outline
+-- pixel takes the darkest step of the ramp of the pixel it borders, or the step after it on the
+-- side the light comes from, the upper left, where it borders a pixel to its right or below it.
+-- Given `ramp`, every outline pixel takes that ramp's darkest step instead, on every side.
+function Canvas:selout(x0, y0, w, h, ramp)
+  local add = {}
+  for y = y0 - 1, y0 + h do
+    for x = x0 - 1, x0 + w do
+      if self:get(x, y) == 0 then
+        local lit, i = true, self:get(x + 1, y)
+        if i == 0 then i = self:get(x, y + 1) end
+        if i == 0 then lit, i = false, self:get(x - 1, y) end
+        if i == 0 then i = self:get(x, y - 1) end
+        if i ~= 0 then
+          local r = M.ramp_of[i]
+          add[#add + 1] = { x, y, ramp and M.index[ramp .. 1] or M.index[r[1] .. (lit and 2 or 1)] }
+        end
+      end
+    end
+  end
+  for _, p in ipairs(add) do self:set(p[1], p[2], p[3]) end
 end
 
 -- Writes the canvas into an Aseprite RGB image.

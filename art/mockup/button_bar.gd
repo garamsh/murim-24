@@ -114,14 +114,14 @@ class Bar extends "res://hud/panel.gd":
 			if option == "rail":
 				if lit or over:
 					draw_rect(c, Palette.INK_1)
-					draw_rect(Rect2(c.position, Vector2(1, c.size.y)), Palette.JADE_3 if lit else Palette.GOLD_3)
+					draw_rect(Rect2(c.position, Vector2(1, c.size.y)), Palette.JADE_4 if lit else Palette.GOLD_4)
 				_icon(entry.icon, c.position + Vector2(4, 3), off, lit)
-				_text(c.position + Vector2(17, 2), word(entry), Palette.STONE_3 if off else (Palette.JADE_4 if lit else Palette.PAPER_3))
-				_right(c.end.x - 3, c.position.y + 2, entry.key, Palette.STONE_3 if off else Palette.GOLD_3)
+				_text(c.position + Vector2(17, 2), word(entry), Palette.STONE_3 if off else (Palette.JADE_7 if lit else Palette.PAPER_6))
+				_right(c.end.x - 3, c.position.y + 2, entry.key, Palette.STONE_3 if off else Palette.GOLD_4)
 				continue
-			draw_rect(c, Palette.JADE_3 if lit else (Palette.GOLD_3 if over else Palette.INK_2))
+			draw_rect(c, Palette.JADE_4 if lit else (Palette.GOLD_4 if over else Palette.INK_2))
 			draw_rect(c.grow(-1), Palette.JADE_2 if lit else Palette.INK_1)
-			var key_colour := Palette.STONE_3 if off else (Palette.PAPER_3 if lit else Palette.GOLD_3)
+			var key_colour := Palette.STONE_3 if off else (Palette.PAPER_6 if lit else Palette.GOLD_4)
 			_text(c.position + Vector2(3, 4), entry.key, key_colour)
 			_icon(entry.icon, Vector2(c.end.x - 3 - 9, c.position.y + 5), off, lit)
 		if hovered >= 0 and option != "rail":
@@ -140,12 +140,12 @@ class Bar extends "res://hud/panel.gd":
 			left = at.x - 3 - w
 			top = c.position.y + 3
 		draw_rect(Rect2(left, top, w, 14), Palette.INK_1)
-		draw_rect(Rect2(left, top, w, 1), Palette.GOLD_3)
-		_text(Vector2(left + 4, top + 1), text, Palette.PAPER_3)
+		draw_rect(Rect2(left, top, w, 1), Palette.GOLD_4)
+		_text(Vector2(left + 4, top + 1), text, Palette.PAPER_6)
 
 	func _icon(name: String, top_left: Vector2, off: bool, lit: bool) -> void:
 		var rows: Array = Touch.BUTTON_ICONS[name] if Touch.BUTTON_ICONS.has(name) else ICONS[name]
-		var colour := Palette.STONE_3 if off else (Palette.JADE_4 if lit else (Palette.PAPER_3 if name == "arts" else Palette.GOLD_3))
+		var colour := Palette.STONE_3 if off else (Palette.JADE_7 if lit else (Palette.PAPER_6 if name == "arts" else Palette.GOLD_4))
 		for y in rows.size():
 			var row: String = rows[y]
 			for x in row.length():
@@ -153,9 +153,9 @@ class Bar extends "res://hud/panel.gd":
 					continue
 				var ink := colour
 				if not off and row[x] == "p":
-					ink = Palette.LACQUER_3
+					ink = Palette.LACQUER_5
 				elif not off and row[x] == "l":
-					ink = Palette.GOLD_3
+					ink = Palette.GOLD_4
 				draw_rect(Rect2(top_left + Vector2(x, y), Vector2.ONE), ink)
 
 

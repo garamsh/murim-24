@@ -60,9 +60,9 @@ end
 
 local sheet = px.canvas(W, y)
 sheet:rect(0, 0, W, y, c("ink", 2))
-sheet:text(8, 6, "MURIM24  PRODUCTION SET  EVERY FRAME AT NATIVE SIZE", c("paper", 3))
+sheet:text(8, 6, "MURIM24  PRODUCTION SET  EVERY FRAME AT NATIVE SIZE", c("paper", 6))
 for _, entry in ipairs(laid) do
-  sheet:text(8, entry.y, shown(entry.name), c("paper", 3))
+  sheet:text(8, entry.y, shown(entry.name), c("paper", 6))
   sheet:text(8 + px.text_width(shown(entry.name)) + 8, entry.y, entry.words, c("stone", 4))
   for _, f in ipairs(entry.frames) do sheet:stamp(f[1], f[2], f[3]) end
 end

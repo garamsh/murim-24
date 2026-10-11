@@ -58,9 +58,9 @@ const PAST_REACH := 7
 const COLOURS := {
 	WorldAdapter.RELATION_OWN: Palette.JADE_2,
 	WorldAdapter.RELATION_ALLY: Palette.JADE_2,
-	WorldAdapter.RELATION_NEUTRAL: Palette.PAPER_1,
-	WorldAdapter.RELATION_HOSTILE: Palette.CRIMSON_4,
-	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_4,
+	WorldAdapter.RELATION_NEUTRAL: Palette.PAPER_3,
+	WorldAdapter.RELATION_HOSTILE: Palette.CRIMSON_5,
+	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_5,
 }
 
 

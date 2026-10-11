@@ -153,42 +153,42 @@ class Dialogue extends Drawn:
 		_portrait(view.person, Rect2(c.position + Vector2(26, 2), Vector2(32, 48)), false)
 		_text(Vector2(c.position.x, c.position.y + 54), fit(view.faction, c.size.x), view.colour)
 		# A merchant's trade stands where a sect would: its best discipline, medicine, which makes it one.
-		_text(Vector2(c.position.x, c.position.y + 68), fit(view.merchant, c.size.x), Palette.JADE_3)
+		_text(Vector2(c.position.x, c.position.y + 68), fit(view.merchant, c.size.x), Palette.JADE_4)
 		_text(Vector2(c.position.x, c.position.y + 82), view.age, Palette.STONE_4)
-		draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_3)
+		draw_rect(Rect2(SAY_X - 10, RECT.position.y + 26, 1, RECT.size.y - 52), Palette.INK_4)
 		var room := RECT.end.x - 12 - SAY_X
 		if not trading:
-			_text(Vector2(SAY_X, SAY_Y), "“" + w("GREETING") + "”", Palette.GOLD_4)
+			_text(Vector2(SAY_X, SAY_Y), "“" + w("GREETING") + "”", Palette.GOLD_6)
 			var items: Array[Dictionary] = []
 			for offer: String in view.offers:
 				items.append({"text": offer})
 			_menu(Vector2(SAY_X, SAY_Y + 22), room, items, view.chosen)
 			return
-		_text(Vector2(SAY_X, SAY_Y), "“" + w("TRADE_GREETING") + "”", Palette.GOLD_4)
+		_text(Vector2(SAY_X, SAY_Y), "“" + w("TRADE_GREETING") + "”", Palette.GOLD_6)
 		var silver := w("SILVER") % view.silver
 		var right := RECT.end.x - 12
-		_text(Vector2(right - _width(silver), SAY_Y), silver, Palette.PAPER_3)
+		_text(Vector2(right - _width(silver), SAY_Y), silver, Palette.PAPER_6)
 		icon("silver", Vector2(right - _width(silver) - 18, SAY_Y - 2))
 		for n in WARES.size():
 			var ware: Dictionary = WARES[n]
 			var y := SAY_Y + 22 + n * ROW
 			if n > 0:
-				draw_rect(Rect2(SAY_X, y - 3, room, 1), Palette.INK_3)
+				draw_rect(Rect2(SAY_X, y - 3, room, 1), Palette.INK_4)
 			var on: bool = n == view.chosen
 			if on:
 				draw_rect(Rect2(SAY_X, y - 2, room, ROW - 2), Palette.INK_2)
-				draw_rect(Rect2(SAY_X, y - 2, 1, ROW - 2), Palette.JADE_3)
+				draw_rect(Rect2(SAY_X, y - 2, 1, ROW - 2), Palette.JADE_4)
 			icon(ware.icon, Vector2(SAY_X + 4, y - 1))
-			_text(Vector2(SAY_X + 24, y + 1), w(ware.name), Palette.GOLD_4 if on else Palette.PAPER_3)
+			_text(Vector2(SAY_X + 24, y + 1), w(ware.name), Palette.GOLD_6 if on else Palette.PAPER_6)
 			var effect := w("HEALTH_UP") % ware.health if ware.health > 0 else w("QI_UP") % thousands(ware.qi)
-			_text(Vector2(SAY_X + 132, y + 1), effect, Color("d63a2f") if ware.health > 0 else Palette.AZURE_4)
+			_text(Vector2(SAY_X + 132, y + 1), effect, Color("d63a2f") if ware.health > 0 else Palette.AZURE_5)
 			_text(Vector2(SAY_X + 204, y + 1), w("HELD") % view.held[n], Palette.STONE_4)
 			var price := w("SILVER") % ware.price
 			var afford: bool = view.silver >= ware.price
-			_text(Vector2(right - 4 - _width(price), y + 1), price, Palette.GOLD_3 if afford else Palette.STONE_3)
+			_text(Vector2(right - 4 - _width(price), y + 1), price, Palette.GOLD_4 if afford else Palette.STONE_3)
 		if not view.line.is_empty():
 			var y := SAY_Y + 22 + WARES.size() * ROW + 6
-			_text(Vector2(SAY_X, y), view.line, CRIMSON_LIGHT if view.refused else Palette.JADE_3)
+			_text(Vector2(SAY_X, y), view.line, CRIMSON_LIGHT if view.refused else Palette.JADE_4)
 
 	func width_of(text: String) -> float:
 		_font = get_theme_default_font() if _font == null else _font
@@ -213,7 +213,7 @@ class Purse extends Drawn:
 		_frame(STRIP, Palette.INK_2)
 		icon("silver", STRIP.position + Vector2(4, 1))
 		var text := unit % silver
-		_text(Vector2(STRIP.end.x - 6 - _width(text), STRIP.position.y + 3), text, Palette.PAPER_3)
+		_text(Vector2(STRIP.end.x - 6 - _width(text), STRIP.position.y + 3), text, Palette.PAPER_6)
 		if not belt:
 			return
 		var rect := Rect2(belt_at, Vector2(WARES.size() * BELT_STEP + 6, 26))
@@ -224,9 +224,9 @@ class Purse extends Drawn:
 			draw_rect(cell.grow(-1), Palette.INK_1)
 			var none: bool = held[n] == 0
 			icon(WARES[n].icon, cell.position + Vector2(12, 2), none)
-			_text(cell.position + Vector2(2, 3), WARES[n].key, Palette.STONE_3 if none else Palette.GOLD_3)
+			_text(cell.position + Vector2(2, 3), WARES[n].key, Palette.STONE_3 if none else Palette.GOLD_4)
 			var count := str(held[n])
-			_text(cell.end - Vector2(_width(count) + 1, 12), count, Palette.STONE_3 if none else Palette.PAPER_3, true)
+			_text(cell.end - Vector2(_width(count) + 1, 12), count, Palette.STONE_3 if none else Palette.PAPER_6, true)
 
 
 var _dir := "."

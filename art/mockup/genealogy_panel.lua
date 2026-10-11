@@ -6,7 +6,7 @@
 -- Run: aseprite --batch --script art/mockup/genealogy_panel.lua (after target_screen.lua)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/../pixel.lua")
+local px = dofile(here .. "/pixel.lua")
 local bdf = dofile(here .. "/bdf.lua")
 local panel_ui = dofile(here .. "/panel.lua")(px, bdf)
 local c = px.c
@@ -53,7 +53,7 @@ bdf.text(panel, font, PX + PW - 8 - close_w, PY + 4, words.close, c("stone", 4))
 -- Bodies: each faction's idle frame, read back from the production sources.
 local bodies = {}
 for _, f in ipairs({ "orthodox", "demonic", "unorthodox" }) do
-  bodies[f] = px.load_frames(here .. "/../bodies/" .. f .. ".aseprite")[1]
+  bodies[f] = px.load_frames(here .. "/frozen/bodies/" .. f .. ".aseprite")[1]
 end
 
 local CARD_W, CARD_H = panel_ui.CARD_W, panel_ui.CARD_H

@@ -253,11 +253,11 @@ func _compose(hud: CanvasLayer, variant: String) -> void:
 			counts["left out"] = counts.get("left out", 0) + 1
 			continue
 		taken.append(rect)
-		var colour: Color = _plates.Palette.PAPER_3
+		var colour: Color = _plates.Palette.PAPER_6
 		if hostile:
-			colour = _plates.Palette.CRIMSON_4
+			colour = _plates.Palette.CRIMSON_5
 		elif person.relation in [WorldAdapter.RELATION_OWN, WorldAdapter.RELATION_ALLY]:
-			colour = _plates.Palette.JADE_3
+			colour = _plates.Palette.JADE_4
 		plates.append({"text": text, "colour": colour, "at": rect.position})
 		counts[person.relation] = counts.get(person.relation, 0) + 1
 	_plates.plates = plates

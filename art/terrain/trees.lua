@@ -28,7 +28,7 @@ local function broadleaf(seed, rad)
       cv:set(x, y, col)
     end)
   end
-  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  cv:selout(0, 0, 32, 40)
   return cv
 end
 local function pine(seed)
@@ -46,7 +46,7 @@ local function pine(seed)
     end
   end
   cv:set(16, 5, c("leaf", 4))
-  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  cv:selout(0, 0, 32, 40)
   return cv
 end
 trees[1] = broadleaf(80, 11)
@@ -70,7 +70,7 @@ local function bamboo(seed)
       for t = 1, 4 do cv:set(sx + dir * t, ly + (t + 1) // 2, (t < 3) and c("grass", 5) or c("leaf", 4)) end
     end
   end
-  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  cv:selout(0, 0, 32, 40)
   return cv
 end
 -- Willow: a short trunk and long hanging strands of pale green.
@@ -88,19 +88,19 @@ local function willow(seed)
       cv:set(x + ((y // 4) % 2), y, (y % 3 == 0) and c("grass", 6) or c("grass", 4))
     end
   end
-  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  cv:selout(0, 0, 32, 40)
   return cv
 end
 -- Poplar: the oases' tree, a tall narrow crown of yellow-green on a pale trunk.
 local function poplar(seed)
   local cv = px.canvas(32, 40)
-  cv:rect(15, 28, 2, 9, c("paper", 1)); cv:vline(15, 28, 9, c("paper", 2))
+  cv:rect(15, 28, 2, 9, c("paper", 3)); cv:vline(15, 28, 9, c("paper", 4))
   cv:each_ellipse(16, 16, 5, 14, function(x, y)
     local n = px.noise(x, y, 2, seed)
     local light = -(x - 16) / 5 * 0.6 - (y - 16) / 14 * 0.4 + (n - 0.5) * 0.8
     cv:set(x, y, light > 0.4 and c("grass", 6) or (light > -0.1 and c("grass", 5) or (light > -0.5 and c("grass", 4) or c("leaf", 3))))
   end)
-  cv:outline(0, 0, 32, 40, c("leaf", 1))
+  cv:selout(0, 0, 32, 40)
   return cv
 end
 -- A pine high on a snowy range, snow lying on the upper side of each tier.
@@ -110,7 +110,7 @@ local function snow_pine(seed)
     for x = 0, 31 do
       local i = cv:get(x, y)
       if i ~= 0 and i ~= c("leaf", 1) and cv:get(x, y - 1) == c("leaf", 1) and px.hash(x, y, seed) > 0.25 then
-        cv:set(x, y, x < 16 and c("robe", 3) or c("robe", 2))
+        cv:set(x, y, x < 16 and c("robe", 7) or c("robe", 4))
       end
     end
   end

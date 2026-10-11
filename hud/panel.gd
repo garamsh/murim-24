@@ -70,7 +70,7 @@ func _room() -> Rect2:
 # A panel in `rect` with `title` and `close` in its title bar and `keys` along its foot.
 func _dialog(rect: Rect2, title: String, close: String, keys: String) -> void:
 	_titled(rect, title, close)
-	draw_rect(Rect2(rect.position.x + 3, rect.end.y - 20, rect.size.x - 6, 1), Palette.GOLD_2)
+	draw_rect(Rect2(rect.position.x + 3, rect.end.y - 20, rect.size.x - 6, 1), Palette.GOLD_3)
 	_text(Vector2(rect.position.x + (rect.size.x - _width(keys)) / 2.0, rect.end.y - 17), keys, Palette.STONE_4)
 
 
@@ -78,8 +78,8 @@ func _dialog(rect: Rect2, title: String, close: String, keys: String) -> void:
 func _titled(rect: Rect2, title: String, close: String) -> void:
 	_frame(rect, Palette.INK_2)
 	draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(rect.size.x - 6, 16)), Palette.INK_1)
-	draw_rect(Rect2(rect.position + Vector2(3, 19), Vector2(rect.size.x - 6, 1)), Palette.GOLD_2)
-	_text(rect.position + Vector2(8, 4), title, Palette.PAPER_3, true)
+	draw_rect(Rect2(rect.position + Vector2(3, 19), Vector2(rect.size.x - 6, 1)), Palette.GOLD_3)
+	_text(rect.position + Vector2(8, 4), title, Palette.PAPER_6, true)
 	_text(Vector2(rect.end.x - 8 - _width(close), rect.position.y + 4), close, Palette.STONE_4)
 
 
@@ -91,14 +91,14 @@ func _menu(top_left: Vector2, width: float, items: Array[Dictionary], chosen: in
 		var item := items[n]
 		var y := top_left.y + n * MENU_STEP
 		if n > 0:
-			draw_rect(Rect2(top_left.x, y - 3, width, 1), Palette.INK_3)
+			draw_rect(Rect2(top_left.x, y - 3, width, 1), Palette.INK_4)
 		if n == chosen:
 			draw_rect(Rect2(top_left.x, y - 2, width, 16), Palette.INK_2)
-			draw_rect(Rect2(top_left.x, y - 2, 1, 16), Palette.JADE_3)
+			draw_rect(Rect2(top_left.x, y - 2, 1, 16), Palette.JADE_4)
 			for k in 4:
-				draw_rect(Rect2(top_left.x + 4 + k, y + 2 + k, 1, 7 - 2 * k), Palette.GOLD_4)
+				draw_rect(Rect2(top_left.x + 4 + k, y + 2 + k, 1, 7 - 2 * k), Palette.GOLD_6)
 		var note: String = item.get("note", "")
-		var colour := Palette.STONE_3 if not note.is_empty() else (Palette.GOLD_4 if n == chosen else Palette.PAPER_3)
+		var colour := Palette.STONE_3 if not note.is_empty() else (Palette.GOLD_6 if n == chosen else Palette.PAPER_6)
 		_text(Vector2(top_left.x + 12, y), item.text, colour)
 		if not note.is_empty():
 			_text(Vector2(top_left.x + width - 4 - _width(note), y), note, Palette.STONE_3)
@@ -108,19 +108,19 @@ func _menu(top_left: Vector2, width: float, items: Array[Dictionary], chosen: in
 func _slip(top_left: Vector2, width: float, text: String, on: bool) -> void:
 	if on:
 		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), Palette.JADE_2)
-		draw_rect(Rect2(top_left, Vector2(width, 1)), Palette.JADE_3)
+		draw_rect(Rect2(top_left, Vector2(width, 1)), Palette.JADE_4)
 	else:
-		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), Palette.INK_3)
-		draw_rect(Rect2(top_left + Vector2(0, SLIP_HEIGHT - 1), Vector2(width, 1)), Palette.INK_4)
-	_text(top_left + Vector2(floorf((width - _width(text)) / 2.0), 1), text, Palette.PAPER_3 if on else Palette.STONE_4)
+		draw_rect(Rect2(top_left, Vector2(width, SLIP_HEIGHT)), Palette.INK_4)
+		draw_rect(Rect2(top_left + Vector2(0, SLIP_HEIGHT - 1), Vector2(width, 1)), Palette.INK_5)
+	_text(top_left + Vector2(floorf((width - _width(text)) / 2.0), 1), text, Palette.PAPER_6 if on else Palette.STONE_4)
 
 
 # A key's cap from `top_left` with `text` on it; returns its width.
 func _keycap(top_left: Vector2, text: String) -> float:
 	var w := keycap_width(text)
-	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT)), Palette.INK_4)
-	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT - 1)), Palette.INK_3)
-	_text(top_left + Vector2(floorf((w - _width(text)) / 2.0), 0), text, Palette.PAPER_3)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT)), Palette.INK_5)
+	draw_rect(Rect2(top_left, Vector2(w, KEYCAP_HEIGHT - 1)), Palette.INK_4)
+	_text(top_left + Vector2(floorf((w - _width(text)) / 2.0), 0), text, Palette.PAPER_6)
 	return w
 
 
@@ -137,7 +137,7 @@ func _person_card(rect: Rect2, person: int, name: String, line: String, dead: bo
 	_portrait(person, Rect2(rect.position + Vector2(4, 12), Vector2(16, 24)), dead)
 	# A card's name stays within its 2-pixel frame.
 	var room := CARD.x - CARD_TEXT_X - 2
-	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(name, room), Palette.STONE_4 if dead else Palette.PAPER_3)
+	_text(rect.position + Vector2(CARD_TEXT_X, 6), fit(name, room), Palette.STONE_4 if dead else Palette.PAPER_6)
 	_text(rect.position + Vector2(CARD_TEXT_X, 21), line, Palette.STONE_3 if dead else Palette.STONE_4)
 
 
@@ -145,7 +145,7 @@ func _person_card(rect: Rect2, person: int, name: String, line: String, dead: bo
 func _tag(top_right: Vector2, text: String, fill: Color) -> float:
 	var w := _width(text) + 6
 	draw_rect(Rect2(top_right - Vector2(w, 0), Vector2(w, 11)), fill)
-	_text(top_right - Vector2(w - 3, 0), text, Palette.PAPER_3)
+	_text(top_right - Vector2(w - 3, 0), text, Palette.PAPER_6)
 	return w
 
 
@@ -170,14 +170,14 @@ func _frame(rect: Rect2, fill: Color) -> void:
 	draw_rect(rect, Palette.INK_2)
 	draw_rect(rect.grow(-1), Palette.INK_1)
 	draw_rect(rect.grow(-2), fill)
-	draw_rect(Rect2(rect.position + Vector2(2, 0), Vector2(rect.size.x - 4, 1)), Palette.GOLD_3)
-	draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 1), Vector2(rect.size.x - 4, 1)), Palette.GOLD_2)
-	draw_rect(Rect2(rect.position + Vector2(0, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_2)
-	draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_2)
+	draw_rect(Rect2(rect.position + Vector2(2, 0), Vector2(rect.size.x - 4, 1)), Palette.GOLD_4)
+	draw_rect(Rect2(rect.position + Vector2(2, rect.size.y - 1), Vector2(rect.size.x - 4, 1)), Palette.GOLD_3)
+	draw_rect(Rect2(rect.position + Vector2(0, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_3)
+	draw_rect(Rect2(rect.position + Vector2(rect.size.x - 1, 2), Vector2(1, rect.size.y - 4)), Palette.GOLD_3)
 	for corner in [rect.position, Vector2(rect.end.x - 3, rect.position.y),
 			Vector2(rect.position.x, rect.end.y - 3), rect.end - Vector2(3, 3)]:
-		draw_rect(Rect2(corner, Vector2(3, 3)), Palette.GOLD_3)
-		draw_rect(Rect2(corner + Vector2.ONE, Vector2.ONE), Palette.LACQUER_3)
+		draw_rect(Rect2(corner, Vector2(3, 3)), Palette.GOLD_4)
+		draw_rect(Rect2(corner + Vector2.ONE, Vector2.ONE), Palette.LACQUER_5)
 
 
 func _text(top_left: Vector2, text: String, colour: Color, shadow := false) -> void:
@@ -239,7 +239,7 @@ func _pixel_icon(rows: Array, top_left: Vector2, colour: Color) -> void:
 		var row: String = rows[y]
 		for x in row.length():
 			if row[x] != ".":
-				var ink := Palette.LACQUER_3 if row[x] == "p" else (Palette.GOLD_3 if row[x] == "l" else colour)
+				var ink := Palette.LACQUER_5 if row[x] == "p" else (Palette.GOLD_4 if row[x] == "l" else colour)
 				draw_rect(Rect2(top_left + Vector2(x, y), Vector2.ONE), ink)
 
 

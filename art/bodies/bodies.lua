@@ -27,10 +27,10 @@ local HEAD_BOTTOM = 15
 -- The body that stands for each faction, the approved line-up's first column, and the colour of
 -- its outline seen through what hides it.
 local factions = {
-  orthodox = { spec = { faction = "orthodox", head = "topknot", weapon = "sword" }, xray = c("azure", 4) },
-  demonic = { spec = { faction = "demonic", head = "spiky", body = "tunic", weapon = "saber" }, xray = c("violet", 4) },
+  orthodox = { spec = { faction = "orthodox", head = "topknot", weapon = "sword" }, xray = c("azure", 5) },
+  demonic = { spec = { faction = "demonic", head = "spiky", body = "tunic", weapon = "saber" }, xray = c("violet", 5) },
   unorthodox = { spec = { faction = "unorthodox", head = "topknot", hat = "straw", body = "tunic", weapon = "knife" },
-    xray = c("amber", 4) },
+    xray = c("amber", 5) },
 }
 
 local function copy(spec, over)
@@ -65,7 +65,7 @@ end
 -- The same body seen from behind: skin and eyes on the head become hair.
 local function back(cv)
   local out = px.canvas(W, H)
-  local skin = { [c("skin", 3)] = true, [c("skin", 4)] = true }
+  local skin = { [c("skin", 4)] = true, [c("skin", 6)] = true }
   for k, i in pairs(cv.p) do
     local x, y = k % W, k // W
     if y <= HEAD_BOTTOM and (skin[i] or (i == c("ink", 1) and not edge(cv, x, y))) then i = c("ink", 2) end
@@ -74,13 +74,13 @@ local function back(cv)
   return out
 end
 
--- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only, so
--- the outline stays whole; `spread` 1 is a stain on the chest, 2 runs it down the side, the leg and
--- the arm.
+-- Pixels of blood on the body, at offsets from (6, 16), the chest's left: on solid pixels only and
+-- clear of the boots in every frame, so the outline stays whole and keeps the colour of what it
+-- borders; `spread` 1 is a stain on the chest, 2 runs it down the side, the leg and the arm.
 local STAIN = {
-  { { 0, 0, 3 }, { 1, 0, 2 }, { 0, 1, 2 }, { 1, 1, 3 }, { 2, 1, 2 } },
-  { { 2, 2, 3 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 3 }, { 2, 5, 2 }, { -1, 2, 2 },
-    { 3, 3, 3 }, { 2, 4, 3 }, { 3, 5, 2 }, { 3, 6, 3 }, { -1, 3, 3 }, { -2, 2, 2 }, { 4, 1, 3 } },
+  { { 0, 0, 4 }, { 1, 0, 2 }, { 0, 1, 2 }, { 1, 1, 4 }, { 2, 1, 2 } },
+  { { 2, 2, 4 }, { 3, 2, 2 }, { 2, 3, 2 }, { 3, 4, 4 }, { 2, 5, 2 }, { -1, 2, 2 },
+    { 3, 3, 4 }, { 2, 4, 4 }, { -1, 3, 4 }, { -2, 2, 2 }, { 4, 1, 4 } },
 }
 local function stained(cv, spread)
   local out = px.canvas(W, H)
@@ -89,7 +89,7 @@ local function stained(cv, spread)
     for _, d in ipairs(STAIN[n]) do
       local x, y = 6 + d[1], 16 + d[2]
       local i = out:get(x, y)
-      if i ~= 0 and i ~= c("ink", 1) then out:set(x, y, c("crimson", d[3])) end
+      if i ~= 0 and not edge(cv, x, y) then out:set(x, y, c("crimson", d[3])) end
     end
   end
   return out

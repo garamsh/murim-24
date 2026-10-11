@@ -173,7 +173,7 @@ return function(px, bdf, ui, here)
 
   -- The icons, 16 x 16 each: the production set's strike and burst, and the rest drawn here.
   local icons = {}
-  local skill_icons = px.load_frames(here .. "/../icons/skill_icons.aseprite")
+  local skill_icons = px.load_frames(here .. "/frozen/icons/skill_icons.aseprite")
   icons.strike, icons.burst = skill_icons[1], skill_icons[2]
   local paper, jade, lac, amb, stone = c("paper", 3), c("jade", 3), c("lacquer", 3), c("amber", 4), c("stone", 5)
   local function sprite(rows, map)

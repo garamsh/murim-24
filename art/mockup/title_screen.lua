@@ -5,7 +5,7 @@
 -- Run: aseprite --batch --script art/mockup/title_screen.lua (after art/title/backdrop.lua)
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
-local px = dofile(here .. "/../pixel.lua")
+local px = dofile(here .. "/pixel.lua")
 local bdf = dofile(here .. "/bdf.lua")
 local ui = dofile(here .. "/panel.lua")(px, bdf)
 local c = px.c
@@ -22,7 +22,7 @@ for _, w in pairs(words) do texts[#texts + 1] = w end
 local font = bdf.load(here .. "/../../hud/fonts/Galmuri9.bdf", texts)
 
 -- The mountains and the working title, from the production backdrop the game draws too.
-local backdrop = px.load_frames(here .. "/../title/backdrop.aseprite")[1]
+local backdrop = px.load_frames(here .. "/frozen/title/backdrop.aseprite")[1]
 
 local menu = px.canvas(W, H)
 

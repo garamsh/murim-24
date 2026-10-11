@@ -176,7 +176,7 @@ func _set_up() -> void:
 	font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	_theme.default_font = font
 	_theme.default_font_size = FONT_SIZE
-	_theme.set_color("font_color", "Label", Palette.PAPER_3)
+	_theme.set_color("font_color", "Label", Palette.PAPER_6)
 	_build()
 
 
@@ -299,7 +299,7 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	labels.season.text = season_text(world.date())
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
-		style.border_color = Palette.JADE_3 if skills.has(loadout.skill(world, slot)) else Palette.INK_2
+		style.border_color = Palette.JADE_4 if skills.has(loadout.skill(world, slot)) else Palette.INK_2
 	if arts.visible:
 		arts.reread()
 	if touch.visible:
@@ -503,7 +503,7 @@ func show_target(world: WorldAdapter, person: int, steered: int) -> void:
 	var hostile := world.relation(world.army_faction(steered), faction) in [
 		WorldAdapter.RELATION_HOSTILE, WorldAdapter.RELATION_AT_WAR]
 	labels.target_name.text = PersonName.of(world, person, true)
-	labels.target_name.add_theme_color_override("font_color", Palette.CRIMSON_4 if hostile else Palette.PAPER_3)
+	labels.target_name.add_theme_color_override("font_color", Palette.CRIMSON_5 if hostile else Palette.PAPER_6)
 	labels.target_faction.text = Affiliation.faction_name(world, faction)
 	labels.target_health.text = tr("HUD_TARGET_HEALTH") % world.person_health(person)
 
@@ -623,18 +623,18 @@ func _build() -> void:
 	title.position = Vector2(42, 3)
 	title.add_theme_constant_override("separation", 6)
 	player.add_child(title)
-	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, Palette.PAPER_3)
+	labels.player = _label(title, "HUD_PLAYER", Vector2.ZERO, Palette.PAPER_6)
 	labels.faction = _label(title, "", Vector2.ZERO, Palette.STONE_4)
 	# Each value on its label's line, right-aligned, and its bar under the line.
-	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), Palette.CRIMSON_4)
+	labels.hp = _label(player, "HUD_HP", Vector2(42, 14), Palette.CRIMSON_5)
 	labels.hp_value = _value(player, Vector2(42, 14), 120)
-	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), Palette.AZURE_3)
+	labels.qi = _label(player, "HUD_QI", Vector2(42, 30), Palette.AZURE_4)
 	labels.qi_value = _value(player, Vector2(42, 30), 120)
-	labels.realm = _label(player, "HUD_REALM", Vector2(42, 47), Palette.GOLD_3)
+	labels.realm = _label(player, "HUD_REALM", Vector2(42, 47), Palette.GOLD_4)
 	labels.realm_value = _value(player, Vector2(42, 47), 120)
 	labels.realm_value.text = "—"
-	_bar(player, hp_bar, Vector2(42, 26), Palette.CRIMSON_4)
-	_bar(player, qi_bar, Vector2(42, 42), Palette.AZURE_3)
+	_bar(player, hp_bar, Vector2(42, 26), Palette.CRIMSON_5)
+	_bar(player, qi_bar, Vector2(42, 42), Palette.AZURE_4)
 	qi_bar.value = 0.0
 	labels.qi_value.text = "—"
 
@@ -645,7 +645,7 @@ func _build() -> void:
 	_map.stretch_mode = TextureRect.STRETCH_SCALE
 	_map.texture = AtlasTexture.new()
 	map.add_child(_map)
-	_dot.color = Palette.JADE_3
+	_dot.color = Palette.JADE_4
 	_dot.size = Vector2(2, 2)
 	map.add_child(_dot)
 	labels.season = _trimmed(map, Vector2(5, 48), 74)
@@ -676,7 +676,7 @@ func _build() -> void:
 		number.position = SLOT_KEY.position
 		number.size = SLOT_KEY.size
 		number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		number.add_theme_color_override("font_color", Palette.GOLD_3)
+		number.add_theme_color_override("font_color", Palette.GOLD_4)
 		number.add_theme_color_override("font_outline_color", Palette.INK_1)
 		number.add_theme_constant_override("outline_size", 2)
 		cell.add_child(number)
@@ -706,18 +706,18 @@ func _build() -> void:
 	purse.use_font(_theme.default_font)
 
 	var leadership := _panel(Rect2(4, 70, 168, 18))
-	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), Palette.GOLD_3)
+	labels.leader = _label(leadership, "HUD_LEADER", Vector2(5, 2), Palette.GOLD_4)
 	labels.leader_value = _trimmed(leadership, Vector2(42, 2), 56)
 
 	duel_panel = _panel(Rect2(DUEL_AT[false], Vector2(128, 44)))
 	duel_panel.visible = false
-	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), Palette.CRIMSON_4)
+	labels.duel = _label(duel_panel, "HUD_DUEL", Vector2(5, 3), Palette.CRIMSON_5)
 	labels.duel_challenger = _trimmed(duel_panel, Vector2(5, 15), 52)
 	labels.duel_leader = _trimmed(duel_panel, Vector2(5, 28), 52)
 	duel_bars.challenger = ProgressBar.new()
 	duel_bars.leader = ProgressBar.new()
-	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), Palette.CRIMSON_4)
-	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), Palette.CRIMSON_4)
+	_bar(duel_panel, duel_bars.challenger, Vector2(60, 20), Palette.CRIMSON_5)
+	_bar(duel_panel, duel_bars.leader, Vector2(60, 33), Palette.CRIMSON_5)
 	duel_bars.challenger.size.x = 62
 	duel_bars.leader.size.x = 62
 
@@ -727,7 +727,7 @@ func _build() -> void:
 	labels.target_faction = _trimmed(target_panel, Vector2(5, 16), 72)
 	labels.target_health = _value(target_panel, Vector2(79, 16), 52)
 
-	labels.notice = _label(self, "", NOTICE_AT[false], Palette.PAPER_3)
+	labels.notice = _label(self, "", NOTICE_AT[false], Palette.PAPER_6)
 	labels.notice.size = Vector2(300, 12)
 	labels.notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	labels.notice.add_theme_color_override("font_outline_color", Palette.INK_1)
@@ -736,7 +736,7 @@ func _build() -> void:
 	# The notice's slip, under its words: ink framed in gold, as the talk prompt's.
 	var slip := StyleBoxFlat.new()
 	slip.bg_color = Palette.INK_2
-	slip.border_color = Palette.GOLD_2
+	slip.border_color = Palette.GOLD_3
 	slip.set_border_width_all(1)
 	_notice_slip.add_theme_stylebox_override("panel", slip)
 	_notice_slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -784,7 +784,7 @@ func _panel(rect: Rect2) -> Panel:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Palette.INK_2
 	style.set_border_width_all(1)
-	style.border_color = Palette.GOLD_2
+	style.border_color = Palette.GOLD_3
 	style.border_width_top = 2
 	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
@@ -809,7 +809,7 @@ func _value(parent: Control, at: Vector2, width: float) -> Label:
 	label.position = at
 	label.size = Vector2(width, 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_color_override("font_color", Palette.PAPER_3)
+	label.add_theme_color_override("font_color", Palette.PAPER_6)
 	parent.add_child(label)
 	return label
 

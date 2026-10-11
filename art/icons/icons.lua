@@ -17,19 +17,19 @@ local strike = px.canvas(16, 16)
 -- The qi arc behind the blade, then the blade from hilt to point, lit on its upper edge.
 for t = 0, 10 do
   local a = math.rad(200 + t * 9)
-  strike:set(math.floor(7 + math.cos(a) * -6.5 + 0.5), math.floor(7 + math.sin(a) * -6.5 + 0.5), c("azure", 5))
-  strike:set(math.floor(7 + math.cos(a) * -5.5 + 0.5), math.floor(7 + math.sin(a) * -5.5 + 0.5), c("azure", 4))
+  strike:set(math.floor(7 + math.cos(a) * -6.5 + 0.5), math.floor(7 + math.sin(a) * -6.5 + 0.5), c("azure", 7))
+  strike:set(math.floor(7 + math.cos(a) * -5.5 + 0.5), math.floor(7 + math.sin(a) * -5.5 + 0.5), c("azure", 5))
 end
-strike:line(4, 11, 12, 3, c("stone", 6)); strike:line(5, 11, 13, 3, c("stone", 4))
-strike:line(2, 11, 5, 14, c("gold", 3)); strike:line(2, 13, 3, 14, c("wood", 3))
+strike:line(4, 11, 12, 3, c("stone", 7)); strike:line(5, 11, 13, 3, c("stone", 4))
+strike:line(2, 11, 5, 14, c("gold", 4)); strike:line(2, 13, 3, 14, c("wood", 3))
 strike:outline(0, 0, 16, 16, c("ink", 1))
 
 local burst = px.canvas(16, 16)
 burst:each_ellipse(8, 8, 7.5, 7.5, function(x, y, d)
-  if d > 0.82 then burst:set(x, y, c("crimson", 4)) elseif d > 0.7 and (x + y) % 2 == 0 then burst:set(x, y, c("crimson", 3)) end
+  if d > 0.82 then burst:set(x, y, c("crimson", 5)) elseif d > 0.7 and (x + y) % 2 == 0 then burst:set(x, y, c("crimson", 4)) end
 end)
 burst:sprite(4, 3, { ".#.#.#..", ".#.#.#..", "######..", "######.#", "#######.", ".#####..", ".####...", "..###..." },
-  { ["#"] = c("skin", 4) })
+  { ["#"] = c("skin", 6) })
 burst:outline(3, 2, 10, 10, c("ink", 1))
 
 px.save_frames(16, 16, { strike, burst }, { { "strike", 1, 1, 100 }, { "burst", 2, 2, 100 } },
@@ -38,11 +38,11 @@ px.save_frames(16, 16, { strike, burst }, { { "strike", 1, 1, 100 }, { "burst", 
 local food = px.canvas(16, 16)
 -- The bowl, lacquered red, with a mound of rice and chopsticks across it.
 food:each_ellipse(8, 10, 6.5, 4, function(x, y, d)
-  if y >= 10 then food:set(x, y, x < 6 and c("lacquer", 3) or c("lacquer", 2)) end
+  if y >= 10 then food:set(x, y, x < 6 and c("lacquer", 5) or c("lacquer", 4)) end
 end)
-food:hline(2, 10, 13, c("lacquer", 3))
+food:hline(2, 10, 13, c("lacquer", 5))
 food:each_ellipse(8, 9, 5, 3.5, function(x, y, d)
-  if y <= 10 then food:set(x, y, (x + y) % 3 == 0 and c("robe", 2) or c("robe", 3)) end
+  if y <= 10 then food:set(x, y, (x + y) % 3 == 0 and c("robe", 4) or c("robe", 7)) end
 end)
 food:line(3, 3, 13, 7, c("wood", 4)); food:line(3, 4, 13, 8, c("wood", 3))
 food:outline(0, 0, 16, 16, c("ink", 1))
@@ -50,21 +50,21 @@ food:outline(0, 0, 16, 16, c("ink", 1))
 local stock = px.canvas(16, 16)
 -- A sack of grain, tied at the neck, grain at its mouth.
 stock:each_ellipse(8, 10, 5.5, 5, function(x, y, d)
-  stock:set(x, y, x < 7 and c("cloth", 4) or (d > 0.75 and c("cloth", 2) or c("cloth", 3)))
+  stock:set(x, y, x < 7 and c("cloth", 6) or (d > 0.75 and c("cloth", 3) or c("cloth", 4)))
 end)
-stock:rect(6, 3, 5, 3, c("cloth", 3)); stock:hline(6, 3, 5, c("amber", 4)); stock:set(8, 2, c("amber", 5))
+stock:rect(6, 3, 5, 3, c("cloth", 4)); stock:hline(6, 3, 5, c("amber", 5)); stock:set(8, 2, c("amber", 7))
 stock:hline(5, 6, 7, c("wood", 3))
-stock:vline(8, 9, 4, c("cloth", 2))
+stock:vline(8, 9, 4, c("cloth", 3))
 stock:outline(0, 0, 16, 16, c("ink", 1))
 
 local housing = px.canvas(16, 16)
 -- A house: slate roof with upturned eaves, plaster wall, a door.
 for y = 2, 7 do
   local inset = math.max(0, 6 - y)
-  for x = 1 + inset, 14 - inset do housing:set(x, y, ((x % 3) == 0) and c("stone", 2) or (y < 4 and c("stone", 5) or c("stone", 4))) end
+  for x = 1 + inset, 14 - inset do housing:set(x, y, ((x % 3) == 0) and c("stone", 2) or (y < 4 and c("stone", 6) or c("stone", 4))) end
 end
 housing:set(0, 6, c("stone", 2)); housing:set(15, 6, c("stone", 2))
-housing:rect(3, 8, 10, 6, c("paper", 2)); housing:vline(3, 8, 6, c("lacquer", 3)); housing:vline(12, 8, 6, c("lacquer", 3))
+housing:rect(3, 8, 10, 6, c("paper", 4)); housing:vline(3, 8, 6, c("lacquer", 5)); housing:vline(12, 8, 6, c("lacquer", 5))
 housing:rect(7, 10, 3, 4, c("wood", 2))
 housing:hline(2, 14, 12, c("stone", 4))
 housing:outline(0, 0, 16, 16, c("ink", 1))
@@ -77,19 +77,19 @@ herb:sprite(0, 0, { "................", "......gg........", ".....gGGg..gg...", 
   "......gg..gGGg..", ".......s...gg...", ".gg....s..s.....", "gGGg...s.s......", "gGGg....ss......",
   ".gg.s...s.......", ".....s..s.......", "......s.s.......", ".......ss.......", "........r.......",
   ".......rrr......", "......r.r.r....." },
-  { g = c("jade", 2), G = c("jade", 3), s = c("grass", 4), r = c("earth", 5) })
+  { g = c("jade", 2), G = c("jade", 4), s = c("grass", 4), r = c("earth", 5) })
 
 local elixir = px.canvas(16, 16)
 elixir:sprite(0, 0, { "................", "................", "................", ".....kkkkkk.....",
   "....kRRRRRRk....", "...kRYYRRRRRk...", "...kRYRRRRRRk...", "...kRRRRRRRRk...", "...kRRRRRRRrk...",
   "...kRRRRRRrrk...", "....kRRRrrrk....", ".....kkkkkk....." },
-  { k = c("ink", 1), R = c("crimson", 4), Y = c("gold", 4), r = c("lacquer", 3) })
+  { k = c("ink", 1), R = c("crimson", 5), Y = c("gold", 6), r = c("lacquer", 5) })
 
 local silver = px.canvas(16, 16)
 silver:sprite(0, 0, { "................", "................", "................", ".....kkkkk......",
   ".kk.kSWWWSk.kk..", "kSSkkSSSSSkkSSk.", "kSWSSSSSSSSSSSk.", ".kSSSSSSSSSSSk..", "..kSSSSSSSSSk...",
   "...kkkkkkkkk...." },
-  { k = c("ink", 1), S = c("stone", 4), W = c("robe", 3) })
+  { k = c("ink", 1), S = c("stone", 4), W = c("robe", 7) })
 
 px.save_frames(16, 16, { herb, elixir, silver },
   { { "herb", 1, 1, 100 }, { "elixir", 2, 2, 100 }, { "silver", 3, 3, 100 } },

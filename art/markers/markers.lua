@@ -4,8 +4,8 @@
 -- army's name and count are text the HUD draws, not part of the frame.
 -- player_marker.aseprite, the player's markers on the body's 16x24 frame: tagged ring (drawn
 -- under the body) and chevron (drawn over it, two frames bobbing by a pixel).
--- shadow.aseprite, a 16x8 frame tagged shadow: the dithered ink ellipse on the ground under every
--- body's feet, centred on (8, 4).
+-- shadow.aseprite, a 16x8 frame tagged shadow: the soft contact shadow on the ground under every
+-- body's feet, an ink ellipse centred on (8, 4), dithered thinner toward its rim.
 -- Run: aseprite --batch --script art/markers/markers.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -26,17 +26,20 @@ px.save_frames(64, 48, frames, tags, here .. "/army_marker.aseprite")
 
 -- The player: a jade ring round the feet and a gold chevron over the head.
 local ring = px.canvas(16, 24)
-ring:each_ellipse(8, 21, 7, 2.6, function(x, y, d) if d > 0.68 then ring:set(x, y, c("jade", 3)) end end)
+ring:each_ellipse(8, 21, 7, 2.6, function(x, y, d) if d > 0.68 then ring:set(x, y, c("jade", 4)) end end)
 local function chevron(dy)
   local cv = px.canvas(16, 24)
-  cv:sprite(6, 2 + dy, { "#####", ".###.", "..#.." }, { ["#"] = c("gold", 4) })
+  cv:sprite(6, 2 + dy, { "#####", ".###.", "..#.." }, { ["#"] = c("gold", 6) })
   cv:outline(5, 1 + dy, 7, 5, c("ink", 1))
   return cv
 end
 px.save_frames(16, 24, { ring, chevron(0), chevron(1) }, { { "ring", 1, 1, 100 }, { "chevron", 2, 3, 400 } },
   here .. "/player_marker.aseprite")
 
--- Every body's shadow: every other pixel of a flat ellipse, so the ground shows through.
+-- Every body's shadow: a flat ellipse by the ordered dither, four pixels in five at its middle
+-- and one in ten at its rim, so the ground shows through more toward the edge.
 local shadow = px.canvas(16, 8)
-shadow:each_ellipse(8, 4, 5.5, 2.2, function(x, y) if (x + y) % 2 == 0 then shadow:set(x, y, c("ink", 1)) end end)
+shadow:each_ellipse(8, 4, 6, 2.5, function(x, y, d)
+  if px.bayer(x, y) < 0.8 - 0.7 * d then shadow:set(x, y, c("ink", 1)) end
+end)
 px.save_frames(16, 8, { shadow }, { { "shadow", 1, 1, 100 } }, here .. "/shadow.aseprite")

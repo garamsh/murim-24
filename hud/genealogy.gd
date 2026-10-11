@@ -209,16 +209,16 @@ func _draw() -> void:
 	_chrome(tr("GENEALOGY_KEYS"))
 	var title := tr("GENEALOGY_TITLE")
 	var family_x := 8 + _width(title) + 10
-	_text(PANEL.position + Vector2(8, 4), title, Palette.PAPER_3, true)
-	_text(PANEL.position + Vector2(family_x, 4), details.family, Palette.GOLD_4, true)
+	_text(PANEL.position + Vector2(8, 4), title, Palette.PAPER_6, true)
+	_text(PANEL.position + Vector2(family_x, 4), details.family, Palette.GOLD_6, true)
 	_text(PANEL.position + Vector2(family_x + _width(details.family) + 14, 4), details.generation, Palette.STONE_4)
 	var close_text := tr("GENEALOGY_CLOSE")
 	_text(Vector2(PANEL.end.x - 8 - _width(close_text), PANEL.position.y + 4), close_text, Palette.STONE_4)
 	# Generation labels.
 	for n in 3:
 		var label: String = tr(["GENEALOGY_PARENTS", "GENEALOGY_ROW_SELF", "GENEALOGY_CHILDREN"][n])
-		_text(Vector2(PANEL.position.x + 10, ROWS[n] + 14), label, Palette.GOLD_3)
-		draw_rect(Rect2(PANEL.position.x + 10, ROWS[n] + 28, 26, 1), Palette.INK_3)
+		_text(Vector2(PANEL.position.x + 10, ROWS[n] + 14), label, Palette.GOLD_4)
+		draw_rect(Rect2(PANEL.position.x + 10, ROWS[n] + 28, 26, 1), Palette.INK_4)
 	_kin_lines()
 	for index in cards.size():
 		_draw_card(index)
@@ -264,12 +264,12 @@ func _marriage(x0: float, x1: float, y: float) -> void:
 	_line(Vector2(x0, y - 1), Vector2(x1, y - 1))
 	_line(Vector2(x0, y + 1), Vector2(x1, y + 1))
 	var knot := floorf((x0 + x1) / 2.0)
-	draw_rect(Rect2(knot - 1, y - 2, 3, 5), Palette.GOLD_4)
-	draw_rect(Rect2(knot, y, 1, 1), Palette.LACQUER_3)
+	draw_rect(Rect2(knot - 1, y - 2, 3, 5), Palette.GOLD_6)
+	draw_rect(Rect2(knot, y, 1, 1), Palette.LACQUER_5)
 
 
 func _line(from: Vector2, to: Vector2) -> void:
-	draw_rect(Rect2(from.min(to).floor(), (to - from).abs().floor() + Vector2.ONE), Palette.GOLD_2)
+	draw_rect(Rect2(from.min(to).floor(), (to - from).abs().floor() + Vector2.ONE), Palette.GOLD_3)
 
 
 func _draw_card(index: int) -> void:
@@ -278,8 +278,8 @@ func _draw_card(index: int) -> void:
 	var own_card: bool = card.person == own
 	var chosen: bool = card.person == selected
 	_person_card(rect, card.person, card.short, card.line, card.dead,
-			Palette.JADE_3 if own_card else (Palette.GOLD_3 if chosen else Palette.INK_1),
-			Palette.JADE_2 if own_card else (Palette.GOLD_2 if chosen else Palette.INK_3))
+			Palette.JADE_4 if own_card else (Palette.GOLD_4 if chosen else Palette.INK_1),
+			Palette.JADE_2 if own_card else (Palette.GOLD_3 if chosen else Palette.INK_4))
 	if own_card:
 		_tag(Vector2(rect.end.x - 3, rect.position.y - 5), tr("GENEALOGY_SELF"), Palette.JADE_2)
 
@@ -292,9 +292,9 @@ func _draw_details() -> void:
 	_portrait(centre, Rect2(at + Vector2(10, 4), Vector2(32, 48)), _world.person_health(centre) == 0)
 	# Each line keeps the 8 pixels from the column's right edge that the rows keep.
 	var room := DETAILS.size.x - DETAILS_TEXT_X - 8
-	_text(at + Vector2(DETAILS_TEXT_X, 10), fit(details.name, room), Palette.PAPER_3, true)
-	_text(at + Vector2(DETAILS_TEXT_X, 24), fit(details.family, room), Palette.GOLD_4)
-	_text(at + Vector2(DETAILS_TEXT_X, 38), fit(details.sect, room), Palette.AZURE_4)
+	_text(at + Vector2(DETAILS_TEXT_X, 10), fit(details.name, room), Palette.PAPER_6, true)
+	_text(at + Vector2(DETAILS_TEXT_X, 24), fit(details.family, room), Palette.GOLD_6)
+	_text(at + Vector2(DETAILS_TEXT_X, 38), fit(details.sect, room), Palette.AZURE_5)
 	var rows := [
 		["GENEALOGY_AGE_LABEL", details.age], ["GENEALOGY_TALENT", details.talent],
 		["GENEALOGY_LIFESPAN", details.lifespan], ["GENEALOGY_SPOUSE", details.spouse],
@@ -302,11 +302,11 @@ func _draw_details() -> void:
 	]
 	for n in rows.size():
 		var y := at.y + 62 + n * 20
-		draw_rect(Rect2(at.x + 6, y - 4, DETAILS.size.x - 12, 1), Palette.INK_3)
+		draw_rect(Rect2(at.x + 6, y - 4, DETAILS.size.x - 12, 1), Palette.INK_4)
 		var label := tr(rows[n][0])
-		_text(Vector2(at.x + 8, y), label, Palette.GOLD_3)
+		_text(Vector2(at.x + 8, y), label, Palette.GOLD_4)
 		var value: String = rows[n][1]
 		var unknown := value == tr("GENEALOGY_UNKNOWN")
 		# The value, such as a spouse's name, keeps 4 pixels from its label.
 		value = fit(value, DETAILS.size.x - 16 - _width(label) - 4)
-		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, Palette.STONE_3 if unknown else Palette.PAPER_3)
+		_text(Vector2(DETAILS.end.x - 8 - _width(value), y), value, Palette.STONE_3 if unknown else Palette.PAPER_6)

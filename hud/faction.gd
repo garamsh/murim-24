@@ -44,9 +44,9 @@ const REFUSAL_KEYS := {
 }
 const RELATION_FILL := {
 	WorldAdapter.RELATION_ALLY: Palette.JADE_2,
-	WorldAdapter.RELATION_NEUTRAL: Palette.INK_4,
+	WorldAdapter.RELATION_NEUTRAL: Palette.INK_5,
 	WorldAdapter.RELATION_HOSTILE: Palette.AMBER_2,
-	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_3,
+	WorldAdapter.RELATION_AT_WAR: Palette.CRIMSON_4,
 }
 const LEGEND := [WorldAdapter.RELATION_ALLY, WorldAdapter.RELATION_NEUTRAL, WorldAdapter.RELATION_HOSTILE,
 		WorldAdapter.RELATION_AT_WAR]
@@ -314,18 +314,18 @@ func _draw_pc() -> void:
 		_row_back(Rect2(PANEL.position.x + 6, y, PANEL.size.x - 12, ROW - 1), n)
 		_text(Vector2(NAME_X + 6, y + 2), row.name, row.colour)
 		_relation_tag(Vector2(RELATION_X, y + 3), row.relation)
-		_text(Vector2(LEADER_X, y + 2), fit(row.leader, PEOPLE_RIGHT - 40 - LEADER_X), Palette.PAPER_3)
-		_right(PEOPLE_RIGHT, y + 2, str(row.people), Palette.PAPER_3)
-		_right(VILLAGES_RIGHT, y + 2, str(row.villages), Palette.PAPER_3)
+		_text(Vector2(LEADER_X, y + 2), fit(row.leader, PEOPLE_RIGHT - 40 - LEADER_X), Palette.PAPER_6)
+		_right(PEOPLE_RIGHT, y + 2, str(row.people), Palette.PAPER_6)
+		_right(VILLAGES_RIGHT, y + 2, str(row.villages), Palette.PAPER_6)
 		_text(Vector2(SINCE_X, y + 2), fit(row.since, PANEL.end.x - 8 - SINCE_X), Palette.STONE_4)
 	var top := ROWS_Y + rows.size() * ROW + 2
-	draw_rect(Rect2(PANEL.position.x + 6, top, PANEL.size.x - 12, 1), Palette.GOLD_2)
-	draw_rect(Rect2(DIVIDER_X, top + 4, 1, PANEL.end.y - 24 - top - 4), Palette.INK_3)
+	draw_rect(Rect2(PANEL.position.x + 6, top, PANEL.size.x - 12, 1), Palette.GOLD_3)
+	draw_rect(Rect2(DIVIDER_X, top + 4, 1, PANEL.end.y - 24 - top - 4), Palette.INK_4)
 	top += 6
 	var row: Dictionary = rows[chosen]
 	_text(Vector2(DETAIL_X, top), row.name, row.colour, true)
 	_relation_tag(Vector2(DETAIL_X + _width(row.name) + 8, top + 1), row.relation)
-	_text(Vector2(DETAIL_X, top + 16), fit(tr(ABOUT_KEYS.get(row.relation, "")), DIVIDER_X - 8 - DETAIL_X), Palette.PAPER_3)
+	_text(Vector2(DETAIL_X, top + 16), fit(tr(ABOUT_KEYS.get(row.relation, "")), DIVIDER_X - 8 - DETAIL_X), Palette.PAPER_6)
 	if row.has("declared"):
 		_text(Vector2(DETAIL_X, top + 30), fit(row.declared, DIVIDER_X - 8 - DETAIL_X), Palette.STONE_4)
 	var y := top + 50
@@ -341,8 +341,8 @@ func _draw_pc() -> void:
 		_text(Vector2(DETAIL_X, y - 2), fit(tr("FACTION_LEADER_ONLY"), DIVIDER_X - 8 - DETAIL_X), Palette.STONE_3)
 		_order_slip(Rect2(DETAIL_X, y + 14, CHALLENGE_WIDTH, SLIP_HEIGHT), tr("FACTION_CHALLENGE"), true, true)
 		if not verdict.is_empty():
-			_text(Vector2(DETAIL_X, y + 32), fit(tr(verdict), DIVIDER_X - 8 - DETAIL_X), Palette.CRIMSON_4)
-	_text(Vector2(LEGEND_X, top), tr("FACTION_RELATION"), Palette.GOLD_4)
+			_text(Vector2(DETAIL_X, y + 32), fit(tr(verdict), DIVIDER_X - 8 - DETAIL_X), Palette.CRIMSON_5)
+	_text(Vector2(LEGEND_X, top), tr("FACTION_RELATION"), Palette.GOLD_6)
 	for n in LEGEND.size():
 		var ly := top + 18 + n * 17
 		_relation_tag(Vector2(LEGEND_X, ly + 1), LEGEND[n])
@@ -356,22 +356,22 @@ func _draw_touch() -> void:
 	for n in rows.size():
 		var row: Dictionary = rows[n]
 		var rect := _touch_row(n)
-		draw_rect(rect, Palette.GOLD_2 if n == chosen else Palette.INK_4)
-		draw_rect(rect.grow(-1), Palette.INK_3 if n == chosen else Palette.INK_2)
+		draw_rect(rect, Palette.GOLD_3 if n == chosen else Palette.INK_5)
+		draw_rect(rect.grow(-1), Palette.INK_4 if n == chosen else Palette.INK_2)
 		if n == chosen:
-			draw_rect(Rect2(rect.position + Vector2(1, 1), Vector2(2, rect.size.y - 2)), Palette.JADE_3)
+			draw_rect(Rect2(rect.position + Vector2(1, 1), Vector2(2, rect.size.y - 2)), Palette.JADE_4)
 		var x := rect.position.x + 8
 		_text(Vector2(x, rect.position.y + 6), row.name, row.colour)
 		_relation_tag(Vector2(x, rect.position.y + 24), row.relation)
 		var rx := rect.position.x + TOUCH_TEXT_X
-		_text(Vector2(rx, rect.position.y + 6), fit(tr("HUD_LEADER") + " " + row.leader, rect.end.x - 6 - rx), Palette.PAPER_3)
+		_text(Vector2(rx, rect.position.y + 6), fit(tr("HUD_LEADER") + " " + row.leader, rect.end.x - 6 - rx), Palette.PAPER_6)
 		_text(Vector2(rx, rect.position.y + 23), tr("FACTION_STRENGTH") % [row.people, row.villages], Palette.STONE_4)
 	var d := TOUCH_DETAIL
-	draw_rect(Rect2(d.position.x - 8, d.position.y, 1, PANEL.end.y - 8 - d.position.y), Palette.INK_3)
+	draw_rect(Rect2(d.position.x - 8, d.position.y, 1, PANEL.end.y - 8 - d.position.y), Palette.INK_4)
 	var row: Dictionary = rows[chosen]
 	_text(d.position, row.name, row.colour, true)
 	_relation_tag(Vector2(d.position.x + _width(row.name) + 8, d.position.y + 1), row.relation)
-	var y := _wrapped(d.position + Vector2(0, 18), tr(ABOUT_KEYS.get(row.relation, "")), d.size.x, Palette.PAPER_3)
+	var y := _wrapped(d.position + Vector2(0, 18), tr(ABOUT_KEYS.get(row.relation, "")), d.size.x, Palette.PAPER_6)
 	if row.has("declared"):
 		y = _wrapped(Vector2(d.position.x, y + 2), row.declared, d.size.x, Palette.STONE_4)
 	if leads:
@@ -384,7 +384,7 @@ func _draw_touch() -> void:
 	else:
 		y = _wrapped(Vector2(d.position.x, y + 6), tr("FACTION_LEADER_ONLY"), d.size.x, Palette.STONE_3)
 		if not verdict.is_empty():
-			_wrapped(Vector2(d.position.x, y + 4), tr(verdict), d.size.x, Palette.CRIMSON_4)
+			_wrapped(Vector2(d.position.x, y + 4), tr(verdict), d.size.x, Palette.CRIMSON_5)
 		_touch_button(_challenge_button(), tr("FACTION_CHALLENGE_TOUCH"), true, true)
 
 
@@ -392,20 +392,20 @@ func _draw_own(at: Vector2) -> void:
 	var own: Dictionary = rows[0]
 	_text(at, own.name, own.colour, true)
 	var x := at.x + _width(own.name) + 10
-	_text(Vector2(x, at.y), tr("HUD_LEADER"), Palette.GOLD_4)
-	_text(Vector2(x + _width(tr("HUD_LEADER")) + 6, at.y), own.leader, Palette.PAPER_3)
+	_text(Vector2(x, at.y), tr("HUD_LEADER"), Palette.GOLD_6)
+	_text(Vector2(x + _width(tr("HUD_LEADER")) + 6, at.y), own.leader, Palette.PAPER_6)
 	if leads:
-		_tag(Vector2(PANEL.end.x - 10, at.y + 1), tr("FACTION_YOU_LEAD"), Palette.GOLD_2)
+		_tag(Vector2(PANEL.end.x - 10, at.y + 1), tr("FACTION_YOU_LEAD"), Palette.GOLD_3)
 
 
 func _row_back(rect: Rect2, n: int) -> void:
 	if n > 0:
-		draw_rect(Rect2(rect.position - Vector2(0, 1), Vector2(rect.size.x, 1)), Palette.INK_3)
+		draw_rect(Rect2(rect.position - Vector2(0, 1), Vector2(rect.size.x, 1)), Palette.INK_4)
 	if n == chosen:
-		draw_rect(rect, Palette.INK_3)
-		draw_rect(Rect2(rect.position, Vector2(1, rect.size.y)), Palette.JADE_3)
+		draw_rect(rect, Palette.INK_4)
+		draw_rect(Rect2(rect.position, Vector2(1, rect.size.y)), Palette.JADE_4)
 		for k in 4:
-			draw_rect(Rect2(rect.position.x + 4 + k, rect.position.y + 5 + k, 1, 7 - 2 * k), Palette.GOLD_4)
+			draw_rect(Rect2(rect.position.x + 4 + k, rect.position.y + 5 + k, 1, 7 - 2 * k), Palette.GOLD_6)
 
 
 func _draw_confirm() -> void:
@@ -413,7 +413,7 @@ func _draw_confirm() -> void:
 	var rect := TOUCH_CONFIRM if touch_layout else PC_CONFIRM
 	_titled(rect, tr("FACTION_CONFIRM_TITLE"), "")
 	var row: Dictionary = rows[chosen]
-	var y := _wrapped(rect.position + Vector2(12, 28), tr("FACTION_CONFIRM_LINE") % row.name, rect.size.x - 24, Palette.PAPER_3)
+	var y := _wrapped(rect.position + Vector2(12, 28), tr("FACTION_CONFIRM_LINE") % row.name, rect.size.x - 24, Palette.PAPER_6)
 	var then := "FACTION_CONFIRM_ALLY" if row.relation == WorldAdapter.RELATION_ALLY else "FACTION_CONFIRM_WAR"
 	_wrapped(Vector2(rect.position.x + 12, y + 2), tr(then), rect.size.x - 24, Palette.STONE_4)
 	var buttons := _confirm_buttons(rect)
@@ -470,25 +470,25 @@ func _wrapped(top_left: Vector2, text: String, width: float, colour: Color) -> f
 func _relation_tag(top_left: Vector2, relation: int) -> void:
 	var text := tr(RELATION_KEYS[relation])
 	if relation == WorldAdapter.RELATION_OWN:
-		_text(top_left - Vector2(0, 1), text, Palette.GOLD_4)
+		_text(top_left - Vector2(0, 1), text, Palette.GOLD_6)
 		return
 	draw_rect(Rect2(top_left, Vector2(_width(text) + 6, 11)), RELATION_FILL[relation])
-	_text(top_left + Vector2(3, -1), text, Palette.PAPER_3)
+	_text(top_left + Vector2(3, -1), text, Palette.PAPER_6)
 
 
 # An order on a slip in `rect`: jade when lit, crimson when lit and it is war's, ink and greyed when
 # refused.
 func _order_slip(rect: Rect2, text: String, open: bool, lit: bool, war := false) -> void:
 	var on := open and lit
-	draw_rect(rect, (Palette.CRIMSON_3 if war else Palette.JADE_2) if on else Palette.INK_3)
-	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 1)), (Palette.CRIMSON_4 if war else Palette.JADE_3) if on else Palette.INK_4)
-	_text(rect.position + Vector2(floorf((rect.size.x - _width(text)) / 2.0), 1), text, Palette.PAPER_3 if open else Palette.STONE_3)
+	draw_rect(rect, (Palette.CRIMSON_4 if war else Palette.JADE_2) if on else Palette.INK_4)
+	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 1)), (Palette.CRIMSON_5 if war else Palette.JADE_4) if on else Palette.INK_5)
+	_text(rect.position + Vector2(floorf((rect.size.x - _width(text)) / 2.0), 1), text, Palette.PAPER_6 if open else Palette.STONE_3)
 
 
 # A button a finger presses, lit as _order_slip lights it, framed in gold while it can be pressed.
 func _touch_button(rect: Rect2, text: String, open: bool, lit: bool, war := false) -> void:
 	var on := open and lit
-	draw_rect(rect, Palette.GOLD_2 if open else Palette.INK_4)
-	draw_rect(rect.grow(-1), (Palette.CRIMSON_3 if war else Palette.JADE_2) if on else Palette.INK_3)
+	draw_rect(rect, Palette.GOLD_3 if open else Palette.INK_5)
+	draw_rect(rect.grow(-1), (Palette.CRIMSON_4 if war else Palette.JADE_2) if on else Palette.INK_4)
 	var top := rect.position.y + floorf((rect.size.y - 14) / 2.0)
-	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), top), text, Palette.PAPER_3 if open else Palette.STONE_3)
+	_text(Vector2(rect.position.x + floorf((rect.size.x - _width(text)) / 2.0), top), text, Palette.PAPER_6 if open else Palette.STONE_3)

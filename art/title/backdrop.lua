@@ -17,7 +17,7 @@ local font = bdf.load(here .. "/../../hud/fonts/Galmuri9.bdf", { words.title, wo
 local scene = px.canvas(W, H)
 
 -- The sky darkens upward from the horizon, its bands dithered into each other.
-local sky = { { 0, c("ink", 1) }, { 46, c("ink", 2) }, { 96, c("ink", 3) }, { 138, c("stone", 1) } }
+local sky = { { 0, c("ink", 1) }, { 46, c("ink", 2) }, { 96, c("ink", 4) }, { 138, c("stone", 1) } }
 for y = 0, H - 1 do
   for x = 0, W - 1 do
     local band = 1
@@ -36,8 +36,8 @@ local SX, SY = 352, 112
 scene:each_ellipse(SX, SY, 44, 44, function(x, y, d)
   if px.bayer(x, y) > d * 1.6 - 0.2 then scene:set(x, y, c("gold", 1)) end
 end)
-scene:ellipse(SX, SY, 20, 20, c("gold", 3))
-scene:ellipse(SX - 3, SY - 3, 13, 13, c("gold", 4))
+scene:ellipse(SX, SY, 20, 20, c("gold", 4))
+scene:ellipse(SX - 3, SY - 3, 13, 13, c("gold", 6))
 
 -- Birds crossing the sky.
 for _, b in ipairs({ { 300, 62 }, { 312, 70 }, { 292, 74 }, { 404, 54 } }) do
@@ -51,7 +51,7 @@ end
 local ridges = {
   { base = 150, amp = 46, scale = 70, seed = 11, colour = c("stone", 2) },
   { base = 180, amp = 40, scale = 52, seed = 12, colour = c("stone", 1) },
-  { base = 210, amp = 30, scale = 40, seed = 13, colour = c("ink", 3) },
+  { base = 210, amp = 30, scale = 40, seed = 13, colour = c("ink", 4) },
   { base = 238, amp = 18, scale = 30, seed = 14, colour = c("ink", 2) },
 }
 local function top(r, x)
@@ -106,20 +106,20 @@ local wordmark = px.canvas(W, H)
 -- The working title at 4x, its shadow a pixel of the font down and right in lacquer, outlined in
 -- ink. The 4x is whole pixels of the font, so it stays on the grid.
 local glyphs = px.canvas(W, 24)
-local title_w = bdf.text(glyphs, font, 0, 0, words.title, c("paper", 3))
+local title_w = bdf.text(glyphs, font, 0, 0, words.title, c("paper", 6))
 local TX, TY, S = 40, 40, 4
 for k in pairs(glyphs.p) do
   local gx, gy = k % glyphs.w, k // glyphs.w
-  wordmark:rect(TX + gx * S + S, TY + gy * S + S, S, S, c("lacquer", 2))
+  wordmark:rect(TX + gx * S + S, TY + gy * S + S, S, S, c("lacquer", 4))
 end
 for k in pairs(glyphs.p) do
   local gx, gy = k % glyphs.w, k // glyphs.w
-  wordmark:rect(TX + gx * S, TY + gy * S, S, S, gy >= 7 and c("paper", 2) or c("paper", 3))
+  wordmark:rect(TX + gx * S, TY + gy * S, S, S, gy >= 7 and c("paper", 4) or c("paper", 6))
 end
 wordmark:outline(TX - 1, TY - 1, title_w * S + S + 2, 12 * S + S + 2, c("ink", 1))
 local rule_y = TY + 12 * S + 6
-wordmark:hline(TX, rule_y, title_w * S, c("gold", 2))
+wordmark:hline(TX, rule_y, title_w * S, c("gold", 3))
 wordmark:hline(TX, rule_y + 1, title_w * S, c("gold", 1))
-bdf.text(wordmark, font, TX, rule_y + 4, words.latin, c("gold", 3), c("ink", 1))
+bdf.text(wordmark, font, TX, rule_y + 4, words.latin, c("gold", 4), c("ink", 1))
 
 px.save(W, H, { { "scene", scene }, { "wordmark", wordmark } }, here .. "/backdrop.aseprite")

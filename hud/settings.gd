@@ -266,11 +266,11 @@ func _draw() -> void:
 		var name: String = ROWS[n]
 		var y := DIALOG.position.y + 30 + n * ROW_STEP
 		if n > 0:
-			draw_rect(Rect2(left, y - 5, width, 1), Palette.INK_3)
+			draw_rect(Rect2(left, y - 5, width, 1), Palette.INK_4)
 		if n == row:
 			draw_rect(Rect2(left, y - 4, width, ROW_STEP - 2), Palette.INK_1)
-			draw_rect(Rect2(left, y - 4, 1, ROW_STEP - 2), Palette.JADE_3)
-		_text(Vector2(left + 8, y + 3), tr(LABEL_KEYS[name]), Palette.GOLD_4 if n == row else Palette.GOLD_3)
+			draw_rect(Rect2(left, y - 4, 1, ROW_STEP - 2), Palette.JADE_4)
+		_text(Vector2(left + 8, y + 3), tr(LABEL_KEYS[name]), Palette.GOLD_6 if n == row else Palette.GOLD_4)
 		var words := choices(name)
 		var slip := choice_width(name)
 		var x := choices_x(words.size(), slip)
@@ -278,7 +278,7 @@ func _draw() -> void:
 			_slip(Vector2(x, y + 2), slip, words[k], k == chosen[name])
 			x += slip + 4
 	var about_y := DIALOG.position.y + 30 + ROWS.size() * ROW_STEP
-	draw_rect(Rect2(left, about_y - 5, width, 1), Palette.INK_3)
+	draw_rect(Rect2(left, about_y - 5, width, 1), Palette.INK_4)
 	_text(Vector2(left + 8, about_y + 2), about(ROWS[row]), Palette.STONE_4)
 
 

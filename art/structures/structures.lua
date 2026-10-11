@@ -14,7 +14,6 @@
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
 local px = dofile(here .. "/../pixel.lua")
 local c = px.c
-local INK = c("ink", 1)
 
 local CW, CD = 16, 12
 
@@ -76,10 +75,10 @@ local function roof(cv, x0, x1, eave, ridge, back, hip, tone)
   cv:hline(r0, ridge - 1, r1 - r0 + 1, c(tone, 2)); cv:hline(r0, ridge, r1 - r0 + 1, c("ink", 2))
   for _, s in ipairs({ { r0, -1 }, { r1, 1 } }) do
     cv:set(s[1] + s[2], ridge - 1, c("ink", 2)); cv:set(s[1] + s[2] * 2, ridge - 2, c("ink", 2))
-    cv:set(s[1] + s[2] * 2, ridge - 3, c("gold", 3))
+    cv:set(s[1] + s[2] * 2, ridge - 3, c("gold", 4))
   end
   -- Round tile ends along the front eave, its corners turned up.
-  for xx = x0 - 2, x1 + 2 do cv:set(xx, eave, ((xx - x0) % 3 == 1) and c(tone, 5) or c(tone, 1)) end
+  for xx = x0 - 2, x1 + 2 do cv:set(xx, eave, ((xx - x0) % 3 == 1) and c(tone, 6) or c(tone, 1)) end
   cv:set(x0 - 3, eave - 1, c(tone, 2)); cv:set(x0 - 4, eave - 2, c(tone, 2))
   cv:set(x1 + 3, eave - 1, c(tone, 2)); cv:set(x1 + 4, eave - 2, c(tone, 2))
 end
@@ -96,18 +95,18 @@ end
 -- with a door at its middle and windows at the given offsets.
 local function front(cv, x, base, w, h, windows, door)
   local top = base - h
-  cv:rect(x, top, w, h, c("paper", 2))
-  cv:hline(x, base - 2, w, c("paper", 1))
-  cv:hline(x, top, w, c("paper", 1))
+  cv:rect(x, top, w, h, c("paper", 4))
+  cv:hline(x, base - 2, w, c("paper", 3))
+  cv:hline(x, top, w, c("paper", 3))
   local pillars = { x, x + w - 2 }
-  for _, p in ipairs(pillars) do cv:vline(p, top, h, c("lacquer", 3)); cv:vline(p + 1, top, h, c("lacquer", 2)) end
+  for _, p in ipairs(pillars) do cv:vline(p, top, h, c("lacquer", 5)); cv:vline(p + 1, top, h, c("lacquer", 4)) end
   if door ~= false then
     local dx = x + w // 2 - 4
     cv:rect(dx, top + 3, 8, h - 3, c("wood", 2))
     cv:vline(dx + 4, top + 3, h - 3, c("wood", 1))
     cv:hline(dx - 1, top + 2, 10, c("wood", 3))
-    cv:set(dx + 2, top + 3 + (h - 3) // 2, c("gold", 3)); cv:set(dx + 5, top + 3 + (h - 3) // 2, c("gold", 3))
-    cv:vline(dx - 2, top, h, c("lacquer", 3)); cv:vline(dx + 9, top, h, c("lacquer", 2))
+    cv:set(dx + 2, top + 3 + (h - 3) // 2, c("gold", 4)); cv:set(dx + 5, top + 3 + (h - 3) // 2, c("gold", 4))
+    cv:vline(dx - 2, top, h, c("lacquer", 5)); cv:vline(dx + 9, top, h, c("lacquer", 4))
   end
   for _, wx in ipairs(windows or {}) do window(cv, x + wx, top + 3, 7, math.max(4, h - 8)) end
 end
@@ -178,7 +177,7 @@ local function destroyed(intact, w, d, seed)
     local keep = base - 3 - math.floor(px.noise(x, 0, 4, seed) * math.min(12, D // 2))
     for y = keep, cv.h - 1 do
       local i = intact:get(x, y)
-      if i ~= 0 then cv:set(x, y, y == keep and c("ink", 3) or i) end
+      if i ~= 0 then cv:set(x, y, y == keep and c("ink", 4) or i) end
     end
   end
   -- The open inside, charred, behind the stumps.
@@ -186,7 +185,7 @@ local function destroyed(intact, w, d, seed)
     for x = 10, 8 + W - 3 do
       local n = px.noise(x, y, 4, seed)
       if cv:get(x, y) == 0 and n > 0.3 then
-        cv:set(x, y, n > 0.7 and c("stone", 2) or (n > 0.5 and c("ink", 3) or c("wood", 1)))
+        cv:set(x, y, n > 0.7 and c("stone", 2) or (n > 0.5 and c("ink", 4) or c("wood", 1)))
       end
     end
   end
@@ -201,7 +200,7 @@ local function destroyed(intact, w, d, seed)
       if i ~= 0 then cv:set(x, base - D - 4 + y, i) end
     end
   end
-  for _ = 1, 10 + w * 3 do cv:set(r.int(6, cv.w - 6), r.int(base - 2, base + 5), c("ink", r.int(2, 4))) end
+  for _ = 1, 10 + w * 3 do cv:set(r.int(6, cv.w - 6), r.int(base - 2, base + 5), r.pick({ c("ink", 2), c("ink", 4), c("ink", 5) })) end
   return cv
 end
 
@@ -232,11 +231,12 @@ local function rubble(intact, w, d, seed)
   return cv
 end
 
--- Outlines a finished frame in ink.
-local function save_frame(cv) cv:outline(0, 0, cv.w, cv.h, INK) end
+-- Outlines a finished frame sel-out.
+local function save_frame(cv) cv:selout(0, 0, cv.w, cv.h) end
 
 -- Saves the intact frame and, given its footprint, the three damage stages after it. `trim`, for
--- a piece laid end to end in a run, takes the outline off each frame where the next piece meets it.
+-- a piece laid end to end in a run, takes the outline off each frame where the next piece meets it;
+-- it also runs before the outline, so nothing drawn where it trims leaves an outline behind.
 local function save(name, cv, w, d, trim)
   local frames = { cv }
   if w then
@@ -246,7 +246,8 @@ local function save(name, cv, w, d, trim)
     frames[4] = rubble(cv, w, d, seed)
   end
   for _, f in ipairs(frames) do
-    f:outline(0, 0, f.w, f.h, INK)
+    if trim then trim(f) end
+    f:selout(0, 0, f.w, f.h)
     if trim then trim(f) end
   end
   local tags = { { "intact", 1, 1, 1000 } }
@@ -275,7 +276,7 @@ do
   local cv, x, base = frame(3, 2, 32)
   building(cv, x, base, 3, 2, 12, 9, {}, { hip = 5 })
   local dx = x + 24 - 5
-  for k = 0, 1 do for j = 0, 2 do cv:set(dx + 2 + k * 5, base - 12 + j * 3, c("stone", 5)) end end
+  for k = 0, 1 do for j = 0, 2 do cv:set(dx + 2 + k * 5, base - 12 + j * 3, c("stone", 6)) end end
   for k = 0, 1 do
     cv:rect(x + 6 + k * 30, base - 11, 3, 2, c("ink", 2))
   end
@@ -297,8 +298,8 @@ do
   roof(cv, x + 1, x + W - 2, eave, eave - 9, eave - 9, 3)
   local foot2 = eave - 8
   front(cv, x + 12, foot2, W - 24, 12, { 6, 27 }, false)
-  cv:rect(x + 26, foot2 - 10, 12, 6, c("gold", 3)); cv:rect(x + 27, foot2 - 9, 10, 4, c("lacquer", 2))
-  cv:hline(x + 29, foot2 - 7, 6, c("gold", 4))
+  cv:rect(x + 26, foot2 - 10, 12, 6, c("gold", 4)); cv:rect(x + 27, foot2 - 9, 10, 4, c("lacquer", 4))
+  cv:hline(x + 29, foot2 - 7, 6, c("gold", 6))
   local eave2 = foot2 - 12 + 2
   roof(cv, x + 8, x + W - 9, eave2, eave2 - 16, eave2 - 22, 7)
   save("manual_hall", cv, 4, 3)
@@ -358,7 +359,7 @@ do
       cv:set(xx, yy, col)
     end
   end
-  cv:ellipse(cx, cy, 11.5, 6.2, c("stone", 5))
+  cv:ellipse(cx, cy, 11.5, 6.2, c("stone", 6))
   cv:ellipse(cx, cy + 0.5, 8.5, 4.2, c("water", 1))
   cv:ellipse(cx - 1, cy, 5, 2.2, c("water", 2))
   cv:set(cx - 3, cy - 1, c("water", 4))
@@ -366,7 +367,7 @@ do
     cv:rect(p, cy - 22, 2, 26, c("wood", 3)); cv:vline(p, cy - 22, 26, c("wood", 4))
   end
   cv:hline(cx - 11, cy - 15, 23, c("wood", 2))
-  cv:vline(cx + 3, cy - 14, 9, c("paper", 1))
+  cv:vline(cx + 3, cy - 14, 9, c("paper", 3))
   cv:rect(cx + 1, cy - 6, 5, 4, c("wood", 3)); cv:hline(cx + 1, cy - 6, 5, c("wood", 4))
   roof(cv, cx - 15, cx + 15, cy - 21, cy - 29, cy - 32, 4)
   save("well", cv, 2, 2)
@@ -379,14 +380,14 @@ do
   local W = 48
   for _, p in ipairs({ 3, W - 13 }) do
     block(cv, x + p, base, 10, 6, 4, "stone", 3)
-    cv:rect(x + p + 2, base - 38, 6, 34, c("lacquer", 2))
-    cv:vline(x + p + 2, base - 38, 34, c("lacquer", 3)); cv:vline(x + p + 7, base - 38, 34, c("lacquer", 1))
+    cv:rect(x + p + 2, base - 38, 6, 34, c("lacquer", 4))
+    cv:vline(x + p + 2, base - 38, 34, c("lacquer", 5)); cv:vline(x + p + 7, base - 38, 34, c("lacquer", 1))
   end
-  cv:rect(x + 1, base - 42, W - 2, 3, c("lacquer", 3))
-  for xx = x + 2, x + W - 3, 4 do cv:rect(xx, base - 45, 2, 3, c("jade", 2)); cv:set(xx + 2, base - 44, c("gold", 3)) end
-  cv:rect(x + 15, base - 39, 18, 9, c("gold", 3)); cv:rect(x + 16, base - 38, 16, 7, c("ink", 2))
-  cv:hline(x + 18, base - 35, 4, c("gold", 4)); cv:hline(x + 25, base - 35, 4, c("gold", 4))
-  cv:vline(x + 20, base - 37, 4, c("gold", 4)); cv:vline(x + 27, base - 37, 4, c("gold", 4))
+  cv:rect(x + 1, base - 42, W - 2, 3, c("lacquer", 5))
+  for xx = x + 2, x + W - 3, 4 do cv:rect(xx, base - 45, 2, 3, c("jade", 2)); cv:set(xx + 2, base - 44, c("gold", 4)) end
+  cv:rect(x + 15, base - 39, 18, 9, c("gold", 4)); cv:rect(x + 16, base - 38, 16, 7, c("ink", 2))
+  cv:hline(x + 18, base - 35, 4, c("gold", 6)); cv:hline(x + 25, base - 35, 4, c("gold", 6))
+  cv:vline(x + 20, base - 37, 4, c("gold", 6)); cv:vline(x + 27, base - 37, 4, c("gold", 6))
   roof(cv, x - 1, x + W, base - 46, base - 53, base - 56, 4)
   save("seat_gate", cv, 3, 1)
 end
@@ -430,9 +431,9 @@ local function training_ground(stage)
       if px.noise(xx, yy, 3, 7) > 0.7 then col = c("earth", 5) end
       if stage == "rubble" then
         local n = px.noise(xx, yy, 3, seed)
-        col = n > 0.62 and c("grass", 4) or (n > 0.4 and c("ink", 3) or c("earth", 4))
+        col = n > 0.62 and c("grass", 4) or (n > 0.4 and c("ink", 4) or c("earth", 4))
       elseif stage ~= "intact" and px.noise(xx, yy, 4, seed + (stage == "destroyed" and 1 or 0)) > (stage == "destroyed" and 0.45 or 0.62) then
-        col = (xx + yy) % 2 == 0 and c("ink", 3) or c("earth", 3)
+        col = (xx + yy) % 2 == 0 and c("ink", 4) or c("earth", 3)
       end
       cv:set(xx, yy, col)
     end
@@ -441,7 +442,7 @@ local function training_ground(stage)
   if stage == "rubble" then
     cv:each_ellipse(x + W / 2, back - 2, 14, 4, function(xx, yy)
       local n = px.noise(xx, yy, 2, seed)
-      cv:set(xx, yy, n > 0.6 and c("wood", 1) or (n > 0.35 and c("ink", 3) or c("ink", 2)))
+      cv:set(xx, yy, n > 0.6 and c("wood", 1) or (n > 0.35 and c("ink", 4) or c("ink", 2)))
     end)
     save_frame(cv)
     return cv
@@ -456,16 +457,16 @@ local function training_ground(stage)
     if stage == "damaged" and n == 2 then
       -- Knocked flat: its frame and weapons lying on the sand.
       cv:hline(rx, back - 1, 23, c("wood", 2)); cv:hline(rx + 2, back + 1, 20, c("wood", 4))
-      for k = 0, 4 do cv:set(rx + 3 + k * 4, back, c("stone", 6)) end
+      for k = 0, 4 do cv:set(rx + 3 + k * 4, back, c("stone", 7)) end
     else
-      local post = burnt and c("ink", 3) or c("wood", 2)
+      local post = burnt and c("ink", 4) or c("wood", 2)
       cv:rect(rx, back - 14, 1, 14, post); cv:rect(rx + 22, back - 14, 1, 14, post)
       cv:hline(rx, back - 12, 23, burnt and c("ink", 2) or c("wood", 3))
       cv:hline(rx, back - 6, 23, burnt and c("ink", 2) or c("wood", 3))
       if not burnt then
         for k = 0, 4 do
           local wx = rx + 3 + k * 4
-          cv:vline(wx, back - 17, 16, c("wood", 4)); cv:set(wx, back - 18, c("stone", 6))
+          cv:vline(wx, back - 17, 16, c("wood", 4)); cv:set(wx, back - 18, c("stone", 7))
         end
       end
     end
@@ -473,7 +474,7 @@ local function training_ground(stage)
   for k = 0, 2 do
     local dx = x + 38 + k * 9
     if burnt or (stage == "damaged" and k == 1) then
-      cv:rect(dx, back - 3, 2, 3, burnt and c("ink", 3) or c("wood", 3))
+      cv:rect(dx, back - 3, 2, 3, burnt and c("ink", 4) or c("wood", 3))
     else
       cv:rect(dx, back - 9, 2, 9, c("wood", 3)); cv:rect(dx - 2, back - 12, 6, 4, c("wood", 4))
       cv:rect(dx - 1, back - 15, 4, 3, c("wood", 4))
@@ -513,7 +514,7 @@ local function walkway(cv, x, top, w, d)
   for y = top, top + d - 1 do
     for xx = x, x + w - 1 do
       local joint = (y - top) % 6 == 5 or (xx + ((y - top) // 6) * 4) % 8 == 0
-      cv:set(xx, y, joint and c("stone", 4) or c("stone", 5))
+      cv:set(xx, y, joint and c("stone", 4) or c("stone", 6))
     end
   end
 end
@@ -523,7 +524,7 @@ local function merlons_along(cv, x, edge, w)
   cv:hline(x, edge - 2, w, c("stone", 3))
   for k = 0, w - 1, 4 do
     cv:rect(x + k, edge - 5, 2, 5, c("stone", 4))
-    cv:set(x + k, edge - 5, c("stone", 5)); cv:set(x + k + 1, edge - 5, c("stone", 5))
+    cv:set(x + k, edge - 5, c("stone", 6)); cv:set(x + k + 1, edge - 5, c("stone", 6))
   end
 end
 
@@ -532,7 +533,7 @@ end
 local function merlons_down(cv, x, top, d)
   cv:vline(x + 1, top, d, c("stone", 3))
   for y = top + 4, top + d - 1, 6 do
-    cv:rect(x, y - 3, 3, 2, c("stone", 5))
+    cv:rect(x, y - 3, 3, 2, c("stone", 6))
     cv:rect(x, y - 1, 3, 3, c("stone", 3))
   end
 end
@@ -628,7 +629,7 @@ do
   cv:rect(px0, base - 13, CW, 13, c("ink", 2))
   cv:each_ellipse(px0 + CW / 2 - 0.5, base - 13, CW / 2, 4, function(xx, yy) if yy <= base - 13 then cv:set(xx, yy, c("ink", 2)) end end)
   cv:rect(px0, base - 12, 2, 12, c("wood", 2)); cv:rect(px0 + CW - 2, base - 12, 2, 12, c("wood", 2))
-  cv:rect(px0 + 1, top + 1, CW - 2, 3, c("gold", 3)); cv:rect(px0 + 2, top + 2, CW - 4, 1, c("lacquer", 2))
+  cv:rect(px0 + 1, top + 1, CW - 2, 3, c("gold", 4)); cv:rect(px0 + 2, top + 2, CW - 4, 1, c("lacquer", 4))
   walkway(cv, x, top - D, W, D)
   merlons_along(cv, x, top - D + 1, W)
   local foot = top - 6
@@ -646,8 +647,8 @@ do
   for k = 0, 7 do
     local y0 = base - k * 5
     cv:rect(x, y0 - 2, W, 2, c("stone", 3))
-    cv:rect(x, y0 - 5, W, 3, c("stone", 5))
-    cv:hline(x, y0 - 5, W, c("stone", 6))
+    cv:rect(x, y0 - 5, W, 3, c("stone", 6))
+    cv:hline(x, y0 - 5, W, c("stone", 7))
   end
   cv:vline(x, base - 40, 40, c("stone", 4)); cv:vline(x + W - 1, base - 40, 40, c("stone", 2))
   save("town_steps", cv, 1, 2)
@@ -658,7 +659,7 @@ local function lacquer(cv, x, y, w, h)
   for yy = y, y + h - 1 do
     for xx = x, x + w - 1 do
       local i = cv:get(xx, yy)
-      if i == c("paper", 2) then cv:set(xx, yy, c("lacquer", 3)) elseif i == c("paper", 1) then cv:set(xx, yy, c("lacquer", 2)) end
+      if i == c("paper", 4) then cv:set(xx, yy, c("lacquer", 5)) elseif i == c("paper", 3) then cv:set(xx, yy, c("lacquer", 4)) end
     end
   end
 end
@@ -678,7 +679,7 @@ do
   local foot2 = eave - 8
   front(cv, x + 14, foot2, W - 28, 10, {}, false)
   lacquer(cv, x + 14, foot2 - 10, W - 28, 10)
-  cv:rect(x + 26, foot2 - 8, 12, 5, c("gold", 3)); cv:rect(x + 27, foot2 - 7, 10, 3, c("ink", 2))
+  cv:rect(x + 26, foot2 - 8, 12, 5, c("gold", 4)); cv:rect(x + 27, foot2 - 7, 10, 3, c("ink", 2))
   local eave2 = foot2 - 10 + 2
   roof(cv, x + 6, x + W - 7, eave2, eave2 - 14, eave2 - 20, 8)
   save("town_temple", cv, 4, 3)
@@ -696,15 +697,15 @@ do
   local table_top = base - 1 - 5 - 7
   for k = 0, 2 do cv:each_ellipse(x + 7 + k * 3, table_top + 4, 1.6, 1.2, function(xx, yy) cv:set(xx, yy, c("earth", 3)) end) end
   cv:rect(x + 16, table_top + 2, 4, 3, c("grass", 5)); cv:set(x + 17, table_top + 2, c("grass", 6))
-  cv:rect(x + 21, table_top + 1, 3, 4, c("azure", 4)); cv:rect(x + 24, table_top + 2, 3, 3, c("amber", 4))
+  cv:rect(x + 21, table_top + 1, 3, 4, c("azure", 5)); cv:rect(x + 24, table_top + 2, 3, 3, c("amber", 5))
   -- The awning, sloping from the back posts' tops down to the front's, in stripes.
   for yy = base - D - 18, base - 15 do
     for xx = x - 1, x + W do
       local stripe = ((xx - x) // 4) % 2 == 0
-      cv:set(xx, yy, stripe and c("paper", 3) or c("crimson", 3))
+      cv:set(xx, yy, stripe and c("paper", 6) or c("crimson", 4))
     end
   end
-  cv:hline(x - 1, base - 15, W + 2, c("ink", 3))
+  cv:hline(x - 1, base - 15, W + 2, c("ink", 4))
   save("town_market_stall", cv, 2, 1)
 end
 
@@ -718,7 +719,7 @@ do
   for yy = back + 1, base - 9 do
     for xx = x + 2, x + W - 3 do
       local joint = (yy - back) % 6 == 5 or (xx - x) % 8 == 0
-      cv:set(xx, yy, joint and c("stone", 4) or c("stone", 5))
+      cv:set(xx, yy, joint and c("stone", 4) or c("stone", 6))
     end
   end
   cv:each_ellipse(x + 24, base - 18, 4, 3, function(xx, yy, dd) cv:set(xx, yy, dd > 0.7 and c("leaf", 2) or c("leaf", 4)) end)
@@ -744,7 +745,7 @@ do
   courses(cv, x, base, W, 9)
   cv:hline(x, base - 10, W, c("stone", 4))
   cv:rect(x + 34, base - 9, 12, 9, c("wood", 2)); cv:vline(x + 40, base - 9, 9, c("wood", 1))
-  cv:set(x + 37, base - 5, c("gold", 3)); cv:set(x + 42, base - 5, c("gold", 3))
+  cv:set(x + 37, base - 5, c("gold", 4)); cv:set(x + 42, base - 5, c("gold", 4))
   roof(cv, x + 31, x + 48, base - 10, base - 15, base - 17, 3)
   save("town_courtyard_house", cv, 5, 5)
 end
