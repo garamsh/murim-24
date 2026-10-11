@@ -143,7 +143,9 @@ return function(px)
     cv:sprite(hx, hy, heads[spec.head or "topknot"], map)
     if spec.hat then cv:sprite(hx - 3 + 1, hy - 3, hats[spec.hat], map) end
     if spec.weapon then weapons[spec.weapon](cv, bx + bw - 1, by + 3) end
-    cv:selout(0, 0, 16, 18)
+    -- The whole silhouette in the darkest step of the body's garment, so no edge takes a step of
+    -- its skin or hair and the figure stays dark against the ground.
+    cv:selout(0, 0, 16, 18, px.ramp_of[map.R][1])
     return cv
   end
 

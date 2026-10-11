@@ -304,7 +304,8 @@ end
 -- Adds a one-pixel sel-out outline around every set pixel inside the given box: each outline
 -- pixel takes the darkest step of the ramp of the pixel it borders, or the step after it on the
 -- side the light comes from, the upper left, where it borders a pixel to its right or below it.
-function Canvas:selout(x0, y0, w, h)
+-- Given `ramp`, every outline pixel takes that ramp's darkest step instead, on every side.
+function Canvas:selout(x0, y0, w, h, ramp)
   local add = {}
   for y = y0 - 1, y0 + h do
     for x = x0 - 1, x0 + w do
@@ -315,7 +316,7 @@ function Canvas:selout(x0, y0, w, h)
         if i == 0 then i = self:get(x, y - 1) end
         if i ~= 0 then
           local r = M.ramp_of[i]
-          add[#add + 1] = { x, y, M.index[r[1] .. (lit and 2 or 1)] }
+          add[#add + 1] = { x, y, ramp and M.index[ramp .. 1] or M.index[r[1] .. (lit and 2 or 1)] }
         end
       end
     end
