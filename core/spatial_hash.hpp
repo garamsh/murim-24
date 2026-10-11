@@ -115,9 +115,17 @@ class SpatialHash {
         best_distance = distance;
       }
     };
+    // How far the centre lies from its own cell's nearest side, at least 1:
+    // a cell `ring` cells out lies at least `ring - 1` cells and that much
+    // away along one axis, so no nearer position lies in it.
+    const std::int64_t offset_x =
+        std::int64_t{centre.x} - (std::int64_t{middle.x} * CELL_SIZE);
+    const std::int64_t offset_y =
+        std::int64_t{centre.y} - (std::int64_t{middle.y} * CELL_SIZE);
+    const std::int64_t margin = std::min({CELL_SIZE - offset_x, offset_x + 1,
+                                          CELL_SIZE - offset_y, offset_y + 1});
     for (std::int32_t ring = 0; ring <= rings; ++ring) {
-      // A cell `ring` cells out lies more than `ring - 1` cells away.
-      const std::int64_t gap = std::int64_t{ring - 1} * CELL_SIZE;
+      const std::int64_t gap = (std::int64_t{ring - 1} * CELL_SIZE) + margin;
       if (best && ring > 0 && gap * gap > best_distance) {
         break;
       }
