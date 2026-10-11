@@ -41,7 +41,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | Asset | Frame | Tags |
 |---|---|---|
 | `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
-| `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
+| `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three: violet, yellow and white), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
 | `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), `idle_hurt` and `walk_hurt` (one and four), `idle_maimed` and `walk_maimed` (one and four), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
 | `art/structures/house` | 64 x 92 | `intact`, `damaged`, `destroyed`, `rubble` |
@@ -296,7 +296,10 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 ## Effects and HUD
 
 - A hit on or from the player holds the struck and the striker still for 2 to 4 frames by the damage, a hit stop, and shakes the screen by 1 to 3 whole screen pixels for 150 ms, unless the settings turn both off; the world's time runs on.
-- A hit draws blood, unless the settings turn it off: a spray of six pixels from the struck body's middle along the blow, fading in 300 ms, and three drops on the ground beyond its feet that fade over 3 s, in the crimson ramp's second and third steps, `5c1418` and `9c1f24`, dithered as they fade: its first is too near black to read on the ground, and `d63a2f` stays for hostility.
+- A hit draws blood, unless the settings turn it off, in the crimson ramp's second and third steps, `5c1418` and `9c1f24`, dithered as it fades: its first is too near black to read on the ground, and `d63a2f` stays for hostility.
+  - A spray of eight pixels, in `9c1f24`, flies from the struck body's side facing the blow along it, 12 to 22 pixels out, about a cell, in its first 120 ms, falling a little, and fades by 400 ms.
+  - Five drops fall, three beyond its feet in the blow's direction and two pooled just below them, and fade over 3 s. A drop is a cluster of two or three pixels, a `5c1418` core with a `9c1f24` edge.
+  - Nothing else on the ground is red, so red there means blood: the grass's flowers are violet, yellow and white.
 - Effects are brief and bright over calm ground: an area skill is a ring of force in its user's accent ramp with a white-hot core, cracks on the ground and sparks; sword qi is a crescent in the azure ramp; damage numbers rise in the colour of the technique that dealt them, with an ink shadow.
 - Fire uses the fire ramp; smoke is grey puffs lit from the upper left that thin with height.
 - HUD panels are ink with a gold trim and lacquer corner studs, so that they sit apart from the world's greens and earths. Bars are crimson for HP and azure for QI, each under its label and its value.
