@@ -15,7 +15,7 @@ Issue #247. The owner decided on 2026-10-11 to add attack slots and attack token
 Facts from `core/` at `c86b08d` and the open pull requests it builds on:
 - Every living person acts on every tick (ADR 0017). People keep the separation, `SEPARATION`, a cell (256 sub-cell units), through a push from each neighbour closer than that, read from the spatial hash rebuilt each tick.
 - A person moves `SPEED`, 16 units a tick, or `DIAGONAL_SPEED`, 11 along each axis, on an 8-connected flow field toward its army's objective (ADR 0037). A mover feels no pull while a foe on the move lies ahead within its reach.
-- A person no driver steers engages the nearest foe within the rules' sight, 6 cells in the region. It stands to fight while the foe is within its reach, and otherwise takes the open step nearest the line to the foe (ADR 0046's engage rule).
+- A person no driver steers engages the nearest foe within the rules' sight, 6 cells in the region: at home only a foe inside its home village's claim, and on the march any, as the PM narrowed ADR 0046 on 2026-10-09. It stands to fight while the foe is within its reach, and otherwise takes the open step nearest the line to the foe (ADR 0046's engage rule).
 - The basic strike, `MELEE`, reaches a cell and a half (384 units). In ADR 0066 (pull request #237) it is `TARGETED` and aimed at the army's attack-intent target, else at the nearest foe in range, every 15 ticks.
 - An attack intent is an order's target, which the army's members chase and strike, steered or not. It ends when the target dies, stops being a foe or leaves sight (the army then holds where its lead stands), or when the player clears it or gives a move order.
 - Nothing limits how many strike one person: in the M1 battle, 18 strikes land a tick among 500 people, and a foe at the front of a line takes every strike in reach.
@@ -28,13 +28,18 @@ Facts from `core/` at `c86b08d` and the open pull requests it builds on:
   - The ring's radius is the reach less two steps (32 units), so a striker on its slot stays in reach while separation jostles it.
   - It holds the most slots, up to 16, whose neighbours lie at least `SEPARATION` apart. For the basic strike that is a radius of 352 units and 8 slots.
   - Slot `k` of `n` lies at angle `k / n` of a turn from east, as an offset from a fixed integer table built once per ring size and pinned by a test. No floating point is read at run time.
+  - Strikers of different reach use different rings. A foe has one ring for each reach class, each with its own slots:
+    - arm's length, a reach up to 2 cells, sized by the shortest reach of that class among the people engaging the foe on the tick;
+    - long, from 2 to 4 cells, sized the same way.
+
+    A reach beyond 4 cells, a dart's or a bow's, strikes from where it stands, within range, with a token and no slot.
 - **The 8 cells around the foe.** Rejected: the diagonal cells' centres lie 1.41 cells from the foe, 23 units inside the basic strike's reach, so a striker jostled there drifts out of reach. Neighbouring cells also sit exactly the separation apart, where its push begins. A longer reach would still be held to arm's length.
 - **No slots, only tokens.** Rejected: waiting people would still close on one point and pile up behind the token holders, which is the look the owner wants gone.
 
 ### Options weighed for assigning slots
 
 - **Sticky, in a fixed order.**
-  - Each tick, the people engaging a foe are taken in order of distance squared, then person index, positions read as the tick began.
+  - Each tick, the people engaging a foe are taken in order of distance squared, then person index, positions read as the tick began. That is also the order in which several who arrive on the same tick, with nobody queued, take the first free tokens.
   - A person keeps the slot it holds while it engages that foe. A person without a slot takes the free slot nearest it, the lower slot index among equals.
   - Chosen. The order is a total order on world state, so the same world gives the same slots on every platform and draws nothing from the seeded streams.
 - **Reassign everyone each tick by distance.** Rejected: two people near the boundary between slots swap back and forth as they step, so slots flicker and people dither.
@@ -43,6 +48,7 @@ Facts from `core/` at `c86b08d` and the open pull requests it builds on:
 
 - **Tokens per foe by the foe's realm rank, from a table in the rules (pack data under ADR 0049).** Chosen.
   - The region's default is 2 tokens for the two lowest ranks, 3 for the next two, 4 for the next two, and 6 above. A master draws more attackers at once, and a novice is not swarmed.
+  - A person of no realm reads the table's first row, as rank 0.
   - The table may grow a column by size once bodies have sizes; nothing has one yet.
 - **One fixed count for everyone.** Rejected: the owner suggested realm or size, and a fixed count makes a master as easy to swarm as a levy.
 - **Tokens by the attacker.** Rejected: the pattern is the defender's: how many may set on one person at once.
@@ -52,17 +58,22 @@ Facts from `core/` at `c86b08d` and the open pull requests it builds on:
 - **It holds on a waiting ring outside the foe's reach and circles, until a token frees.** Chosen.
   - The waiting ring's radius is the striker's reach plus the separation plus two steps: 672 units, 2.6 cells, for the basic strike. Its slots are spaced by the same rule, up to 16.
   - A waiter takes a waiting slot as an attacker takes a slot. Every 30 ticks it moves on to the next free waiting slot, clockwise for an even person index and counter-clockwise for an odd one, so a ring of waiters circles in both directions.
-  - Waiters queue in the order they began to wait, then by person index. When a token frees, the head of the queue takes it and walks to the slot nearest it.
+  - Waiters queue in the order they began to wait, then by person index. A waiter already queued comes before one who starts waiting on the same tick. When a token frees, the head of the queue takes it and walks to the slot nearest it.
+  - When two circlers move on toward the same free waiting slot, the one earlier in the queue takes it, and the other keeps its slot until the next period.
   - A waiter beyond the waiting ring's slots holds where it stands, outside reach.
-- **It looks for another foe.** Partly chosen: a person engaging on its own, with no attack intent, takes the nearest foe in sight that has a free token or has granted it one, through the same outward search. Only when none has one does it wait on the nearest. A crowd then spreads over a line of foes before it queues on one. A person with an attack intent waits on its target: its player chose it.
+- **It looks for another foe.** Partly chosen: a person engaging on its own, with no attack intent, takes the nearest foe in sight that has a free token or has granted it one, through the same outward search. Only when none has one does it wait on the nearest. A crowd then spreads over a line of foes before it queues on one.
 - **It stands where it is.** Rejected: a crowd of waiters then stands in a clump behind the holders, which is the pile-up again.
 
 ### Options weighed for what tokens gate
 
-- **A use aimed at a person needs that person's token: the automatic strike and a cast at a person. A use aimed at a point does not, and hits whoever its shape covers.** Chosen.
+- **A use aimed at a person needs that person's token: the automatic strike, and any use an NPC aims at a person. A use aimed at a point does not, and hits whoever its shape covers.** Chosen.
   - Area, arc and line uses then catch people in a crowd as ADR 0046 resolves them.
   - Only the choice of whom to aim at is limited, so one striker cannot be ganged on.
-  - A cast at a person without its token is refused with a reason, `NO_TOKEN`, as the cast port refuses other casts.
+- **The steered person is exempt as an attacker** (the PM's ruling on this pull request). It may always strike or cast at its target.
+  - When it does, it takes one of that foe's tokens ahead of any queue. If none is free, the NPC holder that took its token last gives it up and goes to the head of the queue, so NPCs make room around the player.
+  - It takes the free slot nearest it in its reach class, and closes straight on its target when none is free; it never waits. The lease does not apply to it.
+  - Otherwise a player who pressed Space at a crowded foe would see nothing happen, the worst feel this rule could make.
+  - People attacking the steered person still need its tokens, as anyone's.
 - **Every use near a foe needs a token.** Rejected: an area art swept through a crowd would need a token from each person it covers, which is not what tokens model.
 
 ### Options weighed for freeing
@@ -89,26 +100,26 @@ Facts from `core/` at `c86b08d` and the open pull requests it builds on:
   - The hold before a moving foe reads the striker's reach, and the waiting ring lies outside it, so waiters are not held by the foe.
 - **ADR 0058.** A slot or waiting slot is offered only on a passable cell whose level is within a step of the foe's cell, so nobody is sent to a slot it would have to leap to. A leaping person takes and holds none.
 - **Duels.** A duel's two fighters take each other's first token before anyone else does, so a duel is never refused for want of one.
-- **The player.** The rule is the same: people attacking the player need its tokens, and the player's strikes and casts at a person need that person's. The HUD shows the reason when a cast is refused for `NO_TOKEN`.
+- **The player.** People attacking the player need its tokens, as anyone's. The steered person attacking needs none, and takes a token with priority, as above.
 
 ### Cost
 
 State per person, in structure-of-arrays form sized to the world's capacity at construction and on load, never resized on a tick:
 - the engaged foe as a 4-byte index;
-- the slot or waiting slot as 1 byte;
+- the slot or waiting slot as 1 byte, its ring class in the flags;
 - flags (token held, waiting) as 1 byte;
 - the tick waiting began and the tick the token was taken, 4 bytes each.
 
 That is 14 bytes a person.
 
 State per foe, indexed by person:
-- a 16-bit mask of the slots taken;
+- a 16-bit mask of the slots taken on each of its two rings;
 - a 16-bit mask of the waiting slots taken;
 - the tokens held as 1 byte.
 
-That is 5 bytes a person.
+That is 7 bytes a person.
 
-Totals: 19 bytes a person, 9.5 KB at 500 and 95 KB at 5,000, 119 KB at a capacity of 6,250.
+Totals: 21 bytes a person, 10.5 KB at 500 and 105 KB at 5,000, 131 KB at a capacity of 6,250.
 
 The tick's assignment reuses one buffer of person indices, sized to the capacity:
 - A counting sort groups the people engaging by foe, in O(people).
@@ -122,11 +133,11 @@ The state is world state: saved, and hashed only when someone holds a slot. `SAV
 
 Combat gains attack slots and attack tokens, the same for every person.
 
-**Slots.** Around each foe, the people engaging it are given slots on a ring sized by their reach, spaced at least the separation apart, up to 16. They are assigned each tick in order of distance squared, then person index, and kept while held. Each person closes on its slot, not on the foe.
+**Slots.** Around each foe, the people engaging it are given slots on a ring for their reach class, arm's length or long, sized by the shortest reach of that class among them, spaced at least the separation apart, up to 16 each. A reach beyond 4 cells strikes from where it stands. They are assigned each tick in order of distance squared, then person index, and kept while held. Each person closes on its slot, not on the foe.
 
-**Tokens.** Each foe grants tokens by its realm rank from a table in the rules, by default 2, 2, 3, 3, 4, 4 and 6 above. Only a token holder may aim a use at that person, whether an automatic strike or a cast; a cast without it is refused with `NO_TOKEN`. A use aimed at a point needs no token.
+**Tokens.** Each foe grants tokens by its realm rank from a table in the rules, by default 2, 2, 3, 3, 4, 4 and 6 above, a person of no realm reading the first. Only a token holder may aim a use at that person; a use aimed at a point needs no token. The steered person attacking is exempt: it may always strike or cast at its target, and takes one of that foe's tokens ahead of any queue, the NPC holder that took its token last giving it up when none is free.
 
-**Waiting.** A person without a token waits on a ring outside reach and circles it every 30 ticks, queued by when it began to wait, then by index. A person engaging on its own prefers a foe in sight with a free token.
+**Waiting.** A person without a token waits on a ring outside reach and circles it every 30 ticks, queued by when it began to wait, then by index, before anyone who starts waiting on the same tick. A person engaging on its own prefers a foe in sight with a free token.
 
 **Freeing.** Slots and tokens free when the holder dies, chooses another foe, ends or moves its intent, starts a leap, or lies beyond the waiting ring; when the foe dies; and after a lease of 90 ticks while someone waits.
 
@@ -136,6 +147,8 @@ Combat gains attack slots and attack tokens, the same for every person.
 - ADR 0058: offers no slot a leap away.
 
 The flow field, separation, shapes and duels keep their rules.
+
+**What it supersedes.** This supersedes ADR 0046's closing on the nearest foe and its strike at any foe in reach. It amends ADR 0066's automatic strike for NPCs, which needs the target's token; a steered body's strike at its intent's target does not.
 
 **What stays fixed.** The slot geometry, the ring rules and the order of assignment are code. The token table, the circling period and the lease are rules data.
 
@@ -152,7 +165,7 @@ The flow field, separation, shapes and duels keep their rules.
      - no slot on a blocked cell, or a level more than a step from the foe's.
    - The crossing hash re-pinned once, with the reason.
 3. **Tokens.**
-   - Gating, the waiting ring and circling, freeing, leases, the free-token preference and `NO_TOKEN`.
+   - Gating, the waiting ring and circling, freeing, leases, the free-token preference and the steered person's priority.
    - Tests:
      - eight against one: at most the foe's tokens strike it on any tick; control: with tokens at 8, all eight strike;
      - a holder's death gives the head of the queue the token within a tick, and it strikes once in reach;
@@ -160,7 +173,7 @@ The flow field, separation, shapes and duels keep their rules.
      - a waiter's waiting slot moves on every 30 ticks;
      - an area use still hits a waiter in its shape;
      - the player as a foe is capped by its own tokens;
-     - a cast at a person without its token is refused with `NO_TOKEN`.
+     - the steered person strikes a foe whose tokens NPCs all hold, and the NPC that took its token last gives it up; control: an NPC arriving instead waits.
    - Retune the token table if the sweep falls below 48 of 50; the M1 bench's floor of 16 strikes a tick is checked.
 4. **The view.**
    - Nothing new to decide. The waiting ring reads from the people's positions.
@@ -172,12 +185,12 @@ The flow field, separation, shapes and duels keep their rules.
 - Fights end later, by up to the ratio of attackers to tokens, so raids, duels and wars may miss their target times until the token table is tuned. The sweep watches that.
 - Engaging people spread over a line of foes rather than all striking the nearest, since a foe with no free token sends them to the next.
 - Area arts gain value against crowds: they ignore tokens.
-- The player gets the same protection in a crowd, and needs a token to strike a foe already engaged by allies, which can mean waiting.
-- The tick gains 19 bytes a person and well under a tenth of a millisecond of work at 5,000. Saves grow by the engaged people's state.
+- The player gets the same protection in a crowd. As an attacker it never waits: it strikes its target and moves an NPC out of the way.
+- The tick gains 21 bytes a person and well under a tenth of a millisecond of work at 5,000. Saves grow by the engaged people's state.
 
 ## Signs the decision was wrong
 
-- The player waits for a token on a foe its allies hold, and finds it frustrating enough that the steered body needs to come first.
+- NPC allies displaced by the player's priority give up their strikes often enough that a player's band fights worse with the player in it than without.
 - Battles of two lines slow until the sweep falls below 48 of 50 at any token table, or the M1 bench falls below 16 strikes a tick.
 - Waiters circling block movers passing by, because the waiting ring cuts across a road or a gate.
 - The free-token preference makes people walk past a near foe to a far one, and lines stretch thin instead of meeting.
