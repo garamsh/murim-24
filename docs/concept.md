@@ -263,6 +263,11 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - A manual teaches only its art's first-stage forms.
   - Mastery is raised by training at a sect's training ground and by sect teaching.
   - Tier 3 arts start with no manual.
+- **Insight is separate from arts.** Decided by the owner on 2026-10-11 (issue #257). ADR 0072 (`docs/architecture/adr/0072-gate-arts-on-insights-gained-by-manuals-nature-and-repetition-and-let-arts-grant-passive-skills.md`), proposed, designs it.
+  - An insight (kkaedareum) is gained from a manual, naturally over time and conditions such as meditation, seasons or a place, or by repeating an action: sword strikes, swimming in rapids, chopping wood, leaping cliffs, or surviving a near death.
+  - Learning an art has requirements: certain insights, a minimum realm, and sometimes a lower art learned first. If any is missing, learning fails, and the attempt says what was missing.
+  - An art grants several skills. Some are active casts, and some are passive and always on, such as regeneration, damage by family, sight and stamina.
+  - The arts' lineage is visible at a glance. The window's layout is the owner's to choose.
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
 
 ## Arts that reshape the world [agreed]
