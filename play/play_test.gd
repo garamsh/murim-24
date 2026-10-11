@@ -1151,7 +1151,7 @@ func _names_pass() -> bool:
 	scene.show_view(view)
 	scene.show_talk()
 	scene.show_names()
-	var near: Array = art.near.map(func(person: Dictionary) -> int: return person.person)
+	var near: Array = Array(art.near.person)
 	var named: Array = hud.nameplates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 	var setup: bool = not near.is_empty() and scene.talk_to >= 0 and hud.talk_prompt.visible
 	var within := named.all(func(person: int) -> bool: return near.has(person))

@@ -84,12 +84,10 @@ func _process(delta: float) -> void:
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
 	bodies_outlined = _art.outlined
-	var people: Array[Dictionary] = []
-	for person: Dictionary in _art.near:
-		people.append({"person": person.person, "relation": person.relation,
-			"head": ((person.head - view.position) * _camera.zoom / _hud_scale).floor()})
-	_names.show_names(world, people, [])
-	named_near = people.size()
+	# The world's pixels in view to the HUD's, which the names are drawn in.
+	var to_hud := Transform2D(0.0, _camera.zoom / _hud_scale, 0.0, -view.position * _camera.zoom / _hud_scale)
+	_names.show_names(world, _art.near, [], -1, -1, to_hud)
+	named_near = _art.near.person.size()
 	names_shown = _names.plates.size()
 	view_usec += Time.get_ticks_usec() - viewing
 

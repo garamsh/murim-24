@@ -75,9 +75,10 @@ var steered := -1:
 ## The army whose lead names are read around and relations read toward, or -1 for none.
 var viewer := -1
 ## The people within NAME_REACH of the viewer's lead in the last refresh, the lead itself left out,
-## nearest first, each as `person`, `head`, where its head is drawn in pixels, `relation`, how its
-## faction stands toward the viewer's, and `cells`, how far it stands from the lead.
-var near: Array[Dictionary] = []
+## nearest first, as packed arrays: each one's `person`, `head`, where its head is drawn in pixels,
+## `relation`, how its faction stands toward the viewer's, and `cells`, how far it stands from the lead.
+var near := {"person": PackedInt64Array(), "head": PackedVector2Array(), "relation": PackedInt64Array(),
+	"cells": PackedFloat64Array()}
 ## Bodies drawn in the last refresh, after culling to the screen.
 var drawn := 0
 ## The territory the borders were last drawn from, as WorldAdapter.territory() gives it.
@@ -294,13 +295,8 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	var outlining := _outlines()
 	outlining.visible = outlined > 0
 	_fill(outlining, filled.outlines)
-	near.clear()
-	var people: PackedInt64Array = filled.near_person
-	var heads: PackedVector2Array = filled.near_head
-	var relations: PackedInt64Array = filled.near_relation
-	var cells: PackedFloat64Array = filled.near_cells
-	for i in people.size():
-		near.append({"person": people[i], "head": heads[i], "relation": relations[i], "cells": cells[i]})
+	near = {"person": filled.near_person, "head": filled.near_head, "relation": filled.near_relation,
+		"cells": filled.near_cells}
 	# The markers follow the steered person while it lives.
 	var alive: bool = filled.lead
 	_ring.visible = alive

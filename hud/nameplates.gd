@@ -34,40 +34,48 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## Names the people of `people` in `world`, each as `person`, `head`, where its head stands in the
-## HUD's pixels, and `relation`, nearest first: `selected` first and `hovered` next when among them,
-## then the hostile, then the rest, each in that order, until NAME_CAP are named, leaving out a name
-## that would cover one already placed, any of `clear` or the edge of the room, the control's own
-## rect.
-func show_names(world: WorldAdapter, people: Array[Dictionary], clear: Array[Rect2], selected := -1,
-		hovered := -1) -> void:
+## Names the people of `people` in `world`, nearest first, as world_art.gd's `near` gives them:
+## packed arrays of each one's `person`, `head`, where its head stands, which `to_hud` takes to the
+## HUD's pixels, and `relation`. `selected` comes first and `hovered` next when among them, then the
+## hostile, then the rest, each in that order, until NAME_CAP are named, leaving out a name that would
+## cover one already placed, any of `clear` or the edge of the room, the control's own rect. Only the
+## heads of those tried are taken to the HUD, and no Dictionary is made for anyone not named.
+func show_names(world: WorldAdapter, people: Dictionary, clear: Array[Rect2], selected := -1,
+		hovered := -1, to_hud := Transform2D.IDENTITY) -> void:
 	_font = get_theme_default_font() if _font == null else _font
 	if world != _world or TranslationServer.get_locale() != _locale:
 		_world = world
 		_locale = TranslationServer.get_locale()
 		_names.clear()
-	var marked := func(person: Dictionary) -> bool: return person.person in [selected, hovered]
-	var first := people.filter(func(person: Dictionary) -> bool: return person.person == selected) \
-			+ people.filter(func(person: Dictionary) -> bool: return person.person == hovered and hovered != selected)
-	var hostile := people.filter(func(person: Dictionary) -> bool:
-		return person.relation in HOSTILE_RELATIONS and not marked.call(person))
-	var rest := people.filter(func(person: Dictionary) -> bool:
-		return not person.relation in HOSTILE_RELATIONS and not marked.call(person))
+	var persons: PackedInt64Array = people.get("person", PackedInt64Array())
+	var heads: PackedVector2Array = people.get("head", PackedVector2Array())
+	var relations: PackedInt64Array = people.get("relation", PackedInt64Array())
+	var order := PackedInt64Array()
+	for i in persons.size():
+		if persons[i] == selected:
+			order.append(i)
+	for i in persons.size():
+		if persons[i] == hovered and hovered != selected:
+			order.append(i)
+	for hostile: bool in [true, false]:
+		for i in persons.size():
+			if (relations[i] in HOSTILE_RELATIONS) == hostile and persons[i] != selected and persons[i] != hovered:
+				order.append(i)
 	var room := Rect2(Vector2.ZERO, size)
 	var taken := clear.duplicate()
 	plates.clear()
-	for person: Dictionary in first + hostile + rest:
+	for i in order:
 		if plates.size() == NAME_CAP:
 			break
-		var text := _name(person.person)
-		var rect := plate_rect(text, person.head)
+		var person := persons[i]
+		var text := _name(person)
+		var rect := plate_rect(text, (to_hud * heads[i]).floor())
 		# A pixel's gap, so two names never read as one.
 		if not room.encloses(rect) or taken.any(func(other: Rect2) -> bool: return other.intersects(rect.grow(1))):
 			continue
 		taken.append(rect)
-		var mark := "selected" if person.person == selected else ("hovered" if person.person == hovered else "")
-		plates.append({"person": person.person, "text": text, "colour": COLOURS[person.relation], "rect": rect,
-			"mark": mark})
+		var mark := "selected" if person == selected else ("hovered" if person == hovered else "")
+		plates.append({"person": person, "text": text, "colour": COLOURS[relations[i]], "rect": rect, "mark": mark})
 	queue_redraw()
 
 

@@ -484,7 +484,12 @@ func show_view(view: Rect2) -> void:
 
 ## Returns `at`, a point in the world's pixels, where it lies on the HUD, in the HUD's pixels.
 func to_hud_pixels(at: Vector2) -> Vector2:
-	return _hud.from_window((at - _view_origin) * _camera.zoom)
+	return _to_hud() * at
+
+
+# The world's pixels to the window's, then to the HUD's, as from_window() takes them.
+func _to_hud() -> Transform2D:
+	return _hud.transform.affine_inverse() * Transform2D(0.0, _camera.zoom, 0.0, -_view_origin * _camera.zoom)
 
 
 ## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
@@ -890,13 +895,9 @@ func show_talk() -> void:
 ## while no panel is open, the selected one and the one under the cursor first and marked; the HUD
 ## keeps the talk prompt's slip, over the head of the one it names, clear of names.
 func show_names() -> void:
-	var people: Array[Dictionary] = []
-	if _hud.panel() == null:
-		for person: Dictionary in _art.near:
-			people.append({"person": person.person, "relation": person.relation,
-				"head": to_hud_pixels(person.head).floor()})
+	var people: Dictionary = _art.near if _hud.panel() == null else {}
 	var hovered := person_at(_cursor) if not _hud.touch.visible and _hud.panel() == null else -1
-	_hud.show_names(world, people, selected, hovered)
+	_hud.show_names(world, people, selected, hovered, _to_hud())
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
