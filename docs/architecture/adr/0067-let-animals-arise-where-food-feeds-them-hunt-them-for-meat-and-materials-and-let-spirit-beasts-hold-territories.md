@@ -18,6 +18,13 @@ The owner decided on 2026-10-10, in the issue's second comment:
 - Numbers stay bounded by food: where forage is grazed down or prey is hunted out, fewer appear, and none appear where nothing feeds them.
 - Spirit beasts arise the same way, in a suitable territory left empty.
 
+The owner decided on 2026-10-11, in the issue's third comment:
+- **Many kinds of creatures,** a wider bestiary as pack data: grazers, browsers, small game, predators of several sizes, birds and fish where cheap, and spirit beasts.
+- **Herds.** Some kinds move and graze in groups, deer, boar, wild horses and wolves in packs. A group moves as one by simple flocking, cohesion, alignment and separation, behind a leader or centre that follows forage.
+- **Prey flees predators.** Grazers that see a predator run away from it, toward their group or cover. Predators hunt, chase and give up after a while, on a chase budget.
+- **An ecosystem that balances,** forage to grazers to predators, bounded by food (#229) with no caps, over 100 years in the sweep: no extinction everywhere and no explosion.
+- **Some intelligence.** Animals avoid predators and avoid larger groups, giving way when outnumbered, by the same threat appraisal people use (#256).
+
 The issue asks the design to state:
 - the rules as core rules, with the slots and bytes they cost
 - how animal counts stay bounded by food over 100 years, as a sweep measure
@@ -45,20 +52,22 @@ Options weighed:
   |---|---|
   | position, in sub-cell units as a person's | 8 |
   | home area | 2 |
+  | herd, the index of its group, or none | 2 |
   | kind | 1 |
-  | state: grazing, fleeing, fighting or home | 1 |
+  | state: grazing, fleeing, chasing, fighting or home | 1 |
   | health | 2 |
   | hunger, in cycles unfed | 1 |
-  | reserved | 1 |
+  | chase budget left, in tens of ticks | 1 |
   | the tick its strike is ready | 4 |
-  | the person it fights, if any | 4 |
-  | **Total** | **24** |
+  | the person or animal it chases or fights, if any | 4 |
+  | reserved | 2 |
+  | **Total** | **28** |
 
   - Animals are kept by home area, in an index of 4 bytes an animal, so a rule reads one area's animals without a search.
   - Chosen. Animals move, flee and fight, which a slot fixed to a cell cannot, and they need none of a person's genealogy, purse or roster.
   - Rejected: game as slot kinds, as ADR 0056 first expected. A slot cannot be chased, cannot cross an area, and cannot defend a territory, so predators hunting grazers and spirit beasts attacking intruders would need a second form anyway.
   - Rejected: animals as people of a faction of beasts. Every person carries kin, talent, a household and a vote in its faction's rules, all meaningless for a deer, and every rule that reads people would need an exception.
-- **The capacity.** The store holds at most 262,144 animals, 6 MiB, with its index 1 MiB more. It is a technical capacity, as #243's ADR 0063 makes the living bound: an appearance past it is refused and counted in a 4-byte counter, saved and hashed, and `make sweep` and `make bench` fail on any refusal.
+- **The capacity.** The store holds at most 262,144 animals, 7 MiB, with its index 1 MiB more. It is a technical capacity, as #243's ADR 0063 makes the living bound: an appearance past it is refused and counted in a 4-byte counter, saved and hashed, and `make sweep` and `make bench` fail on any refusal.
   - **Its basis.** Grazers are bounded by forage, at most one for 3 forage slots (below). If the base pack's forage kinds take a quarter of ADR 0056's 1,048,576 slots, that is at most about 87,000 grazers, and predators at most a sixth of them, about 15,000, so about 102,000 in all. The base pack keeps the peak at three fifths of the capacity or less, about 157,000, which leaves room for a mod with richer forage.
   - Rejected: a capacity sized for every slot as forage, about 350,000 grazers and 58,000 predators. At three fifths of it that is about 680,000 records, 16 MiB, for a map no pack paints.
 - **Forage, on ADR 0056's slots.** Grass is a new slot kind of the base pack. Its biomes are plain 6, hills 4 and forest 2, it grows in 16 days, and its stump regrows in 8. A kind is forage when the pack marks it so; bushes are not, since people gather their berries.
@@ -70,13 +79,21 @@ Options weighed:
 
   | Kind | Role | Lives on | Health | Speed | Drops |
   |---|---|---|---|---|---|
-  | Deer | grazer | plain 4, forest 3, hills 3 | 60 | 16 | 30 meat, 1 hide, 1 horn |
-  | Boar | grazer | forest 4, hills 3 | 120 | 14 | 50 meat, 1 hide, 1 bone |
-  | Wolf | predator of deer and boar | forest 3, hills 4 | 90 | 18 | 10 meat, 1 hide, 1 bone |
-  | Tiger | predator of deer and boar | forest 4 | 240 | 18 | 30 meat, 2 hide, 2 bone, 1 claw |
+  | Deer | grazer, herds of 3 to 8 | plain 4, forest 3, hills 3 | 60 | 16 | 30 meat, 1 hide, 1 horn |
+  | Boar | grazer, herds of 2 to 6 | forest 4, hills 3 | 120 | 14 | 50 meat, 1 hide, 1 bone |
+  | Wolf | predator of deer, roe and boar, packs of 2 to 6 | forest 3, hills 4 | 90 | 18 | 10 meat, 1 hide, 1 bone |
+  | Tiger | predator of deer, roe, boar and wild horse, alone | forest 4 | 240 | 18 | 30 meat, 2 hide, 2 bone, 1 claw |
+  | Hare | grazer, small game, alone | plain 4, hills 3 | 10 | 20 | 4 meat, 1 hide |
+  | Wild horse | grazer, herds of 4 to 12 | plain 5 | 150 | 22 | 60 meat, 2 hide, 1 bone |
+  | Roe | browser, herds of 2 to 6 | forest 5 | 50 | 18 | 20 meat, 1 hide, 1 horn |
+  | Fox | predator of hare, alone | plain 3, forest 3 | 30 | 18 | 4 meat, 1 hide |
   | Spirit tiger | spirit beast, predator of deer and boar | forest 4, hills 2 | 4,000 | 18 | 1 spirit core, 4 spirit hide, 4 spirit bone, 2 spirit claw, 40 meat |
 
   Speed is in sub-cell units a tick, beside a person's `SPEED` of 16. Meat is a food kind, a measure a unit. Hide, horn, bone, claw, spirit hide, spirit bone and spirit claw are #245's material kinds.
+  - **Browsers** feed on undergrowth, a second forage kind of the base pack: forest 6, hills 1, growing in 16 days, its stump regrowing in 8. A kind names the forage kinds it eats, so roe crop undergrowth and deer and wild horses grass. Undergrowth is placed by the build tool as grass is.
+  - **Small game** is a grazer alone, light and fast, eaten by small predators: hares and foxes run the same rules at a smaller scale.
+  - **Birds and fish** are not records. They are slot kinds of ADR 0056, a shoal on water cells and a covey on plain, gathered by the gathering order as fruit is, since chasing them would add cost and nothing a rule reads. This is the owner's "where cheap".
+  - The kinds above are the base pack's. A pack adds kinds as rows, within the bounds below.
 - **Appearance.** At each area's cycle, after grazing, one draw for each role, from `animal_stream`, a counter-based stream of the world's seed, the area's index, the cycle's number and the role. Like `slot_stream`, no other rule's draws shift it, and no order of visiting matters.
   - **Where nothing appears.** No animal appears in an area holding any structure of a village, so none appear in towns. An area whose biomes no kind lives on, or with no forage, has no grazers, and so no predators.
   - **Grazers, at a rate set by the spare forage.** The forage supports S grazers, the area's forage slots that are not empty divided by `forage_per_grazer`, and G graze there. One grazer appears with a chance of 250 × (S − G) / S per mille, rounded down, and none while G is at least S. So an area with all its forage to spare fills at 250 per mille a cycle, one half grazed at 125, and one at its support not at all. The kind is drawn by its weight on the area's biomes, at a forage slot's cell.
@@ -86,14 +103,32 @@ Options weighed:
   - Rejected: a flat chance below a ceiling. Food would then be a gate and not a rate, and an area one grazer short of its support would fill as fast as an empty one.
   - Rejected: breeding, which the owner ruled out.
   - Rejected: spawn points placed by the map. The owner ruled out fixed spawn points, and they would refill a hunted area whatever its food.
-- **Hunger.** A grazer that finds no grown forage to crop at its cycle gains a cycle of hunger, and loses it when it eats. A predator eats every second cycle: it kills one grazer of its prey in its area or the 8 around it, the lowest index first, and gains a cycle of hunger when it finds none. A grazer dies at 2 cycles of hunger and a predator at 3, and leaves nothing.
-  - **Predation is settled at the cycle, in every tier.** The killed grazer is removed and its drops are lost. In a live area the predator stands at the grazer's cell afterwards.
-  - Rejected: predators chasing grazers tick by tick. It would cost a hunt per predator per tick in live areas, and a far predator would still need the cycle's rule, two forms for one rule.
-- **Where the balance comes from.** Each grazer needs 3 forage slots, so grazers never outnumber their forage for long: past it they starve. Each predator kills one grazer every 16 days, and grazers refill at most one an area every 32 days on average, so an area and its neighbours, 9 areas, refill about 4 grazers in the 16 days 1 predator kills 1. Predators past a sixth of the grazers around them find none to kill and starve. Hunting by people takes from the same refill, so an over-hunted region thins its game and its predators with it.
-- **Movement.** In live areas, animals move tick by tick, straight toward a cell and stopped by blocked footing, within their home area. They walk on no flow field.
-  - **Grazers** walk to the next grown forage slot of their area. A grazer a person approaches within 4 cells, or that a strike hits, flees directly away for 60 ticks, then grazes again.
-  - **Predators** wander between the cells of their prey's area. A predator a person strikes fights it, by its strike, until the person or it is 8 cells away.
-  - In stepped and far areas, animals stand where they last were, and only the cycle's rules change them.
+- **Hunger.** A grazer that finds no grown forage of its kinds to crop at its cycle gains a cycle of hunger, and loses it when it eats. A predator must eat every second cycle, and gains a cycle of hunger when it has not killed since its last meal. A grazer dies at 2 cycles of hunger and a predator at 3, and leaves nothing.
+- **Herds.** A kind may herd, with a size range as pack data. A herd is a row of a herd table, 8 bytes: its kind, its leader's index, its count and its home area.
+  - **Joining.** A herding animal that appears joins the herd of its kind in its area with the fewest members below the kind's most, or founds one. A herd at its most splits when a new member would join, the newer half following a new leader.
+  - **The leader** is the member of lowest index. It walks to the next grown forage slot of the herd's kinds, so the herd follows forage. When it dies the next lowest leads.
+  - **Flocking,** in live areas, for each member each tick, in integers:
+    - **cohesion:** a pull toward the herd's centre, the mean of the members' positions, when farther than 4 cells from it
+    - **alignment:** the leader's heading, at half weight
+    - **separation:** a push from any herd mate nearer than a cell
+    - The sum is clamped to the kind's speed. Herds are at most 12, so a member reads at most 11 mates, and needs no other search.
+  - Packs of predators herd by the same rule, behind a leader that hunts.
+- **Flight and the chase.** In live areas, each tick:
+  - **Prey sees its predators.** A grazer that `sees` (ADR 0058) a predator of a kind that eats it within its kind's sight, 8 cells in the base pack, flees: it runs away from the predator toward its herd's centre, or toward the nearest forest cell when alone, and its herd's leader flees with it, so the herd turns as one. It grazes again 60 ticks after it last saw one.
+  - **A predator hunts** when hungry, from its cycle until it eats: it takes the nearest prey it sees and chases it at its speed, the chase budget counting down from its kind's, 300 ticks, 10 seconds, in the base pack. Reaching its prey within an arm's length, it strikes by its kind's strike, and a kill is its meal. With the budget spent it gives up and rests 600 ticks, then hunts again. A pack chases the leader's target together.
+  - **The kill** removes the prey and drops nothing to people: the predator has eaten it. A predator struck by a person fights back until the person or it is 8 cells away.
+  - **Speed decides the chase.** A wolf at 18 gains a cell on a deer at 16 every 8 ticks, so it closes from 8 cells within its 300-tick budget unless the deer reaches its herd or cover. A tiger at 18 on a wild horse at 22 never closes on open plain and must ambush in forest.
+- **Avoiding the stronger.** Animals give way by the threat appraisal people use, #256's, which the core worker designs as ADR 0071. This ADR gives it the animals' inputs:
+  - **A side** is a herd, a pack or a lone animal.
+  - **Strength** is the side's summed health × strike, by its kind's data. A grazer's strike is its kick or tusk, a small value in the kind's row.
+  - **Temperament** is a kind's, pack data: timid for hares, deer and horses, wary for boar and wolves, bold for tigers and spirit beasts.
+  - So a lone wolf gives way to a herd of six boar, a pack keeps clear of a band of armed people, and grazers keep away from a group of people larger than their herd. A spirit beast holds its territory whatever it faces, as the owner decided.
+  - Until #256's appraisal is built, an animal flees only predators that eat it and people within 4 cells, as the steps below order it.
+- **In stepped and far areas** animals stand where they last were, herds included, and the cycle settles what the chase does live: a hungry predator kills one prey of its kinds in its area or the 8 around it, the lowest index first, with a chance from its speed against its prey's, 500 per mille plus 100 per mille for each unit of speed it has over the prey, between 100 and 900. A wolf on a deer, 2 faster, kills at 700 per mille a cycle; a tiger on a wild horse, 4 slower, at 100.
+  - The two forms are one rule at two grains: the far chance is set so that a live area's kills over a cycle match it, which step 2 measures.
+  - Rejected: predation settled only at the cycle, in every tier. The owner asked for prey that flees and predators that chase and give up, which only a live chase shows.
+- **Where the balance comes from.** Each grazer needs 3 forage slots, so grazers never outnumber their forage for long: past it they starve. A predator eats one grazer every 16 days at most, and grazers refill at most one an area every 32 days on average, so an area and its neighbours, 9 areas, refill about 4 grazers in the 16 days 1 predator eats 1. Predators past a sixth of the grazers around them find none to kill and starve. Fleeing and herding lower the predators' success, so their share settles lower than the cycle's arithmetic alone gives, which the sweep's bands bound. Hunting by people takes from the same refill.
+- **Movement.** In live areas, animals move tick by tick, straight toward a cell and stopped by blocked footing, within their home area and its 8 neighbours. They walk on no flow field. A grazer a person approaches within 4 cells, or that a strike hits, flees as from a predator.
 - **Strikes on animals.** A strike's shape hits the animals in it as it hits people (ADR 0046), from the area index. The steered body may take an animal as a cast's target. An animal's health falls by the same damage rule, and at 0 it dies.
 - **Drops.** A killed animal drops its kind's stacks as piles at its cell (ADR 0051). The nearest person with room picks them up by ADR 0051's rule, as it picks up anything with a price.
 - **Hunting, by NPCs as by the player.** Hunting is a livelihood, as ADR 0052 lists "selling game" among earnings. It is not paid by a treasury, as ADR 0056's gathering is.
@@ -121,28 +156,35 @@ Options weighed:
   - **Refined.** An apothecary refines 1 core and 2 herbs into 3 spirit pills, each of 320 qi, in 2 workers' days, by #245's recipe rule. The pills hold 960 qi to the core's 800, so refining is worth the labour, and a pill is a ware anyone can buy.
   - **For NPCs.** A person no driver steers who holds a core or a pill consumes it once a day when its store lies below its limit by at least the value. Otherwise it sells the core to its village's market. An apothecary's market buys cores, so refining happens where an apothecary stands.
   - **For the player,** it is an item like any other, to consume, sell, or have refined by buying the pills.
-- **Tiers.** The cycle's rules, appearance, grazing, hunger, predation and spirit beasts' arrival, run on the area's tick of ADR 0056's cycle in every tier. Movement, flight and fights run only in live areas.
+- **Tiers.** The cycle's rules, appearance, grazing, hunger and spirit beasts' arrival, run on the area's tick of ADR 0056's cycle in every tier. Movement, flocking, flight, chases and fights run only in live areas, and predation is the chase there and the cycle's chance elsewhere.
   - **Far hunting** is settled once a day: each assigned hunter of a far village kills the nearest animal it may hunt within 32 cells, by index, and its drops go into its inventory. A spirit beast is never killed this way; it needs a fight.
 - **Cost, at 50,000 people with #216's live tier of 5,000.**
-  - **Memory.** 6 MiB of records and 1 MiB of index at the capacity, plus a 4-byte refusal counter. Grass costs no storage beyond ADR 0056's slots.
+  - **Memory.** 7 MiB of records and 1 MiB of index at the capacity, plus a 4-byte refusal counter, and a herd table of 8 bytes a herd, at most 65,535 herds, 512 KiB. Grass costs no storage beyond ADR 0056's slots.
   - **The cycle.** About one area a tick, as ADR 0056's slots: at most 64 slots and the area's animals, typically under 30, and a few draws. The predator and spirit-beast tests read the 9 areas' grazer counts, kept per area.
-  - **Live movement.** Live areas hold at most about 3,000 animals, at about 30 an area. Each takes one step a tick and one flight test against people within 4 cells, through #205's spatial index: about 3,000 queries a tick.
+  - **Live movement.** Live areas hold at most about 3,000 animals, at about 30 an area. Each takes one step a tick: flocking reads at most 11 herd mates, about 33,000 reads a tick at worst. A grazer's flight test asks #205's spatial index for predators and people within its 8 cells' sight, about 3,000 queries a tick, and `sees` walks a line only where levels differ (ADR 0058). A chasing predator reads its one target. No allocation is made per tick.
+  - **At 500 living,** the region's few areas hold a few hundred animals, a tenth of these figures.
   - **Strikes.** A strike reads the animal index of the areas its shape touches, a few dozen records.
   - **Far hunting.** A scan of at most 9 areas' animals for each hunter, once a day, beside ADR 0056's far gathering.
 - **Bounds, with refusals.** These are core bounds. A pack past any of them is refused at load with a `ContentRefusal` naming the bound (ADR 0049):
   - at most 64 animal kinds
+  - a herd of at most 12, and at most 65,535 herds
+  - a chase budget of at most 2,550 ticks, its byte in tens of ticks
+  - a sight of at most ADR 0046's reach
   - at most 8 prey kinds a predator
   - at most 8 stacks in a kind's drops
   - health of at most 65,535
   - a territory radius of at most 32 cells
   - a spirit core's qi value of at most 15,000, the region's highest talent limit
-- **Saves, the hash and determinism.** The animal records, the index and the refusal counter are saved and hashed. Every rule is integer. Areas run on their own tick of the cycle in index order, animals within an area in index order, and every draw comes from `animal_stream`.
+- **Saves, the hash and determinism.** The animal records, the herd table, the index and the refusal counter are saved and hashed. Every rule is integer. Areas run on their own tick of the cycle in index order, animals within an area in index order, and every draw comes from `animal_stream`.
 
 The implementation, in order, each a pull request with its acceptance, after ADR 0056's slots and gathering are built:
 1. **Grass, grazers and their store.**
    - Acceptance, each with a control: grazers appearing only in areas with forage; none in an area holding a village structure; grazing cropping slots that regrow in 3 cycles; a grazed-down area's grazers starving to its forage; an appearance past the capacity refused and counted.
    - Acceptance: `make sweep` with the animal bands below.
-2. **Predators.** Acceptance, each with a control: predators appearing only near enough prey; predation removing a grazer; a predator starving where prey is hunted out. `make sweep` within the bands.
+2. **Herds, predators, flight and the chase.**
+   - Acceptance, each with a control: a herd following its leader to forage and keeping within 4 cells of its centre, where a lone animal wanders; a deer fleeing a wolf it sees toward its herd, where one behind a cliff it cannot see does not; a wolf giving up when its budget is spent and resting; a pack chasing one target; predators appearing only near enough prey and starving where prey is hunted out.
+   - Acceptance: a live area's kills over 50 cycles within a fifth of the far chance's for the same animals, so the two grains agree.
+   - Acceptance: `make bench` within budget with the animals of the live tier, and `make sweep` within the bands.
 3. **Strikes on animals, flight and hunting.**
    - Acceptance, each with a control: a strike killing a deer and its drops as piles; a hunter assigned only while game stands within 32 cells; meat eaten by its household before rations, the rest sold to the granary; hide sold to the market and tanned at a leatherworks.
    - Acceptance: `make bench` within budget with the animals of the live tier.
@@ -159,6 +201,8 @@ The implementation, in order, each a pull request with its acceptance, after ADR
 | Predators against what the prey supports, from year 20 | half to all of it at every decade, on 40 seeds or more |
 | Predators against grazers, from year 20 | a twelfth to a quarter, on 40 seeds or more |
 | A grazer kind and a predator kind alive at year 100 | on 40 seeds or more |
+| No explosion: a kind's count in any area against what its food supports there | at most twice, at every decade, on every seed |
+| No extinction everywhere: every base-pack kind alive somewhere | at every decade, on 45 seeds or more |
 | Wild meat a living person has a year at year 100 | 5 to 40 measures: a supplement to fields, never the staple |
 | Refusals at the capacity | none, on every seed |
 
@@ -166,11 +210,11 @@ Spirit beasts are reported with no band: the region's 16 areas and its villages 
 
 ## Decision
 
-Animals are records of 24 bytes in a store of their own, kept by home area, with a technical capacity of 262,144, an appearance past it refused and counted as a failure. Kinds are pack data: grazers, predators and spirit beasts, with biomes, health, speed, strike, prey and drops.
+Animals are records of 28 bytes in a store of their own, kept by home area, with a technical capacity of 262,144, an appearance past it refused and counted as a failure. Kinds are pack data: grazers, predators and spirit beasts, with biomes, health, speed, strike, prey and drops.
 
 Grass is a forage slot kind of ADR 0056. At each area's 8-day cycle, a grazer crops one grown forage slot, so it needs 3 of them, and starves at 2 cycles without one. A predator kills one grazer of its prey nearby every second cycle, and starves at 3 cycles without one. A grazer appears, with no breeding, at a chance of 250 per mille times the share of the area's forage support still unused, and a predator at 100 per mille times the share of the prey's support still unused, each by a counter-based draw, so the rate follows the spare food and is none at the support. None appear in an area holding a village structure.
 
-In live areas animals move within their home area, grazers flee people, and predators fight back when struck. Strikes hit animals as people, and a killed animal drops its kind's stacks as piles. Idle earners hunt while game stands within 32 cells, at most a fifth of them. Meat feeds the hunter's household first and the rest goes to the granary; hide, horn, bone and claw go to the market, where #245's workshops make leather and gear from them, spirit-beast gear among it.
+The base pack's bestiary holds grazers, browsers and small game, predators of several sizes and a spirit beast, and birds and fish as slot kinds. Herding kinds move in herds of up to 12 behind a leader that follows forage, by cohesion, alignment and separation. In live areas a grazer that sees a predator of its kind flees toward its herd or cover, and a hungry predator chases the nearest prey on a budget and gives up when it is spent; elsewhere the cycle settles predation by a chance from the two speeds. Animals give way to a stronger side by #256's threat appraisal, with their kind's strength and temperament. Predators fight back when struck. Strikes hit animals as people, and a killed animal drops its kind's stacks as piles. Idle earners hunt while game stands within 32 cells, at most a fifth of them. Meat feeds the hunter's household first and the rest goes to the granary; hide, horn, bone and claw go to the market, where #245's workshops make leather and gear from them, spirit-beast gear among it.
 
 A spirit beast appears, at a chance that rises with the spare prey from none at 12 to 8 per mille a cycle at 60, no village stands within 48 cells and no other spirit beast within 128, holds a territory of 12 cells, attacks anyone inside it and never leaves it. Its death drops a spirit core, which adds its qi to the consumer's store up to its talent's limit, or which an apothecary refines into pills.
 
@@ -191,3 +235,5 @@ This supersedes ADR 0056's hunting as gathering from a slot that moves, now hunt
 - Wild meat feeds more than fields in the sweep, so food is no longer farmed and villages stop growing fields.
 - Spirit beasts never appear, because no place lies 48 cells from every village, or they kill so many travellers that roads empty.
 - Spirit cores carry ordinary people across realms too easily, so realms stop marking talent.
+- Live kills and the far chance drift apart, so an area changes its game as the player walks in or out of it.
+- Herds clump at area borders or split and rejoin every tick, so flocking needs damping.

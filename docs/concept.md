@@ -161,9 +161,13 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - A spirit beast leaves a spirit core (영단), a cultivation item consumed or refined for qi or realm progress, and materials worth more than an ordinary animal's.
   - Every animal leaves materials when killed, by species as pack data. Meat is food: it feeds the hunter's household and counts as food. Hide, bone and horn feed crafting.
   - Hunters are a trade, and NPCs hunt for food and materials as the player does.
+  - Decided by the owner on 2026-10-11 (#171): many kinds of creatures, as pack data: grazers, browsers, small game, predators of several sizes, birds and fish where cheap, and spirit beasts. Some kinds move and graze in herds, as one, by simple flocking behind a leader or centre that follows forage. Prey that sees a predator flees toward its group or cover, and predators hunt, chase and give up after a while. The ecosystem balances from forage to grazers to predators, bounded by food with no caps, with no extinction everywhere and no explosion over 100 years. Animals avoid predators and larger groups, giving way when outnumbered, by the same threat appraisal people use.
 - **[proposed]** ADR 0067's details:
   - grass as a forage slot, a grazer needing 3 of them
   - predators eating every 16 days, starving after 3 cycles unfed
+  - herds of up to 12 behind their lowest-index member, flocking within 4 cells of their centre
+  - a predator's chase budget of 10 seconds, and in areas not simulated in full a kill chance from the two kinds' speeds
+  - birds and fish as gathered slots, not animals
   - an appearance chance scaled by the spare food: forage over the grazers' need, prey over the predators'
   - none appearing in an area holding a village structure
   - hunting as a livelihood for idle earners within 32 cells, not paid by a treasury, meat eaten at home first
