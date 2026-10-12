@@ -29,11 +29,12 @@ func run() -> bool:
 	# stop, turning each off.
 	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
 			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT,
-			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT]:
+			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT,
+			KEY_DOWN, KEY_RIGHT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1}
+		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -133,7 +134,8 @@ func _fit_pass() -> bool:
 		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "SETTINGS_CAST_PRESS",
 				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS + Settings.NUMBERS_KEYS \
 				+ Settings.BLOOD_KEYS \
-				+ Settings.HITSTOP_KEYS:
+				+ Settings.HITSTOP_KEYS \
+				+ Settings.SCREEN_KEYS:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)

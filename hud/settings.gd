@@ -19,26 +19,26 @@ const PATH := "user://settings.cfg"
 const SECTION := "settings"
 # The mockup's layout, in the native 480x270.
 const DIALOG := Rect2(60, 4, 360, 256)
-# The mockup's rows were 26 pixels apart; the rows for casting, touch, damage numbers, blood and
-# hit stop close them up, and the dialog stands 6 pixels higher, to keep the line under them within
-# the panel.
-const ROW_STEP := 16
+# The mockup's rows were 26 pixels apart; the rows for casting, touch, damage numbers, blood, hit
+# stop and screen effects close them up, and the dialog stands 6 pixels higher, to keep the line
+# under them within the panel.
+const ROW_STEP := 14
 const CHOICE_WIDTH := 64
 const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
 const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music", "cast",
-		"touch", "numbers", "blood", "hitstop"]
+		"touch", "numbers", "blood", "hitstop", "screen"]
 const LABEL_KEYS := {"speed": "SETTINGS_SPEED", "window": "SETTINGS_WINDOW",
 		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE",
 		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC",
 		"cast": "SETTINGS_CAST", "touch": "SETTINGS_TOUCH", "numbers": "SETTINGS_NUMBERS",
-		"blood": "SETTINGS_BLOOD", "hitstop": "SETTINGS_HITSTOP"}
+		"blood": "SETTINGS_BLOOD", "hitstop": "SETTINGS_HITSTOP", "screen": "SETTINGS_SCREEN"}
 const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW_ABOUT",
 		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
 		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
 		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT", "touch": "SETTINGS_TOUCH_ABOUT",
 		"numbers": "SETTINGS_NUMBERS_ABOUT", "blood": "SETTINGS_BLOOD_ABOUT",
-		"hitstop": "SETTINGS_HITSTOP_ABOUT"}
+		"hitstop": "SETTINGS_HITSTOP_ABOUT", "screen": "SETTINGS_SCREEN_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
@@ -62,12 +62,15 @@ const BLOOD_KEYS := ["SETTINGS_BLOOD_ON", "SETTINGS_BLOOD_OFF"]
 ## Whether a hit on or from the player holds the struck and the striker a few frames and shakes the
 ## screen.
 const HITSTOP_KEYS := ["SETTINGS_HITSTOP_ON", "SETTINGS_HITSTOP_OFF"]
+## How much the screen's effects (#209) show, low dropping the costly ones, as grade.gd's Quality
+## counts them. ADR 0048's quality profile takes this row's place once it is accepted.
+const SCREEN_KEYS := ["SETTINGS_SCREEN_LOW", "SETTINGS_SCREEN_STANDARD", "SETTINGS_SCREEN_HIGH"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
 ## the music sits under the effects, a cast key casts on its press, as Albion Online's quick
 ## cast does, and only the player's own damage floats up as numbers, which a battle of hundreds
 ## would otherwise bury; and a hit draws blood and holds the frame.
 const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
-		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 1, "blood": 0, "hitstop": 0}
+		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 1, "blood": 0, "hitstop": 0, "screen": 1}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -146,6 +149,9 @@ func choices(name: String) -> Array[String]:
 		"hitstop":
 			for hitstop_key: String in HITSTOP_KEYS:
 				words.append(tr(hitstop_key))
+		"screen":
+			for screen_key: String in SCREEN_KEYS:
+				words.append(tr(screen_key))
 		_:
 			for volume: float in VOLUMES:
 				words.append("%d%%" % roundi(volume * 100))
@@ -189,6 +195,11 @@ func blood() -> bool:
 ## screen.
 func hit_stop() -> bool:
 	return chosen.hitstop == 0
+
+
+## Returns how much the screen's effects show: 0 low, 1 standard, 2 high.
+func screen_quality() -> int:
+	return chosen.screen
 
 
 ## Returns whether a tap on the ground walks the steered person there.
