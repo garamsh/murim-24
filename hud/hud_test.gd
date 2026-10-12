@@ -29,10 +29,11 @@ const SHOWN := {
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
 # the dialogue window's, its wares' and the rumours' among them, of the lessons' words, which
-# _lessons_pass measures, and of the purse's silver and its notices, which _purse_pass measures.
+# _lessons_pass measures, of the purse's silver and its notices, which _purse_pass measures, and of
+# the map window, which map_window_test measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
 		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
-		"BUY_", "WARE_", "SILVER", "CONSUME_"]
+		"BUY_", "WARE_", "SILVER", "CONSUME_", "MAP_"]
 const Arts := preload("res://hud/arts.gd")
 const WordFit := preload("res://hud/word_fit.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
