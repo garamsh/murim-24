@@ -252,7 +252,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] std::int64_t army_count() const;
 
   /// Returns the world's date: `year` and `day` counted from 1, `season`
-  /// from 0, as the core's calendar gives them.
+  /// from 0, as the core's calendar gives them; `tick`, the tick within the
+  /// day from 0, and `ticks_per_day`, for the view's time of day.
   [[nodiscard]] godot::Dictionary date() const;
 
   /// Returns how many ticks the world has run, the tick body_ready() counts

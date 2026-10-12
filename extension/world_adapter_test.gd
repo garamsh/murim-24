@@ -8,7 +8,8 @@
 # villages are read back with the cap, stock and population the core derives;
 # and that a region's sects and manuals are read back as the core holds them; and that the player
 # applies to a sect, hears rumours and shows attainment through the adapter as the core holds them;
-# and that a snapshot reads in one call what the per-army, per-structure and per-strike reads give.
+# and that a snapshot reads in one call what the per-army, per-structure and per-strike reads give;
+# and that the date reads the tick within the day and the day's length.
 extends RefCounted
 
 const SEED := 42
@@ -114,6 +115,22 @@ func run() -> bool:
 			and WorldAdapter.create_region(SEED, 0, 0) == null and WorldAdapter.create_region(SEED, 0, -1) == null
 	print("world_adapter_test: a region of five-tick days accepted %s, on day %d after five ticks from day %d; days of 0 and -1 ticks refused: %s" % [
 		short != null, short.date().day if short != null else -1, first_day, "pass" if days_pass else "FAIL"])
+	# The date gives the tick within the day and the day's length: a region of five-tick days reads
+	# 5, its tick 0 at a day's start, 3 three ticks on and 0 again as the next day starts. Control: a
+	# region of the core's default day reads its own length, not 5.
+	var timed := WorldAdapter.create_region(SEED, 0, 5)
+	var ticks_seen: Array[int] = [timed.date().tick]
+	for i in 3:
+		timed.tick()
+	ticks_seen.append(timed.date().tick)
+	for i in 2:
+		timed.tick()
+	ticks_seen.append(timed.date().tick)
+	var default_day: int = WorldAdapter.create_region(SEED, 0).date().ticks_per_day
+	var time_pass: bool = timed.date().ticks_per_day == 5 and ticks_seen == [0, 3, 0] and default_day != 5 \
+			and default_day > 0
+	print("world_adapter_test: five-tick days read %d ticks a day, the tick %s over five ticks; the default day reads %d: %s" % [
+		timed.date().ticks_per_day, ticks_seen, default_day, "pass" if time_pass else "FAIL"])
 	var orders_pass := _orders_pass()
 	var reads_pass := _reads_pass()
 	var villages_pass := _villages_pass()
@@ -130,7 +147,7 @@ func run() -> bool:
 	var event_people_pass := _event_people_pass()
 	var snapshot_pass := _snapshot_pass()
 	return snapshot_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and time_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
 

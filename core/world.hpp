@@ -332,6 +332,9 @@ class World {
   /// Returns the date the world has reached.
   [[nodiscard]] Date date() const;
 
+  /// Returns how many ticks a day of the world's calendar takes.
+  [[nodiscard]] std::uint64_t ticks_per_day() const { return rules_.ticks_per_day; }
+
   /// Returns the date of tick `tick` on the world's calendar.
   [[nodiscard]] Date date_at(std::uint64_t tick) const;
 

@@ -687,6 +687,9 @@ godot::Dictionary WorldAdapter::date() const {
   fields.set("year", static_cast<std::int64_t>(today.year));
   fields.set("season", static_cast<std::int64_t>(today.season));
   fields.set("day", static_cast<std::int64_t>(today.day));
+  const std::uint64_t per_day = world().ticks_per_day();
+  fields.set("tick", static_cast<std::int64_t>(world().tick_count() % per_day));
+  fields.set("ticks_per_day", static_cast<std::int64_t>(per_day));
   return fields;
 }
 
