@@ -1,6 +1,6 @@
 # ADR 0073: Chart the land a soul has seen, and show each village as it was last seen
 
-> Status: proposed
+> Status: accepted
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
