@@ -1066,7 +1066,7 @@ class SaveCodec {
       out.size(fight.leader);
       put_duel(out, fight.rule);
     });
-    put_all(out, world.declarations_,
+    put_all(out, world.declarations_.slots(),
             [&out](const std::optional<Declared>& standing) {
               put_maybe(out, standing, [&out](Declared declared) {
                 out.u8(static_cast<std::uint8_t>(declared.what));
@@ -1164,16 +1164,19 @@ class SaveCodec {
       fight.rule = get_duel(input);
       return fight;
     });
-    world.declarations_ = get_all<std::optional<Declared>>(input, [&input] {
-      return get_maybe<Declared>(input, [&input] {
-        constexpr std::uint8_t DECLARATIONS = 2;
-        Declared declared;
-        declared.what = static_cast<Declaration>(input.tag(DECLARATIONS));
-        declared.by = input.size();
-        declared.tick = input.u64();
-        return declared;
-      });
-    });
+    std::vector<std::optional<Declared>> declarations =
+        get_all<std::optional<Declared>>(input, [&input] {
+          return get_maybe<Declared>(input, [&input] {
+            constexpr std::uint8_t DECLARATIONS = 2;
+            Declared declared;
+            declared.what = static_cast<Declaration>(input.tag(DECLARATIONS));
+            declared.by = input.size();
+            declared.tick = input.u64();
+            return declared;
+          });
+        });
+    world.declarations_ =
+        Declarations{world.rules_.hostile.size(), std::move(declarations)};
     world.progress_ = decltype(world.progress_){
         get_all<Progress>(input, [&input] { return get_progress(input); })};
     world.events_ = decltype(world.events_){
