@@ -175,7 +175,7 @@ func _notice_slip_pass() -> bool:
 								hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
 								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
 								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
-								hud.place_notice()
+								hud._process(0.0)
 							checks += 1
 							var slip: Rect2 = hud.notice_rect()
 							var prompt: Rect2 = hud.talk_prompt.slip_rect()
