@@ -65,9 +65,9 @@ func tap(at: Vector2) -> String:
 	if FIELD.has_point(at):
 		if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
 			DisplayServer.virtual_keyboard_show(typed, FIELD, DisplayServer.KEYBOARD_TYPE_NUMBER, MAX_DIGITS)
-	elif _random_slip().has_point(at):
+	elif random_slip_rect().has_point(at):
 		typed = str(randi())
-	elif _start_slip().has_point(at):
+	elif start_slip_rect().has_point(at):
 		DisplayServer.virtual_keyboard_hide()
 		return "start"
 	queue_redraw()
@@ -98,19 +98,21 @@ func _draw() -> void:
 	_text(FIELD.position + Vector2(5, 2), typed, Palette.PAPER_6)
 	# The caret, after what was typed.
 	draw_rect(Rect2(FIELD.position.x + 6 + _width(typed), y + 3, 1, 10), Palette.PAPER_6)
-	var random := _random_slip()
+	var random := random_slip_rect()
 	_slip(random.position, random.size.x, tr("NEW_GAME_RANDOM"), false)
 	_text(Vector2(DIALOG.position.x + 12, y + 26), tr("NEW_GAME_SAME"), Palette.STONE_4)
 	_text(Vector2(DIALOG.position.x + 12, y + 40), tr("NEW_GAME_EMPTY"), Palette.STONE_3)
 	draw_rect(Rect2(DIALOG.position.x + 6, y + 58, DIALOG.size.x - 12, 1), Palette.INK_4)
-	var start := _start_slip()
+	var start := start_slip_rect()
 	_slip(start.position, start.size.x, tr("NEW_GAME_START"), true)
 
 
-func _random_slip() -> Rect2:
+## Returns the slip that draws a seed at random, in the HUD's pixels.
+func random_slip_rect() -> Rect2:
 	return Rect2(RANDOM_X, FIELD.position.y + 1, DIALOG.end.x - 12 - RANDOM_X, SLIP_HEIGHT)
 
 
-func _start_slip() -> Rect2:
+## Returns the slip that starts the world, in the HUD's pixels.
+func start_slip_rect() -> Rect2:
 	return Rect2(DIALOG.position.x + floorf((DIALOG.size.x - START_WIDTH) / 2.0), FIELD.position.y + 66,
 			START_WIDTH, SLIP_HEIGHT)

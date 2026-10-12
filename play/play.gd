@@ -456,7 +456,7 @@ func _process(delta: float) -> void:
 	var screen := get_viewport_rect().size / _camera.zoom
 	_camera.position = view_centre(drawn_lead().round(), screen, _bounds).round()
 	var view := Rect2(_camera.position - screen / 2.0, screen)
-	_art.refresh(view, _between())
+	show_view(view)
 	# A hit on or from the player shakes the screen by whole screen pixels, never past the bounds.
 	var shake := Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
 	_camera.offset = shake.clamp((_bounds.position - view.position).min(Vector2.ZERO),
@@ -467,12 +467,24 @@ func _process(delta: float) -> void:
 	if _moving:
 		follow(_cursor)
 	_show_aim()
-	_view_origin = view.position
-	_hud.touch.body_at = _hud.from_window((drawn_lead() - view.position) * _camera.zoom).round()
+	_hud.touch.body_at = to_hud_pixels(drawn_lead()).round()
 	_hud.refresh(world, steered, _skills)
 	_hud.show_target(world, selected, steered)
 	show_talk()
 	show_names()
+
+
+## Draws the world within `view`, in the world's pixels, and measures taps on the ground and the
+## HUD's marks over the world from its top-left corner. Each frame gives it the camera's view; a
+## test, with no window, gives its own.
+func show_view(view: Rect2) -> void:
+	_art.refresh(view, _between())
+	_view_origin = view.position
+
+
+## Returns `at`, a point in the world's pixels, where it lies on the HUD, in the HUD's pixels.
+func to_hud_pixels(at: Vector2) -> Vector2:
+	return _hud.from_window((at - _view_origin) * _camera.zoom)
 
 
 ## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
@@ -870,7 +882,7 @@ func show_talk() -> void:
 		return
 	var head := _to_pixels(world.person_position(talk_to)) - Vector2(0, _art.HEAD)
 	_hud.talk_prompt.key = OS.get_keycode_string(TALK_KEY)
-	_hud.talk_prompt.point_at(world, talk_to, _hud.from_window((head - _view_origin) * _camera.zoom).floor(),
+	_hud.talk_prompt.point_at(world, talk_to, to_hud_pixels(head).floor(),
 			talk_hostile)
 
 
@@ -882,7 +894,7 @@ func show_names() -> void:
 	if _hud.panel() == null:
 		for person: Dictionary in _art.near:
 			people.append({"person": person.person, "relation": person.relation,
-				"head": _hud.from_window((person.head - _view_origin) * _camera.zoom).floor()})
+				"head": to_hud_pixels(person.head).floor()})
 	var hovered := person_at(_cursor) if not _hud.touch.visible and _hud.panel() == null else -1
 	_hud.show_names(world, people, selected, hovered)
 

@@ -99,16 +99,16 @@ func _tap_pass(world: WorldAdapter, army: int) -> bool:
 	panel.use_font(load(Hud.FONT))
 	panel.show_factions(world, army, true)
 	var hostile := _row_of(panel, WorldAdapter.RELATION_HOSTILE)
-	var row_rect: Rect2 = panel._touch_row(hostile)
+	var row_rect: Rect2 = panel.touch_row_rect(hostile)
 	var chose: bool = hostile > 0 and panel.tap(row_rect.get_center()) == "choose" and panel.chosen == hostile
 	var nothing: bool = panel.tap(Vector2(140, 236)) == ""
-	var order: String = panel.tap(panel._order_button(0).get_center())
+	var order: String = panel.tap(panel.order_button_rect(0).get_center())
 	var war: bool = order == "order" and panel.order == 0
 	var opened := false
 	if panel.orders[0].refusal == WorldAdapter.DECLARE_NONE:
 		panel.ask()
 		opened = panel.confirming == WorldAdapter.DECLARATION_WAR \
-				and panel.tap(panel._confirm_buttons(Faction.TOUCH_CONFIRM)[0].get_center()) == "yes"
+				and panel.tap(panel.confirm_button_rects(Faction.TOUCH_CONFIRM)[0].get_center()) == "yes"
 	panel.answer(false)
 	var closed: bool = panel.tap(Vector2(Faction.PANEL.end.x - 10, Faction.PANEL.position.y + 8)) == "close"
 	var passed := chose and nothing and war and opened and closed

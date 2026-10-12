@@ -146,7 +146,8 @@ var _slots: Array[Panel] = []
 # The duel being shown: its challenger and each duellist's health when it began.
 var _duel := {}
 var _notice_until := 0
-var _notice_slip := Panel.new()
+## The slip drawn under the notice, so a test can read where it stands.
+var notice_slip := Panel.new()
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
 var _map_panel: Panel
@@ -423,7 +424,7 @@ func _place() -> void:
 	purse.queue_redraw()
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
 	target_panel.position = TARGET_AT[on] + Vector2(gained.x / 2.0, 0)
-	_place_notice()
+	place_notice()
 	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
 		over.position = (gained / 2.0).floor()
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
@@ -566,7 +567,7 @@ func _who(world: WorldAdapter, person: int, own: PackedInt64Array) -> String:
 func _notice(key: String) -> void:
 	labels.notice.text = key
 	labels.notice.visible = true
-	_place_notice()
+	place_notice()
 	_notice_until = Time.get_ticks_msec() + NOTICE_MS
 
 
@@ -574,7 +575,7 @@ func _process(_delta: float) -> void:
 	if labels.has("notice") and labels.notice.visible and Time.get_ticks_msec() > _notice_until:
 		labels.notice.visible = false
 	if labels.has("notice"):
-		_place_notice()
+		place_notice()
 	if labels.has("notice") and not labels.notice.visible and not _waiting.is_empty():
 		_notice(_waiting.pop_front())
 
@@ -588,9 +589,9 @@ func notice_rect() -> Rect2:
 			Vector2(width, NOTICE_SLIP_HEIGHT))
 
 
-# Places the notice on its line, or, where its slip would meet the talk prompt's, just above the
-# prompt's slip, or just below it where above would leave the room; and its slip under it.
-func _place_notice() -> void:
+## Places the notice on its line, or, where its slip would meet the talk prompt's, just above the
+## prompt's slip, or just below it where above would leave the room; and its slip under it.
+func place_notice() -> void:
 	var notice: Label = labels.notice
 	notice.position = NOTICE_AT[touch.visible] + (room - NATIVE) / 2.0
 	var prompt: Rect2 = talk_prompt.slip_rect() if talk_prompt.visible else Rect2()
@@ -598,9 +599,9 @@ func _place_notice() -> void:
 	if prompt.has_area() and slip.grow(1).intersects(prompt):
 		var above := prompt.position.y - 2 - slip.size.y
 		notice.position.y += (above if above >= 0 else prompt.end.y + 2) - slip.position.y
-	_notice_slip.position = notice_rect().position
-	_notice_slip.size = notice_rect().size
-	_notice_slip.visible = notice.visible
+	notice_slip.position = notice_rect().position
+	notice_slip.size = notice_rect().size
+	notice_slip.visible = notice.visible
 
 
 ## The season and year of `date`, as the core's calendar gives them, in the current locale.
@@ -738,11 +739,11 @@ func _build() -> void:
 	slip.bg_color = Palette.INK_2
 	slip.border_color = Palette.GOLD_3
 	slip.set_border_width_all(1)
-	_notice_slip.add_theme_stylebox_override("panel", slip)
-	_notice_slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_notice_slip.visible = false
-	add_child(_notice_slip)
-	move_child(_notice_slip, labels.notice.get_index())
+	notice_slip.add_theme_stylebox_override("panel", slip)
+	notice_slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	notice_slip.visible = false
+	add_child(notice_slip)
+	move_child(notice_slip, labels.notice.get_index())
 	# The touch controls, hidden until the touch layout is on, under the panels and screens but over
 	# the arts panel, beside which their arc stays live.
 	touch = preload("res://hud/touch.gd").new()

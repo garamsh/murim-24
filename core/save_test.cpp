@@ -150,6 +150,90 @@ std::vector<std::uint8_t> resealed(
   return bytes;
 }
 
+// The index in `payload` of the last byte it differs in from the payload of
+// the save `other`, both read back from their ends.
+std::size_t last_difference(const std::vector<std::uint8_t>& payload,
+                            const std::vector<std::uint8_t>& other) {
+  const auto from_end =
+      std::mismatch(
+          payload.rbegin(), payload.rend(),
+          other.rbegin() + static_cast<std::ptrdiff_t>(CHECKSUM_BYTES))
+          .first -
+      payload.rbegin();
+  return payload.size() - 1 - static_cast<std::size_t>(from_end);
+}
+
+// Two hostile people a cell apart after one tick, in which the one not
+// `struck` strikes `struck` dead and is struck by nothing that harms.
+World struck_dead(std::size_t struck) {
+  const Skill deadly{2 * CELL_SIZE, 0, 1, 0, 1'000};
+  const Skill harmless{2 * CELL_SIZE, 0, 0, 0, 1'000};
+  World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{
+           {0, 0}, {Recruit{{0, 0}, 1}}, 0, {struck == 1 ? deadly : harmless}},
+       ArmySpec{
+           {1, 0}, {Recruit{{1, 0}, 1}}, 1, {struck == 0 ? deadly : harmless}}},
+      {},
+      Rules{0, {{false, true}, {true, false}}, STAGE_FLOORS}};
+  world.tick();
+  return world;
+}
+
+constexpr std::uint32_t DAILY_QI = 10;
+
+// One person cultivating `DAILY_QI` a day, up to twice that, among `realms`,
+// after a day for each realm, days of one tick.
+World cultivated(const std::vector<Realm>& realms) {
+  const Life life{{{"sword", {1, 0}, {1, 0}}},
+                  1,
+                  std::nullopt,
+                  0,
+                  0,
+                  0,
+                  std::nullopt,
+                  std::nullopt,
+                  {},
+                  std::nullopt,
+                  std::nullopt,
+                  std::nullopt,
+                  Cultivation{{DAILY_QI, 0}, {2 * DAILY_QI, 0}, 0, 1},
+                  realms,
+                  {},
+                  Learning{},
+                  std::nullopt,
+                  std::nullopt};
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{{"....", "...."}},
+              {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{}}}},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  for (std::size_t day = 0; day < realms.size(); ++day) {
+    world.tick();
+  }
+  return world;
+}
+
+// The person and rank of `world`'s latest step of progress, when it gained a
+// realm.
+std::optional<std::pair<std::size_t, std::size_t>> latest_gain(
+    const World& world) {
+  if (world.progress().empty()) {
+    return std::nullopt;
+  }
+  const auto* gained = std::get_if<RealmGained>(&world.progress().back().what);
+  if (gained == nullptr) {
+    return std::nullopt;
+  }
+  return std::pair{gained->person, gained->rank};
+}
+
 TEST(Save, ALoadedRegionHashesAndTicksOnAsTheSavedOne) {
   const Saved saved = lived_region(REGION_SEED);
   ASSERT_GT(saved.world.date().year, YEARS);
@@ -211,6 +295,8 @@ TEST(Save, ALoadedRegionKeepsEveryonesQiAndArts) {
   }
 }
 
+// The header's layout is under test here, so its offsets are named in the
+// test.
 TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
   const World world{Seed{1},
                     Map{{"....", "...."}},
@@ -258,7 +344,9 @@ TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
 
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   // One structure no village holds and no plan laid: the payload ends with
-  // its plan, absent, as one flag byte.
+  // its plan, absent, as one flag byte. Only growth lays a planned structure,
+  // so no legal world differs from this one in that field alone, and the test
+  // reads it by its place in the encoding.
   const World world{Seed{1},
                     Map{{"....", "...."}},
                     {},
@@ -286,107 +374,70 @@ TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
 }
 
 TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
-  // Two hostile people strike each other dead on the first tick: the save
-  // keeps both deaths, then the souls, surnames, structures' villages and
-  // plans, each an empty list.
-  const Skill once{2 * CELL_SIZE, 0, 1, 0, 1'000};
-  World world{Seed{1},
-              Map{{"....", "...."}},
-              {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {once}},
-               ArmySpec{{1, 0}, {Recruit{{1, 0}, 1}}, 1, {once}}},
-              {},
-              Rules{0, {{false, true}, {true, false}}, STAGE_FLOORS}};
-  world.tick();
-  ASSERT_EQ(world.events().size(), 2U);
+  // One person strikes the other dead on the first tick: person 1 in one
+  // world and person 0 in the other, which differ in nothing the save holds
+  // after the death.
+  const World world = struck_dead(1);
+  ASSERT_EQ(world.events().size(), 1U);
+  ASSERT_EQ(struck_dead(0).events().size(), 1U);
   MemorySaves store;
-  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
-  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  ASSERT_TRUE(save(Saved{std::nullopt, struck_dead(0)}, store, SLOT));
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, OTHER_SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(OTHER_SLOT);
   std::array<std::uint8_t, HEADER_BYTES> header{};
   std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  // The last event's person, before four empty lists.
-  constexpr std::size_t EMPTY_LISTS = 4 * sizeof(std::uint64_t);
-  const std::size_t person =
-      payload.size() - EMPTY_LISTS - sizeof(std::uint64_t);
+  // The last payload byte the two saves differ in is the death's person.
+  const std::size_t person = last_difference(payload, store.bytes(SLOT));
   ASSERT_EQ(payload.at(person), 1);
-  // Control: resealing the same payload loads with its events.
-  store.bytes(SLOT) = resealed(header, payload);
-  const Saved restored = loaded(load(store, SLOT));
+  // Control: resealing the same payload loads with its event.
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, OTHER_SLOT));
   EXPECT_EQ(restored.world.hash(), world.hash());
-  EXPECT_EQ(restored.world.events().size(), 2U);
+  EXPECT_EQ(restored.world.events().size(), 1U);
   // The death now names a person the world never held.
   payload.at(person) = 2;
-  store.bytes(SLOT) = resealed(header, payload);
-  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, OTHER_SLOT)), LoadError::CORRUPTED);
 }
 
 TEST(Save, ASealedSaveNamingARealmNoProgressCanNameIsRefused) {
-  // One person cultivating 10 qi a day reaches the one realm, at 10, on the
-  // first day: the save keeps that step of progress, then the events, souls,
-  // surnames, structures' villages and plans, each an empty list.
-  constexpr std::uint32_t DAILY = 10;
-  const Life life{{{"sword", {1, 0}, {1, 0}}},
-                  1,
-                  std::nullopt,
-                  0,
-                  0,
-                  0,
-                  std::nullopt,
-                  std::nullopt,
-                  {},
-                  std::nullopt,
-                  std::nullopt,
-                  std::nullopt,
-                  Cultivation{{DAILY, 0}, {DAILY, 0}, 0, 1},
-                  {Realm{{"삼류", "Third-rate"}, DAILY, PER_MILLE}},
-                  {},
-                  Learning{},
-                  std::nullopt,
-                  std::nullopt};
-  Rules rules{0, {{false}}, STAGE_FLOORS};
-  rules.ticks_per_day = 1;
-  World world{Seed{1},
-              Map{{"....", "...."}},
-              {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{}}}},
-              {},
-              rules,
-              {},
-              {},
-              life};
-  world.tick();
+  // A person reaches its world's one realm, at 10, on the first day; another
+  // the second of two, at 20, on the second. The two differ in nothing the
+  // save holds after the latest step.
+  const Realm third{{"삼류", "Third-rate"}, DAILY_QI, PER_MILLE};
+  const Realm second{{"이류", "Second-rate"}, 2 * DAILY_QI, PER_MILLE};
+  const World world = cultivated({third});
+  const World further = cultivated({third, second});
+  using Gain = std::pair<std::size_t, std::size_t>;
   ASSERT_EQ(world.progress().size(), 1U);
-  ASSERT_TRUE(world.events().empty());
-  const auto* gained = std::get_if<RealmGained>(&world.progress().back().what);
-  ASSERT_NE(gained, nullptr);
-  ASSERT_EQ(gained->rank, 1U);
+  ASSERT_EQ(latest_gain(world), Gain(0, 1));
+  ASSERT_EQ(latest_gain(further), Gain(0, 2));
+  ASSERT_TRUE(world.events().empty() && further.events().empty());
   MemorySaves store;
-  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
-  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  ASSERT_TRUE(save(Saved{std::nullopt, further}, store, SLOT));
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, OTHER_SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(OTHER_SLOT);
   std::array<std::uint8_t, HEADER_BYTES> header{};
   std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  // The step's rank, before five empty lists.
-  constexpr std::size_t EMPTY_LISTS = 5 * sizeof(std::uint64_t);
-  const std::size_t rank = payload.size() - EMPTY_LISTS - sizeof(std::uint64_t);
+  // The last payload byte the two saves differ in is the latest step's rank.
+  const std::size_t rank = last_difference(payload, store.bytes(SLOT));
   ASSERT_EQ(payload.at(rank), 1);
   // Control: resealing the same payload loads with its step.
-  store.bytes(SLOT) = resealed(header, payload);
-  const Saved restored = loaded(load(store, SLOT));
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, OTHER_SLOT));
   EXPECT_EQ(restored.world.hash(), world.hash());
-  ASSERT_EQ(restored.world.progress().size(), 1U);
-  const auto* kept =
-      std::get_if<RealmGained>(&restored.world.progress().back().what);
-  ASSERT_NE(kept, nullptr);
-  EXPECT_EQ(kept->person, 0U);
-  EXPECT_EQ(kept->rank, 1U);
+  EXPECT_EQ(restored.world.progress().size(), 1U);
+  EXPECT_EQ(latest_gain(restored.world), Gain(0, 1));
   // The step now names a realm past the one the world holds.
   payload.at(rank) = 2;
-  store.bytes(SLOT) = resealed(header, payload);
-  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+  store.bytes(OTHER_SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, OTHER_SLOT)), LoadError::CORRUPTED);
 }
 
 TEST(Save, ALoadedRegionKeepsItsLessonsAndRealmsNoted) {
