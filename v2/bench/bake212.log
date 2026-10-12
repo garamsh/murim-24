@@ -1,0 +1,15 @@
+round 1 main start load 2.94 under 3.0, Now drawing from AC Power 11:32:23
+round 1 main exit 0 11:32:26
+round 1 head start load 2.95 under 3.0, Now drawing from AC Power 11:32:26
+round 1 head exit 0 11:32:30
+round 2 main start load 2.95 under 3.0, Now drawing from AC Power 11:32:30
+round 2 main exit 0 11:32:32
+round 2 head start load 2.95 under 3.0, Now drawing from AC Power 11:32:33
+round 2 head exit 0 11:32:35
+round 3 main start load 2.80 under 3.0, Now drawing from AC Power 11:32:45
+round 3 main exit 0 11:32:48
+round 3 head start load 2.80 under 3.0, Now drawing from AC Power 11:32:48
+round 3 head exit 0 11:32:51
+make bench start load 2.95 under 3.0, Now drawing from AC Power 11:33:01
+make bench exit 0 11:33:36
+series done 11:33:36
