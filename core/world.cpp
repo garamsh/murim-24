@@ -595,6 +595,34 @@ std::vector<std::optional<std::size_t>> claimed(
   return held;
 }
 
+// Folds the attack tokens' rules, when set, and what each engaged person
+// holds, so a world with neither keeps its hash.
+template <typename Fold>
+void fold_attacks(const Fold& fold, const std::optional<Tokens>& tokens,
+                  const Attacks& attacks) {
+  if (tokens) {
+    fold(tokens->by_rank.size());
+    for (const std::uint32_t granted : tokens->by_rank) {
+      fold(granted);
+    }
+    fold(tokens->circling);
+    fold(tokens->lease);
+  }
+  if (!attacks.any()) {
+    return;
+  }
+  for (const Engaged& each : attacks.engaged()) {
+    const Engagement& held = each.engagement;
+    fold(each.person);
+    fold(held.foe);
+    fold(static_cast<std::uint8_t>(held.ring));
+    fold(held.slot);
+    fold(held.token);
+    fold(held.waiting_since);
+    fold(held.token_since);
+  }
+}
+
 template <typename Fold>
 void fold_progress(const Fold& fold, const Progress& step) {
   fold(step.sequence);
@@ -932,14 +960,16 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       !reachable(rules_.talk_reach) || !reachable(rules_.sight) ||
       !reachable(rules_.map_sight) || rules_.people_capacity > PEOPLE_CEILING ||
       recruits > rules_.people_capacity ||
+      (rules_.tokens && !valid(*rules_.tokens)) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
         "separation, rumour and talk reach, sight, range and radius must lie "
         "in "
         "[0, MAX_REACH], hostility "
-        "must be square, the world must hold at most its rules' capacity of "
-        "people, itself at most PEOPLE_CEILING, each "
+        "must be square, attack tokens must be valid, the world must hold at "
+        "most its rules' capacity of people, itself at most PEOPLE_CEILING, "
+        "each "
         "with health up to MAX_HEALTH on a passable cell, every army must "
         "have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known "
         "faction, and every structure must cover 1 to MAX_FOOTPRINT cells "
@@ -968,6 +998,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   for (ArmySpec& army : armies) {
     enlist(army, paired.at(armies_.size()), families);
   }
+  attacks_ = Attacks{people_.size()};
   // Each family, one for every army the world starts with and every head of
   // a household, takes a surname.
   for (std::size_t family = 0;
@@ -1020,6 +1051,7 @@ void World::restore() {
       !reachable(rules_.rumour_reach) || !reachable(rules_.talk_reach) ||
       !reachable(rules_.sight) || !reachable(rules_.map_sight) ||
       rules_.people_capacity > PEOPLE_CEILING ||
+      (rules_.tokens && !valid(*rules_.tokens)) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
@@ -2460,6 +2492,7 @@ StateHash World::hash() const {
   for (const Progress& step : progress_.entries()) {
     fold_progress(fold, step);
   }
+  fold_attacks(fold, rules_.tokens, attacks_);
   return StateHash{digest};
 }
 

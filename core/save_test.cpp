@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
@@ -837,6 +838,87 @@ TEST(Save, ASealedSaveCastingAtAPersonTheWorldLacksIsRefused) {
   payload.at(person) = 2;
   store.bytes(OTHER_SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, OTHER_SLOT)), LoadError::CORRUPTED);
+}
+
+// Two hostile people a cell apart, with attack tokens by `tokens` or none.
+World tokened(std::optional<Tokens> tokens) {
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.tokens = std::move(tokens);
+  return World{Seed{1},
+               Map{{"....", "...."}},
+               {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{}}},
+                ArmySpec{{1, 0}, {Recruit{{1, 0}, 1}}, 1, {Skill{}}}},
+               {},
+               rules};
+}
+
+TEST(Save, ALoadedWorldKeepsItsAttackTokens) {
+  const Tokens region{{2, 2, 3, 3, 4, 4, 6}, 30, 90};
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, tokened(region)}, store, SLOT));
+  EXPECT_EQ(loaded(load(store, SLOT)).world.hash(), tokened(region).hash());
+  // Control: tokens are folded into the hash, so their loss would show, and
+  // a world without them hashes as before they existed.
+  EXPECT_NE(tokened(region).hash(), tokened(std::nullopt).hash());
+  Tokens leased = region;
+  leased.lease = 0;
+  EXPECT_NE(tokened(region).hash(), tokened(leased).hash());
+}
+
+// A save of `bytes`' soulless world holding, in place of its empty list of
+// engaged people, the one engaged person `entry` encodes. The payload ends
+// with that list, then the empty list of charts.
+std::vector<std::uint8_t> engaging(const std::vector<std::uint8_t>& bytes,
+                                   const std::vector<std::uint8_t>& entry) {
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(bytes.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      bytes.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      bytes.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  payload.resize(payload.size() - sizeof(std::uint64_t));
+  write_last_u64(payload, 1);
+  payload.insert(payload.end(), entry.begin(), entry.end());
+  payload.resize(payload.size() + sizeof(std::uint64_t), 0);
+  return resealed(header, payload);
+}
+
+// An engaged person's entry as a save encodes it: person, foe, ring, slot,
+// token, and the ticks it began to wait and took the token.
+std::vector<std::uint8_t> entry(std::uint64_t person, std::uint64_t foe,
+                                std::uint8_t ring) {
+  std::vector<std::uint8_t> bytes;
+  for (const std::uint64_t value : {person, foe}) {
+    for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+      bytes.push_back(static_cast<std::uint8_t>(value >> (byte * BYTE_BITS)));
+    }
+  }
+  bytes.insert(bytes.end(), {ring, 0, 1});
+  bytes.resize(bytes.size() + 2 * sizeof(std::uint32_t), 0);
+  return bytes;
+}
+
+// The engaged people's encoding is under test here: no world engages anyone
+// yet, so the test writes an entry in place of the save's empty list.
+TEST(Save, AnEngagedPersonLoadsAndSavesAgainAsItWasWritten) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, tokened(std::nullopt)}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  constexpr std::uint8_t NEAR_RING = 0;
+  store.bytes(SLOT) = engaging(intact, entry(0, 1, NEAR_RING));
+  const std::vector<std::uint8_t> written = store.bytes(SLOT);
+  const Saved restored = loaded(load(store, SLOT));
+  // The engagement is held: it is folded into the hash, and saved again as
+  // it was written.
+  EXPECT_NE(restored.world.hash(), tokened(std::nullopt).hash());
+  ASSERT_TRUE(save(restored, store, OTHER_SLOT));
+  EXPECT_EQ(store.bytes(OTHER_SLOT), written);
+
+  // A foe the world never held, and a ring past the three, are refused.
+  constexpr std::uint8_t NO_RING = RING_KINDS;
+  store.bytes(SLOT) = engaging(intact, entry(0, 2, NEAR_RING));
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+  store.bytes(SLOT) = engaging(intact, entry(0, 1, NO_RING));
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
 }  // namespace

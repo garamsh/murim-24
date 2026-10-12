@@ -11,6 +11,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `limits` the bounds a world accepts;
   - `calendar` the days, seasons and years;
   - `skill` skills, strikes, casts and their refusals;
+  - `attack` each person's attack slot and token against the foe it engages, each foe's slots and tokens taken, and the token table's rules (ADR 0068), saved and hashed only when set or held;
   - `talent` talent and its draws, and souls;
   - `chart` the cells and villages a soul remembers;
   - `names` names;
@@ -320,7 +321,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **NPC leaders.** One daily rule moves a policy a step at most after a year's term, from food per head, the treasury, threat, discontent and war, around defaults its character sets.
   - **Open for the PM.** Roads have no rule that builds or keeps them, so no spending priority funds them.
 - **Personal favor.** ADR 0060 (`adr/0060-keep-each-persons-favor-toward-the-few-it-deals-with-often-beside-its-groups-standing.md`), proposed; nothing above changes until the pull requests that build it land. Each person holds favor toward at most 8 others, kin and those it deals with often, changed by deeds felt first-hand. A person's own conduct follows its favor where it holds one, and its groups' standing otherwise.
-- **Attack slots and tokens.** ADR 0068 (`adr/0068-surround-a-foe-from-attack-slots-and-let-only-its-token-holders-strike-it.md`), proposed; nothing above changes until the pull requests that build it land.
+- **Attack slots and tokens.** ADR 0068 (`adr/0068-surround-a-foe-from-attack-slots-and-let-only-its-token-holders-strike-it.md`), proposed. Its first step, the state and the rules data, is the `attack` unit above, and no one engages yet: the rest waits for the pull requests that build steps 2 to 4.
   - **Slots.** People engaging a foe close on slots on a ring around it, sized by their reach and spaced by the separation, assigned by distance then index and kept while held, in place of closing on the foe itself as above.
   - **Tokens.** Only a holder of one of the foe's tokens, by its realm rank as rules data, may aim a use at it, which limits the automatic strike above. The steered person attacking is exempt and takes a token ahead of any queue. The rest circle a waiting ring outside reach, and people engaging on their own prefer a foe with a free token.
   - **Freeing.** Slots and tokens free on death, a new foe, an intent's end, a leap or flight, and after a lease while others wait.
