@@ -5,7 +5,7 @@
 #   each village as last seen, a village whose residents were gone when seen in stone.
 # - today_<run>_<locale>.png: the HUD's map as main draws it today, the live world, for comparison.
 # - window_<run>_<locale>.png: the map window N opens, the same image at the largest whole multiple
-#   at which the whole map fits the panel, with the player's place, the season, and a legend.
+#   at which the whole map and its legend fit the HUD's room, in a frame sized to them, with the player's place, the season, and a legend.
 # On a touch screen only the minimap is drawn: the window's touch button is deferred (scope,
 # 2026-10-09).
 # What was seen is computed here, for the mockup only, as the ADR has the core do it: a disc of
@@ -26,6 +26,8 @@ const TICKS_PER_DAY := 5
 const DAYS_PER_YEAR := 120
 const MAP_SIGHT := 15
 const CLAIM := 16
+# The least gap between the map window's frame and the HUD room's edge.
+const FRAME_INSET := 12
 const JOURNEY := 3
 const ARRIVED := 3
 const LOCALES := ["ko", "en"]
@@ -64,6 +66,8 @@ class MapWindow extends "res://hud/panel.gd":
 	var words := {}
 	var factions: Array = []
 	var season := ""
+	## The HUD's room, in this control's pixels, that the frame is centred in.
+	var room_rect := Rect2()
 
 	func _draw() -> void:
 		if map == null:
@@ -73,7 +77,7 @@ class MapWindow extends "res://hud/panel.gd":
 		var size := Vector2(map.get_size()) * scale_by
 		frame = Rect2(Vector2.ZERO, Vector2(size.x + LEGEND_WIDTH + 3 * MARGIN, size.y + 2 * MARGIN + 42))
 		frame.size.x = maxf(frame.size.x, _width(words.KEYS) + 24)
-		frame.position = ((SCREEN - frame.size) / 2.0).floor()
+		frame.position = (room_rect.position + (room_rect.size - frame.size) / 2.0).floor()
 		_dialog(frame, words.MAP, words.CLOSE, words.KEYS)
 		var MAP_AT := frame.position + Vector2(MARGIN, 20 + MARGIN)
 		var LEGEND_X := MAP_AT.x + size.x + MARGIN * 2
@@ -302,9 +306,13 @@ func _process(_delta: float) -> bool:
 			var room: Vector2 = hud.room
 			_window.position = Vector2(floorf((room.x - _window.SCREEN.x) / 2.0), floorf((room.y - _window.SCREEN.y) / 2.0))
 			_window.map = hud.map_texture
-			var fits := floori(minf((_window.PANEL.size.x - _window.LEGEND_WIDTH - 3 * _window.MARGIN) / hud.map_texture.get_width(),
-					(_window.PANEL.size.y - 2 * _window.MARGIN - 42) / hud.map_texture.get_height()))
+			# The room left for the map once the frame's margins, title, foot and legend are taken.
+			_window.room_rect = Rect2(-_window.position, room)
+			var fits := floori(minf((room.x - 2 * FRAME_INSET - _window.LEGEND_WIDTH - 3 * _window.MARGIN) / hud.map_texture.get_width(),
+					(room.y - 2 * FRAME_INSET - 2 * _window.MARGIN - 42) / hud.map_texture.get_height()))
 			_window.scale_by = maxi(fits, 1)
+			print("map_mockup: %s, a HUD of %s at %dx, draws the map at %dx: %d screen pixels a cell" % [
+					shot.run.name, room, hud.transform.get_scale().x, _window.scale_by, _window.scale_by * int(hud.transform.get_scale().x)])
 			_window.player = Vector2(_body())
 			_window.season = hud.labels.season.text
 			_window.words = {}
@@ -312,7 +320,7 @@ func _process(_delta: float) -> bool:
 				_window.words[key] = _word(key)
 			_window.factions = []
 			for faction in _world.faction_names().size():
-				_window.factions.append({"name": tr(_world.faction_names()[faction]),
+				_window.factions.append({"name": Affiliation.faction_name(_world, faction),
 						"colour": Palette.ACCENTS[Affiliation.sprite(_world, faction)]})
 			_window.visible = shot.view == "window"
 			_window.queue_redraw()
