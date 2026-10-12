@@ -430,10 +430,12 @@ func _place() -> void:
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
 
 
-## Names the people of `people` in `world` as nameplates.gd names them, `selected` and `hovered`
+## Names the people of `people` in `world`, whose heads `to_hud` takes to the HUD's pixels, as
+## nameplates.gd names them, `selected` and `hovered`
 ## first and marked, clear of every panel shown, the shortcut rail, the purse, and the talk prompt's
 ## slip.
-func show_names(world: WorldAdapter, people: Array[Dictionary], selected := -1, hovered := -1) -> void:
+func show_names(world: WorldAdapter, people: Dictionary, selected := -1, hovered := -1,
+		to_hud := Transform2D.IDENTITY) -> void:
 	var clear: Array[Rect2] = [purse.strip_rect()]
 	if purse.belt:
 		clear.append(purse.belt_rect())
@@ -444,7 +446,7 @@ func show_names(world: WorldAdapter, people: Array[Dictionary], selected := -1, 
 			clear.append((child as Control).get_rect())
 	if shortcuts.visible:
 		clear.append(shortcuts.rect())
-	nameplates.show_names(world, people, clear, selected, hovered)
+	nameplates.show_names(world, people, clear, selected, hovered, to_hud)
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress

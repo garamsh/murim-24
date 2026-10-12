@@ -770,6 +770,77 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::strikes() const {
   return strikes;
 }
 
+godot::Dictionary WorldAdapter::snapshot() const {
+  const murim::World& now = world();
+  godot::PackedInt64Array first;
+  godot::PackedInt64Array persons;
+  godot::PackedVector2Array positions;
+  godot::PackedInt64Array healths;
+  godot::PackedInt64Array ready;
+  godot::PackedInt64Array factions;
+  for (std::size_t army = 0; army < now.army_count(); ++army) {
+    first.push_back(persons.size());
+    factions.push_back(static_cast<std::int64_t>(now.faction(army)));
+    for (const std::size_t member : now.roster(army)) {
+      const murim::Person& person = now.person(member);
+      persons.push_back(static_cast<std::int64_t>(member));
+      positions.push_back(vector(person.position));
+      healths.push_back(static_cast<std::int64_t>(person.health));
+      ready.push_back(static_cast<std::int64_t>(person.ready_at));
+    }
+  }
+  first.push_back(persons.size());
+  godot::PackedInt64Array stages;
+  for (std::size_t structure = 0; structure < now.structure_count();
+       ++structure) {
+    stages.push_back(static_cast<std::int64_t>(now.stage(structure)));
+  }
+  godot::PackedInt64Array strike_person;
+  godot::PackedInt64Array strike_shape;
+  godot::PackedInt64Array strike_range;
+  godot::PackedInt64Array strike_radius;
+  godot::PackedInt64Array strike_body_damage;
+  godot::PackedVector2Array strike_origin;
+  godot::PackedVector2Array strike_toward;
+  godot::PackedVector2Array strike_end;
+  godot::PackedInt64Array strike_first;
+  godot::PackedInt64Array struck;
+  for (const murim::Strike& strike : now.strikes()) {
+    strike_person.push_back(static_cast<std::int64_t>(strike.person));
+    strike_shape.push_back(static_cast<std::int64_t>(strike.shape));
+    strike_range.push_back(strike.range);
+    strike_radius.push_back(strike.radius);
+    strike_body_damage.push_back(static_cast<std::int64_t>(strike.body_damage));
+    strike_origin.push_back(vector(strike.origin));
+    strike_toward.push_back(vector(strike.toward));
+    strike_end.push_back(vector(strike.end));
+    strike_first.push_back(struck.size());
+    for (const std::size_t person : strike.struck) {
+      struck.push_back(static_cast<std::int64_t>(person));
+    }
+  }
+  strike_first.push_back(struck.size());
+  godot::Dictionary read;
+  read.set("first", first);
+  read.set("person", persons);
+  read.set("position", positions);
+  read.set("health", healths);
+  read.set("ready", ready);
+  read.set("faction", factions);
+  read.set("stage", stages);
+  read.set("strike_person", strike_person);
+  read.set("strike_shape", strike_shape);
+  read.set("strike_range", strike_range);
+  read.set("strike_radius", strike_radius);
+  read.set("strike_body_damage", strike_body_damage);
+  read.set("strike_origin", strike_origin);
+  read.set("strike_toward", strike_toward);
+  read.set("strike_end", strike_end);
+  read.set("strike_first", strike_first);
+  read.set("struck", struck);
+  return read;
+}
+
 std::int64_t WorldAdapter::structure_field_state(std::int64_t structure) const {
   const std::optional<murim::FieldState> state =
       world().field_state(structure_index(structure));
@@ -1697,6 +1768,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::skills);
   godot::ClassDB::bind_method(godot::D_METHOD("strikes"),
                               &WorldAdapter::strikes);
+  godot::ClassDB::bind_method(godot::D_METHOD("snapshot"),
+                              &WorldAdapter::snapshot);
   godot::ClassDB::bind_method(godot::D_METHOD("structure_stage", "structure"),
                               &WorldAdapter::structure_stage);
   godot::ClassDB::bind_method(

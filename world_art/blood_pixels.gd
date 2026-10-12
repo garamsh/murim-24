@@ -36,6 +36,10 @@ var _written := 0
 func rebuild(combat: Combat) -> void:
 	_set_up()
 	var fallen := combat.spray_pixels_thrown if sprays else combat.drops_fallen
+	# A ring begun again, as a world loaded begins it, shows none of what it held.
+	if fallen < _written:
+		_written = 0
+		multimesh.visible_instance_count = 0
 	if fallen == _written:
 		return
 	var most := _most()

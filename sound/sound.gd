@@ -124,14 +124,15 @@ func show_world(shown: WorldAdapter, to_screen: Callable) -> void:
 	_stages.clear()
 	_seen.fill(-2)
 	_next_event = 0
-	_read(false)
+	_read(false, shown.snapshot())
 
 
-## Hears what the tick just run changed.
-func note_tick() -> void:
+## Hears what the tick just run changed, from `snapshot`, the world as the tick left it (read here
+## when empty).
+func note_tick(snapshot := {}) -> void:
 	_tick += 1
 	_started.fill(0)
-	_read(true)
+	_read(true, snapshot if not snapshot.is_empty() else _world.snapshot())
 
 
 ## Hears an event of kind `kind`, one of Heard, at `at` in pixels: starts a voice for it when it
@@ -200,9 +201,9 @@ func advance(delta: float) -> void:
 			_music.play()
 
 
-# Reads the events, bodies and structures, hearing what happened since the last read when
-# `listen` is set.
-func _read(listen: bool) -> void:
+# Reads the events, and the bodies and structures `snapshot` holds, hearing what happened since the
+# last read when `listen` is set.
+func _read(listen: bool, snapshot: Dictionary) -> void:
 	for event: Dictionary in _world.events(_next_event):
 		_next_event = event.sequence + 1
 		var at: Vector2 = _to_screen.call((Vector2(event.cell) + Vector2.ONE / 2.0) * WorldAdapter.CELL_SIZE)
@@ -210,26 +211,25 @@ func _read(listen: bool) -> void:
 			hear(Heard.FALL, at)
 		elif listen and event.kind == WorldAdapter.EVENT_RAIDED:
 			hear(Heard.BELL, at)
-	for army in _world.army_count():
-		var roster := _world.roster(army)
-		var healths := _world.body_strengths(army)
-		var ready := _world.body_ready(army)
-		var positions := _world.body_positions(army)
-		for body in roster.size():
-			var person := roster[body]
-			if person >= _seen.size():
-				_grow(person + 1)
-			var at: Vector2 = _to_screen.call(positions[body])
-			if listen and _seen[person] == _tick - 1:
-				if ready[body] != _ready_at[person]:
-					hear(Heard.STRIKE, at)
-				if healths[body] < _health[person]:
-					hear(Heard.HIT, at)
-			_seen[person] = _tick
-			_health[person] = healths[body]
-			_ready_at[person] = ready[body]
-	for structure in _world.structure_count():
-		var stage := _world.structure_stage(structure)
+	var persons: PackedInt64Array = snapshot.person
+	var healths: PackedInt64Array = snapshot.health
+	var ready: PackedInt64Array = snapshot.ready
+	var positions: PackedVector2Array = snapshot.position
+	for body in persons.size():
+		var person := persons[body]
+		if person >= _seen.size():
+			_grow(person + 1)
+		if listen and _seen[person] == _tick - 1:
+			if ready[body] != _ready_at[person]:
+				hear(Heard.STRIKE, _to_screen.call(positions[body]))
+			if healths[body] < _health[person]:
+				hear(Heard.HIT, _to_screen.call(positions[body]))
+		_seen[person] = _tick
+		_health[person] = healths[body]
+		_ready_at[person] = ready[body]
+	var stages: PackedInt64Array = snapshot.stage
+	for structure in stages.size():
+		var stage := stages[structure]
 		if structure == _stages.size():
 			_stages.append(stage)
 		elif stage != _stages[structure]:

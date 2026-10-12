@@ -300,6 +300,19 @@ class WorldAdapter : public godot::RefCounted {
   /// sub-cell units, and the people it hit, `struck` (PackedInt64Array).
   [[nodiscard]] godot::TypedArray<godot::Dictionary> strikes() const;
 
+  /// Returns what a view reads of the world after a tick, in one read of
+  /// packed arrays: every living body in army order, `first` giving where
+  /// each army's bodies start in them and, last, how many there are;
+  /// each body's `person`, `position` in sub-cell units, `health` and
+  /// `ready`, as roster(), body_positions(), body_strengths() and
+  /// body_ready() give them; each army's `faction`; each structure's
+  /// `stage`; and the last tick's uses of skills as strikes() gives them,
+  /// one entry each in `strike_person`, `strike_shape`, `strike_range`,
+  /// `strike_radius`, `strike_body_damage`, `strike_origin`,
+  /// `strike_toward` and `strike_end`, the people each struck in `struck`
+  /// from `strike_first` on, which has one entry more than the strikes.
+  [[nodiscard]] godot::Dictionary snapshot() const;
+
   /// Returns the stage structure `structure` is in, one of the STAGE_*
   /// constants.
   [[nodiscard]] std::int64_t structure_stage(std::int64_t structure) const;
