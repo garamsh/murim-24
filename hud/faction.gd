@@ -214,7 +214,7 @@ func key(event: InputEventKey) -> String:
 ## for a faction tapped, or "" for nothing.
 func tap(at: Vector2) -> String:
 	if confirming >= 0:
-		var buttons := _confirm_buttons(TOUCH_CONFIRM)
+		var buttons := confirm_button_rects(TOUCH_CONFIRM)
 		if buttons[0].has_point(at):
 			return "yes"
 		if buttons[1].has_point(at):
@@ -223,14 +223,14 @@ func tap(at: Vector2) -> String:
 	if _close_hit(PANEL, tr("FACTION_CLOSE_TOUCH"), at):
 		return "close"
 	for n in range(1, rows.size()):
-		if _touch_row(n).has_point(at):
+		if touch_row_rect(n).has_point(at):
 			chosen = n
 			verdict = ""
 			_compose()
 			return "choose"
 	if leads:
 		for n in orders.size():
-			if _order_button(n).has_point(at):
+			if order_button_rect(n).has_point(at):
 				order = n
 				queue_redraw()
 				return "order"
@@ -355,7 +355,7 @@ func _draw_touch() -> void:
 	_draw_own(Vector2(TOUCH_ROWS.position.x + 6, OWN_Y))
 	for n in rows.size():
 		var row: Dictionary = rows[n]
-		var rect := _touch_row(n)
+		var rect := touch_row_rect(n)
 		draw_rect(rect, Palette.GOLD_3 if n == chosen else Palette.INK_5)
 		draw_rect(rect.grow(-1), Palette.INK_4 if n == chosen else Palette.INK_2)
 		if n == chosen:
@@ -379,7 +379,7 @@ func _draw_touch() -> void:
 			var refusal: int = orders[n].refusal
 			if refusal != WorldAdapter.DECLARE_NONE and n == order:
 				_wrapped(Vector2(d.position.x, TOUCH_BUTTONS_Y - 18), tr(REFUSAL_KEYS[refusal]), d.size.x, Palette.STONE_3)
-			_touch_button(_order_button(n), tr(ORDER_KEYS[orders[n].what]), refusal == WorldAdapter.DECLARE_NONE,
+			_touch_button(order_button_rect(n), tr(ORDER_KEYS[orders[n].what]), refusal == WorldAdapter.DECLARE_NONE,
 					n == order)
 	else:
 		y = _wrapped(Vector2(d.position.x, y + 6), tr("FACTION_LEADER_ONLY"), d.size.x, Palette.STONE_3)
@@ -416,7 +416,7 @@ func _draw_confirm() -> void:
 	var y := _wrapped(rect.position + Vector2(12, 28), tr("FACTION_CONFIRM_LINE") % row.name, rect.size.x - 24, Palette.PAPER_6)
 	var then := "FACTION_CONFIRM_ALLY" if row.relation == WorldAdapter.RELATION_ALLY else "FACTION_CONFIRM_WAR"
 	_wrapped(Vector2(rect.position.x + 12, y + 2), tr(then), rect.size.x - 24, Palette.STONE_4)
-	var buttons := _confirm_buttons(rect)
+	var buttons := confirm_button_rects(rect)
 	if touch_layout:
 		_touch_button(buttons[0], tr("FACTION_CONFIRM_YES_TOUCH"), true, true, true)
 		_touch_button(buttons[1], tr("FACTION_CONFIRM_NO_TOUCH"), true, false)
@@ -425,8 +425,8 @@ func _draw_confirm() -> void:
 		_order_slip(buttons[1], tr("FACTION_CONFIRM_NO"), true, false)
 
 
-# The confirmation's buttons in `rect`, yes then no.
-func _confirm_buttons(rect: Rect2) -> Array[Rect2]:
+## Returns the confirmation's buttons in `rect`, yes then no, in the HUD's pixels.
+func confirm_button_rects(rect: Rect2) -> Array[Rect2]:
 	if rect == TOUCH_CONFIRM:
 		var w := (rect.size.x - 36) / 2.0
 		var y := rect.end.y - 12 - TOUCH_BUTTON
@@ -436,11 +436,13 @@ func _confirm_buttons(rect: Rect2) -> Array[Rect2]:
 			Rect2(rect.end.x - 18 - ORDER_WIDTH, by, ORDER_WIDTH, SLIP_HEIGHT)]
 
 
-func _touch_row(n: int) -> Rect2:
+## Returns faction row `n` on a touch screen, in the HUD's pixels.
+func touch_row_rect(n: int) -> Rect2:
 	return Rect2(TOUCH_ROWS.position.x, TOUCH_ROWS.position.y + n * TOUCH_ROW, TOUCH_ROWS.size.x, TOUCH_BUTTON)
 
 
-func _order_button(n: int) -> Rect2:
+## Returns the leader's order button `n` on a touch screen, in the HUD's pixels.
+func order_button_rect(n: int) -> Rect2:
 	var w := (TOUCH_DETAIL.size.x - 8) / 2.0
 	return Rect2(TOUCH_DETAIL.position.x + n * (w + 8), TOUCH_BUTTONS_Y, w, TOUCH_BUTTON)
 

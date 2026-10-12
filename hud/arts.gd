@@ -195,7 +195,7 @@ func clear_selected() -> bool:
 ## Chooses the skill whose tile is at `at`, on a touch screen. Returns whether a tile of a skill
 ## the person has was there.
 func tap(at: Vector2) -> bool:
-	for tile: Dictionary in _tiles():
+	for tile: Dictionary in tiles():
 		if tile.rect.has_point(at) and tile.skill.known:
 			selected = tile.skill.held
 			_compose()
@@ -362,19 +362,20 @@ func _keep_in_view() -> void:
 				_first_row = at - LIST_ROWS + 1
 
 
-# The tiles shown on a touch screen, each a Dictionary of its `rect`, its `skill` and its `group`.
-func _tiles() -> Array[Dictionary]:
-	var tiles: Array[Dictionary] = []
+## Returns the tiles shown on a touch screen, each a Dictionary of its `rect`, in the HUD's pixels,
+## its `skill` and its `group`.
+func tiles() -> Array[Dictionary]:
+	var shown_tiles: Array[Dictionary] = []
 	if not touch_layout:
-		return tiles
+		return shown_tiles
 	var groups: Array = shown.get("groups", [])
 	for n in mini(GROUPS_SHOWN, groups.size() - _first_group):
 		var group: Dictionary = groups[_first_group + n]
 		var top := GROUPS_TOP + n * GROUP_STEP + 14
 		for s in group.skills.size():
-			tiles.append({"rect": Rect2(GROUPS_LEFT + s * (TILE + TILE_GAP), top, TILE, TILE),
+			shown_tiles.append({"rect": Rect2(GROUPS_LEFT + s * (TILE + TILE_GAP), top, TILE, TILE),
 					"skill": group.skills[s], "group": group})
-	return tiles
+	return shown_tiles
 
 
 func _draw() -> void:
@@ -491,7 +492,7 @@ func _draw_touch() -> void:
 		var hx := GROUPS_LEFT + _width(name) + 4
 		for tag: Dictionary in group.tags:
 			hx += _tag_at(Vector2(hx, gy + 1), tag.text, tag.fill) + 3
-	for tile: Dictionary in _tiles():
+	for tile: Dictionary in tiles():
 		var skill: Dictionary = tile.skill
 		var rect: Rect2 = tile.rect
 		_tile(rect, skill.icon, skill.held == selected, loadout.slot_of(skill.held) >= 0, not skill.known)

@@ -109,7 +109,7 @@ func run() -> bool:
 	var lacking := Vector2.ZERO
 	var having := Vector2.ZERO
 	var had := {}
-	for tile: Dictionary in panel._tiles():
+	for tile: Dictionary in panel.tiles():
 		if not tile.skill.known and lacking == Vector2.ZERO:
 			lacking = tile.rect.get_center()
 		if tile.skill.known and having == Vector2.ZERO:
