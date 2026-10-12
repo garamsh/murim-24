@@ -37,6 +37,10 @@ TEST(Tokens, ATableIsValidWithARowForNoRealmAndHoldsWithinBounds) {
   // The bounds themselves are accepted.
   const Tokens widest{{MAX_TOKENS}, MAX_HOLD_TICKS, MAX_HOLD_TICKS};
   EXPECT_TRUE(valid(widest));
+  // No table is no limit, and a table given is checked.
+  EXPECT_TRUE(valid(std::optional<Tokens>{}));
+  EXPECT_TRUE(valid(std::optional<Tokens>{region}));
+  EXPECT_FALSE(valid(std::optional<Tokens>{refused}));
 }
 
 TEST(Attacks, AnEngagedPersonHoldsItsSlotAndTokenUntilReleased) {
@@ -49,14 +53,14 @@ TEST(Attacks, AnEngagedPersonHoldsItsSlotAndTokenUntilReleased) {
   constexpr std::uint32_t TOKEN_SINCE = 70;
   attacks.engage(
       0, Engagement{FOE, Ring::LONG, SLOT, true, WAITING_SINCE, TOKEN_SINCE});
-  const std::optional<Engagement> held = attacks.engagement(0);
-  ASSERT_TRUE(held.has_value());
-  EXPECT_EQ(held->foe, FOE);
-  EXPECT_EQ(held->ring, Ring::LONG);
-  EXPECT_EQ(held->slot, SLOT);
-  EXPECT_TRUE(held->token);
-  EXPECT_EQ(held->waiting_since, WAITING_SINCE);
-  EXPECT_EQ(held->token_since, TOKEN_SINCE);
+  ASSERT_TRUE(attacks.engagement(0).has_value());
+  const Engagement held = attacks.engagement(0).value_or(Engagement{});
+  EXPECT_EQ(held.foe, FOE);
+  EXPECT_EQ(held.ring, Ring::LONG);
+  EXPECT_EQ(held.slot, SLOT);
+  EXPECT_TRUE(held.token);
+  EXPECT_EQ(held.waiting_since, WAITING_SINCE);
+  EXPECT_EQ(held.token_since, TOKEN_SINCE);
   EXPECT_TRUE(attacks.any());
   EXPECT_TRUE(attacks.taken(FOE, Ring::LONG, SLOT));
   // Control: the same slot on the other rings, and the next on this one,
@@ -79,7 +83,7 @@ TEST(Attacks, GrowingKeepsWhatEveryoneHolds) {
   attacks.engage(0, Engagement{FOE, Ring::NEAR, 1, true, 0, 0});
   attacks.grow_to(2 * PEOPLE);
   EXPECT_EQ(attacks.people(), 2 * PEOPLE);
-  EXPECT_EQ(attacks.engagement(0)->slot, 1);
+  EXPECT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, 1);
   EXPECT_EQ(attacks.tokens_held(FOE), 1U);
   // A person past the old room engages once there is room for it.
   attacks.engage(PEOPLE, Engagement{FOE, Ring::NEAR, 2, true, 0, 0});
@@ -104,11 +108,11 @@ TEST(Attacks, ASavedEngagementIsRefusedWhenNoWorldCouldHoldIt) {
                                   on(1, Ring::NEAR, 1, true),
                                   on(2, Ring::WAITING, 0, false)};
   // Control: the intact entries give back the same engagements.
-  const std::optional<Attacks> intact = Attacks::of(PEOPLE, kept);
-  ASSERT_TRUE(intact.has_value());
-  EXPECT_EQ(intact->engaged().size(), kept.size());
-  EXPECT_EQ(intact->tokens_held(FOE), 2U);
-  EXPECT_TRUE(intact->taken(FOE, Ring::WAITING, 0));
+  ASSERT_TRUE(Attacks::of(PEOPLE, kept).has_value());
+  const Attacks intact = Attacks::of(PEOPLE, kept).value_or(Attacks{PEOPLE});
+  EXPECT_EQ(intact.engaged().size(), kept.size());
+  EXPECT_EQ(intact.tokens_held(FOE), 2U);
+  EXPECT_TRUE(intact.taken(FOE, Ring::WAITING, 0));
 
   const std::vector<std::vector<Engaged>> refused{
       // A person past the people.

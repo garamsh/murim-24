@@ -25,6 +25,10 @@ bool valid(const Tokens& tokens) {
          tokens.circling <= MAX_HOLD_TICKS && tokens.lease <= MAX_HOLD_TICKS;
 }
 
+bool valid(const std::optional<Tokens>& tokens) {
+  return !tokens || valid(*tokens);
+}
+
 Attacks::Attacks(std::size_t people) { grow_to(people); }
 
 std::optional<Attacks> Attacks::of(std::size_t people,

@@ -882,18 +882,24 @@ std::vector<std::uint8_t> engaging(const std::vector<std::uint8_t>& bytes,
   return resealed(header, payload);
 }
 
-// An engaged person's entry as a save encodes it: person, foe, ring, slot,
-// token, and the ticks it began to wait and took the token.
-std::vector<std::uint8_t> entry(std::uint64_t person, std::uint64_t foe,
-                                std::uint8_t ring) {
+// An engaged person as a save encodes it, its ring as a raw tag.
+struct Entry {
+  std::uint64_t person = 0;
+  std::uint64_t foe = 0;
+  std::uint8_t ring = 0;
+};
+
+// `entry`'s bytes: person, foe, ring, slot 0, a token, and 0 for the ticks it
+// began to wait and took the token.
+std::vector<std::uint8_t> encoded(const Entry& entry) {
   std::vector<std::uint8_t> bytes;
-  for (const std::uint64_t value : {person, foe}) {
+  for (const std::uint64_t value : {entry.person, entry.foe}) {
     for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
       bytes.push_back(static_cast<std::uint8_t>(value >> (byte * BYTE_BITS)));
     }
   }
-  bytes.insert(bytes.end(), {ring, 0, 1});
-  bytes.resize(bytes.size() + 2 * sizeof(std::uint32_t), 0);
+  bytes.insert(bytes.end(), {entry.ring, 0, 1});
+  bytes.resize(bytes.size() + (2 * sizeof(std::uint32_t)), 0);
   return bytes;
 }
 
@@ -904,7 +910,7 @@ TEST(Save, AnEngagedPersonLoadsAndSavesAgainAsItWasWritten) {
   ASSERT_TRUE(save(Saved{std::nullopt, tokened(std::nullopt)}, store, SLOT));
   const std::vector<std::uint8_t> intact = store.bytes(SLOT);
   constexpr std::uint8_t NEAR_RING = 0;
-  store.bytes(SLOT) = engaging(intact, entry(0, 1, NEAR_RING));
+  store.bytes(SLOT) = engaging(intact, encoded({0, 1, NEAR_RING}));
   const std::vector<std::uint8_t> written = store.bytes(SLOT);
   const Saved restored = loaded(load(store, SLOT));
   // The engagement is held: it is folded into the hash, and saved again as
@@ -915,9 +921,9 @@ TEST(Save, AnEngagedPersonLoadsAndSavesAgainAsItWasWritten) {
 
   // A foe the world never held, and a ring past the three, are refused.
   constexpr std::uint8_t NO_RING = RING_KINDS;
-  store.bytes(SLOT) = engaging(intact, entry(0, 2, NEAR_RING));
+  store.bytes(SLOT) = engaging(intact, encoded({0, 2, NEAR_RING}));
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
-  store.bytes(SLOT) = engaging(intact, entry(0, 1, NO_RING));
+  store.bytes(SLOT) = engaging(intact, encoded({0, 1, NO_RING}));
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 

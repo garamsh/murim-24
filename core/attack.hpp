@@ -34,6 +34,9 @@ struct Tokens {
 /// circling period and lease within MAX_HOLD_TICKS.
 [[nodiscard]] bool valid(const Tokens& tokens);
 
+/// Whether `tokens` is none, for no limit, or valid as above.
+[[nodiscard]] bool valid(const std::optional<Tokens>& tokens);
+
 /// The ring around a foe a slot lies on: arm's length, long reach, or the
 /// waiting ring outside both.
 enum class Ring : std::uint8_t { NEAR, LONG, WAITING };

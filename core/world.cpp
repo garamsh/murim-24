@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
@@ -959,8 +960,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   if (!reachable(rules_.separation) || !reachable(rules_.rumour_reach) ||
       !reachable(rules_.talk_reach) || !reachable(rules_.sight) ||
       !reachable(rules_.map_sight) || rules_.people_capacity > PEOPLE_CEILING ||
-      recruits > rules_.people_capacity ||
-      (rules_.tokens && !valid(*rules_.tokens)) ||
+      recruits > rules_.people_capacity || !valid(rules_.tokens) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged) ||
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
@@ -1050,8 +1050,7 @@ void World::restore() {
       rules_.ticks_per_day == 0 || !reachable(rules_.separation) ||
       !reachable(rules_.rumour_reach) || !reachable(rules_.talk_reach) ||
       !reachable(rules_.sight) || !reachable(rules_.map_sight) ||
-      rules_.people_capacity > PEOPLE_CEILING ||
-      (rules_.tokens && !valid(*rules_.tokens)) ||
+      rules_.people_capacity > PEOPLE_CEILING || !valid(rules_.tokens) ||
       std::any_of(rules_.hostile.begin(), rules_.hostile.end(), ragged);
   const auto off_map = [this](const Structure& structure) {
     return !spans(structure.footprint) || structure.cell.x < 0 ||
