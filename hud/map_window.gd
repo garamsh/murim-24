@@ -51,6 +51,7 @@ func map_scale() -> int:
 ## The frame, in this control's pixels: sized to the map at map_scale() and the legend, and centred
 ## in the room.
 func frame() -> Rect2:
+	_font = get_theme_default_font() if _font == null else _font
 	var shown := Vector2(_map.get_size()) * map_scale()
 	var size := Vector2(shown.x + LEGEND_WIDTH + 3 * MARGIN, shown.y + 2 * MARGIN + BARS)
 	size.x = maxf(size.x, _width(tr("MAP_KEYS")) + 2 * INSET)
