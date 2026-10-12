@@ -1374,8 +1374,9 @@ std::optional<VillageMemory> remembered(const World& world) {
 
 // Whether the watcher stands on `cell`.
 bool watcher_on(const World& world, Cell cell) {
-  const Cell at = cell_of(world.person(world.roster(WATCHER).front()).position);
-  return at.x == cell.x && at.y == cell.y;
+  const Cell here =
+      cell_of(world.person(world.roster(WATCHER).front()).position);
+  return here.x == cell.x && here.y == cell.y;
 }
 
 // Ticks until the watcher stands on `cell`, or PHASE_TICKS pass.

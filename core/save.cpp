@@ -675,10 +675,8 @@ void put_chart(Writer& out, const Chart& chart) {
 }
 
 // Reads a chart over a map of `size` cells, refusing one no chart gives or
-// one remembering more than `villages` villages or an owner at or past
-// `factions`.
-Chart get_chart(Reader& input, Footprint size, std::size_t villages,
-                std::size_t factions) {
+// one remembering an owner at or past `factions`.
+Chart get_chart(Reader& input, Footprint size, std::size_t factions) {
   constexpr std::uint8_t STAGES = 3;
   const std::vector<ChartBlock> blocks = get_all<ChartBlock>(input, [&input] {
     ChartBlock block{input.u32(), {}};
@@ -698,7 +696,7 @@ Chart get_chart(Reader& input, Footprint size, std::size_t villages,
       });
   std::optional<Chart> chart =
       Chart::restore(size, blocks, remembered, factions);
-  if (!chart || remembered.size() > villages) {
+  if (!chart) {
     throw Refusal{LoadError::CORRUPTED};
   }
   return std::move(*chart);
@@ -1245,8 +1243,12 @@ class SaveCodec {
         input, [&input] { return get_index(input); });
     const Footprint size{world.map_.width(), world.map_.height()};
     world.charts_ = get_all<Chart>(input, [&input, &world, size] {
-      return get_chart(input, size, world.villages_.size(),
-                       world.rules_.hostile.size());
+      Chart chart = get_chart(input, size, world.rules_.hostile.size());
+      // A chart remembers no village past the world's.
+      if (chart.villages().size() > world.villages_.size()) {
+        throw Refusal{LoadError::CORRUPTED};
+      }
+      return chart;
     });
     if (world.charts_.size() != world.souls_.size()) {
       throw Refusal{LoadError::CORRUPTED};

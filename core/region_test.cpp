@@ -1625,9 +1625,9 @@ Century century(const RegionData& data, Seed seed) {
 }
 
 // The region of SEED with its player born into village 0, carrying a soul
-// and steered, seeing the land within `map_sight` cells, lived `ticks`
-// ticks at days of five ticks.
-World charted_lived(std::int32_t map_sight, std::uint64_t ticks) {
+// and steered, seeing the land within `map_sight` cells, lived a year at
+// days of five ticks.
+World charted_lived(std::int32_t map_sight) {
   constexpr std::uint64_t TICKS_PER_SHORT_DAY = 5;
   Region region = generate_region(SEED, base_data());
   region.rules.ticks_per_day = TICKS_PER_SHORT_DAY;
@@ -1636,7 +1636,8 @@ World charted_lived(std::int32_t map_sight, std::uint64_t ticks) {
   World world = world_of(region);
   world.ensoul(world.population() - 1);
   world.steer(region.armies.size() - 1, true);
-  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+  for (std::uint64_t tick = 0; tick < DAYS_PER_YEAR * TICKS_PER_SHORT_DAY;
+       ++tick) {
     world.tick();
   }
   return world;
@@ -1685,9 +1686,8 @@ std::vector<std::int64_t> outcomes(const World& world) {
 
 TEST(Region, NoOutcomeReadsTheChart) {
   constexpr std::int32_t MAP_SIGHT = 15;
-  constexpr std::uint64_t YEAR_OF_TICKS = std::uint64_t{DAYS_PER_YEAR} * 5;
-  const World charted = charted_lived(MAP_SIGHT, YEAR_OF_TICKS);
-  const World blind = charted_lived(0, YEAR_OF_TICKS);
+  const World charted = charted_lived(MAP_SIGHT);
+  const World blind = charted_lived(0);
   // Setup: one world charted a year of what its player saw, the other none.
   ASSERT_FALSE(charted.chart(0).empty());
   ASSERT_TRUE(blind.chart(0).empty());
@@ -1696,8 +1696,9 @@ TEST(Region, NoOutcomeReadsTheChart) {
   // ...and in nothing else.
   EXPECT_EQ(outcomes(charted), outcomes(blind));
   // Control: one tick more is an outcome the comparison sees.
-  EXPECT_NE(outcomes(charted_lived(MAP_SIGHT, YEAR_OF_TICKS + 1)),
-            outcomes(charted));
+  World later = charted_lived(MAP_SIGHT);
+  later.tick();
+  EXPECT_NE(outcomes(later), outcomes(charted));
 }
 
 TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
