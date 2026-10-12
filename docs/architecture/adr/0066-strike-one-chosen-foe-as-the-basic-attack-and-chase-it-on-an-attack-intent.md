@@ -1,6 +1,6 @@
 # ADR 0066: Strike one chosen foe as the basic attack, and chase it on an attack intent
 
-> Status: accepted
+> Status: accepted; its automatic strike amended for NPCs by ADR-0068, under which an NPC aims a strike at a person only with one of that person's tokens
 > Date: 2026-10-10
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
