@@ -131,8 +131,9 @@ var _moving := false
 var _aiming := KEY_NONE
 # The person last steered, whose death the rebirth screen sums up once its soul is born again.
 var _body := -1
-# The date at the last tick, and the days that have begun since the world was last saved.
-var _date := {}
+# The day at the last tick, as its year, season and day, and the days that have begun since the
+# world was last saved.
+var _date := []
 var _unsaved_days := 0
 ## The way the person last moved, or was last steered, as a facing for a tapped skill's aim.
 var facing := Vector2.DOWN
@@ -272,12 +273,17 @@ static func drawn_bounds(size: Vector2, relief: Relief) -> Rect2:
 	return Rect2(Vector2.ZERO, size - Vector2(0, lift))
 
 
+# The day `date` names, its year, season and day, without the tick within it.
+static func _day_of(date: Dictionary) -> Array:
+	return [date.year, date.season, date.day]
+
+
 # Plays `made`, steering the person carrying the player's soul, and closes the title screen.
 func _play(made: WorldAdapter) -> void:
 	world = made
 	world_seed = world.region_seed()
 	steered = world.player_army()
-	_date = world.date()
+	_date = _day_of(world.date())
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
 	_art.show_world(world, steered)
@@ -1069,9 +1075,9 @@ func step() -> void:
 		steered = army
 		_art.steered = army
 		_hud.show_player(world, army)
-	var date := world.date()
-	if date != _date:
-		_date = date
+	var day := _day_of(world.date())
+	if day != _date:
+		_date = day
 		_unsaved_days += 1
 	if _unsaved_days >= AUTOSAVE_DAYS and army >= 0:
 		_hud.show_autosave(save())

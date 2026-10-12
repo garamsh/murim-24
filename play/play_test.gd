@@ -836,13 +836,14 @@ func _autosave_pass() -> bool:
 	TestSaves.clear()
 	var scene := _scene(0)
 	var every: int = scene.AUTOSAVE_DAYS
-	var date: Dictionary = scene.world.date()
+	# A day begins when the date's year, season or day changes, not its tick within the day.
+	var date: Array = _day(scene.world.date())
 	var days := 0
 	var early := false
 	while not FileAccess.file_exists(TestSaves.path(0)) and days <= every:
 		scene.step()
-		if scene.world.date() != date:
-			date = scene.world.date()
+		if _day(scene.world.date()) != date:
+			date = _day(scene.world.date())
 			days += 1
 		early = early or (days < every and FileAccess.file_exists(TestSaves.path(0)))
 	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.directory)
@@ -856,6 +857,11 @@ func _autosave_pass() -> bool:
 		days, ticks, every, days == every, not early, saved, untouched,
 		"pass" if passed else "FAIL"])
 	return passed
+
+
+# The day `date` names, without the tick within it.
+func _day(date: Dictionary) -> Array:
+	return [date.year, date.season, date.day]
 
 
 # The borders follow the territory as it moves, and the map follows the player's chart (ADR 0073).
