@@ -346,9 +346,9 @@ func _taps_pass() -> bool:
 	var menu: Vector2 = title.MENU.position + title.MENU_INSET
 	scene.navigate(_finger(0, menu + Vector2(20, 5), true))
 	var new_game_open: bool = hud.screen() == hud.new_game
-	scene.navigate(_finger(0, hud.new_game._random_slip().get_center(), true))
+	scene.navigate(_finger(0, hud.new_game.random_slip_rect().get_center(), true))
 	var typed: String = hud.new_game.typed
-	scene.navigate(_finger(0, hud.new_game._start_slip().get_center(), true))
+	scene.navigate(_finger(0, hud.new_game.start_slip_rect().get_center(), true))
 	var started: bool = scene.world != null and typed != "" and scene.world_seed == int(typed) \
 			and hud.screen() == null
 	var pause_at: Vector2 = hud.touch.PAUSE.get_center()
@@ -702,11 +702,11 @@ func _shortcuts_pass() -> bool:
 	var marked: bool = rail.hovered == 2
 	scene.click(_motion(hud.room / 2.0, 0))
 	var unmarked: bool = rail.hovered == -1
-	var objective: Vector2i = scene._objective
+	var objective: Vector2i = scene.world.objective(scene.steered)
 	var elsewhere := []
 	for at: Vector2 in [hud.room / 2.0, rail.rect().position + Vector2(-2, 8)]:
 		elsewhere.append(scene.click(_left(at)) or scene.command(_left(at)) or _open_now(scene) != "")
-	var no_order: bool = scene._objective == objective
+	var no_order: bool = scene.world.objective(scene.steered) == objective
 	hud.use_touch(true)
 	var hidden_taken: bool = scene.click(_left(rail.row_rect(0).get_center())) or _open_now(scene) != ""
 	scene.free()
@@ -950,7 +950,7 @@ func _talk_pass() -> bool:
 	var closed_first: bool = scene.command(_key(KEY_ESCAPE)) and not dialogue.visible
 	# With the touch controls shown, a tap where the ally stands, in the HUD's pixels, opens it too.
 	hud.use_touch(true)
-	var on_hud: Vector2 = hud.from_window((_pixels_of(scene, ally) - scene._view_origin) * scene._camera.zoom)
+	var on_hud: Vector2 = scene.to_hud_pixels(_pixels_of(scene, ally))
 	scene.touch(_finger(0, on_hud, true))
 	scene.touch(_finger(0, on_hud, false))
 	var tapped: bool = closed_first and dialogue.visible and dialogue.person == ally and scene.selected < 0
@@ -1148,8 +1148,7 @@ func _names_pass() -> bool:
 	scene.get_node("Camera").zoom = Vector2(zoom, zoom)
 	hud.fit(window, false)
 	var view := Rect2(art.to_screen(scene.lead()) - Vector2(window) / zoom / 2.0, Vector2(window) / zoom)
-	art.refresh(view, 1.0)
-	scene._view_origin = view.position
+	scene.show_view(view)
 	scene.show_talk()
 	scene.show_names()
 	var near: Array = art.near.map(func(person: Dictionary) -> int: return person.person)
