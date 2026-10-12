@@ -40,7 +40,7 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 
 | Asset | Frame | Tags |
 |---|---|---|
-| `art/terrain/ramps` | 4 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its four colours, dark to light |
+| `art/terrain/ramps` | 7 x 1 | One per kind of ground, by its name in `world_art/relief.gd`'s order, then `bank`, the earth of a bank's face: its seven colours, dark to light |
 | `art/terrain/detail` | 5 x 5 | `tuft`, `flower` (three: violet, yellow and white), `litter`, `reed`; root at (2, 3), the ink ramp standing for the ground's ramp's steps |
 | `art/terrain/trees` | 32 x 40 | `tree` (three), `pine`, `bamboo`, `willow`, `poplar`, `snow_pine` (two each), each foot at (16, 36) |
 | `art/bodies/orthodox`, `demonic`, `unorthodox` | 16 x 24 | `idle` (one frame), `walk` and `back` (four frames each), `strike` (two), `idle_hurt` and `walk_hurt` (one and four), `idle_maimed` and `walk_maimed` (one and four), and each again with `_xray`, the silhouette's outline in the colour §Bodies and markers gives it; feet on row 22 |
@@ -164,13 +164,17 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 
 | Kind | Where | Ramp, dark to light, hue in degrees, saturation, lightness | Surface | Rim |
 |---|---|---|---|---|
-| Plain | Plain cells | hue 100, 0.42, 0.42 | Grass in clustered texture and large colour patches | None of its own |
-| Hills | Hills cells, as slopes | hue 80, 0.36, 0.50 | As the plain, a step lighter and yellower | As the plain |
+| Plain | Plain cells | hue 100, 0.32, 0.42 | Grass in clustered texture and large colour patches | None of its own |
+| Hills | Hills cells, as slopes | hue 70, 0.30, 0.47 | As the plain, a step lighter and yellower | As the plain |
 | Forest | Forest floor | hue 130, 0.38, 0.27 | Leaf litter under clustered trees | Darkest step along its edge, a narrow dither where it meets other ground |
-| Water | Water cells, a level down | hue 205, 0.45, 0.42 | Deep-water grain | Shallows and foam at the shore, reeds |
+| Water | Water cells, a level down | hue 192, 0.42, 0.42 | Deep-water grain | Shallows and foam at the shore, reeds |
 | Rock | Mountain cells | hue 220, 0.12, 0.46 | Two greys with moss in clusters | A lit lip at each drop |
 
-- Each ramp has four steps shifted in hue: toward blue in the dark steps and toward yellow in the light ones (#212). `art/terrain/ground.lua` draws them from the hue, saturation and lightness in the table above, and an earth bank's from hue 28, 0.35, 0.36.
+- Each ramp has seven steps, built by §Palette's rule (ADR 0069) from the colour of the hue, saturation and lightness in the table above, and an earth bank's from hue 28, 0.35, 0.36. It differs from a material's in two ways, so the ground stays calm under what stands on it:
+  - its steps span only 0.13 of lightness below that colour and 0.12 above;
+  - its shadows and lights are mixed toward the cool and warm tints by a third as much, 0.18 and 0.12.
+  `art/terrain/ground.lua` draws them.
+- The shader's grain takes four adjacent steps about the ramp's middle, the second to the fifth, so the plain reads as one surface under what stands on it. Water's grain takes three tones of the dark half, and its shallows and foam the light steps. Rock's strata take every step from the third up.
 - An edge between kinds is the cells' values interpolated through a point warped by noise, so it wanders over the cells' sides and never runs along one. The noise varies slowly enough that the warp never folds the ground over, so no island of one kind lies inside another. Where two kinds meet, a dither a few pixels wide joins them.
 - A face drops where the ground drops a level and the ground cannot be crossed. Rock faces have strata of uneven thickness that tilt along the face, split by fissures, with plants over the lip and scree piled at the foot. Water's banks are earth. Each face has a lit lip above and a shadow at its foot.
 - Detail is scattered per area by Poisson-disc spacing, denser near an edge between kinds: tufts and flowers on grass, litter on the forest floor and reeds at the water's edge. A detail frame's ink pixels take the ramp of the ground it lies on, or the forest's for litter and reeds.

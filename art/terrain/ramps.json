@@ -1,56 +1,56 @@
 { "frames": [
    {
     "filename": "ramps 0.aseprite",
-    "frame": { "x": 0, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 0, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    },
    {
     "filename": "ramps 1.aseprite",
-    "frame": { "x": 4, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 7, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    },
    {
     "filename": "ramps 2.aseprite",
-    "frame": { "x": 8, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 14, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    },
    {
     "filename": "ramps 3.aseprite",
-    "frame": { "x": 12, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 21, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    },
    {
     "filename": "ramps 4.aseprite",
-    "frame": { "x": 16, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 28, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    },
    {
     "filename": "ramps 5.aseprite",
-    "frame": { "x": 20, "y": 0, "w": 4, "h": 1 },
+    "frame": { "x": 35, "y": 0, "w": 7, "h": 1 },
     "rotated": false,
     "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 1 },
-    "sourceSize": { "w": 4, "h": 1 },
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 7, "h": 1 },
+    "sourceSize": { "w": 7, "h": 1 },
     "duration": 100
    }
  ],
@@ -59,7 +59,7 @@
   "version": "1.3.18.6-arm64",
   "image": "ramps.png",
   "format": "RGBA8888",
-  "size": { "w": 24, "h": 1 },
+  "size": { "w": 42, "h": 1 },
   "scale": "1",
   "frameTags": [
    { "name": "water", "from": 0, "to": 5, "direction": "forward", "color": "#000000ff" },

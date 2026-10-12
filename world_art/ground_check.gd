@@ -165,7 +165,7 @@ func _edge(ground: Node2D, rows: Vector2i) -> Array:
 	var image: Image = ground.images_of(Vector2i.ZERO).ground
 	var forest := Relief.KINDS.find("forest")
 	var ramp := []
-	for step in 4:
+	for step in ground.STEPS:
 		ramp.append(ground.ramp_colour(forest, step))
 	var of_forest := func(x: int, y: int) -> bool:
 		var colour := image.get_pixel(x, y)

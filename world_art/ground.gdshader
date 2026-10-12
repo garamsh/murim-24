@@ -10,7 +10,7 @@
 //   neighbouring cells, so edges and cliffs run along curves and not along the grid;
 // - looking down the column from the highest ground that could show at the pixel, the first
 //   point that shows at or above it is what is seen: its ground, or the face dropping from it;
-// - ground kinds take a 4-step ramp each (`ramps`), varied per pixel in clusters, with large
+// - ground kinds take a 7-step ramp each (`ramps`), varied per pixel in clusters, with large
 //   patches of colour and moss on rock, a dithered band where two kinds meet, and rims: foam and
 //   shallows by the shore, shade at a forest's edge, a lit lip on a cliff's top and a shadow at its
 //   foot; faces are drawn as rock in strata or as an earth bank by their material.
@@ -27,7 +27,7 @@ uniform vec2 image_size;
 uniform int row_from;
 uniform int row_to;
 uniform int pass_kind;
-uniform vec3 ramps[24];
+uniform vec3 ramps[42];
 // How far, in pixels, noise moves the point a pixel reads its cells from; 0 draws every edge along
 // the cells' sides, for a probe's control.
 uniform float warp = 32.0;
@@ -186,8 +186,9 @@ int kind_at(vec2 p, int level) {
 	return best;
 }
 
+// Step `step` of kind `kind`'s ramp, 0 darkest to 6 lightest.
 vec3 ramp(int kind, int step) {
-	return ramps[kind * 4 + clamp(step, 0, 3)];
+	return ramps[kind * 7 + clamp(step, 0, 6)];
 }
 
 // Within `r` pixels of `p` on its level, is there ground of another kind than `kind`?
@@ -210,13 +211,17 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	ivec2 sx = ivec2(floor(screen));
 	float tex = 0.62 * vnoise(screen / 2.3 + 5.0, 21) + 0.38 * hash01(sx.x, sx.y, 22);
 	float macro = (fbm(screen / 48.0 + vec2(11.0, 3.0), 23) - 0.5) * 0.5;
-	int step = tex < 0.3 + macro * 0.5 ? 0 : (tex > 0.74 + macro * 0.5 ? 2 : 1);
+	// Four tones of grain on adjacent steps about the ramp's middle, so the ground reads as one
+	// surface under what stands on it.
+	float t = tex - macro * 0.5;
+	int step = t < 0.3 ? 1 : (t < 0.52 ? 2 : (t < 0.74 ? 3 : 4));
 	if (kind == WATER) {
-		step = vnoise(p / 9.0, 24) > 0.55 ? 1 : 0;
+		float ripple = vnoise(p / 9.0, 24);
+		step = ripple > 0.62 ? 3 : (ripple > 0.48 ? 2 : 1);
 		if (near_other(p, level, WATER, 1)) {
-			step = 3;
+			step = 6;
 		} else if (near_other(p, level, WATER, 3)) {
-			step = 2;
+			step = 4;
 		}
 	} else if (kind == FOREST) {
 		if (near_other(p, level, FOREST, 2)) {
@@ -225,19 +230,19 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	}
 	// Rock wears moss and lichen in patches.
 	if (kind == ROCK && fbm(screen / 18.0 + vec2(3.0, 9.0), 30) > 0.58 && vnoise(screen / 1.7, 31) > 0.45) {
-		return ramp(FOREST, step == 2 ? 2 : 1);
+		return ramp(FOREST, step >= 3 ? 4 : 2);
 	}
 	vec3 colour = ramp(kind, step);
 	// The lit lip where the ground turns down into a face.
 	if (drops(p, p + vec2(0.0, 1.0))) {
-		colour = ramp(kind == ROCK || kind == WATER ? kind : HILLS, 3);
+		colour = ramp(kind == ROCK || kind == WATER ? kind : HILLS, 6);
 	}
 	// The foot of a face is in its shadow, thinning away from it, and scree lies there in
 	// clusters, more of it nearer the face.
 	for (int d = 1; d <= 6; d++) {
 		if (drops(p - vec2(0.0, float(d)), p - vec2(0.0, float(d - 1)))) {
 			if (kind != WATER && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
-				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 3 : 1);
+				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 6 : 2);
 			}
 			if (d <= 4 && hash01(px.x, px.y, 35) < (1.0 - float(d - 1) / 4.0) * 0.9) {
 				colour = mix(colour, SHADE, 0.38);
@@ -251,11 +256,11 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 // A face's colour by its material, `depth` pixels below its top and `height` pixels high.
 vec3 face(vec2 p, int material, float depth, float height) {
 	ivec2 px = ivec2(int(floor(p.x)), int(depth));
-	int step = 1;
+	int step = 2;
 	int kind = ROCK;
 	if (material == 1) {
 		kind = BANK;
-		step = depth < 2.0 ? 3 : ((int(depth) % 3 == 0) ? 0 : 1);
+		step = depth < 2.0 ? 6 : ((int(depth) % 3 == 0) ? 0 : ((int(depth) % 3 == 1) ? 2 : 3));
 	} else {
 		// Rock: strata of uneven thickness that tilt and wander along the face, each a tone of
 		// its own with a lit top and a dark underside, split by fissures.
@@ -263,11 +268,11 @@ vec3 face(vec2 p, int material, float depth, float height) {
 		float band = (depth + (vnoise(vec2(p.x / 11.0, 0.0), 26) - 0.5) * 6.0 + (vnoise(vec2(p.x / 37.0, 3.0), 36) - 0.5) * 10.0) / thickness;
 		int layer = int(floor(band));
 		float within = fract(band);
-		step = 1 + int(hash01(layer, int(p.x / 40.0), 27) * 2.99);
+		step = 2 + int(hash01(layer, int(p.x / 40.0), 27) * 4.99);
 		if (within < 0.2) {
-			step = min(step + 1, 3);
+			step = min(step + 2, 6);
 		} else if (within > 0.8) {
-			step = max(step - 1, 0);
+			step = max(step - 2, 0);
 		}
 		if (hash01(px.x / 3, 0, 28) > 0.9 && depth > height * vnoise(vec2(p.x, 7.0), 29)) {
 			step = 0;
@@ -275,20 +280,20 @@ vec3 face(vec2 p, int material, float depth, float height) {
 		// Plants hang over the lip in tufts, and scree piles at the foot to an uneven height.
 		float hang = vnoise(vec2(p.x / 4.0, 9.0), 37) > 0.55 ? 4.0 * vnoise(vec2(p.x / 2.0, 1.0), 38) : 0.0;
 		if (depth < hang) {
-			return ramp(FOREST, depth < 1.0 ? 2 : 1);
+			return ramp(FOREST, depth < 1.0 ? 4 : 2);
 		}
 		float pile = 2.0 + 9.0 * vnoise(vec2(p.x / 13.0, 5.0), 39);
 		if (depth > height - pile) {
-			return ramp(ROCK, hash01(px.x, int(depth), 40) > 0.55 ? 3 : (hash01(px.x / 2, int(depth) / 2, 41) > 0.5 ? 1 : 0));
+			return ramp(ROCK, hash01(px.x, int(depth), 40) > 0.55 ? 6 : (hash01(px.x / 2, int(depth) / 2, 41) > 0.5 ? 2 : 0));
 		}
-		return ramp(ROCK, depth < 1.0 ? 3 : step);
+		return ramp(ROCK, depth < 1.0 ? 6 : step);
 	}
 	if (depth < 1.0) {
-		step = 3;
+		step = 6;
 	} else if (depth > height - 3.0) {
 		step = 0;
 	} else if (material == 0 && depth > height * 0.6) {
-		step = max(step - 1, 0);
+		step = max(step - 2, 0);
 	}
 	return ramp(kind, step);
 }

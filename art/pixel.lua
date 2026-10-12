@@ -68,13 +68,15 @@ local function turn(h, to) return ((to - h) % 360 + 540) % 360 - 180 end
 M.DARKEN, M.LIGHTEN, M.TURN, M.TURN_CAP, M.SATURATE = 0.62, 0.8, 0.95, 30, 1.06
 M.SHADOW_HUE, M.LIGHT_HUE = 250, 55
 M.SHADOW_TINT, M.LIGHT_TINT, M.COOL, M.WARM = "3a2a7a", "ffe7a0", 0.55, 0.35
-function M.build_ramp(base)
+-- `darken`, `lighten`, `cool` and `warm`, when given, take DARKEN's, LIGHTEN's, COOL's and WARM's
+-- places for this ramp.
+function M.build_ramp(base, darken, lighten, cool, warm)
   local h, s, l = rgb_hsl(hex_rgb(base))
   local grey = s < 0.06
   local ramp = {}
   for k = 0, M.STEPS - 1 do
     local u = ((k + 0.5) / M.STEPS) * 2 - 1
-    local lightness = u < 0 and l * (1 + u * M.DARKEN) or l + (1 - l) * u * M.LIGHTEN
+    local lightness = u < 0 and l * (1 + u * (darken or M.DARKEN)) or l + (1 - l) * u * (lighten or M.LIGHTEN)
     local to = u < 0 and M.SHADOW_HUE or M.LIGHT_HUE
     local amount = math.abs(u) * M.TURN
     local cap = M.TURN_CAP * math.abs(u)
@@ -84,7 +86,7 @@ function M.build_ramp(base)
     lightness = clamp(lightness, 0.02, 0.98)
     local r, g, b = hsl_rgb(hue, clamp(sat, 0, 1), lightness)
     local tr, tg, tb = hex_rgb(u < 0 and M.SHADOW_TINT or M.LIGHT_TINT)
-    local mix = math.abs(u) * (u < 0 and M.COOL or M.WARM)
+    local mix = math.abs(u) * (u < 0 and (cool or M.COOL) or (warm or M.WARM))
     local mh, ms = rgb_hsl(r + (tr - r) * mix, g + (tg - g) * mix, b + (tb - b) * mix)
     ramp[#ramp + 1] = rgb_hex(hsl_rgb(mh, ms, lightness))
   end
