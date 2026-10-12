@@ -265,8 +265,8 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	// clusters, more of it nearer the face; where water meets a bank's foot, a strip of wet sand.
 	for (int d = 1; d <= 6; d++) {
 		if (drops(p - vec2(0.0, float(d)), p - vec2(0.0, float(d - 1)))) {
-			if (kind == WATER && (d == 1 || (d == 2 && hash01(px.x, px.y, 44) > 0.4))) {
-				colour = ramp(BANK, d == 1 ? 3 : 4);
+			if (kind == WATER && d <= 2) {
+				colour = ramp(BANK, d == 1 ? 4 : 3);
 			}
 			if (kind != WATER && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
 				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 6 : 2);
