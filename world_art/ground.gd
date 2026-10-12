@@ -57,7 +57,7 @@ const TREE_FOOT := Vector2(16, 36)
 # A kind of the shader's what-pass from which a pixel is a face, not ground.
 const FACE_KINDS_FROM := 20
 # The kind whose ramp a detail takes, where it is not the ground's it lies on.
-const DETAIL_RAMP := {"litter": "forest", "reed": "forest"}
+const DETAIL_RAMP := {"litter": "forest", "reed": "forest", "pebble": "rock"}
 # More than the levels the what-pass can encode, plus two, so a row offset and a level make one key.
 const LEVELS := 16
 
@@ -307,9 +307,9 @@ static func poisson(rng: RandomNumberGenerator, size: Vector2i, spacing: float, 
 	return points
 
 
-# Tufts and flowers on grass, litter on the forest floor and reeds at the water's edge, from the
-# detail sheet: more of them near an edge between kinds, each drawn only on its own ground, taking
-# the ramp DETAIL_RAMP names.
+# Tufts, flowers and pebbles on grass, litter on the forest floor and reeds at the water's edge,
+# from the detail sheet: more of them near an edge between kinds, each drawn only on its own
+# ground, taking the ramp DETAIL_RAMP names.
 func _scatter_detail(colour: Image, what: PackedByteArray, width: int, rng: RandomNumberGenerator) -> void:
 	for point: Vector3 in poisson(rng, colour.get_size(), DETAIL_SPACING, DETAIL_TRIES):
 		var at := Vector2i(int(point.x), int(point.y))
@@ -328,7 +328,7 @@ func _scatter_detail(colour: Image, what: PackedByteArray, width: int, rng: Rand
 		var tag := ""
 		match kind:
 			"plain", "hills":
-				tag = "tuft" if pick < 0.72 else "flower"
+				tag = "tuft" if pick < 0.64 else ("flower" if pick < 0.88 else "pebble")
 			"forest":
 				tag = "litter"
 			"water":

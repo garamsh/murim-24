@@ -6,8 +6,8 @@
 --     down and 0.12 up, and a third of its cool and warm mix, so the ground stays calm under what
 --     stands on it.
 --   detail.aseprite: 5 x 5 frames of the small detail scattered over the ground, its root at (2, 3):
---     tuft, flower (violet, yellow, white: no red, which on the ground means blood), litter and
---     reed. A pixel in INK_STEPS's colours stands for that step, 0, 2, 4 or 6, of the ramp of the
+--     tuft, flower (violet, yellow, white: no red, which on the ground means blood), litter,
+--     reed and pebble. A pixel in INK_STEPS's colours stands for that step, 0, 2, 4 or 6, of the ramp of the
 --     ground the view draws it on; any other colour is drawn as it is.
 -- Run: aseprite --batch --script art/terrain/ground.lua
 
@@ -76,6 +76,8 @@ local marks = {
     { { 0, 0, c("robe", 7) }, { 0, 1, step(0) } } },
   { "litter", { { 0, 0, step(0) }, { 1, -1, step(0) }, { -1, -1, step(2) } } },
   { "reed", { { 0, 0, step(1) }, { 0, -1, step(1) }, { 0, -2, step(1) }, { 0, -3, step(3) } } },
+  { "pebble", { { 0, 0, step(1) }, { 1, 0, step(2) }, { 0, -1, step(3) } },
+    { { 0, 0, step(2) }, { -1, 0, step(1) }, { 1, -1, step(3) }, { 1, 0, step(1) } } },
 }
 local frames, tags = {}, {}
 for _, detail in ipairs(marks) do
