@@ -10,6 +10,7 @@ extends RefCounted
 
 const ART_SCENE := "res://world_art/world_art.tscn"
 const HUD_SCENE := "res://hud/hud.tscn"
+const WordFit := preload("res://hud/word_fit.gd")
 const ViewScale := preload("res://view_scale.gd")
 const PersonName := preload("res://hud/person_name.gd")
 const Palette := preload("res://hud/palette.gd")
@@ -207,6 +208,7 @@ func _rail_pass() -> bool:
 # and clear of every other name, every panel the HUD shows, the shortcut rail with play.gd's rows,
 # the purse and the talk prompt, which points at the room's middle. Setup: the names are the widest the region's people bear.
 func _fit_pass() -> bool:
+	var fit := WordFit.new()
 	var world := WorldAdapter.create_region(SEED)
 	var hud: CanvasLayer = load(HUD_SCENE).instantiate()
 	hud.show_player(world, world.player_army())
@@ -217,7 +219,7 @@ func _fit_pass() -> bool:
 	var widest := {}
 	for locale: String in hud.LOCALES:
 		TranslationServer.set_locale(locale)
-		var people := _widest(world, hud.nameplates)
+		var people := _widest(world)
 		widest[locale] = PersonName.of(world, people[0])
 		for window: Vector2i in PC_WINDOWS:
 			hud.fit(window, false)
@@ -244,7 +246,7 @@ func _fit_pass() -> bool:
 				var rect: Rect2 = plate.rect
 				checks += 1
 				var whole: bool = plate.text == PersonName.of(world, plate.person) \
-						and rect.size.x >= hud.nameplates._width(plate.text)
+						and rect.size.x >= fit.width(plate.text)
 				if not whole or not room.encloses(rect):
 					faults.append("%s %s: %s at %s" % [window, locale, plate.text, rect])
 				for other: Dictionary in plates.slice(p + 1):
@@ -289,13 +291,14 @@ func _named(plates: Control, world: WorldAdapter, people: Array[Dictionary], cle
 	return plates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 
 
-# The region's people, widest name first, in the current locale, as `plates` draws them.
-func _widest(world: WorldAdapter, plates: Control) -> Array[int]:
+# The region's people, widest name first, in the current locale, in the HUD's font.
+func _widest(world: WorldAdapter) -> Array[int]:
+	var fit := WordFit.new()
 	var people: Array[int] = []
 	for army in world.army_count():
 		people.append_array(world.roster(army))
 	people.sort_custom(func(a: int, b: int) -> bool:
-		return plates._width(PersonName.of(world, a)) > plates._width(PersonName.of(world, b)))
+		return fit.width(PersonName.of(world, a)) > fit.width(PersonName.of(world, b)))
 	return people.slice(0, 8)
 
 

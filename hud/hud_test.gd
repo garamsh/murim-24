@@ -34,6 +34,7 @@ const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_",
 		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
 		"BUY_", "WARE_", "SILVER", "CONSUME_"]
 const Arts := preload("res://hud/arts.gd")
+const WordFit := preload("res://hud/word_fit.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
 # person.
 const LESSON_TICKS := 6000
@@ -174,12 +175,12 @@ func _notice_slip_pass() -> bool:
 								hud.talk_prompt.point_at(world, -1, Vector2.ZERO, false)
 								hud.show_consume(world, 0, WorldAdapter.CONSUME_NONE)
 								hud.talk_prompt.point_at(world, person, Vector2(x, y), hostile)
-								hud._process(0.0)
+								hud.place_notice()
 							checks += 1
 							var slip: Rect2 = hud.notice_rect()
 							var prompt: Rect2 = hud.talk_prompt.slip_rect()
 							if slip.intersects(prompt) or not room.encloses(slip) or slip.size != widest.size \
-									or hud._notice_slip.get_rect() != slip or not hud._notice_slip.visible:
+									or hud.notice_slip.get_rect() != slip or not hud.notice_slip.visible:
 								faults.append("%s %s: notice %s, prompt %s" % [window, locale, slip, prompt])
 	TranslationServer.set_locale(hud.LOCALES[0])
 	hud.free()
@@ -348,6 +349,7 @@ func _layout_pass() -> bool:
 func _rail_faults(hud: CanvasLayer, room: Rect2, at: String) -> Array[String]:
 	var faults: Array[String] = []
 	var rail: Control = hud.shortcuts
+	var fit := WordFit.new()
 	var rect: Rect2 = rail.rect()
 	var middle: Vector2 = ((room.size - hud.NATIVE) / 2.0).floor()
 	var clear_of := {"the centre": Rect2(room.size / 2.0 - Vector2(80, 45), Vector2(160, 90)),
@@ -364,7 +366,7 @@ func _rail_faults(hud: CanvasLayer, room: Rect2, at: String) -> Array[String]:
 	for n in rail.rows.size():
 		var row: Dictionary = rail.rows[n]
 		var word: String = rail.tr(row.label)
-		var reach: float = rail.WORD_X + rail._width(word) + 8 + rail._width(row.key)
+		var reach: float = rail.WORD_X + fit.width(word) + 8 + fit.width(row.key)
 		if word == row.label or reach > rail.row_rect(n).size.x:
 			faults.append("%s: \"%s %s\" reaches %d in a %d px row" % [at, word, row.key, reach, rail.row_rect(n).size.x])
 	return faults
