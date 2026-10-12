@@ -167,7 +167,7 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 | Plain | Plain cells | hue 100, 0.32, 0.42 | Grass in clustered texture and large colour patches | None of its own |
 | Hills | Hills cells, as slopes | hue 70, 0.30, 0.47 | As the plain, a step lighter and yellower | As the plain |
 | Forest | Forest floor | hue 130, 0.38, 0.27 | Leaf litter under clustered trees | Darkest step along its edge, a narrow dither where it meets other ground |
-| Water | Water cells, a level down | hue 192, 0.42, 0.42 | Deep-water grain | Shallows and foam at the shore, reeds |
+| Water | Water cells, a level down | hue 192, 0.42, 0.42 | Deep-water grain | Shallows and foam at the shore, a strip of wet sand at a bank's foot, reeds |
 | Rock | Mountain cells | hue 220, 0.12, 0.46 | Two greys with moss in clusters | A lit lip at each drop |
 
 - Each ramp has seven steps, built by §Palette's rule (ADR 0069) from the colour of the hue, saturation and lightness in the table above, and an earth bank's from hue 28, 0.35, 0.36. It differs from a material's in two ways, so the ground stays calm under what stands on it:
@@ -177,7 +177,7 @@ The ground is not drawn as tiles. `world_art/ground.gdshader` draws it off the c
 - The shader's grain takes four adjacent steps about the ramp's middle, the second to the fifth, so the plain reads as one surface under what stands on it. Water's grain takes three tones of the dark half, and its shallows and foam the light steps. Rock's strata take every step from the third up.
 - An edge between kinds is the cells' values interpolated through a point warped by noise, so it wanders over the cells' sides and never runs along one. The noise varies slowly enough that the warp never folds the ground over, so no island of one kind lies inside another. Where two kinds meet, a dither a few pixels wide joins them.
 - A face drops where the ground drops a level and the ground cannot be crossed. Rock faces have strata of uneven thickness that tilt along the face, split by fissures, with plants over the lip and scree piled at the foot. Water's banks are earth. Each face has a lit lip above and a shadow at its foot.
-- Detail is scattered per area by Poisson-disc spacing, denser near an edge between kinds: tufts and flowers on grass, litter on the forest floor and reeds at the water's edge. A detail frame's ink pixels take the ramp of the ground it lies on, or the forest's for litter and reeds.
+- Detail is scattered per area by Poisson-disc spacing, denser near an edge between kinds: tufts, flowers and pebbles on grass, litter on the forest floor and reeds at the water's edge. A detail frame's ink pixels take the ramp of the ground it lies on, the forest's for litter and reeds, or the rock's for pebbles.
 - Decorative trees (`art/terrain/trees`) cluster inside forests and thin toward their edges, with a lone tree now and then in the open. A shadow lies on the ground round each one's foot, and none stands on a village or a structure.
 - Fields are tiles a cell each over the ground (`art/decorations/fields`), since their state changes. What people build in straight lines is drawn over the ground as well, not in it: a village's paving and road are tiles a cell each (`art/decorations/ground`).
 
@@ -317,7 +317,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 | Market stall | 2 x 1 | A striped awning of paper and crimson on four posts over a table of pots, greens and bolts of cloth |
 | Courtyard house | 5 x 5 | A grey wall round a paved court with a tree, the main hall across its back, a wing down each side, a gate in its front wall under a small roof |
 
-- What is built is drawn crisp: its edges run along the pixel grid, and where the ground round it is flat, the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam; on a slope's edge the ground is drawn as any other, so no cliff stands where nothing blocks the way.
+- What is built is drawn crisp: its edges run along the pixel grid, and where the ground round it is flat, the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam; on a slope's edge the ground is drawn as any other, so no cliff stands where nothing blocks the way. Outside the seam the ground is trodden bare: a band of the bank's earth up to three pixels wide, dithered from three pixels in four beside what is built to one in five at its edge, so a road's or paving's square tiles fray into the ground round them.
 
 ## Effects and HUD
 
