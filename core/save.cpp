@@ -1074,9 +1074,9 @@ class SaveCodec {
                 out.u64(declared.tick);
               });
             });
-    put_all(out, world.progress_,
+    put_all(out, world.progress_.entries(),
             [&out](const Progress& step) { put_progress(out, step); });
-    put_all(out, world.events_,
+    put_all(out, world.events_.entries(),
             [&out](const Event& event) { put_event(out, event); });
     put_all(out, world.souls_, [&out](const Soul& soul) {
       out.u32(soul.lives);
@@ -1174,10 +1174,10 @@ class SaveCodec {
         return declared;
       });
     });
-    world.progress_ =
-        get_all<Progress>(input, [&input] { return get_progress(input); });
-    world.events_ =
-        get_all<Event>(input, [&input] { return get_event(input); });
+    world.progress_ = decltype(world.progress_){
+        get_all<Progress>(input, [&input] { return get_progress(input); })};
+    world.events_ = decltype(world.events_){
+        get_all<Event>(input, [&input] { return get_event(input); })};
     world.souls_ = get_all<Soul>(input, [&input] {
       Soul soul;
       soul.lives = input.u32();
