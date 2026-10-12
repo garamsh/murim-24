@@ -1,0 +1,7 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+pan scene: res://world_art/world_art.tscn, region of seed 2026 (2048 x 1536 pixels), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+pan: (4.0, 3.0) pixels a frame at 3x, bouncing between the map's edges; at most 14 ground nodes shown
+frame time: p50 3.849 ms, p99 9.770 ms, max 10.947 ms
+PASS: p99 9.770 ms against a 16.7 ms budget
