@@ -583,6 +583,8 @@ class WorldAdapter : public godot::RefCounted {
   static void _bind_methods();
 
  private:
+  // Each village's fields as villages() gives them, by index.
+  [[nodiscard]] std::vector<godot::Dictionary> village_fields() const;
   // Set by create(), the only way GDScript gets an adapter, since the class is
   // registered abstract.
   std::optional<murim::World> world_;

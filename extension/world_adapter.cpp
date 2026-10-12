@@ -989,10 +989,18 @@ godot::PackedInt64Array WorldAdapter::territory() const {
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   godot::TypedArray<godot::Dictionary> villages;
+  for (const godot::Dictionary& fields : village_fields()) {
+    villages.push_back(fields);
+  }
+  return villages;
+}
+
+std::vector<godot::Dictionary> WorldAdapter::village_fields() const {
+  std::vector<godot::Dictionary> villages;
   const auto add = [this, &villages](
                        const std::string& name, const std::string& kind,
                        murim::Cell corner, murim::Footprint area) {
-    const auto index = static_cast<std::size_t>(villages.size());
+    const std::size_t index = villages.size();
     godot::Dictionary fields;
     fields.set("name", godot::String(name.c_str()));
     fields.set("kind", godot::String(kind.c_str()));
@@ -1035,7 +1043,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::remembered_villages() const {
   if (terrain_.empty()) {
     return remembered;
   }
-  const godot::TypedArray<godot::Dictionary> all = villages();
+  const std::vector<godot::Dictionary> all = village_fields();
   const std::vector<std::optional<murim::VillageMemory>>& memories =
       world().chart(PLAYER_SOUL).villages();
   for (std::size_t village = 0; village < memories.size(); ++village) {
@@ -1043,8 +1051,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::remembered_villages() const {
     if (!memory) {
       continue;
     }
-    godot::Dictionary fields =
-        godot::Dictionary(all[static_cast<std::int64_t>(village)]).duplicate();
+    godot::Dictionary fields = all.at(village).duplicate();
     fields.set("index", static_cast<std::int64_t>(village));
     fields.set("faction", static_cast<std::int64_t>(memory->owner));
     fields.set("peopled", memory->peopled);
