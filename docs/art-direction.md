@@ -223,7 +223,7 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 | Wall, height | 2 levels for a town, 3 for a city | Lifted like a cliff level, with a walkway and crenellations. #239 draws a town's wall one level high for now, an exception the art will follow |
 | Gate | 2 to 3 cells wide, under a 5 x 2 gate tower over a road of 3 cells, as #239 draws it | 2 to 4 gates a town, on its roads |
 | Corner tower | 3 x 3 | On every corner of a town's wall |
-| Village | 15 x 10 to 30 x 20, unwalled | 5 to 30 households |
+| Village | 15 x 10 to 30 x 20, unwalled | 6 to 42 households, 20 to 149 residents at about 3.5 a household, below ADR 0062's town of 150 (ADR 0076, proposed) |
 | Walled town | at least 40 x 30 inside the wall | Owner: streets, wards, market, hall, temples, courtyard houses |
 | Major city | at least 80 x 60 inside the wall | Owner: with inner wards |
 | Sect seat | 24 x 16 to 40 x 30 | A compound of gate, halls, training grounds and quarters, not a single hall |
@@ -235,6 +235,13 @@ The li of ADR 0047 measures the distance between places, and a place's layout pa
 | River | 4 to 8 cells wide | |
 | Great river, the Yellow River or the Yangtze | 16 to 40 cells wide | Exaggerated narrow: at a person's scale a real width would be hundreds of cells |
 | Bridge | the river's width plus 2, 3 cells wide | Arched over streams and rivers. Great rivers are crossed by ferries and fords (ADR 0047) |
+
+**[proposed]** ADR 0076 gives a village its look by growth rather than by template:
+- a paved square at its centre, with the hall, the well and the workshops on its edges;
+- houses around it along lanes a cell wide, following the ground nearest the square;
+- fields and pens beyond the houses, terraced up the slope where hills lie nearer than flat land.
+
+A house's material by tier, such as thatch, tile and stone, and regional styles are drawn after #200's look is approved.
 
 - **The field's yield.** Decided by the PM on #242, 2026-10-11: fields stay at 4 to 8 cells a household, and the base pack's yield is lowered from ADR 0022's 600 measures a cell, about 5 people, to about 1 person a cell: 120 measures a cell on plain and 60 on hills, as ADR 0063 sets them. So a household's fields feed about a household, and food, not a field's size, binds the population (#229).
   - It is a pack-data change. The pull request that applies it shows `make sweep` 48/50 or better, since births follow food.
