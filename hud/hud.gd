@@ -899,7 +899,7 @@ func _map_image(world: WorldAdapter) -> Image:
 	for village: Dictionary in world.remembered_villages():
 		var corner: Vector2i = village.corner
 		var area: Vector2i = village.area
-		var colour := Palette.STONE_3 if village.stage == WorldAdapter.STAGE_RUINS \
+		var colour := Palette.STONE_3 if village.stage == WorldAdapter.VILLAGE_RUINS \
 				else Palette.ACCENTS[sprites[village.faction]].lightened(0.3)
 		image.fill_rect(Rect2i(corner, area), colour)
 	return image

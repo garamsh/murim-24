@@ -20,6 +20,7 @@
 
 #include "arts.hpp"
 #include "calendar.hpp"
+#include "chart.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -824,7 +825,7 @@ TEST(World, QuickSkillBeatsSlowSkill) {
 
 // A village of one house with three residents at (4, 4), their home; a
 // field army of faction 0 with no members yet; and a hostile post of one
-// person at (12, 4).
+// person at (12, 4); its steered see the land within `map_sight` cells.
 constexpr std::size_t HOME_ARMY = 0;
 constexpr std::size_t FIELD = 1;
 constexpr std::size_t POST = 2;
@@ -833,19 +834,18 @@ constexpr Cell POST_CELL{12, 4};
 constexpr std::uint64_t POST_HEALTH = 200;
 constexpr std::uint32_t HOME_DURABILITY = 100;
 
-World conscription_world() {
+World conscription_world(std::int32_t map_sight = 0) {
   const Skill strike{2 * CELL_SIZE, 0, 10, 0, 15};
   const std::vector<ArmySpec> armies{
       army(HOME, HOME, 3, 1'000, 0, {strike}),
       ArmySpec{HOME, {}, 0, {strike}},
       army(POST_CELL, POST_CELL, 1, POST_HEALTH, 1, {strike}),
   };
-  return World{Seed{1},
-               Map{open_map(OPEN_SIDE)},
-               armies,
-               {{{2, 2}, HOME_DURABILITY}},
-               at_war(SEPARATION),
-               {{{0}, HOME_ARMY, {}, 0, {}}}};
+  Rules rules = at_war(SEPARATION);
+  rules.map_sight = map_sight;
+  return World{Seed{1}, Map{open_map(OPEN_SIDE)},
+               armies,  {{{2, 2}, HOME_DURABILITY}},
+               rules,   {{{0}, HOME_ARMY, {}, 0, {}}}};
 }
 
 TEST(World, APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding) {
@@ -1319,6 +1319,109 @@ TEST(World, RebuilderBecomesTheOwnerOnlyWhereNoResidentLives) {
   const auto [kept, survivors] = owner_after_mending(TARGET_HEALTH);
   EXPECT_GT(survivors, 0U);
   EXPECT_EQ(kept, 0U);
+}
+
+// village_world() with a neutral watcher of faction 2 at `watcher`, steered
+// and carrying a soul, who sees the land within WATCH_SIGHT cells.
+constexpr std::size_t WATCHER = 3;
+constexpr std::int32_t WATCH_SIGHT = 4;
+constexpr Cell BESIDE_VILLAGE{10, 12};
+constexpr Cell WATCH_CORNER{22, 1};
+
+World watched_village_world() {
+  const Skill guard{3 * CELL_SIZE, 0, 1, 0, 15};
+  const Skill strike{3 * CELL_SIZE, 0, 50, 0, 10};
+  const Skill torch{0, 3 * CELL_SIZE, 0, 10, 10};
+  const Skill mend{0, 3 * CELL_SIZE, 0, -2, 10};
+  const std::vector<ArmySpec> armies{
+      ArmySpec{{10, 10},
+               {Recruit{{9, 10}, RESIDENT_HEALTH},
+                Recruit{{10, 10}, RESIDENT_HEALTH},
+                Recruit{{11, 10}, RESIDENT_HEALTH},
+                Recruit{{12, 10}, RESIDENT_HEALTH}},
+               0,
+               {guard}},
+      army(open_map(ORDERS_SIDE), RAIDER_HOME, RAIDER_HOME, 10, 100'000, 1,
+           {strike, torch}),
+      army(open_map(ORDERS_SIDE), MENDER_HOME, MENDER_HOME, 10, 100'000, 2,
+           {mend}),
+      army(open_map(ORDERS_SIDE), BESIDE_VILLAGE, BESIDE_VILLAGE, 1, 100'000, 2,
+           {IDLE}),
+  };
+  Rules rules{
+      SEPARATION,
+      {{false, true, false}, {true, false, false}, {false, false, false}},
+      STAGE_FLOORS};
+  rules.map_sight = WATCH_SIGHT;
+  World world{VILLAGE_SEED,
+              Map{open_map(ORDERS_SIDE)},
+              armies,
+              {{{WEST_HOUSE, HOUSE_TOP}, HOUSE_DURABILITY, SMALL_HOUSE},
+               {{EAST_HOUSE, HOUSE_TOP}, HOUSE_DURABILITY, SMALL_HOUSE}},
+              rules,
+              {small_village()}};
+  world.ensoul(world.roster(WATCHER).front());
+  world.steer(WATCHER, true);
+  return world;
+}
+
+// The village as the watcher's soul, the world's only one, last saw it.
+std::optional<VillageMemory> remembered(const World& world) {
+  const std::vector<std::optional<VillageMemory>>& villages =
+      world.chart(0).villages();
+  return villages.empty() ? std::nullopt : villages.front();
+}
+
+// Whether the watcher stands on `cell`.
+bool watcher_on(const World& world, Cell cell) {
+  const Cell at = cell_of(world.person(world.roster(WATCHER).front()).position);
+  return at.x == cell.x && at.y == cell.y;
+}
+
+// Ticks until the watcher stands on `cell`, or PHASE_TICKS pass.
+void walk_watcher(World& world, Cell cell) {
+  world.order(WATCHER, {cell, {0}});
+  for (std::uint64_t tick = 0; tick < PHASE_TICKS && !watcher_on(world, cell);
+       ++tick) {
+    world.tick();
+  }
+}
+
+// Ticks until the village lies in ruins, or PHASE_TICKS pass.
+void raze(World& world) {
+  world.order(RAIDER, {IN_VILLAGE, {0, 1}});
+  for (std::uint64_t tick = 0;
+       tick < PHASE_TICKS && world.village_state(0) != VillageState::RUINS;
+       ++tick) {
+    world.tick();
+  }
+}
+
+TEST(World, AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain) {
+  World world = watched_village_world();
+  world.tick();
+  const VillageMemory standing{0, true, VillageStage::STANDING};
+  ASSERT_EQ(remembered(world), standing);
+
+  walk_watcher(world, WATCH_CORNER);
+  ASSERT_TRUE(watcher_on(world, WATCH_CORNER));
+  raze(world);
+  ASSERT_EQ(world.village_state(0), VillageState::RUINS);
+  // Burnt while the watcher was away: it is remembered standing and peopled.
+  EXPECT_EQ(remembered(world), standing);
+
+  walk_watcher(world, BESIDE_VILLAGE);
+  ASSERT_TRUE(watcher_on(world, BESIDE_VILLAGE));
+  EXPECT_EQ(remembered(world), (VillageMemory{0, false, VillageStage::RUINS}));
+
+  // Control: the same burning in sight is remembered on the tick it ends.
+  World watched = watched_village_world();
+  watched.tick();
+  ASSERT_EQ(remembered(watched), standing);
+  raze(watched);
+  ASSERT_EQ(watched.village_state(0), VillageState::RUINS);
+  ASSERT_TRUE(remembered(watched).has_value());
+  EXPECT_EQ(remembered(watched).value_or(standing).stage, VillageStage::RUINS);
 }
 
 TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
@@ -1976,6 +2079,65 @@ TEST(World, ARebirthContinuesTheWorldInsteadOfResettingIt) {
   // Control: the world as created, before any of it happened, differs.
   EXPECT_NE(world.hash(), fresh.hash());
   EXPECT_GT(world.date().day, fresh.date().day);
+}
+
+// The post's soul, steered, in conscription_world() with a map sight of
+// CHART_SIGHT; returns the soul.
+constexpr std::int32_t CHART_SIGHT = 3;
+
+std::size_t steered_post(World& world) {
+  const std::size_t soul = world.ensoul(world.roster(POST).front());
+  world.steer(POST, true);
+  return soul;
+}
+
+TEST(World, ASteeredSoulChartsTheCellsWithinItsMapSight) {
+  World world = conscription_world(CHART_SIGHT);
+  const std::size_t soul = steered_post(world);
+  ASSERT_TRUE(world.chart(soul).empty());
+  world.tick();
+
+  const Chart& chart = world.chart(soul);
+  EXPECT_TRUE(chart.seen(POST_CELL));
+  EXPECT_TRUE(chart.seen(Cell{POST_CELL.x - CHART_SIGHT, POST_CELL.y}));
+  EXPECT_FALSE(chart.seen(Cell{POST_CELL.x - CHART_SIGHT - 1, POST_CELL.y}));
+  // The house at (2, 2) lies 10 cells off, out of view.
+  EXPECT_TRUE(chart.villages().empty());
+  // Controls: the same soul unsteered, or steered with no map sight, charts
+  // nothing.
+  World unsteered = conscription_world(CHART_SIGHT);
+  const std::size_t loose = unsteered.ensoul(unsteered.roster(POST).front());
+  unsteered.tick();
+  EXPECT_TRUE(unsteered.chart(loose).empty());
+  World blind = conscription_world(0);
+  const std::size_t unseeing = steered_post(blind);
+  blind.tick();
+  EXPECT_TRUE(blind.chart(unseeing).empty());
+}
+
+TEST(World, ASoulKeepsItsChartWhenItIsBornAgain) {
+  World world = conscription_world(CHART_SIGHT);
+  const std::size_t soul = steered_post(world);
+  const std::size_t post = world.roster(POST).front();
+  const std::size_t before = world.population();
+  world.order(POST, {HOME, {0}});
+  run_ticks(world, ARRIVAL_TICKS);
+
+  // Setup: the post died at the village and its soul was born again there.
+  ASSERT_EQ(world.person(post).health, 0U);
+  ASSERT_EQ(world.population(), before + 1);
+  ASSERT_EQ(world.person(before).soul, std::optional<std::size_t>{soul});
+  const Cell reborn_at = cell_of(world.person(before).position);
+  ASSERT_GT(std::abs(reborn_at.x - POST_CELL.x), CHART_SIGHT);
+  // Where the first body started, out of the new body's sight, is still
+  // charted, and so is the village it reached.
+  EXPECT_TRUE(world.chart(soul).seen(POST_CELL));
+  ASSERT_EQ(world.chart(soul).villages().size(), 1U);
+  EXPECT_TRUE(world.chart(soul).villages().front().has_value());
+  // Control: a cell no body of the soul came within sight of is not.
+  EXPECT_FALSE(
+      world.chart(soul).seen(Cell{static_cast<std::int32_t>(OPEN_SIDE) - 1,
+                                  static_cast<std::int32_t>(OPEN_SIDE) - 1}));
 }
 
 TEST(World, PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife) {

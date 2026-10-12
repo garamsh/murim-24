@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -554,6 +555,29 @@ class WorldAdapter : public godot::RefCounted {
   /// founded as the world runs, on the land the core says each was founded
   /// on; empty unless the world was made by create_region().
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
+
+  /// Returns, for each cell row by row, 1 where the player's soul has seen
+  /// it and 0 where it has not, as the core's chart keeps it; empty unless
+  /// the world was made by create_region().
+  [[nodiscard]] godot::PackedByteArray explored() const;
+
+  /// Returns each village the player's soul has seen, as villages() gives
+  /// it, with `faction` its owner and `stage` one of the VILLAGE_*
+  /// constants as last seen, and `peopled` whether it had living residents;
+  /// empty unless the world was made by create_region().
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> remembered_villages()
+      const;
+
+  /// Returns the faction each cell's territory lay in as the player's soul
+  /// last saw it, as territory() gives it, from the villages it remembers,
+  /// and -1 for a cell it has not seen; empty unless the world was made by
+  /// create_region().
+  [[nodiscard]] godot::PackedInt64Array remembered_territory() const;
+
+  /// Returns a count that rises whenever the player's soul first sees a cell
+  /// or a village's memory changes, for the view to redraw on; 0 unless the
+  /// world was made by create_region().
+  [[nodiscard]] std::int64_t chart_revision() const;
 
  protected:
   static void _bind_methods();

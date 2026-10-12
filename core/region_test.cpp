@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "calendar.hpp"
+#include "chart.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "kinship.hpp"
@@ -1621,6 +1622,82 @@ Century century(const RegionData& data, Seed seed) {
          (elders >= 1 && elders <= std::max<std::size_t>(members / 3, 1)));
   }
   return result;
+}
+
+// The region of SEED with its player born into village 0, carrying a soul
+// and steered, seeing the land within `map_sight` cells, lived `ticks`
+// ticks at days of five ticks.
+World charted_lived(std::int32_t map_sight, std::uint64_t ticks) {
+  constexpr std::uint64_t TICKS_PER_SHORT_DAY = 5;
+  Region region = generate_region(SEED, base_data());
+  region.rules.ticks_per_day = TICKS_PER_SHORT_DAY;
+  region.rules.map_sight = map_sight;
+  region.armies.push_back(born_in(region, 0));
+  World world = world_of(region);
+  world.ensoul(world.population() - 1);
+  world.steer(region.armies.size() - 1, true);
+  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+    world.tick();
+  }
+  return world;
+}
+
+// Every outcome of `world` its public reads show beside its charts: each
+// person's place, health and readiness, home, family, qi and silver; each
+// army's roster and objective; each structure's durability; each village's
+// owner, state and residents; the events; and the date.
+std::vector<std::int64_t> outcomes(const World& world) {
+  std::vector<std::int64_t> seen;
+  const auto add = [&seen](auto value) {
+    seen.push_back(static_cast<std::int64_t>(value));
+  };
+  for (std::size_t index = 0; index < world.population(); ++index) {
+    const Person& person = world.person(index);
+    add(person.position.x);
+    add(person.position.y);
+    add(person.health);
+    add(person.ready_at);
+    add(person.home.value_or(world.village_count()));
+    add(person.family);
+    add(person.qi);
+    add(person.silver);
+  }
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    for (const std::size_t member : world.roster(army)) {
+      add(member);
+    }
+    add(world.objective(army).x);
+    add(world.objective(army).y);
+  }
+  for (std::size_t structure = 0; structure < world.structure_count();
+       ++structure) {
+    add(world.structure(structure).durability);
+  }
+  for (std::size_t village = 0; village < world.village_count(); ++village) {
+    add(world.owner(village));
+    add(world.village_state(village));
+    add(world.residents_of(village));
+  }
+  add(world.events().size());
+  add(world.date().day);
+  return seen;
+}
+
+TEST(Region, NoOutcomeReadsTheChart) {
+  constexpr std::int32_t MAP_SIGHT = 15;
+  constexpr std::uint64_t YEAR_OF_TICKS = std::uint64_t{DAYS_PER_YEAR} * 5;
+  const World charted = charted_lived(MAP_SIGHT, YEAR_OF_TICKS);
+  const World blind = charted_lived(0, YEAR_OF_TICKS);
+  // Setup: one world charted a year of what its player saw, the other none.
+  ASSERT_FALSE(charted.chart(0).empty());
+  ASSERT_TRUE(blind.chart(0).empty());
+  // The two differ in their charts, which the hash folds...
+  EXPECT_NE(charted.hash(), blind.hash());
+  // ...and in nothing else.
+  EXPECT_EQ(outcomes(charted), outcomes(blind));
+  // Control: one tick more is an outcome the comparison sees.
+  EXPECT_NE(outcomes(charted_lived(MAP_SIGHT, YEAR_OF_TICKS + 1)),
+            outcomes(charted));
 }
 
 TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
