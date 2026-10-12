@@ -164,6 +164,7 @@ var _talk_read_at := -1
 @onready var _hud: CanvasLayer = $Hud
 @onready var _sound: Node2D = $Sound
 @onready var _aim: Node2D = $Aim
+@onready var _grade: CanvasLayer = $Grade
 
 
 func _ready() -> void:
@@ -196,11 +197,12 @@ func fit_view() -> void:
 
 
 ## Shows the damage the struck take as numbers over them, or not, blood on a hit and the hit stop, or
-## not, as the settings choose.
+## not, and the screen's effects at their quality, as the settings choose.
 func show_numbers() -> void:
 	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
 	_art.get_node("Combat").blood = _hud.settings.blood()
 	_art.get_node("Combat").hit_stop = _hud.settings.hit_stop()
+	_grade.quality = _hud.settings.screen_quality()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from
@@ -454,6 +456,8 @@ func controls() -> Array[Dictionary]:
 
 func _process(delta: float) -> void:
 	advance(delta)
+	if world == null:
+		_grade.visible = false
 	if world == null or _hud.screen() != null:
 		return
 	var screen := get_viewport_rect().size / _camera.zoom
@@ -482,6 +486,10 @@ func _process(delta: float) -> void:
 ## test, with no window, gives its own.
 func show_view(view: Rect2) -> void:
 	_art.refresh(view, _between())
+	# The screen graded by the time of day and the season the world has reached (#209).
+	var date := world.date()
+	_grade.art_pixel = _camera.zoom.x
+	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
 	_view_origin = view.position
 
 

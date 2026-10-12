@@ -37,6 +37,7 @@ var _hud_scale := 1
 @onready var _art: Node2D = $WorldArt
 @onready var _camera: Camera2D = $Camera
 @onready var _sound: Node2D = $Sound
+@onready var _grade: CanvasLayer = $Grade
 
 
 func _ready() -> void:
@@ -81,6 +82,9 @@ func _process(delta: float) -> void:
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.position - screen / 2.0, screen)
 	_art.refresh(view, _since_tick / step)
+	var date := world.date()
+	_grade.art_pixel = _camera.zoom.x
+	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
 	bodies_outlined = _art.outlined
