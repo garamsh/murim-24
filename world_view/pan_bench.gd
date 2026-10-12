@@ -1,8 +1,8 @@
 ## Measures frame time as world_art.tscn draws a region of REGION_SEED while the view pans across
 ## it, so the ground streams its areas in and out as a player crossing the map makes it, the world
 ## ticking as it is drawn, vsync off. It prints p50, p99 and max against the frame budget, and how
-## many areas the ground showed. It needs a display, so it runs by hand on a developer's machine,
-## as `godot --path . --script res://world_view/pan_bench.gd`, beside make bench's frame bench.
+## many areas the ground showed. `make bench` runs it after the frame bench; it needs a display, so
+## it runs on a developer's machine and not in CI.
 extends SceneTree
 
 const SCENE := "res://world_art/world_art.tscn"

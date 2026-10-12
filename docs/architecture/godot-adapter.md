@@ -80,7 +80,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 ### Scenes
 
 - `world_view/world_view.tscn` shows and sounds the M1 scenario through `world_art.tscn` and `sound/sound.tscn`, ticking at the core's tick rate whatever the frame rate, with names shown, so `make bench` measures a frame with names on. `make bench` renders it at the PC's scale and prints where a frame's time goes: the core's tick, the adapter's snapshot, the view's scripts with the native code they call, and rendering. `world_view/village_bench.gd`, run by hand, times a frame in a generated region's village.
-- `world_view/pan_bench.gd`, run by hand on a display, pans the view across a region while the ground streams its areas and the world ticks, and reports frame time against the same budget.
+- `world_view/pan_bench.gd` pans the view across a region while the ground streams its areas and the world ticks, and reports frame time against the same budget; `make bench` runs it after the frame bench.
 - The view fills the window at a whole-pixel scale, drawing textures without filtering, as `view_scale.gd` sets it, with a smaller least view on touch than on a PC. Bodies stand on whole world pixels.
 - `play/play.tscn`, the project's main scene, opens on the title screen. A new game has `create_region` make the region of a seed typed or drawn at random, and Continue resumes the world saved in slot 0.
 - The play scene steers the army `player_army` names, re-read when the world is made or loaded and after every tick, so it follows the soul after a rebirth.
