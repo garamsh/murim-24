@@ -123,3 +123,7 @@ Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8
 - Players find a reborn body's stale map misleading more than useful. Then the blank chart is the better choice.
 - A rule comes to need what an NPC knows of the land. Then a chart per soul is the wrong unit, and the record belongs to people.
 - 15 cells reveals too little or too much of what the screen shows, once ADR 0057's zoom lets the player see farther. Then the map's sight should follow the view, not the rules.
+
+## Errata
+
+- **2026-10-13, implementing issue #168 on macOS arm64 with Apple Clang.** The table's village memory of 4 bytes was an estimate, not the layout built in `core/chart.hpp`: `sizeof(VillageMemory)` is 16 bytes, and each `std::optional<VillageMemory>` slot is 24 bytes, including slots before the last remembered village that are empty. Thus 10,000 slots occupy 234.38 KiB before vector capacity and allocation overhead, rather than 39.06 KiB. Each `ChartBlock` occupies 132 bytes, its area index beside its 128 bytes of bits; the area's lookup index still costs 4 bytes. A `Chart` object itself occupies 96 bytes before its vectors' allocations. `build/issue-168/chart_sizes.cpp` and `chart-sizes.log` record the check in the implementing pull request's local evidence. The sparse record, save encoding and decision to keep it with the soul stand.

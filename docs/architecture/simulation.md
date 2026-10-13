@@ -80,7 +80,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - a person carrying a soul who dies is born again on the next tick, into a village with a living resident, in the army its body served in; with no such village it is not born again
 - A soul keeps a chart of what its bodies have seen, `chart()`. No rule reads it: it is the steered body's remembered view.
   - at the end of every tick, each living person carrying a soul in a steered army sees the cells within the rules' `map_sight`, 15 in the region, and 0 charts nothing
-  - seen cells are kept a bit a cell, in blocks of 128 bytes for each 32-cell area with a seen cell
+  - seen cells are kept a bit a cell, in blocks of 128 bytes for each 32-cell area with a seen cell; runtime storage includes each block's area index and optional village slots, as ADR 0073's erratum records
   - a village with a structure in view is remembered as it stands then: its owner, whether it has living residents, and whether its structures stand, are damaged or lie in ruins; one never in view is not remembered
   - `remembered_territory()` derives borders as `territory()` does, from the villages remembered, and gives no holder to a cell not seen
   - a body born again keeps the soul's chart; the chart is saved, and the hash folds it only while it holds something
