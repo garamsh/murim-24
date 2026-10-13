@@ -67,6 +67,7 @@ enum class DeclarationRefusal : std::uint8_t {
 /// `factions`, so a declaration holds for both whichever names it first.
 class Declarations {
  public:
+  /// No factions and no declarations.
   Declarations() = default;
 
   /// No declaration between any two of `factions`.
@@ -86,9 +87,9 @@ class Declarations {
   /// `other`. Throws std::out_of_range when either is no faction.
   void declare(std::size_t faction, std::size_t other, Declared declared);
 
-  /// Whether the declarations are as declare() keeps them: one place for
-  /// each two factions, each standing under the lower's row, made by one of
-  /// them no later than tick `now`.
+  /// Whether the saved-state invariant holds: one place for each two
+  /// factions, each standing under the lower's row, made by one of them no
+  /// later than tick `now`.
   [[nodiscard]] bool kept(std::uint64_t now) const;
 
   /// Every place, by the lower faction's index times the factions plus the
