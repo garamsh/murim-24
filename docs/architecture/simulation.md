@@ -12,6 +12,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `calendar` the days, seasons and years;
   - `skill` skills, strikes, casts and their refusals;
   - `talent` talent and its draws, and souls;
+  - `chart` the cells and villages a soul remembers;
   - `names` names;
   - `kinship` marriage and births;
   - `village` villages, their structures and what they hold;

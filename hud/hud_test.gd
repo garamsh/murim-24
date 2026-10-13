@@ -152,7 +152,8 @@ func _fog_pass() -> bool:
 	var width := image.get_width()
 	var hidden := 0
 	var shown := 0
-	var right := true
+	var hidden_right := true
+	var shown_right := true
 	for village: Dictionary in world.remembered_villages():
 		var colour: Color = preload("res://hud/palette.gd").ACCENTS[
 				preload("res://hud/affiliation.gd").sprite(world, village.faction)].lightened(0.3)
@@ -160,15 +161,15 @@ func _fog_pass() -> bool:
 			for x in range(village.corner.x, village.corner.x + village.area.x):
 				if seen[y * width + x] == 0:
 					hidden += 1
-					right = right and image.get_pixel(x, y).to_html() == preload("res://hud/map_window.gd").FOG.to_html()
+					hidden_right = hidden_right and image.get_pixel(x, y).to_html() == preload("res://hud/map_window.gd").FOG.to_html()
 				else:
 					shown += 1
 					var pixel := image.get_pixel(x, y)
-					right = right and absf(pixel.r - colour.r) < 1.0 / 255 \
+					shown_right = shown_right and absf(pixel.r - colour.r) < 1.0 / 255 \
 							and absf(pixel.g - colour.g) < 1.0 / 255 and absf(pixel.b - colour.b) < 1.0 / 255
-	var passed := hidden > 0 and shown > 0 and right
-	print("hud_test: partly seen villages keep %d unseen cells in fog and %d seen cells coloured: %s" % [
-			hidden, shown, "pass" if passed else "FAIL"])
+	var passed := hidden > 0 and shown > 0 and hidden_right and shown_right
+	print("hud_test: partly seen villages keep %d unseen cells in fog %s and %d seen cells coloured %s: %s" % [
+			hidden, hidden_right, shown, shown_right, "pass" if passed else "FAIL"])
 	hud.free()
 	return passed
 
