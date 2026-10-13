@@ -200,10 +200,11 @@ This supersedes ADR 0046's engagement of the nearest foe in sight regardless of 
      - an unequal-version save is refused; control, the matching-version save restores, with no migration.
    - Sweep identical.
 2. **Individuals: back off, flee, regroup and hold.**
+   - Unless testing isolation, keep an ally in sight and set the two sides' strengths to the named ratio; assert that setup before checking the outcome.
    - Tests:
-     - a cautious villager outside its claim backs off from two equally strong foes (ratio 2,000) and closes on one; control, the same villager bold closes on two;
+     - a cautious villager outside its claim backs off at ratio 2,000 and closes at 1,000; control, the same layout with the villager bold closes at 2,000;
      - a cowardly one flees to its village;
-     - one inside its claim holds against three;
+     - one inside its claim holds at ratio 2,000;
      - a straggler regroups to its army before engaging;
      - a backing-off token holder with a foe still in reach releases all slots and tokens before assignment and deals no damage, taking none on later ticks; control, the same layout with a closing token holder strikes; repeat for flee;
      - worsening risk: cautious back off at ratio 1,600 at tick 0 becomes flee at 4,000 at tick 15, with stance tick 15, repeat from hold on home ground and from regroup while alone, each entering flee at 4,000; control, 1,600 then 2,000 with allies in sight stays back off (hold on home ground), with its original tick;
