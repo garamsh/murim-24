@@ -29,11 +29,12 @@ func run() -> bool:
 	# stop, turning each off.
 	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
 			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT,
-			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT]:
+			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT,
+			KEY_DOWN, KEY_RIGHT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1}
+		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -54,22 +55,25 @@ func run() -> bool:
 	var read_back: Dictionary = reread.chosen.duplicate()
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
 			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied \
-			and reread.damage_numbers() == "everyone" and not reread.blood() and not reread.hit_stop()
+			and reread.damage_numbers() == "everyone" and not reread.blood() and not reread.hit_stop() \
+			and reread.screen_quality() == 2
 
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(_missing)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
 			and not missing.cast_on_release() and missing.damage_numbers() == "mine" and missing.blood() \
-			and missing.hit_stop()
+			and missing.hit_stop() and missing.screen_quality() == 1
 
 	# A resolution out of range is refused; the speed beside it in range is read.
 	file = ConfigFile.new()
 	file.set_value(Settings.SECTION, "speed", 1)
 	file.set_value(Settings.SECTION, "resolution", Settings.RESOLUTIONS.size())
+	file.set_value(Settings.SECTION, "screen", Settings.SCREEN_KEYS.size())
 	file.save(_path)
 	var ranged := _panel(_path)
 	ranged.read()
-	var refused: bool = ranged.chosen.resolution == Settings.DEFAULTS.resolution and ranged.chosen.speed == 1
+	var refused: bool = ranged.chosen.resolution == Settings.DEFAULTS.resolution and ranged.chosen.speed == 1 \
+			and ranged.screen_quality() == Settings.DEFAULTS.screen
 
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	_remove(_path)
@@ -95,7 +99,7 @@ func _tap_pass() -> bool:
 	panel.applied.connect(func() -> void: sent[0] += 1)
 	panel.open()
 	var row := Settings.ROWS.find("touch")
-	var y := Settings.DIALOG.position.y + 30 + row * Settings.ROW_STEP + 2 + Settings.SLIP_HEIGHT / 2.0
+	var y := Settings.DIALOG.position.y + Settings.ROW_TOP + row * Settings.ROW_STEP + Settings.SLIP_HEIGHT / 2.0
 	var slip := Settings.choice_width("touch")
 	var first := Settings.choices_x(Settings.TOUCH_MODES.size(), slip)
 	var shown := {}
@@ -133,7 +137,8 @@ func _fit_pass() -> bool:
 		for key: String in ["SETTINGS_SPEED_TIMES", "SETTINGS_WINDOWED", "SETTINGS_FULLSCREEN", "SETTINGS_CAST_PRESS",
 				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS + Settings.NUMBERS_KEYS \
 				+ Settings.BLOOD_KEYS \
-				+ Settings.HITSTOP_KEYS:
+				+ Settings.HITSTOP_KEYS \
+				+ Settings.SCREEN_KEYS:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)
@@ -148,8 +153,8 @@ func _fit_pass() -> bool:
 		var keys := fit.say("SETTINGS_KEYS")
 		fit.check(keys, 8 + fit.width(keys), dialog.size.x - 8)
 		# The line under the rows, as tall as the font, ends above the line over the foot.
-		var about_end := 30 + Settings.ROWS.size() * Settings.ROW_STEP + 2 + Hud.FONT_SIZE
-		fit.check("%d rows" % Settings.ROWS.size(), about_end, dialog.size.y - 20)
+		var about_end := Settings.ROW_TOP + Settings.ROWS.size() * Settings.ROW_STEP + 2 + Hud.FONT_SIZE
+		fit.check("%d rows" % Settings.ROWS.size(), about_end + 2, dialog.size.y - 20)
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	panel.free()
 	var unmeasured := fit.unmeasured(["SETTINGS_", "LOCALE_"])
