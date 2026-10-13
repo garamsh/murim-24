@@ -1083,10 +1083,8 @@ func _borders_follow(borders: Array, owners: PackedInt64Array, world: WorldAdapt
 	return borders.size() == edges and edges > 0
 
 
-# Whether the HUD's map marks with a faction's accent exactly the cells, outside every village's
-# square, whose right or lower neighbour lies in another territory of `owners`.
 # Whether the HUD's map shows `world`'s chart: apart from the squares of the villages it remembers,
-# each drawn whole, fog on every cell the player has not seen, and on the rest a faction's accent
+# clipped to seen cells, fog on every cell the player has not seen, and on the rest a faction's accent
 # exactly where the remembered territory has a border with a seen neighbour.
 func _map_follows(hud: CanvasLayer, world: WorldAdapter) -> bool:
 	var image: Image = hud.map_texture.get_image()
@@ -1104,11 +1102,11 @@ func _map_follows(hud: CanvasLayer, world: WorldAdapter) -> bool:
 		return false
 	for i in owners.size():
 		var cell := Vector2i(i % width, i / width)
-		if squares.any(func(square: Rect2i) -> bool: return square.has_point(cell)):
-			continue
 		if seen[i] == 0:
 			if image.get_pixel(cell.x, cell.y).to_html(false) != fog:
 				return false
+			continue
+		if squares.any(func(square: Rect2i) -> bool: return square.has_point(cell)):
 			continue
 		var border := ((i + 1) % width != 0 and seen[i + 1] != 0 and owners[i] != owners[i + 1]) \
 				or (i + width < owners.size() and seen[i + width] != 0 and owners[i] != owners[i + width])

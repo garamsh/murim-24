@@ -134,9 +134,43 @@ func run() -> bool:
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
 	var purse_passed := _purse_pass()
+	var fog_passed := _fog_pass()
 	var slip_passed := _notice_slip_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed and purse_passed and slip_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed and fog_passed and slip_passed
+
+
+# A partly seen village keeps fog on its unseen cells, with its seen cells in its owner's colour.
+# Seed 0 places a village across the edge of the player's first sight.
+func _fog_pass() -> bool:
+	var world := WorldAdapter.create_region(0)
+	world.tick()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, world.player_army())
+	var image: Image = hud.map_texture.get_image()
+	var seen := world.explored()
+	var width := image.get_width()
+	var hidden := 0
+	var shown := 0
+	var right := true
+	for village: Dictionary in world.remembered_villages():
+		var colour: Color = preload("res://hud/palette.gd").ACCENTS[
+				preload("res://hud/affiliation.gd").sprite(world, village.faction)].lightened(0.3)
+		for y in range(village.corner.y, village.corner.y + village.area.y):
+			for x in range(village.corner.x, village.corner.x + village.area.x):
+				if seen[y * width + x] == 0:
+					hidden += 1
+					right = right and image.get_pixel(x, y).to_html() == preload("res://hud/map_window.gd").FOG.to_html()
+				else:
+					shown += 1
+					var pixel := image.get_pixel(x, y)
+					right = right and absf(pixel.r - colour.r) < 1.0 / 255 \
+							and absf(pixel.g - colour.g) < 1.0 / 255 and absf(pixel.b - colour.b) < 1.0 / 255
+	var passed := hidden > 0 and shown > 0 and right
+	print("hud_test: partly seen villages keep %d unseen cells in fog and %d seen cells coloured: %s" % [
+			hidden, shown, "pass" if passed else "FAIL"])
+	hud.free()
+	return passed
 
 
 # A notice stands on a slip as wide as its words, within the room, and never over the talk prompt's

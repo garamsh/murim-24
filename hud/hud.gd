@@ -866,7 +866,7 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 # One pixel per cell, of what the player has seen: fog on a cell not seen; on a seen one the terrain
 # kind's colour, the accent of the faction holding it along the borders derived from the villages
 # as last seen, against a seen neighbour, or of its neighbour's where it lies in no territory; and each village as last seen,
-# its square in its owner's accent, or in stone when it was seen in ruins.
+# its seen cells in its owner's accent, or in stone when it was seen in ruins.
 func _map_image(world: WorldAdapter) -> Image:
 	var rows := world.map_rows()
 	_world_size = Vector2i(rows[0].length() if rows.size() > 0 else 0, rows.size())
@@ -902,5 +902,8 @@ func _map_image(world: WorldAdapter) -> Image:
 		var area: Vector2i = village.area
 		var colour := Palette.STONE_3 if village.stage == WorldAdapter.VILLAGE_RUINS \
 				else Palette.ACCENTS[sprites[village.faction]].lightened(0.3)
-		image.fill_rect(Rect2i(corner, area), colour)
+		for y in range(corner.y, corner.y + area.y):
+			for x in range(corner.x, corner.x + area.x):
+				if seen[y * _world_size.x + x] != 0:
+					image.set_pixel(x, y, colour)
 	return image

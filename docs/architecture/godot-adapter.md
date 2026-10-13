@@ -102,7 +102,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `hud/hud.tscn` is drawn at a whole-pixel scale of its own, as `view_scale.gd` gives it, and laid out in the window's size at that scale.
 - The HUD shows:
   - the player's portrait, faction, health, qi and realm
-  - a map around the player of what the player's soul has seen, from `explored`, `remembered_territory` and `remembered_villages`: unseen cells in fog, borders only against seen cells, and each village as last seen, in stone if seen in ruins; it is drawn again when `chart_revision` moves, and shows the core's season and year
+  - a map around the player of what the player's soul has seen, from `explored`, `remembered_territory` and `remembered_villages`: unseen cells in fog, borders only against seen cells, and each village as last seen on its seen cells, in stone if seen in ruins; it is drawn again when `chart_revision` moves, and shows the core's season and year
   - its faction's leader, and a duel for the lead while one is fought
   - the target frame on the person the player selected
   - the notices of the core's refusals and of the player's lessons and realms, read from `progress`
