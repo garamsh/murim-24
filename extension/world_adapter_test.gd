@@ -7,7 +7,9 @@
 # region's people are read back with their names and kin; that a region's
 # villages are read back with the cap, stock and population the core derives;
 # and that a region's sects and manuals are read back as the core holds them; and that the player
-# applies to a sect, hears rumours and shows attainment through the adapter as the core holds them.
+# applies to a sect, hears rumours and shows attainment through the adapter as the core holds them;
+# and that a snapshot reads in one call what the per-army, per-structure and per-strike reads give;
+# and that the date reads the tick within the day and the day's length.
 extends RefCounted
 
 const SEED := 42
@@ -113,6 +115,22 @@ func run() -> bool:
 			and WorldAdapter.create_region(SEED, 0, 0) == null and WorldAdapter.create_region(SEED, 0, -1) == null
 	print("world_adapter_test: a region of five-tick days accepted %s, on day %d after five ticks from day %d; days of 0 and -1 ticks refused: %s" % [
 		short != null, short.date().day if short != null else -1, first_day, "pass" if days_pass else "FAIL"])
+	# The date gives the tick within the day and the day's length: a region of five-tick days reads
+	# 5, its tick 0 at a day's start, 3 three ticks on and 0 again as the next day starts. Control: a
+	# region of the core's default day reads its own length, not 5.
+	var timed := WorldAdapter.create_region(SEED, 0, 5)
+	var ticks_seen: Array[int] = [timed.date().tick]
+	for i in 3:
+		timed.tick()
+	ticks_seen.append(timed.date().tick)
+	for i in 2:
+		timed.tick()
+	ticks_seen.append(timed.date().tick)
+	var default_day: int = WorldAdapter.create_region(SEED, 0).date().ticks_per_day
+	var time_pass: bool = timed.date().ticks_per_day == 5 and ticks_seen == [0, 3, 0] and default_day != 5 \
+			and default_day > 0
+	print("world_adapter_test: five-tick days read %d ticks a day, the tick %s over five ticks; the default day reads %d: %s" % [
+		timed.date().ticks_per_day, ticks_seen, default_day, "pass" if time_pass else "FAIL"])
 	var orders_pass := _orders_pass()
 	var reads_pass := _reads_pass()
 	var villages_pass := _villages_pass()
@@ -127,9 +145,61 @@ func run() -> bool:
 	var qi_pass := _qi_pass(lived)
 	var lessons_pass := _lessons_pass(lived)
 	var event_people_pass := _event_people_pass()
-	return hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and sects_pass \
+	var snapshot_pass := _snapshot_pass()
+	return snapshot_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and time_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
+
+
+# On a tick of the M1 battle with uses of skills recorded and someone dead, a snapshot holds every
+# army's roster, positions, health and ready ticks, its faction, every structure's stage, and every
+# use with whom it struck, as the reads one army, structure or use at a time give them. Setup: the
+# tick recorded uses and the rosters shrank. Control: a snapshot of another tick differs.
+func _snapshot_pass() -> bool:
+	var world := WorldAdapter.create_m1()
+	var start := world.snapshot()
+	var ticks := 0
+	while ticks < TICKS and (world.strikes().is_empty() or world.snapshot().person.size() == start.person.size()):
+		world.tick()
+		ticks += 1
+	var snapshot := world.snapshot()
+	var setup: bool = not world.strikes().is_empty() and snapshot.person.size() < start.person.size()
+	var first := PackedInt64Array([0])
+	var persons := PackedInt64Array()
+	var positions := PackedVector2Array()
+	var healths := PackedInt64Array()
+	var ready := PackedInt64Array()
+	var factions := PackedInt64Array()
+	for army in world.army_count():
+		persons.append_array(world.roster(army))
+		positions.append_array(world.body_positions(army))
+		healths.append_array(world.body_strengths(army))
+		ready.append_array(world.body_ready(army))
+		factions.append(world.army_faction(army))
+		first.append(persons.size())
+	var stages := PackedInt64Array()
+	for structure in world.structure_count():
+		stages.append(world.structure_stage(structure))
+	var strikes_match := true
+	var strikes := world.strikes()
+	for i in strikes.size():
+		var strike: Dictionary = strikes[i]
+		strikes_match = strikes_match and snapshot.strike_person[i] == strike.person \
+				and snapshot.strike_shape[i] == strike.shape and snapshot.strike_range[i] == strike.range \
+				and snapshot.strike_radius[i] == strike.radius and snapshot.strike_body_damage[i] == strike.body_damage \
+				and snapshot.strike_origin[i] == strike.origin and snapshot.strike_toward[i] == strike.toward \
+				and snapshot.strike_end[i] == strike.end \
+				and snapshot.struck.slice(snapshot.strike_first[i], snapshot.strike_first[i + 1]) == strike.struck
+	var reads_match: bool = snapshot.first == first and snapshot.person == persons and snapshot.position == positions \
+			and snapshot.health == healths and snapshot.ready == ready and snapshot.faction == factions \
+			and snapshot.stage == stages and snapshot.strike_person.size() == strikes.size() and strikes_match
+	world.tick()
+	var later := world.snapshot()
+	var passed: bool = setup and reads_match and (later.position != snapshot.position or later.health != snapshot.health)
+	print("world_adapter_test: after %d ticks of the M1 battle, %d uses and %d of %d people living, the snapshot reads as the per-army, per-structure and per-use reads %s; a tick later it differs %s: %s" % [
+		ticks, strikes.size(), snapshot.person.size(), start.person.size(), reads_match,
+		later.position != snapshot.position or later.health != snapshot.health, "pass" if passed else "FAIL"])
+	return passed
 
 
 # `lived`, a region lived ten years of five-tick days, reads its realms, and a person who knows an

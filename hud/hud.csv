@@ -143,6 +143,7 @@ CONTROLS_WARES,약 먹기,Use wares
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
+CONTROLS_MAP,지도,Map
 CONTROLS_PAUSE_CANCEL,일시정지 · 취소,Pause · Cancel
 CONTROLS_LEFT_CLICK,좌클릭,L-Click
 CONTROLS_SELECT,선택 · 대화,Select · Talk
@@ -215,6 +216,11 @@ SETTINGS_HITSTOP,역경직·흔들림,Hit stop
 SETTINGS_HITSTOP_ON,켬,On
 SETTINGS_HITSTOP_OFF,끔,Off
 SETTINGS_HITSTOP_ABOUT,내가 때리거나 맞으면 두 몸이 잠깐 멈추고 화면이 흔들린다.,Hits you deal or take pause both bodies and shake the view.
+SETTINGS_SCREEN,화면 효과,Screen effects
+SETTINGS_SCREEN_LOW,낮음,Low
+SETTINGS_SCREEN_STANDARD,보통,Standard
+SETTINGS_SCREEN_HIGH,높음,High
+SETTINGS_SCREEN_ABOUT,시간과 계절의 빛깔과 화면의 효과. 낮음은 무거운 효과를 끈다.,The light of the hour and season. Low drops the costly effects.
 NOTICE_COMPREHENDED,깨달음: %s,Comprehended: %s
 NOTICE_READ,비급 독파: %s,Read from a manual: %s
 NOTICE_TAUGHT,사문 전수: %s,Taught by the sect: %s
@@ -329,3 +335,10 @@ CONSUME_DEAD,쓰러진 몸으로는 먹을 수 없다,You cannot take it while f
 CONSUME_NONE_HELD,%s · 가진 것이 없다,%s · none held
 CONSUME_FULL_HEALTH,체력이 이미 가득하다,Health is already full
 CONSUME_FULL_QI,내공이 이미 가득하다,Qi is already full
+MAP_TITLE,지도,Map
+MAP_CLOSE,N 닫기,N Close
+MAP_KEYS,"가 본 곳만 보이고, 마지막으로 본 모습으로 남습니다","Only what you have seen, as you last saw it"
+MAP_LEGEND,범례,Legend
+MAP_RUINS,폐허로 본 마을,Seen in ruins
+MAP_UNSEEN,가 보지 않은 곳,Not yet seen
+MAP_YOU,나,You

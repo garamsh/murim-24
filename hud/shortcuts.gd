@@ -12,7 +12,8 @@ const WORD_X := 17
 const INSET := 3
 ## Each icon a row or a touch button may name, 9 pixels square, a letter a pixel as _pixel_icon
 ## draws it: a tree of three kin, a banner on its pole, crossed swords and a jian upright, as
-## touch.lua and mobile_hud_arts.lua draw them, then a gear and two bars.
+## touch.lua and mobile_hud_arts.lua draw them, then a gear, two bars and a map folded in three
+## panels with a road across it.
 const ICONS := {
 	"genealogy": ["...###...", "...#.#...", "...###...", "....#....", ".#######.", ".#.....#.",
 			"###...###", "#.#...#.#", "###...###"],
@@ -26,6 +27,8 @@ const ICONS := {
 			"..#####..", ".#.###.#.", "....#...."],
 	"pause": [".........", ".##...##.", ".##...##.", ".##...##.", ".##...##.", ".##...##.",
 			".##...##.", ".##...##.", "........."],
+	"map": ["#..##..##", "##.###.##", "#####.###", "#.###..##", "#..##..##", "#..##..##",
+			"#..###.##", "#..#.####", "##.#..#.#"],
 }
 
 ## The rows, top first, each a Dictionary of its `action`, the HUD's name for the panel or screen

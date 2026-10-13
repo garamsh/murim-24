@@ -64,9 +64,12 @@ const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const ARTS_KEY := KEY_K
 const FACTIONS_KEY := KEY_F
+## The key that opens the map window and closes it again.
+const MAP_KEY := KEY_N
 ## The keys that open a panel over the world and close it again, by the HUD's name for the panel
 ## each opens, which the touch controls' button for it bears too.
-const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions"}
+const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions",
+		MAP_KEY: "map_window"}
 ## The key that talks to the person the prompt names; inside the faction window it challenges.
 const TALK_KEY := KEY_C
 ## The key that sets an attack intent on the selected person, or the nearest foe in sight.
@@ -93,6 +96,7 @@ const SHORTCUTS: Array[Dictionary] = [
 	{"action": "sect", "key": SECT_KEY, "icon": "sect", "label": "CONTROLS_SECTS"},
 	{"action": "factions", "key": FACTIONS_KEY, "icon": "factions", "label": "CONTROLS_FACTIONS"},
 	{"action": "arts", "key": ARTS_KEY, "icon": "arts", "label": "CONTROLS_ARTS"},
+	{"action": "map_window", "key": MAP_KEY, "icon": "map", "label": "CONTROLS_MAP"},
 	{"action": "settings", "key": KEY_NONE, "icon": "settings", "label": "SETTINGS_TITLE"},
 	{"action": "pause", "key": PAUSE_KEY, "icon": "pause", "label": "CONTROLS_PAUSE_CANCEL"},
 ]
@@ -127,8 +131,9 @@ var _moving := false
 var _aiming := KEY_NONE
 # The person last steered, whose death the rebirth screen sums up once its soul is born again.
 var _body := -1
-# The date at the last tick, and the days that have begun since the world was last saved.
-var _date := {}
+# The day at the last tick, as its year, season and day, and the days that have begun since the
+# world was last saved.
+var _date := []
 var _unsaved_days := 0
 ## The way the person last moved, or was last steered, as a facing for a tapped skill's aim.
 var facing := Vector2.DOWN
@@ -160,6 +165,7 @@ var _talk_read_at := -1
 @onready var _hud: CanvasLayer = $Hud
 @onready var _sound: Node2D = $Sound
 @onready var _aim: Node2D = $Aim
+@onready var _grade: CanvasLayer = $Grade
 
 
 func _ready() -> void:
@@ -192,11 +198,12 @@ func fit_view() -> void:
 
 
 ## Shows the damage the struck take as numbers over them, or not, blood on a hit and the hit stop, or
-## not, as the settings choose.
+## not, and the screen's effects at their quality, as the settings choose.
 func show_numbers() -> void:
 	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
 	_art.get_node("Combat").blood = _hud.settings.blood()
 	_art.get_node("Combat").hit_stop = _hud.settings.hit_stop()
+	_grade.quality = _hud.settings.screen_quality()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from
@@ -266,12 +273,17 @@ static func drawn_bounds(size: Vector2, relief: Relief) -> Rect2:
 	return Rect2(Vector2.ZERO, size - Vector2(0, lift))
 
 
+# The day `date` names, its year, season and day, without the tick within it.
+static func _day_of(date: Dictionary) -> Array:
+	return [date.year, date.season, date.day]
+
+
 # Plays `made`, steering the person carrying the player's soul, and closes the title screen.
 func _play(made: WorldAdapter) -> void:
 	world = made
 	world_seed = world.region_seed()
 	steered = world.player_army()
-	_date = world.date()
+	_date = _day_of(world.date())
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
 	_art.show_world(world, steered)
@@ -282,7 +294,6 @@ func _play(made: WorldAdapter) -> void:
 	for keycode: Key in WARE_KEYS:
 		_hud.purse.keys.append(OS.get_keycode_string(keycode))
 	_body = world.roster(steered)[0]
-	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
 	var rows := world.map_rows()
 	_bounds = drawn_bounds(Vector2(rows[0].length(), rows.size()) * _art.CELL, _art.relief)
@@ -451,6 +462,8 @@ func controls() -> Array[Dictionary]:
 
 func _process(delta: float) -> void:
 	advance(delta)
+	if world == null:
+		_grade.visible = false
 	if world == null or _hud.screen() != null:
 		return
 	var screen := get_viewport_rect().size / _camera.zoom
@@ -479,12 +492,21 @@ func _process(delta: float) -> void:
 ## test, with no window, gives its own.
 func show_view(view: Rect2) -> void:
 	_art.refresh(view, _between())
+	# The screen graded by the time of day and the season the world has reached (#209).
+	var date := world.date()
+	_grade.art_pixel = _camera.zoom.x
+	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
 	_view_origin = view.position
 
 
 ## Returns `at`, a point in the world's pixels, where it lies on the HUD, in the HUD's pixels.
 func to_hud_pixels(at: Vector2) -> Vector2:
-	return _hud.from_window((at - _view_origin) * _camera.zoom)
+	return _to_hud() * at
+
+
+# The world's pixels to the window's, then to the HUD's, as from_window() takes them.
+func _to_hud() -> Transform2D:
+	return _hud.transform.affine_inverse() * Transform2D(0.0, _camera.zoom, 0.0, -_view_origin * _camera.zoom)
 
 
 ## Turns `event`, its position in this node's pixels, into an order for the steered person, keeping
@@ -890,18 +912,14 @@ func show_talk() -> void:
 ## while no panel is open, the selected one and the one under the cursor first and marked; the HUD
 ## keeps the talk prompt's slip, over the head of the one it names, clear of names.
 func show_names() -> void:
-	var people: Array[Dictionary] = []
-	if _hud.panel() == null:
-		for person: Dictionary in _art.near:
-			people.append({"person": person.person, "relation": person.relation,
-				"head": to_hud_pixels(person.head).floor()})
+	var people: Dictionary = _art.near if _hud.panel() == null else {}
 	var hovered := person_at(_cursor) if not _hud.touch.visible and _hud.panel() == null else -1
-	_hud.show_names(world, people, selected, hovered)
+	_hud.show_names(world, people, selected, hovered, _to_hud())
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
-## genealogy panel; the sect panel while the world has sects; the arts panel; the faction window; or
-## the dialogue window, on the person the prompt names when the core lets the steered person talk to
+## genealogy panel; the sect panel while the world has sects; the arts panel; the faction window; the
+## map window, on what the player has seen; or the dialogue window, on the person the prompt names when the core lets the steered person talk to
 ## it. While a panel is open, it takes every key, and no key gives an order or casts. Returns
 ## whether it opened.
 func open_panel(keycode: Key) -> bool:
@@ -920,6 +938,8 @@ func open_panel(keycode: Key) -> bool:
 			_hud.show_placing()
 		FACTIONS_KEY:
 			_hud.factions.show_factions(world, steered, _hud.touch.visible)
+		MAP_KEY:
+			_hud.open_map(world, steered)
 		TALK_KEY:
 			return talk_with(talk_to)
 		_:
@@ -1040,8 +1060,9 @@ func advance(delta: float) -> void:
 ## again as another.
 func step() -> void:
 	world.tick()
-	_art.note_tick()
-	_sound.note_tick()
+	var snapshot := world.snapshot()
+	_art.note_tick(snapshot)
+	_sound.note_tick(snapshot)
 	ticks += 1
 	# While the joystick is held, the person is ordered on its way again from each new cell it
 	# reaches.
@@ -1054,9 +1075,9 @@ func step() -> void:
 		steered = army
 		_art.steered = army
 		_hud.show_player(world, army)
-	var date := world.date()
-	if date != _date:
-		_date = date
+	var day := _day_of(world.date())
+	if day != _date:
+		_date = day
 		_unsaved_days += 1
 	if _unsaved_days >= AUTOSAVE_DAYS and army >= 0:
 		_hud.show_autosave(save())

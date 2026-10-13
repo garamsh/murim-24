@@ -3,7 +3,8 @@
 ## window. It ticks the world at the core's tick rate whatever the frame rate, draws the bodies
 ## between their last two ticks' positions on every frame, names the people round the lead of the
 ## army nearest the battle's centre as the play scene names those round the player, at the HUD's
-## scale, and holds no game rule.
+## scale, and holds no game rule. It reads the world once a tick, through WorldAdapter.snapshot(),
+## for the art and the sound alike, and keeps the time each part of a frame takes.
 extends Node2D
 
 const ViewScale := preload("res://view_scale.gd")
@@ -23,6 +24,11 @@ var bodies_outlined := 0
 ## People within the names' reach in the last frame, and the names shown over them.
 var named_near := 0
 var names_shown := 0
+## Microseconds spent so far ticking the core, reading it through the adapter, and in the view's
+## scripts and the native code they call: art, sound and names.
+var tick_usec := 0
+var adapter_usec := 0
+var view_usec := 0
 
 var _since_tick := 0.0
 var _names := Nameplates.new()
@@ -31,6 +37,7 @@ var _hud_scale := 1
 @onready var _art: Node2D = $WorldArt
 @onready var _camera: Camera2D = $Camera
 @onready var _sound: Node2D = $Sound
+@onready var _grade: CanvasLayer = $Grade
 
 
 func _ready() -> void:
@@ -38,6 +45,7 @@ func _ready() -> void:
 	_camera.zoom = Vector2(scale, scale)
 	world = WorldAdapter.create_m1()
 	_art.show_world(world, -1)
+	bodies = world.snapshot().person.size()
 	_camera.position = _art.to_screen(Vector2(WorldAdapter.m1_centre()))
 	_art.name_around(_nearest_army(Vector2(WorldAdapter.m1_centre())))
 	_sound.show_world(world, _art.to_screen)
@@ -57,27 +65,35 @@ func _process(delta: float) -> void:
 	var step := 1.0 / WorldAdapter.TICKS_PER_SECOND
 	_since_tick = minf(_since_tick + delta, step * MAX_TICKS_PER_FRAME)
 	while _since_tick >= step:
+		var started := Time.get_ticks_usec()
 		world.tick()
-		_art.note_tick()
-		_sound.note_tick()
+		var ticked := Time.get_ticks_usec()
+		var snapshot := world.snapshot()
+		var read := Time.get_ticks_usec()
+		_art.note_tick(snapshot)
+		_sound.note_tick(snapshot)
+		bodies = snapshot.person.size()
 		ticks += 1
 		_since_tick -= step
+		tick_usec += ticked - started
+		adapter_usec += read - ticked
+		view_usec += Time.get_ticks_usec() - read
+	var viewing := Time.get_ticks_usec()
 	var screen := get_viewport_rect().size / _camera.zoom
 	var view := Rect2(_camera.position - screen / 2.0, screen)
 	_art.refresh(view, _since_tick / step)
+	var date := world.date()
+	_grade.art_pixel = _camera.zoom.x
+	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
 	bodies_outlined = _art.outlined
-	var people: Array[Dictionary] = []
-	for person: Dictionary in _art.near:
-		people.append({"person": person.person, "relation": person.relation,
-			"head": ((person.head - view.position) * _camera.zoom / _hud_scale).floor()})
-	_names.show_names(world, people, [])
-	named_near = people.size()
+	# The world's pixels in view to the HUD's, which the names are drawn in.
+	var to_hud := Transform2D(0.0, _camera.zoom / _hud_scale, 0.0, -view.position * _camera.zoom / _hud_scale)
+	_names.show_names(world, _art.near, [], -1, -1, to_hud)
+	named_near = _art.near.person.size()
 	names_shown = _names.plates.size()
-	bodies = 0
-	for army in world.army_count():
-		bodies += world.body_positions(army).size()
+	view_usec += Time.get_ticks_usec() - viewing
 
 
 # The army whose lead stands nearest `at`, in sub-cell units.

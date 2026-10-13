@@ -90,15 +90,12 @@ func _colours_pass() -> bool:
 	var view := Rect2(lead - Vector2(WINDOW) / zoom / 2.0, Vector2(WINDOW) / zoom)
 	art.refresh(view, 1.0)
 	setup = setup and art.drawn == PEOPLE.size() and view.has_point(art.body_at(PAST_REACH, 0, 1.0))
-	var people: Array[Dictionary] = []
-	for person: Dictionary in art.near:
-		people.append({"person": person.person, "relation": person.relation,
-			"head": hud.from_window((person.head - view.position) * zoom).floor()})
-	hud.show_names(world, people)
+	var to_window := Transform2D(0.0, Vector2(zoom, zoom), 0.0, -view.position * zoom)
+	hud.show_names(world, art.near, -1, -1, hud.transform.affine_inverse() * to_window)
 	var faults := []
 	var near := {}
-	for person: Dictionary in art.near:
-		near[person.person] = person.relation
+	for i in art.near.person.size():
+		near[art.near.person[i]] = art.near.relation[i]
 	var named := {}
 	for plate: Dictionary in hud.nameplates.plates:
 		named[plate.person] = plate.colour
@@ -136,14 +133,14 @@ func _order_pass() -> bool:
 		people.append({"person": n, "relation": WorldAdapter.RELATION_OWN if n < 6 else WorldAdapter.RELATION_HOSTILE,
 			"head": Vector2(120 + (n % 4) * 180, 120 + (n / 4) * 80)})
 	var none: Array[Rect2] = []
-	plates.show_names(world, people, none)
+	plates.show_names(world, _packed(people), none)
 	var order: Array = plates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 	var hostile_first: bool = order == [6, 7, 8, 9, 10, 11, 0, 1]
 	var own: Array[Dictionary] = []
 	for n in 10:
 		own.append({"person": n, "relation": WorldAdapter.RELATION_OWN,
 			"head": Vector2(120 + (n % 4) * 180, 120 + (n / 4) * 80)})
-	plates.show_names(world, own, none)
+	plates.show_names(world, _packed(own), none)
 	var own_order: Array = plates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 	var control: bool = own_order == [0, 1, 2, 3, 4, 5, 6, 7]
 	plates.free()
@@ -190,11 +187,11 @@ func _rail_pass() -> bool:
 	var person := world.roster(0)[0]
 	var under := rail.get_center() + Vector2(0, 8)
 	var on: Array[Dictionary] = [{"person": person, "relation": WorldAdapter.RELATION_HOSTILE, "head": under}]
-	hud.show_names(world, on)
+	hud.show_names(world, _packed(on))
 	var on_rail: Array = hud.nameplates.plates.duplicate()
 	var beside := Vector2(rail.position.x - 120, under.y)
 	var off: Array[Dictionary] = [{"person": person, "relation": WorldAdapter.RELATION_HOSTILE, "head": beside}]
-	hud.show_names(world, off)
+	hud.show_names(world, _packed(off))
 	var off_rail: Array = hud.nameplates.plates.duplicate()
 	hud.free()
 	var passed := set_up and on_rail.is_empty() and off_rail.size() == 1
@@ -232,7 +229,7 @@ func _fit_pass() -> bool:
 					crowd.append({"person": people[n % people.size()], "head": Vector2(x, y),
 						"relation": WorldAdapter.RELATION_HOSTILE if n % 2 == 0 else WorldAdapter.RELATION_OWN})
 					n += 1
-			hud.show_names(world, crowd)
+			hud.show_names(world, _packed(crowd))
 			var plates: Array[Dictionary] = hud.nameplates.plates
 			var kept := [hud.purse.strip_rect(), hud.purse.belt_rect(), hud.talk_prompt.slip_rect(), hud.shortcuts.rect()]
 			for child: Node in hud.get_children():
@@ -287,7 +284,7 @@ func _plates() -> Control:
 
 
 func _named(plates: Control, world: WorldAdapter, people: Array[Dictionary], clear: Array[Rect2]) -> Array:
-	plates.show_names(world, people, clear)
+	plates.show_names(world, _packed(people), clear)
 	return plates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 
 
@@ -316,3 +313,13 @@ func _tint(art: Node2D, at: Vector2) -> Color:
 			if Vector2(buffer[base + 3], buffer[base + 7]) + band.position == centre:
 				return Color(buffer[base + 8], buffer[base + 9], buffer[base + 10], buffer[base + 11])
 	return Color.BLACK
+
+
+# `people`, each a `person`, `head` and `relation`, packed as world_art.gd's `near` gives them.
+func _packed(people: Array[Dictionary]) -> Dictionary:
+	var packed := {"person": PackedInt64Array(), "head": PackedVector2Array(), "relation": PackedInt64Array()}
+	for person: Dictionary in people:
+		packed.person.append(person.person)
+		packed.head.append(person.head)
+		packed.relation.append(person.relation)
+	return packed

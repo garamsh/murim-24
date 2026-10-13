@@ -7,7 +7,9 @@
 # not; and the steered person's hit holds the struck foe's drawn flash for its hit stop, where with
 # the settings' hit stop off it fades, and a foe out of reach starts no hit stop; and the same hit
 # shakes the screen by whole pixels, as far as its size, until it ends, where with the hit stop off
-# or out of reach it does not.
+# or out of reach it does not. A hit stop lasts its frames whether or not its body is drawn, and
+# holds no one dead; a world shown anew, as a load shows it, shows none of the last one's blood or
+# hit stops; and the blood's rings keep their most, the newest in the oldest's place.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -32,11 +34,16 @@ const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "s
 const TICKS := 90
 # How far apart the two refreshes a hit stop must hold are, in milliseconds.
 const HELD_MS := 60
+# More view frames than the longest hit stop holds.
+const HIT_STOP_FRAMES := 6
+# A view far from the map, which draws none of it.
+const ELSEWHERE := Rect2(Vector2(100000, 100000), Vector2(256, 80))
 
 
 func run() -> bool:
 	return _blood_pass() and _off_pass() and _cap_pass() and _wound_pass() and _drip_pass() \
-			and _hit_stop_pass() and _shake_pass()
+			and _hit_stop_pass() and _shake_pass() and _held_off_screen_pass() and _held_dead_pass() \
+			and _load_pass() and _ring_pass()
 
 
 # On the hit tick the foe bleeds: one spray from its middle, and drops on the ground, two or more of
@@ -219,6 +226,138 @@ func _shake_pass() -> bool:
 	return passed
 
 
+# After the steered person's hit, the striker walks away while the view looks elsewhere for more
+# frames than the longest hit stop; brought back into view it is held no more and drawn where it now
+# stands, a tick later further on. Control: the same hit with the hit stop off draws it the same;
+# and brought back at once, before its stop ends, it is still held.
+func _held_off_screen_pass() -> bool:
+	var cases := []
+	for case: Array in [[true, HIT_STOP_FRAMES], [false, HIT_STOP_FRAMES], [true, 0]]:
+		var fight := _fight(BESIDE, 60, true, case[0])
+		var striker: int = fight.world.roster(0)[0]
+		var started: bool = fight.art.combat.bodies.held(striker)
+		fight.world.order(0, Vector2i(STRIKER_CELL.x, MAP_ROWS.size() - 1), PackedInt64Array([0]))
+		for i in case[1]:
+			fight.world.tick()
+			fight.art.note_tick()
+			fight.art.refresh(ELSEWHERE)
+		fight.art.refresh(_view())
+		var held: bool = fight.art.combat.bodies.held(striker)
+		var at: Vector2 = fight.art.body_at(0, 0, 1.0)
+		var drawn := _drawn_near(fight.art, at)
+		cases.append({"started": started, "held": held, "drawn": drawn})
+		fight.art.free()
+	var passed: bool = cases[0].started and not cases[0].held and cases[0].drawn \
+			and not cases[1].started and not cases[1].held and cases[1].drawn \
+			and cases[2].started and cases[2].held
+	print("blood_test: a hit stop on the striker %s, after %d frames off screen held %s and drawn where it stands %s; hit stop off %s, %s, %s; back at once held %s: %s" % [
+		cases[0].started, HIT_STOP_FRAMES, cases[0].held, cases[0].drawn, cases[1].started, cases[1].held,
+		cases[1].drawn, cases[2].held, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The steered person's hit kills the foe: both are held on the tick, and after the next refresh the
+# dead foe is held no more. Control: the living striker still is.
+func _held_dead_pass() -> bool:
+	var fight := _fight(BESIDE, HEALTH, true)
+	var foe: int = fight.victim
+	var striker: int = fight.world.roster(0)[0]
+	var died: bool = fight.world.roster(1).is_empty()
+	var stops: Array = fight.art.combat.hit_stops.map(func(stop: Dictionary) -> int: return stop.person)
+	fight.art.refresh(_view())
+	var foe_held: bool = fight.art.combat.bodies.held(foe)
+	var striker_held: bool = fight.art.combat.bodies.held(striker)
+	fight.art.free()
+	var passed := died and stops.has(foe) and not foe_held and striker_held
+	print("blood_test: the foe killed %s and stopped %s, held after the next refresh %s; the striker held %s: %s" % [
+		died, stops.has(foe), foe_held, striker_held, "pass" if passed else "FAIL"])
+	return passed
+
+
+# A world shown anew mid-battle, as play.gd shows a loaded world on the same art, shows no blood, no
+# hit stop and no held body, as the same world shown on a fresh art does. Setup: the battle left
+# blood and hit stops to clear.
+func _load_pass() -> bool:
+	var fight := _fight(BESIDE, 60, true)
+	var before := _leftovers(fight.art)
+	var loaded := WorldAdapter.create(7, PackedStringArray(MAP_ROWS), _calm_armies(), [], RULES)
+	fight.art.show_world(loaded, 0)
+	var after := _leftovers(fight.art)
+	var fresh: Node2D = load(SCENE).instantiate()
+	fresh.show_world(WorldAdapter.create(7, PackedStringArray(MAP_ROWS), _calm_armies(), [], RULES), 0)
+	var fresh_left := _leftovers(fresh)
+	fight.art.free()
+	fresh.free()
+	var setup: bool = before.drops > 0 and before.pixels > 0 and before.stops > 0 and before.held > 0
+	var passed: bool = setup and after == fresh_left and after.drops == 0 and after.pixels == 0
+	print("blood_test: mid-battle %s, shown anew %s, a fresh art %s: %s" % [before, after, fresh_left,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+# Writing one drop and one spray pixel past each ring's most keeps the most, the newest in the
+# oldest's place, and given to draw so: the drops' first instance at the newest drop. Control: one
+# under the most, nothing is overwritten.
+func _ring_pass() -> bool:
+	var results := []
+	for past: int in [1, -1]:
+		var combat := Combat.new()
+		for n in Combat.MOST_DROPS + past:
+			combat._drop(Vector2(n, 0), 0)
+		for n in Combat.MOST_SPRAY_PIXELS + past:
+			combat._throw(Vector2(n, 0), Vector2.ZERO, 0)
+		var drops := BloodPixels.new()
+		drops.rebuild(combat)
+		var first_drawn := Vector2(drops.multimesh.buffer[3], drops.multimesh.buffer[7]) - Vector2(0.5, 0.5)
+		results.append({"drops": [combat.drop_at.size(), combat.drops_fallen, combat.drop_at[0].x],
+			"pixels": [combat.spray_pixel_at.size(), combat.spray_pixels_thrown, combat.spray_pixel_at[0].x],
+			"drawn": [drops.multimesh.visible_instance_count, first_drawn.x]})
+		drops.free()
+		combat.free()
+	var over: Dictionary = results[0]
+	var under: Dictionary = results[1]
+	var passed: bool = over.drops == [Combat.MOST_DROPS, Combat.MOST_DROPS + 1, float(Combat.MOST_DROPS)] \
+			and over.pixels == [Combat.MOST_SPRAY_PIXELS, Combat.MOST_SPRAY_PIXELS + 1, float(Combat.MOST_SPRAY_PIXELS)] \
+			and over.drawn == [Combat.MOST_DROPS * BloodPixels.DROP_PIXELS, float(Combat.MOST_DROPS)] \
+			and under.drops == [Combat.MOST_DROPS - 1, Combat.MOST_DROPS - 1, 0.0] \
+			and under.pixels == [Combat.MOST_SPRAY_PIXELS - 1, Combat.MOST_SPRAY_PIXELS - 1, 0.0] \
+			and under.drawn == [(Combat.MOST_DROPS - 1) * BloodPixels.DROP_PIXELS, 0.0]
+	print("blood_test: one past the rings' most %s, one under %s: %s" % [over, under, "pass" if passed else "FAIL"])
+	return passed
+
+
+# What of the last fight `art` still shows or holds: drops and spray pixels given to draw, hit stops
+# and held bodies.
+func _leftovers(art: Node2D) -> Dictionary:
+	return {"drops": art.get_node("Drops").multimesh.visible_instance_count,
+		"pixels": art.get_node("Sprays").multimesh.visible_instance_count,
+		"stops": art.combat.hit_stops.size(), "held": art.combat.bodies.held_count()}
+
+
+# Two armies standing apart with nothing that reaches, as a world loaded after a battle might be.
+func _calm_armies() -> Array[Dictionary]:
+	return [
+		{"objective": STRIKER_CELL, "faction": 0, "skills": [NO_REACH], "members": [{"cell": STRIKER_CELL, "health": HEALTH}]},
+		{"objective": OUT_OF_REACH, "faction": 1, "skills": [NO_REACH], "members": [{"cell": OUT_OF_REACH, "health": HEALTH}]},
+	]
+
+
+# Whether a band draws a body within a pixel of where one standing at `at`, its feet, is drawn.
+func _drawn_near(art: Node2D, at: Vector2) -> bool:
+	var centre := Vector2(at.x, at.y - WorldArt.FEET + WorldArt.BODY_FRAME.y / 2.0).round()
+	for child in art.get_node("Standing").get_children():
+		var band := child as MultiMeshInstance2D
+		if band == null:
+			continue
+		var buffer := band.multimesh.buffer
+		for i in band.multimesh.visible_instance_count:
+			var base := i * WorldArt.BODY_FLOATS
+			if buffer[base + 14] >= 0.0 and buffer[base + 15] == 1.0 \
+					and (Vector2(buffer[base + 3], buffer[base + 7]) + band.position).distance_to(centre) <= 1.0:
+				return true
+	return false
+
+
 # The share of white the band instance nearest `at`, the feet of a body, draws, or -1 for none.
 func _white_at(art: Node2D, at: Vector2) -> float:
 	var centre := Vector2(at.x, at.y - WorldArt.FEET + WorldArt.BODY_FRAME.y / 2.0).round()
@@ -253,6 +392,7 @@ func _fight(foe_cell: Vector2i, damage: int, blood: bool, stop := true) -> Dicti
 	art.show_world(world, 0)
 	art.combat.blood = blood
 	art.combat.hit_stop = stop
+	var victim := world.roster(1)[0]
 	var first := -1
 	for i in TICKS:
 		world.tick()
@@ -261,7 +401,7 @@ func _fight(foe_cell: Vector2i, damage: int, blood: bool, stop := true) -> Dicti
 		if not world.strikes().is_empty():
 			first = i
 			break
-	return {"world": world, "art": art, "victim": world.roster(1)[0], "tick": first}
+	return {"world": world, "art": art, "victim": victim, "tick": first}
 
 
 # The tag of the frame a band draws the body standing at `at` with, within the knock a hit gives

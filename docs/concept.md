@@ -17,6 +17,7 @@ This document is the single reference for the game concept agreed with the user.
 - Martial arts [draft]
 - Qi and martial arts [agreed]
 - Fighting in a crowd [agreed]
+- Weighing danger [agreed]
 - Arts that reshape the world [agreed]
 - Mods and re-theming [agreed]
 - Gear, wealth and livelihoods [agreed]
@@ -332,6 +333,16 @@ Decided by the owner on 2026-10-11 (issue #247). ADR 0068 (`docs/architecture/ad
 - **Attack slots.** Around each foe stand a few positions at arm's length. A person closing to strike goes to a free slot, not straight at the foe, so a crowd spreads around its target instead of piling onto one point.
 - **Attack tokens.** Each foe grants a small number of tokens, and only a token holder strikes it. The rest hold on a ring just outside, circling and waiting, and take a token when one frees, so one against many reads as a wuxia brawl rather than a pile-on.
 - **One rule for everyone.** It holds the same for NPCs and for attacks on the player.
+
+## Weighing danger [agreed]
+
+Decided by the owner on 2026-10-11 (issue #256). ADR 0071 (`docs/architecture/adr/0071-weigh-danger-by-one-appraisal-of-the-strength-in-sight-and-back-off-flee-or-regroup-by-temperament.md`), proposed, designs it.
+
+- **Flee what is stronger.** A person or an animal that sees a predator, a spirit beast or a force clearly stronger than its own side moves away instead of closing. For people, stronger means more numbers, higher realms or better gear; animals use their kind's data.
+- **Avoid crowds of foes.** Nobody walks into a group that outnumbers its side: it waits, goes around or gathers first.
+- **Safety in numbers.** People and animals seek their group: herd mates, fellow villagers or the army.
+- **One simple rule for both.** A threat appraisal from what one sees, comparing the two sides' strength, with thresholds by temperament (bold, cautious or cowardly) as data. No scripted behaviour per kind.
+- **The player is never overridden.** The rule moves NPCs and animals; the player decides for its own body.
 
 ## Arts that reshape the world [agreed]
 

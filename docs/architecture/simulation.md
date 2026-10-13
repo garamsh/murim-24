@@ -12,12 +12,13 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `calendar` the days, seasons and years;
   - `skill` skills, strikes, casts and their refusals;
   - `talent` talent and its draws, and souls;
+  - `chart` the cells and villages a soul remembers;
   - `names` names;
   - `kinship` marriage and births;
   - `village` villages, their structures and what they hold;
   - `growth` how villages grow;
   - `arts` arts, realms, cultivation, learning and manuals;
-  - `diplomacy` relations, declarations and their refusals, and the declarations standing between factions, one place for each two;
+  - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two;
   - `trade` wares and trade;
   - `talk` talk and what a person offers;
   - `leadership` a faction's lead, duels, admission and elections;
@@ -77,6 +78,12 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - A soul is the history a person may carry from body to body: the lives it has lived and the disciplines it practised. `ensoul()` gives a living person one.
   - a past life widens a person's talent draw, the less as lives repeat
   - a person carrying a soul who dies is born again on the next tick, into a village with a living resident, in the army its body served in; with no such village it is not born again
+- A soul keeps a chart of what its bodies have seen, `chart()`. No rule reads it: it is the steered body's remembered view.
+  - at the end of every tick, each living person carrying a soul in a steered army sees the cells within the rules' `map_sight`, 15 in the region, and 0 charts nothing
+  - seen cells are kept a bit a cell, in blocks of 128 bytes for each 32-cell area with a seen cell; runtime storage includes each block's area index and optional village slots, as ADR 0078 records
+  - a village with a structure in view is remembered as it stands then: its owner, whether it has living residents, its claim centre, and whether its structures stand, are damaged or lie in ruins; one never in view is not remembered
+  - `remembered_territory()` derives borders as `territory()` does, from the villages remembered and their remembered claim centres, and gives no holder to a cell not seen
+  - a body born again keeps the soul's chart; the chart is saved, and the hash folds it only while it holds something
 
 ### Movement
 
@@ -198,6 +205,8 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 ## Rationale
 
+- Remembering each claim centre with the village so live orders do not move remembered borders: ADR 0078 (`adr/0078-remember-each-villages-claim-centre-with-its-last-seen-state.md`).
+
 - The core is C++ and loads no engine, so its rules run headless: ADR 0002 (`adr/0002-build-on-godot-with-a-cpp-simulation-core.md`).
 - The build, test framework, formatter and linter, and how CI installs them: ADR 0003 (`adr/0003-build-the-core-with-cmake-googletest-and-llvm-tools.md`).
 - Lint against one pinned Linux sysroot, because clang-tidy's findings depend on the standard library it parses: ADR 0016 (`adr/0016-lint-against-one-pinned-linux-sysroot-on-every-host.md`).
@@ -222,6 +231,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - Households of married couples, each heading a family of its own, as a village's founders: ADR 0025 (`adr/0025-start-each-village-from-households-of-married-couples.md`), which supersedes ADR 0021's one family per starting army for the families of households.
 - A child of the sex its village's unmarried lack, so a faction's line does not end on a run of one sex, and the alternatives measured against it: ADR 0027 (`adr/0027-bear-each-child-of-the-sex-its-village-lacks.md`), which supersedes ADR 0021's even-odds sex for those children.
 - Marriage, children and names as data under one rule for everyone, births capped by the living bound, founding ages, and the day's ticks as world data: ADR 0021 (`adr/0021-let-people-marry-have-children-and-bear-family-names.md`), which supersedes ADR 0019's day fixed in the core.
+- A chart per soul of what its steered bodies saw, kept by area, villages as last seen with borders derived from them, saved, hashed only while held, and read by no rule: ADR 0073 (`adr/0073-chart-the-land-a-soul-has-seen-and-show-each-village-as-it-was-last-seen.md`).
 - Talent and lifespan drawn at birth by one rule, ageing, souls born again into a family of the same world with a widened draw, and the calendar: ADR 0019 (`adr/0019-draw-talent-and-lifespan-at-birth-and-bear-a-soul-again.md`).
 - Saving through a save port of bytes by slot, the whole state with its data and the region's origin in the core's own encoding, versions refused rather than misread, and every state no world can be in refused at the boundary: ADR 0030 (`adr/0030-save-a-world-through-a-save-port-in-the-cores-own-versioned-encoding.md`).
 - Orders as the one shape of every army's intent, and the player's body as an army of one: ADR 0011 (`adr/0011-steer-a-body-by-the-orders-every-army-follows.md`), whose record of no driver ADR 0038 supersedes.
@@ -293,7 +303,6 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Animals.** Animals are records of their own, kept by home area. Grazers crop grass slots and predators kill grazers at each area's 8-day cycle, and each appears, with no breeding, at a chance scaled by the spare food around it, none where its food is all used. Starving ones die. Herding kinds flock behind a leader, prey flees the predators it sees, and predators chase on a budget where people are simulated in full and kill by a speed chance elsewhere. Animals give way to the stronger by the threat appraisal of #256.
   - **Hunting.** Strikes hit animals, whose drops fall as piles. Idle earners hunt game within 32 cells. Meat feeds their households first, and hide, horn and bone go to the market for the workshops.
   - **Spirit beasts.** They appear rarely in wild places, defend a territory, and drop a spirit core that adds qi up to the talent's limit.
-- **The player's chart.** ADR 0073 (`adr/0073-chart-the-land-a-soul-has-seen-and-show-each-village-as-it-was-last-seen.md`), proposed; nothing above changes until the pull request that builds it lands. Each soul keeps a chart of what its steered bodies saw within a map sight of its own, 15 cells in the region: a bit a cell, kept by 32-cell area once seen, and each village's owner, residents and stage as last seen, from which borders are derived. It is charted every tick, kept when the soul is born again, saved and hashed. No rule an NPC acts on reads it.
 - **Village spacing and forms.** ADR 0076 (`adr/0076-keep-villages-a-spacing-apart-and-grow-each-ones-form-from-its-square-by-the-ground-it-stands-on.md`), proposed; nothing above changes until the pull request that builds it lands. Founding opens a site only where no village's centre lies within `apart` cells, the same test generation uses. A village's tier, from its residents, sets its square and the vicinity it builds in. Growth places each plan by its role, square, home or edge, nearest the square by path, with ties drawn by the seed, in place of building nearest the centre in a straight line. Fields may terrace rough hill cells at a higher labour cost, which amends ADR 0024 for terraced fields alone. A tier, once reached, is kept. Founding lays a core and growth builds the rest.
 - **Travel means.** ADR 0061 (`adr/0061-travel-on-foot-by-horse-or-by-boat-at-speeds-set-by-travel-class-and-means.md`), proposed; nothing above changes until the map and items it needs are built. Speeds are per means and travel class: foot, horse and boat. Horses are items in a mount slot, and boats are vehicles sailing routes of landings for a fare. Armies move at their slowest member's means. A horse cannot leap, so a rider goes round by road or tethers its horse at a leap edge, and speeds hold whatever size the map is built at.
 - **Insights, requirements and passive skills.** ADR 0072 (`adr/0072-gate-arts-on-insights-gained-by-manuals-nature-and-repetition-and-let-arts-grant-passive-skills.md`), proposed; nothing above changes until the pull requests that build it land.
@@ -311,6 +320,12 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **Slots.** People engaging a foe close on slots on a ring around it, sized by their reach and spaced by the separation, assigned by distance then index and kept while held, in place of closing on the foe itself as above.
   - **Tokens.** Only a holder of one of the foe's tokens, by its realm rank as rules data, may aim a use at it, which limits the automatic strike above. The steered person attacking is exempt and takes a token ahead of any queue. The rest circle a waiting ring outside reach, and people engaging on their own prefer a foe with a free token.
   - **Freeing.** Slots and tokens free on death, a new foe, an intent's end, a leap or flight, and after a lease while others wait.
+- **Weighing danger.** ADR 0071 (`adr/0071-weigh-danger-by-one-appraisal-of-the-strength-in-sight-and-back-off-flee-or-regroup-by-temperament.md`), proposed; nothing above changes until the pull requests that build it land.
+  - **The appraisal.** Everyone outside the player's armies compares the strength in sight that would strike it with its own side's: health times realm might times the realm's weight, which doubles with each realm, and gear once ADR 0050 lands. It does so every 15 ticks. An army a driver steers is never appraised, nor one holding an attack intent while it holds.
+  - **Temperament.** Drawn at birth, bold, cautious or cowardly, naming the ratios at which a person backs off and flees. New person-state storage starts cautious before every birth (founders and recruits included) installs its draw or loading restores saved temperament, including bold living NPCs; unequal save versions remain refused without migration.
+  - **Outcomes.** Closing as above at or below the back-off ratio; holding inside the home claim; backing off from the threat; fleeing to the army's lead or home; regrouping when alone. At each appraisal, flight above its threshold takes precedence over regrouping and holding ground and overrides any non-flee stance immediately. Otherwise close enters the chosen outcome immediately; a non-close stance yields only after 30 ticks and a ratio strictly below three quarters of its entry threshold (the entry threshold for regroup is half the back-off threshold), then chooses again from the current conditions. A cautious back-off at 1,600 becomes flight at 4,000 at the next appraisal; declining or oscillating risk waits for both recovery conditions. Every change starts a new stance tick. Back off and flee free all slots and tokens before assignment, take none, and strike nothing even with a foe in reach. This replaces the engagement above, which closes whatever the odds.
+  - **Bands.** An army on a march order appraises through its lead, counting what any member sees, and turns home when outmatched, so a raid can fail on sight of a strong village.
+  - **State.** Temperament, stance and a full 64-bit stance tick stay with the persistent person record, through deaths, roster changes and crowd compaction; a reborn body gets its own birth draw. They are saved, so a loaded bold living NPC continues as saved even with an identity beyond the living capacity. The existing crowd maps compact query slots to persistent people; only scratch stamps key those live slots and are bounded by the living capacity. Payload is 10 bytes per recorded person (dead included), 9 per recorded army and 4 per live-capacity slot, excluding record padding; persistent history is not capped by the living bound. Appraisal adds no allocation or new mapping.
 - **Who sells, once people have trades.** `sells` reads a person's best discipline. When issue #170 gives people trades, the trade replaces it there, in that one function (ADR 0040).
 - **Silver taken by force.** Issue #175's deeds may let extortion move silver. Silver stays a plain count on the person so a deed can take it.
 - **Whether full health is the person's own.** A village's healing restores anyone up to `newborn_health`, the same for every person. A per-person maximum waits for a rule that needs one.

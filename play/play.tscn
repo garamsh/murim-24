@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://play/play.gd" id="1"]
 [ext_resource type="PackedScene" path="res://world_art/world_art.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://hud/hud.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://sound/sound.tscn" id="4"]
 [ext_resource type="Script" path="res://play/aim.gd" id="5"]
+[ext_resource type="PackedScene" path="res://grade/grade.tscn" id="6"]
 
 [node name="Play" type="Node2D"]
 script = ExtResource("1")
@@ -15,6 +16,8 @@ script = ExtResource("1")
 script = ExtResource("5")
 
 [node name="Camera" type="Camera2D" parent="."]
+
+[node name="Grade" parent="." instance=ExtResource("6")]
 
 [node name="Hud" parent="." instance=ExtResource("3")]
 

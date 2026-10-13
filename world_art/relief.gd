@@ -203,6 +203,15 @@ func cell_image() -> Image:
 	return Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, data)
 
 
+## The cells as lift_at() reads them, for a reader of its own: their `size`, each cell's `level`,
+## whether it rises as a `slope` (1) or not (0), and its `flat` level plus one where the ground round
+## it is flat, else 0.
+func view_cells() -> Dictionary:
+	if _flat.is_empty():
+		_find_flat()
+	return {"size": size, "level": _level, "slope": _slope, "flat": _flat}
+
+
 ## The height of the ground, in levels, at `point`, in pixels on the unraised ground, as
 ## ground.gdshader's height_at() gives it: its cells' levels read through coordinates warped by
 ## noise and interpolated, then taken to the nearest level one of them has, except toward cells

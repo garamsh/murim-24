@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -251,7 +252,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] std::int64_t army_count() const;
 
   /// Returns the world's date: `year` and `day` counted from 1, `season`
-  /// from 0, as the core's calendar gives them.
+  /// from 0, as the core's calendar gives them; `tick`, the tick within the
+  /// day from 0, and `ticks_per_day`, for the view's time of day.
   [[nodiscard]] godot::Dictionary date() const;
 
   /// Returns how many ticks the world has run, the tick body_ready() counts
@@ -299,6 +301,19 @@ class WorldAdapter : public godot::RefCounted {
   /// far as, `end`: a line's far end, and for any other shape `toward`, all in
   /// sub-cell units, and the people it hit, `struck` (PackedInt64Array).
   [[nodiscard]] godot::TypedArray<godot::Dictionary> strikes() const;
+
+  /// Returns what a view reads of the world after a tick, in one read of
+  /// packed arrays: every living body in army order, `first` giving where
+  /// each army's bodies start in them and, last, how many there are;
+  /// each body's `person`, `position` in sub-cell units, `health` and
+  /// `ready`, as roster(), body_positions(), body_strengths() and
+  /// body_ready() give them; each army's `faction`; each structure's
+  /// `stage`; and the last tick's uses of skills as strikes() gives them,
+  /// one entry each in `strike_person`, `strike_shape`, `strike_range`,
+  /// `strike_radius`, `strike_body_damage`, `strike_origin`,
+  /// `strike_toward` and `strike_end`, the people each struck in `struck`
+  /// from `strike_first` on, which has one entry more than the strikes.
+  [[nodiscard]] godot::Dictionary snapshot() const;
 
   /// Returns the stage structure `structure` is in, one of the STAGE_*
   /// constants.
@@ -542,10 +557,35 @@ class WorldAdapter : public godot::RefCounted {
   /// on; empty unless the world was made by create_region().
   [[nodiscard]] godot::TypedArray<godot::Dictionary> villages() const;
 
+  /// Returns, for each cell row by row, 1 where the player's soul has seen
+  /// it and 0 where it has not, as the core's chart keeps it; empty unless
+  /// the world was made by create_region().
+  [[nodiscard]] godot::PackedByteArray explored() const;
+
+  /// Returns each village the player's soul has seen, as villages() gives
+  /// it, with `faction` its owner and `stage` one of the VILLAGE_*
+  /// constants as last seen, and `peopled` whether it had living residents;
+  /// empty unless the world was made by create_region().
+  [[nodiscard]] godot::TypedArray<godot::Dictionary> remembered_villages()
+      const;
+
+  /// Returns the faction each cell's territory lay in as the player's soul
+  /// last saw it, as territory() gives it, from the villages it remembers,
+  /// and -1 for a cell it has not seen; empty unless the world was made by
+  /// create_region().
+  [[nodiscard]] godot::PackedInt64Array remembered_territory() const;
+
+  /// Returns a count that rises whenever the player's soul first sees a cell
+  /// or a village's memory changes, for the view to redraw on; 0 unless the
+  /// world was made by create_region().
+  [[nodiscard]] std::int64_t chart_revision() const;
+
  protected:
   static void _bind_methods();
 
  private:
+  // Each village's fields as villages() gives them, by index.
+  [[nodiscard]] std::vector<godot::Dictionary> village_fields() const;
   // Set by create(), the only way GDScript gets an adapter, since the class is
   // registered abstract.
   std::optional<murim::World> world_;

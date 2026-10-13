@@ -122,7 +122,7 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _grade_pass()
 
 
 # The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom
@@ -722,7 +722,8 @@ func _shortcuts_pass() -> bool:
 # or none for "". Returns what is open then, as _open_now names it.
 func _open_from(scene: Node2D, state: String) -> String:
 	var hud: CanvasLayer = scene.get_node("Hud")
-	for over: Control in [hud.genealogy, hud.sect, hud.factions, hud.arts, hud.dialogue, hud.settings, hud.pause]:
+	for over: Control in [hud.genealogy, hud.sect, hud.factions, hud.arts, hud.map_window, hud.dialogue, hud.settings,
+			hud.pause]:
 		over.visible = false
 	for row: Dictionary in scene.SHORTCUTS:
 		if row.action == state:
@@ -835,13 +836,14 @@ func _autosave_pass() -> bool:
 	TestSaves.clear()
 	var scene := _scene(0)
 	var every: int = scene.AUTOSAVE_DAYS
-	var date: Dictionary = scene.world.date()
+	# A day begins when the date's year, season or day changes, not its tick within the day.
+	var date: Array = _day(scene.world.date())
 	var days := 0
 	var early := false
 	while not FileAccess.file_exists(TestSaves.path(0)) and days <= every:
 		scene.step()
-		if scene.world.date() != date:
-			date = scene.world.date()
+		if _day(scene.world.date()) != date:
+			date = _day(scene.world.date())
 			days += 1
 		early = early or (days < every and FileAccess.file_exists(TestSaves.path(0)))
 	var loaded := WorldAdapter.load(scene.SAVE_SLOT, TestSaves.directory)
@@ -857,42 +859,57 @@ func _autosave_pass() -> bool:
 	return passed
 
 
-# The borders and the map follow the territory as it moves. Setup: a tick with no order moves no
-# territory, and the tick after the march is ordered finds it moved. Before and after, the borders
-# and the map's border pixels match the territory the core gives then; control: the territory after no
-# longer matches the borders before, so the match after is the redraw's. The tick that moved
-# nothing, and frames after the move, keep the same borders and map.
+# The day `date` names, without the tick within it.
+func _day(date: Dictionary) -> Array:
+	return [date.year, date.season, date.day]
+
+
+# The borders follow the territory as it moves, and the map follows the player's chart (ADR 0073).
+# Setup: a tick with no order moves no territory, and the tick after the march is ordered finds it
+# moved. Before and after, the borders match the territory the core gives then, and the map's
+# pixels the territory as the player remembers it, its borders against seen cells only, in fog where
+# it has seen nothing; control: the
+# territory after no longer matches the borders before, so the match after is the redraw's. The
+# map is drawn again exactly when the chart's revision moves, and frames after keep it.
 func _territory_pass() -> bool:
 	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
 	var art: Node2D = scene.get_node("WorldArt")
 	var hud: CanvasLayer = scene.get_node("Hud")
 	var territory: Node2D = art.get_node("Territory")
+	# The player sees its surroundings on the first tick, and the HUD draws them on the next frame.
+	scene.step()
+	_frame(scene)
 	var before := world.territory()
 	var borders_before: Array = territory.borders
 	var map_before: ImageTexture = hud.map_texture
-	var drawn_before := _borders_follow(borders_before, before, world) \
-			and _map_follows(hud, before, world)
+	var revision_before := world.chart_revision()
+	var drawn_before := _borders_follow(borders_before, before, world) and _map_follows(hud, world)
 	scene.step()
-	var unchanged_tick: bool = world.territory() == before \
-			and is_same(territory.borders, borders_before) and is_same(hud.map_texture, map_before)
+	_frame(scene)
+	var unchanged_tick: bool = world.territory() == before and is_same(territory.borders, borders_before) \
+			and is_same(hud.map_texture, map_before) == (world.chart_revision() == revision_before)
+	map_before = hud.map_texture
+	revision_before = world.chart_revision()
 	var target: Dictionary = world.villages()[MARCHED_ON]
 	var ordered := world.order(MARCHERS, target.corner + target.area / 2,
 			PackedInt64Array(range(world.skill_count(MARCHERS))))
 	scene.step()
+	_frame(scene)
 	var after := world.territory()
 	var moved := after != before
 	var borders_after: Array = territory.borders
 	var map_after: ImageTexture = hud.map_texture
+	var redrawn_on_revision := is_same(map_after, map_before) == (world.chart_revision() == revision_before)
 	for frame in 3:
 		_frame(scene)
-	var frames_kept: bool = is_same(territory.borders, borders_after) \
-			and is_same(hud.map_texture, map_after) and not is_same(map_after, map_before)
-	var drawn_after := _borders_follow(borders_after, after, world) and _map_follows(hud, after, world)
+	var frames_kept: bool = is_same(territory.borders, borders_after) and is_same(hud.map_texture, map_after) \
+			and redrawn_on_revision
+	var drawn_after := _borders_follow(borders_after, after, world) and _map_follows(hud, world)
 	var old_stale := not _borders_follow(borders_before, after, world)
 	var passed := unchanged_tick and ordered and moved and drawn_before and drawn_after \
 			and old_stale and frames_kept
-	print("play_test: a tick with no order keeps the territory, borders and map %s; army %d ordered on village %d %s, the territory moved by the next tick %s; borders and map follow the territory before %s and after %s, the borders before stale after %s; kept over frames %s: %s" % [
+	print("play_test: a tick with no order keeps the territory and borders, and redraws the map only on a new chart revision %s; army %d ordered on village %d %s, the territory moved by the next tick %s; borders follow the territory and the map the chart before %s and after %s, the borders before stale after %s; kept over frames %s: %s" % [
 		unchanged_tick, MARCHERS, MARCHED_ON, ordered, moved, drawn_before, drawn_after,
 		old_stale, frames_kept, "pass" if passed else "FAIL"])
 	scene.free()
@@ -1072,23 +1089,33 @@ func _borders_follow(borders: Array, owners: PackedInt64Array, world: WorldAdapt
 	return borders.size() == edges and edges > 0
 
 
-# Whether the HUD's map marks with a faction's accent exactly the cells, outside every village's
-# square, whose right or lower neighbour lies in another territory of `owners`.
-func _map_follows(hud: CanvasLayer, owners: PackedInt64Array, world: WorldAdapter) -> bool:
+# Whether the HUD's map shows `world`'s chart: apart from the squares of the villages it remembers,
+# clipped to seen cells, fog on every cell the player has not seen, and on the rest a faction's accent
+# exactly where the remembered territory has a border with a seen neighbour.
+func _map_follows(hud: CanvasLayer, world: WorldAdapter) -> bool:
 	var image: Image = hud.map_texture.get_image()
 	var width := world.map_rows()[0].length()
+	var owners := world.remembered_territory()
+	var seen := world.explored()
+	var fog := preload("res://hud/map_window.gd").FOG.to_html(false)
 	var accents := []
 	for accent: Color in preload("res://hud/palette.gd").ACCENTS:
 		accents.append(accent.to_html(false))
 	var squares: Array[Rect2i] = []
-	for village: Dictionary in world.villages():
+	for village: Dictionary in world.remembered_villages():
 		squares.append(Rect2i(village.corner, village.area))
+	if seen.size() != owners.size() or not seen.has(1):
+		return false
 	for i in owners.size():
 		var cell := Vector2i(i % width, i / width)
+		if seen[i] == 0:
+			if image.get_pixel(cell.x, cell.y).to_html(false) != fog:
+				return false
+			continue
 		if squares.any(func(square: Rect2i) -> bool: return square.has_point(cell)):
 			continue
-		var border := ((i + 1) % width != 0 and owners[i] != owners[i + 1]) \
-				or (i + width < owners.size() and owners[i] != owners[i + width])
+		var border := ((i + 1) % width != 0 and seen[i + 1] != 0 and owners[i] != owners[i + 1]) \
+				or (i + width < owners.size() and seen[i + width] != 0 and owners[i] != owners[i + width])
 		if accents.has(image.get_pixel(cell.x, cell.y).to_html(false)) != border:
 			return false
 	return true
@@ -1151,7 +1178,7 @@ func _names_pass() -> bool:
 	scene.show_view(view)
 	scene.show_talk()
 	scene.show_names()
-	var near: Array = art.near.map(func(person: Dictionary) -> int: return person.person)
+	var near: Array = Array(art.near.person)
 	var named: Array = hud.nameplates.plates.map(func(plate: Dictionary) -> int: return plate.person)
 	var setup: bool = not near.is_empty() and scene.talk_to >= 0 and hud.talk_prompt.visible
 	var within := named.all(func(person: int) -> bool: return near.has(person))
@@ -1433,6 +1460,40 @@ func _loadout_save_pass() -> bool:
 	return passed
 
 
+# The pass follows the core's five-tick day, with the settings' quality and the camera's art scale.
+func _grade_pass() -> bool:
+	var scene := _title()
+	var grade: CanvasLayer = scene.get_node("Grade")
+	var hidden := not grade.visible
+	scene.call("_play", WorldAdapter.create_region(SEED, 0, 5))
+	var view := Rect2(Vector2.ZERO, Vector2(640, 360))
+	scene.get_node("Camera").zoom = Vector2(3, 3)
+	scene.show_view(view)
+	var night: Vector3 = grade.params().gain
+	for tick in 3:
+		scene.step()
+	scene.show_view(view)
+	var date: Dictionary = scene.world.date()
+	var noon: Vector3 = grade.params().gain
+	var expected: Vector3 = grade.grade_at(0.6, date.season).gain
+	var clock: bool = date.tick == 3 and date.ticks_per_day == 5 \
+			and noon.is_equal_approx(expected) and not noon.is_equal_approx(night)
+	var settings: Control = scene.get_node("Hud").settings
+	settings.chosen.screen = 0
+	scene.show_numbers()
+	var low: float = grade.params().vignette
+	settings.chosen.screen = 1
+	scene.show_numbers()
+	var standard: float = grade.params().vignette
+	var passed: bool = hidden and grade.visible and clock and low == 0.0 and standard > 0.0 \
+			and grade.params().art_pixel == 3.0
+	print("play_test: grade hidden on title %s, shown in play %s; five-tick day at tick %d gain %s against %s, midnight %s; low vignette %.2f standard %.2f art pixel %.1f: %s" % [
+		hidden, grade.visible, date.tick, noon, expected, night, low, standard, grade.params().art_pixel,
+		"pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
 # The scene with a world started from SEED, its player born into `village`, saving to the tests'
 # own directory.
 func _scene(village: int) -> Node2D:
@@ -1512,8 +1573,7 @@ func _numbers_pass() -> bool:
 	var now := Time.get_ticks_msec()
 	combat.show_at(Rect2(0, 0, 64, 64), now, Vector2.ZERO)
 	for mine: bool in [true, false]:
-		combat.numbers.append({"ms": now, "text": "7" if mine else "9", "at": Vector2(32, 32),
-			"own": mine, "mine": mine, "width": 4.0})
+		combat.bodies.add_number(now, "7" if mine else "9", Vector2(32, 32), mine, mine)
 	var texts := func() -> Array: return combat.shown_numbers(now).map(
 			func(number: Dictionary) -> String: return number.text)
 	var at_start: Array = texts.call()
