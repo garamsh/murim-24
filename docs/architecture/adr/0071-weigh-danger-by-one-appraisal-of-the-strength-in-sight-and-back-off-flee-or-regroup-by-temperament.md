@@ -61,7 +61,7 @@ Facts from `core/` at `1c4bb7f` and the proposals this builds on:
 - **A temperament per person, drawn at birth, and per animal kind, each naming three thresholds as pack data.** Chosen.
   - The people's table draws bold, cautious or cowardly by a share, by default 20%, 60% and 20%. The draw is counter-based and seeded per person: a hash of the world's seed, the person's index and its birth tick. No seeded stream moves, and two people born on one tick draw independently.
   - A kind of animal names one temperament, a spirit beast bold, a deer cowardly.
-  - People already alive when a world loads under this rule, and worlds from before it, read cautious.
+  - New person-state storage is initialized to cautious before birth or restoration fills it. Every birth, including founders and explicit scenario recruits through the existing birth rule, replaces that initial value with the seeded draw. Loading restores the saved temperament; it never draws or defaults a living person again. Saves with a version unequal to `SAVE_VERSION` remain refused, including saves from before this rule; no backward-save migration is proposed.
 
   The thresholds, as the ratio of threat to own strength per mille, at which each outcome begins:
 
@@ -76,14 +76,13 @@ Facts from `core/` at `1c4bb7f` and the proposals this builds on:
 
 ### Options weighed for the outcomes
 
-Five outcomes, from the appraisal and whether the person has its group in sight:
+Five outcomes, from the appraisal and whether the person has its group in sight. At each appraisal, choose flee first when above its threshold, otherwise regroup when alone above its threshold, otherwise hold or back off above the back-off threshold, otherwise close. The hysteresis below decides whether a held stance may yield to that choice:
 
 - **Close**, the ratio at or below the back-off threshold: ADR 0046's engagement and ADR 0068's slots, unchanged.
-- **Hold**, the ratio above the back-off threshold, for a person inside its home village's claim, or within two cells of a wall or gate of its faction's once walls exist: it does not close. It stands to fight whoever comes within its reach, and it does not take ADR 0068's waiting ring. Defenders hold their ground; they do not run from it.
+- **Hold**, the ratio above the back-off threshold, for a person inside its home village's claim, or within two cells of a wall or gate of its faction's once walls exist: it does not close. It stands to fight whoever comes within its reach, and it does not take ADR 0068's waiting ring. Defenders hold their ground up to the flee threshold; above it they flee.
 - **Back off**, the ratio above the back-off threshold and not holding:
-  - it neither closes nor takes a slot;
-  - it steps away from the threat's centroid, a strength-weighted mean of the foes' positions as the appraisal read them, by the open step nearest that line, until the ratio falls under the threshold;
-  - it still strikes a foe within its reach with a token;
+  - it neither closes nor strikes, takes no slot or token, and frees those it held before slot assignment;
+  - it steps away from the threat's centroid, a strength-weighted mean of the foes' positions as the appraisal read them, by the open step nearest that line, until the release conditions below hold, unless worsening danger requires flight first;
   - a waiter on ADR 0068's ring that backs off leaves the ring.
 - **Flee**, the ratio above the flee threshold, holding or not: it walks toward its refuge with its army's flow field, never toward the threat. The refuge is:
   - its army's lead while the army has one in sight;
@@ -97,10 +96,11 @@ The owner's "go around" is no outcome of its own. A person backing off takes the
 
 ### Options weighed for hysteresis
 
-- **A stance kept until the ratio falls under three quarters of the threshold that set it, and for at least 30 ticks.** Chosen.
-  - A person backing off at 1,600 against a threshold of 1,500 closes again only under 1,125.
-  - A stance changes at most once a second.
-  - Combined, they keep a person on the boundary from dithering, and a fleeing crowd does not turn back the moment it has gained a step.
+- **Immediate flight on worsening danger, with a release ratio and minimum hold time for recovery.** Chosen.
+  - At each appraisal, a ratio above the flee threshold changes any non-flee stance to flee, even before 30 ticks or without satisfying a release ratio. Flight takes precedence over holding ground and regrouping. The new stance tick is that appraisal tick; staying in the same stance does not reset it.
+  - Close enters the selected non-close outcome immediately. A non-close stance otherwise yields only after at least 30 ticks in that stance and a ratio strictly below three quarters of its entry threshold: the flee threshold for flee, the back-off threshold for hold or back off, and half the back-off threshold for regroup. On release, choose again from the current appraisal and group/ground conditions.
+  - A cautious person backing off at 1,600 at tick 0 flees at tick 15 if the ratio becomes 4,000. Its flight releases only at an appraisal at or after tick 45 with ratio below 2,250; 2,000 selects back off again, whereas 1,000 with allies in sight selects close.
+  - Without escalation, 1,600 at tick 0 followed by 1,000 at tick 15 remains back off until tick 30. Oscillating between 1,400 and 1,600 remains back off even past 30 ticks; at 1,125 it still holds, and only below 1,125 may it release. Recovery is limited by both conditions, while crossing the flee threshold is not delayed.
 - **A timer alone.** Rejected: a ratio hovering at the threshold would still flip every 30 ticks.
 
 ### Options weighed for who is exempt
@@ -142,7 +142,7 @@ That is 6 bytes a person: 3 KB at 500 and 30 KB at 5,000. An army keeps its stan
 **Saves and the hash.** The stance and the tick it began carry the hysteresis, so they are world state, as ADR 0068 keeps its slots:
 - a person's temperament, stance and stance tick, and an army's stance and stance tick, are saved, and `SAVE_VERSION` rises;
 - the hash folds a person's temperament only when it is not cautious, and a stance with its tick only when it is not close, so a world in which nobody has left close hashes as before;
-- a world loaded from a save continues as the world it was saved from.
+- a world loaded from a matching-version save restores temperament, stance and stance tick unchanged, including a bold living NPC; unequal versions remain refused, with no migration.
 
 **The query.** The hash gains one public query: visit the positions of some kinds within a radius. It asks `holds` over its span first, and passes over every cell holding none of the kinds, as `nearest` does. Nothing else in the hash changes, and it allocates nothing.
 
@@ -171,13 +171,13 @@ At the capacity of 6,250 the stamps are 25 KB, and with the 6 bytes of state a p
 
 Every person outside the player's armies, and every animal, appraises the danger it sees with one rule.
 - **The appraisal.** It is the ratio of the strength of those in sight who would strike it to its own side's strength, per mille. A person's strength is its health, times its realm's might over 1,000, times its realm's weight, by default doubling from 1 with no realm to 256, times its gear's factor; an animal's is its kind's. Its side is those in sight of its army or faction not hostile to it, or its herd. Sight is the rules' sight, by ADR 0058's `sees` once that lands.
-- **Temperament.** A person's temperament is drawn at birth, bold, cautious or cowardly by shares in pack data, and an animal's comes from its kind. It names the ratios above which the person backs off and flees: by default 2,500 and 5,000 for bold, 1,500 and 3,000 for cautious, and 1,000 and 1,800 for cowardly.
+- **Temperament.** A person's temperament is drawn at birth, bold, cautious or cowardly by shares in pack data, and an animal's comes from its kind. New person-state storage starts cautious; every birth, including founders and recruits, replaces it with the draw, and restoration replaces it with the saved temperament and refuses unequal save versions. It names the ratios above which the person backs off and flees: by default 2,500 and 5,000 for bold, 1,500 and 3,000 for cautious, and 1,000 and 1,800 for cowardly.
 - **The outcomes.**
   - At or below the back-off ratio it closes as ADR 0046 and ADR 0068 say.
-  - Above it, a person inside its home claim or by its faction's wall holds; anyone else backs off from the threat's centroid.
+  - Above it, a person inside its home claim or by its faction's wall holds; anyone else backs off from the threat's centroid. Back off and flee free all slots and tokens before assignment, take none, and strike nothing, even with a foe in reach.
   - Above the flee ratio it flees to its refuge: its army's lead, its home village, or its herd.
   - Alone with any threat above half the back-off ratio, it regroups toward its group first.
-- **Hysteresis.** A stance holds until the ratio falls under three quarters of the threshold that set it, and for at least 30 ticks.
+- **Transition precedence and hysteresis.** At each appraisal, choose flee above its threshold first, then regroup when alone above half the back-off threshold, then hold or back off above the back-off threshold, then close. Flight overrides any non-flee stance immediately, regardless of release ratio or elapsed time. Close enters the chosen outcome immediately; other transitions require both 30 ticks in the current stance and a ratio strictly below three quarters of its entry threshold. Each change records a new stance tick; unchanged stances keep theirs. A cautious back-off at 1,600 therefore becomes flight at 4,000 at the next appraisal, while declining or oscillating risk obeys the recovery conditions above.
 - **Who appraises, and how often.** An army on a march order appraises through its lead, counting what any member sees, and its members follow its stance: a band that backs off or flees turns home. Each person appraises every 15 ticks at its own phase.
 - **What is exempt.** An army a driver steers is never appraised, its lead and members alike, and an army holding an attack intent is not appraised while the intent holds. Nothing overrides the player.
 - **State.** Temperament, stance and the tick a stance began are saved, and hashed when they differ from cautious and close.
@@ -196,18 +196,23 @@ This supersedes ADR 0046's engagement of the nearest foe in sight regardless of 
      - the kinds query visits only positions of the kinds sought; control, the same layout through `visit_within` visits all;
      - a hidden foe not counted, once ADR 0058 lands;
      - the draw's shares over 10,000 births within a tolerance;
-     - the save round trip.
+     - a saved bold living NPC restores as bold, with the same hash and appraisal thresholds; control, an otherwise identical cautious NPC at ratio 2,000 reads above its back-off threshold while the restored bold NPC reads below its own;
+     - an unequal-version save is refused; control, the matching-version save restores, with no migration.
    - Sweep identical.
 2. **Individuals: back off, flee, regroup and hold.**
    - Tests:
-     - a cautious villager outside its claim backs off from three foes and closes on one; control, the same villager bold closes on three;
+     - a cautious villager outside its claim backs off from two equally strong foes (ratio 2,000) and closes on one; control, the same villager bold closes on two;
      - a cowardly one flees to its village;
      - one inside its claim holds against three;
      - a straggler regroups to its army before engaging;
-     - hysteresis: a ratio set to oscillate across the threshold keeps the stance for 30 ticks and to three quarters of it;
+     - a backing-off token holder with a foe still in reach releases all slots and tokens before assignment and deals no damage, taking none on later ticks; control, the same layout with a closing token holder strikes; repeat for flee;
+     - worsening risk: cautious back off at ratio 1,600 at tick 0 becomes flee at 4,000 at tick 15, with stance tick 15, repeat from hold on home ground and from regroup while alone, each entering flee at 4,000; control, 1,600 then 2,000 with allies in sight stays back off (hold on home ground), with its original tick;
+     - declining risk: back off at 1,600 at tick 0 and 1,000 at tick 15 remains back off until tick 30, then closes with allies in sight; control, 1,125 at tick 30 does not release;
+     - oscillating risk: 1,400 and 1,600 at successive appraisals keep back off past 30 ticks; control, 1,000 after that releases it;
+     - after the escalation at tick 15, flight at 2,000 at tick 30 persists until tick 45, then becomes back off; controls, 2,250 at tick 45 retains flight and 1,000 with allies in sight releases to close;
      - a steered army facing three foes keeps closing, its lead and members alike; control, the same army not steered backs off;
      - an army ordered with an attack intent at a stronger foe keeps chasing it; control, the same army after `end_intent` backs off at its next phase;
-     - a world saved mid-retreat and loaded hashes the same, 60 ticks on, as the world continued; control, the same world loaded with its stances reset to close does not.
+     - a world containing a bold living NPC saved mid-retreat restores its temperament, stance and stance tick and hashes the same, 60 ticks on, as the world continued; control, the same world loaded with its stances reset to close does not.
 3. **Bands.**
    - Army stances through the lead, raids turning home, defenders holding.
    - Tests:
