@@ -874,6 +874,7 @@ func _map_image(world: WorldAdapter) -> Image:
 	var rows := world.map_rows()
 	_world_size = Vector2i(rows[0].length() if rows.size() > 0 else 0, rows.size())
 	var image := Image.create_empty(maxi(_world_size.x, 1), maxi(_world_size.y, 1), false, Image.FORMAT_RGBA8)
+	image.fill(MapWindow.FOG)
 	var names := world.terrain_names()
 	var terrain := world.terrain()
 	var owners := world.remembered_territory()
@@ -885,7 +886,6 @@ func _map_image(world: WorldAdapter) -> Image:
 		for x in _world_size.x:
 			var i := y * _world_size.x + x
 			if seen.size() != _world_size.x * _world_size.y or seen[i] == 0:
-				image.set_pixel(x, y, MapWindow.FOG)
 				continue
 			var colour: Color
 			if terrain.size() == _world_size.x * _world_size.y:
