@@ -1,6 +1,6 @@
 # ADR 0067: Let animals arise where food feeds them, hunt them for meat and materials, and let spirit beasts hold territories
 
-> Status: proposed
+> Status: proposed; its grazers fleeing the predators they see superseded by ADR-0071, under which an animal gives way by the same appraisal of strength as people, with its kind's strength and temperament
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
