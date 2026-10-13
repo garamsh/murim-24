@@ -134,10 +134,36 @@ func run() -> bool:
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
 	var purse_passed := _purse_pass()
+	var map_position_passed := _map_position_pass()
 	var fog_passed := _fog_pass()
 	var slip_passed := _notice_slip_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed and purse_passed and fog_passed and slip_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed and map_position_passed and fog_passed and slip_passed
+
+
+# The full map follows the player's cell while it stays open and the world advances.
+func _map_position_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	world.tick()
+	var player := world.player_army()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, player)
+	hud.open_map(world, player)
+	var before: Vector2 = hud.map_window.player_cell
+	var target: Dictionary = world.villages()[1]
+	var ordered := world.order(player, target.corner + target.area / 2,
+			PackedInt64Array(range(world.skill_count(player))))
+	for tick in 120:
+		world.tick()
+	hud.refresh(world, player, PackedInt64Array())
+	var now := (world.body_positions(player)[0] / WorldAdapter.CELL_SIZE).floor()
+	var moved := now != before
+	var follows: bool = hud.map_window.visible and hud.map_window.player_cell == now
+	var passed := ordered and moved and follows
+	print("hud_test: full map stays open, player moved %s -> %s (order %s, moved %s), dot follows %s: %s" % [
+			before, now, ordered, moved, follows, "pass" if passed else "FAIL"])
+	hud.free()
+	return passed
 
 
 # A partly seen village keeps fog on its unseen cells, with its seen cells in its owner's colour.

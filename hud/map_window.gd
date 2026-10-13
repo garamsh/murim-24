@@ -38,6 +38,15 @@ func show_map(world: WorldAdapter, map: Texture2D, player: Vector2, season: Stri
 	queue_redraw()
 
 
+## Updates the player's place and season while the window stays open.
+func refresh(player: Vector2, season: String) -> void:
+	if player_cell == player and _season == season:
+		return
+	player_cell = player
+	_season = season
+	queue_redraw()
+
+
 ## The whole multiple the map is drawn at: the largest at which it and its legend fit the room.
 func map_scale() -> int:
 	if _map == null:

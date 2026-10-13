@@ -317,6 +317,9 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		purse.read(world, person)
 		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
+	if map_window.visible:
+		var player := (positions[0] / WorldAdapter.CELL_SIZE).floor() if not positions.is_empty() else Vector2(-1, -1)
+		map_window.refresh(player, labels.season.text)
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = Palette.JADE_4 if skills.has(loadout.skill(world, slot)) else Palette.INK_2
