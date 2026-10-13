@@ -555,6 +555,8 @@ void fold_chart(const Fold& fold, std::size_t soul, const Chart& chart) {
     if (memory) {
       fold(memory->owner);
       fold(memory->peopled);
+      fold(memory->centre.x);
+      fold(memory->centre.y);
       fold(static_cast<std::uint8_t>(memory->stage));
     }
   }
@@ -3792,8 +3794,8 @@ bool World::in_view(std::size_t village, Cell from) const {
       });
 }
 
-// Village `village` as it stands: its owner, whether it has living
-// residents, and whether every structure is intact, rubble, or neither.
+// Village `village` as it stands: its owner, claim centre, whether it has
+// living residents, and whether every structure is intact, rubble, or neither.
 VillageMemory World::memory_of(std::size_t village) const {
   const std::vector<std::size_t>& built = villages_.at(village).spec.structures;
   const auto all_in = [this, &built](Stage wanted) {
@@ -3807,7 +3809,8 @@ VillageMemory World::memory_of(std::size_t village) const {
   } else if (all_in(Stage::INTACT)) {
     stage = VillageStage::STANDING;
   }
-  return VillageMemory{owner(village), residents_of(village) > 0, stage};
+  return VillageMemory{owner(village), residents_of(village) > 0, stage,
+                       seat(village)};
 }
 
 std::int64_t World::age_in_years(std::size_t person) const {
@@ -4238,7 +4241,7 @@ std::vector<std::optional<std::size_t>> World::remembered_territory(
   for (std::size_t village = 0; village < villages.size(); ++village) {
     const std::optional<VillageMemory>& memory = villages.at(village);
     if (memory && memory->peopled) {
-      centres.emplace_back(seat(village), memory->owner);
+      centres.emplace_back(memory->centre, memory->owner);
     }
   }
   if (!life_.growth) {

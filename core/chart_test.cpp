@@ -148,5 +148,34 @@ TEST(Chart, RefusesAVillageOwnedByNoFaction) {
   EXPECT_FALSE(Chart::restore(MAP, {}, unowned, FACTIONS));
 }
 
+TEST(Chart, AMovedClaimCentreChangesTheMemoryAndRevision) {
+  Chart chart{MAP};
+  const VillageMemory first{1, true, VillageStage::STANDING, {8, 9}};
+  ASSERT_TRUE(chart.remember(0, first));
+  const auto revision = chart.revision();
+  EXPECT_FALSE(chart.remember(0, first));
+  EXPECT_EQ(chart.revision(), revision);
+  const VillageMemory moved{1, true, VillageStage::STANDING, {18, 9}};
+  EXPECT_TRUE(chart.remember(0, moved));
+  EXPECT_EQ(chart.villages().front(), moved);
+  EXPECT_GT(chart.revision(), revision);
+}
+
+TEST(Chart, RefusesAVillageClaimCentreOffTheMap) {
+  const auto accepts = [](Cell centre) {
+    return Chart::restore(
+               MAP, {},
+               {VillageMemory{0, true, VillageStage::STANDING, centre}},
+               FACTIONS)
+        .has_value();
+  };
+  EXPECT_TRUE(accepts({0, 0}));
+  EXPECT_TRUE(accepts({MAP.width - 1, MAP.height - 1}));
+  EXPECT_FALSE(accepts({-1, 0}));
+  EXPECT_FALSE(accepts({0, -1}));
+  EXPECT_FALSE(accepts({MAP.width, 0}));
+  EXPECT_FALSE(accepts({0, MAP.height}));
+}
+
 }  // namespace
 }  // namespace murim

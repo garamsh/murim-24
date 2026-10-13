@@ -82,7 +82,9 @@ std::optional<Chart> Chart::restore(
     chart.blocks_.push_back(block);
   }
   for (const std::optional<VillageMemory>& memory : villages) {
-    if (memory && memory->owner >= factions) {
+    if (memory && (memory->owner >= factions || memory->centre.x < 0 ||
+                   memory->centre.y < 0 || memory->centre.x >= size.width ||
+                   memory->centre.y >= size.height)) {
       return std::nullopt;
     }
   }

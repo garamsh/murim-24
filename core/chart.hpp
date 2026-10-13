@@ -28,11 +28,14 @@ struct VillageMemory {
   std::size_t owner;
   bool peopled;
   VillageStage stage;
+  /// The village's claim centre when it was last seen.
+  Cell centre{};
 
   friend bool operator==(const VillageMemory& left,
                          const VillageMemory& right) {
     return left.owner == right.owner && left.peopled == right.peopled &&
-           left.stage == right.stage;
+           left.stage == right.stage && left.centre.x == right.centre.x &&
+           left.centre.y == right.centre.y;
   }
   friend bool operator!=(const VillageMemory& left,
                          const VillageMemory& right) {
@@ -59,7 +62,8 @@ class Chart {
   /// `villages`, as `blocks` and `villages` gave them, or nothing when they
   /// are no chart's: an area off the map, areas out of order or repeated, an
   /// area with no seen cell or with a cell off the map seen, or a village
-  /// owned by a faction at or past `factions`.
+  /// owned by a faction at or past `factions`, or a remembered claim centre
+  /// off the map.
   [[nodiscard]] static std::optional<Chart> restore(
       Footprint size, const std::vector<ChartBlock>& blocks,
       const std::vector<std::optional<VillageMemory>>& villages,

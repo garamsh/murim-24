@@ -669,13 +669,15 @@ void put_chart(Writer& out, const Chart& chart) {
             put_maybe(out, village, [&out](VillageMemory memory) {
               out.size(memory.owner);
               out.flag(memory.peopled);
+              out.i32(memory.centre.x);
+              out.i32(memory.centre.y);
               out.u8(static_cast<std::uint8_t>(memory.stage));
             });
           });
 }
 
 // Reads a chart over a map of `size` cells, refusing one no chart gives or
-// one remembering an owner at or past `factions`.
+// one remembering an owner at or past `factions` or a centre off the map.
 Chart get_chart(Reader& input, Footprint size, std::size_t factions) {
   constexpr std::uint8_t STAGES = 3;
   const std::vector<ChartBlock> blocks = get_all<ChartBlock>(input, [&input] {
@@ -690,8 +692,10 @@ Chart get_chart(Reader& input, Footprint size, std::size_t factions) {
         return get_maybe<VillageMemory>(input, [&input] {
           const std::size_t owner = input.size();
           const bool peopled = input.flag();
+          const Cell centre{input.i32(), input.i32()};
           return VillageMemory{owner, peopled,
-                               static_cast<VillageStage>(input.tag(STAGES))};
+                               static_cast<VillageStage>(input.tag(STAGES)),
+                               centre};
         });
       });
   std::optional<Chart> chart =

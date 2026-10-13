@@ -1326,6 +1326,7 @@ TEST(World, RebuilderBecomesTheOwnerOnlyWhereNoResidentLives) {
 constexpr std::size_t WATCHER = 3;
 constexpr std::int32_t WATCH_SIGHT = 4;
 constexpr Cell BESIDE_VILLAGE{10, 12};
+constexpr Cell WATCH_SEAT{10, 10};
 constexpr Cell WATCH_CORNER{22, 1};
 
 World watched_village_world() {
@@ -1334,7 +1335,7 @@ World watched_village_world() {
   const Skill torch{0, 3 * CELL_SIZE, 0, 10, 10};
   const Skill mend{0, 3 * CELL_SIZE, 0, -2, 10};
   const std::vector<ArmySpec> armies{
-      ArmySpec{{10, 10},
+      ArmySpec{WATCH_SEAT,
                {Recruit{{9, 10}, RESIDENT_HEALTH},
                 Recruit{{10, 10}, RESIDENT_HEALTH},
                 Recruit{{11, 10}, RESIDENT_HEALTH},
@@ -1401,7 +1402,7 @@ void raze(World& world) {
 TEST(World, AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain) {
   World world = watched_village_world();
   world.tick();
-  const VillageMemory standing{0, true, VillageStage::STANDING};
+  const VillageMemory standing{0, true, VillageStage::STANDING, WATCH_SEAT};
   ASSERT_EQ(remembered(world), standing);
 
   walk_watcher(world, WATCH_CORNER);
@@ -1413,7 +1414,8 @@ TEST(World, AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain) {
 
   walk_watcher(world, BESIDE_VILLAGE);
   ASSERT_TRUE(watcher_on(world, BESIDE_VILLAGE));
-  EXPECT_EQ(remembered(world), (VillageMemory{0, false, VillageStage::RUINS}));
+  EXPECT_EQ(remembered(world),
+            (VillageMemory{0, false, VillageStage::RUINS, WATCH_SEAT}));
 
   // Control: the same burning in sight is remembered on the tick it ends.
   World watched = watched_village_world();
@@ -1435,7 +1437,7 @@ void rebuild_watched_village(World& world) {
 TEST(World, AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain) {
   World world = watched_village_world();
   world.tick();
-  const VillageMemory standing{0, true, VillageStage::STANDING};
+  const VillageMemory standing{0, true, VillageStage::STANDING, WATCH_SEAT};
   ASSERT_EQ(remembered(world), standing);
   walk_watcher(world, WATCH_CORNER);
   ASSERT_TRUE(watcher_on(world, WATCH_CORNER));
@@ -1448,7 +1450,7 @@ TEST(World, AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain) {
   EXPECT_EQ(remembered(world), standing);
   walk_watcher(world, BESIDE_VILLAGE);
   ASSERT_TRUE(watcher_on(world, BESIDE_VILLAGE));
-  const VillageMemory rebuilt{2, true, VillageStage::STANDING};
+  const VillageMemory rebuilt{2, true, VillageStage::STANDING, IN_VILLAGE};
   EXPECT_EQ(remembered(world), rebuilt);
 
   // Control: the same rebuilding in sight updates the remembered owner.
@@ -4256,6 +4258,98 @@ World defending(std::int32_t apart, Cell objective, bool homed) {
                {VillageSpec{{}, 0, {}, 0, {}}},
                {},
                life};
+}
+
+constexpr Cell CHART_HOME{8, 9};
+constexpr Cell CHART_WATCH{8, 11};
+constexpr Cell CHART_AWAY{28, 28};
+constexpr Cell CHART_MOVED{18, 9};
+constexpr std::size_t CHART_WATCHER = 1;
+
+// A peopled village with one house and a steered soul beside it, on open
+// ground.
+World territory_chart_world() {
+  Rules rules = peaceful(SEPARATION);
+  rules.map_sight = 5;
+  Life life = one_discipline(0);
+  Growth growth;
+  growth.interval = 1;
+  growth.claim = 4;
+  growth.stances.resize(rules.hostile.size());
+  life.growth = growth;
+  World world{Seed{1},
+              Map{open_map(GROWTH_SIDE)},
+              {army(CHART_HOME, CHART_HOME, 1, TARGET_HEALTH, 0, {IDLE}),
+               army(CHART_WATCH, CHART_WATCH, 1, TARGET_HEALTH, 0, {IDLE})},
+              {Structure{{8, 8}, INTACT}},
+              rules,
+              {VillageSpec{{0}, 0, {}, 0, {}}},
+              {},
+              life};
+  world.ensoul(world.roster(CHART_WATCHER).front());
+  world.steer(CHART_WATCHER, true);
+  world.tick();
+  return world;
+}
+
+void walk_chart_watcher(World& world, Cell to) {
+  world.order(CHART_WATCHER, {to, {0}});
+  for (std::uint64_t tick = 0; tick < PHASE_TICKS; ++tick) {
+    const Cell here =
+        cell_of(world.person(world.roster(CHART_WATCHER).front()).position);
+    if (here.x == to.x && here.y == to.y) {
+      return;
+    }
+    world.tick();
+  }
+}
+
+TEST(World, RememberedBordersKeepTheLastSeenClaimCentreUntilSeenAgain) {
+  World world = territory_chart_world();
+  walk_chart_watcher(world, CHART_AWAY);
+  const Cell away =
+      cell_of(world.person(world.roster(CHART_WATCHER).front()).position);
+  ASSERT_EQ(away.x, CHART_AWAY.x);
+  ASSERT_EQ(away.y, CHART_AWAY.y);
+  const auto remembered_before = world.remembered_territory(0);
+  ASSERT_TRUE(std::any_of(remembered_before.begin(), remembered_before.end(),
+                          [](const auto& owner) { return owner.has_value(); }));
+  const auto live_before = world.territory();
+  const auto revision = world.chart(0).revision();
+  world.order(0, {CHART_MOVED, {0}});
+  world.tick();
+  ASSERT_NE(world.territory(), live_before);
+  EXPECT_EQ(world.remembered_territory(0), remembered_before);
+  EXPECT_EQ(world.chart(0).revision(), revision);
+  walk_chart_watcher(world, CHART_WATCH);
+  const Cell returned =
+      cell_of(world.person(world.roster(CHART_WATCHER).front()).position);
+  ASSERT_EQ(returned.x, CHART_WATCH.x);
+  ASSERT_EQ(returned.y, CHART_WATCH.y);
+  constexpr Cell NEW_CLAIM_CELL{15, 11};
+  const auto slot = [](Cell cell) {
+    return (static_cast<std::size_t>(cell.y) * GROWTH_SIDE) +
+           static_cast<std::size_t>(cell.x);
+  };
+  ASSERT_TRUE(world.chart(0).seen(CHART_HOME));
+  ASSERT_TRUE(world.chart(0).seen(NEW_CLAIM_CELL));
+  ASSERT_EQ(world.territory().at(slot(NEW_CLAIM_CELL)),
+            std::optional<std::size_t>{0});
+  const auto refreshed = world.remembered_territory(0);
+  EXPECT_EQ(refreshed.at(slot(CHART_HOME)), std::nullopt);
+  EXPECT_EQ(refreshed.at(slot(NEW_CLAIM_CELL)), std::optional<std::size_t>{0});
+
+  // Control: the same change in sight changes the revision without seeing a new
+  // cell.
+  World watched = territory_chart_world();
+  const auto before = watched.chart(0).revision();
+  const auto blocks = watched.chart(0).blocks();
+  ASSERT_EQ(blocks.size(), 1U);
+  watched.order(0, {CHART_MOVED, {0}});
+  watched.tick();
+  ASSERT_EQ(watched.chart(0).blocks().size(), 1U);
+  EXPECT_EQ(watched.chart(0).blocks().front().bits, blocks.front().bits);
+  EXPECT_GT(watched.chart(0).revision(), before);
 }
 
 TEST(World, AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets) {

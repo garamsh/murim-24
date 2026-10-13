@@ -439,6 +439,48 @@ TEST(Save, AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
+TEST(Save, ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap) {
+  const Saved saved = charted_region(REGION_SEED, TICKS_PER_SHORT_DAY);
+  const auto& memories = saved.world.chart(0).villages();
+  ASSERT_FALSE(memories.empty());
+  ASSERT_TRUE(memories.back().has_value());
+  const Cell first = memories.back().value_or(VillageMemory{}).centre;
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+  const auto intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The last memory ends with its two centre coordinates and its stage.
+  const std::size_t x = payload.size() - 1 - (2 * sizeof(std::int32_t));
+  ASSERT_EQ(payload.at(x), static_cast<std::uint8_t>(first.x));
+  const auto put_x = [&payload, x](std::uint32_t value) {
+    for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+      payload.at(x + byte) =
+          static_cast<std::uint8_t>(value >> (byte * BYTE_BITS));
+    }
+  };
+  const std::uint32_t changed = first.x == 0 ? 1U : 0U;
+  put_x(changed);
+  store.bytes(SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, SLOT));
+  const Cell centre = restored.world.chart(0)
+                          .villages()
+                          .back()
+                          .value_or(VillageMemory{})
+                          .centre;
+  EXPECT_EQ(centre.x, static_cast<std::int32_t>(changed));
+  EXPECT_EQ(centre.y, first.y);
+  EXPECT_NE(restored.world.hash(), saved.world.hash());
+  // Control above: another centre on the map loads; its first off-map x does
+  // not.
+  put_x(static_cast<std::uint32_t>(REGION_SIDE));
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
 TEST(Save, ASealedSaveNamingAPersonNoEventCanNameIsRefused) {
   // One person strikes the other dead on the first tick: person 1 in one
   // world and person 0 in the other, which differ in nothing the save holds

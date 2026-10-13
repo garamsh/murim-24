@@ -102,7 +102,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `hud/hud.tscn` is drawn at a whole-pixel scale of its own, as `view_scale.gd` gives it, and laid out in the window's size at that scale.
 - The HUD shows:
   - the player's portrait, faction, health, qi and realm
-  - a map around the player of what the player's soul has seen, from `explored`, `remembered_territory` and `remembered_villages`: unseen cells in fog, borders only against seen cells, and each village as last seen on its seen cells, in stone if seen in ruins; it is drawn again when `chart_revision` moves, and shows the core's season and year
+  - a map around the player of what the player's soul has seen, from `explored`, `remembered_territory` and `remembered_villages`: unseen cells in fog, borders from remembered claim centres only against seen cells, and each village as last seen on its seen cells, in stone if seen in ruins; it is drawn again when `chart_revision` moves, and shows the core's season and year
   - its faction's leader, and a duel for the lead while one is fought
   - the target frame on the person the player selected
   - the notices of the core's refusals and of the player's lessons and realms, read from `progress`
@@ -143,6 +143,8 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `sound/exit_probe.gd`, run in a Godot of its own, checks that freeing the sound scene leaks nothing.
 
 ## Rationale
+
+- Remembered borders use the village's claim centre as last seen, and a changed centre redraws the map: ADR 0078 (`adr/0078-remember-each-villages-claim-centre-with-its-last-seen-state.md`).
 
 - Godot is the presentation adapter and the core reaches it through GDExtension: ADR 0002 (`adr/0002-build-on-godot-with-a-cpp-simulation-core.md`).
 - The binding release, its pin, the build path, the scenario format, how refusals reach GDScript, the test runner and how CI installs Godot: ADR 0004 (`adr/0004-bind-the-core-to-godot-with-godot-cpp-through-cmake.md`).

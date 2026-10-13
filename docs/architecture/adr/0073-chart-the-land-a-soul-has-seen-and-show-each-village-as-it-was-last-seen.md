@@ -1,6 +1,6 @@
 # ADR 0073: Chart the land a soul has seen, and show each village as it was last seen
 
-> Status: accepted
+> Status: superseded by ADR-0078 (remembered village record and claim centre only)
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
@@ -126,4 +126,4 @@ Costs, at the region of 128 cells built today, ADR 0047's 4,096 and ADR 0070's 8
 
 ## Errata
 
-- **2026-10-13, implementing issue #168 on macOS arm64 with Apple Clang 21.0.0 (`clang-2100.1.1.101`), C++17.** The table's village memory of 4 bytes was an estimate, not the layout built in `core/chart.hpp`: `sizeof(VillageMemory)` is 16 bytes, and each `std::optional<VillageMemory>` slot is 24 bytes, including slots before the last remembered village that are empty. Thus 10,000 slots occupy 234.38 KiB before vector capacity and allocation overhead, rather than 39.06 KiB. Each `ChartBlock` occupies 132 bytes, its area index beside its 128 bytes of bits; the area's lookup index still costs 4 bytes. A `Chart` object itself occupies 96 bytes before its vectors' allocations. `build/issue-168/chart_sizes.cpp` and `chart-sizes.log` record the check in the implementing pull request's local evidence. The sparse record, save encoding and decision to keep it with the soul stand.
+- **2026-10-13, implementing issue #168 on macOS arm64 with Apple Clang 21.0.0 (`clang-2100.1.1.101`), C++17.** Before the centre was added by ADR 0078, at `a45c5c1b`, the table's village memory of 4 bytes was an estimate, not the layout built in `core/chart.hpp`: `sizeof(VillageMemory)` is 16 bytes, and each `std::optional<VillageMemory>` slot is 24 bytes, including slots before the last remembered village that are empty. Thus 10,000 slots occupy 234.38 KiB before vector capacity and allocation overhead, rather than 39.06 KiB. Each `ChartBlock` occupies 132 bytes, its area index beside its 128 bytes of bits; the area's lookup index still costs 4 bytes. A `Chart` object itself occupies 96 bytes before its vectors' allocations. `build/issue-168/chart_sizes.cpp` and `chart-sizes.log` record the check in the implementing pull request's local evidence. The sparse record, save encoding and decision to keep it with the soul stand.
