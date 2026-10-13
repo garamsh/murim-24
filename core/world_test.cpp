@@ -1425,6 +1425,44 @@ TEST(World, AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain) {
   EXPECT_EQ(remembered(watched).value_or(standing).stage, VillageStage::RUINS);
 }
 
+// Rebuilds the razed village under faction 2 while the raiders leave it.
+void rebuild_watched_village(World& world) {
+  world.order(RAIDER, {RAIDER_HOME, {0, 1}});
+  world.order(MENDER, {IN_VILLAGE, {0}});
+  run_ticks(world, PHASE_TICKS);
+}
+
+TEST(World, AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain) {
+  World world = watched_village_world();
+  world.tick();
+  const VillageMemory standing{0, true, VillageStage::STANDING};
+  ASSERT_EQ(remembered(world), standing);
+  walk_watcher(world, WATCH_CORNER);
+  ASSERT_TRUE(watcher_on(world, WATCH_CORNER));
+  raze(world);
+  ASSERT_EQ(world.village_state(0), VillageState::RUINS);
+  rebuild_watched_village(world);
+  ASSERT_EQ(world.owner(0), 2U);
+  ASSERT_EQ(world.stage(0), Stage::INTACT);
+  ASSERT_EQ(world.stage(1), Stage::INTACT);
+  EXPECT_EQ(remembered(world), standing);
+  walk_watcher(world, BESIDE_VILLAGE);
+  ASSERT_TRUE(watcher_on(world, BESIDE_VILLAGE));
+  const VillageMemory rebuilt{2, true, VillageStage::STANDING};
+  EXPECT_EQ(remembered(world), rebuilt);
+
+  // Control: the same rebuilding in sight updates the remembered owner.
+  World watched = watched_village_world();
+  watched.tick();
+  raze(watched);
+  ASSERT_EQ(watched.village_state(0), VillageState::RUINS);
+  rebuild_watched_village(watched);
+  ASSERT_EQ(watched.owner(0), 2U);
+  ASSERT_EQ(watched.stage(0), Stage::INTACT);
+  ASSERT_EQ(watched.stage(1), Stage::INTACT);
+  EXPECT_EQ(remembered(watched), rebuilt);
+}
+
 TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
   const ArmySpec one = army({0, 0}, {0, 0}, 1, 1, 0, {IDLE});
   const std::vector<Structure> houses{{{4, 4}, 1}, {{6, 4}, 1}};
