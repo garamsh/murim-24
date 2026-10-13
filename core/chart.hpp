@@ -25,9 +25,9 @@ enum class VillageStage : std::uint8_t { STANDING, DAMAGED, RUINS };
 
 /// A village as it was last seen.
 struct VillageMemory {
-  std::size_t owner;
-  bool peopled;
-  VillageStage stage;
+  std::size_t owner = 0;
+  bool peopled = false;
+  VillageStage stage = VillageStage::STANDING;
   /// The village's claim centre when it was last seen.
   Cell centre{};
 

@@ -4238,8 +4238,7 @@ std::vector<std::optional<std::size_t>> World::remembered_territory(
   const Footprint size{map_.width(), map_.height()};
   std::vector<std::pair<Cell, std::size_t>> centres;
   const std::vector<std::optional<VillageMemory>>& villages = seen.villages();
-  for (std::size_t village = 0; village < villages.size(); ++village) {
-    const std::optional<VillageMemory>& memory = villages.at(village);
+  for (const std::optional<VillageMemory>& memory : villages) {
     if (memory && memory->peopled) {
       centres.emplace_back(memory->centre, memory->owner);
     }

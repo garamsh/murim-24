@@ -454,11 +454,11 @@ TEST(Save, ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap) {
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
   // The last memory ends with its two centre coordinates and its stage.
-  const std::size_t x = payload.size() - 1 - (2 * sizeof(std::int32_t));
-  ASSERT_EQ(payload.at(x), static_cast<std::uint8_t>(first.x));
-  const auto put_x = [&payload, x](std::uint32_t value) {
+  const std::size_t x_offset = payload.size() - 1 - (2 * sizeof(std::int32_t));
+  ASSERT_EQ(payload.at(x_offset), static_cast<std::uint8_t>(first.x));
+  const auto put_x = [&payload, x_offset](std::uint32_t value) {
     for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
-      payload.at(x + byte) =
+      payload.at(x_offset + byte) =
           static_cast<std::uint8_t>(value >> (byte * BYTE_BITS));
     }
   };

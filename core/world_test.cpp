@@ -4261,6 +4261,8 @@ World defending(std::int32_t apart, Cell objective, bool homed) {
 }
 
 constexpr Cell CHART_HOME{8, 9};
+constexpr Cell CHART_HOUSE{8, 8};
+constexpr std::int32_t CHART_REACH = 5;
 constexpr Cell CHART_WATCH{8, 11};
 constexpr Cell CHART_AWAY{28, 28};
 constexpr Cell CHART_MOVED{18, 9};
@@ -4270,7 +4272,7 @@ constexpr std::size_t CHART_WATCHER = 1;
 // ground.
 World territory_chart_world() {
   Rules rules = peaceful(SEPARATION);
-  rules.map_sight = 5;
+  rules.map_sight = CHART_REACH;
   Life life = one_discipline(0);
   Growth growth;
   growth.interval = 1;
@@ -4281,7 +4283,7 @@ World territory_chart_world() {
               Map{open_map(GROWTH_SIDE)},
               {army(CHART_HOME, CHART_HOME, 1, TARGET_HEALTH, 0, {IDLE}),
                army(CHART_WATCH, CHART_WATCH, 1, TARGET_HEALTH, 0, {IDLE})},
-              {Structure{{8, 8}, INTACT}},
+              {Structure{CHART_HOUSE, INTACT}},
               rules,
               {VillageSpec{{0}, 0, {}, 0, {}}},
               {},
@@ -4292,12 +4294,12 @@ World territory_chart_world() {
   return world;
 }
 
-void walk_chart_watcher(World& world, Cell to) {
-  world.order(CHART_WATCHER, {to, {0}});
+void walk_chart_watcher(World& world, Cell destination) {
+  world.order(CHART_WATCHER, {destination, {0}});
   for (std::uint64_t tick = 0; tick < PHASE_TICKS; ++tick) {
     const Cell here =
         cell_of(world.person(world.roster(CHART_WATCHER).front()).position);
-    if (here.x == to.x && here.y == to.y) {
+    if (here.x == destination.x && here.y == destination.y) {
       return;
     }
     world.tick();
