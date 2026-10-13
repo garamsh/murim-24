@@ -142,7 +142,7 @@ That is 10 bytes of field payload per recorded person, including the dead: 5 KB 
 
 **Saves and the hash.** The stance and the tick it began carry the hysteresis, so they are world state, as ADR 0068 keeps its slots:
 - a person's temperament, stance and full 64-bit stance tick, and an army's stance and full stance tick, are saved, and `SAVE_VERSION` rises;
-- the hash folds a person's temperament only when it is not cautious, and a stance with its tick only when it is not close, so a world in which nobody has left close hashes as before;
+- the hash folds a person's temperament only when it is not cautious, and a stance with its tick only when it is not close, so a world in which every person is cautious and every person and army stance is close hashes as before;
 - a world loaded from a matching-version save restores temperament, stance and stance tick unchanged, including a bold living NPC; unequal versions remain refused, with no migration.
 
 **The query.** The hash gains one public query: visit the positions of some kinds within a radius. It asks `holds` over its span first, and passes over every cell holding none of the kinds, as `nearest` does. Nothing else in the hash changes, and it allocates nothing.
@@ -181,13 +181,13 @@ Every person outside the player's armies, and every animal, appraises the danger
 - **Transition precedence and hysteresis.** At each appraisal, choose flee above its threshold first, then regroup when alone above half the back-off threshold, then hold or back off above the back-off threshold, then close. Flight overrides any non-flee stance immediately, regardless of release ratio or elapsed time. Close enters the chosen outcome immediately; other transitions require both 30 ticks in the current stance and a ratio strictly below three quarters of its entry threshold. Each change records a new stance tick; unchanged stances keep theirs. A cautious back-off at 1,600 therefore becomes flight at 4,000 at the next appraisal, while declining or oscillating risk obeys the recovery conditions above.
 - **Who appraises, and how often.** An army on a march order appraises through its lead, counting what any member sees, and its members follow its stance: a band that backs off or flees turns home. Each person appraises every 15 ticks at its own phase.
 - **What is exempt.** An army a driver steers is never appraised, its lead and members alike, and an army holding an attack intent is not appraised while the intent holds. Nothing overrides the player.
-- **State.** Temperament, stance and the full 64-bit tick a stance began stay on the persistent person record, including after a crowd is compacted, and are saved and hashed when they differ from cautious and close. Rebirth creates a new record with its own draw. Only the scratch stamps key compact live slots and are bounded by the living capacity; recorded history is not bounded by it.
+- **State.** Temperament, stance and the full 64-bit tick a stance began stay on the persistent person record, including after a crowd is compacted, and are saved unchanged. The hash folds temperament only when it is not cautious, and a person's or army's stance with its tick only when it is not close. Rebirth creates a new record with its own draw. Only the scratch stamps key compact live slots and are bounded by the living capacity; recorded history is not bounded by it.
 
 This supersedes ADR 0046's engagement of the nearest foe in sight regardless of the odds. It amends ADR 0068 so that a person backing off or fleeing takes no slot or token, and ADR 0067's flight of a grazer from a predator, which becomes this rule.
 
 **Implementation steps.** Each step is its own pull request, with `make ci`, GCC, `make sweep` keeping 48 of 50 seeds or better with the war and peace counts reported, and `make bench` passing on AC power:
 1. **Temperament and the appraisal, no behaviour.**
-   - Temperament drawn at birth, saved and hashed when not cautious; persistent fields on the existing person record, army fields on its order, and stance ticks on the 64-bit world clock. Report field payload separately from the measured change in record size, and persistent memory by recorded population, dead included.
+   - Temperament drawn at birth and saved unchanged, hashed only when not cautious; persistent fields on the existing person record, army fields on its order, and stance ticks on the 64-bit world clock. Report field payload separately from the measured change in record size, and persistent memory by recorded population, dead included.
    - The realms' weights in the realm table.
    - The hash's query of some kinds within a radius, and the world's stamps.
    - The pure appraisal function, reading the hash and returning the ratio, for a person and for an army's merged sight.
