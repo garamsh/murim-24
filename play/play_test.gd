@@ -122,7 +122,7 @@ func run() -> bool:
 			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _grade_pass()
 
 
 # The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom
@@ -1457,6 +1457,40 @@ func _loadout_save_pass() -> bool:
 			and first[1] == {"art": -1, "skill": 1} and untouched
 	print("play_test: the loadout %s saved %s, restored by Continue %s, T showing %s; a new game starts from %s; the game's slot 0 untouched %s: %s" % [
 		changed, saved, restored, not restored_shown.is_empty(), first, untouched, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The pass follows the core's five-tick day, with the settings' quality and the camera's art scale.
+func _grade_pass() -> bool:
+	var scene := _title()
+	var grade: CanvasLayer = scene.get_node("Grade")
+	var hidden := not grade.visible
+	scene.call("_play", WorldAdapter.create_region(SEED, 0, 5))
+	var view := Rect2(Vector2.ZERO, Vector2(640, 360))
+	scene.get_node("Camera").zoom = Vector2(3, 3)
+	scene.show_view(view)
+	var night: Vector3 = grade.params().gain
+	for tick in 3:
+		scene.step()
+	scene.show_view(view)
+	var date: Dictionary = scene.world.date()
+	var noon: Vector3 = grade.params().gain
+	var expected: Vector3 = grade.grade_at(0.6, date.season).gain
+	var clock: bool = date.tick == 3 and date.ticks_per_day == 5 \
+			and noon.is_equal_approx(expected) and not noon.is_equal_approx(night)
+	var settings: Control = scene.get_node("Hud").settings
+	settings.chosen.screen = 0
+	scene.show_numbers()
+	var low: float = grade.params().vignette
+	settings.chosen.screen = 1
+	scene.show_numbers()
+	var standard: float = grade.params().vignette
+	var passed: bool = hidden and grade.visible and clock and low == 0.0 and standard > 0.0 \
+			and grade.params().art_pixel == 3.0
+	print("play_test: grade hidden on title %s, shown in play %s; five-tick day at tick %d gain %s against %s, midnight %s; low vignette %.2f standard %.2f art pixel %.1f: %s" % [
+		hidden, grade.visible, date.tick, noon, expected, night, low, standard, grade.params().art_pixel,
+		"pass" if passed else "FAIL"])
+	scene.free()
 	return passed
 
 

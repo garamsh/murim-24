@@ -4,6 +4,7 @@
 [ext_resource type="Shader" path="res://grade/grade.gdshader" id="2"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_grade"]
+resource_local_to_scene = true
 shader = ExtResource("2")
 
 [node name="Grade" type="CanvasLayer"]

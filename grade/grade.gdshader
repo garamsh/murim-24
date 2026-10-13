@@ -42,7 +42,7 @@ void fragment() {
 	}
 	if (vignette > 0.0) {
 		vec2 cell = floor(FRAGCOORD.xy / art_pixel);
-		vec2 centred = SCREEN_UV * 2.0 - 1.0;
+		vec2 centred = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE * 2.0 - 1.0;
 		float reach = smoothstep(0.55, 1.35, length(centred));
 		int k = (int(mod(cell.y, 4.0)) * 4) + int(mod(cell.x, 4.0));
 		if ((BAYER[k] + 0.5) / 16.0 < reach) {

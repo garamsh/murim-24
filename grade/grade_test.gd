@@ -31,7 +31,28 @@ func run() -> bool:
 			and is_equal_approx(low.vignette, 0.0) and is_equal_approx(low.hue_shift, Grade.HUE_SHIFT) \
 			and is_equal_approx(standard.hue_shift, Grade.HUE_SHIFT) \
 			and Vector3(standard.gain).is_equal_approx(noon.gain)
-	var passed: bool = grades_pass and quality_pass and hidden_before and shown_after
+	var winter := grade.grade_at(0.5, 3)
+	var spring := grade.grade_at(0.5, 0)
+	var midnight := grade.grade_at(0.0, SUMMER)
+	var wrapped := grade.grade_at(1.0, SUMMER)
+	var before_midnight := grade.grade_at(0.99999, SUMMER)
+	var boundaries_pass: bool = winter.gain.is_equal_approx(Vector3(0.96, 0.99, 1.06)) \
+			and spring.gain.is_equal_approx(Vector3(1.0, 1.02, 0.98)) \
+			and not winter.gain.is_equal_approx(noon.gain) \
+			and midnight.gain.is_equal_approx(wrapped.gain) \
+			and before_midnight.gain.is_equal_approx(midnight.gain)
+	grade.quality = Grade.Quality.HIGH
+	var high := grade.params()
+	boundaries_pass = boundaries_pass and is_equal_approx(high.vignette, standard.vignette)
+	var other: Grade = load(SCENE).instantiate()
+	other.show_time(0.76, SUMMER)
+	var separate: bool = Vector3(grade.params().gain).is_equal_approx(noon.gain) \
+			and Vector3(other.params().gain).is_equal_approx(dusk.gain)
+	other.free()
+	print("grade_test: spring %s, winter %s, midnight %s wrapped %s before %s; high vignette %.2f: %s" % [
+		spring.gain, winter.gain, midnight.gain, wrapped.gain, before_midnight.gain, high.vignette,
+		"pass" if boundaries_pass else "FAIL"])
+	var passed: bool = grades_pass and quality_pass and boundaries_pass and separate and hidden_before and shown_after
 	print("grade_test: noon in summer gain %s saturation %.2f, dusk gain %s, between them %s against %s; standard vignette %.2f hue shift %.2f, low vignette %.2f hue shift %.2f; hidden before a time %s, shown after %s: %s" % [
 		noon.gain, noon.saturation, dusk.gain, between.gain, halfway, standard.vignette, standard.hue_shift,
 		low.vignette, low.hue_shift, hidden_before, shown_after, "pass" if passed else "FAIL"])
