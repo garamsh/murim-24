@@ -203,7 +203,7 @@ func screen() -> Control:
 
 
 ## Returns the panel open over the world, the one that takes the keys and taps while no screen is
-## open: the genealogy, sect or arts panel, the faction window or the dialogue window, or null
+## open: the genealogy, sect or arts panel, the faction, map or dialogue window, or null
 ## while none is.
 func panel() -> Control:
 	for open: Control in [genealogy, sect, arts, factions, map_window, dialogue]:
