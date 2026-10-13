@@ -154,7 +154,7 @@ func _fit_pass() -> bool:
 		fit.check(keys, 8 + fit.width(keys), dialog.size.x - 8)
 		# The line under the rows, as tall as the font, ends above the line over the foot.
 		var about_end := Settings.ROW_TOP + Settings.ROWS.size() * Settings.ROW_STEP + 2 + Hud.FONT_SIZE
-		fit.check("%d rows" % Settings.ROWS.size(), about_end, dialog.size.y - 20)
+		fit.check("%d rows" % Settings.ROWS.size(), about_end + 2, dialog.size.y - 20)
 	TranslationServer.set_locale(Hud.LOCALES[0])
 	panel.free()
 	var unmeasured := fit.unmeasured(["SETTINGS_", "LOCALE_"])

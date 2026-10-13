@@ -23,7 +23,7 @@ const DIALOG := Rect2(60, 4, 360, 256)
 # stop and screen effects close them up, and the dialog stands 6 pixels higher, to keep the line
 # under them within the panel.
 const ROW_STEP := 15
-const ROW_TOP := 29
+const ROW_TOP := 27
 const CHOICE_WIDTH := 64
 const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
