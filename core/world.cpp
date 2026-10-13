@@ -994,7 +994,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   leadership_ = std::move(leadership);
   leadership_.resize(rules_.hostile.size());
-  declarations_.resize(rules_.hostile.size() * rules_.hostile.size());
+  declarations_ = Declarations{rules_.hostile.size()};
   add_sects(std::move(sects));
 }
 
@@ -1101,9 +1101,9 @@ void World::restore() {
       std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
       manuals.scatter_chance > PER_MILLE || !reachable(manuals.scatter_reach) ||
       !all_below(surnames_, life_.names.surnames.size());
-  if (bad_rules || bad_life || bad_structures || !declarations_kept() ||
-      !events_kept() || !progress_kept() || !rostered() ||
-      living() > rules_.people_capacity ||
+  if (bad_rules || bad_life || bad_structures ||
+      !declarations_.kept(tick_count_) || !events_kept() || !progress_kept() ||
+      !rostered() || living() > rules_.people_capacity ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
       std::any_of(villages_.begin(), villages_.end(), stray_village) ||
       leadership_.size() != factions ||
@@ -1124,27 +1124,6 @@ void World::restore() {
                   structure.footprint.height * CELL_SIZE});
   }
   structure_index_ = SpatialHash{centres_of(structures_)};
-}
-
-// Whether the declarations are as declare() keeps them: one place for each
-// two factions, each standing under the lower's row, made by one of them no
-// later than now.
-bool World::declarations_kept() const {
-  const std::size_t factions = rules_.hostile.size();
-  if (declarations_.size() != factions * factions) {
-    return false;
-  }
-  for (std::size_t index = 0; index < declarations_.size(); ++index) {
-    const std::optional<Declared>& standing = declarations_.at(index);
-    const std::size_t one = index / factions;
-    const std::size_t other = index % factions;
-    if (standing &&
-        (one >= other || (standing->by != one && standing->by != other) ||
-         standing->tick > tick_count_)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // Whether the events kept are as tick() keeps them: at most
@@ -2503,7 +2482,7 @@ StateHash World::hash() const {
     fold(fight.challenger);
     fold(fight.leader);
   }
-  fold_relations(fold, declarations_, armies_, life_.diplomacy);
+  fold_relations(fold, declarations_.slots(), armies_, life_.diplomacy);
   for (const Village& village : villages_) {
     fold_village(fold, village);
   }
@@ -2645,25 +2624,16 @@ bool World::elects(std::size_t faction) const {
 }
 
 bool World::hostile(std::size_t from, std::size_t target) const {
-  const std::optional<Declared>& standing =
-      declarations_.at(pair_of(from, target));
+  const std::optional<Declared>& standing = declarations_.between(from, target);
   if (standing) {
     return standing->what == Declaration::WAR;
   }
   return rules_.hostile.at(from).at(target);
 }
 
-std::size_t World::pair_of(std::size_t faction, std::size_t other) const {
-  const std::size_t factions = rules_.hostile.size();
-  if (faction >= factions || other >= factions) {
-    throw std::out_of_range("no such faction");
-  }
-  return (std::min(faction, other) * factions) + std::max(faction, other);
-}
-
 Relation World::relation(std::size_t faction, std::size_t other) const {
   const std::optional<Declared>& standing =
-      declarations_.at(pair_of(faction, other));
+      declarations_.between(faction, other);
   if (faction == other) {
     return Relation::OWN;
   }
@@ -2679,7 +2649,7 @@ Relation World::relation(std::size_t faction, std::size_t other) const {
 
 std::optional<Declared> World::declaration(std::size_t faction,
                                            std::size_t other) const {
-  return declarations_.at(pair_of(faction, other));
+  return declarations_.between(faction, other);
 }
 
 DeclarationRefusal World::declaration_refusal(std::size_t person,
@@ -2706,8 +2676,7 @@ DeclarationRefusal World::declaration_refusal(std::size_t person,
       (standing == Relation::ALLY || standing == Relation::NEUTRAL)) {
     return DeclarationRefusal::ALREADY_AT_PEACE;
   }
-  const std::optional<Declared>& last =
-      declarations_.at(pair_of(*own, faction));
+  const std::optional<Declared>& last = declarations_.between(*own, faction);
   const std::uint64_t hold =
       life_.diplomacy
           ? std::uint64_t{life_.diplomacy->hold_days} * rules_.ticks_per_day
@@ -2727,7 +2696,7 @@ void World::declare(std::size_t person, std::size_t faction, Declaration what) {
         "another faction, change how the two stand and come after the last "
         "has held");
   }
-  declarations_.at(pair_of(*own, faction)) = Declared{what, *own, tick_count_};
+  declarations_.declare(*own, faction, Declared{what, *own, tick_count_});
 }
 
 // What faction `faction`'s leader seeks toward faction `other` by the

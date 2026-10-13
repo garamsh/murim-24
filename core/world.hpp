@@ -767,11 +767,6 @@ class World {
   [[nodiscard]] std::optional<Sought> sought(
       const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
       const std::vector<std::uint64_t>& numbers) const;
-  [[nodiscard]] bool declarations_kept() const;
-  /// The index in declarations_ of the pair of factions `faction` and
-  /// `other`. Throws std::out_of_range when there is no such faction.
-  [[nodiscard]] std::size_t pair_of(std::size_t faction,
-                                    std::size_t other) const;
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
   [[nodiscard]] std::uint32_t draw(Range range);
@@ -880,9 +875,8 @@ class World {
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
   std::vector<Fight> duels_;
-  /// The declaration standing between each two factions, by the lower's
-  /// index times the factions plus the higher's; the rest stay empty.
-  std::vector<std::optional<Declared>> declarations_;
+  /// The declaration standing between each two factions.
+  Declarations declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.
   Chronicle<Event, EVENT_CAPACITY> events_;
   std::vector<Strike> strikes_;

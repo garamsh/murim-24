@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 namespace murim {
 
@@ -59,6 +61,47 @@ enum class DeclarationRefusal : std::uint8_t {
   /// The two factions' last declaration was made fewer than the diplomacy's
   /// `hold_days` days ago.
   TOO_SOON,
+};
+
+/// The declarations standing between factions: one place for each two of
+/// `factions`, so a declaration holds for both whichever names it first.
+class Declarations {
+ public:
+  /// No factions and no declarations.
+  Declarations() = default;
+
+  /// No declaration between any two of `factions`.
+  explicit Declarations(std::size_t factions);
+
+  /// The declarations `slots` give for `factions`, as a save holds them,
+  /// unchecked until kept() is asked.
+  Declarations(std::size_t factions,
+               std::vector<std::optional<Declared>> slots);
+
+  /// Returns the declaration standing between `faction` and `other`, if one
+  /// does. Throws std::out_of_range when either is no faction.
+  [[nodiscard]] const std::optional<Declared>& between(std::size_t faction,
+                                                       std::size_t other) const;
+
+  /// Makes `declared` the declaration standing between `faction` and
+  /// `other`. Throws std::out_of_range when either is no faction.
+  void declare(std::size_t faction, std::size_t other, Declared declared);
+
+  /// Whether the saved-state invariant holds: one place for each two
+  /// factions, each standing under the lower's row, made by one of them no
+  /// later than tick `now`.
+  [[nodiscard]] bool kept(std::uint64_t now) const;
+
+  /// Every place, by the lower faction's index times the factions plus the
+  /// higher's; the rest stay empty.
+  [[nodiscard]] const std::vector<std::optional<Declared>>& slots() const;
+
+ private:
+  [[nodiscard]] std::size_t pair_of(std::size_t faction,
+                                    std::size_t other) const;
+
+  std::size_t factions_ = 0;
+  std::vector<std::optional<Declared>> slots_;
 };
 
 }  // namespace murim

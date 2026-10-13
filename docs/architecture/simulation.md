@@ -18,7 +18,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `village` villages, their structures and what they hold;
   - `growth` how villages grow;
   - `arts` arts, realms, cultivation, learning and manuals;
-  - `diplomacy` relations, declarations and their refusals;
+  - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two;
   - `trade` wares and trade;
   - `talk` talk and what a person offers;
   - `leadership` a faction's lead, duels, admission and elections;
