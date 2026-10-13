@@ -287,9 +287,9 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
 
 - **Qi amount.** Every person holds a store of inner energy (naegong), which grows by cultivation: time and practice. Talent bounds how far and how fast it grows, and stays hidden (§Talent).
 - **Realms (gyeongji).** Thresholds of qi make realms, on a ladder familiar from Korean wuxia: for example third-rate (samryu), second-rate (iryu), first-rate (ilryu), peak (jeoljeong), beyond peak (chojeoljeong), transformation (hwagyeong), mystery (hyeongyeong) and life-and-death (saengsagyeong). The names and thresholds are data.
-- **Qi nature.** Qi has two axes:
-  - Orientation: orthodox (jeong), unorthodox (sa) or demonic (ma), set by the person's heart method (simbeop).
-  - Polarity: firm yang (yanggang) or soft yin (eumyu).
+- **Qi nature.** The owner selected model B on 2026-10-13 ([#293](https://github.com/garamsh/murim-24/issues/293)): nature moves gradually on righteous-to-demonic and yin-to-yang axes according to the heart method (simbeop), under the same rules for NPCs and players. ADR 0079 (`docs/architecture/adr/0079-move-qi-nature-gradually-on-two-axes-by-the-heart-method.md`) records this direction.
+  - **Implemented today:** nature is derived from the first art learned, with orthodox, unorthodox or demonic orientation and yang or yin polarity; gradual drift is not built.
+  - **Still undecided:** numerical ranges, rates and cadence, five elements, forced use and deviation penalties, and reborn-body initialization. The answer approves none of these.
   - Each art has a nature. An art of another nature than one's own is harder to learn or weaker to use.
 - **Skills need qi.** Each skill has a minimum qi or realm to learn and to use, and costs qi to cast.
 - **Families and tiers.** Decided by the owner on 2026-10-09 (issue #194). ADR 0055 (`docs/architecture/adr/0055-give-arts-a-family-a-tier-and-a-mastery-and-gain-higher-arts-by-synthesis-over-a-lineage-graph.md`), proposed, designs them.
@@ -321,7 +321,7 @@ Prosperity → Raided → Ruins → (survivors return / another faction moves in
   - teaching and synthesis rolled only for arts whose requirements hold
   - passives adding where they add, taking the strongest where they multiply
   - footwork's climbing effect carried as a footwork passive
-  - qi nature as a point on two axes, righteous to demonic and yin to yang, pulled daily by the heart method, with each art requiring a range on both (the PM's model B, its options the owner's to choose)
+  - daily pulling, numerical axis and art-requirement ranges, and path bands remain proposals; model B's direction alone is selected above
   - a sealed art's skills and passives off, unsealed when the body's realm rank or nature changes
   - the path scrolls read from the righteous-to-demonic band
 - **[proposed]** Risks such as qi deviation (juhwaipma) when forcing an art of the wrong nature or above one's realm.
