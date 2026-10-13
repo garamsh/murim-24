@@ -409,8 +409,10 @@ TEST(Save, ASealedSaveNamingARealmNoProgressCanNameIsRefused) {
   // save holds after the latest step.
   const Realm third{{"삼류", "Third-rate"}, DAILY_QI, PER_MILLE};
   const Realm second{{"이류", "Second-rate"}, 2 * DAILY_QI, PER_MILLE};
-  const World world = cultivated({third});
-  const World further = cultivated({third, second});
+  const std::vector<Realm> one{third};
+  const std::vector<Realm> two{third, second};
+  const World world = cultivated(one);
+  const World further = cultivated(two);
   using Gain = std::pair<std::size_t, std::size_t>;
   ASSERT_EQ(world.progress().size(), 1U);
   ASSERT_EQ(latest_gain(world), Gain(0, 1));
