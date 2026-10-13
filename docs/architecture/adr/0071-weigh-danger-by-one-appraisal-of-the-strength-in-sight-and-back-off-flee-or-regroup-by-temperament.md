@@ -31,6 +31,7 @@ Facts from `core/` at `1c4bb7f` and the proposals this builds on:
   - `visit_within` takes no kinds: it visits every cell of its span, 169 at 6 cells of sight, and every position in them, keeping those within the radius.
   - No public query visits only the cells holding a kind sought.
 - **The live scenario (`core/live_scenario.cpp`).** 5,000 people: two battles of two lines of ten armies of 50, 40 armies and 2,000 people; eight villages of 250; and 20 bands of 50 on the roads. Its p99 tick at `make bench` on 2026-10-11 was 3.856 ms against an informational target of 4 ms (#269).
+- **Identity and clock (re-read on main `585311ec`).** `core/world.cpp` keeps every recorded person, dead included; births and rebirths append new identities while the capacity bounds only the living. A live person's identity may therefore exceed the capacity. The spatial hash indexes compact living slots; the existing crowd maps those slots to persistent people and back. The world clock, a person's ready tick and a declaration's tick are 64-bit (`core/world.hpp`, `core/person.hpp`, `core/diplomacy.hpp`).
 - **Wars (ADR 0038).** A faction's leader declares war and makes peace by its numbers against the other's, and raids by a village's pressed residents take a party to a hostile neighbour. `make sweep` keeps every faction peopled on 48 of 50 seeds, with 54 wars and 27 peaces.
 
 ### Options weighed for what is counted
@@ -132,28 +133,28 @@ The owner's "go around" is no outcome of its own. A person backing off takes the
 
 ### Cost
 
-**State.** A person keeps, in structure-of-arrays form sized to the capacity, never resized on a tick:
+**State.** Keep persistent appraisal state with the existing person record, indexed by its lifetime identity, not in arrays bounded by the living capacity:
 - its temperament, 1 byte, drawn at birth;
 - its stance, 1 byte;
-- the tick the stance began, 4 bytes.
+- the tick the stance began, 8 bytes, on the same 64-bit clock as the world.
 
-That is 6 bytes a person: 3 KB at 500 and 30 KB at 5,000. An army keeps its stance and the tick it began in its order, 5 bytes.
+That is 10 bytes of field payload per recorded person, including the dead: 5 KB for 500 records and 50 KB for 5,000 records, not bounds at those living counts. An army keeps its stance and its 64-bit stance tick in its existing order, 9 bytes of field payload. These counts exclude record padding; step 1 reports the actual change in record size. Birth and restoration use the existing record-allocation boundaries; appraisal adds no allocation or new identity mapping. Death, a changed roster and crowd compaction do not transfer a person's saved state to another body, and rebirth gives the new body its own birth draw.
 
 **Saves and the hash.** The stance and the tick it began carry the hysteresis, so they are world state, as ADR 0068 keeps its slots:
-- a person's temperament, stance and stance tick, and an army's stance and stance tick, are saved, and `SAVE_VERSION` rises;
+- a person's temperament, stance and full 64-bit stance tick, and an army's stance and full stance tick, are saved, and `SAVE_VERSION` rises;
 - the hash folds a person's temperament only when it is not cautious, and a stance with its tick only when it is not close, so a world in which nobody has left close hashes as before;
 - a world loaded from a matching-version save restores temperament, stance and stance tick unchanged, including a bold living NPC; unequal versions remain refused, with no migration.
 
 **The query.** The hash gains one public query: visit the positions of some kinds within a radius. It asks `holds` over its span first, and passes over every cell holding none of the kinds, as `nearest` does. Nothing else in the hash changes, and it allocates nothing.
 
 **Merged sight.** An army appraising through its lead reads the foes and allies in sight of any member:
-- each member's sight is visited in turn with the new query;
-- a person found by several members must count once, so the world keeps one stamp a person, 4 bytes, sized to the capacity and allocated with the world;
-- each appraisal takes the next serial and stamps each person it counts, skipping one already stamped with it;
+- each member's sight is visited in turn with the new query, whose results are compact live crowd slots; read persistent state through the existing crowd's slot-to-person map, and locate a member through its person-to-slot map;
+- a person found by several members must count once, so the world keeps one 4-byte stamp per compact live slot, sized to the living capacity and allocated with the world, never indexed by a persistent person identity;
+- each appraisal takes the next serial and stamps each slot it counts, skipping one already stamped with it; the crowd is fixed for that appraisal, and every later appraisal uses a new serial, so a changed crowd cannot inherit a previous occupant's membership;
 - armies appraise one at a time, so one stamp array serves every army, and no army keeps scratch space of its own;
-- when the serial wraps, the array is cleared once.
+- when the serial wraps, the array is cleared once. Stamps are scratch space, neither saved nor hashed.
 
-At the capacity of 6,250 the stamps are 25 KB, and with the 6 bytes of state a person carries 10 bytes in all.
+At a living capacity of 6,250 the stamps are 25 KB. With P recorded people, C living capacity and A recorded armies, the added field payload and stamp storage are 10P + 4C + 9A bytes, before record padding and the serial. Persistent memory grows with recorded history; the living capacity bounds only the scratch array.
 
 **Work.** Each person and each army not exempt appraises every 15 ticks, at a phase of its index modulo 15, so a fifteenth appraise on any tick.
 - An appraisal first asks, through the new query, whether any block in sight may hold a threat's kinds; where none may, it ends there.
@@ -180,19 +181,20 @@ Every person outside the player's armies, and every animal, appraises the danger
 - **Transition precedence and hysteresis.** At each appraisal, choose flee above its threshold first, then regroup when alone above half the back-off threshold, then hold or back off above the back-off threshold, then close. Flight overrides any non-flee stance immediately, regardless of release ratio or elapsed time. Close enters the chosen outcome immediately; other transitions require both 30 ticks in the current stance and a ratio strictly below three quarters of its entry threshold. Each change records a new stance tick; unchanged stances keep theirs. A cautious back-off at 1,600 therefore becomes flight at 4,000 at the next appraisal, while declining or oscillating risk obeys the recovery conditions above.
 - **Who appraises, and how often.** An army on a march order appraises through its lead, counting what any member sees, and its members follow its stance: a band that backs off or flees turns home. Each person appraises every 15 ticks at its own phase.
 - **What is exempt.** An army a driver steers is never appraised, its lead and members alike, and an army holding an attack intent is not appraised while the intent holds. Nothing overrides the player.
-- **State.** Temperament, stance and the tick a stance began are saved, and hashed when they differ from cautious and close.
+- **State.** Temperament, stance and the full 64-bit tick a stance began stay on the persistent person record, including after a crowd is compacted, and are saved and hashed when they differ from cautious and close. Rebirth creates a new record with its own draw. Only the scratch stamps key compact live slots and are bounded by the living capacity; recorded history is not bounded by it.
 
 This supersedes ADR 0046's engagement of the nearest foe in sight regardless of the odds. It amends ADR 0068 so that a person backing off or fleeing takes no slot or token, and ADR 0067's flight of a grazer from a predator, which becomes this rule.
 
 **Implementation steps.** Each step is its own pull request, with `make ci`, GCC, `make sweep` keeping 48 of 50 seeds or better with the war and peace counts reported, and `make bench` passing on AC power:
 1. **Temperament and the appraisal, no behaviour.**
-   - Temperament drawn at birth, saved and hashed when not cautious.
+   - Temperament drawn at birth, saved and hashed when not cautious; persistent fields on the existing person record, army fields on its order, and stance ticks on the 64-bit world clock. Report field payload separately from the measured change in record size, and persistent memory by recorded population, dead included.
    - The realms' weights in the realm table.
    - The hash's query of some kinds within a radius, and the world's stamps.
    - The pure appraisal function, reading the hash and returning the ratio, for a person and for an army's merged sight.
    - Tests:
      - the ratio for set layouts: one against one equal; three against one; a peak master against three novices at 134 per mille, with a control: the same layout with every weight 1 reads 2,143;
      - an army's merged sight counts a foe seen by two members once; control, two foes, each seen by one member, count twice;
+     - repeat that layout after deaths and births or rebirths give a living person an identity beyond the living capacity, and after roster changes remap compact crowd slots; assert those identities, mappings and living count in the setup; control, the same visible strengths with identities below the capacity give the same ratio;
      - the kinds query visits only positions of the kinds sought; control, the same layout through `visit_within` visits all;
      - a hidden foe not counted, once ADR 0058 lands;
      - the draw's shares over 10,000 births within a tolerance;
@@ -213,7 +215,8 @@ This supersedes ADR 0046's engagement of the nearest foe in sight regardless of 
      - after the escalation at tick 15, flight at 2,000 at tick 30 persists until tick 45, then becomes back off; controls, 2,250 at tick 45 retains flight and 1,000 with allies in sight releases to close;
      - a steered army facing three foes keeps closing, its lead and members alike; control, the same army not steered backs off;
      - an army ordered with an attack intent at a stronger foe keeps chasing it; control, the same army after `end_intent` backs off at its next phase;
-     - a world containing a bold living NPC saved mid-retreat restores its temperament, stance and stance tick and hashes the same, 60 ticks on, as the world continued; control, the same world loaded with its stances reset to close does not.
+     - a world containing a bold living NPC saved mid-retreat restores its temperament, stance and stance tick and hashes the same, 60 ticks on, as the world continued; repeat after a death/birth or rebirth history puts its identity beyond the living capacity and roster compaction changes its crowd slot; controls, the same sequence without compaction retains its own state, and loading with stances reset to close diverges;
+     - a cautious NPC at phase 1 begins back off at T = UINT32_MAX − 14, escalates to flee at T + 15, and is saved there with its full stance tick above UINT32_MAX; at ratio 2,000 it still flees at T + 30 and releases to back off at T + 45, so a truncated tick cannot release it early; continuation after load matches the unsaved world; nearby control, start at UINT32_MAX − 59 and repeat the same ratios and hold ages before the boundary; assert the fixture's world clock and stance tick before checking the outcomes.
 3. **Bands.**
    - Army stances through the lead, raids turning home, defenders holding.
    - Tests:
@@ -229,7 +232,7 @@ This supersedes ADR 0046's engagement of the nearest foe in sight regardless of 
 - The player can rout a band by outnumbering it, and is never made to run.
 - Wars cost fewer lives and may last longer before ADR 0038's diplomacy makes peace; the sweep's war and peace counts will move.
 - Animals and people share the rule, so a tiger in a herd of deer reads the same as a master among novices.
-- Each person carries 6 more bytes and the world a 4-byte stamp for each, and the tick gains about 0.1 ms at 5,000.
+- Each recorded person adds 10 bytes of field payload and each recorded army 9, plus measured record padding; scratch stamps cost 4 bytes per live-capacity slot. Dead history grows the persistent storage without raising the living bound. Appraisal adds no allocation; its estimated tick cost is about 0.1 ms at 5,000, to be measured in step 1.
 
 ## Signs the decision was wrong
 
