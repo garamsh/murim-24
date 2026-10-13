@@ -1,0 +1,8 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 246 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 246 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.463 ms p99 11.815 ms max 13.533 ms
+PASS: night village p99 11.815 ms against 16.7 ms

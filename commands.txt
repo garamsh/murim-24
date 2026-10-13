@@ -1,0 +1,12 @@
+make ci > build/issue310/ci.log 2>&1
+.venv/bin/cmake -S core -B build/issue310/gcc16 -G Ninja -DCMAKE_MAKE_PROGRAM="$PWD/.venv/bin/ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-16
+.venv/bin/cmake --build build/issue310/gcc16
+.venv/bin/ctest --test-dir build/issue310/gcc16 --no-tests=error --output-on-failure
+godot --path . --script build/issue310/capture.gd
+godot --path . --script res://grade/grade_check.gd
+godot --path . --script build/issue310/pixel-grid.gd
+godot --headless --path . --script build/issue310/capture-check.gd
+python3 build/issue310/controls.py
+python3 build/issue310/date-control.py
+python3 build/issue310/pixel-control.py
+python3 build/issue310/renderer-control.py

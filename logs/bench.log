@@ -1,0 +1,72 @@
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/m2-art/build/_deps/json-src/include/
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/m2-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.3s)
+-- Generating done (0.2s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake -S core -B build/bench -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/m2-art/build/bench/_deps/json-src/include/
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/m2-art/build/bench
+/Users/sauce/orca/workspaces/murim-24/m2-art/.venv/bin/cmake --build build/bench --target murim_core_bench
+[1/10] Building CXX object CMakeFiles/murim_core.dir/chart.cpp.o
+[2/10] Building CXX object CMakeFiles/murim_core.dir/live_scenario.cpp.o
+[3/10] Building CXX object CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[4/10] Building CXX object CMakeFiles/murim_core_bench.dir/bench.cpp.o
+[5/10] Building CXX object CMakeFiles/murim_core.dir/region.cpp.o
+[6/10] Building CXX object CMakeFiles/murim_core.dir/content.cpp.o
+[7/10] Building CXX object CMakeFiles/murim_core.dir/save.cpp.o
+[8/10] Building CXX object CMakeFiles/murim_core.dir/world.cpp.o
+[9/10] Linking CXX static library libmurim_core.a
+[10/10] Linking CXX executable murim_core_bench
+scenario: M1 (core/m1_scenario.cpp), seed 2026, 128x128 cells, 20 armies, 10 structures
+ticks: 60 warm-up, then 600 timed, at 30 ticks per second
+people: 500, all in one battle; 499 alive when timing ended; at most 500 alive at once, under a capacity of 625
+strikes per tick: 18.040, of which area 1.077 (32.300 per second)
+structures broken: 3 of 10
+tick time: p50 0.452 ms, p99 0.486 ms, max 0.524 ms
+PASS: p99 0.486 ms against a 4.000 ms budget
+scenario: live (core/live_scenario.cpp), seed 2026, 256x256 cells, 68 armies
+ticks: 60 warm-up, then 600 timed, at 30 ticks per second
+people: 5000, 2000 in two battles, the rest in villages and on roads; 4998 alive when timing ended; at most 5000 alive at once, under a capacity of 6250
+strikes per tick: 68.903, of which in battle 68.903
+tick time: p50 2.856 ms, p99 3.052 ms, max 3.235 ms
+TARGET MET: p99 3.052 ms against a 4.000 ms target, not yet in force (#216; ADR 0053 makes it binding), so it does not decide the exit status
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 193 ticks in 6.2 s timed (30 per second set)
+bodies: 500 in the world, 403 on screen drawn as sprites through MultiMesh bands
+outlines: 121.2 bodies outlined over what hides them a frame on average, 122 in the last frame
+names: 8 shown over the 151 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 40.3 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.074 ms, p99 7.727 ms, max 8.812 ms
+frame breakdown, mean a timed frame: core tick 0.097 ms, adapter 0.004 ms, view script 0.435 ms, render CPU 1.142 ms (GPU 0.000 ms), the rest 3.515 ms of 5.193 ms
+PASS: p99 7.727 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+make bench ran the tick benchmark (exit 0) and the frame benchmark (exit 0)

@@ -1,0 +1,489 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+SCRIPT ERROR: Invalid call. Nonexistent function 'show_world' in base 'Nil'.
+          at: _play (res://play/play.gd:289)
+          GDScript backtrace (most recent call first):
+              [0] _play (res://play/play.gd:289)
+              [1] start (res://play/play.gd:228)
+              [2] _initialize (res://build/issue310/night-village.gd:22)
+SCRIPT ERROR: Invalid access to property or key 'chosen' on a base object of type 'Nil'.
+          at: _initialize (res://build/issue310/night-village.gd:23)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue310/night-village.gd:23)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'lift_at' in base 'Nil'.
+          at: to_screen (res://world_art/world_art.gd:257)
+          GDScript backtrace (most recent call first):
+              [0] to_screen (res://world_art/world_art.gd:257)
+              [1] _process (res://build/issue310/night-village.gd:38)
+night village: grade, village, bodies or clock setup failed

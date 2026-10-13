@@ -1,0 +1,533 @@
+Test project /Users/sauce/orca/workspaces/murim-24/m2-art/build/issue310/gcc16
+        Start   1: Chart.SeeMarksEveryCellWithinReachAndNoOther
+  1/264 Test   #1: Chart.SeeMarksEveryCellWithinReachAndNoOther ............................   Passed    0.03 sec
+        Start   2: Chart.SeeReportsOnlyCellsNotSeenBefore
+  2/264 Test   #2: Chart.SeeReportsOnlyCellsNotSeenBefore ..................................   Passed    0.02 sec
+        Start   3: Chart.SeeStopsAtTheMapsEdge
+  3/264 Test   #3: Chart.SeeStopsAtTheMapsEdge .............................................   Passed    0.02 sec
+        Start   4: Chart.KeepsABlockOnlyForAreasWithASeenCell
+  4/264 Test   #4: Chart.KeepsABlockOnlyForAreasWithASeenCell ..............................   Passed    0.02 sec
+        Start   5: Chart.RememberReportsOnlyAChangedMemory
+  5/264 Test   #5: Chart.RememberReportsOnlyAChangedMemory .................................   Passed    0.03 sec
+        Start   6: Chart.RestoresWhatItGave
+  6/264 Test   #6: Chart.RestoresWhatItGave ................................................   Passed    0.03 sec
+        Start   7: Chart.RefusesBlocksNoChartGives
+  7/264 Test   #7: Chart.RefusesBlocksNoChartGives .........................................   Passed    0.04 sec
+        Start   8: Chart.RefusesAVillageOwnedByNoFaction
+  8/264 Test   #8: Chart.RefusesAVillageOwnedByNoFaction ...................................   Passed    0.02 sec
+        Start   9: Chart.AMovedClaimCentreChangesTheMemoryAndRevision
+  9/264 Test   #9: Chart.AMovedClaimCentreChangesTheMemoryAndRevision ......................   Passed    0.02 sec
+        Start  10: Chart.RefusesAVillageClaimCentreOffTheMap
+ 10/264 Test  #10: Chart.RefusesAVillageClaimCentreOffTheMap ...............................   Passed    0.02 sec
+        Start  11: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity
+ 11/264 Test  #11: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity .......................   Passed    0.02 sec
+        Start  12: Chronicle.RefusesEntriesNotAsAddKeepsThem
+ 12/264 Test  #12: Chronicle.RefusesEntriesNotAsAddKeepsThem ...............................   Passed    0.02 sec
+        Start  13: Content.ATinyBasePackLoadsWithNoError
+ 13/264 Test  #13: Content.ATinyBasePackLoadsWithNoError ...................................   Passed    0.02 sec
+        Start  14: Content.AnUnknownFieldRefusesItsPack
+ 14/264 Test  #14: Content.AnUnknownFieldRefusesItsPack ....................................   Passed    0.03 sec
+        Start  15: Content.AFractionIsRefused
+ 15/264 Test  #15: Content.AFractionIsRefused ..............................................   Passed    0.03 sec
+        Start  16: Content.AnUnresolvedIdRefusesTheMergedSet
+ 16/264 Test  #16: Content.AnUnresolvedIdRefusesTheMergedSet ...............................   Passed    0.03 sec
+        Start  17: Content.PacksLoadingAfterEachOtherInACycleAreRefused
+ 17/264 Test  #17: Content.PacksLoadingAfterEachOtherInACycleAreRefused ....................   Passed    0.03 sec
+        Start  18: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt
+ 18/264 Test  #18: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt ............   Passed    0.03 sec
+        Start  19: Content.ARemovedEntryTakesNoIndex
+ 19/264 Test  #19: Content.ARemovedEntryTakesNoIndex .......................................   Passed    0.02 sec
+        Start  20: Content.ADocumentTheSourceCannotReadRefusesItsPack
+ 20/264 Test  #20: Content.ADocumentTheSourceCannotReadRefusesItsPack ......................   Passed    0.02 sec
+        Start  21: Content.AFieldOfTheWrongTypeIsRefused
+ 21/264 Test  #21: Content.AFieldOfTheWrongTypeIsRefused ...................................   Passed    0.02 sec
+        Start  22: Content.AnIdTwiceInOneDocumentIsRefused
+ 22/264 Test  #22: Content.AnIdTwiceInOneDocumentIsRefused .................................   Passed    0.02 sec
+        Start  23: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused
+ 23/264 Test  #23: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused ..........   Passed    0.02 sec
+        Start  24: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet
+ 24/264 Test  #24: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet ...............   Passed    0.02 sec
+        Start  25: Content.AValueOutsideItsLimitsIsRefused
+ 25/264 Test  #25: Content.AValueOutsideItsLimitsIsRefused .................................   Passed    0.02 sec
+        Start  26: Content.AModCallingItselfABaseIsRefused
+ 26/264 Test  #26: Content.AModCallingItselfABaseIsRefused .................................   Passed    0.02 sec
+        Start  27: Content.AMergedSetFailingTheRegionsChecksIsRefused
+ 27/264 Test  #27: Content.AMergedSetFailingTheRegionsChecksIsRefused ......................   Passed    0.03 sec
+        Start  28: Content.AModOverridingOneSkillsDamageChangesOnlyThatField
+ 28/264 Test  #28: Content.AModOverridingOneSkillsDamageChangesOnlyThatField ...............   Passed    0.04 sec
+        Start  29: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked
+ 29/264 Test  #29: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked ....................   Passed    0.02 sec
+        Start  30: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason
+ 30/264 Test  #30: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason ...................   Passed    0.02 sec
+        Start  31: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames
+ 31/264 Test  #31: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames ................   Passed    0.02 sec
+        Start  32: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge
+ 32/264 Test  #32: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge .................   Passed    0.06 sec
+        Start  33: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError
+ 33/264 Test  #33: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError ...................   Passed    0.03 sec
+        Start  34: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal
+ 34/264 Test  #34: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal ....................   Passed    0.02 sec
+        Start  35: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine
+ 35/264 Test  #35: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine ................   Passed    0.02 sec
+        Start  36: FlowField.NoStepCutsACornerBetweenTwoBlockedCells
+ 36/264 Test  #36: FlowField.NoStepCutsACornerBetweenTwoBlockedCells .......................   Passed    0.02 sec
+        Start  37: FlowField.NoStepPassesBesideOneBlockedCell
+ 37/264 Test  #37: FlowField.NoStepPassesBesideOneBlockedCell ..............................   Passed    0.02 sec
+        Start  38: Region.SameSeedGivesTheSameRegionAndWorld
+ 38/264 Test  #38: Region.SameSeedGivesTheSameRegionAndWorld ...............................   Passed    0.17 sec
+        Start  39: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages
+ 39/264 Test  #39: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages ...............   Passed    1.07 sec
+        Start  40: Region.VillagesStandOnBuildableCells
+ 40/264 Test  #40: Region.VillagesStandOnBuildableCells ....................................   Passed    6.23 sec
+        Start  41: Region.VillagesLieInTheirOwnersTerritory
+ 41/264 Test  #41: Region.VillagesLieInTheirOwnersTerritory ................................   Passed    1.05 sec
+        Start  42: Region.VillagesDoNotOverlap
+ 42/264 Test  #42: Region.VillagesDoNotOverlap .............................................   Passed    1.06 sec
+        Start  43: Region.GeneratesAFourthFactionAddedAsData
+ 43/264 Test  #43: Region.GeneratesAFourthFactionAddedAsData ...............................   Passed    1.01 sec
+        Start  44: Region.RejectsInconsistentData
+ 44/264 Test  #44: Region.RejectsInconsistentData ..........................................   Passed    0.03 sec
+        Start  45: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds
+ 45/264 Test  #45: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds ...........   Passed    0.03 sec
+        Start  46: Region.EachSeatKeepsItsOpenCourtClearOfGrowth
+ 46/264 Test  #46: Region.EachSeatKeepsItsOpenCourtClearOfGrowth ...........................   Passed    0.03 sec
+        Start  47: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt
+ 47/264 Test  #47: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt ....................   Passed    0.06 sec
+        Start  48: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith
+ 48/264 Test  #48: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith ........   Passed    1.63 sec
+        Start  49: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion
+ 49/264 Test  #49: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion ..................   Passed    0.29 sec
+        Start  50: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage
+ 50/264 Test  #50: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage ..............   Passed    0.05 sec
+        Start  51: Region.ADuelEndsWithinItsTargetTime
+ 51/264 Test  #51: Region.ADuelEndsWithinItsTargetTime .....................................   Passed    0.19 sec
+        Start  52: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime
+ 52/264 Test  #52: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime ....................   Passed    0.33 sec
+        Start  53: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther
+ 53/264 Test  #53: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther ...............   Passed    0.09 sec
+        Start  54: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime
+ 54/264 Test  #54: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime .....................   Passed    1.05 sec
+        Start  55: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime
+ 55/264 Test  #55: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime ............   Passed    1.62 sec
+        Start  56: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike
+ 56/264 Test  #56: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike ...............   Passed    0.64 sec
+        Start  57: Region.FamiliesReachAThirdGenerationWithinThirtyYears
+ 57/264 Test  #57: Region.FamiliesReachAThirdGenerationWithinThirtyYears ...................   Passed    0.55 sec
+        Start  58: Region.BirthsStopOnceMaxPeopleLive
+ 58/264 Test  #58: Region.BirthsStopOnceMaxPeopleLive ......................................   Passed    3.79 sec
+        Start  59: Region.BirthsStopAtTheCapacityTheRulesSet
+ 59/264 Test  #59: Region.BirthsStopAtTheCapacityTheRulesSet ...............................   Passed    0.52 sec
+        Start  60: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName
+ 60/264 Test  #60: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName ..................   Passed    0.77 sec
+        Start  61: Region.VillagesFillToTheirCapsAndNoFurther
+ 61/264 Test  #61: Region.VillagesFillToTheirCapsAndNoFurther ..............................   Passed    4.58 sec
+        Start  62: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound
+ 62/264 Test  #62: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound ............   Passed    8.27 sec
+        Start  63: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary
+ 63/264 Test  #63: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary .........   Passed    3.43 sec
+        Start  64: Region.EachFactionStartsWithAtMostFourHouseholds
+ 64/264 Test  #64: Region.EachFactionStartsWithAtMostFourHouseholds ........................   Passed    1.06 sec
+        Start  65: Region.NoOutcomeReadsTheChart
+ 65/264 Test  #65: Region.NoOutcomeReadsTheChart ...........................................   Passed    0.22 sec
+        Start  66: Region.AFewHouseholdsGrowIntoACivilisationOverACentury
+ 66/264 Test  #66: Region.AFewHouseholdsGrowIntoACivilisationOverACentury ..................   Passed   12.35 sec
+        Start  67: Region.ChildrenOfTheScarcerSexKeepEveryFactionPeopled
+ 67/264 Test  #67: Region.ChildrenOfTheScarcerSexKeepEveryFactionPeopled ...................   Passed    4.46 sec
+        Start  68: Region.SectsAdmitChangeMastersAndElectOverACentury
+ 68/264 Test  #68: Region.SectsAdmitChangeMastersAndElectOverACentury ......................   Passed   19.40 sec
+        Start  69: Save.ALoadedRegionHashesAndTicksOnAsTheSavedOne
+ 69/264 Test  #69: Save.ALoadedRegionHashesAndTicksOnAsTheSavedOne .........................   Passed    0.77 sec
+        Start  70: Save.ALoadedRegionKeepsEveryonesQiAndArts
+ 70/264 Test  #70: Save.ALoadedRegionKeepsEveryonesQiAndArts ...............................   Passed    0.32 sec
+        Start  71: Save.ARefusedSaveNamesWhyAndAnIntactOneLoads
+ 71/264 Test  #71: Save.ARefusedSaveNamesWhyAndAnIntactOneLoads ............................   Passed    0.02 sec
+        Start  72: Save.ASealedSaveNamingARecordTheWorldLacksIsRefused
+ 72/264 Test  #72: Save.ASealedSaveNamingARecordTheWorldLacksIsRefused .....................   Passed    0.02 sec
+        Start  73: Save.AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused
+ 73/264 Test  #73: Save.AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused ...............   Passed    0.15 sec
+        Start  74: Save.ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap
+ 74/264 Test  #74: Save.ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap .............   Passed    0.12 sec
+        Start  75: Save.ASealedSaveNamingAPersonNoEventCanNameIsRefused
+ 75/264 Test  #75: Save.ASealedSaveNamingAPersonNoEventCanNameIsRefused ....................   Passed    0.02 sec
+        Start  76: Save.ASealedSaveNamingARealmNoProgressCanNameIsRefused
+ 76/264 Test  #76: Save.ASealedSaveNamingARealmNoProgressCanNameIsRefused ..................   Passed    0.02 sec
+        Start  77: Save.ALoadedRegionKeepsItsLessonsAndRealmsNoted
+ 77/264 Test  #77: Save.ALoadedRegionKeepsItsLessonsAndRealmsNoted .........................   Passed    0.32 sec
+        Start  78: Save.APendingCastLoadsAndLandsAsTheSavedOne
+ 78/264 Test  #78: Save.APendingCastLoadsAndLandsAsTheSavedOne .............................   Passed    0.02 sec
+        Start  79: Save.ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations
+ 79/264 Test  #79: Save.ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations ..................   Passed    0.02 sec
+        Start  80: Save.ALoadedWorldKeepsItsPeopleCapacity
+ 80/264 Test  #80: Save.ALoadedWorldKeepsItsPeopleCapacity .................................   Passed    0.02 sec
+        Start  81: Save.ALoadedWorldKeepsItsAttackIntent
+ 81/264 Test  #81: Save.ALoadedWorldKeepsItsAttackIntent ...................................   Passed    0.02 sec
+        Start  82: Save.ALoadedWorldKeepsItsTalkReach
+ 82/264 Test  #82: Save.ALoadedWorldKeepsItsTalkReach ......................................   Passed    0.02 sec
+        Start  83: Save.ALoadedWorldKeepsItsSilverWaresAndTrade
+ 83/264 Test  #83: Save.ALoadedWorldKeepsItsSilverWaresAndTrade ............................   Passed    0.02 sec
+        Start  84: Save.ALoadedWorldKeepsItsSkillsShapesAndItsSight
+ 84/264 Test  #84: Save.ALoadedWorldKeepsItsSkillsShapesAndItsSight ........................   Passed    0.02 sec
+        Start  85: Save.ASealedSaveCastingAtAPersonTheWorldLacksIsRefused
+ 85/264 Test  #85: Save.ASealedSaveCastingAtAPersonTheWorldLacksIsRefused ..................   Passed    0.02 sec
+        Start  86: SpatialHash.VisitWithinMatchesABruteForceScan
+ 86/264 Test  #86: SpatialHash.VisitWithinMatchesABruteForceScan ...........................   Passed    0.02 sec
+        Start  87: SpatialHash.NearestMatchesABruteForceScan
+ 87/264 Test  #87: SpatialHash.NearestMatchesABruteForceScan ...............................   Passed    0.02 sec
+        Start  88: SpatialHash.NearestTakesTheLowerIndexAmongEquals
+ 88/264 Test  #88: SpatialHash.NearestTakesTheLowerIndexAmongEquals ........................   Passed    0.02 sec
+        Start  89: SpatialHash.NearestPassesOverPositionsOfOtherKinds
+ 89/264 Test  #89: SpatialHash.NearestPassesOverPositionsOfOtherKinds ......................   Passed    0.02 sec
+        Start  90: SpatialHash.NearestFindsAPositionAtTheRadiusAndNoneOneUnitPast
+ 90/264 Test  #90: SpatialHash.NearestFindsAPositionAtTheRadiusAndNoneOneUnitPast ..........   Passed    0.02 sec
+        Start  91: SpatialHash.NearestWeighsAnEqualDistanceOnALaterRing
+ 91/264 Test  #91: SpatialHash.NearestWeighsAnEqualDistanceOnALaterRing ....................   Passed    0.02 sec
+        Start  92: World.SameSeedGivesSameHashAfterTenThousandTicks
+ 92/264 Test  #92: World.SameSeedGivesSameHashAfterTenThousandTicks ........................   Passed    0.32 sec
+        Start  93: World.HashAfterTenThousandTicksIsTheSameOnEveryPlatform
+ 93/264 Test  #93: World.HashAfterTenThousandTicksIsTheSameOnEveryPlatform .................   Passed    0.10 sec
+        Start  94: World.PeopleReachTheirObjectiveAroundAWall
+ 94/264 Test  #94: World.PeopleReachTheirObjectiveAroundAWall ..............................   Passed    0.03 sec
+        Start  95: World.APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed
+ 95/264 Test  #95: World.APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed .............   Passed    0.02 sec
+        Start  96: World.PeopleAtTheirObjectiveStandTheSeparationApart
+ 96/264 Test  #96: World.PeopleAtTheirObjectiveStandTheSeparationApart .....................   Passed    0.04 sec
+        Start  97: World.MarchingPeopleKeepNearlyTheSeparationApart
+ 97/264 Test  #97: World.MarchingPeopleKeepNearlyTheSeparationApart ........................   Passed    0.03 sec
+        Start  98: World.APersonOrderedOutOfAStandingCrowdLeavesIt
+ 98/264 Test  #98: World.APersonOrderedOutOfAStandingCrowdLeavesIt .........................   Passed    0.03 sec
+        Start  99: World.FoesOnCrossingDiagonalsHoldWithinReachAndFight
+ 99/264 Test  #99: World.FoesOnCrossingDiagonalsHoldWithinReachAndFight ....................   Passed    0.03 sec
+        Start 100: World.OnlyHostilePeopleWithinRangeUseTheirSkills
+100/264 Test #100: World.OnlyHostilePeopleWithinRangeUseTheirSkills ........................   Passed    0.02 sec
+        Start 101: World.AWarDeclaredBetweenTicksIsStruckOnTheNextTick
+101/264 Test #101: World.AWarDeclaredBetweenTicksIsStruckOnTheNextTick .....................   Passed    0.02 sec
+        Start 102: World.EquallyNearTargetsGoToTheLowestIndex
+102/264 Test #102: World.EquallyNearTargetsGoToTheLowestIndex ..............................   Passed    0.02 sec
+        Start 103: World.StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap
+103/264 Test #103: World.StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap ................   Passed    0.02 sec
+        Start 104: World.AreaSkillHitsExactlyThePeopleInsideItsShape
+104/264 Test #104: World.AreaSkillHitsExactlyThePeopleInsideItsShape .......................   Passed    0.02 sec
+        Start 105: World.AStrikeHitsEachHostilePersonInItsDiscOnce
+105/264 Test #105: World.AStrikeHitsEachHostilePersonInItsDiscOnce .........................   Passed    0.02 sec
+        Start 106: World.StrikeAtTheLargestAcceptedValuesKeepsHealthExact
+106/264 Test #106: World.StrikeAtTheLargestAcceptedValuesKeepsHealthExact ..................   Passed    0.02 sec
+        Start 107: World.InputJustPastALimitIsRefused
+107/264 Test #107: World.InputJustPastALimitIsRefused ......................................   Passed    0.02 sec
+        Start 108: World.AWorldHoldsNoMoreThanMaxPeople
+108/264 Test #108: World.AWorldHoldsNoMoreThanMaxPeople ....................................   Passed    0.02 sec
+        Start 109: World.AWorldHoldsNoMoreThanTheCapacityItsRulesSet
+109/264 Test #109: World.AWorldHoldsNoMoreThanTheCapacityItsRulesSet .......................   Passed    0.02 sec
+        Start 110: World.ACapacityOtherThanMaxPeopleChangesTheHash
+110/264 Test #110: World.ACapacityOtherThanMaxPeopleChangesTheHash .........................   Passed    0.02 sec
+        Start 111: World.AreaSkillWalksAStructureThroughEveryStage
+111/264 Test #111: World.AreaSkillWalksAStructureThroughEveryStage .........................   Passed    0.02 sec
+        Start 112: World.AreaSkillBeatsSingleTargetSkill
+112/264 Test #112: World.AreaSkillBeatsSingleTargetSkill ...................................   Passed    0.03 sec
+        Start 113: World.QuickSkillBeatsSlowSkill
+113/264 Test #113: World.QuickSkillBeatsSlowSkill ..........................................   Passed    0.03 sec
+        Start 114: World.APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding
+114/264 Test #114: World.APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding .....   Passed    0.02 sec
+        Start 115: World.ConscriptingAndDisbandingKeepEveryPersonOnOneRoster
+115/264 Test #115: World.ConscriptingAndDisbandingKeepEveryPersonOnOneRoster ...............   Passed    0.02 sec
+        Start 116: World.OnlyALivingPersonCanBeConscripted
+116/264 Test #116: World.OnlyALivingPersonCanBeConscripted .................................   Passed    0.03 sec
+        Start 117: World.OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData
+117/264 Test #117: World.OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData ..............   Passed    0.03 sec
+        Start 118: World.OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse
+118/264 Test #118: World.OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse ...............   Passed    0.03 sec
+        Start 119: World.ReplayingARecordedOrderLogGivesTheSameHash
+119/264 Test #119: World.ReplayingARecordedOrderLogGivesTheSameHash ........................   Passed    0.03 sec
+        Start 120: World.OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused
+120/264 Test #120: World.OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused ...............   Passed    0.02 sec
+        Start 121: World.AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint
+121/264 Test #121: World.AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint ...............   Passed    0.03 sec
+        Start 122: World.BodiesWalkAroundAStructuresFootprint
+122/264 Test #122: World.BodiesWalkAroundAStructuresFootprint ..............................   Passed    0.03 sec
+        Start 123: World.FootprintsOverWallsArmiesOrEachOtherAreRefused
+123/264 Test #123: World.FootprintsOverWallsArmiesOrEachOtherAreRefused ....................   Passed    0.02 sec
+        Start 124: World.ObjectiveTheArmyCannotReachIsRefused
+124/264 Test #124: World.ObjectiveTheArmyCannotReachIsRefused ..............................   Passed    0.02 sec
+        Start 125: World.VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder
+125/264 Test #125: World.VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder .......   Passed    0.03 sec
+        Start 126: World.RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther
+126/264 Test #126: World.RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther ............   Passed    0.02 sec
+        Start 127: World.RebuilderBecomesTheOwnerOnlyWhereNoResidentLives
+127/264 Test #127: World.RebuilderBecomesTheOwnerOnlyWhereNoResidentLives ..................   Passed    0.05 sec
+        Start 128: World.AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain
+128/264 Test #128: World.AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain ..........   Passed    0.03 sec
+        Start 129: World.AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain
+129/264 Test #129: World.AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain ....   Passed    0.05 sec
+        Start 130: World.VillageNamingAMissingOrClaimedStructureOrArmyIsRefused
+130/264 Test #130: World.VillageNamingAMissingOrClaimedStructureOrArmyIsRefused ............   Passed    0.02 sec
+        Start 131: World.VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction
+131/264 Test #131: World.VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction ..........   Passed    0.03 sec
+        Start 132: World.OnlyAMemberMayChallengeTheCultsLeader
+132/264 Test #132: World.OnlyAMemberMayChallengeTheCultsLeader .............................   Passed    0.02 sec
+        Start 133: World.AChallengerWhoWinsLeadsAndTheLeadersAlliesTurnOnThem
+133/264 Test #133: World.AChallengerWhoWinsLeadsAndTheLeadersAlliesTurnOnThem ..............   Passed    0.03 sec
+        Start 134: World.ThePlayerAndAnNpcChallengeThroughTheSameOrder
+134/264 Test #134: World.ThePlayerAndAnNpcChallengeThroughTheSameOrder .....................   Passed    0.03 sec
+        Start 135: World.AChallengeIsRefusedForEachReasonTheOrderRefusesIt
+135/264 Test #135: World.AChallengeIsRefusedForEachReasonTheOrderRefusesIt .................   Passed    0.03 sec
+        Start 136: World.APersonsFactionIsItsArmysAndNoneOnceDead
+136/264 Test #136: World.APersonsFactionIsItsArmysAndNoneOnceDead ..........................   Passed    0.03 sec
+        Start 137: World.ADuelIsReadWhileItIsFoughtAndGoneOnceSettled
+137/264 Test #137: World.ADuelIsReadWhileItIsFoughtAndGoneOnceSettled ......................   Passed    0.03 sec
+        Start 138: World.OnlyAFactionsLeaderDeclaresWarOrMakesPeace
+138/264 Test #138: World.OnlyAFactionsLeaderDeclaresWarOrMakesPeace ........................   Passed    0.02 sec
+        Start 139: World.ADeclarationIsRefusedForEachReasonDeclareRefusesIt
+139/264 Test #139: World.ADeclarationIsRefusedForEachReasonDeclareRefusesIt ................   Passed    0.03 sec
+        Start 140: World.ALeaderNoDriverSteersDeclaresByTheDiplomacy
+140/264 Test #140: World.ALeaderNoDriverSteersDeclaresByTheDiplomacy .......................   Passed    0.03 sec
+        Start 141: World.ALeaderOutnumberedInADeclaredWarMakesPeace
+141/264 Test #141: World.ALeaderOutnumberedInADeclaredWarMakesPeace ........................   Passed    0.03 sec
+        Start 142: World.TheCalendarFollowsTheTicks
+142/264 Test #142: World.TheCalendarFollowsTheTicks ........................................   Passed    0.16 sec
+        Start 143: World.HowManyTicksMakeADayIsTheWorldsData
+143/264 Test #143: World.HowManyTicksMakeADayIsTheWorldsData ...............................   Passed    0.02 sec
+        Start 144: World.TalentIsDrawnAtBirthFromItsDistribution
+144/264 Test #144: World.TalentIsDrawnAtBirthFromItsDistribution ...........................   Passed    0.02 sec
+        Start 145: World.LifeDrawingPastItsLimitsIsRefused
+145/264 Test #145: World.LifeDrawingPastItsLimitsIsRefused .................................   Passed    0.02 sec
+        Start 146: World.KinshipPastItsLimitsIsRefused
+146/264 Test #146: World.KinshipPastItsLimitsIsRefused .....................................   Passed    0.02 sec
+        Start 147: World.ThePeopleAWorldStartsWithAreBornBeforeItByTheFoundingAge
+147/264 Test #147: World.ThePeopleAWorldStartsWithAreBornBeforeItByTheFoundingAge ..........   Passed    0.02 sec
+        Start 148: World.APersonsAgeIsCountedInWholeYearsOfTheCalendar
+148/264 Test #148: World.APersonsAgeIsCountedInWholeYearsOfTheCalendar .....................   Passed    0.02 sec
+        Start 149: World.PeopleAgeOutUnlessAttainmentExtendsTheirLives
+149/264 Test #149: World.PeopleAgeOutUnlessAttainmentExtendsTheirLives .....................   Passed    0.02 sec
+        Start 150: World.PeopleTheWorldStartsWithBelongToTheFamilyOfTheirArmy
+150/264 Test #150: World.PeopleTheWorldStartsWithBelongToTheFamilyOfTheirArmy ..............   Passed    0.02 sec
+        Start 151: World.ASoulIsBornAgainIntoAFamilyOfTheSameWorld
+151/264 Test #151: World.ASoulIsBornAgainIntoAFamilyOfTheSameWorld .........................   Passed    0.03 sec
+        Start 152: World.ARebirthContinuesTheWorldInsteadOfResettingIt
+152/264 Test #152: World.ARebirthContinuesTheWorldInsteadOfResettingIt .....................   Passed    0.04 sec
+        Start 153: World.ASteeredSoulChartsTheCellsWithinItsMapSight
+153/264 Test #153: World.ASteeredSoulChartsTheCellsWithinItsMapSight .......................   Passed    0.03 sec
+        Start 154: World.ASoulKeepsItsChartWhenItIsBornAgain
+154/264 Test #154: World.ASoulKeepsItsChartWhenItIsBornAgain ...............................   Passed    0.03 sec
+        Start 155: World.PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife
+155/264 Test #155: World.PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife ...........   Passed    0.02 sec
+        Start 156: World.AVillagesCapIsTheLeastOfItsHousingFoodAndStorage
+156/264 Test #156: World.AVillagesCapIsTheLeastOfItsHousingFoodAndStorage ..................   Passed    0.02 sec
+        Start 157: World.AFieldBlocksNoOneAndATorchBurnsIt
+157/264 Test #157: World.AFieldBlocksNoOneAndATorchBurnsIt .................................   Passed    0.02 sec
+        Start 158: World.AVillageWithoutAHarvestRunsOutOfFoodAndItsPeopleMove
+158/264 Test #158: World.AVillageWithoutAHarvestRunsOutOfFoodAndItsPeopleMove ..............   Passed    0.02 sec
+        Start 159: World.TheHungryWithNowhereToGoDie
+159/264 Test #159: World.TheHungryWithNowhereToGoDie .......................................   Passed    0.03 sec
+        Start 160: World.ResidentsStrikeHarderWhileASmithyArmingThemStands
+160/264 Test #160: World.ResidentsStrikeHarderWhileASmithyArmingThemStands .................   Passed    0.03 sec
+        Start 161: World.TheWoundedHealWhileAnApothecaryTendingThemStands
+161/264 Test #161: World.TheWoundedHealWhileAnApothecaryTendingThemStands ..................   Passed    0.03 sec
+        Start 162: World.APressedVillageBuildsWhatItLacksAndRaisesItByRepair
+162/264 Test #162: World.APressedVillageBuildsWhatItLacksAndRaisesItByRepair ...............   Passed    0.03 sec
+        Start 163: World.APressedVillageBuildsOnlyOnBuildableCells
+163/264 Test #163: World.APressedVillageBuildsOnlyOnBuildableCells .........................   Passed    0.03 sec
+        Start 164: World.APressedVillageBuildsACellClearOfItsClearings
+164/264 Test #164: World.APressedVillageBuildsACellClearOfItsClearings .....................   Passed    0.03 sec
+        Start 165: World.AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary
+165/264 Test #165: World.AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary ..........   Passed    0.03 sec
+        Start 166: World.APressedVillageFoundsAVillageOnFreeLand
+166/264 Test #166: World.APressedVillageFoundsAVillageOnFreeLand ...........................   Passed    0.03 sec
+        Start 167: World.AFoundedVillageNamesTheLandItWasLaidOutOn
+167/264 Test #167: World.AFoundedVillageNamesTheLandItWasLaidOutOn .........................   Passed    0.03 sec
+        Start 168: World.SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem
+168/264 Test #168: World.SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem ......   Passed    0.03 sec
+        Start 169: World.APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome
+169/264 Test #169: World.APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome .........   Passed    0.03 sec
+        Start 170: World.NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach
+170/264 Test #170: World.NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach ...................   Passed    0.02 sec
+        Start 171: World.ADeclaredPeaceStopsARaidAndADeclaredWarSendsOne
+171/264 Test #171: World.ADeclaredPeaceStopsARaidAndADeclaredWarSendsOne ...................   Passed    0.03 sec
+        Start 172: World.TheStanceOrdersTheChoicesAndTheCapAndNeighboursDecideThem
+172/264 Test #172: World.TheStanceOrdersTheChoicesAndTheCapAndNeighboursDecideThem .........   Passed    0.03 sec
+        Start 173: World.GrowthPastItsLimitsIsRefused
+173/264 Test #173: World.GrowthPastItsLimitsIsRefused ......................................   Passed    0.02 sec
+        Start 174: World.AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn
+174/264 Test #174: World.AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn ......   Passed    0.02 sec
+        Start 175: World.RefusesMoreHouseholdsThanItsResidentsPairInto
+175/264 Test #175: World.RefusesMoreHouseholdsThanItsResidentsPairInto .....................   Passed    0.02 sec
+        Start 176: World.ASectAdmitsItsFactionsPeopleWithinReachUpToItsCap
+176/264 Test #176: World.ASectAdmitsItsFactionsPeopleWithinReachUpToItsCap .................   Passed    0.03 sec
+        Start 177: World.ASectAdmitsNoOneBelowItsThresholdsBeyondReachOrOfAnotherFaction
+177/264 Test #177: World.ASectAdmitsNoOneBelowItsThresholdsBeyondReachOrOfAnotherFaction ...   Passed    0.03 sec
+        Start 178: World.ALostSeatCapsItsSectAtNothingAndKeepsItsMembers
+178/264 Test #178: World.ALostSeatCapsItsSectAtNothingAndKeepsItsMembers ...................   Passed    0.02 sec
+        Start 179: World.AMemberServingAnotherFactionLeavesItsSect
+179/264 Test #179: World.AMemberServingAnotherFactionLeavesItsSect .........................   Passed    0.02 sec
+        Start 180: World.EldersAreTheShareOfMembersOfHighestAttainment
+180/264 Test #180: World.EldersAreTheShareOfMembersOfHighestAttainment .....................   Passed    0.02 sec
+        Start 181: World.AFallenSectScattersOrLosesItsManuals
+181/264 Test #181: World.AFallenSectScattersOrLosesItsManuals ..............................   Passed    0.02 sec
+        Start 182: World.AnElectionMakesTheMasterLeaderWhenNoOneLeads
+182/264 Test #182: World.AnElectionMakesTheMasterLeaderWhenNoOneLeads ......................   Passed    0.02 sec
+        Start 183: World.AFactionReadsAsElectingOnlyWithAnElection
+183/264 Test #183: World.AFactionReadsAsElectingOnlyWithAnElection .........................   Passed    0.02 sec
+        Start 184: World.AnApplicantJoinsAtOnceByTheAdmissionsThresholdsWithoutItsChance
+184/264 Test #184: World.AnApplicantJoinsAtOnceByTheAdmissionsThresholdsWithoutItsChance ...   Passed    0.02 sec
+        Start 185: World.AnApplicationIsRefusedForEachReasonApplyRefusesIt
+185/264 Test #185: World.AnApplicationIsRefusedForEachReasonApplyRefusesIt .................   Passed    0.02 sec
+        Start 186: World.EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened
+186/264 Test #186: World.EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened ..............   Passed    0.03 sec
+        Start 187: World.ASectsFallIsRecordedOnceWhenItsLastMemberLeaves
+187/264 Test #187: World.ASectsFallIsRecordedOnceWhenItsLastMemberLeaves ...................   Passed    0.02 sec
+        Start 188: World.ALeadChangingHandsIsRecordedAndARenewedOneIsNot
+188/264 Test #188: World.ALeadChangingHandsIsRecordedAndARenewedOneIsNot ...................   Passed    0.03 sec
+        Start 189: World.VillagesFoundedRaidedAndRuinedAreRecorded
+189/264 Test #189: World.VillagesFoundedRaidedAndRuinedAreRecorded .........................   Passed    0.04 sec
+        Start 190: World.TheWorldKeepsItsLatestEventsUpToItsCapacity
+190/264 Test #190: World.TheWorldKeepsItsLatestEventsUpToItsCapacity .......................   Passed    0.02 sec
+        Start 191: World.ARumourReachOutsideItsLimitsIsRefused
+191/264 Test #191: World.ARumourReachOutsideItsLimitsIsRefused .............................   Passed    0.02 sec
+        Start 192: World.ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse
+192/264 Test #192: World.ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse ..........   Passed    0.02 sec
+        Start 193: World.AnArmyMakesTheVillageItNamesItsMembersHome
+193/264 Test #193: World.AnArmyMakesTheVillageItNamesItsMembersHome ........................   Passed    0.02 sec
+        Start 194: World.ACastAtAPersonLandsOnThatPersonInPlaceOfTheNearest
+194/264 Test #194: World.ACastAtAPersonLandsOnThatPersonInPlaceOfTheNearest ................   Passed    0.02 sec
+        Start 195: World.ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt
+195/264 Test #195: World.ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt ...................   Passed    0.02 sec
+        Start 196: World.TickCountIsTheTickACooldownIsCountedAgainst
+196/264 Test #196: World.TickCountIsTheTickACooldownIsCountedAgainst .......................   Passed    0.02 sec
+        Start 197: World.ACastAtItselfCentresItsDiscOnTheCaster
+197/264 Test #197: World.ACastAtItselfCentresItsDiscOnTheCaster ............................   Passed    0.02 sec
+        Start 198: World.AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind
+198/264 Test #198: World.AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind .............   Passed    0.02 sec
+        Start 199: World.AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther
+199/264 Test #199: World.AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther ..............   Passed    0.02 sec
+        Start 200: World.ALineHitsEveryFoeAlongItWithinItsLength
+200/264 Test #200: World.ALineHitsEveryFoeAlongItWithinItsLength ...........................   Passed    0.03 sec
+        Start 201: World.AnArcAndALineReachTheStructuresTheyCover
+201/264 Test #201: World.AnArcAndALineReachTheStructuresTheyCover ..........................   Passed    0.03 sec
+        Start 202: World.ASelfSkillLandsAroundItsUserWhereverItIsCast
+202/264 Test #202: World.ASelfSkillLandsAroundItsUserWhereverItIsCast ......................   Passed    0.03 sec
+        Start 203: World.ATargetedSkillHitsThePersonItLocksOnAlone
+203/264 Test #203: World.ATargetedSkillHitsThePersonItLocksOnAlone .........................   Passed    0.03 sec
+        Start 204: World.NoShapeStrikesAnAlly
+204/264 Test #204: World.NoShapeStrikesAnAlly ..............................................   Passed    0.02 sec
+        Start 205: World.EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck
+205/264 Test #205: World.EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck ........   Passed    0.02 sec
+        Start 206: World.ASkillsShapeChangesTheHash
+206/264 Test #206: World.ASkillsShapeChangesTheHash ........................................   Passed    0.02 sec
+        Start 207: World.APersonClosesOnAFoeInSightAndStandsToFightIt
+207/264 Test #207: World.APersonClosesOnAFoeInSightAndStandsToFightIt ......................   Passed    0.02 sec
+        Start 208: World.AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies
+208/264 Test #208: World.AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies ............   Passed    0.02 sec
+        Start 209: World.AMoveOrderGivenDuringAnIntentReachesItsCell
+209/264 Test #209: World.AMoveOrderGivenDuringAnIntentReachesItsCell .......................   Passed    0.02 sec
+        Start 210: World.EndingAnIntentHoldsTheArmyWhereItsLeadStands
+210/264 Test #210: World.EndingAnIntentHoldsTheArmyWhereItsLeadStands ......................   Passed    0.02 sec
+        Start 211: World.AnAttackIntentStepsRoundACornerShuttingItsDiagonal
+211/264 Test #211: World.AnAttackIntentStepsRoundACornerShuttingItsDiagonal ................   Passed    0.02 sec
+        Start 212: World.AnOrderWithoutATargetEndsTheAttackIntent
+212/264 Test #212: World.AnOrderWithoutATargetEndsTheAttackIntent ..........................   Passed    0.02 sec
+        Start 213: World.AnAttackIntentEndsWhenItsTargetLeavesSight
+213/264 Test #213: World.AnAttackIntentEndsWhenItsTargetLeavesSight ........................   Passed    0.02 sec
+        Start 214: World.AnArmyMayTargetOnlyALivingFoeInSight
+214/264 Test #214: World.AnArmyMayTargetOnlyALivingFoeInSight ..............................   Passed    0.02 sec
+        Start 215: World.FoesInSightAreListedNearestFirst
+215/264 Test #215: World.FoesInSightAreListedNearestFirst ..................................   Passed    0.02 sec
+        Start 216: World.RememberedBordersKeepTheLastSeenClaimCentreUntilSeenAgain
+216/264 Test #216: World.RememberedBordersKeepTheLastSeenClaimCentreUntilSeenAgain .........   Passed    0.02 sec
+        Start 217: World.AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets
+217/264 Test #217: World.AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets ........   Passed    0.02 sec
+        Start 218: World.ASteeredBodyDoesNotCloseOnAFoe
+218/264 Test #218: World.ASteeredBodyDoesNotCloseOnAFoe ....................................   Passed    0.02 sec
+        Start 219: World.ACastIsRefusedWithItsReason
+219/264 Test #219: World.ACastIsRefusedWithItsReason .......................................   Passed    0.02 sec
+        Start 220: World.ACastByOrAtTheDeadIsRefused
+220/264 Test #220: World.ACastByOrAtTheDeadIsRefused .......................................   Passed    0.02 sec
+        Start 221: World.AnNpcCastsThroughTheSameFunction
+221/264 Test #221: World.AnNpcCastsThroughTheSameFunction ..................................   Passed    0.02 sec
+        Start 222: World.ALaterCastBeforeTheTickReplacesTheFirst
+222/264 Test #222: World.ALaterCastBeforeTheTickReplacesTheFirst ...........................   Passed    0.02 sec
+        Start 223: World.ACastNoLongerAllowedOnItsTickLapses
+223/264 Test #223: World.ACastNoLongerAllowedOnItsTickLapses ...............................   Passed    0.02 sec
+        Start 224: World.CastsReplayToTheSameHash
+224/264 Test #224: World.CastsReplayToTheSameHash ..........................................   Passed    0.02 sec
+        Start 225: World.APendingCastIsPartOfTheHash
+225/264 Test #225: World.APendingCastIsPartOfTheHash .......................................   Passed    0.02 sec
+        Start 226: World.AimTakesTheNearestFoeAheadOfTheFacing
+226/264 Test #226: World.AimTakesTheNearestFoeAheadOfTheFacing .............................   Passed    0.02 sec
+        Start 227: World.QiCapacityGrowsADayUpToItsLimitAndQiRecovers
+227/264 Test #227: World.QiCapacityGrowsADayUpToItsLimitAndQiRecovers ......................   Passed    0.02 sec
+        Start 228: World.ThePeopleAWorldStartsWithCultivatedForTheirFoundingAge
+228/264 Test #228: World.ThePeopleAWorldStartsWithCultivatedForTheirFoundingAge ............   Passed    0.02 sec
+        Start 229: World.ARealmIsHowManyRealmsTheQiCapacityReaches
+229/264 Test #229: World.ARealmIsHowManyRealmsTheQiCapacityReaches .........................   Passed    0.02 sec
+        Start 230: World.QiDataPastItsLimitsIsRefused
+230/264 Test #230: World.QiDataPastItsLimitsIsRefused ......................................   Passed    0.02 sec
+        Start 231: World.AManualOnACellTeachesWhatItsReadersRealmAllowsAndStays
+231/264 Test #231: World.AManualOnACellTeachesWhatItsReadersRealmAllowsAndStays ............   Passed    0.02 sec
+        Start 232: World.ReadingSpendsQiAndTeachesOnlyUpToTheReadersRealm
+232/264 Test #232: World.ReadingSpendsQiAndTeachesOnlyUpToTheReadersRealm ..................   Passed    0.02 sec
+        Start 233: World.AnArtOfAnotherNatureCostsMoreToRead
+233/264 Test #233: World.AnArtOfAnotherNatureCostsMoreToRead ...............................   Passed    0.02 sec
+        Start 234: World.ARealmsMightAndAnArtsNatureScaleItsDamage
+234/264 Test #234: World.ARealmsMightAndAnArtsNatureScaleItsDamage .........................   Passed    0.03 sec
+        Start 235: World.EachArtSkillKeepsItsOwnCooldown
+235/264 Test #235: World.EachArtSkillKeepsItsOwnCooldown ...................................   Passed    0.02 sec
+        Start 236: World.ACastIsRefusedForLackOfQi
+236/264 Test #236: World.ACastIsRefusedForLackOfQi .........................................   Passed    0.02 sec
+        Start 237: World.AUseSpendsItsSkillsQi
+237/264 Test #237: World.AUseSpendsItsSkillsQi .............................................   Passed    0.02 sec
+        Start 238: World.ThoseWhoKnowAnArtStrikeWithItUnbidden
+238/264 Test #238: World.ThoseWhoKnowAnArtStrikeWithItUnbidden .............................   Passed    0.03 sec
+        Start 239: World.ARealmGainedComprehendsASkillOfAnArtItKnows
+239/264 Test #239: World.ARealmGainedComprehendsASkillOfAnArtItKnows .......................   Passed    0.02 sec
+        Start 240: World.ASectTeachesItsArtsWithinItsMembersAndEldersRealms
+240/264 Test #240: World.ASectTeachesItsArtsWithinItsMembersAndEldersRealms ................   Passed    0.02 sec
+        Start 241: World.EveryRealmGainedAndSkillReadFromAManualIsRecorded
+241/264 Test #241: World.EveryRealmGainedAndSkillReadFromAManualIsRecorded .................   Passed    0.02 sec
+        Start 242: World.ASkillComprehendedIsRecordedAsComprehended
+242/264 Test #242: World.ASkillComprehendedIsRecordedAsComprehended ........................   Passed    0.03 sec
+        Start 243: World.ASkillTaughtIsRecordedAsTaught
+243/264 Test #243: World.ASkillTaughtIsRecordedAsTaught ....................................   Passed    0.02 sec
+        Start 244: World.ProgressKeepsTheLatestStepsApartFromTheEvents
+244/264 Test #244: World.ProgressKeepsTheLatestStepsApartFromTheEvents .....................   Passed    0.02 sec
+        Start 245: World.ProgressShortOfItsCapacityKeepsEveryStep
+245/264 Test #245: World.ProgressShortOfItsCapacityKeepsEveryStep ..........................   Passed    0.02 sec
+        Start 246: World.KnownSkillsAndQiArePartOfTheHash
+246/264 Test #246: World.KnownSkillsAndQiArePartOfTheHash ..................................   Passed    0.02 sec
+        Start 247: World.APersonTalksToAnyoneWithinTheTalkReachWhoIsNotHostile
+247/264 Test #247: World.APersonTalksToAnyoneWithinTheTalkReachWhoIsNotHostile .............   Passed    0.02 sec
+        Start 248: World.AHostileFactionsPersonRefusesToTalk
+248/264 Test #248: World.AHostileFactionsPersonRefusesToTalk ...............................   Passed    0.02 sec
+        Start 249: World.APersonOfAFactionAtWarRefusesToTalk
+249/264 Test #249: World.APersonOfAFactionAtWarRefusesToTalk ...............................   Passed    0.02 sec
+        Start 250: World.TheDeadDoNotTalk
+250/264 Test #250: World.TheDeadDoNotTalk ..................................................   Passed    0.02 sec
+        Start 251: World.TheDeadOfferNoNews
+251/264 Test #251: World.TheDeadOfferNoNews ................................................   Passed    0.02 sec
+        Start 252: World.ATalkReachOutsideItsLimitsIsRefused
+252/264 Test #252: World.ATalkReachOutsideItsLimitsIsRefused ...............................   Passed    0.02 sec
+        Start 253: World.APersonSellsTheWaresOfItsBestDiscipline
+253/264 Test #253: World.APersonSellsTheWaresOfItsBestDiscipline ...........................   Passed    0.02 sec
+        Start 254: World.NoOneSellsWithoutATrade
+254/264 Test #254: World.NoOneSellsWithoutATrade ...........................................   Passed    0.02 sec
+        Start 255: World.ABuyerPaysTheSellerForTheWareItHolds
+255/264 Test #255: World.ABuyerPaysTheSellerForTheWareItHolds ..............................   Passed    0.02 sec
+        Start 256: World.APurchaseIsRefusedForItsFirstReason
+256/264 Test #256: World.APurchaseIsRefusedForItsFirstReason ...............................   Passed    0.02 sec
+        Start 257: World.TheDeadNeitherSellNorBuy
+257/264 Test #257: World.TheDeadNeitherSellNorBuy ..........................................   Passed    0.02 sec
+        Start 258: World.AHerbRestoresHealthUpToANewbornsAndNoFurther
+258/264 Test #258: World.AHerbRestoresHealthUpToANewbornsAndNoFurther ......................   Passed    0.02 sec
+        Start 259: World.AHerbIsRefusedAtFullHealth
+259/264 Test #259: World.AHerbIsRefusedAtFullHealth ........................................   Passed    0.02 sec
+        Start 260: World.APillRestoresQiUpToTheStoreAndIsRefusedWhenFull
+260/264 Test #260: World.APillRestoresQiUpToTheStoreAndIsRefusedWhenFull ...................   Passed    0.02 sec
+        Start 261: World.ThoseNoDriverSteersBuyADayAndConsumeWhenWounded
+261/264 Test #261: World.ThoseNoDriverSteersBuyADayAndConsumeWhenWounded ...................   Passed    0.02 sec
+        Start 262: World.ThoseWithAHomeEarnAWageADay
+262/264 Test #262: World.ThoseWithAHomeEarnAWageADay .......................................   Passed    0.02 sec
+        Start 263: World.SilverAndWaresHeldArePartOfTheHash
+263/264 Test #263: World.SilverAndWaresHeldArePartOfTheHash ................................   Passed    0.02 sec
+        Start 264: World.ATradeOutsideItsLimitsIsRefused
+264/264 Test #264: World.ATradeOutsideItsLimitsIsRefused ...................................   Passed    0.02 sec
+
+100% tests passed out of 264
+
+Total Test time (real) =  83.98 sec

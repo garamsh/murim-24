@@ -1,0 +1,99 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261013194816646293
+world_adapter_test: 2000 ticks, 2 armies, 2 structures; core hash -7842469183209719204, adapter hash -7842469183209719204 for seed 42, -3708329586982014488 for seed 43: pass
+world_adapter_test: 12 people through the adapter, 12 from the core, 12 for seed 43; positions and health equal: pass
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is out of range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: cooldown is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: stage_floors must hold three ints
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: valid scenario accepted true; 7 of 7 invalid scenarios refused: pass
+ERROR: WorldAdapter.create_region: a day must last at least one tick
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:114)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create_region: ticks_per_day is out of range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:114)
+       [1] _init (res://run_tests.gd:22)
+world_adapter_test: a region of five-tick days accepted true, on day 2 after five ticks from day 1; days of 0 and -1 ticks refused: pass
+world_adapter_test: five-tick days read 5 ticks a day, the tick [0, 0, 0] over five ticks; the default day reads 1800: FAIL
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _orders_pass (res://extension/world_adapter_test.gd:536)
+       [1] run (res://extension/world_adapter_test.gd:134)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: ordered person accepted true, moved true, camp left 0 of 10; unordered moved false, camp left 10; order for a missing skill refused true: pass
+ERROR: WorldAdapter.create: shape names no shape
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] _reads_pass (res://extension/world_adapter_test.gd:512)
+       [2] run (res://extension/world_adapter_test.gd:135)
+       [3] _init (res://run_tests.gd:22)
+world_adapter_test: factions 0, 1; strengths 1200, 1010, bodies 1200; no region from create true; region of 16384 cells: terrain ["plain", "forest", "hills", "water", "mountain"] agrees with blocked cells true, each village's centre in its owner's territory and some cell in none true, 9 villages, person's faction 0, first village's 0; created footprint (1, 1), region footprints [(3, 3), (5, 3), (2, 2), (1, 1), (5, 1), (3, 2), (4, 3), (6, 4), (3, 1)], 89 of 89 structures inside a village: pass
+world_adapter_test: structure kinds: created "", M1 barrels, region ["house", "hall", "well", "barrels", "fence", "field", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate"], first village village; skills read back true: pass
+world_adapter_test: born into village 1 of faction 1, after 600 ticks 95 of 95 region structures intact; the torch beside a structure no village holds breaks it true: pass
+world_adapter_test: the player's body is 이 은비 (Lee Eunbi) of family 10, spouse -1, 0 parents, 0 children; names() holds 24 surnames and 24 given names, every one of 21 people's among them true; a created world names no one true, its names() empty true: pass
+world_adapter_test: 10 villages, first with 3 people under a cap of 50 and 6000 food, 5997 a day later: pass
+world_adapter_test: 3 sects, first Hwasan of faction 0 seated in village 7, members [14, 15], elders [14], master 14, cap 20; manuals [{ "art": 0, "place": "sect", "sect": 0 }, { "art": 1, "place": "sect", "sect": 1 }, { "art": 2, "place": "sect", "sect": 2 }]; player's sect -1; electing factions ["Orthodox"]; a world from create has 0 sects and 0 of 2 factions electing: pass
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:651)
+       [1] run (res://extension/world_adapter_test.gd:144)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:665)
+       [1] run (res://extension/world_adapter_test.gd:144)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: the Cult player may apply to sect 1 true, joins true, is refused again true; the Unorthodox player refused by sect 2 as unproven true (setup true); 5 rumours after ten years, newest first, within the map and 5 of them naming the born or the dead rightly true, the first { "sequence": 19, "tick": 4150, "cell": (54, 90), "kind": "born", "person": 40 }; disciplines ["sword", "saber", "fist", "hidden weapons", "medicine"], master 14 attained [0, 0, 0, 0, 120] true; a world from create() names none true: pass
+world_adapter_test: 8 realms, the first { "korean": "삼류", "romanised": "Third-rate", "qi": 1000, "might": 1100 }; person 4 knows 3 skills, the last { "range": 2048, "radius": 128, "body_damage": 20, "structure_damage": 0, "cooldown": 90, "qi_cost": 100, "shape": 2, "ready_at": 0, "art": 2, "skill": 0, "rank": 1, "korean": "흑아표", "romanised": "Black Fang Dart", "orientation": 1, "polarity": 1 }, qi 3751 of 3752, realm 2, nature { "orientation": 1, "polarity": 1 }; a world from create() reads none true: pass
+world_adapter_test: 3 arts, 9 art skills known named alike, 9 skills learned and 15 realms gained in its progress, none among its events; a world from create() has no arts true: pass
+world_adapter_test: of a region's last 49 events, 45 births and 1 deaths name their person and 3 others none true: pass
+world_adapter_test: after 581 ticks of the M1 battle, 14 uses and 499 of 500 people living, the snapshot reads as the per-army, per-structure and per-use reads true; a tick later it differs true: pass
+extension/world_adapter_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed

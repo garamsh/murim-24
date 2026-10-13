@@ -1,0 +1,5 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+capture HUD control: day changes 0 pixels across status, map and shortcut panels
+capture HUD control: dusk changes 0 pixels across status, map and shortcut panels
+capture HUD control: night changes 0 pixels across status, map and shortcut panels
