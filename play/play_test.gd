@@ -722,7 +722,8 @@ func _shortcuts_pass() -> bool:
 # or none for "". Returns what is open then, as _open_now names it.
 func _open_from(scene: Node2D, state: String) -> String:
 	var hud: CanvasLayer = scene.get_node("Hud")
-	for over: Control in [hud.genealogy, hud.sect, hud.factions, hud.arts, hud.dialogue, hud.settings, hud.pause]:
+	for over: Control in [hud.genealogy, hud.sect, hud.factions, hud.arts, hud.map_window, hud.dialogue, hud.settings,
+			hud.pause]:
 		over.visible = false
 	for row: Dictionary in scene.SHORTCUTS:
 		if row.action == state:
@@ -857,42 +858,52 @@ func _autosave_pass() -> bool:
 	return passed
 
 
-# The borders and the map follow the territory as it moves. Setup: a tick with no order moves no
-# territory, and the tick after the march is ordered finds it moved. Before and after, the borders
-# and the map's border pixels match the territory the core gives then; control: the territory after no
-# longer matches the borders before, so the match after is the redraw's. The tick that moved
-# nothing, and frames after the move, keep the same borders and map.
+# The borders follow the territory as it moves, and the map follows the player's chart (ADR 0073).
+# Setup: a tick with no order moves no territory, and the tick after the march is ordered finds it
+# moved. Before and after, the borders match the territory the core gives then, and the map's
+# pixels the territory as the player remembers it, its borders against seen cells only, in fog where
+# it has seen nothing; control: the
+# territory after no longer matches the borders before, so the match after is the redraw's. The
+# map is drawn again exactly when the chart's revision moves, and frames after keep it.
 func _territory_pass() -> bool:
 	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
 	var art: Node2D = scene.get_node("WorldArt")
 	var hud: CanvasLayer = scene.get_node("Hud")
 	var territory: Node2D = art.get_node("Territory")
+	# The player sees its surroundings on the first tick, and the HUD draws them on the next frame.
+	scene.step()
+	_frame(scene)
 	var before := world.territory()
 	var borders_before: Array = territory.borders
 	var map_before: ImageTexture = hud.map_texture
-	var drawn_before := _borders_follow(borders_before, before, world) \
-			and _map_follows(hud, before, world)
+	var revision_before := world.chart_revision()
+	var drawn_before := _borders_follow(borders_before, before, world) and _map_follows(hud, world)
 	scene.step()
-	var unchanged_tick: bool = world.territory() == before \
-			and is_same(territory.borders, borders_before) and is_same(hud.map_texture, map_before)
+	_frame(scene)
+	var unchanged_tick: bool = world.territory() == before and is_same(territory.borders, borders_before) \
+			and is_same(hud.map_texture, map_before) == (world.chart_revision() == revision_before)
+	map_before = hud.map_texture
+	revision_before = world.chart_revision()
 	var target: Dictionary = world.villages()[MARCHED_ON]
 	var ordered := world.order(MARCHERS, target.corner + target.area / 2,
 			PackedInt64Array(range(world.skill_count(MARCHERS))))
 	scene.step()
+	_frame(scene)
 	var after := world.territory()
 	var moved := after != before
 	var borders_after: Array = territory.borders
 	var map_after: ImageTexture = hud.map_texture
+	var redrawn_on_revision := is_same(map_after, map_before) == (world.chart_revision() == revision_before)
 	for frame in 3:
 		_frame(scene)
-	var frames_kept: bool = is_same(territory.borders, borders_after) \
-			and is_same(hud.map_texture, map_after) and not is_same(map_after, map_before)
-	var drawn_after := _borders_follow(borders_after, after, world) and _map_follows(hud, after, world)
+	var frames_kept: bool = is_same(territory.borders, borders_after) and is_same(hud.map_texture, map_after) \
+			and redrawn_on_revision
+	var drawn_after := _borders_follow(borders_after, after, world) and _map_follows(hud, world)
 	var old_stale := not _borders_follow(borders_before, after, world)
 	var passed := unchanged_tick and ordered and moved and drawn_before and drawn_after \
 			and old_stale and frames_kept
-	print("play_test: a tick with no order keeps the territory, borders and map %s; army %d ordered on village %d %s, the territory moved by the next tick %s; borders and map follow the territory before %s and after %s, the borders before stale after %s; kept over frames %s: %s" % [
+	print("play_test: a tick with no order keeps the territory and borders, and redraws the map only on a new chart revision %s; army %d ordered on village %d %s, the territory moved by the next tick %s; borders follow the territory and the map the chart before %s and after %s, the borders before stale after %s; kept over frames %s: %s" % [
 		unchanged_tick, MARCHERS, MARCHED_ON, ordered, moved, drawn_before, drawn_after,
 		old_stale, frames_kept, "pass" if passed else "FAIL"])
 	scene.free()
@@ -1072,23 +1083,33 @@ func _borders_follow(borders: Array, owners: PackedInt64Array, world: WorldAdapt
 	return borders.size() == edges and edges > 0
 
 
-# Whether the HUD's map marks with a faction's accent exactly the cells, outside every village's
-# square, whose right or lower neighbour lies in another territory of `owners`.
-func _map_follows(hud: CanvasLayer, owners: PackedInt64Array, world: WorldAdapter) -> bool:
+# Whether the HUD's map shows `world`'s chart: apart from the squares of the villages it remembers,
+# clipped to seen cells, fog on every cell the player has not seen, and on the rest a faction's accent
+# exactly where the remembered territory has a border with a seen neighbour.
+func _map_follows(hud: CanvasLayer, world: WorldAdapter) -> bool:
 	var image: Image = hud.map_texture.get_image()
 	var width := world.map_rows()[0].length()
+	var owners := world.remembered_territory()
+	var seen := world.explored()
+	var fog := preload("res://hud/map_window.gd").FOG.to_html(false)
 	var accents := []
 	for accent: Color in preload("res://hud/palette.gd").ACCENTS:
 		accents.append(accent.to_html(false))
 	var squares: Array[Rect2i] = []
-	for village: Dictionary in world.villages():
+	for village: Dictionary in world.remembered_villages():
 		squares.append(Rect2i(village.corner, village.area))
+	if seen.size() != owners.size() or not seen.has(1):
+		return false
 	for i in owners.size():
 		var cell := Vector2i(i % width, i / width)
+		if seen[i] == 0:
+			if image.get_pixel(cell.x, cell.y).to_html(false) != fog:
+				return false
+			continue
 		if squares.any(func(square: Rect2i) -> bool: return square.has_point(cell)):
 			continue
-		var border := ((i + 1) % width != 0 and owners[i] != owners[i + 1]) \
-				or (i + width < owners.size() and owners[i] != owners[i + width])
+		var border := ((i + 1) % width != 0 and seen[i + 1] != 0 and owners[i] != owners[i + 1]) \
+				or (i + width < owners.size() and seen[i + width] != 0 and owners[i] != owners[i + width])
 		if accents.has(image.get_pixel(cell.x, cell.y).to_html(false)) != border:
 			return false
 	return true

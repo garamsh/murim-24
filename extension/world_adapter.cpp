@@ -12,6 +12,7 @@
 #include <godot_cpp/core/error_macros.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -31,6 +32,7 @@
 
 #include "arts.hpp"
 #include "calendar.hpp"
+#include "chart.hpp"
 #include "content.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
@@ -987,10 +989,18 @@ godot::PackedInt64Array WorldAdapter::territory() const {
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
   godot::TypedArray<godot::Dictionary> villages;
+  for (const godot::Dictionary& fields : village_fields()) {
+    villages.push_back(fields);
+  }
+  return villages;
+}
+
+std::vector<godot::Dictionary> WorldAdapter::village_fields() const {
+  std::vector<godot::Dictionary> villages;
   const auto add = [this, &villages](
                        const std::string& name, const std::string& kind,
                        murim::Cell corner, murim::Footprint area) {
-    const auto index = static_cast<std::size_t>(villages.size());
+    const std::size_t index = villages.size();
     godot::Dictionary fields;
     fields.set("name", godot::String(name.c_str()));
     fields.set("kind", godot::String(kind.c_str()));
@@ -1011,6 +1021,62 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::villages() const {
         land->corner, land->area);
   }
   return villages;
+}
+
+godot::PackedByteArray WorldAdapter::explored() const {
+  godot::PackedByteArray seen;
+  if (terrain_.empty()) {
+    return seen;
+  }
+  const murim::Chart& chart = world().chart(PLAYER_SOUL);
+  const murim::Footprint size{
+      static_cast<std::int32_t>(map_rows_.front().size()),
+      static_cast<std::int32_t>(map_rows_.size())};
+  for (const murim::Cell cell : murim::cells_of(murim::Cell{0, 0}, size)) {
+    seen.push_back(chart.seen(cell) ? 1 : 0);
+  }
+  return seen;
+}
+
+godot::TypedArray<godot::Dictionary> WorldAdapter::remembered_villages() const {
+  godot::TypedArray<godot::Dictionary> remembered;
+  if (terrain_.empty()) {
+    return remembered;
+  }
+  const std::vector<godot::Dictionary> all = village_fields();
+  const std::vector<std::optional<murim::VillageMemory>>& memories =
+      world().chart(PLAYER_SOUL).villages();
+  for (std::size_t village = 0; village < memories.size(); ++village) {
+    const std::optional<murim::VillageMemory>& memory = memories.at(village);
+    if (!memory) {
+      continue;
+    }
+    godot::Dictionary fields = all.at(village).duplicate();
+    fields.set("index", static_cast<std::int64_t>(village));
+    fields.set("faction", static_cast<std::int64_t>(memory->owner));
+    fields.set("peopled", memory->peopled);
+    fields.set("stage", static_cast<std::int64_t>(memory->stage));
+    remembered.push_back(fields);
+  }
+  return remembered;
+}
+
+godot::PackedInt64Array WorldAdapter::remembered_territory() const {
+  godot::PackedInt64Array owners;
+  if (!terrain_.empty()) {
+    for (const std::optional<std::size_t> owner :
+         world().remembered_territory(PLAYER_SOUL)) {
+      owners.push_back(owner ? static_cast<std::int64_t>(*owner) : -1);
+    }
+  }
+  return owners;
+}
+
+std::int64_t WorldAdapter::chart_revision() const {
+  if (terrain_.empty()) {
+    return 0;
+  }
+  return static_cast<std::int64_t>(world().chart(PLAYER_SOUL).revision());
 }
 
 std::int64_t WorldAdapter::faction_count() const {
@@ -1801,6 +1867,14 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::faction_names);
   godot::ClassDB::bind_method(godot::D_METHOD("territory"),
                               &WorldAdapter::territory);
+  godot::ClassDB::bind_method(godot::D_METHOD("explored"),
+                              &WorldAdapter::explored);
+  godot::ClassDB::bind_method(godot::D_METHOD("remembered_villages"),
+                              &WorldAdapter::remembered_villages);
+  godot::ClassDB::bind_method(godot::D_METHOD("remembered_territory"),
+                              &WorldAdapter::remembered_territory);
+  godot::ClassDB::bind_method(godot::D_METHOD("chart_revision"),
+                              &WorldAdapter::chart_revision);
   godot::ClassDB::bind_method(godot::D_METHOD("villages"),
                               &WorldAdapter::villages);
   godot::ClassDB::bind_integer_constant(name, "", "TICKS_PER_SECOND",
@@ -1809,6 +1883,14 @@ void WorldAdapter::_bind_methods() {
                                         murim::CELL_SIZE);
   godot::ClassDB::bind_integer_constant(name, "", "ARC_HALF_WIDTH_DEGREES",
                                         murim::ARC_HALF_WIDTH_DEGREES);
+  godot::ClassDB::bind_integer_constant(
+      name, "", "VILLAGE_STANDING",
+      static_cast<int>(murim::VillageStage::STANDING));
+  godot::ClassDB::bind_integer_constant(
+      name, "", "VILLAGE_DAMAGED",
+      static_cast<int>(murim::VillageStage::DAMAGED));
+  godot::ClassDB::bind_integer_constant(
+      name, "", "VILLAGE_RUINS", static_cast<int>(murim::VillageStage::RUINS));
   godot::ClassDB::bind_integer_constant(name, "", "STAGE_INTACT",
                                         static_cast<int>(murim::Stage::INTACT));
   godot::ClassDB::bind_integer_constant(

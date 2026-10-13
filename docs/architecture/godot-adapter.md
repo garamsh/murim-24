@@ -21,7 +21,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - `load` reads a saved world back from a slot.
 - A world from `create` or `create_m1` has no region: no terrain kinds, villages, sects, manuals, realms, arts or names, and it cannot be saved.
 - The adapter keeps what the view draws of a region and the world does not hold: each cell's terrain kind, the kinds' and factions' names, and the villages with their templates. `load` regenerates it from the region's seed and the player's birth village, which the save holds.
-- Reads give back what the core holds or derives, by subject: the world's hash, date and tick; armies, rosters, bodies and structures; leadership, duels, relations and declarations; names and kin; villages, fields and territory; sects and manuals; qi, realms, arts and a person's skills; rumours and attainment; talking and trade; and the last tick's strikes, the events and the steps of progress kept from a sequence on.
+- Reads give back what the core holds or derives, by subject: the world's hash, date and tick; armies, rosters, bodies and structures; leadership, duels, relations and declarations; names and kin; villages, fields and territory; what the player's soul has seen, its chart; sects and manuals; qi, realms, arts and a person's skills; rumours and attainment; talking and trade; and the last tick's strikes, the events and the steps of progress kept from a sequence on.
 - `snapshot` gives in one call, as packed arrays, what a view reads after a tick: every living body with its person, position, health and ready tick, each army's faction, each structure's stage, and the tick's strikes with whom each struck. The world art and the sound read one snapshot a tick between them (ADR 0075).
 - The library also registers `BodyView`, the view's native module, which keeps the bodies and what the fighting did to them by person, packs the bodies on screen into the rows' buffers each frame and draws the strikes, the target's brackets and the numbers in one call. It holds no game rule; its timings and buffer layout cross as its constants (ADR 0075).
 - Orders go to the core through the port: `order`, `end_intent`, `steer`, `declare`, `apply`, `cast`, `buy` and `consume`.
@@ -102,7 +102,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `hud/hud.tscn` is drawn at a whole-pixel scale of its own, as `view_scale.gd` gives it, and laid out in the window's size at that scale.
 - The HUD shows:
   - the player's portrait, faction, health, qi and realm
-  - a map of the region from `territory` and `villages`, with the core's season and year
+  - a map around the player of what the player's soul has seen, from `explored`, `remembered_territory` and `remembered_villages`: unseen cells in fog, borders from remembered claim centres only against seen cells, and each village as last seen on its seen cells, in stone if seen in ruins; it is drawn again when `chart_revision` moves, and shows the core's season and year
   - its faction's leader, and a duel for the lead while one is fought
   - the target frame on the person the player selected
   - the notices of the core's refusals and of the player's lessons and realms, read from `progress`
@@ -116,6 +116,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - `hud/arts.gd`: the person's realm, qi, heart method and known arts, and the loadout's five slots. Its left column is wider than the mockup's, so the longest English names fit, and every skill's icon is the technique bar's, since the mockups' own icons for each art skill are not in the production set
   - `hud/title.gd`, `hud/new_game.gd`, `hud/pause.gd` and `hud/settings.gd`: the screens. The title names the core's `LoadError` when slot 0 does not load
   - `hud/rebirth.gd`: the life just ended beside the life begun, in the panels' frame, with no mockup
+  - `hud/map_window.gd`: the minimap's image at the largest whole multiple at which it and its legend fit the HUD's room, in a frame sized to them, with the player's place and season following the world while open, and a legend, as evidence/map-mockup lays it out; N opens it, and its row on the rail shows a map icon drawn in `hud/shortcuts.gd`
 - `hud/nameplates.gd` names the people `world_art.tscn` lists over their heads, coloured by relation, at most `NAME_CAP` at once, the selected and the hostile first, leaving out a name that would cover another or a panel. The play scene names no one while a panel is open.
 - `hud/talk_prompt.gd` names, over the person to talk to, the talk key or the core's refusal.
 - `hud/loadout.gd` holds the skill on each of the five slots by what it is, so a slot keeps its skill as the person learns more. It is the player's choice, not the world's state: the core's save does not hold it, and the play scene writes it beside slot 0.
@@ -143,8 +144,11 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 
 ## Rationale
 
+- Remembered borders use the village's claim centre as last seen, and a changed centre redraws the map: ADR 0078 (`adr/0078-remember-each-villages-claim-centre-with-its-last-seen-state.md`).
+
 - Godot is the presentation adapter and the core reaches it through GDExtension: ADR 0002 (`adr/0002-build-on-godot-with-a-cpp-simulation-core.md`).
 - The binding release, its pin, the build path, the scenario format, how refusals reach GDScript, the test runner and how CI installs Godot: ADR 0004 (`adr/0004-bind-the-core-to-godot-with-godot-cpp-through-cmake.md`).
+- The map drawn from the player's chart, of what it has seen as it was last seen, and the map window on N: ADR 0073 (`adr/0073-chart-the-land-a-soul-has-seen-and-show-each-village-as-it-was-last-seen.md`).
 - The calendar kept by the core and read by the HUD, and the player's body carrying a soul: ADR 0019 (`adr/0019-draw-talent-and-lifespan-at-birth-and-bear-a-soul-again.md`).
 - Every body one person, read and drawn one by one, and no focus to set: ADR 0017 (`adr/0017-make-every-npc-an-individual-and-every-army-a-roster.md`).
 - Saving through the core's save port, served by files under `user://saves/`, and what the adapter regenerates from the region's origin on load: ADR 0030 (`adr/0030-save-a-world-through-a-save-port-in-the-cores-own-versioned-encoding.md`).
@@ -166,7 +170,6 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 ## Open questions
 
 - **Banners after a change of owner.** A banner keeps the colours of the owner its village had when it was laid, while the map's square and the borders follow the owner now.
-- **The map on the rail.** The rail has no map row until #168 gives the map a window and a key; that change adds the row to `SHORTCUTS`, and the rail and the pause guide both list it.
 - **Panels by touch.** On a touch screen the genealogy and sect panels open and close, but their selection, Tab's next faction and Enter's application have no touch of their own yet.
 - **Talking by touch.** On a touch screen no button talks and no prompt shows, while touch is deferred (scope, 2026-10-09); a tap only closes an open dialogue window.
 - **Wares by touch.** On a touch screen no belt shows and no button consumes a ware, while touch is deferred (scope, 2026-10-09); the silver strip shows.
@@ -197,7 +200,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Natural objects in the view.** ADR 0056, proposed. The view draws each slot of the areas in its chunks, from the core's slot table: its kind's sprite for its stage, from the pack's `view/`, redrawn when a slot's stage changes. A grown tree's canopy is drawn upright, like a structure's facade.
 - **Zooming out for world-scale arts.** ADR 0057, proposed. The camera zooms out to a half, a quarter, an eighth and a sixteenth. The ground is drawn from downscaled area images built with the map and redrawn for changed areas, with people as dots below a quarter and as one cluster per area below an eighth. A wave's aim shows its full disc, and the cast pulls the camera back. An area whose terrain changes has its ground re-baked once after the change settles, spread over frames, which extends ADR 0059's bake once per area.
 - **Animals in the view.** ADR 0067, proposed. The view draws each animal of the areas in its chunks from the core's animal store, by kind and state, with sprites from the pack's `view/`: grazing, fleeing, fighting and dying. A spirit beast's territory is shown once the player has seen its beast. Hunting needs no new input: the player strikes an animal, or takes it as a cast's target.
-- **The map from the player's chart.** ADR 0073, proposed. The minimap draws only what the player's soul has seen, as it was last seen, from `explored`, `remembered_villages` and `remembered_territory`, with unseen cells in fog, and is redrawn when `chart_revision` changes. A map window on N draws the same image larger, and the rail and the pause guide list it, which settles the map on the rail above. Its touch button waits with the deferred touch controls.
+- **The map by touch.** On a touch screen no button opens the map window, while touch is deferred (scope, 2026-10-09); the minimap shows.
 - **Riders and boats in the view.** ADR 0061, proposed. A rider is drawn on its horse, and a boat as a vehicle on the river's cells with its passengers aboard. `mount`, `dismount` and boarding are orders through the port, with their refusals shown.
 - **The map's images at 8,192 cells.** ADR 0070, proposed. The minimap, the map window and the zoomed-out images are built with the map at four times the pixels of a 4,096 map. Chunks, bakes and the streaming radius stay per area, so what the view holds around the camera is unchanged.
 - **Walls in the view.** ADR 0062, proposed. #239 already draws the walled town's pieces as art, in the view only: wall runs, corner towers, gate towers and steps. ADR 0062's segments, corner towers and gate towers are drawn from those pieces at their height in levels, with a walkway and crenellations, as #242 sizes them. A closed gate is drawn shut, and a breach as a broken segment.

@@ -10,6 +10,7 @@
 
 #include "arts.hpp"
 #include "calendar.hpp"
+#include "chart.hpp"
 #include "chronicle.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
@@ -97,6 +98,9 @@ struct Rules {
   /// up to PEOPLE_CEILING: a storage and performance limit, not a rule of
   /// play. Births stop at it, and a world or save with more is refused.
   std::size_t people_capacity = MAX_PEOPLE;
+  /// Cells within which a person a driver steers, carrying a soul, sees the
+  /// land for its soul's chart; 0 charts nothing.
+  std::int32_t map_sight = 0;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -311,6 +315,19 @@ class World {
 
   /// Returns soul `soul`'s history.
   [[nodiscard]] const Soul& soul(std::size_t soul) const;
+
+  /// Returns what soul `soul`'s bodies have seen: the cells within the
+  /// rules' map sight of each, at the end of every tick it was steered, and
+  /// each village with a structure in view as it was then. A soul keeps its
+  /// chart when it is born again, and no rule reads it.
+  [[nodiscard]] const Chart& chart(std::size_t soul) const;
+
+  /// Returns the faction each cell's territory lay in as soul `soul` last
+  /// saw it, row by row: as territory() derives it, from the villages its
+  /// chart remembers with living residents, and nothing for a cell it has
+  /// not seen.
+  [[nodiscard]] std::vector<std::optional<std::size_t>> remembered_territory(
+      std::size_t soul) const;
 
   /// Returns the date the world has reached.
   [[nodiscard]] Date date() const;
@@ -782,6 +799,9 @@ class World {
   [[nodiscard]] bool free_to_marry(std::size_t person,
                                    const Kinship& kinship) const;
   [[nodiscard]] Cell seat(std::size_t village) const;
+  void chart_steered();
+  [[nodiscard]] bool in_view(std::size_t village, Cell from) const;
+  [[nodiscard]] VillageMemory memory_of(std::size_t village) const;
   void marry(std::size_t person, const std::vector<std::size_t>& living,
              const Kinship& kinship);
   void bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
@@ -865,6 +885,8 @@ class World {
   Chronicle<Progress, PROGRESS_CAPACITY> progress_;
   Life life_;
   std::vector<Soul> souls_;
+  /// Each soul's chart, by the soul's index.
+  std::vector<Chart> charts_;
   /// Each family's surname, by index among the life's surnames.
   std::vector<std::size_t> surnames_;
   // The village each structure belongs to, if any.

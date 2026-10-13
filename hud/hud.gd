@@ -31,6 +31,7 @@ const HudPanel := preload("res://hud/panel.gd")
 const PersonName := preload("res://hud/person_name.gd")
 const Arts := preload("res://hud/arts.gd")
 const Loadout := preload("res://hud/loadout.gd")
+const MapWindow := preload("res://hud/map_window.gd")
 const ViewScale := preload("res://view_scale.gd")
 ## The room the panels are placed in below, the native size; a larger room moves each panel by the
 ## room it gains, as far as its corner of the room.
@@ -97,6 +98,8 @@ var sect: Control
 var arts: Control
 ## The faction window, open over the HUD while the player reads it or orders war or peace.
 var factions: Control
+## The map window, open over the HUD while the player reads the map larger.
+var map_window: Control
 ## The dialogue window, open at the foot of the HUD while the player talks to someone.
 var dialogue: Control
 ## The prompt over the person the player may talk to.
@@ -150,6 +153,8 @@ var _notice_until := 0
 var notice_slip := Panel.new()
 var _skill_bar: Panel
 var _world_size := Vector2i.ZERO
+# The revision of the player's chart the map was last drawn from, or -1 before it is drawn.
+var _chart_revision := -1
 var _map_panel: Panel
 # The steered body's ready tick when it last moved, and the ticks it then had to wait.
 var _ready_at := -1
@@ -201,7 +206,7 @@ func screen() -> Control:
 ## open: the genealogy, sect or arts panel, the faction window or the dialogue window, or null
 ## while none is.
 func panel() -> Control:
-	for open: Control in [genealogy, sect, arts, factions, dialogue]:
+	for open: Control in [genealogy, sect, arts, factions, map_window, dialogue]:
 		if open.visible:
 			return open
 	return null
@@ -261,11 +266,23 @@ func show_loadout(world: WorldAdapter) -> void:
 	touch.show_skills(reach)
 
 
-## Draws `world`'s region on the map as it stands: its terrain, the territory the core derives
-## now and its villages.
+## Draws the map from what the player has seen of `world`, as the core's chart keeps it: unseen
+## cells in fog, and seen ones with their terrain, the borders derived from the villages as last
+## seen, and those villages.
 func show_map(world: WorldAdapter) -> void:
+	_chart_revision = world.chart_revision()
 	map_texture = ImageTexture.create_from_image(_map_image(world))
 	(_map.texture as AtlasTexture).atlas = map_texture
+	if map_window.visible:
+		map_window.show_map(world, map_texture, map_window.player_cell, season_text(world.date()))
+
+
+## Opens the map window on what the player has seen of `world`, with the place of `steered`'s
+## person.
+func open_map(world: WorldAdapter, steered: int) -> void:
+	var positions := world.body_positions(steered)
+	var player := (positions[0] / WorldAdapter.CELL_SIZE).floor() if not positions.is_empty() else Vector2(-1, -1)
+	map_window.show_map(world, map_texture, player, season_text(world.date()))
 
 
 ## Updates the bars, the map around the player, the technique bar and the arts panel while it is
@@ -279,6 +296,8 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 	hp_bar.value = 100.0 * strength / full
 	# A percentage of the starting strength: strength itself runs to units no player reads.
 	labels.hp_value.text = "%d%%" % floori(hp_bar.value)
+	if world.chart_revision() != _chart_revision:
+		show_map(world)
 	var positions := world.body_positions(steered)
 	_dot.visible = not positions.is_empty()
 	if not positions.is_empty():
@@ -298,6 +317,9 @@ func refresh(world: WorldAdapter, steered: int, skills: PackedInt64Array) -> voi
 		purse.read(world, person)
 		_announce_lessons(world, person)
 	labels.season.text = season_text(world.date())
+	if map_window.visible:
+		var player := (positions[0] / WorldAdapter.CELL_SIZE).floor() if not positions.is_empty() else Vector2(-1, -1)
+		map_window.refresh(player, labels.season.text)
 	for slot in _slots.size():
 		var style: StyleBoxFlat = _slots[slot].get_theme_stylebox("panel")
 		style.border_color = Palette.JADE_4 if skills.has(loadout.skill(world, slot)) else Palette.INK_2
@@ -425,7 +447,8 @@ func _place() -> void:
 	duel_panel.position = DUEL_AT[on] + Vector2(gained.x / 2.0, 0)
 	target_panel.position = TARGET_AT[on] + Vector2(gained.x / 2.0, 0)
 	place_notice()
-	for over: Control in [arts, touch, genealogy, sect, factions, title_screen, new_game, pause, settings, rebirth]:
+	for over: Control in [arts, touch, genealogy, sect, factions, map_window, title_screen, new_game, pause, settings,
+			rebirth]:
 		over.position = (gained / 2.0).floor()
 	dialogue.position = Vector2(floorf(gained.x / 2.0), gained.y)
 
@@ -699,6 +722,9 @@ func _build() -> void:
 	factions = preload("res://hud/faction.gd").new()
 	factions.use_font(_theme.default_font)
 	factions.visible = false
+	map_window = MapWindow.new()
+	map_window.use_font(_theme.default_font)
+	map_window.visible = false
 	dialogue = preload("res://hud/dialogue.gd").new()
 	dialogue.use_font(_theme.default_font)
 	dialogue.visible = false
@@ -759,6 +785,7 @@ func _build() -> void:
 	add_child(genealogy)
 	add_child(sect)
 	add_child(factions)
+	add_child(map_window)
 	add_child(dialogue)
 	# The shortcut rail, over the panels, so the row of the one open reads lit over its dimmed room,
 	# and under the screens.
@@ -839,22 +866,27 @@ func _bar(parent: Control, bar: ProgressBar, at: Vector2, colour: Color) -> void
 	parent.add_child(bar)
 
 
-# One pixel per cell: the terrain kind's colour, the accent of the faction holding it along
-# territory borders, or of its neighbour's where it lies in no territory, and each village's
-# square in its owner's accent.
+# One pixel per cell, of what the player has seen: fog on a cell not seen; on a seen one the terrain
+# kind's colour, the accent of the faction holding it along the borders derived from the villages
+# as last seen, against a seen neighbour, or of its neighbour's where it lies in no territory; and each village as last seen,
+# its seen cells in its owner's accent, or in stone when it was seen in ruins.
 func _map_image(world: WorldAdapter) -> Image:
 	var rows := world.map_rows()
 	_world_size = Vector2i(rows[0].length() if rows.size() > 0 else 0, rows.size())
 	var image := Image.create_empty(maxi(_world_size.x, 1), maxi(_world_size.y, 1), false, Image.FORMAT_RGBA8)
+	image.fill(MapWindow.FOG)
 	var names := world.terrain_names()
 	var terrain := world.terrain()
-	var owners := world.territory()
+	var owners := world.remembered_territory()
+	var seen := world.explored()
 	var sprites := []
 	for faction in world.faction_names().size():
 		sprites.append(Affiliation.sprite(world, faction))
 	for y in _world_size.y:
 		for x in _world_size.x:
 			var i := y * _world_size.x + x
+			if seen.size() != _world_size.x * _world_size.y or seen[i] == 0:
+				continue
 			var colour: Color
 			if terrain.size() == _world_size.x * _world_size.y:
 				colour = KIND_COLOURS.get(names[terrain[i]], KIND_COLOURS.plain)
@@ -863,12 +895,18 @@ func _map_image(world: WorldAdapter) -> Image:
 			if owners.size() == terrain.size() and owners.size() > 0:
 				var right := i + 1 if x + 1 < _world_size.x else i
 				var below := i + _world_size.x if y + 1 < _world_size.y else i
+				# A border is drawn only against a seen neighbour, so none runs along the fog's edge.
 				for next in [right, below]:
-					if owners[next] != owners[i]:
+					if seen[next] != 0 and owners[next] != owners[i]:
 						colour = Palette.ACCENTS[sprites[owners[i] if owners[i] >= 0 else owners[next]]]
 			image.set_pixel(x, y, colour)
-	for village: Dictionary in world.villages():
+	for village: Dictionary in world.remembered_villages():
 		var corner: Vector2i = village.corner
 		var area: Vector2i = village.area
-		image.fill_rect(Rect2i(corner, area), Palette.ACCENTS[sprites[village.faction]].lightened(0.3))
+		var colour := Palette.STONE_3 if village.stage == WorldAdapter.VILLAGE_RUINS \
+				else Palette.ACCENTS[sprites[village.faction]].lightened(0.3)
+		for y in range(corner.y, corner.y + area.y):
+			for x in range(corner.x, corner.x + area.x):
+				if seen[y * _world_size.x + x] != 0:
+					image.set_pixel(x, y, colour)
 	return image

@@ -29,10 +29,11 @@ const SHOWN := {
 }
 # The prefixes of the keys the panels and screens over the HUD draw, which their own tests measure,
 # the dialogue window's, its wares' and the rumours' among them, of the lessons' words, which
-# _lessons_pass measures, and of the purse's silver and its notices, which _purse_pass measures.
+# _lessons_pass measures, of the purse's silver and its notices, which _purse_pass measures, and of
+# the map window, which map_window_test measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
 		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
-		"BUY_", "WARE_", "SILVER", "CONSUME_"]
+		"BUY_", "WARE_", "SILVER", "CONSUME_", "MAP_"]
 const Arts := preload("res://hud/arts.gd")
 const WordFit := preload("res://hud/word_fit.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered
@@ -133,9 +134,70 @@ func run() -> bool:
 	var cast_words_passed := _cast_words_pass()
 	var layout_passed := _layout_pass()
 	var purse_passed := _purse_pass()
+	var map_position_passed := _map_position_pass()
+	var fog_passed := _fog_pass()
 	var slip_passed := _notice_slip_pass()
 	return passed and measure_passed and names_passed and fit_passed and realm_passed \
-			and lessons_passed and cast_words_passed and layout_passed and purse_passed and slip_passed
+			and lessons_passed and cast_words_passed and layout_passed and purse_passed and map_position_passed and fog_passed and slip_passed
+
+
+# The full map follows the player's cell while it stays open and the world advances.
+func _map_position_pass() -> bool:
+	var world := WorldAdapter.create_region(SEED)
+	world.tick()
+	var player := world.player_army()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, player)
+	hud.open_map(world, player)
+	var before: Vector2 = hud.map_window.player_cell
+	var target: Dictionary = world.villages()[1]
+	var ordered := world.order(player, target.corner + target.area / 2,
+			PackedInt64Array(range(world.skill_count(player))))
+	for tick in 120:
+		world.tick()
+	hud.refresh(world, player, PackedInt64Array())
+	var now := (world.body_positions(player)[0] / WorldAdapter.CELL_SIZE).floor()
+	var moved := now != before
+	var follows: bool = hud.map_window.visible and hud.map_window.player_cell == now
+	var passed := ordered and moved and follows
+	print("hud_test: full map stays open, player moved %s -> %s (order %s, moved %s), dot follows %s: %s" % [
+			before, now, ordered, moved, follows, "pass" if passed else "FAIL"])
+	hud.free()
+	return passed
+
+
+# A partly seen village keeps fog on its unseen cells, with its seen cells in its owner's colour.
+# Seed 0 places a village across the edge of the player's first sight.
+func _fog_pass() -> bool:
+	var world := WorldAdapter.create_region(0)
+	world.tick()
+	var hud: CanvasLayer = load(SCENE).instantiate()
+	hud.show_player(world, world.player_army())
+	var image: Image = hud.map_texture.get_image()
+	var seen := world.explored()
+	var width := image.get_width()
+	var hidden := 0
+	var shown := 0
+	var hidden_right := true
+	var shown_right := true
+	for village: Dictionary in world.remembered_villages():
+		var colour: Color = preload("res://hud/palette.gd").ACCENTS[
+				preload("res://hud/affiliation.gd").sprite(world, village.faction)].lightened(0.3)
+		for y in range(village.corner.y, village.corner.y + village.area.y):
+			for x in range(village.corner.x, village.corner.x + village.area.x):
+				if seen[y * width + x] == 0:
+					hidden += 1
+					hidden_right = hidden_right and image.get_pixel(x, y).to_html() == preload("res://hud/map_window.gd").FOG.to_html()
+				else:
+					shown += 1
+					var pixel := image.get_pixel(x, y)
+					shown_right = shown_right and absf(pixel.r - colour.r) < 1.0 / 255 \
+							and absf(pixel.g - colour.g) < 1.0 / 255 and absf(pixel.b - colour.b) < 1.0 / 255
+	var passed := hidden > 0 and shown > 0 and hidden_right and shown_right
+	print("hud_test: partly seen villages keep %d unseen cells in fog %s and %d seen cells coloured %s: %s" % [
+			hidden, hidden_right, shown, shown_right, "pass" if passed else "FAIL"])
+	hud.free()
+	return passed
 
 
 # A notice stands on a slip as wide as its words, within the room, and never over the talk prompt's

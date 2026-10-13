@@ -50,6 +50,9 @@ constexpr std::int32_t TALK_REACH = 2;
 // A person closes on a foe within 6 cells while none is within its reach,
 // as far as two bands meeting in the open start apart.
 constexpr std::int32_t SIGHT = 6;
+// The steered see the land for their map within 15 cells, half the 30 rows
+// the PC's least view shows (ADR 0073).
+constexpr std::int32_t MAP_SIGHT = 15;
 // The attainment a sect's first founder starts with, so it is its master.
 constexpr std::uint32_t FOUNDER_ATTAINMENT = 120;
 
@@ -454,6 +457,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 life_of(data),
                 {},
                 {}};
+  region.rules.map_sight = MAP_SIGHT;
   for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     region.map_rows.at(static_cast<std::size_t>(cell.y))
         .at(static_cast<std::size_t>(cell.x)) =

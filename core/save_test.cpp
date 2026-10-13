@@ -15,6 +15,7 @@
 
 #include "arts.hpp"
 #include "calendar.hpp"
+#include "chart.hpp"
 #include "diplomacy.hpp"
 #include "json_packs.hpp"
 #include "leadership.hpp"
@@ -344,7 +345,8 @@ TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
 
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   // One structure no village holds and no plan laid: the payload ends with
-  // its plan, absent, as one flag byte. Only growth lays a planned structure,
+  // its plan, absent, as one flag byte, then the count of charts, none. Only
+  // growth lays a planned structure,
   // so no legal world differs from this one in that field alone, and the test
   // reads it by its place in the encoding.
   const World world{Seed{1},
@@ -360,15 +362,121 @@ TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  ASSERT_EQ(payload.back(), 0);
+  const std::size_t plan = payload.size() - 1 - sizeof(std::uint64_t);
+  ASSERT_EQ(payload.at(plan), 0);
+  ASSERT_TRUE(std::all_of(payload.begin() + static_cast<std::ptrdiff_t>(plan),
+                          payload.end(),
+                          [](std::uint8_t byte) { return byte == 0; }));
 
   // Control: resealing the same payload loads, so the reseal refuses nothing.
   store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(loaded(load(store, SLOT)).world.hash(), world.hash());
 
   // The structure now names plan 0 of a world without growth, so no plans.
-  payload.back() = 1;
-  payload.resize(payload.size() + sizeof(std::uint64_t), 0);
+  payload.at(plan) = 1;
+  payload.insert(payload.begin() + static_cast<std::ptrdiff_t>(plan) + 1,
+                 sizeof(std::uint64_t), 0);
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
+// The generated region of `seed` with its player steered, so its soul
+// charts what it sees, lived `ticks` ticks at days of five ticks.
+Saved charted_region(Seed seed, std::uint64_t ticks) {
+  Region region = generate_region(seed, base_data());
+  region.rules.ticks_per_day = TICKS_PER_SHORT_DAY;
+  region.armies.push_back(born_in(region, 0));
+  World world{region.seed,       Map{region.map_rows}, region.armies,
+              region.structures, region.rules,         village_specs(region),
+              region.leadership, region.life,          region.sects};
+  world.ensoul(world.population() - 1);
+  world.steer(region.armies.size() - 1, true);
+  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+    world.tick();
+  }
+  return Saved{Origin{seed, 0}, std::move(world)};
+}
+
+TEST(Save, AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused) {
+  constexpr std::uint8_t STAGES = 3;
+  const Saved saved = charted_region(REGION_SEED, TICKS_PER_SHORT_DAY);
+  const Chart& chart = saved.world.chart(0);
+  // Setup: the player saw its home village, the last village it remembers.
+  ASSERT_FALSE(chart.blocks().empty());
+  ASSERT_FALSE(chart.villages().empty());
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.hash(), saved.world.hash());
+  const std::vector<ChartBlock> blocks = restored.world.chart(0).blocks();
+  ASSERT_EQ(blocks.size(), chart.blocks().size());
+  for (std::size_t block = 0; block < blocks.size(); ++block) {
+    EXPECT_EQ(blocks.at(block).area, chart.blocks().at(block).area);
+    EXPECT_EQ(blocks.at(block).bits, chart.blocks().at(block).bits);
+  }
+  EXPECT_EQ(restored.world.chart(0).villages(), chart.villages());
+
+  // The payload ends with the last village remembered, its stage last.
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  ASSERT_EQ(payload.back(),
+            static_cast<std::uint8_t>(
+                chart.villages()
+                    .back()
+                    .value_or(VillageMemory{0, false, VillageStage::RUINS})
+                    .stage));
+  // Control: the last stage there is loads, so the stage byte is read.
+  payload.back() = STAGES - 1;
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+  payload.back() = STAGES;
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
+TEST(Save, ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap) {
+  const Saved saved = charted_region(REGION_SEED, TICKS_PER_SHORT_DAY);
+  const auto& memories = saved.world.chart(0).villages();
+  ASSERT_FALSE(memories.empty());
+  ASSERT_TRUE(memories.back().has_value());
+  const Cell first = memories.back().value_or(VillageMemory{}).centre;
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+  const auto intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The last memory ends with its two centre coordinates and its stage.
+  const std::size_t x_offset = payload.size() - 1 - (2 * sizeof(std::int32_t));
+  ASSERT_EQ(payload.at(x_offset), static_cast<std::uint8_t>(first.x));
+  const auto put_x = [&payload, x_offset](std::uint32_t value) {
+    for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+      payload.at(x_offset + byte) =
+          static_cast<std::uint8_t>(value >> (byte * BYTE_BITS));
+    }
+  };
+  const std::uint32_t changed = first.x == 0 ? 1U : 0U;
+  put_x(changed);
+  store.bytes(SLOT) = resealed(header, payload);
+  const Saved restored = loaded(load(store, SLOT));
+  const Cell centre = restored.world.chart(0)
+                          .villages()
+                          .back()
+                          .value_or(VillageMemory{})
+                          .centre;
+  EXPECT_EQ(centre.x, static_cast<std::int32_t>(changed));
+  EXPECT_EQ(centre.y, first.y);
+  EXPECT_NE(restored.world.hash(), saved.world.hash());
+  // Control above: another centre on the map loads; its first off-map x does
+  // not.
+  put_x(static_cast<std::uint32_t>(REGION_SIDE));
   store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }

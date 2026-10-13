@@ -64,9 +64,12 @@ const GENEALOGY_KEY := KEY_G
 const SECT_KEY := KEY_M
 const ARTS_KEY := KEY_K
 const FACTIONS_KEY := KEY_F
+## The key that opens the map window and closes it again.
+const MAP_KEY := KEY_N
 ## The keys that open a panel over the world and close it again, by the HUD's name for the panel
 ## each opens, which the touch controls' button for it bears too.
-const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions"}
+const PANEL_KEYS := {GENEALOGY_KEY: "genealogy", SECT_KEY: "sect", ARTS_KEY: "arts", FACTIONS_KEY: "factions",
+		MAP_KEY: "map_window"}
 ## The key that talks to the person the prompt names; inside the faction window it challenges.
 const TALK_KEY := KEY_C
 ## The key that sets an attack intent on the selected person, or the nearest foe in sight.
@@ -93,6 +96,7 @@ const SHORTCUTS: Array[Dictionary] = [
 	{"action": "sect", "key": SECT_KEY, "icon": "sect", "label": "CONTROLS_SECTS"},
 	{"action": "factions", "key": FACTIONS_KEY, "icon": "factions", "label": "CONTROLS_FACTIONS"},
 	{"action": "arts", "key": ARTS_KEY, "icon": "arts", "label": "CONTROLS_ARTS"},
+	{"action": "map_window", "key": MAP_KEY, "icon": "map", "label": "CONTROLS_MAP"},
 	{"action": "settings", "key": KEY_NONE, "icon": "settings", "label": "SETTINGS_TITLE"},
 	{"action": "pause", "key": PAUSE_KEY, "icon": "pause", "label": "CONTROLS_PAUSE_CANCEL"},
 ]
@@ -282,7 +286,6 @@ func _play(made: WorldAdapter) -> void:
 	for keycode: Key in WARE_KEYS:
 		_hud.purse.keys.append(OS.get_keycode_string(keycode))
 	_body = world.roster(steered)[0]
-	_art.region_changed.connect(_hud.show_map.bind(world))
 	# The camera stops at the region's edge rather than showing past it.
 	var rows := world.map_rows()
 	_bounds = drawn_bounds(Vector2(rows[0].length(), rows.size()) * _art.CELL, _art.relief)
@@ -901,8 +904,8 @@ func show_names() -> void:
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
-## genealogy panel; the sect panel while the world has sects; the arts panel; the faction window; or
-## the dialogue window, on the person the prompt names when the core lets the steered person talk to
+## genealogy panel; the sect panel while the world has sects; the arts panel; the faction window; the
+## map window, on what the player has seen; or the dialogue window, on the person the prompt names when the core lets the steered person talk to
 ## it. While a panel is open, it takes every key, and no key gives an order or casts. Returns
 ## whether it opened.
 func open_panel(keycode: Key) -> bool:
@@ -921,6 +924,8 @@ func open_panel(keycode: Key) -> bool:
 			_hud.show_placing()
 		FACTIONS_KEY:
 			_hud.factions.show_factions(world, steered, _hud.touch.visible)
+		MAP_KEY:
+			_hud.open_map(world, steered)
 		TALK_KEY:
 			return talk_with(talk_to)
 		_:

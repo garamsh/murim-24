@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "chart.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -633,6 +634,7 @@ void put_rules(Writer& out, const Rules& rules) {
   out.i32(rules.talk_reach);
   out.i32(rules.sight);
   out.u64(rules.people_capacity);
+  out.i32(rules.map_sight);
 }
 
 Rules get_rules(Reader& input) {
@@ -649,7 +651,59 @@ Rules get_rules(Reader& input) {
   rules.talk_reach = input.i32();
   rules.sight = input.i32();
   rules.people_capacity = input.u64();
+  rules.map_sight = input.i32();
   return rules;
+}
+
+// A chart: each seen area's index and bits, in order of area, then each
+// village by index as last seen, or nothing for one never seen.
+void put_chart(Writer& out, const Chart& chart) {
+  put_all(out, chart.blocks(), [&out](const ChartBlock& block) {
+    out.u32(block.area);
+    for (const std::uint8_t bits : block.bits) {
+      out.u8(bits);
+    }
+  });
+  put_all(out, chart.villages(),
+          [&out](const std::optional<VillageMemory>& village) {
+            put_maybe(out, village, [&out](VillageMemory memory) {
+              out.size(memory.owner);
+              out.flag(memory.peopled);
+              out.i32(memory.centre.x);
+              out.i32(memory.centre.y);
+              out.u8(static_cast<std::uint8_t>(memory.stage));
+            });
+          });
+}
+
+// Reads a chart over a map of `size` cells, refusing one no chart gives or
+// one remembering an owner at or past `factions` or a centre off the map.
+Chart get_chart(Reader& input, Footprint size, std::size_t factions) {
+  constexpr std::uint8_t STAGES = 3;
+  const std::vector<ChartBlock> blocks = get_all<ChartBlock>(input, [&input] {
+    ChartBlock block{input.u32(), {}};
+    for (std::uint8_t& bits : block.bits) {
+      bits = input.u8();
+    }
+    return block;
+  });
+  const std::vector<std::optional<VillageMemory>> remembered =
+      get_all<std::optional<VillageMemory>>(input, [&input] {
+        return get_maybe<VillageMemory>(input, [&input] {
+          const std::size_t owner = input.size();
+          const bool peopled = input.flag();
+          const Cell centre{input.i32(), input.i32()};
+          return VillageMemory{owner, peopled,
+                               static_cast<VillageStage>(input.tag(STAGES)),
+                               centre};
+        });
+      });
+  std::optional<Chart> chart =
+      Chart::restore(size, blocks, remembered, factions);
+  if (!chart) {
+    throw Refusal{LoadError::CORRUPTED};
+  }
+  return std::move(*chart);
 }
 
 void put_map(Writer& out, const Map& map) {
@@ -1089,6 +1143,8 @@ class SaveCodec {
     });
     put_all(out, world.plans_,
             [&out](std::optional<std::size_t> plan) { put_index(out, plan); });
+    put_all(out, world.charts_,
+            [&out](const Chart& chart) { put_chart(out, chart); });
   }
 
   static World read(Reader& input) {
@@ -1189,6 +1245,18 @@ class SaveCodec {
         input, [&input] { return get_index(input); });
     world.plans_ = get_all<std::optional<std::size_t>>(
         input, [&input] { return get_index(input); });
+    const Footprint size{world.map_.width(), world.map_.height()};
+    world.charts_ = get_all<Chart>(input, [&input, &world, size] {
+      Chart chart = get_chart(input, size, world.rules_.hostile.size());
+      // A chart remembers no village past the world's.
+      if (chart.villages().size() > world.villages_.size()) {
+        throw Refusal{LoadError::CORRUPTED};
+      }
+      return chart;
+    });
+    if (world.charts_.size() != world.souls_.size()) {
+      throw Refusal{LoadError::CORRUPTED};
+    }
     world.restore();
     return world;
   }

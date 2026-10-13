@@ -143,6 +143,7 @@ CONTROLS_WARES,약 먹기,Use wares
 CONTROLS_GENEALOGY,족보,Genealogy
 CONTROLS_SECTS,문파,Sects
 CONTROLS_ARTS,무공,Arts
+CONTROLS_MAP,지도,Map
 CONTROLS_PAUSE_CANCEL,일시정지 · 취소,Pause · Cancel
 CONTROLS_LEFT_CLICK,좌클릭,L-Click
 CONTROLS_SELECT,선택 · 대화,Select · Talk
@@ -329,3 +330,10 @@ CONSUME_DEAD,쓰러진 몸으로는 먹을 수 없다,You cannot take it while f
 CONSUME_NONE_HELD,%s · 가진 것이 없다,%s · none held
 CONSUME_FULL_HEALTH,체력이 이미 가득하다,Health is already full
 CONSUME_FULL_QI,내공이 이미 가득하다,Qi is already full
+MAP_TITLE,지도,Map
+MAP_CLOSE,N 닫기,N Close
+MAP_KEYS,"가 본 곳만 보이고, 마지막으로 본 모습으로 남습니다","Only what you have seen, as you last saw it"
+MAP_LEGEND,범례,Legend
+MAP_RUINS,폐허로 본 마을,Seen in ruins
+MAP_UNSEEN,가 보지 않은 곳,Not yet seen
+MAP_YOU,나,You
