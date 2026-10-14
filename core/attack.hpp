@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -102,8 +103,13 @@ struct SlotRing {
 /// from east, toward south, from a fixed table.
 [[nodiscard]] Position slot_offset(const SlotRing& ring, std::size_t slot);
 
+/// Whether someone other than person `foe` and the people engaging it
+/// stands within the separation of a point, so a slot there is not offered.
+using Crowded = std::function<bool(Position point, std::size_t foe)>;
+
 /// A person engaging a foe on this tick, with where both stood as it began,
-/// and the point it closes on, which Attacks::assign gives.
+/// and the point it closes on, which Attacks::assign gives: its slot, or a
+/// slot on its way round the ring to its own.
 struct Engaging {
   std::size_t person = 0;
   std::size_t foe = 0;
@@ -113,6 +119,21 @@ struct Engaging {
   std::optional<Position> aim = std::nullopt;
   std::int64_t distance = 0;
 };
+
+/// The slots of `slots` round `engaging`'s foe offered this tick, as a mask
+/// with slot `n` at bit `n`: those on a passable cell of `map` that are not
+/// `crowded` (ADR 0080).
+[[nodiscard]] std::uint16_t offered_slots(const Engaging& engaging,
+                                          const SlotRing& slots, const Map& map,
+                                          const Crowded& crowded);
+
+/// The slot of `slots` seeker `seeker` closes on next on its way to slot
+/// `slot` (ADR 0080): its own once that is the slot nearest the seeker or
+/// one beside it; else, off the ring's band, its radius and half a cell, the
+/// slot nearest the seeker; and on the band, the next slot round from the
+/// nearest toward its own, the shorter way, forward among equals.
+[[nodiscard]] std::size_t waypoint(const Engaging& seeker,
+                                   const SlotRing& slots, std::size_t slot);
 
 /// The attack slots and tokens of every person, a person's as an engager
 /// and a foe's as the one engaged, in arrays indexed by person that grow
@@ -145,13 +166,15 @@ class Attacks {
   /// Gives each of `engaging` a slot around its foe, on the ring for its
   /// reach on `map`, keeping one it holds there; frees what anyone else holds.
   /// A ring's radius is the shortest reach on it less RING_INSET, and its
-  /// slots are those slot_ring() spaces `separation` apart, each on a
-  /// passable cell. Those without a slot take, in order of distance squared
-  /// from their foe then person, the free slot nearest them, the lower slot
-  /// among equals. Each gets its slot's position as its aim, or none.
-  /// `engaging` is reordered.
+  /// slots are those slot_ring() spaces `separation` apart, each offered
+  /// while on a passable cell and not `crowded` (ADR 0080); a held slot no
+  /// longer offered is freed. Those without a slot take, in order of distance
+  /// squared from their foe then person, the free slot nearest them, the
+  /// lower slot among equals. Each gets as its aim the point it closes on,
+  /// round the ring toward its slot as waypoint() gives, or none without a
+  /// slot. `engaging` is reordered.
   void assign(std::vector<Engaging>& engaging, const Map& map,
-              std::int32_t separation);
+              std::int32_t separation, const Crowded& crowded = {});
 
   /// What `person` holds, or nothing while it engages no one.
   [[nodiscard]] std::optional<Engagement> engagement(std::size_t person) const;
@@ -194,7 +217,7 @@ class Attacks {
   // its `slots`, as assign() does.
   void seat(std::vector<Engaging>::iterator first,
             std::vector<Engaging>::iterator last, Ring ring,
-            const SlotRing& slots, const Map& map);
+            const SlotRing& slots, const Map& map, const Crowded& crowded);
   [[nodiscard]] std::uint16_t& taken_mask(std::size_t foe, Ring ring);
   [[nodiscard]] std::uint16_t taken_mask(std::size_t foe, Ring ring) const;
 };

@@ -837,11 +837,12 @@ class World {
   [[nodiscard]] std::vector<Passing> passings() const;
   void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
              const std::vector<Closing>& closings, std::vector<Step>& pulls,
-             std::vector<bool>& standing, std::vector<bool>& seeking) const;
+             std::vector<bool>& standing,
+             std::vector<std::size_t>& seeking) const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
              const std::vector<Step>& pulls, const std::vector<bool>& standing,
-             const std::vector<bool>& seeking);
+             const std::vector<std::size_t>& seeking);
   void reachable_from(const FlowField& field,
                       const std::vector<std::size_t>& members) const;
 

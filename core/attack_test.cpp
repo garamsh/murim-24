@@ -332,5 +332,88 @@ TEST(Slots, NoSlotIsOfferedOnABlockedCell) {
   EXPECT_EQ(open.engagement(0).value_or(Engagement{}).slot, 0U);
 }
 
+// Whether a point lies within half a cell of slot `slot` of the basic ring
+// round FOE_AT: a crowd standing on that slot alone.
+Crowded crowding(std::size_t slot) {
+  return [slot](Position point, std::size_t foe) {
+    return foe == FOE && distance_squared(point, seat(slot)) <
+                             std::int64_t{CELL_SIZE / 2} * (CELL_SIZE / 2);
+  };
+}
+
+TEST(Slots, ACrowdedSlotIsNotOffered) {
+  constexpr std::uint8_t WEST = 4;
+  std::vector<Engaging> engaging{toward(0, from_foe(-AFAR, 0))};
+  Attacks attacks{PEOPLE};
+  attacks.assign(engaging, open_ground(), APART, crowding(WEST));
+  ASSERT_TRUE(attacks.engagement(0).has_value());
+  EXPECT_NE(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  // Control: uncrowded, the west slot is the one it takes.
+  Attacks clear{PEOPLE};
+  clear.assign(engaging, open_ground(), APART);
+  EXPECT_EQ(clear.engagement(0).value_or(Engagement{}).slot, WEST);
+}
+
+TEST(Slots, AHeldSlotThatBecomesCrowdedIsFreedAndAnotherTaken) {
+  constexpr std::uint8_t WEST = 4;
+  std::vector<Engaging> engaging{toward(0, from_foe(-AFAR, 0))};
+  Attacks attacks{PEOPLE};
+  attacks.assign(engaging, open_ground(), APART);
+  // Setup: it holds the west slot.
+  ASSERT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  Attacks kept = attacks;
+  attacks.assign(engaging, open_ground(), APART, crowding(WEST));
+  const std::optional<Engagement> moved = attacks.engagement(0);
+  ASSERT_TRUE(moved.has_value());
+  EXPECT_NE(moved.value_or(Engagement{}).slot, WEST);
+  EXPECT_FALSE(attacks.taken(FOE, Ring::NEAR, WEST));
+  // Control: a crowd on another foe's slots crowds none of FOE's, and it
+  // keeps its slot.
+  kept.assign(engaging, open_ground(), APART,
+              [](Position, std::size_t foe) { return foe != FOE; });
+  EXPECT_EQ(kept.engagement(0).value_or(Engagement{}).slot, WEST);
+}
+
+TEST(Slots, ASeekerReachesItsSlotRoundTheRing) {
+  constexpr std::size_t EAST = 0;
+  constexpr std::size_t WEST = 4;
+  constexpr std::size_t NORTH = 6;
+  const SlotRing ring = basic_ring();
+  // Off the ring's band, east of the foe, it first closes on the east slot.
+  EXPECT_EQ(waypoint(toward(0, from_foe(AFAR, 0)), ring, WEST), EAST);
+  // On the band beside the east slot, it walks round a slot at a time: to
+  // the west, half a turn either way, forward; to the north, back.
+  const Engaging on_band = toward(0, seat(EAST));
+  EXPECT_EQ(waypoint(on_band, ring, WEST), EAST + 1);
+  EXPECT_EQ(waypoint(on_band, ring, NORTH), ring.count - 1);
+  // Control: beside its own slot, or on it, it closes on that slot.
+  EXPECT_EQ(waypoint(on_band, ring, EAST + 1), EAST + 1);
+  EXPECT_EQ(waypoint(on_band, ring, EAST), EAST);
+  EXPECT_EQ(waypoint(toward(0, from_foe(AFAR, 0)), ring, ring.count - 1),
+            ring.count - 1);
+}
+
+TEST(Slots, ASeekerOnTheBandAimsAtTheNextSlotRoundTheRing) {
+  constexpr std::uint8_t WEST = 4;
+  constexpr std::size_t EAST = 0;
+  Attacks attacks{PEOPLE};
+  std::vector<Engaging> engaging{toward(0, from_foe(-AFAR, 0))};
+  attacks.assign(engaging, open_ground(), APART);
+  // Setup: it holds the west slot.
+  ASSERT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  // Standing on the east slot, half a turn from its own, it aims at the next
+  // slot round.
+  engaging = {toward(0, seat(EAST))};
+  attacks.assign(engaging, open_ground(), APART);
+  ASSERT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  const Position next = engaging.front().aim.value_or(Position{});
+  EXPECT_TRUE(next.x == seat(EAST + 1).x && next.y == seat(EAST + 1).y);
+  // Control: beside its own slot, it aims at that slot.
+  engaging = {toward(0, seat(WEST - 1))};
+  attacks.assign(engaging, open_ground(), APART);
+  const Position own = engaging.front().aim.value_or(Position{});
+  EXPECT_TRUE(own.x == seat(WEST).x && own.y == seat(WEST).y);
+}
+
 }  // namespace
 }  // namespace murim

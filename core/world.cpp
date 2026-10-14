@@ -2207,7 +2207,7 @@ void World::tick() {
   const std::vector<Closing> closings = close_in(crowd);
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
-  std::vector<bool> seeking(crowd.people.size(), false);
+  std::vector<std::size_t> seeking(crowd.people.size(), ABSENT);
   steer(crowd, crowd.slot, closings, pulls, standing, seeking);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     march(army, crowd, crowd.slot, pulls, standing, seeking);
@@ -2277,12 +2277,12 @@ std::vector<World::Passing> World::passings() const {
 // walking past. A person within two cells of its ring counts as standing
 // still, so a crowd jostled a little stays standing. One no driver steers,
 // with a foe in sight, closes on it instead, or stands to fight one within
-// its reach; one with an attack slot closes on the slot, `seeking` it until
-// it stands there.
+// its reach; one with an attack slot closes on the slot, `seeking` its foe,
+// by its index in the crowd, until it stands there.
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
                   const std::vector<Closing>& closings,
                   std::vector<Step>& pulls, std::vector<bool>& standing,
-                  std::vector<bool>& seeking) const {
+                  std::vector<std::size_t>& seeking) const {
   for (const Army& army : armies_) {
     for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
       const std::size_t index = slot.at(army.roster.at(rank));
@@ -2300,7 +2300,8 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
         // One on its attack slot stands, whatever its objective, so people
         // closing on slots beyond it pass it.
         standing.at(index) = still && (close.aim || standing.at(index));
-        seeking.at(index) = close.aim && !still;
+        seeking.at(index) =
+            close.aim && !still ? close.foe.value_or(ABSENT) : ABSENT;
       }
     }
   }
@@ -2318,16 +2319,16 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
 // the harder the closer each is, and otherwise along its pull. A person on the
 // move does not give way to people standing still, who give way to it, so a
 // standing crowd parts for a person walking out of it, nor to anyone behind
-// it, so a crowd queues through a gap; and two people both `seeking` an
-// attack slot do not give way to each other, so crossing paths round a foe
-// do not lock (ADR 0068). A step enters any cell
+// it, so a crowd queues through a gap; and two people `seeking` attack slots
+// round the same foe do not give way to each other, so crossing paths round
+// it do not lock (ADR 0080). A step enters any cell
 // the flow field reaches. Positions are read from `crowd`, as the tick began,
 // so the order people move in decides nothing.
 void World::march(std::size_t army, const Crowd& crowd,
                   const std::vector<std::size_t>& slot,
                   const std::vector<Step>& pulls,
                   const std::vector<bool>& standing,
-                  const std::vector<bool>& seeking) {
+                  const std::vector<std::size_t>& seeking) {
   const Army& marching = armies_.at(army);
   const std::int64_t separation = rules_.separation;
   for (const std::size_t member : marching.roster) {
@@ -2346,7 +2347,7 @@ void World::march(std::size_t army, const Crowd& crowd,
       const bool ignored =
           other == self ||
           (!standing.at(self) && (standing.at(other) || ahead < 0)) ||
-          (seeking.at(self) && seeking.at(other));
+          (seeking.at(self) != ABSENT && seeking.at(self) == seeking.at(other));
       const bool yields = standing.at(self) && !standing.at(other);
       const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
       const Push felt =
@@ -3050,7 +3051,8 @@ std::optional<std::size_t> World::engaged_foe(std::size_t index,
 
 // Each living person's foe and the point it closes on, by its index in
 // `crowd`. While the rules set attack tokens, each engaging a foe within
-// LONG_REACH is given an attack slot around it (ADR 0068) and closes on that.
+// LONG_REACH is given an attack slot around it (ADR 0068), offered only where
+// uncrowded, and closes on it round the ring (ADR 0080).
 std::vector<World::Closing> World::close_in(const Crowd& crowd) {
   std::vector<Closing> closings(crowd.people.size());
   engaging_.clear();
@@ -3066,7 +3068,19 @@ std::vector<World::Closing> World::close_in(const Crowd& crowd) {
       }
     }
   }
-  attacks_.assign(engaging_, map_, rules_.separation);
+  // Someone other than the foe and those engaging it stands within the
+  // separation of a slot (ADR 0080).
+  const Crowded crowded = [&](Position point, std::size_t foe) {
+    bool crowding = false;
+    crowd.hash.visit_within(point, rules_.separation, [&](std::size_t other) {
+      const std::size_t person = crowd.people.at(other);
+      const std::optional<std::size_t> theirs = closings.at(other).foe;
+      crowding = crowding || (person != foe && people_.at(person).health > 0 &&
+                              (!theirs || crowd.people.at(*theirs) != foe));
+    });
+    return crowding;
+  };
+  attacks_.assign(engaging_, map_, rules_.separation, crowded);
   for (const Engaging& each : engaging_) {
     closings.at(crowd.slot.at(each.person)).aim = each.aim;
   }
@@ -3076,7 +3090,8 @@ std::vector<World::Closing> World::close_in(const Crowd& crowd) {
 // The pull of the person at `index` of `crowd`, serving in `army`, engaging
 // `close`'s foe: none while it stands on its slot with the foe within its
 // reach, or, with no slot, while the foe lies within its reach, so it stands
-// and fights; and otherwise the step toward its slot, or the foe without one.
+// and fights; and otherwise the step toward the point it closes on, its slot
+// or a slot on its way round the ring, or the foe without one.
 // The step is the one of the eight nearest the line to that point, open as a
 // flow field's is: into a passable cell, and on a diagonal only where both
 // cells beside it are passable; an attack intent's chase whose diagonal is

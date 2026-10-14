@@ -195,7 +195,7 @@ void Attacks::release(std::size_t person) {
 }
 
 void Attacks::assign(std::vector<Engaging>& engaging, const Map& map,
-                     std::int32_t separation) {
+                     std::int32_t separation, const Crowded& crowded) {
   // Frees what anyone holds against another foe or on another ring, and
   // what anyone not engaging holds.
   for (Engaging& each : engaging) {
@@ -236,7 +236,7 @@ void Attacks::assign(std::vector<Engaging>& engaging, const Map& map,
         shortest = std::min(shortest, each->reach);
       }
       seat(first, last, *ring, slot_ring(shortest - RING_INSET, separation),
-           map);
+           map, crowded);
     }
     first = last;
   }
@@ -244,19 +244,22 @@ void Attacks::assign(std::vector<Engaging>& engaging, const Map& map,
 
 void Attacks::seat(std::vector<Engaging>::iterator first,
                    std::vector<Engaging>::iterator last, Ring ring,
-                   const SlotRing& slots, const Map& map) {
+                   const SlotRing& slots, const Map& map,
+                   const Crowded& crowded) {
   const std::size_t count = slots.count;
   const Position foe_at = first->foe_at;
+  const std::size_t foe = first->foe;
   const auto place = [&](std::size_t slot) {
     return shifted(foe_at, slot_offset(slots, slot));
   };
-  const auto offered = [&](std::size_t slot) {
-    return map.passable(cell_of(place(slot)));
+  const std::uint16_t offered = offered_slots(*first, slots, map, crowded);
+  const auto open = [offered](std::size_t slot) {
+    return (offered & bit(static_cast<std::uint8_t>(slot))) != 0;
   };
   // A slot held stays held while the ring still offers it.
   for (auto each = first; each != last; ++each) {
     const std::optional<Engagement> held = engagement(each->person);
-    if (held && (held->slot >= count || !offered(held->slot))) {
+    if (held && (held->slot >= count || !open(held->slot))) {
       release(each->person);
     }
   }
@@ -268,22 +271,61 @@ void Attacks::seat(std::vector<Engaging>::iterator first,
       for (std::size_t slot = 0; slot < count; ++slot) {
         const auto index = static_cast<std::uint8_t>(slot);
         const std::int64_t distance = distance_squared(each->from, place(slot));
-        if (!taken(each->foe, ring, index) && offered(slot) &&
+        if (!taken(foe, ring, index) && open(slot) &&
             (!nearest || distance < best)) {
           nearest = slot;
           best = distance;
         }
       }
       if (nearest) {
-        held = Engagement{each->foe, ring, static_cast<std::uint8_t>(*nearest),
-                          false,     0,    0};
+        held = Engagement{foe,   ring, static_cast<std::uint8_t>(*nearest),
+                          false, 0,    0};
         engage(each->person, *held);
       }
     }
     if (held) {
-      each->aim = place(held->slot);
+      each->aim = place(waypoint(*each, slots, held->slot));
     }
   }
+}
+
+std::uint16_t offered_slots(const Engaging& engaging, const SlotRing& slots,
+                            const Map& map, const Crowded& crowded) {
+  std::uint16_t offered = 0;
+  for (std::size_t slot = 0; slot < slots.count; ++slot) {
+    const Position point = shifted(engaging.foe_at, slot_offset(slots, slot));
+    if (map.passable(cell_of(point)) &&
+        !(crowded && crowded(point, engaging.foe))) {
+      offered |= bit(static_cast<std::uint8_t>(slot));
+    }
+  }
+  return offered;
+}
+
+std::size_t waypoint(const Engaging& seeker, const SlotRing& slots,
+                     std::size_t slot) {
+  const std::size_t count = slots.count;
+  std::size_t nearest = 0;
+  std::int64_t best = 0;
+  for (std::size_t other = 0; other < count; ++other) {
+    const std::int64_t distance = distance_squared(
+        seeker.from, shifted(seeker.foe_at, slot_offset(slots, other)));
+    if (other == 0 || distance < best) {
+      nearest = other;
+      best = distance;
+    }
+  }
+  // Slots round from the nearest to its own, the way the slots are numbered.
+  const std::size_t round = (slot + count - nearest) % count;
+  if (round <= 1 || round >= count - 1) {
+    return slot;
+  }
+  const std::int64_t band = std::int64_t{slots.radius} + (CELL_SIZE / 2);
+  if (distance_squared(seeker.from, seeker.foe_at) > band * band) {
+    return nearest;
+  }
+  return round <= count / 2 ? (nearest + 1) % count
+                            : (nearest + count - 1) % count;
 }
 
 std::optional<Engagement> Attacks::engagement(std::size_t person) const {
