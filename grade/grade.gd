@@ -9,9 +9,11 @@
 ## key's `fog`, a mist thickens toward the screen's top, clear of high ground; and by its `clouds`,
 ## the shadows of clouds drift over the ground, drawn by `clouds`, the material the caller gives
 ## world_art's ground, so nothing standing on it is shaded. Both drift with the wind as the time
-## shown passes. The quality the settings choose sets what it adds: low shows the grade, the
-## hue-shifted shadows and the lights only, standard and high the light vignette, the bloom, the fog
-## and the clouds' shadows too. It decides nothing.
+## shown passes. While it rains, until the world holds weather a switch the settings set, rain
+## streaks fall over the world, the grade dims and greys by grades.json's `rain`, and the overcast
+## casts no clouds' shadows. The quality the settings choose sets what it adds: low shows the grade,
+## the hue-shifted shadows and the lights only, standard and high the light vignette, the bloom, the
+## fog, the clouds' shadows and the rain too. It decides nothing.
 extends CanvasLayer
 
 const WorldArt := preload("res://world_art/world_art.gd")
@@ -35,6 +37,11 @@ var clouds := ShaderMaterial.new()
 var quality := Quality.STANDARD:
 	set(value):
 		quality = value
+		_apply()
+## Whether it rains, until the world holds weather; low draws no rain whatever it says.
+var raining := false:
+	set(value):
+		raining = value
 		_apply()
 ## The screen pixels an art pixel spans, the view's whole-pixel scale.
 var art_pixel := 1.0:
@@ -127,15 +134,16 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 	return grade
 
 
-## What the pass draws with, as its shader's parameters: the grade's but `clouds`, `hue_shift`,
-## `vignette`, `art_pixel`, `bloom`, `light_count` and `fog`; what the light field draws with, the
-## lights shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`,
-## `cells` and `map_size`, and whether it draws, `field_drawn`; and `clouds`, how dark the clouds'
-## material draws their shadows, and `clouds_read_field`, whether it reads them from the light field.
+## What the pass draws with, as its shader's parameters: the grade's but `clouds`, `gain` and
+## `saturation` dimmed while it rains, `hue_shift`, `vignette`, `art_pixel`, `bloom`, `light_count`,
+## `rain`, 1 while it rains, its `drift`, and `fog`; what the light field draws with, the lights
+## shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`, `cells`
+## and `map_size`, and whether it draws, `field_drawn`; and `clouds`, how dark the clouds' material
+## draws their shadows, and `clouds_read_field`, whether it reads them from the light field.
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
-			"vignette", "art_pixel", "bloom", "light_count", "fog"]:
+			"vignette", "art_pixel", "bloom", "light_count", "rain", "fog"]:
 		shown[name] = ($Pass.material as ShaderMaterial).get_shader_parameter(name)
 	for name: String in ["light_rects", "light_reach", "view_origin", "drift", "cells", "map_size"]:
 		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
@@ -150,11 +158,17 @@ func _apply() -> void:
 		return
 	var material := $Pass.material as ShaderMaterial
 	var low := quality == Quality.LOW
+	var rains := raining and not low
 	for field: String in _grade:
 		if not ["fog", "clouds"].has(field):
 			material.set_shader_parameter(field, _grade[field])
+	if rains:
+		material.set_shader_parameter("gain", _grade.gain * _vector(_table.rain.gain))
+		material.set_shader_parameter("saturation", _grade.saturation * float(_table.rain.saturation))
+	material.set_shader_parameter("rain", 1.0 if rains else 0.0)
+	material.set_shader_parameter("drift", _drift)
 	var fog: float = 0.0 if low else _grade.fog
-	var shade: float = 0.0 if low else _grade.clouds
+	var shade: float = 0.0 if low or rains else _grade.clouds
 	material.set_shader_parameter("fog", fog)
 	clouds.set_shader_parameter("clouds", shade)
 	clouds.set_shader_parameter("field", $LightField.get_texture())

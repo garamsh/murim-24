@@ -17,7 +17,10 @@
 ## its lower part and none of its bottom, nor the pixels the high block shows, while the same pixels
 ## beside it change; and that the clouds' shadows darken the frame and leave a block standing in the
 ## fixture unchanged. Until then every step holds the fog and the clouds off, so the checks before
-## see neither. It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw, as
+## see neither. Then, at noon, it draws the frame dry and raining at standard, raining again a moment
+## later, and dry and raining at low. It checks that the rain dims the frame; that its streaks move,
+## changing some pixels from one moment to the next but few; and that at low the rain changes
+## nothing. It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw, as
 ## when its window draws too few frames to reach the last shot within MAX_FRAMES frames. Its window
 ## stays on top, since a covered window is not drawn.
 extends SceneTree
@@ -96,7 +99,12 @@ func _process(_delta: float) -> bool:
 		["bloom", func() -> void: _grade.quality = Grade.Quality.STANDARD],
 		["clear", func() -> void: _show_lights(false); _grade.show_relief(_high_relief()); _grade.show_time(0.3, SUMMER)],
 		["fog", func() -> void: _only(true, false)],
-		["clouds", func() -> void: _only(false, true)]]
+		["clouds", func() -> void: _only(false, true)],
+		["dry", func() -> void: _grade.raining = false; _grade.show_time(0.5, SUMMER)],
+		["wet", func() -> void: _grade.raining = true],
+		["wet_later", func() -> void: _grade.show_time(0.5, SUMMER)],
+		["dry_low", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.raining = false],
+		["wet_low", func() -> void: _grade.raining = true]]
 	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
 	# renderer on a loaded machine.
 	if _drawn < _next:
@@ -164,7 +172,16 @@ func _report() -> void:
 	var standing := _differ(_shots.clear, _shots.clouds, Rect2i(_screen(Vector2(STANDING.position)), STANDING.size * int(_zoom)))
 	_check("grade_check: the clouds' shadows change %d pixels of the frame, %.4f darker, and %d of the block standing" % [
 		shaded.count, shaded.darker, standing.count], shaded.count > 0 and shaded.darker > 0.0 and standing.count == 0)
-	print("grade_check: %d of 9 checks passed" % (9 - _failed))
+	var wet := _differ(_shots.dry, _shots.wet)
+	_check("grade_check: the rain changes %d pixels of the frame, %.3f darker" % [wet.count, wet.darker],
+			wet.count > 0 and wet.darker > 0.0)
+	var moved := _differ(_shots.wet, _shots.wet_later)
+	var frame_size: int = _shots.wet.get_width() * _shots.wet.get_height()
+	_check("grade_check: a moment later the rain's streaks change %d pixels, %.3f of the frame" % [
+		moved.count, float(moved.count) / frame_size], moved.count > 0 and moved.count < frame_size / 5)
+	var at_low := _differ(_shots.dry_low, _shots.wet_low)
+	_check("grade_check: at low the rain changes %d pixels" % at_low.count, at_low.count == 0)
+	print("grade_check: %d of 12 checks passed" % (12 - _failed))
 	quit(0 if _failed == 0 else 1)
 
 
