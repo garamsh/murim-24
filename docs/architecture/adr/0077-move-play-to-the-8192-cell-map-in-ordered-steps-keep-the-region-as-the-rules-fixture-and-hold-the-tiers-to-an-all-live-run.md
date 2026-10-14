@@ -19,9 +19,9 @@ Issue #173 asks for one large, continuous world with distance LOD. Its first pha
 The owner's decisions on the issue moved its target in three steps. ADRs already decide most of it at the target now in force:
 - **512 cells, generated (2026-10-08).** Designed by ADR 0041, superseded before it was built.
 - **4,096 cells, by hand, with regions joined by gates and tiers by quality profile (2026-10-09).** Designed by ADRs 0042, 0043, 0044, 0047 and 0048. The owner asked for the bound measured from 10,000 to 50,000 on the lowest profile.
-- **8,192 cells at half a li (2026-10-11, #255).** Designed by ADR 0070, merged as proposed in #267. It sets the map's format, its memory, a level of regions on the coarse graph, the slots and the routes, in five steps.
+- **A larger world, with travel taking at least twice as long as on the 4,096 map (2026-10-11, #255).** That intent is the owner's, recorded in `concept.md` §World and scale. How to reach it is proposed, not owner-confirmed: ADR 0070, merged as proposed in #267, proposes 8,192 cells at half a li a cell, with the map's format, its memory, a level of regions on the coarse graph, the slots and the routes, in five steps. `concept.md` lists those details as **[proposed]**.
 
-The PM directed on 2026-10-12 that this ADR designs the world and its LOD at ADR 0070's 8,192 cells, reusing:
+The PM directed on 2026-10-12 that this ADR designs the world and its LOD at ADR 0070's proposed 8,192 cells, reusing:
 - ADR 0047's map tools;
 - #216's live-tier budget;
 - ADR 0076's spacing.
@@ -66,7 +66,7 @@ Options weighed for the spacing on the map:
 
 ## Decision
 
-Play moves from the generated region to ADR 0070's map in the order below. The region stays as the rules' fixture: the core's tests and `make sweep` keep it, and every rule runs the same on both worlds, with no branch by world.
+Play moves from the generated region to ADR 0070's map in the order below. The map's 8,192 cells at half a li a cell are ADR 0070's proposal, not an owner decision; the owner's decision is the larger world with travel at least twice as long, and the plan holds whatever size ADR 0070 is accepted at. The region stays as the rules' fixture: the core's tests and `make sweep` keep it, and every rule runs the same on both worlds, with no branch by world.
 
 **Tiers.** ADR 0042's tiers, with ADR 0048's profiles, run on the map's 65,536 areas.
 - The live tier's budget is #216's: 5,000 people within 4 ms p99 on the standard profile. The low profile's cap is measured as ADR 0048 measures it.
@@ -98,16 +98,17 @@ Play moves from the generated region to ADR 0070's map in the order below. The r
 3. **Areas, tiers and profiles,** ADRs 0042 and 0048, with the tiers' state saved as ADR 0044 has it. Acceptance:
    - tiers recomputed with hysteresis, with a control of no steered army running live;
    - a save round-trip with the tiers' state;
-   - a run that goes live, far and live again, by the steered army walking away and back, hashing the same twice. Two controls: another seed gives another hash, and the same run with the far phase skipped, tiers off, gives another hash than the tiered one, so the far phase is seen to act. Step 5 runs the same test again with the far tier's rules;
+   - **the handover keeps every person's record.** A world whose people hold non-default values in every saved field of their record is snapshotted per person before the steered army walks away. The fields are those `Person` holds on `main` today, inner energy (qi and its capacity), health, family, parents, spouses and children, home, sect, talent and attainment, the arts known, silver, items held, hunger, lifespan and soul, and any a later ADR adds before this step is built. Its other army is then handed live to far, then far to live, with no tick run between the handovers, so no rule can change a record. After each handover, every person's record equals its snapshot field by field, except the fields the handover names: position and the army's far anchor and progress. Its control corrupts the handover so it drops one preserved field, qi set to its default, and the same assertion is shown failing on that field;
+   - a run that goes live, far and live again, by the steered army walking away and back, hashing the same twice. Two controls: another seed gives another hash, and the same run with the far phase skipped, tiers off, gives another hash than the tiered one, so the far phase is seen to act. This is reproducibility only: the record test above, not the hash, is what shows the handover preserves each person. Step 5 runs both tests again with the far tier's rules;
    - #216's live scenario within 4 ms p99 at an idle machine.
-4. **The coarse graph with its level of regions:** ADR 0043 and ADR 0070's step 2. Acceptance: a path across the test map within 16 ms on the development Mac at an idle machine, with a control of the graph of areas alone missing it.
+4. **The coarse graph with its level of regions:** ADR 0043 and ADR 0070's step 2. Acceptance: a path across the test map within a frame, 16.7 ms, on the development Mac at an idle machine, with a control of the graph of areas alone missing it.
 5. **The far tier and the consistency check:** ADR 0042's far rules, and the test above. Acceptance: the bands, with a control in which a far tier that skips fights falls outside them.
 6. **The first map's content at 8,192:** ADR 0070's step 4, with `apart` measured and set. Acceptance:
    - the validator's checks on the first map, and Luoyang to Chang'an within ADR 0070's bounds;
    - `apart` set to the largest of 32, 40, 48 and 56 at which every authored settlement passes the validator and `make sweep` keeps 48 of 50. Its control is the next larger value, shown refusing an authored pair or failing the sweep;
    - a test map without inns still compiling and validating, as ADR 0070 has it.
 7. **The bound measured:** ADR 0048 on this map, on the low profile, from 10,000 to 50,000. Acceptance:
-   - the bound is the largest N, in steps of 5,000, at which the median p99 of three runs is within 4 ms and a day's tick within a frame, at an idle machine;
+   - the bound is the largest N, in steps of 5,000, at which the median p99 of three runs is within 4 ms and the tick running the daily rules within a frame, 16.7 ms, at an idle machine;
    - its control is the next N above it, measured and shown failing, unless 50,000 itself passes;
    - the save and the memory at the bound, against this ADR's 160 and 352 bytes a person.
 8. **The view at the map's scale.** Acceptance: captures in Korean of each.
