@@ -270,7 +270,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x5D74B2B269EF2D14ULL);
+            0xB512B00C02B76747ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -4510,7 +4510,7 @@ std::size_t most_striking(World& world, std::size_t army, std::uint64_t ticks) {
 
 TEST(World, AtMostTheFoesTokensStrikeItOnAnyTick) {
   // The foe is of no realm, so it grants the default table's first row.
-  constexpr std::size_t GRANTED = 2;
+  constexpr std::size_t GRANTED = 4;
   ASSERT_EQ(default_tokens().by_rank.front(), GRANTED);
   World world = ringed(open_map(OPEN_SIDE), default_tokens(), false);
   EXPECT_EQ(most_striking(world, 0, RING_TICKS), GRANTED);
@@ -4520,7 +4520,7 @@ TEST(World, AtMostTheFoesTokensStrikeItOnAnyTick) {
 }
 
 TEST(World, ThePlayerAsAFoeIsCappedByItsOwnTokens) {
-  constexpr std::size_t GRANTED = 2;
+  constexpr std::size_t GRANTED = 4;
   World world = ringed(open_map(OPEN_SIDE), default_tokens(), false);
   world.steer(1, true);
   EXPECT_EQ(most_striking(world, 0, RING_TICKS), GRANTED);
@@ -4530,9 +4530,10 @@ TEST(World, ThePlayerAsAFoeIsCappedByItsOwnTokens) {
   EXPECT_EQ(most_striking(all, 0, RING_TICKS), RING_ATTACKERS);
 }
 
-// Two attackers of faction 0 beside RING_FOE, a third person of faction 0
-// four cells further off with an attack intent on the foe, steered when
-// `steered`, and the foe, of faction 1, striking no one.
+// As many attackers of faction 0 beside RING_FOE as the default table's
+// first row grants, a person of faction 0 four cells further off with an
+// attack intent on the foe, steered when `steered`, and the foe, of faction
+// 1, of no realm, striking no one.
 World latecomer(bool steered) {
   const Skill jab{ARM, 0, 0, 0, 1, 0, Shape::TARGETED};
   Rules rules = at_war(SEPARATION);
@@ -4542,7 +4543,8 @@ World latecomer(bool steered) {
   const Cell late{RING_FOE.x - 6, RING_FOE.y};
   World world{Seed{1},
               Map{rows},
-              {army(rows, RING_START, RING_START, 2, TARGET_HEALTH, 0, {jab}),
+              {army(rows, RING_START, RING_START,
+                    default_tokens().by_rank.front(), TARGET_HEALTH, 0, {jab}),
                army(rows, RING_FOE, RING_FOE, 1, TARGET_HEALTH, 1, {IDLE}),
                army(rows, late, late, 1, TARGET_HEALTH, 0, {jab})},
               {},
@@ -4572,21 +4574,29 @@ TEST(World, TheSteeredTakesATokenTheNPCsHoldFromTheLastToTakeOne) {
   };
   World world = latecomer(true);
   const auto [steered, holding] = arrive(world);
-  // Setup: both NPCs held the foe's tokens as the steered person arrived.
-  ASSERT_TRUE(holding.at(0) && holding.at(0)->token && holding.at(1) &&
-              holding.at(1)->token);
+  // Setup: every NPC held one of the foe's tokens as the steered person
+  // arrived.
+  const std::vector<std::size_t> npcs = world.roster(0);
+  for (const std::optional<Engagement>& held : holding) {
+    ASSERT_TRUE(held && held->token);
+  }
   ASSERT_TRUE(steered.has_value());
   EXPECT_TRUE(steered->token);
-  // The NPC that took its token last gave it up.
-  const std::size_t last =
-      holding.at(0)->token_since > holding.at(1)->token_since ? 0 : 1;
-  const std::vector<std::size_t> npcs = world.roster(0);
-  EXPECT_FALSE(
-      world.attacks().engagement(npcs.at(last)).value_or(Engagement{}).token);
-  EXPECT_TRUE(world.attacks()
-                  .engagement(npcs.at(1 - last))
-                  .value_or(Engagement{})
-                  .token);
+  // The NPC that took its token last, the higher among equals, gave it up,
+  // and the others kept theirs.
+  std::size_t last = 0;
+  for (std::size_t rank = 1; rank < npcs.size(); ++rank) {
+    if (std::tuple{holding.at(rank)->token_since, npcs.at(rank)} >
+        std::tuple{holding.at(last)->token_since, npcs.at(last)}) {
+      last = rank;
+    }
+  }
+  for (std::size_t rank = 0; rank < npcs.size(); ++rank) {
+    EXPECT_EQ(
+        world.attacks().engagement(npcs.at(rank)).value_or(Engagement{}).token,
+        rank != last)
+        << rank;
+  }
   // And the steered person strikes the foe.
   EXPECT_GT(most_striking(world, 2, RING_TICKS), 0U);
   // Control: an NPC arriving instead waits.
@@ -4739,9 +4749,10 @@ TEST(World, AHoldersDeathGivesTheHeadOfTheQueueItsTokenWithinATick) {
   EXPECT_TRUE(struck);
 }
 
-// `holders` people of faction 0 at RING_START beside a foe of faction 1 at
-// RING_FOE, a second foe four cells east of it, and a newcomer of faction 0
-// to the north standing where both foes are in sight, the first nearer.
+// `holders` people of faction 0 at RING_START beside a foe of faction 1, of
+// no realm, at RING_FOE, a second foe four cells east of it, and a newcomer of
+// faction 0 to the north standing where both foes are in sight, the first
+// nearer.
 World two_foes(std::size_t holders) {
   const Skill jab{ARM, 0, 0, 0, 1, 0, Shape::TARGETED};
   Rules rules = at_war(SEPARATION);
@@ -4762,7 +4773,8 @@ World two_foes(std::size_t holders) {
 }
 
 TEST(World, ANewcomerTurnsToAFoeWithAFreeTokenBeforeANearerOneWithout) {
-  World full = two_foes(2);
+  const std::uint32_t granted = default_tokens().by_rank.front();
+  World full = two_foes(granted);
   const std::size_t near = full.roster(1).front();
   const std::size_t far = full.roster(2).front();
   const std::size_t newcomer = full.roster(3).front();
@@ -4772,12 +4784,12 @@ TEST(World, ANewcomerTurnsToAFoeWithAFreeTokenBeforeANearerOneWithout) {
             distance_squared(full.person(newcomer).position,
                              full.person(far).position));
   run_ticks(full, RING_TICKS);
-  // Setup: both holders hold the first foe's two tokens.
-  ASSERT_EQ(full.attacks().tokens_held(near), 2U);
+  // Setup: the holders hold all the first foe's tokens.
+  ASSERT_EQ(full.attacks().tokens_held(near), granted);
   EXPECT_EQ(full.attacks().engagement(newcomer).value_or(Engagement{}).foe,
             far);
   // Control: with a token of the nearer foe free, it engages that one.
-  World free = two_foes(1);
+  World free = two_foes(granted - 1);
   run_ticks(free, RING_TICKS);
   EXPECT_EQ(free.attacks()
                 .engagement(free.roster(3).front())

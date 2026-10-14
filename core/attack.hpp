@@ -34,9 +34,10 @@ struct Tokens {
   std::uint64_t lease = 0;
 };
 
-/// ADR 0068's default table: 2 tokens for no realm and the lowest rank, 3
-/// for the next two, 4 for the next two and 6 above, a waiter circling every
-/// second and a holder leasing its token for three while others wait.
+/// ADR 0068's default table as its third step retuned it: 4 tokens for no
+/// realm and the three lowest ranks, 5 for the next two and 6 above, a
+/// waiter circling every second and a holder leasing its token for three
+/// while others wait.
 [[nodiscard]] Tokens default_tokens();
 
 /// Whether `tokens` gives a row for no realm, no row above MAX_TOKENS, and a

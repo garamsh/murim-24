@@ -82,7 +82,7 @@ Position shifted(Position origin, Position offset) {
 }  // namespace
 
 Tokens default_tokens() {
-  constexpr std::array<std::uint32_t, 7> BY_RANK{2, 2, 3, 3, 4, 4, 6};
+  constexpr std::array<std::uint32_t, 7> BY_RANK{4, 4, 4, 4, 5, 5, 6};
   constexpr std::uint64_t CIRCLING = 30;
   constexpr std::uint64_t LEASE = 90;
   return Tokens{{BY_RANK.begin(), BY_RANK.end()}, CIRCLING, LEASE};
