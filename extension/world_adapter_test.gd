@@ -153,7 +153,9 @@ func run() -> bool:
 	var lessons_pass := _lessons_pass(lived)
 	var event_people_pass := _event_people_pass()
 	var snapshot_pass := _snapshot_pass()
-	return snapshot_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
+	# Last, as it ticks `lived` on.
+	var use_reads_pass := _use_reads_pass(lived)
+	return snapshot_pass and use_reads_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and homes_pass and time_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
@@ -706,3 +708,84 @@ func _play_loop_pass(lived: WorldAdapter) -> bool:
 		names, master, attained, attainment_right, bare_right, "pass" if passed else "FAIL"])
 	return passed
 
+
+
+# Each use the snapshot holds names the art its skill was learned from, -1 for one drilled with its
+# army, and what it does to structures, as the user's skills read them: in `lived`, ticked on with
+# whoever can cast an art skill casting it beside itself, a use of a learned art reads its art; and
+# each art names its discipline: Plum Blossom the sword, Heavenly Demon the saber, Black Fang hidden
+# weapons. A torch's use reads its burning, a mend's its repair. Setup: an art was used, and a torch
+# and a mend were.
+func _use_reads_pass(lived: WorldAdapter) -> bool:
+	var faults := []
+	var learned := 0
+	for i in 600:
+		_cast_arts(lived)
+		lived.tick()
+		_check_uses(lived, faults)
+		for art: int in lived.snapshot().strike_art:
+			learned += 1 if art >= 0 else 0
+		if learned > 0 and i > 30:
+			break
+	var names := lived.discipline_names()
+	var disciplines := lived.arts().map(func(art: Dictionary) -> String: return names[art.discipline])
+	var works := {}
+	var torched := _works_world()
+	for i in 200:
+		torched.tick()
+		_check_uses(torched, faults)
+		for work: int in torched.snapshot().strike_structure_damage:
+			works[work] = true
+	var passed: bool = faults.is_empty() and learned > 0 and disciplines == ["sword", "saber", "hidden weapons"] \
+			and works.has(5) and works.has(-5)
+	print("world_adapter_test: uses of a learned art read %d; the arts' disciplines %s; structure works read %s; faults %s: %s" % [
+		learned, disciplines, works.keys(), faults.slice(0, 3), "pass" if passed else "FAIL"])
+	return passed
+
+
+# Has each living person of `world` who knows an art skill it may use on the next tick cast it at a
+# point a cell beside itself; the core refuses any it cannot make.
+static func _cast_arts(world: WorldAdapter) -> void:
+	for army in world.army_count():
+		var roster := world.roster(army)
+		var positions := world.body_positions(army)
+		for body in roster.size():
+			var skills := world.person_skills(roster[body])
+			for skill in skills.size():
+				if skills[skill].art >= 0 and skills[skill].ready_at <= world.tick_count() + 1 \
+						and skills[skill].shape != WorldAdapter.SHAPE_TARGETED:
+					if world.person_qi(roster[body]) >= skills[skill].qi_cost:
+						world.cast(roster[body], skill, positions[body] + Vector2(WorldAdapter.CELL_SIZE, 0))
+					break
+
+
+# Appends to `faults` each use of `world`'s last tick whose snapshot art or structure work differs from
+# its user's skill's.
+static func _check_uses(world: WorldAdapter, faults: Array) -> void:
+	var snapshot := world.snapshot()
+	var strikes := world.strikes()
+	for i in strikes.size():
+		var strike: Dictionary = strikes[i]
+		var skills := world.person_skills(strike.person)
+		var art := -1
+		var works := 0
+		if strike.skill < skills.size():
+			art = skills[strike.skill].art
+			works = skills[strike.skill].structure_damage
+		if snapshot.strike_art[i] != art or snapshot.strike_structure_damage[i] != works:
+			faults.append("use %d by %d: art %d against %d, works %d against %d" % [
+				i, strike.person, snapshot.strike_art[i], art, snapshot.strike_structure_damage[i], works])
+
+
+# A torch-bearer beside an intact structure and a mender beside a damaged one, as sound_test.gd's.
+static func _works_world() -> WorldAdapter:
+	var torch := {"range": 0, "radius": 256, "body_damage": 0, "structure_damage": 5, "cooldown": 10}
+	var mend := {"range": 0, "radius": 256, "body_damage": 0, "structure_damage": -5, "cooldown": 10}
+	var rows := PackedStringArray(["............", "............", "............", "............"])
+	var armies: Array[Dictionary] = [
+		{"objective": Vector2i(2, 1), "members": [{"cell": Vector2i(2, 1), "health": 100}], "faction": 0, "skills": [torch]},
+		{"objective": Vector2i(9, 1), "members": [{"cell": Vector2i(9, 1), "health": 100}], "faction": 0, "skills": [mend]},
+	]
+	var structures := [{"cell": Vector2i(2, 2), "durability": 100}, {"cell": Vector2i(9, 2), "durability": 40}]
+	return WorldAdapter.create(1, rows, armies, structures,
+			{"separation": 256, "hostile": [[false]], "stage_floors": [75, 25, 1]})

@@ -890,8 +890,27 @@ godot::Dictionary WorldAdapter::snapshot() const {
   godot::PackedVector2Array strike_toward;
   godot::PackedVector2Array strike_end;
   godot::PackedInt64Array strike_first;
+  godot::PackedInt64Array strike_art;
+  godot::PackedInt64Array strike_structure_damage;
   godot::PackedInt64Array struck;
   for (const murim::Strike& strike : now.strikes()) {
+    // The art the skill was learned from, -1 for one drilled with its army,
+    // and what it does to structures, read for the view's colours and its
+    // mend and torch (#184); neither for a user who no longer stands in an
+    // army, whose skills the world no longer reads.
+    const std::size_t count = now.skill_count(strike.person);
+    const std::size_t learned = now.person(strike.person).known.size();
+    const std::size_t drilled = count - std::min(count, learned);
+    const bool readable = strike.skill < count;
+    strike_art.push_back(
+        readable && strike.skill >= drilled
+            ? static_cast<std::int64_t>(now.person(strike.person)
+                                            .known.at(strike.skill - drilled)
+                                            .art)
+            : -1);
+    strike_structure_damage.push_back(
+        readable ? now.skill_of(strike.person, strike.skill).structure_damage
+                 : 0);
     strike_person.push_back(static_cast<std::int64_t>(strike.person));
     strike_shape.push_back(static_cast<std::int64_t>(strike.shape));
     strike_range.push_back(strike.range);
@@ -923,6 +942,8 @@ godot::Dictionary WorldAdapter::snapshot() const {
   read.set("strike_toward", strike_toward);
   read.set("strike_end", strike_end);
   read.set("strike_first", strike_first);
+  read.set("strike_art", strike_art);
+  read.set("strike_structure_damage", strike_structure_damage);
   read.set("struck", struck);
   return read;
 }
@@ -1627,6 +1648,7 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::arts() const {
     fields.set("orientation",
                static_cast<std::int64_t>(art.nature.orientation));
     fields.set("polarity", static_cast<std::int64_t>(art.nature.polarity));
+    fields.set("discipline", static_cast<std::int64_t>(art.discipline));
     godot::TypedArray<godot::Dictionary> skills;
     for (const murim::ArtSkill& taught : art.skills) {
       godot::Dictionary skill;
