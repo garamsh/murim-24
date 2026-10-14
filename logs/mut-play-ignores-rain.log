@@ -1,0 +1,57 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261014214616172760
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] follow (res://play/play.gd:584)
+       [1] command (res://play/play.gd:539)
+       [2] run (res://play/play_test.gd:106)
+       [3] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] command (res://play/play.gd:570)
+       [1] run (res://play/play_test.gd:114)
+       [2] _init (res://run_tests.gd:22)
+play_test: cells found true; blocked cell refused true; cell (76, 93) accepted true, distance 724 to 178; key 1 accepted true, key 9 refused true: pass
+play_test: key C alone challenges no one true; F opens the faction window true, where C from an Orthodox village is refused true, the window saying CHALLENGE_NO_SUCCESSION; from a Cult village accepted, closing it, true, the duel shown true; again refused true, the window saying CHALLENGE_DUEL_IN_PROGRESS: pass
+play_test: in the faction window a member declares nothing true; its leader is asked war on ally 2 again true, Escape takes it back true, a digit gives no order true, Enter twice declares it true, F closes it true: pass
+play_test: G opens the genealogy on the steered person true, a digit gives no order while open true, G closes it true, then the digit orders true: pass
+play_test: M opens the sect panel on the steered person's faction true, a digit gives no order while open true, Tab shows the next faction true, M closes it true, then the digit orders true: pass
+play_test: a tick with no order keeps the territory and borders, and redraws the map only on a new chart revision true; army 4 ordered on village 6 true, the territory moved by the next tick true; borders follow the territory and the map the chart before true and after true, the borders before stale after true; kept over frames true: pass
+play_test: right button on (76, 93) from (78, 95) ordered true, 724 to 178 away in 60 ticks; held and moved to (74, 91) ordered true, 902 to 171 away; released true, then moved to (78, 95) ordered nothing true; control without input moved 0.00 cells: pass
+play_test: cast on press, Q with no target refused with its reason true; W accepted true and the ready tick moved 0 to 31, the control's staying true; W again refused as on cooldown with its reason true; E refused as no skill true (setup true): pass
+play_test: cast on release, Q's press aims true, the aim at the cursor with range 24 px true and at the ring past it true, nothing cast while held true; its release with no target casts nothing true true; W's release casts true and the ready tick moved true; W again cancels true, its release casts nothing true true; Escape pauses nothing true, cancels true, the release casts nothing true true: pass
+play_test: opens on the title with no world true; Enter opens the new game true; 4817 typed and Enter starts that world true, the same as the core makes from it and not seed 2026's true; Escape pauses it on that seed true, the guide showing ["CONTROLS_CLICK", "CONTROLS_LEFT_CLICK", "C", "Space", "Tab", "QWERT", "1-9", "0", "ZX", "G", "M", "F", "K", "N", "Esc"] true; no tick while paused true; resumed, 3.5 ticks' time runs 3 ticks, at 4x 16: pass
+play_test: each shortcut row clicked against its key, from the world and from the genealogy panel: faults []; the settings row opens them true, no tick while open true, Escape back to the world true, which runs true; from the pause panel true, back to it true; the cursor marks a row true, off it none true; control: clicks on the centre and beside the rail took [false, false], no order true, a row with the rail hidden taken false (setup true): pass
+play_test: damage numbers shown as the scene starts ["7"], for everyone ["7", "9"], off []: pass
+play_test: M opens the sect panel true; Enter applies true and joins true; from an Unorthodox village Enter is refused as unproven true (setup true): pass
+play_test: Cult body 20 ordered on (83, 99) true; after 2041 ticks the rebirth screen shows 20 dead and 21 born true, not open before true; no tick while open true; Enter goes on and ticks run true: pass
+ERROR: WorldAdapter.load: the slot holds no save of this game
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] resume_saved (res://play/play.gd:235)
+       [1] _take (res://play/play.gd:396)
+       [2] navigate (res://play/play.gd:327)
+       [3] _save_pass (res://play/play_test.gd:804)
+       [4] run (res://play/play_test.gd:121)
+       [5] _init (res://run_tests.gd:22)
+play_test: with no save, Continue passed over true; saved from the pause panel true with its notice true, after ticks that changed the world true; on a fresh title Continue chosen true resumes the same hash, seed 2026 and person 20 true; a broken save refused on the title with its reason true; a world grown past the player's army 9 saved true, and Continue steers that army true; the game's slot 0 untouched true: pass
+play_test: autosaved as day 3 began, after 5400 ticks, every 3 days true; none earlier true; it loads as the world then was true; the game's slot 0 untouched true: pass
+play_test: touch shown true; the joystick pushed (0, -1) taken true, walked 9.38 cells its way, past the 3 one order reaches, and 0.00 across in 150 ticks; let go true, then moved 0.00 cells in 60; control with no touch moved 0.00 cells: pass
+play_test: touch shown true; the joystick pushed down the diagonal (1, 1) taken true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+play_test: right button on (22, 120), down the diagonal (1, 1) from (13, 111), ordered true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+play_test: hostile army 4 marched 1114 ticks, foe 8 in range; a tap facing (0.0, -1.0) cast { "skill": 0, "target": 8 } at the aimed 8 true; dragged onto the cancel zone cast {  }, short of it { "skill": 0, "target": 8 } true; held 400 ms { "skill": 1, "target": (20096.0, 24448.0) }, 500 ms { "skill": 1, "target": <null> } true; a tap on cooldown refused 3, the notice CAST_ON_COOLDOWN shown true: pass
+play_test: new game tapped true; random tapped drew 421920706, start tapped started it true; the pause button with the touch controls hidden ignored true, shown paused true, resume tapped true; the genealogy button opened the panel true, a tap closed it true: pass
+play_test: K opens the arts panel on the first skill true, a digit gives no order true and Escape pauses nothing true while open; down chooses the second true, Q puts it on the first slot, leaving its own true, Delete takes it off true; Escape closes it true, then the digit orders true: pass
+play_test: army 2's person 4 knows 1 skills past its army's 2; the art skill { "art": 2, "skill": 0 } on T shown true; T aims at 128 px true, Q at 24 px true; R's empty slot shows none true, casts none true; the fifth button dragged cast { "skill": 2, "target": (30976.0, 3456.0) } and tapped { "skill": 2, "target": (28928.0, 5504.0) } at range 2048 true; the fourth, empty, cast none true (setup true): pass
+play_test: the loadout [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }] saved true, restored by Continue [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }], T showing true; a new game starts from [{ "art": -1, "skill": 0 }, { "art": -1, "skill": 1 }, {  }, {  }, {  }]; the game's slot 0 untouched true: pass
+play_test: walked 645 ticks up to person 18 of an allied faction, prompted true; C opened the window true, a digit taken true, Enter its 0 rumours true, Escape no pause true, back true, ended true; a left click on it opened it, selecting no one, true, and so did a tap with the touch controls shown true; a tick kept it open true; war declared true closed it true, the prompt refused true, C opened nothing true: pass
+play_test: walked 389 ticks up to seller 12; C opened its menu with wares true; Enter showed them true; bought a herb true, 20 silver left; the pill refused true; back true, ended true; Z at full health refused true, X with no pill true; a digit then ordered true: pass
+play_test: 2 people within reach, 1 named [1], all of them within true, neither the player nor person 0 the prompt names true; G's panel hides them true, closed shows them true (setup true): pass
+play_test: 2 foes in sight after 1069 ticks; a click selected foe 8 with no intent true, the person kept its distance true; Space set the intent true, chased true and closed in true; a click on foe 9 moved it true; a move order replaced it true and the person reached its cell true in 21 ticks; Space again, a chase to (77, 93) and Escape ended it true, the person holding there true, a right click walking it back true; Tab selected the next true; Escape cleared true; Space on one of its own faction refused true; touch next and attack true; with no foe in sight Space did nothing true: pass
+play_test: bounds flat [P: (0.0, 0.0), S: (2048.0, 1536.0)], raised [P: (0.0, 0.0), S: (2048.0, 1472.0)]; the view at the corner [P: (0.0, 0.0), S: (640.0, 360.0)] and at the bottom [P: (680.0, 1112.0), S: (640.0, 360.0)]; centred on the middle at (1000.0, 700.0), on a small map at (160.0, 100.0): pass
+play_test: grade hidden on title true, shown in play true; five-tick day at tick 3 gain (1.0, 1.02, 0.98) against (1.0, 1.02, 0.98), midnight (0.46, 0.5304, 0.7056); low vignette 0.00 standard 0.18 art pixel 3.0; raining with the row off false, on false: FAIL
+res://play/play_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed

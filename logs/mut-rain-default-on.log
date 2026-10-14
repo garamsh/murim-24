@@ -1,0 +1,6 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261014214614164787
+settings_test: chosen { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, on disk { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, read back { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 } with speed 4x, casting on release, everyone's damage numbers and the blood and the hit stop off, the music muted and the master and effects at 0.75 and 0.5 unmuted true: true; a missing file reads the defaults false; a resolution out of range refused, the speed beside it read true: FAIL
+res://hud/settings_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
