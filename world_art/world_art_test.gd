@@ -7,7 +7,8 @@
 # village the world founds as it runs included, and its banners stand on the cells it names; after the view jumps across the region, every body a
 # band holds lies inside the bounds the renderer culls that band by; and between ticks a body is
 # drawn between the positions of the last two; and it lists the windows lit at night of every
-# structure on screen by its kind and stage, and the steered person's torch.
+# structure on screen by its kind and stage, and the steered person's torch; and each of a region's
+# arts rises in its discipline's colour (#184).
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -201,7 +202,8 @@ func run() -> bool:
 	var passed := relief_right and bodies_right and buildings_right and banners_right and decorations_right \
 			and fields_right
 	art.free()
-	return _bands_pass() and _between_pass() and _founded_pass() and _every_kind_pass() and _lights_pass() and passed
+	return _bands_pass() and _between_pass() and _founded_pass() and _every_kind_pass() and _lights_pass() \
+			and _techniques_pass() and passed
 
 
 # The lights of the region SEED makes, over the whole map: the steered person's torch at its feet
@@ -603,3 +605,17 @@ func _tags(path: String) -> Dictionary:
 	for tag: Dictionary in data.meta.frameTags:
 		tags[tag.name] = [int(tag.from), int(tag.to)]
 	return tags
+
+
+# A region's arts rise in their disciplines' colours from techniques.json, by the names the world
+# gives them: Plum Blossom in the sword's azure, Heavenly Demon in the saber's violet, Black Fang in
+# hidden weapons' amber. Control: an art of a discipline techniques.json does not name rises in paper.
+func _techniques_pass() -> bool:
+	var region := WorldAdapter.create_region(SEED)
+	var colours := WorldArt.technique_colours(region.arts(), region.discipline_names())
+	var named := Array(colours).map(func(colour: Color) -> String: return colour.to_html(false))
+	var unnamed := WorldArt.technique_colours([{"discipline": 0}], PackedStringArray(["staff"]))
+	var passed: bool = named == ["9ac4cd", "cb88bd", "e9c36d"] and unnamed[0] == WorldArt.Combat.PAPER
+	print("world_art_test: the arts rise in %s; an art of an unnamed discipline in %s: %s" % [
+		named, unnamed[0].to_html(false), "pass" if passed else "FAIL"])
+	return passed

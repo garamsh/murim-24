@@ -14,7 +14,7 @@ local art = here .. "/.."
 local W = 608
 local GAP = 2
 local SHEETS = {
-  "terrain/trees", "terrain/detail", "bodies/orthodox", "bodies/demonic", "bodies/unorthodox",
+  "terrain/trees", "terrain/detail", "bodies/orthodox", "bodies/demonic", "bodies/unorthodox", "effects/attack",
   "structures/house", "structures/hall", "structures/storehouse", "structures/manual_hall", "structures/granary",
   "structures/well", "structures/seat_gate", "structures/barrels", "structures/fence",
   "structures/training_ground", "structures/smithy", "structures/apothecary", "structures/town_wall_south",

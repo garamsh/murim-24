@@ -27,6 +27,9 @@ const ART := "res://art/"
 const FACTIONS := ["orthodox", "demonic", "unorthodox"]
 # The faction accents of docs/art-direction.md §Palette, in the order of FACTIONS.
 const ACCENTS: Array[Color] = [Color("2b62bc"), Color("d6422e"), Color("e2a32c")]
+# The colours a use's shape flashes in, by faction: its accent, but violet for the Demonic Cult, as its
+# outline and its effects (#184), since crimson stays for hostility and the player's loss.
+const USE_ACCENTS: Array[Color] = [Color("2b62bc"), Color("a652b9"), Color("e2a32c")]
 const STAGES := ["intact", "damaged", "destroyed", "rubble"]
 # The art for each kind of structure; its frames hold the bottom-left corner of the structure's
 # footprint FOOTPRINT_INSET in from their left and bottom edges.
@@ -66,7 +69,14 @@ const FEET := BodyView.FEET
 const HEAD := BodyView.HEAD
 # The frames of a faction's body sheet, `<tag>` and `<tag>_xray` for each of these, by its tags; and
 # the atlas slot after the factions' frames that holds the shadow, centred in it.
-const BODY_TAGS := ["idle", "walk", "back", "strike", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed"]
+const BODY_TAGS := ["idle", "walk", "back", "swing", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed",
+	"lunge", "cast", "throw", "mend", "torch", "recoil"]
+# The effects drawn over a use (#184), a strip of frames tagged as BodyView reads them, in its order;
+# and the colour each discipline's damage numbers rise in.
+const EFFECTS := "effects/attack"
+const EFFECT_TAGS := ["slash_orthodox", "slash_demonic", "slash_unorthodox", "dart", "burst_orthodox",
+	"burst_demonic", "burst_unorthodox", "spark", "mend", "torch"]
+const TECHNIQUES := "res://world_art/techniques.json"
 const SHADOW := "markers/shadow"
 ## How far from the person names are read around another person's name is drawn, in cells.
 const NAME_REACH := BodyView.NAME_REACH
@@ -202,6 +212,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_lay_structures()
 	_lay_ground()
 	_build_body_atlas()
+	_give_effects()
 	var player := _sheet("markers/player_marker")
 	_ring.texture = _region(player, "ring", 0)
 	_chevron_frames.append(_region(player, "chevron", 0))
@@ -593,7 +604,30 @@ func _build_body_atlas() -> void:
 		frames.append(_body_frames[tag])
 		outlines.append(_body_frames[tag + "_xray"])
 	combat.bodies.set_atlas(Vector2(_atlas.get_size()), frames, outlines, Vector2i(_faction_width, _shadow_x),
-			_sprite_of_faction, PackedColorArray(ACCENTS))
+			_sprite_of_faction, PackedColorArray(USE_ACCENTS))
+
+
+# Gives the bodies the effects drawn over uses and, by art, the colour its damage numbers rise in: its
+# discipline's in TECHNIQUES, or paper.
+func _give_effects() -> void:
+	var sheet := _sheet(EFFECTS)
+	var firsts := PackedInt64Array()
+	for tag: String in EFFECT_TAGS:
+		firsts.append(sheet.tags[tag][0])
+	combat.bodies.set_effects(sheet.texture, sheet.frame, firsts)
+	combat.bodies.set_technique_colours(technique_colours(world.arts(), world.discipline_names()))
+
+
+## The colour each of `arts`, as WorldAdapter.arts() gives them, rises in as damage numbers, by its
+## discipline among `names`: TECHNIQUES' colour for it, or paper.
+static func technique_colours(arts: Array, names: PackedStringArray) -> PackedColorArray:
+	var table: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TECHNIQUES))
+	var colours := PackedColorArray()
+	for art: Dictionary in arts:
+		var discipline: int = art.get("discipline", -1)
+		var named := names[discipline] if discipline >= 0 and discipline < names.size() else ""
+		colours.append(Color(table[named]) if table.has(named) else Combat.PAPER)
+	return colours
 
 
 # Gives the bodies what can stand in front of them: the ground's raised strips and trees shown now,

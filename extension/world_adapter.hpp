@@ -320,7 +320,10 @@ class WorldAdapter : public godot::RefCounted {
   /// one entry each in `strike_person`, `strike_shape`, `strike_range`,
   /// `strike_radius`, `strike_body_damage`, `strike_origin`,
   /// `strike_toward` and `strike_end`, the people each struck in `struck`
-  /// from `strike_first` on, which has one entry more than the strikes.
+  /// from `strike_first` on, which has one entry more than the strikes;
+  /// and each use's `strike_art`, the art its skill was learned from or -1
+  /// for one drilled with its army, and `strike_structure_damage`, what it
+  /// does to structures, negative for a repair.
   [[nodiscard]] godot::Dictionary snapshot() const;
 
   /// Returns the stage structure `structure` is in, one of the STAGE_*
@@ -380,7 +383,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::TypedArray<godot::Dictionary> realms() const;
 
   /// Returns the arts people learn, by index, each a Dictionary of its name
-  /// in `korean` and `romanised`, its `orientation` and `polarity`, and its
+  /// in `korean` and `romanised`, its `orientation` and `polarity`, its
+  /// `discipline`, an index into discipline_names(), and its
   /// `skills` in the order they are learned, each its name in `korean` and
   /// `romanised`, the realm `rank` it needs, its `range`, `radius`,
   /// `cooldown` and `qi_cost`; empty for a world with no arts.

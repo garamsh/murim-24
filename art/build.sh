@@ -11,6 +11,7 @@ cd "$(dirname "$0")"
 "$aseprite" --batch --script terrain/trees.lua
 "$aseprite" --batch --script terrain/ground.lua
 "$aseprite" --batch --script bodies/bodies.lua
+"$aseprite" --batch --script effects/effects.lua
 "$aseprite" --batch --script structures/structures.lua
 "$aseprite" --batch --script structures/workshops.lua
 "$aseprite" --batch --script decorations/decorations.lua
@@ -21,7 +22,7 @@ cd "$(dirname "$0")"
 "$aseprite" --batch --script icon/icon.lua
 
 for name in terrain/trees terrain/ramps terrain/detail bodies/orthodox bodies/demonic \
-	bodies/unorthodox structures/house structures/hall structures/well structures/barrels structures/fence \
+	bodies/unorthodox effects/attack structures/house structures/hall structures/well structures/barrels structures/fence \
 	structures/granary structures/storehouse structures/training_ground structures/manual_hall \
 	structures/seat_gate structures/smithy structures/apothecary structures/town_wall_south structures/town_wall_north \
 	structures/town_wall_west structures/town_wall_east structures/town_corner_tower structures/town_gate_tower \

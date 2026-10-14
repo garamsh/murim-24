@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/font.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -91,6 +92,15 @@ class BodyView : public godot::RefCounted {
   void set_selected(std::int64_t person);
   /// Sets the font damage numbers are drawn in, and its size.
   void set_font(const godot::Ref<godot::Font>& font, std::int64_t size);
+  /// Sets the effects drawn over a use (#184): `texture`, a strip of frames
+  /// `size` wide and high, and the first frame of each of world_art.gd's
+  /// EFFECT_TAGS in `firsts`, in its order.
+  void set_effects(const godot::Ref<godot::Texture2D>& texture,
+                   const godot::Vector2i& size,
+                   const godot::PackedInt64Array& firsts);
+  /// Sets the colour each art's damage numbers rise in, by the art's index;
+  /// an art with none, or a skill of no art, rises in paper.
+  void set_technique_colours(const godot::PackedColorArray& colours);
 
   /// Starts on `snapshot` as it stands, showing nothing and holding no one:
   /// what each person holds is what the next tick is compared with.
@@ -166,7 +176,8 @@ class BodyView : public godot::RefCounted {
       std::int64_t now) const;
   /// Adds a damage number, as a hit at `when` adds one.
   void add_number(std::int64_t when, const godot::String& text,
-                  const godot::Vector2& where, bool own, bool mine);
+                  const godot::Vector2& where, bool own, bool mine,
+                  std::int64_t art);
   /// Sets the view and the time the shown effects are taken at, and where
   /// the target is drawn, as fill() sets them.
   void show_at(const godot::Rect2& view, std::int64_t now,
@@ -215,6 +226,10 @@ class BodyView : public godot::RefCounted {
     std::vector<std::int64_t> struck;
     std::int64_t ms = 0;
     bool steered = false;
+    std::int64_t art = -1;
+    std::int64_t structure_damage = 0;
+    // Where each person it struck stood, on the unraised ground.
+    std::vector<Point> struck_points;
   };
   struct Death {
     std::int64_t person = -1;
@@ -230,6 +245,7 @@ class BodyView : public godot::RefCounted {
     bool own = false;
     bool mine = false;
     double width = 0.0;
+    std::int64_t art = -1;
   };
   struct Stop {
     std::int64_t person = -1;
@@ -351,10 +367,15 @@ class BodyView : public godot::RefCounted {
   void draw_strike(const godot::RID& canvas_item, const Strike& strike,
                    double left) const;
   void draw_target(const godot::RID& canvas_item, Point where) const;
+  [[nodiscard]] static std::int64_t motion_of(const Strike& strike);
+  void draw_effect(const godot::RID& canvas_item, std::int64_t effect,
+                   Point centre, bool flip, std::int64_t frame) const;
+  void draw_use_effects(const godot::RID& canvas_item, const Strike& strike,
+                        std::int64_t age) const;
   [[nodiscard]] bool shows(const Strike& strike, std::int64_t now) const;
 
   // The atlas: until it is set, every frame is its first.
-  static constexpr std::size_t TAGS = 8;
+  static constexpr std::size_t TAGS = 14;
   Point atlas_size_{1.0F, 1.0F};
   std::vector<std::int64_t> frames_ = std::vector<std::int64_t>(TAGS, 0);
   std::vector<std::int64_t> outline_frames_ =
@@ -402,6 +423,10 @@ class BodyView : public godot::RefCounted {
   std::vector<std::int64_t> hit_ms_;
   std::vector<Point> away_;
   std::vector<std::int64_t> struck_at_;
+  // The tag of the motion each person's last use plays, from struck_at_, and
+  // the art of the use that last struck it, for its number's colour.
+  std::vector<std::int64_t> motion_;
+  std::vector<std::int64_t> struck_art_;
   std::unordered_map<std::int64_t, Hold> held_;
 
   std::int64_t tick_ = 0;
@@ -415,6 +440,13 @@ class BodyView : public godot::RefCounted {
   std::int64_t shake_ms_ = 0;
   std::int64_t shake_pixels_ = 0;
   std::vector<Strike> strikes_;
+  // Uses that only mend or burn structures, drawn as motes or flames over
+  // their user.
+  std::vector<Strike> works_;
+  godot::Ref<godot::Texture2D> effects_;
+  Point effect_size_;
+  std::vector<std::int64_t> effect_frames_;
+  std::vector<Rgba> technique_;
   std::vector<Death> deaths_;
   std::vector<Number> numbers_;
   std::vector<Stop> hit_stops_;

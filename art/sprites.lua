@@ -72,20 +72,9 @@ return function(px)
       cv:vline(x, y - 7, 7, c("stone", 7)); cv:vline(x + 1, y - 6, 6, c("stone", 4))
       cv:hline(x - 1, y, 4, c("gold", 4))
     end,
-    sword_strike = function(cv, x, y)
-      for k = 0, 7 do cv:set(x + 1 + k, y - k // 2, c("stone", 7)); cv:set(x + 1 + k, y - k // 2 + 1, c("stone", 4)) end
-      cv:vline(x, y - 1, 3, c("gold", 4))
-    end,
     saber = function(cv, x, y)
       cv:vline(x, y - 6, 6, c("stone", 6)); cv:vline(x + 1, y - 7, 6, c("stone", 4))
       cv:set(x + 1, y - 8, c("stone", 6)); cv:hline(x - 1, y, 3, c("crimson", 4))
-    end,
-    saber_strike = function(cv, x, y)
-      for k = 0, 6 do
-        cv:set(x + 1 + k, y - 2 + (k * k) // 12, c("stone", 7))
-        cv:set(x + 1 + k, y - 1 + (k * k) // 12, c("stone", 4))
-      end
-      cv:vline(x, y - 1, 3, c("crimson", 4))
     end,
     spear = function(cv, x, y)
       cv:vline(x, y - 9, 13, c("wood", 4)); cv:set(x, y - 10, c("stone", 7)); cv:set(x, y - 11, c("stone", 6))
@@ -93,9 +82,6 @@ return function(px)
     end,
     staff = function(cv, x, y) cv:vline(x, y - 9, 14, c("wood", 4)); cv:vline(x, y - 9, 2, c("wood", 5)) end,
     knife = function(cv, x, y) cv:vline(x, y - 3, 3, c("stone", 7)); cv:set(x, y, c("wood", 3)) end,
-    knife_strike = function(cv, x, y)
-      cv:hline(x + 1, y - 1, 4, c("stone", 7)); cv:set(x, y - 1, c("wood", 3))
-    end,
     fan = function(cv, x, y)
       cv:hline(x, y - 2, 4, c("amber", 7)); cv:hline(x, y - 1, 4, c("amber", 5)); cv:set(x, y, c("wood", 3))
     end,
@@ -114,7 +100,8 @@ return function(px)
   }
 
   -- Builds one body on a fresh 16x18 canvas, anchored so its feet sit on row 16.
-  -- spec: faction, head, hat, body, weapon, over (letter overrides).
+  -- spec: faction, head, hat, body, weapon, over (letter overrides), raw (true leaves the
+  -- silhouette unoutlined, for a pose that adds to it before outlining it whole).
   function S.body(spec)
     local cv = px.canvas(16, 18)
     local map = scheme(spec.faction, spec.over)
@@ -145,7 +132,7 @@ return function(px)
     if spec.weapon then weapons[spec.weapon](cv, bx + bw - 1, by + 3) end
     -- The whole silhouette in the darkest step of the body's garment, so no edge takes a step of
     -- its skin or hair and the figure stays dark against the ground.
-    cv:selout(0, 0, 16, 18, px.ramp_of[map.R][1])
+    if not spec.raw then cv:selout(0, 0, 16, 18, px.ramp_of[map.R][1]) end
     return cv
   end
 
