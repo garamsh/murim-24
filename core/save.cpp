@@ -1092,18 +1092,19 @@ class SaveCodec {
       put_footprint(out, structure.footprint);
       out.flag(structure.blocks);
     });
-    put_all(out, world.villages_, [&out](const World::Village& village) {
-      put_village_spec(out, village.spec);
-      put_maybe(out, village.destroyer, [&out](Destroyer destroyer) {
-        out.size(destroyer.army);
-        out.size(destroyer.faction);
-      });
-      out.u64(village.stock);
-      put_index(out, village.party);
-      put_index(out, village.raiding);
-      put_maybe(out, village.founded,
-                [&out](Cell cell) { put_cell(out, cell); });
-    });
+    put_all(out, world.villages_.records(),
+            [&out](const VillageRecord& village) {
+              put_village_spec(out, village.spec);
+              put_maybe(out, village.destroyer, [&out](Destroyer destroyer) {
+                out.size(destroyer.army);
+                out.size(destroyer.faction);
+              });
+              out.u64(village.stock);
+              put_index(out, village.party);
+              put_index(out, village.raiding);
+              put_maybe(out, village.founded,
+                        [&out](Cell cell) { put_cell(out, cell); });
+            });
     put_all(out, world.leadership_, [&out](const Leadership& faction) {
       put_leadership(out, faction);
     });
@@ -1138,9 +1139,10 @@ class SaveCodec {
               [&out](bool practised) { out.flag(practised); });
     });
     put_sizes(out, world.surnames_);
-    put_all(out, world.village_of_, [&out](std::optional<std::size_t> village) {
-      put_index(out, village);
-    });
+    put_all(out, world.villages_.membership(),
+            [&out](std::optional<std::size_t> village) {
+              put_index(out, village);
+            });
     put_all(out, world.plans_,
             [&out](std::optional<std::size_t> plan) { put_index(out, plan); });
     put_all(out, world.charts_,
@@ -1183,24 +1185,25 @@ class SaveCodec {
       structure.blocks = input.flag();
       return structure;
     });
-    world.villages_ = get_all<World::Village>(input, [&input] {
-      World::Village village{get_village_spec(input),
-                             std::nullopt,
-                             0,
-                             std::nullopt,
-                             std::nullopt,
-                             std::nullopt};
-      village.destroyer = get_maybe<Destroyer>(input, [&input] {
-        const std::size_t army = input.size();
-        return Destroyer{army, input.size()};
-      });
-      village.stock = input.u64();
-      village.party = get_index(input);
-      village.raiding = get_index(input);
-      village.founded =
-          get_maybe<Cell>(input, [&input] { return get_cell(input); });
-      return village;
-    });
+    std::vector<VillageRecord> villages =
+        get_all<VillageRecord>(input, [&input] {
+          VillageRecord village{get_village_spec(input),
+                                std::nullopt,
+                                0,
+                                std::nullopt,
+                                std::nullopt,
+                                std::nullopt};
+          village.destroyer = get_maybe<Destroyer>(input, [&input] {
+            const std::size_t army = input.size();
+            return Destroyer{army, input.size()};
+          });
+          village.stock = input.u64();
+          village.party = get_index(input);
+          village.raiding = get_index(input);
+          village.founded =
+              get_maybe<Cell>(input, [&input] { return get_cell(input); });
+          return village;
+        });
     world.leadership_ =
         get_all<Leadership>(input, [&input] { return get_leadership(input); });
     world.sects_ = get_all<World::Sect>(input, [&input] {
@@ -1244,8 +1247,10 @@ class SaveCodec {
       return soul;
     });
     world.surnames_ = get_sizes(input);
-    world.village_of_ = get_all<std::optional<std::size_t>>(
-        input, [&input] { return get_index(input); });
+    std::vector<std::optional<std::size_t>> village_of =
+        get_all<std::optional<std::size_t>>(
+            input, [&input] { return get_index(input); });
+    world.villages_ = Villages{std::move(villages), std::move(village_of)};
     world.plans_ = get_all<std::optional<std::size_t>>(
         input, [&input] { return get_index(input); });
     const Footprint size{world.map_.width(), world.map_.height()};

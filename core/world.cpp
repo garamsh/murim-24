@@ -974,7 +974,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
        family < families && !life_.names.surnames.empty(); ++family) {
     surnames_.push_back(next_random() % life_.names.surnames.size());
   }
-  village_of_.resize(structures_.size());
+  villages_ = Villages{structures_.size()};
   plans_.resize(structures_.size());
   if (life_.growth && life_.growth->stances.size() > rules_.hostile.size()) {
     throw std::invalid_argument(
@@ -1048,28 +1048,13 @@ void World::restore() {
            (!given.empty() && person.given >= given.size()) ||
            stray_cultivation(person, life_) || stray_purse(person, life_);
   };
-  const auto stray_village = [&](const Village& village) {
-    const VillageSpec& spec = village.spec;
-    return !all_below(spec.structures, structures) ||
-           spec.residents >= armies_.size() ||
-           (!spec.holdings.empty() &&
-            spec.holdings.size() != spec.structures.size()) ||
-           (village.destroyer && (village.destroyer->army >= armies_.size() ||
-                                  village.destroyer->faction >= factions)) ||
-           !below(village.party, armies_.size()) ||
-           !below(village.raiding, villages);
-  };
   const std::size_t plans = life_.growth ? life_.growth->plans.size() : 0;
   const auto unplanned = [plans](std::optional<std::size_t> plan) {
     return !below(plan, plans);
   };
-  const auto unvillaged = [villages](std::optional<std::size_t> village) {
-    return !below(village, villages);
-  };
   const bool bad_structures =
       std::any_of(structures_.begin(), structures_.end(), off_map) ||
-      village_of_.size() != structures || plans_.size() != structures ||
-      std::any_of(village_of_.begin(), village_of_.end(), unvillaged) ||
+      plans_.size() != structures ||
       std::any_of(plans_.begin(), plans_.end(), unplanned);
   const auto bad_faction = [&](const Leadership& faction) {
     const Admission admission = faction.admission.value_or(Admission{});
@@ -1105,7 +1090,7 @@ void World::restore() {
       !declarations_.kept(tick_count_) || !events_kept() || !progress_kept() ||
       !rostered() || living() > rules_.people_capacity ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
-      std::any_of(villages_.begin(), villages_.end(), stray_village) ||
+      !villages_.kept(structures_, armies_.size(), factions) ||
       leadership_.size() != factions ||
       std::any_of(leadership_.begin(), leadership_.end(), bad_faction) ||
       std::any_of(sects_.begin(), sects_.end(), stray_sect) ||
@@ -1861,8 +1846,10 @@ std::optional<std::size_t> World::sect_master(std::size_t sect) const {
 }
 
 std::size_t World::sect_cap(std::size_t sect) const {
-  return seat_held(sect) ? held(sects_.at(sect).seat, Stage::DAMAGED).pupils
-                         : 0;
+  return seat_held(sect)
+             ? villages_.held(sects_.at(sect).seat, Stage::DAMAGED, stages())
+                   .pupils
+             : 0;
 }
 
 bool World::sect_stands(std::size_t sect) const {
@@ -1883,36 +1870,14 @@ const std::vector<Manual>& World::manuals() const { return manuals_; }
 // or another village houses, or holdings that are not one for each of its
 // structures, or more households than its residents pair into.
 void World::add_village(VillageSpec spec) {
-  const auto claimed = [this](std::size_t structure) {
-    return structure >= village_of_.size() ||
-           village_of_.at(structure).has_value();
-  };
-  const auto housed = [&spec](const Village& village) {
-    return village.spec.residents == spec.residents;
-  };
-  const bool unheld =
-      !spec.holdings.empty() && spec.holdings.size() != spec.structures.size();
-  if (spec.residents >= armies_.size() ||
-      std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
-      std::any_of(villages_.begin(), villages_.end(), housed) || unheld ||
-      std::size_t{2} * spec.households >
-          armies_.at(spec.residents).roster.size()) {
-    throw std::invalid_argument(
-        "a village must name existing structures no other village names, "
-        "an existing army no other village houses as its residents, what "
-        "each of its structures holds, if anything, and no more households "
-        "than its residents pair into");
+  const std::size_t residents = spec.residents;
+  const std::size_t roster =
+      residents < armies_.size() ? armies_.at(residents).roster.size() : 0;
+  const std::size_t village =
+      villages_.add(std::move(spec), armies_.size(), roster, stages());
+  for (const std::size_t member : armies_.at(residents).roster) {
+    people_.at(member).home = village;
   }
-  for (const std::size_t structure : spec.structures) {
-    village_of_.at(structure) = villages_.size();
-  }
-  for (const std::size_t member : armies_.at(spec.residents).roster) {
-    people_.at(member).home = villages_.size();
-  }
-  villages_.push_back(Village{std::move(spec), std::nullopt, 0, std::nullopt,
-                              std::nullopt, std::nullopt});
-  // A village starts with its storage full.
-  villages_.back().stock = held(villages_.size() - 1, Stage::DAMAGED).storage;
 }
 
 // Throws when one of `members` stands where `field` cannot reach.
@@ -2483,7 +2448,7 @@ StateHash World::hash() const {
     fold(fight.leader);
   }
   fold_relations(fold, declarations_.slots(), armies_, life_.diplomacy);
-  for (const Village& village : villages_) {
+  for (const VillageRecord& village : villages_.records()) {
     fold_village(fold, village);
   }
   fold_reaches(fold, rules_);
@@ -2533,10 +2498,8 @@ const Structure& World::structure(std::size_t structure) const {
 
 VillageState World::village_state(std::size_t village) const {
   const VillageSpec& spec = villages_.at(village).spec;
-  const auto all_in = [this, &spec](Stage wanted) {
-    return std::all_of(
-        spec.structures.begin(), spec.structures.end(),
-        [this, wanted](std::size_t index) { return stage(index) == wanted; });
+  const auto all_in = [this, village](Stage wanted) {
+    return villages_.all_in(village, wanted, stages());
   };
   if (all_in(Stage::RUBBLE)) {
     return VillageState::RUINS;
@@ -2780,10 +2743,12 @@ std::optional<Settlement> World::settlement(std::size_t village) const {
 }
 
 Stage World::stage(std::size_t structure) const {
-  const std::uint32_t durability = structures_.at(structure).durability;
-  return static_cast<Stage>(std::count_if(
-      rules_.stage_floors.begin(), rules_.stage_floors.end(),
-      [durability](std::uint32_t floor) { return durability < floor; }));
+  return stages().of(structure);
+}
+
+// The stage each structure is in now.
+Stages World::stages() const {
+  return Stages{structures_, rules_.stage_floors};
 }
 
 std::uint64_t World::next_random() {
@@ -3294,7 +3259,7 @@ std::optional<std::size_t> World::army_of(std::size_t person) const {
 // army's members make it their home.
 bool World::shift(std::size_t structure, Destroyer striker,
                   std::int64_t effect) {
-  const std::optional<std::size_t>& home = village_of_.at(structure);
+  const std::optional<std::size_t> home = villages_.village_of(structure);
   const bool held =
       home && !armies_.at(villages_.at(*home).spec.residents).roster.empty();
   if (held && (effect > 0) != hostile(striker.faction, owner(*home))) {
@@ -3310,18 +3275,12 @@ bool World::shift(std::size_t structure, Destroyer striker,
   if (!home) {
     return effect != 0;
   }
-  Village& village = villages_.at(*home);
-  const std::vector<std::size_t>& own = village.spec.structures;
-  const bool ruined = std::all_of(
-      own.begin(), own.end(),
-      [this](std::size_t index) { return stage(index) == Stage::RUBBLE; });
-  if (stood && ruined) {
-    village.destroyer = striker;
+  const VillageChange change = villages_.shifted(
+      *home, stood, shifted.durability > before, held, striker, stages());
+  if (change == VillageChange::RUINED) {
     record(seat(*home), Ruined{*home, owner(*home), striker});
   }
-  if (shifted.durability > before &&
-      armies_.at(village.spec.residents).roster.empty()) {
-    village.spec.residents = striker.army;
+  if (change == VillageChange::RETAKEN) {
     for (const std::size_t member : armies_.at(striker.army).roster) {
       people_.at(member).home = home;
     }
@@ -3766,11 +3725,8 @@ bool World::in_view(std::size_t village, Cell from) const {
 // Village `village` as it stands: its owner, claim centre, whether it has
 // living residents, and whether every structure is intact, rubble, or neither.
 VillageMemory World::memory_of(std::size_t village) const {
-  const std::vector<std::size_t>& built = villages_.at(village).spec.structures;
-  const auto all_in = [this, &built](Stage wanted) {
-    return std::all_of(
-        built.begin(), built.end(),
-        [this, wanted](std::size_t index) { return stage(index) == wanted; });
+  const auto all_in = [this, village](Stage wanted) {
+    return villages_.all_in(village, wanted, stages());
   };
   VillageStage stage = VillageStage::DAMAGED;
   if (all_in(Stage::RUBBLE)) {
@@ -3962,63 +3918,19 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   armies_.at(army_of.at(lineage)).roster.push_back(born);
 }
 
-// What village `village`'s structures no worse than `worst` hold together,
-// the greatest edge and healing among them, and the harvest of its intact
-// fields.
-Holding World::held(std::size_t village, Stage worst) const {
-  const VillageSpec& spec = villages_.at(village).spec;
-  Holding total;
-  for (std::size_t index = 0; index < spec.holdings.size(); ++index) {
-    const Holding& holding = spec.holdings.at(index);
-    const Stage now = stage(spec.structures.at(index));
-    if (now <= worst) {
-      total.housing += holding.housing;
-      total.storage += holding.storage;
-      total.pupils += holding.pupils;
-      total.arms += holding.arms;
-      total.tends += holding.tends;
-      total.edge = std::max(total.edge, holding.edge);
-      total.healing = std::max(total.healing, holding.healing);
-    }
-    total.harvest += now == Stage::INTACT ? holding.harvest : 0;
-  }
-  return total;
-}
-
 std::size_t World::cap(std::size_t village) const {
-  if (!life_.husbandry) {
-    return rules_.people_capacity;
-  }
-  const Holding standing = held(village, Stage::DAMAGED);
-  const std::uint64_t yearly = std::max<std::uint64_t>(
-      std::uint64_t{life_.husbandry->consumption} * DAYS_PER_YEAR, 1);
-  return static_cast<std::size_t>(
-      std::min({std::uint64_t{standing.housing}, standing.harvest / yearly,
-                standing.storage / yearly}));
+  return villages_.cap(village, stages(), life_.husbandry,
+                       rules_.people_capacity);
 }
 
-// Each village's edge and healing from its standing structures, each kept
-// only while the growth's self-reliance and what they arm, or tend, cover the
-// people whose home it is.
-World::Service World::served() const {
+// Each village's edge and healing from its standing structures, as its
+// people and the growth's self-reliance let them serve.
+Service World::served() const {
   if (villages_.empty()) {
     return {};
   }
-  const std::vector<std::size_t> population = homes();
-  const std::uint64_t reliance = life_.growth ? life_.growth->self_reliance : 0;
-  Service service{std::vector<std::uint32_t>(villages_.size(), 0),
-                  std::vector<std::uint32_t>(villages_.size(), 0)};
-  for (std::size_t village = 0; village < villages_.size(); ++village) {
-    const Holding standing = held(village, Stage::DAMAGED);
-    const std::uint64_t people = population.at(village);
-    if (reliance + standing.arms >= people) {
-      service.edge.at(village) = standing.edge;
-    }
-    if (reliance + standing.tends >= people) {
-      service.healing.at(village) = standing.healing;
-    }
-  }
-  return service;
+  return villages_.served(
+      homes(), life_.growth ? life_.growth->self_reliance : 0, stages());
 }
 
 // Once a day, every living person whose home's workshops tend it recovers
@@ -4047,21 +3959,7 @@ std::size_t World::residents_of(std::size_t village) const {
 }
 
 std::optional<FieldState> World::field_state(std::size_t structure) const {
-  const std::optional<std::size_t>& village = village_of_.at(structure);
-  if (!village) {
-    return std::nullopt;
-  }
-  const VillageSpec& spec = villages_.at(*village).spec;
-  const auto place = static_cast<std::size_t>(
-      std::find(spec.structures.begin(), spec.structures.end(), structure) -
-      spec.structures.begin());
-  if (place >= spec.holdings.size() || spec.holdings.at(place).harvest == 0) {
-    return std::nullopt;
-  }
-  if (stage(structure) != Stage::INTACT) {
-    return FieldState::BURNT;
-  }
-  return static_cast<FieldState>(date().season);
+  return villages_.field_state(structure, stages(), date().season);
 }
 
 // How many living people make each village their home.
@@ -4089,17 +3987,8 @@ void World::husband(const Husbandry& husbandry) {
     settle();
   }
   std::vector<std::size_t> population = homes();
-  std::vector<bool> fed(villages_.size(), false);
-  for (std::size_t village = 0; village < villages_.size(); ++village) {
-    const Holding holds = held(village, Stage::DAMAGED);
-    Village& feeding = villages_.at(village);
-    feeding.stock = std::min<std::uint64_t>(
-        feeding.stock + (harvest ? holds.harvest : 0), holds.storage);
-    const std::uint64_t need =
-        std::uint64_t{husbandry.consumption} * population.at(village);
-    fed.at(village) = feeding.stock >= need;
-    feeding.stock -= fed.at(village) ? need : feeding.stock;
-  }
+  const std::vector<bool> fed =
+      villages_.feed(population, husbandry.consumption, harvest, stages());
   std::vector<Unfed> unfed;
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     for (const std::size_t member : armies_.at(army).roster) {
@@ -4158,8 +4047,8 @@ void World::migrate_or_starve(Unfed unfed, std::int32_t reach,
     const Cell there = seat(village);
     if (village != home && std::abs(there.x - from.x) <= reach &&
         std::abs(there.y - from.y) <= reach &&
-        population.at(village) < cap(village) &&
-        villages_.at(village).stock > 0) {
+        villages_.shelters(village, population.at(village), stages(),
+                           life_.husbandry, rules_.people_capacity)) {
       refuges.push_back(village);
     }
   }
@@ -4272,17 +4161,13 @@ bool World::expand(std::size_t village, Expansion expansion,
 // back to them. A party that became another village's residents is no
 // longer the village's.
 void World::recall(std::size_t village) {
-  Village& raiding = villages_.at(village);
+  const VillageRecord& raiding = villages_.at(village);
   if (!raiding.party) {
     return;
   }
   const std::size_t party = *raiding.party;
-  const auto housed = [party](const Village& other) {
-    return other.spec.residents == party;
-  };
-  if (std::any_of(villages_.begin(), villages_.end(), housed)) {
-    raiding.party.reset();
-    raiding.raiding.reset();
+  if (villages_.houses(party)) {
+    villages_.release(village);
     return;
   }
   if (!raiding.raiding) {
@@ -4297,7 +4182,7 @@ void World::recall(std::size_t village) {
   if (!over) {
     return;
   }
-  raiding.raiding.reset();
+  villages_.end_raid(village);
   const std::vector<std::size_t> members = out.roster;
   for (const std::size_t member : members) {
     const std::optional<std::size_t> home = people_.at(member).home;
@@ -4331,7 +4216,7 @@ World::Ground World::ground() const {
       marked.covered.at(slot(cell)) = true;
     }
   }
-  for (const Village& village : villages_) {
+  for (const VillageRecord& village : villages_.records()) {
     for (const Clearing& clearing : village.spec.clearings) {
       for (const Cell cell : cells_of(clearing.corner, clearing.area)) {
         if (cell.x >= 0 && cell.y >= 0 && cell.x < map_.width() &&
@@ -4381,8 +4266,8 @@ bool World::lay_building(std::size_t village, const Growth& growth) {
         holding.housing, holding.harvest / yearly, holding.storage / yearly,
         reliance + holding.arms, reliance + holding.tends};
   };
-  const std::array<std::uint64_t, HOLDINGS> holds =
-      in_people(held(village, Stage::DAMAGED), growth.self_reliance);
+  const std::array<std::uint64_t, HOLDINGS> holds = in_people(
+      villages_.held(village, Stage::DAMAGED, stages()), growth.self_reliance);
   const auto scarcest = static_cast<std::size_t>(
       std::min_element(holds.begin(), holds.end()) - holds.begin());
   std::optional<std::size_t> chosen;
@@ -4524,10 +4409,9 @@ bool World::found_village(std::size_t village, const Growth& growth) {
     }
   }
   const std::size_t army = form(village, settlers, centre, std::nullopt);
-  villages_.push_back(Village{VillageSpec{{}, army, {}, 0, {}}, std::nullopt, 0,
-                              std::nullopt, std::nullopt, corner});
-  attach(villages_.size() - 1, *laid, growth);
-  record(centre, Founded{villages_.size() - 1, faction});
+  const std::size_t founded = villages_.found(army, corner);
+  attach(founded, *laid, growth);
+  record(centre, Founded{founded, faction});
   return true;
 }
 
@@ -4536,7 +4420,7 @@ bool World::found_village(std::size_t village, const Growth& growth) {
 // hostile to, with living residents and its centre within reach, the lowest
 // among equals. Returns whether it sent them.
 bool World::send_raid(std::size_t village, const Growth& growth) {
-  const Village& raiding = villages_.at(village);
+  const VillageRecord& raiding = villages_.at(village);
   const std::vector<std::size_t>& residents =
       armies_.at(raiding.spec.residents).roster;
   if (raiding.raiding || residents.size() <= growth.raiders) {
@@ -4573,8 +4457,7 @@ bool World::send_raid(std::size_t village, const Growth& growth) {
   }
   const std::size_t party =
       form(village, raiders, seat(*target), raiding.party);
-  villages_.at(village).party = party;
-  villages_.at(village).raiding = target;
+  villages_.send(village, Raid{party, *target});
   record(seat(*target), Raided{*target, owner(*target), faction});
   return true;
 }
@@ -4694,7 +4577,7 @@ std::optional<std::vector<std::size_t>> World::lay(
     const Plan& plan = growth.plans.at(each.plan);
     made.push_back(structures_.size());
     structures_.push_back(Structure{each.cell, 0, plan.footprint, plan.blocks});
-    village_of_.emplace_back();
+    villages_.add_structure();
     plans_.emplace_back(each.plan);
     structure_extent_ =
         std::max({structure_extent_, plan.footprint.width * CELL_SIZE,
@@ -4709,13 +4592,9 @@ std::optional<std::vector<std::size_t>> World::lay(
 void World::attach(std::size_t village,
                    const std::vector<std::size_t>& structures,
                    const Growth& growth) {
-  VillageSpec& spec = villages_.at(village).spec;
-  spec.holdings.resize(spec.structures.size());
   for (const std::size_t structure : structures) {
-    village_of_.at(structure) = village;
-    spec.structures.push_back(structure);
-    spec.holdings.push_back(
-        growth.plans.at(plans_.at(structure).value_or(0)).holding);
+    villages_.attach(village, structure,
+                     growth.plans.at(plans_.at(structure).value_or(0)).holding);
   }
 }
 
