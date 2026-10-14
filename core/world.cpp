@@ -2685,9 +2685,9 @@ std::optional<std::size_t> World::aim_of(std::size_t user, const Skill& skill,
   }
   return crowd.hash.nearest(
       foe_kinds(self, own), from, skill.range, [&](std::size_t other) {
-        const std::size_t person = crowd.people.at(other);
-        return foes(self, army, person, crowd.armies.at(other)) &&
-               may_aim(self, own, person);
+        const std::size_t target = crowd.people.at(other);
+        return foes(self, army, target, crowd.armies.at(other)) &&
+               may_aim(self, own, target);
       });
 }
 
@@ -2991,17 +2991,17 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   const Position from = crowd.hash.position(index);
   const Position foe_at = crowd.hash.position(*close.foe);
   const bool in_reach = distance_squared(from, foe_at) <= reached * reached;
-  const auto on = [from](Position point) {
+  const auto arrived = [from](Position point) {
     return distance_squared(from, point) <= std::int64_t{ON_SLOT} * ON_SLOT;
   };
   Position there = foe_at;
   bool stands = in_reach;
   if (const auto* slot = std::get_if<ToSlot>(&close.approach)) {
     there = slot->at;
-    stands = in_reach && on(there);
+    stands = in_reach && arrived(there);
   } else if (const auto* waiting = std::get_if<ToWait>(&close.approach)) {
     there = waiting->at;
-    stands = on(there);
+    stands = arrived(there);
   } else if (std::holds_alternative<Hold>(close.approach)) {
     stands = true;
   }

@@ -4292,7 +4292,7 @@ constexpr std::uint64_t RINGING_TICKS = 1'000;
 bool on_its_slot(const World& world, std::size_t member, std::size_t foe,
                  const SlotRing& ring) {
   const std::optional<Engagement> held = world.attacks().engagement(member);
-  if (!held) {
+  if (!held || !held->slot) {
     return false;
   }
   const Position centre = world.person(foe).position;
@@ -4490,11 +4490,11 @@ TEST(World, APersonOfferedNoSlotClosesOnTheFoeAndFightsItInReach) {
                   .slot.has_value());
 }
 
-// The most of `world`'s army `army` that strike on any one tick over `ticks`
-// ticks.
-std::size_t most_striking(World& world, std::size_t army, std::uint64_t ticks) {
+// The most of `world`'s army `army` that strike on any one tick over
+// RING_TICKS ticks.
+std::size_t most_striking(World& world, std::size_t army) {
   std::size_t most = 0;
-  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+  for (std::uint64_t tick = 0; tick < RING_TICKS; ++tick) {
     const std::vector<std::size_t> roster = world.roster(army);
     world.tick();
     const std::vector<Strike>& strikes = world.strikes();
@@ -4513,21 +4513,21 @@ TEST(World, AtMostTheFoesTokensStrikeItOnAnyTick) {
   constexpr std::size_t GRANTED = 4;
   ASSERT_EQ(default_tokens().by_rank.front(), GRANTED);
   World world = ringed(open_map(OPEN_SIDE), default_tokens(), false);
-  EXPECT_EQ(most_striking(world, 0, RING_TICKS), GRANTED);
+  EXPECT_EQ(most_striking(world, 0), GRANTED);
   // Control: granting all eight a token, all eight strike on one tick.
   World all = ringed(open_map(OPEN_SIDE), all_strike(), false);
-  EXPECT_EQ(most_striking(all, 0, RING_TICKS), RING_ATTACKERS);
+  EXPECT_EQ(most_striking(all, 0), RING_ATTACKERS);
 }
 
 TEST(World, ThePlayerAsAFoeIsCappedByItsOwnTokens) {
   constexpr std::size_t GRANTED = 4;
   World world = ringed(open_map(OPEN_SIDE), default_tokens(), false);
   world.steer(1, true);
-  EXPECT_EQ(most_striking(world, 0, RING_TICKS), GRANTED);
+  EXPECT_EQ(most_striking(world, 0), GRANTED);
   // Control: granting all eight a token, all eight strike the player.
   World all = ringed(open_map(OPEN_SIDE), all_strike(), false);
   all.steer(1, true);
-  EXPECT_EQ(most_striking(all, 0, RING_TICKS), RING_ATTACKERS);
+  EXPECT_EQ(most_striking(all, 0), RING_ATTACKERS);
 }
 
 // As many attackers of faction 0 beside RING_FOE as the default table's
@@ -4554,56 +4554,75 @@ World latecomer(bool steered) {
   return world;
 }
 
-TEST(World, TheSteeredTakesATokenTheNPCsHoldFromTheLastToTakeOne) {
-  const auto arrive = [](World& world) {
-    const std::size_t late = world.roster(2).front();
-    const std::vector<std::size_t> npcs = world.roster(0);
-    std::optional<Engagement> before;
-    std::vector<std::optional<Engagement>> holding(npcs.size());
-    for (std::uint64_t tick = 0; tick < RING_TICKS; ++tick) {
-      for (std::size_t rank = 0; rank < npcs.size(); ++rank) {
-        holding.at(rank) = world.attacks().engagement(npcs.at(rank));
-      }
-      world.tick();
-      before = world.attacks().engagement(late);
-      if (before) {
-        break;
-      }
-    }
-    return std::pair{before, holding};
-  };
-  World world = latecomer(true);
-  const auto [steered, holding] = arrive(world);
-  // Setup: every NPC held one of the foe's tokens as the steered person
-  // arrived.
+// What the latecomer of `world` engaging holds on the tick it first engages,
+// and what each NPC of army 0 held the tick before.
+struct Arrival {
+  std::optional<Engagement> late;
+  std::vector<std::optional<Engagement>> holding;
+};
+
+Arrival arrive(World& world) {
+  const std::size_t late = world.roster(2).front();
   const std::vector<std::size_t> npcs = world.roster(0);
-  for (const std::optional<Engagement>& held : holding) {
-    ASSERT_TRUE(held && held->token);
+  Arrival arrival{std::nullopt,
+                  std::vector<std::optional<Engagement>>(npcs.size())};
+  for (std::uint64_t tick = 0; tick < RING_TICKS && !arrival.late; ++tick) {
+    for (std::size_t rank = 0; rank < npcs.size(); ++rank) {
+      arrival.holding.at(rank) = world.attacks().engagement(npcs.at(rank));
+    }
+    world.tick();
+    arrival.late = world.attacks().engagement(late);
   }
-  ASSERT_TRUE(steered.has_value());
-  EXPECT_TRUE(steered->token);
-  // The NPC that took its token last, the higher among equals, gave it up,
-  // and the others kept theirs.
+  return arrival;
+}
+
+// The rank among `npcs` of the one that took its token last by `holding`, the
+// higher person among equals.
+std::size_t last_to_take(
+    const std::vector<std::size_t>& npcs,
+    const std::vector<std::optional<Engagement>>& holding) {
+  const auto taken = [&](std::size_t rank) {
+    return std::tuple{holding.at(rank).value_or(Engagement{}).token_since,
+                      npcs.at(rank)};
+  };
   std::size_t last = 0;
   for (std::size_t rank = 1; rank < npcs.size(); ++rank) {
-    if (std::tuple{holding.at(rank)->token_since, npcs.at(rank)} >
-        std::tuple{holding.at(last)->token_since, npcs.at(last)}) {
+    if (taken(rank) > taken(last)) {
       last = rank;
     }
   }
+  return last;
+}
+
+TEST(World, TheSteeredTakesATokenTheNPCsHoldFromTheLastToTakeOne) {
+  World world = latecomer(true);
+  const Arrival steered = arrive(world);
+  // Setup: every NPC held one of the foe's tokens as the steered person
+  // arrived.
+  ASSERT_TRUE(std::all_of(steered.holding.begin(), steered.holding.end(),
+                          [](const std::optional<Engagement>& held) {
+                            return held && held->token;
+                          }));
+  ASSERT_TRUE(steered.late.has_value());
+  EXPECT_TRUE(steered.late.value_or(Engagement{}).token);
+  // The NPC that took its token last, the higher among equals, gave it up,
+  // and the others kept theirs.
+  const std::vector<std::size_t> npcs = world.roster(0);
+  const std::size_t last = last_to_take(npcs, steered.holding);
+  std::vector<bool> kept;
+  std::vector<bool> expected;
   for (std::size_t rank = 0; rank < npcs.size(); ++rank) {
-    EXPECT_EQ(
-        world.attacks().engagement(npcs.at(rank)).value_or(Engagement{}).token,
-        rank != last)
-        << rank;
+    kept.push_back(
+        world.attacks().engagement(npcs.at(rank)).value_or(Engagement{}).token);
+    expected.push_back(rank != last);
   }
+  EXPECT_EQ(kept, expected);
   // And the steered person strikes the foe.
-  EXPECT_GT(most_striking(world, 2, RING_TICKS), 0U);
+  EXPECT_GT(most_striking(world, 2), 0U);
   // Control: an NPC arriving instead waits.
   World npc = latecomer(false);
-  const auto [waiting, ignored] = arrive(npc);
-  ASSERT_TRUE(waiting.has_value());
-  EXPECT_TRUE(!waiting->token && waiting->ring == Ring::WAITING);
+  const Engagement waiting = arrive(npc).late.value_or(Engagement{});
+  EXPECT_TRUE(!waiting.token && waiting.ring == Ring::WAITING);
 }
 
 // One attacker of faction 0 at RING_START with an attack intent on the first
@@ -4686,7 +4705,7 @@ bool a_waiter_was_hit(World& world) {
     for (const std::size_t member : world.roster(0)) {
       if (world.attacks().engagement(member).value_or(Engagement{}).ring ==
               Ring::WAITING &&
-          !(target && target->foe == member)) {
+          (!target || target->foe != member)) {
         waiting.emplace_back(member, world.person(member).health);
       }
     }
@@ -4709,6 +4728,30 @@ TEST(World, AnAreaUseStillHitsAWaiterInItsShape) {
   EXPECT_FALSE(a_waiter_was_hit(targeted));
 }
 
+// The last of `world`'s army 0 holding a token of `foe`, if any does.
+std::optional<std::size_t> token_holder(const World& world, std::size_t foe) {
+  std::optional<std::size_t> holder;
+  for (const std::size_t member : world.roster(0)) {
+    const std::optional<Engagement> held = world.attacks().engagement(member);
+    if (held && held->foe == foe && held->token) {
+      holder = member;
+    }
+  }
+  return holder;
+}
+
+// Whether `person` strikes within RING_TICKS ticks of `world`.
+bool strikes_soon(World& world, std::size_t person) {
+  bool struck = false;
+  for (std::uint64_t tick = 0; tick < RING_TICKS && !struck; ++tick) {
+    world.tick();
+    for (const Strike& strike : world.strikes()) {
+      struck = struck || strike.person == person;
+    }
+  }
+  return struck;
+}
+
 TEST(World, AHoldersDeathGivesTheHeadOfTheQueueItsTokenWithinATick) {
   // The foe kills whoever it strikes, every second.
   constexpr std::uint64_t FRAIL = 10;
@@ -4718,35 +4761,18 @@ TEST(World, AHoldersDeathGivesTheHeadOfTheQueueItsTokenWithinATick) {
   std::optional<std::size_t> taker;
   bool refilled = false;
   for (std::uint64_t tick = 0; tick < RING_TICKS && !taker; ++tick) {
-    std::optional<std::size_t> holder;
-    for (const std::size_t member : world.roster(0)) {
-      const std::optional<Engagement> held = world.attacks().engagement(member);
-      if (held && held->foe == foe && held->token) {
-        holder = member;
-      }
-    }
+    const std::optional<std::size_t> holder = token_holder(world, foe);
     world.tick();
     if (holder && world.person(*holder).health == 0) {
       refilled = world.attacks().tokens_held(foe) == 1;
-      for (const std::size_t member : world.roster(0)) {
-        if (world.attacks().engagement(member).value_or(Engagement{}).token) {
-          taker = member;
-        }
-      }
+      taker = token_holder(world, foe);
     }
   }
   // Setup: a holder died while others waited.
   ASSERT_TRUE(taker.has_value());
   EXPECT_TRUE(refilled);
   // The new holder strikes the foe once in reach.
-  bool struck = false;
-  for (std::uint64_t tick = 0; tick < RING_TICKS && !struck; ++tick) {
-    world.tick();
-    for (const Strike& strike : world.strikes()) {
-      struck = struck || strike.person == *taker;
-    }
-  }
-  EXPECT_TRUE(struck);
+  EXPECT_TRUE(strikes_soon(world, taker.value_or(0)));
 }
 
 // `holders` people of faction 0 at RING_START beside a foe of faction 1, of

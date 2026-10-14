@@ -4,9 +4,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -77,6 +79,39 @@ std::int64_t distance_squared(Position from, Position toward) {
 
 Position shifted(Position origin, Position offset) {
   return Position{origin.x + offset.x, origin.y + offset.y};
+}
+
+// The slot below `count` nearest `from` of those `open` accepts, each where
+// `place` puts it, the lower among equals; none when it accepts none.
+template <typename Place, typename Open>
+std::optional<std::uint8_t> nearest_open(Position from, std::size_t count,
+                                         const Place& place, const Open& open) {
+  std::optional<std::uint8_t> nearest;
+  std::int64_t best = 0;
+  for (std::size_t slot = 0; slot < count; ++slot) {
+    const std::int64_t distance = distance_squared(from, place(slot));
+    if (open(slot) && (!nearest || distance < best)) {
+      nearest = static_cast<std::uint8_t>(slot);
+      best = distance;
+    }
+  }
+  return nearest;
+}
+
+// The first slot of `count` that `open` accepts going round from `slot`,
+// onward for an even `person` and back for an odd one; none when it accepts
+// none.
+template <typename Open>
+std::optional<std::uint8_t> next_round(std::uint8_t slot, std::size_t count,
+                                       std::size_t person, const Open& open) {
+  const std::size_t step = person % 2 == 0 ? 1 : count - 1;
+  for (std::size_t turn = 1; turn < count; ++turn) {
+    const std::size_t next = (slot + (step * turn)) % count;
+    if (open(next)) {
+      return static_cast<std::uint8_t>(next);
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -205,26 +240,26 @@ void Attacks::release(std::size_t person) {
 void Attacks::assign(std::vector<Engaging>& engaging, const Map& map,
                      std::int32_t separation, const Tokens& tokens,
                      std::uint32_t now, const Crowded& crowded) {
-  const Group within = free_stale(engaging, separation);
+  const auto within = free_stale(engaging, separation);
   std::sort(engaging.begin(), within,
             [](const Engaging& left, const Engaging& right) {
               return std::tuple{left.foe, left.distance, left.person} <
                      std::tuple{right.foe, right.distance, right.person};
             });
-  for (Group first = engaging.begin(); first != within;) {
-    const Group last = std::find_if(first, within, [&](const Engaging& each) {
+  for (auto first = engaging.begin(); first != within;) {
+    const auto last = std::find_if(first, within, [&](const Engaging& each) {
       return each.foe != first->foe;
     });
     grant(first, last, tokens, now);
-    const Group waiters = std::find_if(
+    const auto waiters = std::find_if(
         first, last, [](const Engaging& each) { return !each.strikes; });
-    for (Group ring = first; ring != waiters;) {
+    for (auto ring = first; ring != waiters;) {
       const Ring kind = ring_for(ring->reach).value_or(Ring::NEAR);
-      const Group next = std::find_if(ring, waiters, [&](const Engaging& each) {
+      const auto next = std::find_if(ring, waiters, [&](const Engaging& each) {
         return ring_for(each.reach) != kind;
       });
       std::int32_t shortest = ring->reach;
-      for (Group each = ring; each != next; ++each) {
+      for (auto each = ring; each != next; ++each) {
         shortest = std::min(shortest, each->reach);
       }
       if (kind != Ring::FAR) {
@@ -259,7 +294,7 @@ Attacks::Group Attacks::free_stale(std::vector<Engaging>& engaging,
       release(person);
     }
   }
-  const Group within = std::stable_partition(
+  const auto within = std::stable_partition(
       engaging.begin(), engaging.end(),
       [this](const Engaging& each) { return engaging_.at(each.person); });
   for (const Engaging& each : engaging) {
@@ -268,88 +303,121 @@ Attacks::Group Attacks::free_stale(std::vector<Engaging>& engaging,
   return within;
 }
 
-void Attacks::grant(Group first, Group last, const Tokens& tokens,
-                    std::uint32_t now) {
-  const std::size_t foe = first->foe;
-  const std::uint32_t granted = std::min(first->tokens, MAX_TOKENS);
-  // Who has held a token or waited longest: the ticks since `since`.
-  const auto since = [now](std::uint32_t tick) { return now - tick; };
+// The people engaging one foe on a tick by how they stand to its tokens:
+// holders, the one that took its token last first; waiters in the order they
+// began to wait; newcomers by distance; and holders giving theirs up.
+struct Attacks::Lines {
   std::vector<Group> holders;
   std::vector<Group> queued;
   std::vector<Group> newcomers;
   std::vector<Group> lapsed;
-  for (Group each = first; each != last; ++each) {
+};
+
+void Attacks::grant(Group first, Group last, const Tokens& tokens,
+                    std::uint32_t now) {
+  const std::uint32_t granted = std::min(first->tokens, MAX_TOKENS);
+  Lines lines = line_up(first, last, now);
+  lapse(lines, granted, tokens, now);
+  const std::vector<Group> order = claims(lines, granted);
+  hand_out(first, last, lines, order, now);
+}
+
+Attacks::Lines Attacks::line_up(Group first, Group last,
+                                std::uint32_t now) const {
+  Lines lines;
+  for (auto each = first; each != last; ++each) {
     const std::optional<Engagement> held = engagement(each->person);
     if (each->claim == Claim::EXEMPT) {
       each->strikes = true;
     } else if (held && held->token) {
-      holders.push_back(each);
+      lines.holders.push_back(each);
     } else if (held && held->ring == Ring::WAITING) {
-      queued.push_back(each);
+      lines.queued.push_back(each);
     } else {
-      newcomers.push_back(each);
+      lines.newcomers.push_back(each);
     }
   }
-  // The holder that took its token last gives it up first.
-  const auto latest = [&](Group left, Group right) {
-    const Engagement one = engagement(left->person).value_or(Engagement{});
-    const Engagement other = engagement(right->person).value_or(Engagement{});
-    return std::tuple{since(one.token_since), right->person} <
-           std::tuple{since(other.token_since), left->person};
+  // The ticks since `tick`, how long a token was held or a waiter waited.
+  const auto since = [&](Group each, std::uint32_t Engagement::* tick) {
+    return now - engagement(each->person).value_or(Engagement{}).*tick;
   };
-  std::sort(holders.begin(), holders.end(), latest);
+  std::sort(
+      lines.holders.begin(), lines.holders.end(), [&](Group left, Group right) {
+        return std::tuple{since(left, &Engagement::token_since),
+                          right->person} <
+               std::tuple{since(right, &Engagement::token_since), left->person};
+      });
+  std::stable_sort(lines.queued.begin(), lines.queued.end(),
+                   [&](Group left, Group right) {
+                     return std::tuple{since(right, &Engagement::waiting_since),
+                                       left->person} <
+                            std::tuple{since(left, &Engagement::waiting_since),
+                                       right->person};
+                   });
+  return lines;
+}
+
+void Attacks::lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
+                    std::uint32_t now) const {
+  std::vector<Group>& holders = lines.holders;
   const auto give_up = [&](std::size_t index) {
-    lapsed.push_back(holders.at(index));
+    lines.lapsed.push_back(holders.at(index));
     holders.erase(holders.begin() + static_cast<std::ptrdiff_t>(index));
   };
   while (holders.size() > granted) {
     give_up(0);
   }
-  const std::size_t waiting = queued.size() + newcomers.size();
-  if (tokens.lease > 0 && waiting > granted - holders.size()) {
-    for (std::size_t index = holders.size(); index-- > 0;) {
-      const Engagement held =
-          engagement(holders.at(index)->person).value_or(Engagement{});
-      if (holders.at(index)->claim != Claim::FIRST &&
-          since(held.token_since) >= tokens.lease) {
-        give_up(index);
-      }
+  const std::size_t waiting = lines.queued.size() + lines.newcomers.size();
+  if (tokens.lease == 0 || waiting <= granted - holders.size()) {
+    return;
+  }
+  for (std::size_t index = holders.size(); index-- > 0;) {
+    const Engagement held =
+        engagement(holders.at(index)->person).value_or(Engagement{});
+    if (holders.at(index)->claim != Claim::FIRST &&
+        now - held.token_since >= tokens.lease) {
+      give_up(index);
     }
   }
-  std::stable_sort(queued.begin(), queued.end(), [&](Group left, Group right) {
-    const Engagement one = engagement(left->person).value_or(Engagement{});
-    const Engagement other = engagement(right->person).value_or(Engagement{});
-    return std::tuple{since(other.waiting_since), left->person} <
-           std::tuple{since(one.waiting_since), right->person};
-  });
-  // Claim::FIRST ahead of the queue, displacing the latest holder when none
-  // is free; then the queue, newcomers, and those who gave theirs up.
+}
+
+std::vector<Attacks::Group> Attacks::claims(Lines& lines,
+                                            std::uint32_t granted) {
+  // Claim::FIRST ahead of the queue, displacing the holder that took its
+  // token last when none is free; then the queue, newcomers, and those who
+  // gave theirs up.
+  const std::array<const std::vector<Group>*, 3> waiting{
+      &lines.queued, &lines.newcomers, &lines.lapsed};
   std::vector<Group> order;
-  for (std::vector<Group>* line : {&queued, &newcomers, &lapsed}) {
-    for (const Group each : *line) {
-      if (each->claim == Claim::FIRST) {
-        order.push_back(each);
-      }
-    }
+  for (const std::vector<Group>* line : waiting) {
+    std::copy_if(line->begin(), line->end(), std::back_inserter(order),
+                 [](Group each) { return each->claim == Claim::FIRST; });
   }
-  for (std::size_t first_claims = order.size();
-       first_claims > 0 && holders.size() + first_claims > granted &&
-       !holders.empty() && holders.front()->claim != Claim::FIRST;
-       --first_claims) {
-    give_up(0);
+  std::vector<Group>& holders = lines.holders;
+  for (std::size_t first = order.size();
+       first > 0 && holders.size() + first > granted && !holders.empty() &&
+       holders.front()->claim != Claim::FIRST;
+       --first) {
+    lines.lapsed.push_back(holders.front());
+    holders.erase(holders.begin());
   }
-  for (std::vector<Group>* line : {&queued, &newcomers, &lapsed}) {
-    for (const Group each : *line) {
-      if (each->claim != Claim::FIRST) {
-        order.push_back(each);
-      }
-    }
+  for (const std::vector<Group>* line : waiting) {
+    std::copy_if(line->begin(), line->end(), std::back_inserter(order),
+                 [](Group each) { return each->claim != Claim::FIRST; });
   }
-  std::size_t free = granted - std::min<std::size_t>(holders.size(), granted);
-  for (const Group each : holders) {
+  return order;
+}
+
+void Attacks::hand_out(Group first, Group last, const Lines& lines,
+                       const std::vector<Group>& order, std::uint32_t now) {
+  const std::size_t foe = first->foe;
+  const std::uint32_t granted = std::min(first->tokens, MAX_TOKENS);
+  std::size_t free =
+      granted - std::min<std::size_t>(lines.holders.size(), granted);
+  for (const auto each : lines.holders) {
     each->strikes = true;
   }
-  for (const Group each : order) {
+  for (const auto each : order) {
     const std::optional<Engagement> held = engagement(each->person);
     const Ring ring = ring_for(each->reach).value_or(Ring::NEAR);
     if (free > 0) {
@@ -362,7 +430,7 @@ void Attacks::grant(Group first, Group last, const Tokens& tokens,
              Engagement{foe, Ring::WAITING, std::nullopt, false, now, 0});
     }
   }
-  for (Group each = first; each != last; ++each) {
+  for (auto each = first; each != last; ++each) {
     const std::optional<Engagement> held = engagement(each->person);
     if (each->claim == Claim::EXEMPT &&
         (!held || held->token || held->ring == Ring::WAITING)) {
@@ -372,21 +440,19 @@ void Attacks::grant(Group first, Group last, const Tokens& tokens,
     }
   }
   // Strikers by ring, distance, then person; then waiters in queue order.
-  std::vector<
-      std::pair<std::tuple<int, int, std::int64_t, std::size_t>, Engaging>>
-      sorted;
-  std::size_t position = 0;
-  for (const Group each : order) {
+  using Key = std::tuple<int, int, std::int64_t, std::size_t>;
+  std::vector<std::pair<Key, Engaging>> sorted;
+  std::int64_t position = 0;
+  for (const auto each : order) {
     if (!each->strikes) {
-      sorted.push_back(
-          {{1, 0, static_cast<std::int64_t>(position++), 0}, *each});
+      sorted.emplace_back(Key{1, 0, position++, 0}, *each);
     }
   }
-  for (Group each = first; each != last; ++each) {
+  for (auto each = first; each != last; ++each) {
     if (each->strikes) {
       const Ring ring = ring_for(each->reach).value_or(Ring::NEAR);
-      sorted.push_back(
-          {{0, static_cast<int>(ring), each->distance, each->person}, *each});
+      sorted.emplace_back(
+          Key{0, static_cast<int>(ring), each->distance, each->person}, *each);
     }
   }
   std::sort(sorted.begin(), sorted.end(),
@@ -411,31 +477,13 @@ void Attacks::seat(Group first, Group last, Ring ring, const SlotRing& slots,
            !taken(foe, ring, static_cast<std::uint8_t>(slot));
   };
   // A slot held stays held while the ring still offers it.
-  for (Group each = first; each != last; ++each) {
-    const std::optional<std::uint8_t> slot =
-        engagement(each->person).value_or(Engagement{}).slot;
-    if (slot && (*slot >= count || (offered & bit(*slot)) == 0)) {
-      sit(each->person, std::nullopt);
-    }
-  }
-  for (Group each = first; each != last; ++each) {
+  unseat(first, last, count, offered);
+  for (auto each = first; each != last; ++each) {
     std::optional<std::uint8_t> slot =
         engagement(each->person).value_or(Engagement{}).slot;
     if (!slot) {
-      std::optional<std::size_t> nearest;
-      std::int64_t best = 0;
-      for (std::size_t other = 0; other < count; ++other) {
-        const std::int64_t distance =
-            distance_squared(each->from, place(other));
-        if (open(other) && (!nearest || distance < best)) {
-          nearest = other;
-          best = distance;
-        }
-      }
-      if (nearest) {
-        slot = static_cast<std::uint8_t>(*nearest);
-        sit(each->person, slot);
-      }
+      slot = nearest_open(each->from, count, place, open);
+      sit(each->person, slot);
     }
     if (slot) {
       each->approach = ToSlot{place(waypoint(*each, slots, *slot))};
@@ -449,8 +497,10 @@ void Attacks::seat_waiting(Group first, Group last, std::int32_t separation,
   if (first == last) {
     return;
   }
+  // The longest reach waiting on the ring sizes it; a reach beyond LONG_REACH
+  // waits on none.
   std::int32_t longest = 0;
-  for (Group each = first; each != last; ++each) {
+  for (auto each = first; each != last; ++each) {
     if (each->reach <= LONG_REACH) {
       longest = std::max(longest, each->reach);
     }
@@ -468,51 +518,33 @@ void Attacks::seat_waiting(Group first, Group last, std::int32_t separation,
     return (offered & bit(static_cast<std::uint8_t>(slot))) != 0 &&
            !taken(foe, Ring::WAITING, static_cast<std::uint8_t>(slot));
   };
-  for (Group each = first; each != last; ++each) {
+  unseat(first, last, count, offered);
+  for (auto each = first; each != last; ++each) {
+    const Engagement held = engagement(each->person).value_or(Engagement{});
+    std::optional<std::uint8_t> slot = held.slot;
+    const std::uint32_t waited = now - held.waiting_since;
+    const bool circles =
+        tokens.circling > 0 && waited > 0 && waited % tokens.circling == 0;
+    if (slot && circles) {
+      slot = next_round(*slot, count, each->person, open).value_or(*slot);
+      sit(each->person, slot);
+    }
+    if (!slot && each->reach <= LONG_REACH) {
+      slot = nearest_open(each->from, count, place, open);
+      sit(each->person, slot);
+    }
+    each->approach = slot ? Approach{ToWait{place(*slot)}} : Approach{Hold{}};
+  }
+}
+
+void Attacks::unseat(Group first, Group last, std::size_t count,
+                     std::uint16_t offered) {
+  for (auto each = first; each != last; ++each) {
     const std::optional<std::uint8_t> slot =
         engagement(each->person).value_or(Engagement{}).slot;
     if (slot && (*slot >= count || (offered & bit(*slot)) == 0 ||
                  each->reach > LONG_REACH)) {
       sit(each->person, std::nullopt);
-    }
-  }
-  for (Group each = first; each != last; ++each) {
-    const Engagement held = engagement(each->person).value_or(Engagement{});
-    std::optional<std::uint8_t> slot = held.slot;
-    const std::uint32_t waited = now - held.waiting_since;
-    if (slot && tokens.circling > 0 && waited > 0 &&
-        waited % tokens.circling == 0) {
-      // Onward for an even person, back for an odd one.
-      const std::size_t step = each->person % 2 == 0 ? 1 : count - 1;
-      for (std::size_t turn = 1; turn < count; ++turn) {
-        const std::size_t next = (*slot + (step * turn)) % count;
-        if (open(next)) {
-          slot = static_cast<std::uint8_t>(next);
-          sit(each->person, slot);
-          break;
-        }
-      }
-    }
-    if (!slot && each->reach <= LONG_REACH) {
-      std::optional<std::size_t> nearest;
-      std::int64_t best = 0;
-      for (std::size_t other = 0; other < count; ++other) {
-        const std::int64_t distance =
-            distance_squared(each->from, place(other));
-        if (open(other) && (!nearest || distance < best)) {
-          nearest = other;
-          best = distance;
-        }
-      }
-      if (nearest) {
-        slot = static_cast<std::uint8_t>(*nearest);
-        sit(each->person, slot);
-      }
-    }
-    if (slot) {
-      each->approach = ToWait{place(*slot)};
-    } else {
-      each->approach = Hold{};
     }
   }
 }

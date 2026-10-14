@@ -286,6 +286,21 @@ class Attacks {
   void seat_waiting(Group first, Group last, std::int32_t separation,
                     const Tokens& tokens, std::uint32_t now, const Map& map,
                     const Crowded& crowded);
+  struct Lines;
+  // The steps of grant(): who holds, waits or arrives; holders giving their
+  // tokens up; the order free tokens go in; and handing them out, ordering
+  // the people of `first` to `last` as grant() does.
+  [[nodiscard]] Lines line_up(Group first, Group last, std::uint32_t now) const;
+  void lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
+             std::uint32_t now) const;
+  [[nodiscard]] static std::vector<Group> claims(Lines& lines,
+                                                 std::uint32_t granted);
+  void hand_out(Group first, Group last, const Lines& lines,
+                const std::vector<Group>& order, std::uint32_t now);
+  // Frees the slot of each of `first` to `last` that lies past `count` or
+  // outside `offered`, or whose reach is beyond LONG_REACH.
+  void unseat(Group first, Group last, std::size_t count,
+              std::uint16_t offered);
   // Takes or leaves `person`'s slot, keeping the rest it holds.
   void sit(std::size_t person, std::optional<std::uint8_t> slot);
   [[nodiscard]] std::uint16_t& taken_mask(std::size_t foe, Ring ring);
