@@ -22,7 +22,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two;
   - `trade` wares and trade;
   - `talk` talk and what a person offers;
-  - `leadership` a faction's lead, duels, admission and elections;
+  - `leadership` a faction's lead, duels, admission and elections, and the leaders a world keeps: the one place for each faction's leadership and the duels being fought, deciding who may challenge a leader, how a duel ends and whom it leaves leading, and when a faction elects;
   - `sect` sects as created, and applying to one;
   - `event` the world's events;
   - `chronicle` the bounded, numbered record that keeps the latest events and steps of progress, and checks a saved one;
@@ -30,7 +30,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `person` a person;
   - `life` the rules of life that gather the rest.
 
-  `world` holds the World, which keeps the rest of the state and runs the rest of the rules on each tick, and the rules data it reads. It schedules the villages' rules and carries what they decide to people and armies: who makes a village home and the rosters they serve on stay with it, as do a village's seat and its growth by building, founding and raiding.
+  `world` holds the World, which keeps the rest of the state and runs the rest of the rules on each tick, and the rules data it reads. It schedules the villages' rules and carries what they decide to people and armies: who makes a village home and the rosters they serve on stay with it, as do a village's seat and its growth by building, founding and raiding. For the leaders it chooses the sect master a faction elects and records each change of leader, and a duel's winner turning its allies hostile changes the rules' hostility there.
 - A world is created from a seed, a map of buildable, rough and blocked cells, armies, structures, rules, villages, each faction's leadership and its rules of life. It advances one `tick()` at a time.
 - The rules are data: the separation people keep, the hostility between factions by their stances, the floors of the structure stages, the ticks in a day, the sight within which people close on a foe, and the core's capacity for the living.
 - The capacity is a storage and performance limit, not a rule of play: ADR 0017's bound, `MAX_PEOPLE`, unless the rules set another, up to `PEOPLE_CEILING`. Only a scenario measuring a larger world sets it, as a measurement aid; every region keeps the default until an ADR raises it with the measurements. It is a hard upper bound, not a target.

@@ -616,14 +616,6 @@ class World {
   void restore();
   [[nodiscard]] bool rostered() const;
 
-  /// A duel fought for faction `faction`'s lead, under its rule.
-  struct Fight {
-    std::size_t faction = 0;
-    std::size_t challenger = 0;
-    std::size_t leader = 0;
-    Duel rule;
-  };
-
   struct Army {
     std::size_t faction;
     std::vector<Skill> skills;
@@ -711,10 +703,8 @@ class World {
                                         std::uint64_t due) const;
   /// The army person `person` serves in, if it serves in one.
   [[nodiscard]] std::optional<std::size_t> army_of(std::size_t person) const;
-  [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
   void start_duel(std::size_t army, std::size_t faction);
-  [[nodiscard]] ChallengeRefusal refusal(const Army& challenging,
-                                         std::size_t faction) const;
+  [[nodiscard]] Challenging challenging(std::size_t army) const;
   void enlist(ArmySpec& army, std::size_t pairs, std::size_t& families);
   void add_village(VillageSpec spec);
   void add_sects(std::vector<SectSpec> sects);
@@ -855,7 +845,7 @@ class World {
   // within it of every point of its footprint.
   std::int32_t structure_extent_ = 0;
   Villages villages_;
-  std::vector<Leadership> leadership_;
+  Leaders leaders_;
   /// A sect: its name, its faction and its seat village.
   struct Sect {
     std::string name;
@@ -864,7 +854,6 @@ class World {
   };
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
-  std::vector<Fight> duels_;
   /// The declaration standing between each two factions.
   Declarations declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.

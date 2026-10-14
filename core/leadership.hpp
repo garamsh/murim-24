@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <vector>
+
+#include "person.hpp"
 
 namespace murim {
 
@@ -80,6 +83,109 @@ struct Leadership {
   std::optional<Duel> succession;
   std::optional<Admission> admission;
   std::optional<Election> election;
+};
+
+/// A duel fought for faction `faction`'s lead, under its rule.
+struct Fight {
+  std::size_t faction = 0;
+  std::size_t challenger = 0;
+  std::size_t leader = 0;
+  Duel rule;
+};
+
+/// An army as a challenge reads it: the faction it fights for, and its lead,
+/// if it has a living member.
+struct Challenging {
+  std::size_t faction = 0;
+  std::optional<std::size_t> lead;
+};
+
+/// A duel the challenger won: the faction it now leads, and whether the
+/// factions at peace with it turn hostile to it.
+struct Won {
+  std::size_t faction;
+  std::size_t challenger;
+  bool allies_turn_hostile;
+};
+
+/// Every faction's leadership and the duels fought for their leads: the one
+/// place either is kept. It decides who may challenge a faction's leader, how
+/// a duel ends and whom it leaves leading, and when a faction elects.
+class Leaders {
+ public:
+  /// No factions and no duels.
+  Leaders() = default;
+
+  /// `leadership` for `factions` factions, those it leaves out led by no one,
+  /// and no duel. Throws std::invalid_argument when it names more factions
+  /// than `factions` or a leader who is none of `people`.
+  Leaders(std::vector<Leadership> leadership, std::size_t factions,
+          const std::vector<Person>& people);
+
+  /// Each faction's leadership and the duels fought, as a save holds them,
+  /// unchecked until kept() is asked.
+  Leaders(std::vector<Leadership> factions, std::vector<Fight> duels);
+
+  /// Returns every faction's leadership, by faction.
+  [[nodiscard]] const std::vector<Leadership>& factions() const;
+
+  /// Returns the duels being fought, in the order they began.
+  [[nodiscard]] const std::vector<Fight>& duels() const;
+
+  /// Returns faction `faction`'s leadership. Throws std::out_of_range when
+  /// there is no such faction.
+  [[nodiscard]] const Leadership& of(std::size_t faction) const;
+
+  /// Returns whether person `person` leads a faction.
+  [[nodiscard]] bool leads(std::size_t person) const;
+
+  /// Returns why `challenging`'s lead may not challenge faction `faction`'s
+  /// leader, the first reason that holds in ChallengeRefusal's order, or
+  /// ChallengeRefusal::NONE when it may.
+  [[nodiscard]] ChallengeRefusal refusal(Challenging challenging,
+                                         std::size_t faction) const;
+
+  /// Starts a duel between `challenging`'s lead and faction `faction`'s
+  /// leader, under the faction's succession. Throws std::invalid_argument
+  /// when refusal() names a reason.
+  void challenge(Challenging challenging, std::size_t faction);
+
+  /// Returns the duel being fought for faction `faction`'s lead, if one is.
+  [[nodiscard]] std::optional<Duellists> duel(std::size_t faction) const;
+
+  /// Returns whether persons `one` and `other` fight a duel with each other.
+  [[nodiscard]] bool duelling(std::size_t one, std::size_t other) const;
+
+  /// Returns whether person `person` fights a duel.
+  [[nodiscard]] bool in_duel(std::size_t person) const;
+
+  /// Ends every duel in which a duellist has no more than its rule's yield
+  /// health left among `people`: the leader keeps the lead unless only the
+  /// challenger stands, who then leads. Returns the duels challengers won,
+  /// in the order they began.
+  std::vector<Won> settle(const std::vector<Person>& people);
+
+  /// Returns whether faction `faction` elects on day `day`: it has an
+  /// election, and its leader is dead among `people` or missing, or `day`
+  /// completes its term.
+  [[nodiscard]] bool elects_on(std::size_t faction,
+                               const std::vector<Person>& people,
+                               std::uint64_t day) const;
+
+  /// Makes `leader` faction `faction`'s leader. Returns whether its leader
+  /// changed.
+  bool lead(std::size_t faction, std::optional<std::size_t> leader);
+
+  /// Whether the saved-state invariant holds: a leadership for each of
+  /// `factions` factions, its leader one of `people` and its admission within
+  /// the limits a world is created with, and every duel's faction and
+  /// duellists ones that exist.
+  [[nodiscard]] bool kept(std::size_t factions,
+                          const std::vector<Person>& people) const;
+
+ private:
+  std::vector<Leadership> factions_;
+  std::vector<Fight> duels_;
 };
 
 }  // namespace murim
