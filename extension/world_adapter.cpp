@@ -309,6 +309,11 @@ std::vector<std::string> discipline_names_of(const murim::Life& life) {
 // values.
 constexpr std::int64_t LOAD_NONE = -1;
 
+// region_refusal()'s verdicts: a seed the core generates a region from, and
+// one it refuses.
+constexpr std::int64_t REGION_NONE = -1;
+constexpr std::int64_t REGION_REFUSED = 0;
+
 // The health each army's members were created with, together, by army.
 std::vector<std::uint64_t> strengths_of(
     const std::vector<murim::ArmySpec>& armies) {
@@ -394,6 +399,27 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(
     godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
                                         error.what());
     return {};
+  } catch (const std::runtime_error& error) {
+    // The core finds no room for a village or a seat on this seed's land.
+    godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
+                                        error.what());
+    return {};
+  }
+}
+
+std::int64_t WorldAdapter::region_refusal(std::int64_t seed) {
+  // The one handler for a seed the core generates no region from: it must
+  // not cross into Godot.
+  try {
+    static_cast<void>(murim::generate_region(
+        murim::Seed{static_cast<std::uint64_t>(seed)}, base_data()));
+    return REGION_NONE;
+  } catch (const std::runtime_error&) {
+    return REGION_REFUSED;
+  } catch (const std::logic_error& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.region_refusal: ",
+                                        error.what());
+    return REGION_REFUSED;
   }
 }
 
@@ -453,6 +479,11 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
     adapter->show(region, *saved.origin);
     return adapter;
   } catch (const std::logic_error& error) {
+    godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
+    return {};
+  } catch (const std::runtime_error& error) {
+    // The core no longer finds room for a village or a seat on the saved
+    // seed's land.
     godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
     return {};
   }
@@ -1656,6 +1687,9 @@ void WorldAdapter::_bind_methods() {
       &WorldAdapter::create_region, DEFVAL(0), DEFVAL(murim::TICKS_PER_DAY));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("m1_centre"),
                                      &WorldAdapter::m1_centre);
+  godot::ClassDB::bind_static_method(name,
+                                     godot::D_METHOD("region_refusal", "seed"),
+                                     &WorldAdapter::region_refusal);
   godot::ClassDB::bind_static_method(
       name, godot::D_METHOD("load", "slot", "directory"), &WorldAdapter::load,
       DEFVAL(FileSaves::DEFAULT_DIRECTORY));
@@ -2097,6 +2131,9 @@ void WorldAdapter::_bind_methods() {
       name, "", "POLARITY_YANG", static_cast<int>(murim::Polarity::YANG));
   godot::ClassDB::bind_integer_constant(name, "", "POLARITY_YIN",
                                         static_cast<int>(murim::Polarity::YIN));
+  godot::ClassDB::bind_integer_constant(name, "", "REGION_NONE", REGION_NONE);
+  godot::ClassDB::bind_integer_constant(name, "", "REGION_REFUSED",
+                                        REGION_REFUSED);
   godot::ClassDB::bind_integer_constant(name, "", "LOAD_NONE", LOAD_NONE);
   const std::array<std::pair<const char*, murim::LoadError>, 5> load_errors{{
       {"LOAD_MISSING", murim::LoadError::MISSING},

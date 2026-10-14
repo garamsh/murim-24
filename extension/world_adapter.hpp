@@ -67,16 +67,22 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns an adapter over the region the core generates from `seed`, with
   /// each faction's leadership, and one person born into village `village`
   /// as the last army, its days `ticks_per_day` ticks long. Returns null,
-  /// after push_error, when the region has no such village or the day is not
-  /// a positive number of ticks.
+  /// after push_error, when the core refuses to generate a region from the
+  /// seed, the region has no such village or the day is not a positive number
+  /// of ticks.
   static godot::Ref<WorldAdapter> create_region(
       std::int64_t seed, std::int64_t village = 0,
       std::int64_t ticks_per_day = murim::TICKS_PER_DAY);
 
+  /// Returns why create_region() refuses `seed`: REGION_REFUSED when the core
+  /// generates no region from it, as when a village or a sect's seat finds no
+  /// room, and REGION_NONE when it generates one.
+  static std::int64_t region_refusal(std::int64_t seed);
+
   /// Returns an adapter over the world saved in slot `slot` of `directory`,
   /// as save() wrote it. Returns null, after push_error naming why, when the
-  /// slot holds no save, the save is refused, or it holds no world made by
-  /// create_region().
+  /// slot holds no save, the save is refused, it holds no world made by
+  /// create_region(), or the core no longer generates its region.
   static godot::Ref<WorldAdapter> load(
       std::int64_t slot,
       const godot::String& directory = FileSaves::DEFAULT_DIRECTORY);

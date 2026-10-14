@@ -388,7 +388,9 @@ func _take(action: String) -> bool:
 		"new":
 			_hud.new_game.open()
 		"start":
-			start(_hud.new_game.world_seed())
+			var from_seed: int = _hud.new_game.world_seed()
+			if not start(from_seed):
+				_hud.new_game.refuse(WorldAdapter.region_refusal(from_seed))
 		"continue":
 			resume_saved()
 		"save":

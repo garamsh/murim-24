@@ -9,6 +9,14 @@ extends RefCounted
 const NewGame := preload("res://hud/new_game.gd")
 const Hud := preload("res://hud/hud.gd")
 const WordFit := preload("res://hud/word_fit.gd")
+# Seeded with SKIP_DRAW, Godot's generator draws REFUSED_DRAW, a seed the core generates no region
+# from, then KEPT_DRAW, one it does; seeded with PLAIN_DRAW, it draws PLAIN_KEPT first, one the core
+# generates.
+const SKIP_DRAW := 105
+const REFUSED_DRAW := 418156736
+const KEPT_DRAW := 2229168570
+const PLAIN_DRAW := 2026
+const PLAIN_KEPT := 4259094339
 
 
 func run() -> bool:
@@ -43,7 +51,7 @@ func run() -> bool:
 		typed, start, typed_seed, filled, full_kept, drawn, empty_seed, back, not panel.visible,
 		"pass" if passed else "FAIL"])
 	panel.free()
-	return passed and _fit_pass()
+	return passed and _fit_pass() and _skip_pass() and _refusal_pass()
 
 
 # In each locale: the title clear of the close key in the title bar; the seed's label clear of its
@@ -67,7 +75,7 @@ func _fit_pass() -> bool:
 		fit.check(random, fit.width(random) + 4, dialog.end.x - 12 - NewGame.RANDOM_X)
 		var start := fit.say("NEW_GAME_START")
 		fit.check(start, fit.width(start) + 4, NewGame.START_WIDTH)
-		for key: String in ["NEW_GAME_SAME", "NEW_GAME_EMPTY", "NEW_GAME_KEYS"]:
+		for key: String in ["NEW_GAME_SAME", "NEW_GAME_REFUSED", "NEW_GAME_EMPTY", "NEW_GAME_KEYS"]:
 			var text := fit.say(key)
 			fit.check(text, 12 + fit.width(text), dialog.size.x - 12)
 	TranslationServer.set_locale(Hud.LOCALES[0])
@@ -84,3 +92,51 @@ func _key(keycode: Key) -> InputEventKey:
 	key.keycode = keycode
 	key.pressed = true
 	return key
+
+
+# The random slip, or an empty field at Enter, passes over a seed the core refuses: seeded with
+# SKIP_DRAW, R draws KEPT_DRAW, not REFUSED_DRAW, and so does the empty field. Control: seeded
+# with PLAIN_DRAW, whose first draw the core generates, R keeps that first draw. Setup: the core
+# refuses REFUSED_DRAW and generates KEPT_DRAW and PLAIN_KEPT.
+func _skip_pass() -> bool:
+	var setup := WorldAdapter.region_refusal(REFUSED_DRAW) == WorldAdapter.REGION_REFUSED \
+			and WorldAdapter.region_refusal(KEPT_DRAW) == WorldAdapter.REGION_NONE \
+			and WorldAdapter.region_refusal(PLAIN_KEPT) == WorldAdapter.REGION_NONE
+	var panel: Control = NewGame.new()
+	panel.open()
+	seed(SKIP_DRAW)
+	panel.key(_key(KEY_R))
+	var skipped: String = panel.typed
+	panel.open()
+	seed(SKIP_DRAW)
+	var empty_skipped: int = panel.world_seed()
+	panel.open()
+	seed(PLAIN_DRAW)
+	panel.key(_key(KEY_R))
+	var plain: String = panel.typed
+	var passed := setup and skipped == str(KEPT_DRAW) and empty_skipped == KEPT_DRAW and plain == str(PLAIN_KEPT)
+	print("new_game_test: setup %s; seeded with %d, R drew %s past %d, an empty field %d; seeded with %d, R drew %s: %s" % [
+		setup, SKIP_DRAW, skipped, REFUSED_DRAW, empty_skipped, PLAIN_DRAW, plain, "pass" if passed else "FAIL"])
+	panel.free()
+	return passed
+
+
+# A refusal the core names shows the panel's notice, until a key changes the field or the panel
+# opens again. Control: REGION_NONE shows none.
+func _refusal_pass() -> bool:
+	var panel: Control = NewGame.new()
+	panel.open()
+	panel.refuse(WorldAdapter.REGION_NONE)
+	var none_shown: bool = panel.refused
+	panel.refuse(WorldAdapter.REGION_REFUSED)
+	var shown: bool = panel.refused
+	panel.key(_key(KEY_4))
+	var typed_cleared: bool = not panel.refused
+	panel.refuse(WorldAdapter.REGION_REFUSED)
+	panel.open()
+	var reopened_cleared: bool = not panel.refused
+	var passed := not none_shown and shown and typed_cleared and reopened_cleared
+	print("new_game_test: REGION_NONE shows the notice %s; REGION_REFUSED shows it %s; a digit clears it %s; opening again clears it %s: %s" % [
+		none_shown, shown, typed_cleared, reopened_cleared, "pass" if passed else "FAIL"])
+	panel.free()
+	return passed
