@@ -278,7 +278,10 @@ func _event_people_pass() -> bool:
 # and a person's art skill names its index among its art's skills, the skill arts() names alike. Its
 # progress gives each skill learned with its person, art, skill and how it was learned, and each
 # realm gained with its person and a rank the person has reached, while none of its events names an
-# art. Control: a world from create() has no arts.
+# art. A person's heart art is the art of its first art skill, which agrees with it fully, some art
+# it does not know agreeing less, and a skill lies within its realm where the skill's rank does not
+# pass the person's. Control: a person knowing no art has no heart art. Control: a world from
+# create() has no arts.
 func _lessons_pass(lived: WorldAdapter) -> bool:
 	var arts := lived.arts()
 	var right: bool = arts.size() == 3 and arts[0].korean == "매화검법" and arts[0].romanised == "Plum Blossom Sword" \
@@ -304,11 +307,32 @@ func _lessons_pass(lived: WorldAdapter) -> bool:
 			gained += 1
 			right = right and lived.person_realm(event.person) >= event.rank and event.rank >= 1
 	right = right and named > 0 and learned > 0 and gained > 0
+	var hearts := 0
+	var eased := 0
+	var artless := 0
+	for army in lived.army_count():
+		for person: int in lived.roster(army):
+			var first := -1
+			for skill: Dictionary in lived.person_skills(person):
+				if skill.art >= 0 and first < 0:
+					first = skill.art
+			right = right and lived.heart_art(person) == first
+			if first < 0:
+				artless += 1
+				continue
+			hearts += 1
+			right = right and lived.art_agreement(person, first) == WorldAdapter.PER_MILLE
+			for art in arts.size():
+				eased += 1 if lived.art_agreement(person, art) < WorldAdapter.PER_MILLE else 0
+				for skill in arts[art].skills.size():
+					right = right and lived.within_realm(person, art, skill) \
+							== (int(arts[art].skills[skill].rank) <= lived.person_realm(person))
+	right = right and hearts > 0 and eased > 0 and artless > 0
 	var bare_right := _create(SEED, _armies, RULES).arts().is_empty() \
 			and lived.events(0).all(func(event: Dictionary) -> bool: return not event.has("art"))
 	var passed := right and bare_right
-	print("world_adapter_test: %d arts, %d art skills known named alike, %d skills learned and %d realms gained in its progress, none among its events; a world from create() has no arts %s: %s" % [
-		arts.size(), named, learned, gained, bare_right, "pass" if passed else "FAIL"])
+	print("world_adapter_test: %d arts, %d art skills known named alike, %d skills learned and %d realms gained in its progress, none among its events; %d with a heart art, %d arts eased, %d knowing none; a world from create() has no arts %s: %s" % [
+		arts.size(), named, learned, gained, hearts, eased, artless, bare_right, "pass" if passed else "FAIL"])
 	return passed
 
 
@@ -339,8 +363,10 @@ func _economy_pass() -> bool:
 # Each sect of a region is read back as the core holds it: a name, its faction, a seat that is a
 # village of the seat template held by that faction, its founders as members with an elder among
 # them as master, a cap from its seat's pupils, standing, and its manual held. The player's body,
-# born into an ordinary village, belongs to no sect. Only the Orthodox elect their leader.
-# Control: a world made by create() has no sects and no manuals, and its factions elect no one.
+# born into an ordinary village, belongs to no sect. Only the Orthodox elect their leader, and only
+# the Demonic pass it by duel. Each sect's gate is a seat gate standing in its seat. Control: a
+# world made by create() has no sects and no manuals, and its factions elect no one and duel for
+# no lead.
 func _sects_pass() -> bool:
 	var region := WorldAdapter.create_region(REGION_SEED)
 	var villages := region.villages()
@@ -354,6 +380,9 @@ func _sects_pass() -> bool:
 				and members.size() == 2 and region.sect_elders(sect).has(master) \
 				and region.person_sect(master) == sect and region.sect_cap(sect) > members.size() \
 				and region.sect_stands(sect)
+		var gate := region.sect_gate(sect)
+		right = right and gate >= 0 and region.structure_kind(gate) == "seat_gate" \
+				and Rect2i(villages[seat].corner, villages[seat].area).has_point(region.structure_cell(gate))
 	var manuals := region.manuals()
 	var held := manuals.size() == region.sect_count()
 	for manual: Dictionary in manuals:
@@ -364,17 +393,21 @@ func _sects_pass() -> bool:
 	for faction in region.faction_names().size():
 		if region.elects(faction):
 			electing.append(region.faction_names()[faction])
+	var dueling: Array[String] = []
+	for faction in region.faction_names().size():
+		if region.passes_by_duel(faction):
+			dueling.append(region.faction_names()[faction])
 	var plain_electing := 0
 	for faction in plain.faction_count():
-		plain_electing += 1 if plain.elects(faction) else 0
+		plain_electing += 1 if plain.elects(faction) or plain.passes_by_duel(faction) else 0
 	var none: bool = plain.sect_count() == 0 and plain.manuals().is_empty() and plain_electing == 0 \
 			and plain.faction_count() > 0
 	var passed: bool = right and held and region.person_sect(player) == -1 and none \
-			and electing == ["Orthodox"]
-	print("world_adapter_test: %d sects, first %s of faction %d seated in village %d, members %s, elders %s, master %d, cap %d; manuals %s; player's sect %d; electing factions %s; a world from create has %d sects and %d of %d factions electing: %s" % [
+			and electing == ["Orthodox"] and dueling == ["Demonic"]
+	print("world_adapter_test: %d sects, first %s of faction %d seated in village %d with gate %d, members %s, elders %s, master %d, cap %d; manuals %s; player's sect %d; electing factions %s, dueling %s; a world from create has %d sects and %d of %d factions electing or dueling: %s" % [
 		region.sect_count(), region.sect_name(0), region.sect_faction(0), region.sect_seat(0),
-		region.sect_members(0), region.sect_elders(0), region.sect_master(0), region.sect_cap(0),
-		manuals, region.person_sect(player), electing, plain.sect_count(), plain_electing,
+		region.sect_gate(0), region.sect_members(0), region.sect_elders(0), region.sect_master(0), region.sect_cap(0),
+		manuals, region.person_sect(player), electing, dueling, plain.sect_count(), plain_electing,
 		plain.faction_count(), "pass" if passed else "FAIL"])
 	return passed
 
