@@ -1550,9 +1550,22 @@ bool BodyView::shows(const Strike& strike, std::int64_t now) const {
          (strike.steered || has_point(view_, screen_point(strike.origin)));
 }
 
+// Whether a use's shape is drawn under its effects: the steered person's own,
+// and one that struck the steered person or its target. In a crowd every
+// other use shows its effects alone, so the shapes cover no one's motion.
+bool BodyView::shaped(const Strike& strike) const {
+  if (strike.steered) {
+    return true;
+  }
+  return std::any_of(
+      strike.struck.begin(), strike.struck.end(), [this](std::int64_t person) {
+        return person == lead_ || (target_ >= 0 && person == target_);
+      });
+}
+
 void BodyView::draw_effects(const godot::RID& canvas_item) const {
   for (const Strike& strike : strikes_) {
-    if (shows(strike, now_)) {
+    if (shows(strike, now_) && shaped(strike)) {
       draw_strike(canvas_item, strike,
                   1.0 - (static_cast<double>(now_ - strike.ms) /
                          static_cast<double>(STRIKE_MS)));
@@ -1791,6 +1804,7 @@ godot::TypedArray<godot::Dictionary> BodyView::strikes() const {
     fields.set("struck", struck);
     fields.set("ms", strike.ms);
     fields.set("steered", strike.steered);
+    fields.set("shaped", shaped(strike));
     kept.push_back(fields);
   }
   return kept;
