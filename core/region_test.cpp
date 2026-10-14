@@ -1661,12 +1661,12 @@ bool raid_in_reach(const Region& region, const RegionData& data) {
     if (raider.faction != DEMONIC) {
       continue;
     }
-    const Cell from = region.armies.at(raider.army).objective;
+    const Cell origin = region.armies.at(raider.army).objective;
     for (const Village& target : region.villages) {
-      const Cell to = region.armies.at(target.army).objective;
+      const Cell reached = region.armies.at(target.army).objective;
       if (region.rules.hostile.at(DEMONIC).at(target.faction) &&
-          std::abs(to.x - from.x) <= reach &&
-          std::abs(to.y - from.y) <= reach) {
+          std::abs(reached.x - origin.x) <= reach &&
+          std::abs(reached.y - origin.y) <= reach) {
         return true;
       }
     }
