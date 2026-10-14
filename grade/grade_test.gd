@@ -7,7 +7,8 @@
 # shader in screen pixels, and of more than MAX_LIGHTS only the nearest the screen's middle (control:
 # under the cap every light is kept). Emitters bloom at standard and high and not at low, while the
 # lamp shows and a hearth is listed (control: standard's bloom at midnight with a hearth), and not
-# at noon nor with no hearth.
+# at noon nor with no hearth. The light field is drawn at midnight with lights shown, and left
+# undrawn at noon and with none (control: drawn at midnight).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -107,9 +108,16 @@ func _lights_pass() -> bool:
 	var bloom_pass: bool = is_equal_approx(standard, Grade.BLOOM) and standard > 0.0 and is_equal_approx(high, Grade.BLOOM) \
 			and is_equal_approx(low.bloom, 0.0) and low.light_count == Grade.MAX_LIGHTS \
 			and is_equal_approx(noon, 0.0) and is_equal_approx(no_hearth, 0.0)
+	var drawn_night: bool = grade.params().field_drawn
+	grade.show_time(0.5, SUMMER)
+	var drawn_noon: bool = grade.params().field_drawn
+	grade.show_time(0.0, SUMMER)
+	grade.show_lights(PackedFloat32Array(), view)
+	var drawn_unlit: bool = grade.params().field_drawn
+	var field_pass := drawn_night and not drawn_noon and not drawn_unlit
 	grade.free()
-	var passed := lamp_pass and shown_pass and cap_pass and bloom_pass
-	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom with a hearth standard %.2f high %.2f low %.2f noon %.2f, without one %.2f, low keeping %d lights: %s" % [
+	var passed := lamp_pass and shown_pass and cap_pass and bloom_pass and field_pass
+	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom with a hearth standard %.2f high %.2f low %.2f noon %.2f, without one %.2f, low keeping %d lights; the light field drawn at midnight %s, at noon %s, with no lights %s: %s" % [
 		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, standard, high, low.bloom,
-		noon, no_hearth, low.light_count, "pass" if passed else "FAIL"])
+		noon, no_hearth, low.light_count, drawn_night, drawn_noon, drawn_unlit, "pass" if passed else "FAIL"])
 	return passed

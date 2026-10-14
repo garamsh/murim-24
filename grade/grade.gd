@@ -4,9 +4,10 @@
 ## Lights the world shows, lit windows and the steered person's torch, warm the night round them by
 ## each key's `lamp`, and the fire ramp's brightest steps, emitters, keep their colour; they bloom
 ## while the lamp shows and a hearth, whose fire is drawn in them, is on screen, and the pass skips
-## the bloom otherwise. The quality the settings choose sets what it adds: low shows the grade, the
-## hue-shifted shadows and the lights only, standard and high the light vignette and the bloom too.
-## It decides nothing.
+## the bloom otherwise. The lights are drawn once a frame into the light field, a viewport of one
+## pixel an art pixel, which the pass reads; the field is left undrawn while no light shows. The
+## quality the settings choose sets what it adds: low shows the grade, the hue-shifted shadows and
+## the lights only, standard and high the light vignette and the bloom too. It decides nothing.
 extends CanvasLayer
 
 const WorldArt := preload("res://world_art/world_art.gd")
@@ -100,12 +101,16 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 
 
 ## What the pass draws with, as its shader's parameters: the grade's, `hue_shift`, `vignette`,
-## `art_pixel`, `bloom`, and the lights shown, `light_count` of `light_rects` and `light_reach`.
+## `art_pixel`, `bloom` and `light_count`; and what the light field draws the lights shown with,
+## `light_rects` and `light_reach`, and whether it draws them, `field_drawn`.
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
-			"vignette", "art_pixel", "bloom", "light_count", "light_rects", "light_reach"]:
+			"vignette", "art_pixel", "bloom", "light_count"]:
 		shown[name] = ($Pass.material as ShaderMaterial).get_shader_parameter(name)
+	for name: String in ["light_rects", "light_reach"]:
+		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
+	shown.field_drawn = $LightField.render_target_update_mode == SubViewport.UPDATE_ALWAYS
 	return shown
 
 
@@ -121,8 +126,19 @@ func _apply() -> void:
 	var blooming: bool = quality != Quality.LOW and _hearths > 0 and _grade.lamp > 0.0
 	material.set_shader_parameter("bloom", BLOOM if blooming else 0.0)
 	material.set_shader_parameter("light_count", _light_rects.size())
-	material.set_shader_parameter("light_rects", _light_rects)
-	material.set_shader_parameter("light_reach", _light_reach)
+	material.set_shader_parameter("light_field", $LightField.get_texture())
+	var field := $LightField/Field.material as ShaderMaterial
+	field.set_shader_parameter("art_pixel", art_pixel)
+	field.set_shader_parameter("light_count", _light_rects.size())
+	field.set_shader_parameter("light_rects", _light_rects)
+	field.set_shader_parameter("light_reach", _light_reach)
+	var drawn: bool = _light_rects.size() > 0 and _grade.lamp > 0.0
+	$LightField.render_target_update_mode = SubViewport.UPDATE_ALWAYS if drawn else SubViewport.UPDATE_DISABLED
+	if is_inside_tree():
+		# One pixel an art pixel, the screen's last part pixel included.
+		var cells := Vector2i((get_viewport().get_visible_rect().size / art_pixel).ceil())
+		$LightField.size = cells
+		$LightField/Field.size = Vector2(cells)
 
 
 static func _vector(values: Array) -> Vector3:

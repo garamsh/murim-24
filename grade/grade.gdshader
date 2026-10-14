@@ -23,10 +23,10 @@ uniform float vignette = 0.0;
 uniform float art_pixel = 1.0;
 uniform float lamp = 0.0;
 uniform float bloom = 0.0;
-// Each light's rect, x, y, width and height, and how far its light reaches, in screen pixels.
+// How many lights show, and the light field grade.gd draws them into, one pixel an art pixel: how
+// lit each is in red, and in green 1 within a lit window's rect.
 uniform int light_count = 0;
-uniform vec4 light_rects[32];
-uniform float light_reach[32];
+uniform sampler2D light_field : filter_nearest;
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
@@ -77,16 +77,9 @@ void fragment() {
 	vec2 cell = floor(FRAGCOORD.xy / art_pixel);
 	float dither = (BAYER[(int(mod(cell.y, 4.0)) * 4) + int(mod(cell.x, 4.0))] + 0.5) / 16.0;
 	if (lamp > 0.0 && light_count > 0) {
-		vec2 at = (cell + 0.5) * art_pixel;
-		float lit = 0.0;
-		bool pane = false;
-		for (int i = 0; i < light_count; i++) {
-			vec4 r = light_rects[i];
-			vec2 off = max(max(r.xy - at, at - (r.xy + r.zw)), vec2(0.0));
-			lit = max(lit, 1.0 - length(off) / light_reach[i]);
-			pane = pane || (r.z > 0.0 && FRAGCOORD.x >= r.x && FRAGCOORD.y >= r.y
-					&& FRAGCOORD.x < r.x + r.z && FRAGCOORD.y < r.y + r.w);
-		}
+		vec2 field = texelFetch(light_field, ivec2(cell), 0).rg;
+		float lit = field.r;
+		bool pane = field.g > 0.5;
 		// Three bands, their edges dithered on the art's pixels.
 		float band = floor(clamp(lit, 0.0, 1.0) * 3.0 + dither) / 3.0;
 		vec3 warm = mix(vec3(l), c, OWN_HUE) * LAMPLIGHT;
