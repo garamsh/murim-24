@@ -35,7 +35,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - Converting Godot types to the core's, and the hash back to a signed int, is the adapter's work.
 - Input the core refuses, or that is missing, of the wrong type or outside the core's integer types, makes `create` report it with `push_error` and return null.
   - `create` catches `std::invalid_argument` alone.
-  - `create_region` and `load` refuse a day, village or slot out of range before they call the core, catch the `std::runtime_error` by which the core refuses to generate a region from a seed, when a village or a sect's seat finds no room, and catch the `std::out_of_range` by which a region lacks the village a person is born into, or a free cell in it. `region_refusal` and `load_refusal` catch the same `std::runtime_error` as their verdict.
+  - `create_region` and `load` refuse a day, village or slot out of range before they call the core, catch the `std::runtime_error` by which the core refuses to generate a region from a seed, when a village or a sect's seat finds no room, refuse a village index the region lacks before the person is born, and catch the `std::runtime_error` by which the village has no free cell to be born on. Any `std::out_of_range` left inside the birth is a broken region, a bug. `region_refusal` and `load_refusal` catch the same `std::runtime_error` as their verdict.
   - `save`, `order`, `declare`, `apply`, `cast`, `cast_refusal`, `aim`, `buy` and `consume` catch `std::invalid_argument`, each reporting it with `push_error`.
   - A read given an index out of range, or called on an adapter no factory made, stops through `CRASH_COND_MSG`.
   - No other exception is caught.

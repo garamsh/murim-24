@@ -115,6 +115,13 @@ func run() -> bool:
 			and WorldAdapter.create_region(SEED, 0, 0) == null and WorldAdapter.create_region(SEED, 0, -1) == null
 	print("world_adapter_test: a region of five-tick days accepted %s, on day %d after five ticks from day %d; days of 0 and -1 ticks refused: %s" % [
 		short != null, short.date().day if short != null else -1, first_day, "pass" if days_pass else "FAIL"])
+	# A village index the region lacks, one past its last or below 0, is refused before anyone is born;
+	# control: its last village is accepted.
+	var count: int = short.villages().size() if short != null else 0
+	var homes_pass: bool = count > 0 and WorldAdapter.create_region(SEED, count) == null \
+			and WorldAdapter.create_region(SEED, -1) == null and WorldAdapter.create_region(SEED, count - 1) != null
+	print("world_adapter_test: villages %d and -1 of %d refused, village %d accepted: %s" % [
+		count, count, count - 1, "pass" if homes_pass else "FAIL"])
 	# The date gives the tick within the day and the day's length: a region of five-tick days reads
 	# 5, its tick 0 at a day's start, 3 three ticks on and 0 again as the next day starts. Control: a
 	# region of the core's default day reads its own length, not 5.
@@ -147,7 +154,7 @@ func run() -> bool:
 	var event_people_pass := _event_people_pass()
 	var snapshot_pass := _snapshot_pass()
 	return snapshot_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
-			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and time_pass and sects_pass \
+			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and homes_pass and time_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
 
 

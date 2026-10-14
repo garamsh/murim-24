@@ -550,6 +550,23 @@ TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
                std::out_of_range);
 }
 
+TEST(Region, NoOneIsBornIntoAVillageWithNoFreeCell) {
+  Region region = generate_region(SEED, base_data());
+  const Village& village = region.villages.at(1);
+  // Control: with its residents as generated, a person is born into it.
+  EXPECT_NO_THROW(static_cast<void>(born_in(region, 1)));
+  // Every open cell of the village taken by a resident leaves none to be born
+  // on, a refusal of the region's room rather than a broken region.
+  ArmySpec& residents = region.armies.at(village.army);
+  const std::uint64_t health = residents.members.front().health;
+  residents.members.clear();
+  for (const Cell cell : open_cells(region, village)) {
+    residents.members.push_back(Recruit{cell, health});
+  }
+  ASSERT_FALSE(residents.members.empty());
+  EXPECT_THROW(static_cast<void>(born_in(region, 1)), std::runtime_error);
+}
+
 // The first sect of faction `faction` in `world`.
 std::size_t sect_of_faction(const World& world, std::size_t faction) {
   std::size_t sect = 0;

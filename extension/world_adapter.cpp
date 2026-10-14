@@ -393,9 +393,10 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
 godot::Ref<WorldAdapter> WorldAdapter::create_region(
     std::int64_t seed, std::int64_t village, std::int64_t ticks_per_day) {
   // Each refusal a caller can meet is reported here and returns null: a day
-  // or a village out of range, a seed the core generates no region from, and
-  // a village the region lacks. A logic_error from region data the core
-  // cannot read is a bug, so nothing here catches it.
+  // or a village out of range, a seed the core generates no region from, a
+  // village the region lacks, and one with no free cell to be born on. A
+  // logic_error from region data the core cannot read is a bug, so nothing here
+  // catches it.
   if (ticks_per_day <= 0 || village < 0) {
     godot::UtilityFunctions::push_error(
         "WorldAdapter.create_region: the day must last a positive number of "
@@ -415,11 +416,16 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(
                                         error.what());
     return {};
   }
+  if (origin.village >= region->villages.size()) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.create_region: the region has no such village");
+    return {};
+  }
   std::optional<murim::ArmySpec> body;
   try {
     body = murim::born_in(*region, origin.village);
-  } catch (const std::out_of_range& error) {
-    // The region has no such village, or no free cell in it.
+  } catch (const std::runtime_error& error) {
+    // The village has no free cell to be born on.
     godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
                                         error.what());
     return {};
@@ -469,8 +475,9 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
   // Each refusal a caller can meet is reported here and returns null: a slot
   // out of range, a save the core refuses or that holds no generated region,
   // a seed the save names whose region the core no longer generates, and a
-  // region that no longer has the save's village. A logic_error from region
-  // data the core cannot read is a bug, so nothing here catches it.
+  // region that no longer has the save's village or a free cell in it. A
+  // logic_error from region data the core cannot read is a bug, so nothing here
+  // catches it.
   if (slot < 0 || slot > std::numeric_limits<std::uint32_t>::max()) {
     godot::UtilityFunctions::push_error(
         "WorldAdapter.load: slot is out of range");
@@ -498,10 +505,15 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
     godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
     return {};
   }
+  if (saved.origin->village >= region->villages.size()) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.load: the region no longer has the save's village");
+    return {};
+  }
   try {
     region->armies.push_back(murim::born_in(*region, saved.origin->village));
-  } catch (const std::out_of_range& error) {
-    // The region no longer has the save's village, or a free cell in it.
+  } catch (const std::runtime_error& error) {
+    // The save's village no longer has a free cell to be born on.
     godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
     return {};
   }
