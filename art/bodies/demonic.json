@@ -87,7 +87,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 10.aseprite",
@@ -96,7 +96,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 11.aseprite",
@@ -105,7 +105,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 80
    },
    {
     "filename": "demonic 12.aseprite",
@@ -114,7 +114,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "demonic 13.aseprite",
@@ -150,7 +150,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 150
    },
    {
     "filename": "demonic 17.aseprite",
@@ -159,7 +159,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "demonic 18.aseprite",
@@ -195,7 +195,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 150
    },
    {
     "filename": "demonic 22.aseprite",
@@ -204,7 +204,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 23.aseprite",
@@ -213,7 +213,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 24.aseprite",
@@ -222,7 +222,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 25.aseprite",
@@ -231,7 +231,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 26.aseprite",
@@ -240,7 +240,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 27.aseprite",
@@ -249,7 +249,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 28.aseprite",
@@ -258,7 +258,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 29.aseprite",
@@ -267,7 +267,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 30.aseprite",
@@ -276,7 +276,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 31.aseprite",
@@ -285,7 +285,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 32.aseprite",
@@ -294,7 +294,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 80
    },
    {
     "filename": "demonic 33.aseprite",
@@ -303,7 +303,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 80
    },
    {
     "filename": "demonic 34.aseprite",
@@ -312,7 +312,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "demonic 35.aseprite",
@@ -339,7 +339,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 150
    },
    {
     "filename": "demonic 38.aseprite",
@@ -376,6 +376,240 @@
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
     "duration": 150
+   },
+   {
+    "filename": "demonic 42.aseprite",
+    "frame": { "x": 672, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 43.aseprite",
+    "frame": { "x": 688, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 44.aseprite",
+    "frame": { "x": 704, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 45.aseprite",
+    "frame": { "x": 720, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 46.aseprite",
+    "frame": { "x": 736, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "demonic 47.aseprite",
+    "frame": { "x": 752, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 48.aseprite",
+    "frame": { "x": 768, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 49.aseprite",
+    "frame": { "x": 784, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 50.aseprite",
+    "frame": { "x": 800, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 51.aseprite",
+    "frame": { "x": 816, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "demonic 52.aseprite",
+    "frame": { "x": 832, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 53.aseprite",
+    "frame": { "x": 848, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 54.aseprite",
+    "frame": { "x": 864, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 55.aseprite",
+    "frame": { "x": 880, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "demonic 56.aseprite",
+    "frame": { "x": 896, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 57.aseprite",
+    "frame": { "x": 912, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 58.aseprite",
+    "frame": { "x": 928, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 59.aseprite",
+    "frame": { "x": 944, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 60.aseprite",
+    "frame": { "x": 960, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 61.aseprite",
+    "frame": { "x": 976, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 62.aseprite",
+    "frame": { "x": 992, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 63.aseprite",
+    "frame": { "x": 1008, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 64.aseprite",
+    "frame": { "x": 1024, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 65.aseprite",
+    "frame": { "x": 1040, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 66.aseprite",
+    "frame": { "x": 1056, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "demonic 67.aseprite",
+    "frame": { "x": 1072, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
    }
  ],
  "meta": {
@@ -383,25 +617,37 @@
   "version": "1.3.18.6-arm64",
   "image": "demonic.png",
   "format": "RGBA8888",
-  "size": { "w": 672, "h": 24 },
+  "size": { "w": 1088, "h": 24 },
   "scale": "1",
   "frameTags": [
    { "name": "idle", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
    { "name": "walk", "from": 1, "to": 4, "direction": "forward", "color": "#000000ff" },
    { "name": "back", "from": 5, "to": 8, "direction": "forward", "color": "#000000ff" },
-   { "name": "strike", "from": 9, "to": 10, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_hurt", "from": 11, "to": 11, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_hurt", "from": 12, "to": 15, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_maimed", "from": 16, "to": 16, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_maimed", "from": 17, "to": 20, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_xray", "from": 21, "to": 21, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_xray", "from": 22, "to": 25, "direction": "forward", "color": "#000000ff" },
-   { "name": "back_xray", "from": 26, "to": 29, "direction": "forward", "color": "#000000ff" },
-   { "name": "strike_xray", "from": 30, "to": 31, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_hurt_xray", "from": 32, "to": 32, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_hurt_xray", "from": 33, "to": 36, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_maimed_xray", "from": 37, "to": 37, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_maimed_xray", "from": 38, "to": 41, "direction": "forward", "color": "#000000ff" }
+   { "name": "swing", "from": 9, "to": 11, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_hurt", "from": 12, "to": 12, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_hurt", "from": 13, "to": 16, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_maimed", "from": 17, "to": 17, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_maimed", "from": 18, "to": 21, "direction": "forward", "color": "#000000ff" },
+   { "name": "lunge", "from": 22, "to": 23, "direction": "forward", "color": "#000000ff" },
+   { "name": "cast", "from": 24, "to": 25, "direction": "forward", "color": "#000000ff" },
+   { "name": "throw", "from": 26, "to": 27, "direction": "forward", "color": "#000000ff" },
+   { "name": "mend", "from": 28, "to": 29, "direction": "forward", "color": "#000000ff" },
+   { "name": "torch", "from": 30, "to": 31, "direction": "forward", "color": "#000000ff" },
+   { "name": "recoil", "from": 32, "to": 33, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_xray", "from": 34, "to": 34, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_xray", "from": 35, "to": 38, "direction": "forward", "color": "#000000ff" },
+   { "name": "back_xray", "from": 39, "to": 42, "direction": "forward", "color": "#000000ff" },
+   { "name": "swing_xray", "from": 43, "to": 45, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_hurt_xray", "from": 46, "to": 46, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_hurt_xray", "from": 47, "to": 50, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_maimed_xray", "from": 51, "to": 51, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_maimed_xray", "from": 52, "to": 55, "direction": "forward", "color": "#000000ff" },
+   { "name": "lunge_xray", "from": 56, "to": 57, "direction": "forward", "color": "#000000ff" },
+   { "name": "cast_xray", "from": 58, "to": 59, "direction": "forward", "color": "#000000ff" },
+   { "name": "throw_xray", "from": 60, "to": 61, "direction": "forward", "color": "#000000ff" },
+   { "name": "mend_xray", "from": 62, "to": 63, "direction": "forward", "color": "#000000ff" },
+   { "name": "torch_xray", "from": 64, "to": 65, "direction": "forward", "color": "#000000ff" },
+   { "name": "recoil_xray", "from": 66, "to": 67, "direction": "forward", "color": "#000000ff" }
   ]
  }
 }
