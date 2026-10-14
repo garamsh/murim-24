@@ -524,14 +524,17 @@ func _reads_pass() -> bool:
 	var farms := villages.filter(func(village: Dictionary) -> bool: return village.kind != "seat").size()
 	var villages_read := farms >= 6 and farms <= 8 and villages.size() == farms + region.sect_count() \
 			and born_faction == int(villages[0].faction)
-	# Every region structure lies inside a village's area, and some span several cells.
+	# Every region structure lies within the growth's largest vicinity of a village's area, its
+	# square or a seat's, as villages place their buildings round their squares (ADR 0076), and some
+	# span several cells.
 	var footprints := {}
 	var inside := 0
+	var vicinity := _largest_vicinity()
 	for structure in region.structure_count():
 		var rect := Rect2i(region.structure_cell(structure), region.structure_footprint(structure))
 		footprints[rect.size] = true
 		for village: Dictionary in villages:
-			if Rect2i(village.corner, village.area).encloses(rect):
+			if Rect2i(village.corner, village.area).grow(vicinity).encloses(rect):
 				inside += 1
 				break
 	var footprints_read := world.structure_footprint(0) == Vector2i.ONE \
@@ -822,3 +825,10 @@ static func _works_world() -> WorldAdapter:
 	var structures := [{"cell": Vector2i(2, 2), "durability": 100}, {"cell": Vector2i(9, 2), "durability": 40}]
 	return WorldAdapter.create(1, rows, armies, structures,
 			{"separation": 256, "hostile": [[false]], "stage_floors": [75, 25, 1]})
+
+# The cells from a village's centre within which the base pack's last tier builds, read from its
+# rules of life.
+func _largest_vicinity() -> int:
+	var life: Array = JSON.parse_string(FileAccess.get_file_as_string("res://packs/wuxia/data/life.json"))
+	var tiers: Array = life[0].growth.tiers
+	return int(tiers[-1].vicinity)

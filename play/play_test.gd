@@ -58,8 +58,8 @@ const TYPED_SEED := 4817
 # generator refuses.
 const DRAW := 2026
 const DRAWN := 4259094339
-# A seed the region generator refuses: no room for a sect's seat.
-const REFUSED_SEED := 320
+# A seed the region generator refuses, the first from 0: no open site for a village.
+const REFUSED_SEED := 394
 # Where a save's payload begins, after the magic, the version and the length, and where in it a
 # generated region's seed lies, after the flag saying it has one.
 const SAVE_HEADER := 20
@@ -79,6 +79,9 @@ const MARCH_LIMIT := 12000
 # A region whose growth forms an army after the player's within fifteen years of five-tick days.
 const GROWN_SEED := 3
 const GROWN_TICKS_PER_DAY := 5
+# The region the art slot is measured in: the first seed from 0 on which, ten years lived, an army's
+# lead knows one art skill, reaching otherwise than its army's first skill, and may cast it.
+const ART_SEED := 0
 const GROWN_TICKS := 9000
 const TestSaves := preload("res://extension/test_saves.gd")
 const ViewScale := preload("res://view_scale.gd")
@@ -100,9 +103,7 @@ const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
 const STICK_TICKS := 150
 # Ticks the person is given to walk up to a person of an allied faction.
 const TALK_WALK_LIMIT := 6000
-# In the region SEED makes, the person born into village 7 has a diagonal open from where it is
-# born, and the four ways it is walked along.
-const DIAGONAL_VILLAGE := 7
+# The four diagonal ways a person is walked along.
 const DIAGONALS := [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
 
 
@@ -230,8 +231,9 @@ func _camera_walk_pass() -> bool:
 # scene with the touch controls shown and no touch, ticked as long, leaves the person in place.
 # Setup: the touch controls are shown in both.
 func _stick_pass() -> bool:
-	var scene := _scene(0)
-	var control := _scene(0)
+	var village := _open_village(WAYS)
+	var scene := _scene(village)
+	var control := _scene(village)
 	scene.get_node("Hud").use_touch(true)
 	control.get_node("Hud").use_touch(true)
 	var touch: Control = scene.get_node("Hud").touch
@@ -272,7 +274,7 @@ func _stick_pass() -> bool:
 # far along one as the other to within a cell. Setup: the touch controls are shown and the
 # diagonal is open.
 func _stick_diagonal_pass() -> bool:
-	var scene := _scene(DIAGONAL_VILLAGE)
+	var scene := _scene(_open_village(DIAGONALS))
 	var stride: int = scene.STRIDE
 	scene.get_node("Hud").use_touch(true)
 	var touch: Control = scene.get_node("Hud").touch
@@ -297,7 +299,7 @@ func _stick_diagonal_pass() -> bool:
 # the person along the diagonal, more than STRIDE cells along each axis, and as far along one as
 # the other to within a cell. Setup: the diagonal is open and the order accepted.
 func _move_diagonal_pass() -> bool:
-	var scene := _scene(DIAGONAL_VILLAGE)
+	var scene := _scene(_open_village(DIAGONALS))
 	var stride: int = scene.STRIDE
 	var way := _clear_way(scene, 3 * stride, DIAGONALS)
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
@@ -449,18 +451,41 @@ func _taps_pass() -> bool:
 	return passed
 
 
+# The first village from 0 whose newborn body has one of `ways` passable for three times STRIDE
+# cells, as _clear_way() reads it, or 0 when none has.
+func _open_village(ways: Array) -> int:
+	var probe := _scene(0)
+	var villages: int = probe.world.villages().size()
+	probe.free()
+	for village in villages:
+		var scene := _scene(village)
+		var open := _clear_way(scene, 3 * scene.STRIDE, ways) != Vector2i.ZERO
+		scene.free()
+		if open:
+			return village
+	return 0
+
+
 # The first of `ways` passable for `cells` cells from where the scene's person stands, the cells
 # beside each diagonal step included, or none.
 func _clear_way(scene: Node2D, cells: int, ways := WAYS) -> Vector2i:
 	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	# The cells structures cover, which the map rows do not show.
+	var built := {}
+	for structure in scene.world.structure_count():
+		var rect := Rect2i(scene.world.structure_cell(structure), scene.world.structure_footprint(structure))
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				built[Vector2i(x, y)] = true
 	for way: Vector2i in ways:
 		var clear := true
 		for stride in range(1, cells + 1):
 			var cell := home + way * stride
 			for passed: Vector2i in [cell, cell - Vector2i(way.x, 0), cell - Vector2i(0, way.y)]:
 				clear = clear and passed.y >= 0 and passed.y < rows.size() and passed.x >= 0 \
-						and passed.x < rows[passed.y].length() and rows[passed.y][passed.x] == "."
+						and passed.x < rows[passed.y].length() and rows[passed.y][passed.x] == "." \
+						and not built.has(passed)
 		if clear:
 			return way
 	return Vector2i.ZERO
@@ -1502,8 +1527,9 @@ func _arts_pass() -> bool:
 	return passed
 
 
-# In a region of five-tick days lived ten years, steering the first person who knows an art skill
-# beyond its army's skills, with that skill put on T from the arts panel: T's slot on the technique
+# In a region of five-tick days lived ten years, steering the first lead of an army who knows one art
+# skill beyond its army's skills, reaching otherwise than its army's first skill and ready to cast,
+# with that skill put on T from the arts panel: T's slot on the technique
 # bar shows it, its key's cap reads T, T held to aim shows its range, and the fifth skill button
 # dragged to the pad's edge casts it at its full range, and tapped casts it at whom the aim finds
 # within that range or at the point that far the way the person faces. Control: R's slot, empty,
@@ -1511,16 +1537,21 @@ func _arts_pass() -> bool:
 # range, which differs. Setup: the art skill's range differs from the army skill's, and the person
 # may cast it.
 func _art_slot_pass() -> bool:
-	var lived := WorldAdapter.create_region(SEED, 0, GROWN_TICKS_PER_DAY)
+	var lived := WorldAdapter.create_region(ART_SEED, 0, GROWN_TICKS_PER_DAY)
 	for i in 10 * 120 * GROWN_TICKS_PER_DAY:
 		lived.tick()
 	var army := -1
 	for each in lived.army_count():
 		var roster := lived.roster(each)
-		if army < 0 and not roster.is_empty() and lived.person_skills(roster[0]).size() > lived.skills(each).size():
+		if army >= 0 or roster.is_empty():
+			continue
+		var known := lived.person_skills(roster[0])
+		var first_art := lived.skills(each).size()
+		if known.size() == first_art + 1 and known[first_art].range != known[0].range \
+				and lived.cast_refusal(roster[0], first_art, null) == WorldAdapter.CAST_NONE:
 			army = each
 	if army < 0:
-		print("play_test: no person knows an art after ten years: FAIL")
+		print("play_test: no person knows one art skill reaching otherwise than its army's and ready after ten years: FAIL")
 		return false
 	var scene := _title()
 	var hud: CanvasLayer = scene.get_node("Hud")
@@ -1866,8 +1897,8 @@ func _pixels_of(scene: Node2D, person: int) -> Vector2:
 	return scene.get_node("WorldArt").to_screen(scene.world.person_position(person))
 
 
-# The nearest hostile army, steered so that it does not close on the person on its own, marches on
-# the person until two of it are in sight and the nearest within INTENT_APART cells, and halts
+# The person walks out of its village along a clear way. The nearest hostile army, steered so that
+# it does not close on the person on its own, marches on the person until two of it are in sight and the nearest within INTENT_APART cells, and halts
 # there; the person stands where it is.
 # A left click on the nearest foe in sight selects it and sets no intent; ticked INTENT_TICKS, the
 # person comes no closer to it (the control). Space then sets the intent on it, and as many ticks
@@ -1881,10 +1912,17 @@ func _pixels_of(scene: Node2D, person: int) -> Vector2:
 # controls' next button selects a foe and their attack button sets the intent on it. In a fresh
 # scene, with no foe in sight, Space does nothing and shows nothing.
 func _intent_pass() -> bool:
-	var scene := _scene(0)
+	# The person, born in the first village with a clear way out, first walks out along it, so it
+	# meets the foes on open ground rather than among its village's people.
+	var scene := _scene(_open_village(WAYS))
 	var world: WorldAdapter = scene.world
 	var hud: CanvasLayer = scene.get_node("Hud")
 	var person: int = world.roster(scene.steered)[0]
+	var way := _clear_way(scene, 3 * scene.STRIDE)
+	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	world.order(scene.steered, home + way * 3 * scene.STRIDE, PackedInt64Array([0]))
+	for i in MOVE_LIMIT:
+		scene.step()
 	var here := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
 	world.order(scene.steered, here, PackedInt64Array(range(world.skill_count(scene.steered))))
 	var foes := _nearest_hostile(world, scene.steered)

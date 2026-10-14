@@ -336,7 +336,7 @@ func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
 				not shadow.is_empty() and shadow.at == Vector2(corner) * WorldArt.CELL - Vector2(0, lift) \
 				and shadow.footprint == footprint and shadow.stage == world.structure_stage(structure)
 		if standing == bottom and shadowed \
-				and sprite.position + sprite.offset + Vector2(INSET, frame.size.y - INSET) == bottom - Vector2(0, lift) \
+				and (sprite.position + sprite.offset + Vector2(INSET, frame.size.y - INSET)).is_equal_approx(bottom - Vector2(0, lift)) \
 				and sprite.get_parent().name == layer and staged \
 				and frame.position.x == sheet.tags[stage][0] * sheet.width \
 				and frame.size.x == sheet.width and sheet.width == footprint.x * 16 + 16:
@@ -364,6 +364,8 @@ func _founded_pass() -> bool:
 		region.tick()
 		ticks += 1
 	art.note_tick()
+	# A refresh lays the sprites of the structures laid since.
+	art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
 	var villages := region.villages()
 	var founded: Dictionary = villages[-1] if villages.size() > generated.size() else {}
 	var set_up := not founded.is_empty()

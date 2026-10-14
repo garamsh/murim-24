@@ -10,6 +10,8 @@
 extends RefCounted
 
 const SCENE := "res://hud/hud.tscn"
+# Ticks the player is given to walk until it has partly seen another village.
+const WALK_TO_SEE := 6000
 const PersonName := preload("res://hud/person_name.gd")
 const SEED := 2026
 # A seed whose first Cult village's leader has the widest given name, Cheonmyeong.
@@ -167,10 +169,28 @@ func _map_position_pass() -> bool:
 
 
 # A partly seen village keeps fog on its unseen cells, with its seen cells in its owner's colour.
-# Seed 0 places a village across the edge of the player's first sight.
+# On seed 0 the player, steered, walks toward the nearest other village until it remembers a village
+# whose square crosses the edge of what it has seen, at most WALK_TO_SEE ticks.
 func _fog_pass() -> bool:
 	var world := WorldAdapter.create_region(0)
-	world.tick()
+	var army := world.player_army()
+	world.steer(army, true)
+	var map_width: int = world.map_rows()[0].length()
+	var here: Vector2i = world.villages()[0].corner + world.villages()[0].area / 2
+	var nearest := Vector2i(-1, -1)
+	for village: Dictionary in world.villages().slice(1):
+		var centre: Vector2i = village.corner + village.area / 2
+		if nearest.x < 0 or (centre - here).length_squared() < (nearest - here).length_squared():
+			nearest = centre
+	world.order(army, nearest, PackedInt64Array(range(world.skill_count(army))))
+	for tick in WALK_TO_SEE:
+		world.tick()
+		if _straddling(world, map_width) > 0:
+			break
+	# Setup: a remembered village's square is partly seen.
+	if _straddling(world, map_width) == 0:
+		print("hud_test: no remembered village partly seen within %d ticks: FAIL" % WALK_TO_SEE)
+		return false
 	var hud: CanvasLayer = load(SCENE).instantiate()
 	hud.show_player(world, world.player_army())
 	var image: Image = hud.map_texture.get_image()
@@ -847,3 +867,20 @@ func _lessons_pass() -> bool:
 	print("hud_test: army %d's person %d learned within %d ticks; waiting %s against %s; %d lessons and realms of others announced none; %d notices measured, overruns %s: %s" % [
 		army, learner, ticks, waiting, expected, others, checks, overruns, "pass" if passed else "FAIL"])
 	return passed
+
+
+# How many remembered villages of `world` have both seen and unseen cells in their area.
+func _straddling(world: WorldAdapter, width: int) -> int:
+	var seen := world.explored()
+	var count := 0
+	for village: Dictionary in world.remembered_villages():
+		var hidden := false
+		var shown := false
+		for y in range(village.corner.y, village.corner.y + village.area.y):
+			for x in range(village.corner.x, village.corner.x + village.area.x):
+				if seen[y * width + x] == 0:
+					hidden = true
+				else:
+					shown = true
+		count += 1 if hidden and shown else 0
+	return count
