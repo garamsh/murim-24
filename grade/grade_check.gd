@@ -6,14 +6,15 @@
 ## standard against low. It checks that the hidden pass leaves the frame unchanged; that dusk and
 ## night change most of it, night darker; and that standard's vignette darkens pixels toward the
 ## corners only, its middle the same as low's. It exits 0 when every check passes, 1 when one fails
-## and 2 when it cannot draw, and quits within MAX_FRAMES frames.
+## and 2 when it cannot draw, as when its window draws too few frames to reach the last shot within
+## MAX_FRAMES frames. Its window stays on top, since a covered window is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
 const Grade := preload("res://grade/grade.gd")
 const SUMMER := 1
 const MAX_FRAMES := 600
-# Frames the scene runs before it is held still, and frames each step waits for the frame to draw.
+# Frames the scene runs before it is held still, and frames drawn after each step before its shot.
 const SETTLE := 60
 const WAIT := 4
 
@@ -23,6 +24,9 @@ var _frame := 0
 var _step := 0
 var _shots := {}
 var _failed := 0
+# Frames the renderer has drawn, and how many must be drawn before the next shot.
+var _drawn := 0
+var _next := 0
 
 
 func _initialize() -> void:
@@ -31,16 +35,19 @@ func _initialize() -> void:
 		quit(2)
 		return
 	root.size = Vector2i(1440, 810)
+	# A window other windows cover is not drawn.
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
 	_view = load(SCENE).instantiate()
 	root.add_child(_view)
 	_grade = _view.get_node("Grade")
+	RenderingServer.frame_post_draw.connect(func() -> void: _drawn += 1)
 
 
 func _process(_delta: float) -> bool:
 	_frame += 1
 	if _frame > MAX_FRAMES:
-		printerr("grade_check: out of frames")
-		quit(1)
+		printerr("grade_check: out of frames, %d drawn, at step %d" % [_drawn, _step])
+		quit(2)
 		return false
 	if _frame < SETTLE:
 		return false
@@ -54,13 +61,17 @@ func _process(_delta: float) -> bool:
 		["night", func() -> void: _grade.show_time(0.0, SUMMER)],
 		["low", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.show_time(0.5, SUMMER)],
 		["standard", func() -> void: _grade.quality = Grade.Quality.STANDARD]]
-	var at := _frame - SETTLE
-	if at % WAIT == 0 and _step < steps.size():
+	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
+	# renderer on a loaded machine.
+	if _drawn < _next:
+		return false
+	_next = _drawn + WAIT
+	if _step < steps.size():
 		if _step > 0:
 			_shots[steps[_step - 1][0]] = root.get_texture().get_image()
 		steps[_step][1].call()
 		_step += 1
-	elif at % WAIT == 0 and _step == steps.size():
+	elif _step == steps.size():
 		_shots[steps[_step - 1][0]] = root.get_texture().get_image()
 		_report()
 	return false
