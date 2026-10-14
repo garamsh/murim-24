@@ -2111,6 +2111,18 @@ TEST(World, ASoulIsBornAgainIntoAFamilyOfTheSameWorld) {
   EXPECT_GT(person.born, 0);
 }
 
+TEST(World, ASoulServesInTheArmyOfItsLatestBody) {
+  World world = soul_world();
+  EXPECT_EQ(world.soul_army(0), std::optional<std::size_t>{POST});
+  run_ticks(world, ARRIVAL_TICKS);
+  // Setup: the post died and its soul was born again into the post's army.
+  ASSERT_EQ(world.person(world.population() - 1).soul,
+            std::optional<std::size_t>{0});
+  EXPECT_EQ(world.soul_army(0), std::optional<std::size_t>{POST});
+  // Control: a soul no one carries serves in no army.
+  EXPECT_FALSE(world.soul_army(1).has_value());
+}
+
 TEST(World, ARebirthContinuesTheWorldInsteadOfResettingIt) {
   World world = soul_world();
   World twin = soul_world();
@@ -2610,6 +2622,18 @@ std::size_t grown_armies(const Growing& growing) {
   World world = growth_world(growing);
   run_ticks(world, 1);
   return world.army_count();
+}
+
+TEST(World, AStructureLaidByGrowthTakesItsPlansKind) {
+  World world = growth_world(Growing{{Expansion::BUILD}});
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"house"});
+  // Control: a structure the world was created with was laid from no plan.
+  EXPECT_FALSE(world.laid_kind(0).has_value());
+  EXPECT_THROW(static_cast<void>(world.laid_kind(STRUCTURES_AT_START + 1)),
+               std::out_of_range);
 }
 
 TEST(World, APressedVillageBuildsWhatItLacksAndRaisesItByRepair) {
@@ -3231,6 +3255,15 @@ TEST(World, AFactionReadsAsElectingOnlyWithAnElection) {
   EXPECT_TRUE(sect_world(electing).elects(0));
   // Control: the same faction without an election does not elect.
   EXPECT_FALSE(sect_world(Sectarian{}).elects(0));
+}
+
+TEST(World, OnlyAFactionWithADuelPassesItsLeadByDuel) {
+  const World world = cult_world(TARGET_HEALTH);
+  EXPECT_TRUE(world.passes_by_duel(CULT));
+  // Control: its ally, led without a duel, and the Orthodox, led by no one.
+  EXPECT_FALSE(world.passes_by_duel(ALLY));
+  EXPECT_FALSE(world.passes_by_duel(ORTHODOX));
+  EXPECT_THROW(static_cast<void>(world.passes_by_duel(99)), std::out_of_range);
 }
 
 constexpr std::size_t VILLAGER = 2;
@@ -5176,6 +5209,32 @@ TEST(World, AnArtOfAnotherNatureCostsMoreToRead) {
   EXPECT_EQ(read(easy).person(READER).qi, STORE - COST - COST);
 }
 
+TEST(World, AnArtsAgreementAndRealmAreReadAsTheReaderLearnsBy) {
+  // Founded with 400 qi and growing no more: second rank.
+  constexpr std::uint32_t STORE = 400;
+  Cultivating uneasy;
+  uneasy.growth = {4, 0};
+  uneasy.limit = {STORE, 0};
+  uneasy.founding_age = FOUNDED_DAYS;
+  uneasy.recovery_ticks = NEVER_AGAIN;
+  uneasy.learning.orientation_ease = HALF;
+  uneasy.learning.polarity_ease = HALF;
+  const World world = read(uneasy);
+  ASSERT_EQ(world.rank(READER), 2U);
+  EXPECT_EQ(world.heart_art(READER), std::optional<std::size_t>{ORTHODOX_ART});
+  EXPECT_EQ(world.art_agreement(READER, ORTHODOX_ART), PER_MILLE);
+  EXPECT_EQ(world.art_agreement(READER, DEMONIC_ART),
+            std::uint64_t{HALF} * HALF / PER_MILLE);
+  // The sweep is of rank 2, the form of rank 3.
+  EXPECT_TRUE(world.within_realm(READER, ORTHODOX_ART, 1));
+  EXPECT_FALSE(world.within_realm(READER, ORTHODOX_ART, 2));
+  // Control: the foe knows no art, so has no heart and every art agrees.
+  EXPECT_FALSE(world.heart_art(QI_FOE).has_value());
+  EXPECT_EQ(world.art_agreement(QI_FOE, DEMONIC_ART), PER_MILLE);
+  EXPECT_THROW(static_cast<void>(world.within_realm(READER, ORTHODOX_ART, 3)),
+               std::out_of_range);
+}
+
 // Cultivating `cultivating`'s world after the reader has read its manuals
 // and the foe has come within reach of it, once the reader may cast skill
 // `skill` at it.
@@ -5566,6 +5625,20 @@ TEST(World, APersonOfAFactionAtWarRefusesToTalk) {
   EXPECT_EQ(peace.talk_refusal(SPEAKER, FOE), TalkRefusal::NONE);
 }
 
+TEST(World, APersonTalksToTheNearestItMayTalkToOrMeetAsAFoe) {
+  const World world = talking();
+  // The foe, hostile, stands 2 cells from the speaker and the neighbour
+  // farther, so the foe is whom it would talk to.
+  EXPECT_EQ(world.talk_target(FOE), std::optional<std::size_t>{SPEAKER});
+  // The neighbour and the foe stand 2 cells from the speaker: the first in
+  // army order.
+  EXPECT_EQ(world.talk_target(SPEAKER), std::optional<std::size_t>{NEIGHBOUR});
+  // Control: the speaker beyond the passer-by's reach is never its target.
+  EXPECT_EQ(world.talk_target(PASSER_BY),
+            std::optional<std::size_t>{NEIGHBOUR});
+  EXPECT_THROW(static_cast<void>(world.talk_target(99)), std::out_of_range);
+}
+
 // Two people of faction 0 side by side, one of whom faction 1's person beside
 // them strikes dead on the first tick: {world, the dead, the living}.
 struct Struck {
@@ -5606,6 +5679,15 @@ TEST(World, TheDeadOfferNoNews) {
   // Control: the living one beside it still offers its news.
   EXPECT_EQ(struck.world.offers(struck.alive), std::vector<Offer>{Offer::NEWS});
   EXPECT_THROW(static_cast<void>(struck.world.offers(99)), std::out_of_range);
+}
+
+TEST(World, NoOneIsTalkedToWhenNoneMayBe) {
+  const Struck struck = struck_beside();
+  ASSERT_EQ(struck.world.person(struck.dead).health, 0U);
+  // The dead talk to no one, and the living one's foe beside it, of a
+  // faction at war, counts; control: the living one has someone.
+  EXPECT_FALSE(struck.world.talk_target(struck.dead).has_value());
+  EXPECT_TRUE(struck.world.talk_target(struck.alive).has_value());
 }
 
 // Whether a world whose people talk within `reach` cells is created.

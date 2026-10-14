@@ -1440,6 +1440,27 @@ std::vector<Event> World::rumours(std::size_t person) const {
       Listener{person, faction_of(person), rules_.rumour_reach}, people_);
 }
 
+std::optional<std::size_t> World::talk_target(std::size_t person) const {
+  const Position here = people_.at(person).position;
+  std::optional<std::size_t> found;
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (const Army& army : armies_) {
+    for (const std::size_t other : army.roster) {
+      const TalkRefusal refusal = talk_refusal(person, other);
+      if (refusal != TalkRefusal::NONE && refusal != TalkRefusal::HOSTILE) {
+        continue;
+      }
+      const std::int64_t apart =
+          distance_squared(here, people_.at(other).position);
+      if (apart < nearest) {
+        nearest = apart;
+        found = other;
+      }
+    }
+  }
+  return found;
+}
+
 TalkRefusal World::talk_refusal(std::size_t person, std::size_t other) const {
   if (person >= people_.size() || other >= people_.size()) {
     throw std::invalid_argument("no such person talks to no such person");
@@ -2424,6 +2445,10 @@ std::optional<std::size_t> World::leader(std::size_t faction) const {
   return leaders_.of(faction).leader;
 }
 
+bool World::passes_by_duel(std::size_t faction) const {
+  return leaders_.of(faction).succession.has_value();
+}
+
 bool World::elects(std::size_t faction) const {
   return leaders_.of(faction).election.has_value();
 }
@@ -3273,6 +3298,19 @@ std::optional<Nature> World::nature(std::size_t person) const {
   return nature_of(people_.at(person), life_);
 }
 
+std::optional<std::size_t> World::heart_art(std::size_t person) const {
+  return heart_of(people_.at(person));
+}
+
+std::uint64_t World::art_agreement(std::size_t person, std::size_t art) const {
+  return agreement(people_.at(person), art, false, life_);
+}
+
+bool World::within_realm(std::size_t person, std::size_t art,
+                         std::size_t skill) const {
+  return murim::within_realm(people_.at(person), art, skill, life_);
+}
+
 const std::vector<Realm>& World::realms() const { return life_.realms; }
 
 const std::vector<Art>& World::arts() const { return life_.arts; }
@@ -3427,6 +3465,15 @@ std::size_t World::ensoul(std::size_t person) {
   souls_.push_back(Soul{0, std::vector<bool>(life_.disciplines.size(), false)});
   charts_.emplace_back(Footprint{map_.width(), map_.height()});
   return souls_.size() - 1;
+}
+
+std::optional<std::size_t> World::soul_army(std::size_t soul) const {
+  for (std::size_t person = people_.size(); person-- > 0;) {
+    if (people_.at(person).soul == soul) {
+      return army_of(person);
+    }
+  }
+  return std::nullopt;
 }
 
 const Soul& World::soul(std::size_t soul) const { return souls_.at(soul); }
@@ -3816,6 +3863,14 @@ std::size_t World::village_count() const { return villages_.size(); }
 
 std::optional<std::size_t> World::plan_of(std::size_t structure) const {
   return plans_.at(structure);
+}
+
+std::optional<std::string> World::laid_kind(std::size_t structure) const {
+  const std::optional<std::size_t> plan = plans_.at(structure);
+  if (!plan || !life_.growth) {
+    return std::nullopt;
+  }
+  return life_.growth->plans.at(*plan).kind;
 }
 
 std::vector<std::optional<std::size_t>> World::territory() const {

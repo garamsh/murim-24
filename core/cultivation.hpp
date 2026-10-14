@@ -24,6 +24,16 @@ enum class Lesson : std::uint8_t { TAUGHT, COMPREHENDED };
 [[nodiscard]] std::optional<Nature> nature_of(const Person& person,
                                               const Life& life);
 
+/// Returns the art person `person` learned first, its heart method, or
+/// nothing while it knows no art.
+[[nodiscard]] std::optional<std::size_t> heart_of(const Person& person);
+
+/// Returns whether skill `skill` of art `art` lies within person `person`'s
+/// realm: the skill's rank is no higher than the person's. Throws
+/// std::out_of_range when `life` has no such art or skill.
+[[nodiscard]] bool within_realm(const Person& person, std::size_t art,
+                                std::size_t skill, const Life& life);
+
 /// Returns how far art `art`'s nature agrees with person `person`'s: the
 /// product, per mille, of `life`'s learning's ease, or its potency when
 /// `potency`, for each axis on which the two differ; PER_MILLE while the

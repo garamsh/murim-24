@@ -527,6 +527,38 @@ TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
   EXPECT_TRUE(specs.front().clearings.empty());
 }
 
+TEST(Region, AVillageIsNamedForItsKindAndNumber) {
+  EXPECT_EQ(village_name("hamlet", 0), "hamlet 1");
+  EXPECT_EQ(village_name("village", 11), "village 12");
+  // The generator names the villages it lays from a template so.
+  const Region region = generate_region(SEED, base_data());
+  ASSERT_FALSE(region.villages.empty());
+  EXPECT_EQ(region.villages.front().name,
+            village_name(region.villages.front().kind, 0));
+}
+
+TEST(Region, EachSeatsGateIsTheSeatGateAmongItsStructures) {
+  const Region region = generate_region(SEED, base_data());
+  ASSERT_FALSE(region.sects.empty());
+  for (const SectSpec& sect : region.sects) {
+    const Village& seat = region.villages.at(sect.seat);
+    const std::optional<std::size_t> gate =
+        gate_of(seat, region.structure_kinds);
+    ASSERT_TRUE(gate.has_value()) << seat.name;
+    const std::size_t structure = gate.value_or(0);
+    EXPECT_EQ(region.structure_kinds.at(structure), SEAT_GATE);
+    EXPECT_NE(
+        std::find(seat.structures.begin(), seat.structures.end(), structure),
+        seat.structures.end());
+  }
+  // Control: an ordinary village has no gate, nor a seat whose kinds are not
+  // known.
+  EXPECT_FALSE(
+      gate_of(region.villages.front(), region.structure_kinds).has_value());
+  EXPECT_FALSE(
+      gate_of(region.villages.at(region.sects.front().seat), {}).has_value());
+}
+
 TEST(Region, APersonBornIntoAVillageIsOfItsFactionInsideIt) {
   Region region = generate_region(SEED, base_data());
   const Village& village = region.villages.at(1);

@@ -505,7 +505,7 @@ Region generate_region(Seed seed, const RegionData& data) {
     }
 
     lay_village(region, data, kind, owner, corner,
-                kind.name + " " + std::to_string(number + 1));
+                village_name(kind.name, static_cast<std::size_t>(number)));
   }
   const std::vector<std::size_t> seats =
       seat_sects(region, data, room, random, nobody);
@@ -554,6 +554,23 @@ std::vector<Cell> open_cells(const Region& region, const Village& village) {
     }
   }
   return open;
+}
+
+std::string village_name(const std::string& kind, std::size_t village) {
+  return kind + " " + std::to_string(village + 1);
+}
+
+std::optional<std::size_t> gate_of(const Village& village,
+                                   const std::vector<std::string>& kinds) {
+  const auto gate = [&kinds](std::size_t structure) {
+    return structure < kinds.size() && kinds.at(structure) == SEAT_GATE;
+  };
+  const auto found =
+      std::find_if(village.structures.begin(), village.structures.end(), gate);
+  if (found == village.structures.end()) {
+    return std::nullopt;
+  }
+  return *found;
 }
 
 ArmySpec born_in(const Region& region, std::size_t village) {
