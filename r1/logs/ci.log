@@ -1,0 +1,272 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+[1/23] Building CXX object CMakeFiles/murim_core.dir/growth.cpp.o
+[2/23] Building CXX object CMakeFiles/murim_core.dir/life.cpp.o
+[3/23] Building CXX object CMakeFiles/murim_core.dir/village.cpp.o
+[4/23] Building CXX object CMakeFiles/murim_core.dir/live_scenario.cpp.o
+[5/23] Building CXX object CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[6/23] Building CXX object CMakeFiles/murim_core.dir/region.cpp.o
+[7/23] Building CXX object CMakeFiles/murim_core_bench.dir/bench.cpp.o
+[8/23] Building CXX object CMakeFiles/murim_core.dir/save.cpp.o
+[9/23] Building CXX object packs_json/CMakeFiles/murim_packs_json.dir/json_packs.cpp.o
+[10/23] Building CXX object CMakeFiles/murim_core.dir/content.cpp.o
+[11/23] Building CXX object CMakeFiles/murim_core_sweep.dir/sweep.cpp.o
+[12/23] Building CXX object CMakeFiles/murim_core_test.dir/Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.o
+[13/23] Building CXX object CMakeFiles/murim_core.dir/world.cpp.o
+[14/23] Building CXX object CMakeFiles/murim_core_test.dir/content_test.cpp.o
+[15/23] Linking CXX static library libmurim_core.a
+[16/23] Linking CXX static library packs_json/libmurim_packs_json.a
+[17/23] Linking CXX executable murim_core_bench
+[18/23] Linking CXX executable murim_core_sweep
+[19/23] Building CXX object CMakeFiles/murim_core_test.dir/village_test.cpp.o
+[20/23] Building CXX object CMakeFiles/murim_core_test.dir/region_test.cpp.o
+[21/23] Building CXX object CMakeFiles/murim_core_test.dir/save_test.cpp.o
+[22/23] Building CXX object CMakeFiles/murim_core_test.dir/world_test.cpp.o
+[23/23] Linking CXX executable murim_core_test
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+[1/19] Building CXX object core/CMakeFiles/murim_core.dir/growth.cpp.o
+[2/19] Building CXX object core/CMakeFiles/murim_core.dir/life.cpp.o
+[3/19] Building CXX object core/CMakeFiles/murim_core.dir/village.cpp.o
+[4/19] Building CXX object core/CMakeFiles/murim_core.dir/live_scenario.cpp.o
+[5/19] Building CXX object core/CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[6/19] Building CXX object CMakeFiles/murim_extension.dir/file_saves.cpp.o
+[7/19] Building CXX object CMakeFiles/murim_extension.dir/extension.cpp.o
+[8/19] Building CXX object CMakeFiles/world_hash.dir/world_hash.cpp.o
+[9/19] Building CXX object core/CMakeFiles/murim_core.dir/region.cpp.o
+[10/19] Building CXX object core/packs_json/CMakeFiles/murim_packs_json.dir/json_packs.cpp.o
+[11/19] Building CXX object core/CMakeFiles/murim_core.dir/content.cpp.o
+[12/19] Building CXX object core/CMakeFiles/murim_core.dir/save.cpp.o
+[13/19] Building CXX object core/CMakeFiles/murim_core.dir/world.cpp.o
+[14/19] Linking CXX static library core/libmurim_core.a
+[15/19] Linking CXX static library core/packs_json/libmurim_packs_json.a
+[16/19] Linking CXX executable world_hash
+[17/19] Building CXX object CMakeFiles/murim_extension.dir/world_adapter.cpp.o
+[18/19] Linking CXX shared library libmurim.macos.template_debug.arm64.dylib
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+./check-contents-list.sh
+checked 106 Markdown files, selected by: git ls-files --cached --others --exclude-standard -- '*.md'
+./lint-sysroot.sh build/lint/sysroot
+kept the lint sysroot in build/lint/sysroot, unpacked from the same 4 packages
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build/lint/core -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core/_deps/json-src/include/
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/lint/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -C build/lint/extension _deps/godot-cpp-build/generate_bindings
+ninja: Entering directory `build/lint/extension'
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+[1/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/bench.cpp.
+[2/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart.cpp.
+[3/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart_test.cpp.
+[4/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chronicle_test.cpp.
+[5/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content.cpp.
+[6/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content_test.cpp.
+[7/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy.cpp.
+[8/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy_test.cpp.
+[9/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field.cpp.
+[10/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field_test.cpp.
+[11/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/growth.cpp.
+[12/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/life.cpp.
+[13/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/limits.cpp.
+[14/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/live_scenario.cpp.
+[15/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/m1_scenario.cpp.
+[16/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/map.cpp.
+[17/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/random.cpp.
+[18/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region.cpp.
+[19/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region_test.cpp.
+[20/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save.cpp.
+[21/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save_test.cpp.
+[22/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/skill.cpp.
+[23/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash.cpp.
+[24/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash_test.cpp.
+[25/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/sweep.cpp.
+[26/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/talent.cpp.
+[27/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/trade.cpp.
+[28/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village.cpp.
+[29/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_test.cpp.
+[30/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world.cpp.
+[31/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world_test.cpp.
+[32/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs.cpp.
+[33/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.
+clang-tidy checked 33 C++ sources and the core/ and packs_json/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'packs_json/*.cpp'
+[1/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp.
+[2/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/extension.cpp.
+[3/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/file_saves.cpp.
+[4/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_adapter.cpp.
+[5/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_hash.cpp.
+clang-tidy checked 5 extension/ C++ sources and the extension/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'
+clang-format checked 72 C++ files, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'packs_json/*.cpp' 'packs_json/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ctest --test-dir build --output-on-failure --no-tests=error
+Test project /Users/sauce/orca/workspaces/murim-24/c-art/build
+        Start   1: Chart.SeeMarksEveryCellWithinReachAndNoOther
+  1/279 Test   #1: Chart.SeeMarksEveryCellWithinReachAndNoOther ............................   Passed    0.08 sec
+        Start   2: Chart.SeeReportsOnlyCellsNotSeenBefore
+  2/279 Test   #2: Chart.SeeReportsOnlyCellsNotSeenBefore ..................................   Passed    0.04 sec
+        Start   3: Chart.SeeStopsAtTheMapsEdge
+  3/279 Test   #3: Chart.SeeStopsAtTheMapsEdge .............................................   Passed    0.04 sec
+        Start   4: Chart.KeepsABlockOnlyForAreasWithASeenCell
+  4/279 Test   #4: Chart.KeepsABlockOnlyForAreasWithASeenCell ..............................   Passed    0.04 sec
+        Start   5: Chart.RememberReportsOnlyAChangedMemory
+  5/279 Test   #5: Chart.RememberReportsOnlyAChangedMemory .................................   Passed    0.04 sec
+        Start   6: Chart.RestoresWhatItGave
+  6/279 Test   #6: Chart.RestoresWhatItGave ................................................   Passed    0.04 sec
+        Start   7: Chart.RefusesBlocksNoChartGives
+  7/279 Test   #7: Chart.RefusesBlocksNoChartGives .........................................   Passed    0.03 sec
+        Start   8: Chart.RefusesAVillageOwnedByNoFaction
+  8/279 Test   #8: Chart.RefusesAVillageOwnedByNoFaction ...................................   Passed    0.03 sec
+        Start   9: Chart.AMovedClaimCentreChangesTheMemoryAndRevision
+  9/279 Test   #9: Chart.AMovedClaimCentreChangesTheMemoryAndRevision ......................   Passed    0.04 sec
+        Start  10: Chart.RefusesAVillageClaimCentreOffTheMap
+ 10/279 Test  #10: Chart.RefusesAVillageClaimCentreOffTheMap ...............................   Passed    0.04 sec
+        Start  11: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity
+ 11/279 Test  #11: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity .......................   Passed    0.04 sec
+        Start  12: Chronicle.RefusesEntriesNotAsAddKeepsThem
+ 12/279 Test  #12: Chronicle.RefusesEntriesNotAsAddKeepsThem ...............................   Passed    0.04 sec
+        Start  13: Content.ATinyBasePackLoadsWithNoError
+ 13/279 Test  #13: Content.ATinyBasePackLoadsWithNoError ...................................   Passed    0.04 sec
+        Start  14: Content.AnUnknownFieldRefusesItsPack
+ 14/279 Test  #14: Content.AnUnknownFieldRefusesItsPack ....................................   Passed    0.04 sec
+        Start  15: Content.AFractionIsRefused
+ 15/279 Test  #15: Content.AFractionIsRefused ..............................................   Passed    0.05 sec
+        Start  16: Content.AnUnresolvedIdRefusesTheMergedSet
+ 16/279 Test  #16: Content.AnUnresolvedIdRefusesTheMergedSet ...............................   Passed    0.04 sec
+        Start  17: Content.PacksLoadingAfterEachOtherInACycleAreRefused
+ 17/279 Test  #17: Content.PacksLoadingAfterEachOtherInACycleAreRefused ....................   Passed    0.04 sec
+        Start  18: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt
+ 18/279 Test  #18: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt ............   Passed    0.04 sec
+        Start  19: Content.ARemovedEntryTakesNoIndex
+ 19/279 Test  #19: Content.ARemovedEntryTakesNoIndex .......................................   Passed    0.04 sec
+        Start  20: Content.ADocumentTheSourceCannotReadRefusesItsPack
+ 20/279 Test  #20: Content.ADocumentTheSourceCannotReadRefusesItsPack ......................   Passed    0.04 sec
+        Start  21: Content.AFieldOfTheWrongTypeIsRefused
+ 21/279 Test  #21: Content.AFieldOfTheWrongTypeIsRefused ...................................   Passed    0.05 sec
+        Start  22: Content.AnIdTwiceInOneDocumentIsRefused
+ 22/279 Test  #22: Content.AnIdTwiceInOneDocumentIsRefused .................................   Passed    0.04 sec
+        Start  23: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused
+ 23/279 Test  #23: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused ..........   Passed    0.03 sec
+        Start  24: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet
+ 24/279 Test  #24: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet ...............   Passed    0.04 sec
+        Start  25: Content.AValueOutsideItsLimitsIsRefused
+ 25/279 Test  #25: Content.AValueOutsideItsLimitsIsRefused .................................   Passed    0.04 sec
+        Start  26: Content.AModCallingItselfABaseIsRefused
+ 26/279 Test  #26: Content.AModCallingItselfABaseIsRefused .................................   Passed    0.03 sec
+        Start  27: Content.AMergedSetFailingTheRegionsChecksIsRefused
+ 27/279 Test  #27: Content.AMergedSetFailingTheRegionsChecksIsRefused ......................   Passed    0.04 sec
+        Start  28: Content.AModOverridingOneSkillsDamageChangesOnlyThatField
+ 28/279 Test  #28: Content.AModOverridingOneSkillsDamageChangesOnlyThatField ...............   Passed    0.25 sec
+        Start  29: Declarations.HoldForBothFactionsWhicheverNamesThemFirst
+ 29/279 Test  #29: Declarations.HoldForBothFactionsWhicheverNamesThemFirst .................   Passed    0.03 sec
+        Start  30: Declarations.RefuseSlotsNotAsDeclareKeepsThem
+ 30/279 Test  #30: Declarations.RefuseSlotsNotAsDeclareKeepsThem ...........................   Passed    0.04 sec
+        Start  31: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked
+ 31/279 Test  #31: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked ....................   Passed    0.03 sec
+        Start  32: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason
+ 32/279 Test  #32: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason ...................   Passed    0.04 sec
+        Start  33: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames
+ 33/279 Test  #33: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames ................   Passed    0.04 sec
+        Start  34: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge
+ 34/279 Test  #34: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge .................   Passed    0.45 sec
+        Start  35: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError
+ 35/279 Test  #35: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError ...................   Passed    0.05 sec
+        Start  36: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal
+ 36/279 Test  #36: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal ....................   Passed    0.04 sec
+        Start  37: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine
+ 37/279 Test  #37: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine ................   Passed    0.04 sec
+        Start  38: FlowField.NoStepCutsACornerBetweenTwoBlockedCells
+ 38/279 Test  #38: FlowField.NoStepCutsACornerBetweenTwoBlockedCells .......................   Passed    0.03 sec
+        Start  39: FlowField.NoStepPassesBesideOneBlockedCell
+ 39/279 Test  #39: FlowField.NoStepPassesBesideOneBlockedCell ..............................   Passed    0.04 sec
+        Start  40: Region.SameSeedGivesTheSameRegionAndWorld
+ 40/279 Test  #40: Region.SameSeedGivesTheSameRegionAndWorld ...............................   Passed    2.16 sec
+        Start  41: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages
+ 41/279 Test  #41: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages ...............   Passed   21.17 sec
+        Start  42: Region.VillagesStandOnBuildableCells
+ 42/279 Test  #42: Region.VillagesStandOnBuildableCells ....................................   Passed  100.35 sec
+        Start  43: Region.VillagesLieInTheirOwnersTerritory
+ 43/279 Test  #43: Region.VillagesLieInTheirOwnersTerritory ................................   Passed   20.50 sec
+        Start  44: Region.VillagesDoNotOverlap
+ 44/279 Test  #44: Region.VillagesDoNotOverlap .............................................   Passed   22.56 sec
+        Start  45: Region.GeneratesAFourthFactionAddedAsData
+ 45/279 Test  #45: Region.GeneratesAFourthFactionAddedAsData ...............................   Passed   29.35 sec
+        Start  46: Region.RejectsInconsistentData
+ 46/279 Test  #46: Region.RejectsInconsistentData ..........................................   Passed    0.16 sec
+        Start  47: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds
+ 47/279 Test  #47: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds ...........   Passed    0.15 sec
+        Start  48: Region.EachSeatKeepsItsOpenCourtClearOfGrowth
+ 48/279 Test  #48: Region.EachSeatKeepsItsOpenCourtClearOfGrowth ...........................   Passed    0.15 sec
+        Start  49: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt
+ 49/279 Test  #49: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt ....................   Passed    0.60 sec
+        Start  50: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith
+ 50/279 Test  #50: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith ........   Passed   25.45 sec
+        Start  51: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion
+ 51/279 Test  #51: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion ..................   Passed    3.95 sec
+        Start  52: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage
+ 52/279 Test  #52: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage ..............   Passed    0.52 sec
+        Start  53: Region.ADuelEndsWithinItsTargetTime
+ 53/279 Test  #53: Region.ADuelEndsWithinItsTargetTime .....................................   Passed    2.86 sec
+        Start  54: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime
+ 54/279 Test  #54: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime ....................   Passed    5.00 sec
+        Start  55: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther
+ 55/279 Test  #55: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther ...............   Passed    1.21 sec
+        Start  56: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime
+ 56/279 Test  #56: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime .....................   Passed   14.07 sec
+        Start  57: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime
+ 57/279 Test  #57: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime ............   Passed   13.42 sec
+        Start  58: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike
+ 58/279 Test  #58: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike ...............   Passed    6.24 sec
+        Start  59: Region.FamiliesReachAThirdGenerationWithinThirtyYears
+ 59/279 Test  #59: Region.FamiliesReachAThirdGenerationWithinThirtyYears ...................   Passed    9.21 sec
+        Start  60: Region.BirthsStopOnceMaxPeopleLive
+ 60/279 Test  #60: Region.BirthsStopOnceMaxPeopleLive ......................................   Passed   34.29 sec
+        Start  61: Region.BirthsStopAtTheCapacityTheRulesSet
+ 61/279 Test  #61: Region.BirthsStopAtTheCapacityTheRulesSet ...............................   Passed    4.51 sec
+        Start  62: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName
+ 62/279 Test  #62: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName ..................   Passed    7.90 sec
+        Start  63: Region.VillagesFillToTheirCapsAndNoFurther
+ 63/279 Test  #63: Region.VillagesFillToTheirCapsAndNoFurther ..............................   Passed   53.98 sec
+        Start  64: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound
+ 64/279 Test  #64: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound ............   Passed   92.94 sec
+        Start  65: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary
+ 65/279 Test  #65: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary .........   Passed   67.23 sec
+        Start  66: Region.EachFactionStartsWithAtMostFourHouseholds
+ 66/279 Test  #66: Region.EachFactionStartsWithAtMostFourHouseholds ........................   Passed   16.95 sec
+        Start  67: Region.NoOutcomeReadsTheChart
+ 67/279 Test  #67: Region.NoOutcomeReadsTheChart ...........................................   Passed    2.39 sec
+        Start  68: Region.AFewHouseholdsGrowIntoACivilisationOverACentury
+make: *** [test] Terminated: 15

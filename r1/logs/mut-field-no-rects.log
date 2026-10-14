@@ -1,0 +1,25 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-2026101421005688367
+grade_test: spring (1.0, 1.02, 0.98), winter (0.96, 0.99, 1.06), midnight (0.4692, 0.52, 0.6912) wrapped (0.4692, 0.52, 0.6912) before (0.4692, 0.52, 0.6912); high vignette 0.18: pass
+grade_test: noon in summer gain (1.02, 1.0, 0.96) saturation 1.06, dusk gain (1.071, 0.9, 0.768), between them (1.0455, 0.95, 0.864) against (1.0455, 0.95, 0.864); standard vignette 0.18 hue shift 1.00, low vignette 0.00 hue shift 1.00; hidden before a time true, shown after true: pass
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'PackedVector4Array'.
+          at: _lights_pass (res://grade/grade_test.gd:78)
+          GDScript backtrace (most recent call first):
+              [0] _lights_pass (res://grade/grade_test.gd:78)
+              [1] run (res://grade/grade_test.gd:66)
+              [2] _init (res://run_tests.gd:22)
+res://grade/grade_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
+WARNING: 2 RIDs of type "Canvas" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 2 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 14 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 3 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: 1 RID allocations of type 'N16RendererViewport8ViewportE' were leaked at exit.
+ERROR: 2 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.
+ERROR: 2 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.

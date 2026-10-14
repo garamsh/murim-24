@@ -1,0 +1,28 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.8s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'

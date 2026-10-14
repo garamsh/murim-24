@@ -1,0 +1,261 @@
+== round 1 main frame 14ab6461 21:25:09 load { 3.05 6.60 8.93 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 249 ticks in 8.0 s timed (30 per second set)
+bodies: 500 in the world, 399 on screen drawn as sprites through MultiMesh bands
+outlines: 122.3 bodies outlined over what hides them a frame on average, 130 in the last frame
+names: 8 shown over the 150 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 42.4 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 6.697 ms, p99 7.443 ms, max 7.642 ms
+frame breakdown, mean a timed frame: core tick 0.119 ms, adapter 0.006 ms, view script 0.518 ms, render CPU 0.909 ms (GPU 0.000 ms), the rest 5.138 ms of 6.689 ms
+PASS: p99 7.443 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 1 main high 14ab6461 21:25:23 load { 3.86 6.60 8.89 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 188 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 188 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 4.934 ms p99 7.630 ms max 45.597 ms
+PASS: night village p99 7.630 ms against 16.7 ms
+exit 0
+== round 1 main low 14ab6461 21:25:35 load { 3.81 6.50 8.83 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 214 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 214 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 5.691 ms p99 9.023 ms max 35.504 ms
+PASS: night village p99 9.023 ms against 16.7 ms
+exit 0
+== round 1 head frame a44ac4e7 21:25:47 load { 5.81 6.79 8.89 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 249 ticks in 7.9 s timed (30 per second set)
+bodies: 500 in the world, 398 on screen drawn as sprites through MultiMesh bands
+outlines: 122.6 bodies outlined over what hides them a frame on average, 128 in the last frame
+names: 8 shown over the 150 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 42.7 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 6.604 ms, p99 7.375 ms, max 8.083 ms
+frame breakdown, mean a timed frame: core tick 0.173 ms, adapter 0.009 ms, view script 0.758 ms, render CPU 0.939 ms (GPU 0.000 ms), the rest 4.745 ms of 6.624 ms
+PASS: p99 7.375 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 1 head high a44ac4e7 21:26:01 load { 10.62 7.77 9.20 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 251 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 251 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.896 ms p99 7.941 ms max 8.701 ms
+PASS: night village p99 7.941 ms against 16.7 ms
+exit 0
+== round 1 head low a44ac4e7 21:26:16 load { 16.76 9.26 9.71 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 251 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 251 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.910 ms p99 7.746 ms max 9.148 ms
+PASS: night village p99 7.746 ms against 16.7 ms
+exit 0
+== round 1 head hearth a44ac4e7 21:26:31 load { 18.20 9.91 9.93 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true setup: bloom 0.6 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 323 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 323 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 8.777 ms p99 10.803 ms max 74.123 ms
+PASS: night village p99 10.803 ms against 16.7 ms
+exit 0
+== round 2 main frame 14ab6461 21:26:49 load { 15.43 9.70 9.86 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 253 ticks in 8.0 s timed (30 per second set)
+bodies: 500 in the world, 399 on screen drawn as sprites through MultiMesh bands
+outlines: 123.4 bodies outlined over what hides them a frame on average, 131 in the last frame
+names: 8 shown over the 151 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 42.6 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 6.545 ms, p99 10.624 ms, max 19.812 ms
+frame breakdown, mean a timed frame: core tick 0.215 ms, adapter 0.011 ms, view script 0.873 ms, render CPU 1.882 ms (GPU 0.000 ms), the rest 3.722 ms of 6.703 ms
+PASS: p99 10.624 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 2 main high 14ab6461 21:27:04 load { 15.28 9.95 9.94 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 235 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 235 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.364 ms p99 8.772 ms max 19.021 ms
+PASS: night village p99 8.772 ms against 16.7 ms
+exit 0
+== round 2 main low 14ab6461 21:27:19 load { 13.51 9.82 9.89 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 251 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 251 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.896 ms p99 7.829 ms max 8.374 ms
+PASS: night village p99 7.829 ms against 16.7 ms
+exit 0
+== round 2 head frame a44ac4e7 21:27:35 load { 12.24 9.73 9.86 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 251 ticks in 8.0 s timed (30 per second set)
+bodies: 500 in the world, 399 on screen drawn as sprites through MultiMesh bands
+outlines: 123.7 bodies outlined over what hides them a frame on average, 133 in the last frame
+names: 8 shown over the 151 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 43.4 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 6.533 ms, p99 9.860 ms, max 17.431 ms
+frame breakdown, mean a timed frame: core tick 0.229 ms, adapter 0.011 ms, view script 0.913 ms, render CPU 3.754 ms (GPU 0.000 ms), the rest 1.731 ms of 6.638 ms
+PASS: p99 9.860 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 2 head high a44ac4e7 21:27:49 load { 13.11 10.06 9.98 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 295 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 295 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 7.622 ms p99 12.886 ms max 19.874 ms
+PASS: night village p99 12.886 ms against 16.7 ms
+exit 0
+== round 2 head low a44ac4e7 21:28:06 load { 12.77 10.12 10.00 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 318 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 318 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 8.336 ms p99 18.547 ms max 32.047 ms
+FAIL: night village p99 18.547 ms against 16.7 ms
+exit 1
+== round 2 head hearth a44ac4e7 21:28:25 load { 11.39 9.99 9.95 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true setup: bloom 0.6 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 302 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 302 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 8.270 ms p99 11.820 ms max 13.639 ms
+PASS: night village p99 11.820 ms against 16.7 ms
+exit 0
+== round 3 main frame 14ab6461 21:28:44 load { 10.92 10.01 9.96 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 376 ticks in 12.0 s timed (30 per second set)
+bodies: 500 in the world, 396 on screen drawn as sprites through MultiMesh bands
+outlines: 125.0 bodies outlined over what hides them a frame on average, 127 in the last frame
+names: 8 shown over the 153 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 41.0 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 9.289 ms, p99 19.632 ms, max 56.632 ms
+frame breakdown, mean a timed frame: core tick 0.355 ms, adapter 0.022 ms, view script 1.159 ms, render CPU 3.361 ms (GPU 0.000 ms), the rest 5.116 ms of 10.013 ms
+FAIL: p99 19.632 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 1
+== round 3 main high 14ab6461 21:29:06 load { 17.77 11.63 10.54 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 307 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 307 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 7.547 ms p99 22.946 ms max 69.680 ms
+FAIL: night village p99 22.946 ms against 16.7 ms
+exit 1
+== round 3 main low 14ab6461 21:29:26 load { 23.30 13.30 11.17 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom <null> fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp <null> bloom <null> lights <null>, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 263 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 263 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.772 ms p99 17.115 ms max 58.768 ms
+FAIL: night village p99 17.115 ms against 16.7 ms
+exit 1
+== round 3 head frame a44ac4e7 21:29:44 load { 19.97 13.19 11.18 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 305 ticks in 9.7 s timed (30 per second set)
+bodies: 500 in the world, 398 on screen drawn as sprites through MultiMesh bands
+outlines: 124.4 bodies outlined over what hides them a frame on average, 122 in the last frame
+names: 8 shown over the 149 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 41.1 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 7.721 ms, p99 15.525 ms, max 21.330 ms
+frame breakdown, mean a timed frame: core tick 0.261 ms, adapter 0.014 ms, view script 0.972 ms, render CPU 2.538 ms (GPU 0.000 ms), the rest 4.328 ms of 8.114 ms
+PASS: p99 15.525 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 3 head high a44ac4e7 21:30:02 load { 20.50 13.80 11.45 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 369 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 369 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 9.472 ms p99 20.973 ms max 74.922 ms
+FAIL: night village p99 20.973 ms against 16.7 ms
+exit 1
+== round 3 head low a44ac4e7 21:30:24 load { 20.80 14.27 11.67 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 0 hearth false setup: bloom 0.0 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.00 art pixel 3.0 lamp 1.0 bloom 0.0 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 377 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 377 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 9.764 ms p99 19.232 ms max 67.283 ms
+FAIL: night village p99 19.232 ms against 16.7 ms
+exit 1
+== round 3 head hearth a44ac4e7 21:30:49 load { 23.16 15.36 12.13 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true setup: bloom 0.6 fog <null> clouds <null>;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.4692, 0.52, 0.6912) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 252 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 252 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.897 ms p99 8.930 ms max 12.762 ms
+PASS: night village p99 8.930 ms against 16.7 ms
+exit 0
