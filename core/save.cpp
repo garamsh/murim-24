@@ -1123,7 +1123,7 @@ class SaveCodec {
               put_maybe(out, village.founded,
                         [&out](Cell cell) { put_cell(out, cell); });
             });
-    put_all(out, world.leadership_, [&out](const Leadership& faction) {
+    put_all(out, world.leaders_.factions(), [&out](const Leadership& faction) {
       put_leadership(out, faction);
     });
     put_all(out, world.sects_, [&out](const World::Sect& sect) {
@@ -1133,7 +1133,7 @@ class SaveCodec {
     });
     put_all(out, world.manuals_,
             [&out](const Manual& manual) { put_manual(out, manual); });
-    put_all(out, world.duels_, [&out](const World::Fight& fight) {
+    put_all(out, world.leaders_.duels(), [&out](const Fight& fight) {
       out.size(fight.faction);
       out.size(fight.challenger);
       out.size(fight.leader);
@@ -1233,7 +1233,7 @@ class SaveCodec {
               get_maybe<Cell>(input, [&input] { return get_cell(input); });
           return village;
         });
-    world.leadership_ =
+    std::vector<Leadership> leadership =
         get_all<Leadership>(input, [&input] { return get_leadership(input); });
     world.sects_ = get_all<World::Sect>(input, [&input] {
       World::Sect sect;
@@ -1244,14 +1244,15 @@ class SaveCodec {
     });
     world.manuals_ =
         get_all<Manual>(input, [&input] { return get_manual(input); });
-    world.duels_ = get_all<World::Fight>(input, [&input] {
-      World::Fight fight;
+    std::vector<Fight> duels = get_all<Fight>(input, [&input] {
+      Fight fight;
       fight.faction = input.size();
       fight.challenger = input.size();
       fight.leader = input.size();
       fight.rule = get_duel(input);
       return fight;
     });
+    world.leaders_ = Leaders{std::move(leadership), std::move(duels)};
     std::vector<std::optional<Declared>> declarations =
         get_all<std::optional<Declared>>(input, [&input] {
           return get_maybe<Declared>(input, [&input] {

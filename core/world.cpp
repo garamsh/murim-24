@@ -1014,17 +1014,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   for (VillageSpec& spec : villages) {
     add_village(std::move(spec));
   }
-  const auto unknown = [this](const Leadership& faction) {
-    return faction.leader && *faction.leader >= people_.size();
-  };
-  if (leadership.size() > rules_.hostile.size() ||
-      std::any_of(leadership.begin(), leadership.end(), unknown)) {
-    throw std::invalid_argument(
-        "leaders must be people the world creates, of no more factions than "
-        "hostility names");
-  }
-  leadership_ = std::move(leadership);
-  leadership_.resize(rules_.hostile.size());
+  leaders_ = Leaders{std::move(leadership), rules_.hostile.size(), people_};
   declarations_ = Declarations{rules_.hostile.size()};
   add_sects(std::move(sects));
 }
@@ -1087,11 +1077,6 @@ void World::restore() {
       std::any_of(structures_.begin(), structures_.end(), off_map) ||
       plans_.size() != structures ||
       std::any_of(plans_.begin(), plans_.end(), unplanned);
-  const auto bad_faction = [&](const Leadership& faction) {
-    const Admission admission = faction.admission.value_or(Admission{});
-    return !below(faction.leader, people) || admission.chance > PER_MILLE ||
-           !reachable(admission.reach) || admission.elder_share > PER_MILLE;
-  };
   const auto stray_sect = [&](const Sect& sect) {
     return sect.faction >= factions || sect.seat >= villages;
   };
@@ -1099,10 +1084,6 @@ void World::restore() {
     const auto* held = std::get_if<HeldBySect>(&manual.place);
     return manual.art >= life_.arts.size() ||
            (held != nullptr && held->sect >= sects_.size());
-  };
-  const auto stray_duel = [&](const Fight& fight) {
-    return fight.faction >= factions || fight.challenger >= people ||
-           fight.leader >= people;
   };
   const auto stray_soul = [disciplines](const Soul& soul) {
     return soul.practised.size() > disciplines;
@@ -1122,11 +1103,9 @@ void World::restore() {
       !rostered() || living() > rules_.people_capacity ||
       std::any_of(people_.begin(), people_.end(), stray_person) ||
       !villages_.kept(structures_, armies_.size(), factions) ||
-      leadership_.size() != factions ||
-      std::any_of(leadership_.begin(), leadership_.end(), bad_faction) ||
+      !leaders_.kept(factions, people_) ||
       std::any_of(sects_.begin(), sects_.end(), stray_sect) ||
       std::any_of(manuals_.begin(), manuals_.end(), stray_manual) ||
-      std::any_of(duels_.begin(), duels_.end(), stray_duel) ||
       std::any_of(souls_.begin(), souls_.end(), stray_soul)) {
     throw std::invalid_argument(
         "a restored world must keep the limits a world is created within, "
@@ -1267,7 +1246,8 @@ void World::add_sects(std::vector<SectSpec> sects) {
   const auto unknown = [this](const std::vector<std::size_t>& held) {
     return !all_below(held, life_.arts.size());
   };
-  if (std::any_of(leadership_.begin(), leadership_.end(), bad_admission) ||
+  if (std::any_of(leaders_.factions().begin(), leaders_.factions().end(),
+                  bad_admission) ||
       std::any_of(sects.begin(), sects.end(), stray) ||
       manuals.held.size() > sects.size() ||
       std::any_of(manuals.held.begin(), manuals.held.end(), unknown) ||
@@ -1382,8 +1362,7 @@ ApplicationRefusal World::assess(std::size_t person,
   if (!applicant.home) {
     return ApplicationRefusal::NO_HOME;
   }
-  const std::optional<Admission>& admission =
-      leadership_.at(*faction).admission;
+  const std::optional<Admission>& admission = leaders_.of(*faction).admission;
   if (*faction != sects_.at(sect).faction || !admission) {
     return ApplicationRefusal::NOT_OF_FACTION;
   }
@@ -1427,8 +1406,7 @@ void World::admit(const Living& living) {
   for (const std::size_t candidate : living.people) {
     const std::size_t faction =
         armies_.at(living.army_of.at(candidate)).faction;
-    const std::optional<Admission>& admission =
-        leadership_.at(faction).admission;
+    const std::optional<Admission>& admission = leaders_.of(faction).admission;
     std::vector<std::size_t> sects;
     for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
       if (assess(candidate, faction, sect, openings.at(sect)) ==
@@ -1801,8 +1779,7 @@ void World::elect(std::size_t faction) {
       most = favour;
     }
   }
-  if (chosen && chosen != leadership_.at(faction).leader) {
-    leadership_.at(faction).leader = chosen;
+  if (chosen && leaders_.lead(faction, chosen)) {
     record(cell_of(people_.at(*chosen).position),
            LeaderChanged{faction, *chosen, ChosenBy::ELECTION});
   }
@@ -1847,7 +1824,7 @@ std::vector<std::size_t> World::sect_members(std::size_t sect) const {
 
 std::vector<std::size_t> World::sect_elders(std::size_t sect) const {
   const std::optional<Admission>& admission =
-      leadership_.at(sects_.at(sect).faction).admission;
+      leaders_.of(sects_.at(sect).faction).admission;
   std::vector<std::size_t> elders;
   if (!admission) {
     return elders;
@@ -2066,17 +2043,19 @@ void World::hold(Army& chasing) {
 // Starts a duel between army `army`'s lead and faction `faction`'s leader, or
 // throws when the faction's succession refuses the challenge.
 void World::start_duel(std::size_t army, std::size_t faction) {
-  const ChallengeRefusal refused = challenge_refusal(army, faction);
-  const Leadership none{};
-  const Leadership& led =
-      faction < leadership_.size() ? leadership_.at(faction) : none;
-  if (refused != ChallengeRefusal::NONE || !led.leader || !led.succession) {
-    throw std::invalid_argument(
-        "a challenge must name a faction that passes its lead by duel and has "
-        "a leader, from an army whose lead may challenge it, outside a duel");
+  if (army >= armies_.size()) {
+    throw std::invalid_argument("a challenge must come from an army");
   }
-  duels_.push_back(Fight{faction, armies_.at(army).roster.front(), *led.leader,
-                         *led.succession});
+  leaders_.challenge(challenging(army), faction);
+}
+
+// Army `army` as a challenge reads it: its faction and its lead, if any.
+Challenging World::challenging(std::size_t army) const {
+  const Army& challenger = armies_.at(army);
+  return Challenging{challenger.faction, challenger.roster.empty()
+                                             ? std::nullopt
+                                             : std::optional<std::size_t>{
+                                                   challenger.roster.front()}};
 }
 
 ChallengeRefusal World::challenge_refusal(std::size_t army,
@@ -2084,44 +2063,11 @@ ChallengeRefusal World::challenge_refusal(std::size_t army,
   if (army >= armies_.size()) {
     throw std::invalid_argument("a challenge must come from an army");
   }
-  return refusal(armies_.at(army), faction);
-}
-
-ChallengeRefusal World::refusal(const Army& challenging,
-                                std::size_t faction) const {
-  const Leadership none{};
-  const Leadership& led =
-      faction < leadership_.size() ? leadership_.at(faction) : none;
-  if (!led.succession) {
-    return ChallengeRefusal::NO_SUCCESSION;
-  }
-  if (!led.leader) {
-    return ChallengeRefusal::NO_LEADER;
-  }
-  if (challenging.roster.empty()) {
-    return ChallengeRefusal::NO_CHALLENGER;
-  }
-  if (led.succession->members_only && challenging.faction != faction) {
-    return ChallengeRefusal::NOT_A_MEMBER;
-  }
-  if (challenging.roster.front() == *led.leader) {
-    return ChallengeRefusal::IS_LEADER;
-  }
-  if (duel(faction)) {
-    return ChallengeRefusal::DUEL_IN_PROGRESS;
-  }
-  return ChallengeRefusal::NONE;
+  return leaders_.refusal(challenging(army), faction);
 }
 
 std::optional<Duellists> World::duel(std::size_t faction) const {
-  const auto fought = [faction](const Fight& fight) {
-    return fight.faction == faction;
-  };
-  const auto found = std::find_if(duels_.begin(), duels_.end(), fought);
-  if (found == duels_.end()) {
-    return std::nullopt;
-  }
-  return Duellists{found->challenger, found->leader};
+  return leaders_.duel(faction);
 }
 
 void World::cast(std::size_t person, std::size_t skill, const Target& target) {
@@ -2299,14 +2245,9 @@ void World::tick() {
 // Elects a leader, on day `day`, for each faction with an election whose
 // leader is dead or missing, or whose term `day` completes.
 void World::hold_elections(std::uint64_t day) {
-  for (std::size_t faction = 0; faction < leadership_.size(); ++faction) {
-    const Leadership& lead = leadership_.at(faction);
-    if (!lead.election) {
-      continue;
-    }
-    const bool vacant = !lead.leader || people_.at(*lead.leader).health == 0;
-    const std::uint32_t term = lead.election->term;
-    if (vacant || (term > 0 && day % term == 0)) {
+  for (std::size_t faction = 0; faction < leaders_.factions().size();
+       ++faction) {
+    if (leaders_.elects_on(faction, people_, day)) {
       elect(faction);
     }
   }
@@ -2456,7 +2397,7 @@ StateHash World::hash() const {
       fold(member);
     }
   }
-  for (const Leadership& faction : leadership_) {
+  for (const Leadership& faction : leaders_.factions()) {
     fold(faction.leader.has_value());
     fold(faction.leader.value_or(0));
     const Duel rule = faction.succession.value_or(Duel{false, 0, false});
@@ -2473,7 +2414,7 @@ StateHash World::hash() const {
   for (const Manual& manual : manuals_) {
     fold_manual(fold, manual);
   }
-  for (const Fight& fight : duels_) {
+  for (const Fight& fight : leaders_.duels()) {
     fold(fight.faction);
     fold(fight.challenger);
     fold(fight.leader);
@@ -2567,55 +2508,32 @@ bool World::within_reach(const Army& army, const VillageSpec& spec,
       });
 }
 
-bool World::duelling(std::size_t one, std::size_t other) const {
-  return std::any_of(
-      duels_.begin(), duels_.end(), [one, other](const Fight& fight) {
-        return (fight.challenger == one && fight.leader == other) ||
-               (fight.challenger == other && fight.leader == one);
-      });
-}
-
 // Ends every duel in which a duellist has no more than its faction's yield
 // health left: the leader keeps the lead unless only the challenger stands,
 // who then leads, and the factions at peace with it turn hostile to it if
 // the duel says so.
 void World::settle_duels() {
-  const auto down = [this](const Fight& fight, std::size_t duellist) {
-    return people_.at(duellist).health <= fight.rule.yield_health;
-  };
-  const auto fallen = [&down](const Fight& fight) {
-    return down(fight, fight.challenger) || down(fight, fight.leader);
-  };
-  for (const Fight& fight : duels_) {
-    const Duel& rule = fight.rule;
-    const bool won =
-        down(fight, fight.leader) && !down(fight, fight.challenger);
-    if (!won) {
-      continue;
-    }
-    leadership_.at(fight.faction).leader = fight.challenger;
-    record(cell_of(people_.at(fight.challenger).position),
-           LeaderChanged{fight.faction, fight.challenger, ChosenBy::DUEL});
+  for (const Won& won : leaders_.settle(people_)) {
+    record(cell_of(people_.at(won.challenger).position),
+           LeaderChanged{won.faction, won.challenger, ChosenBy::DUEL});
     std::vector<std::vector<bool>>& hostility = rules_.hostile;
     for (std::size_t other = 0; other < hostility.size(); ++other) {
-      const bool ally = other != fight.faction &&
-                        !hostility.at(other).at(fight.faction) &&
-                        !hostility.at(fight.faction).at(other);
-      hostility.at(other).at(fight.faction) =
-          hostility.at(other).at(fight.faction) ||
-          (ally && rule.allies_turn_hostile);
+      const bool ally = other != won.faction &&
+                        !hostility.at(other).at(won.faction) &&
+                        !hostility.at(won.faction).at(other);
+      hostility.at(other).at(won.faction) =
+          hostility.at(other).at(won.faction) ||
+          (ally && won.allies_turn_hostile);
     }
   }
-  duels_.erase(std::remove_if(duels_.begin(), duels_.end(), fallen),
-               duels_.end());
 }
 
 std::optional<std::size_t> World::leader(std::size_t faction) const {
-  return leadership_.at(faction).leader;
+  return leaders_.of(faction).leader;
 }
 
 bool World::elects(std::size_t faction) const {
-  return leadership_.at(faction).election.has_value();
+  return leaders_.of(faction).election.has_value();
 }
 
 bool World::hostile(std::size_t from, std::size_t target) const {
@@ -2657,7 +2575,7 @@ DeclarationRefusal World::declaration_refusal(std::size_t person,
     return DeclarationRefusal::DEAD;
   }
   const std::optional<std::size_t> own = faction_of(person);
-  if (!own || leadership_.at(*own).leader != person) {
+  if (!own || leaders_.of(*own).leader != person) {
     return DeclarationRefusal::NOT_THE_LEADER;
   }
   if (*own == faction) {
@@ -2737,7 +2655,7 @@ void World::negotiate(const Diplomacy& diplomacy) {
     numbers.at(army.faction) += army.roster.size();
   }
   for (std::size_t faction = 0; faction < factions; ++faction) {
-    const std::optional<std::size_t> leader = leadership_.at(faction).leader;
+    const std::optional<std::size_t> leader = leaders_.of(faction).leader;
     const std::optional<std::size_t> army =
         leader ? army_of(*leader) : std::nullopt;
     if (!army || armies_.at(*army).steered) {
@@ -3194,18 +3112,14 @@ std::int32_t World::reach(const Person& person, const Army& army) const {
 bool World::foes(std::size_t person, std::size_t army, std::size_t other,
                  std::size_t other_army) const {
   return hostile(armies_.at(army).faction, armies_.at(other_army).faction) ||
-         duelling(person, other);
+         leaders_.duelling(person, other);
 }
 
 // The kinds the crowd's index marks the people person `person`, serving in
 // `army`, may strike by: those of the factions hostile to its army's, or every
 // kind while it fights a duel, whose foe may be of any faction.
 std::uint64_t World::foe_kinds(std::size_t person, const Army& army) const {
-  const bool duellist =
-      std::any_of(duels_.begin(), duels_.end(), [person](const Fight& fight) {
-        return fight.challenger == person || fight.leader == person;
-      });
-  if (duellist) {
+  if (leaders_.in_duel(person)) {
     return UINT64_LIMIT;
   }
   std::uint64_t kinds = 0;
@@ -4521,11 +4435,7 @@ std::vector<std::size_t> World::levy(std::size_t village) const {
   std::vector<std::size_t> levied;
   for (const std::size_t member :
        armies_.at(villages_.at(village).spec.residents).roster) {
-    const auto leads = [member](const Leadership& faction) {
-      return faction.leader == member;
-    };
-    if (people_.at(member).health > 0 &&
-        std::none_of(leadership_.begin(), leadership_.end(), leads)) {
+    if (people_.at(member).health > 0 && !leaders_.leads(member)) {
       levied.push_back(member);
     }
   }
