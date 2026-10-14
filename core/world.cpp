@@ -152,8 +152,12 @@ struct Push {
   std::int64_t y;
 };
 
-// The integer square root of `value`, 0 or more, rounded down.
+// The integer square root of `value`, rounded down, and 0 for a value of 0
+// or less.
 std::int64_t root(std::int64_t value) {
+  if (value <= 0) {
+    return 0;
+  }
   // The floating-point root is only a guess: it is corrected to the exact
   // floor in whole numbers, so every platform returns the same root.
   auto guess = static_cast<std::int64_t>(std::sqrt(static_cast<double>(value)));
