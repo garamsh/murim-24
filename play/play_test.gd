@@ -60,6 +60,12 @@ const DRAW := 2026
 const DRAWN := 4259094339
 # A seed the region generator refuses: no room for a sect's seat.
 const REFUSED_SEED := 320
+# Where a save's payload begins, after the magic, the version and the length, and where in it a
+# generated region's seed lies, after the flag saying it has one.
+const SAVE_HEADER := 20
+const SAVED_SEED_AT := SAVE_HEADER + 1
+const SAVE_CHECKSUM := 8
+const WORD := 0xFFFFFFFF
 # In the region the scene's seed makes, village 5's residents are army 4, of the Cult; ordered on
 # village 7, of the Orthodox, they take village 5's seat, and its claim, with them.
 const MARCHERS := 4
@@ -126,7 +132,8 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _refused_seed_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _refused_seed_pass() and _refused_save_pass() \
+			and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _grade_pass()
@@ -627,6 +634,70 @@ func _refused_seed_pass() -> bool:
 		REFUSED_SEED, refused, TYPED_SEED, cleared, started, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
+
+
+# A save whose region's seed the core no longer generates a region from is refused on the title
+# with its own notice, and load_refusal names it: the save of SEED's region, with its seed made
+# REFUSED_SEED and its checksum sealed again. Control: the same save sealed again with SEED kept
+# resumes the world, so the seal is the core's and the seed is what refuses it. Setup: the save
+# holds a region's seed, SEED, where the test writes it.
+func _refused_save_pass() -> bool:
+	var game_slot := TestSaves.game_slot()
+	TestSaves.clear()
+	var world := WorldAdapter.create_region(SEED, 0)
+	var saved := world.save(0, TestSaves.directory)
+	var bytes := FileAccess.get_file_as_bytes(TestSaves.path(0))
+	var setup := saved and bytes.size() > SAVED_SEED_AT + 8 and bytes[SAVE_HEADER] == 1 \
+			and bytes.decode_u32(SAVED_SEED_AT) == SEED and bytes.decode_u32(SAVED_SEED_AT + 4) == 0
+	_write_save(_sealed(bytes, SEED))
+	var kept := _title()
+	kept.navigate(_key(KEY_DOWN))
+	kept.navigate(_key(KEY_ENTER))
+	var resumed: bool = kept.world != null and kept.world.hash() == world.hash()
+	kept.free()
+	_write_save(_sealed(bytes, REFUSED_SEED))
+	var named := WorldAdapter.load_refusal(0, TestSaves.directory) == WorldAdapter.LOAD_REGION_REFUSED \
+			and WorldAdapter.load(0, TestSaves.directory) == null
+	var refused_scene := _title()
+	var refused_hud: CanvasLayer = refused_scene.get_node("Hud")
+	refused_scene.navigate(_key(KEY_DOWN))
+	refused_scene.navigate(_key(KEY_ENTER))
+	var noticed: bool = refused_scene.world == null and refused_hud.screen() == refused_hud.title_screen \
+			and refused_hud.title_screen.notice == "TITLE_LOAD_REGION_REFUSED"
+	refused_scene.free()
+	TestSaves.clear()
+	var untouched := TestSaves.game_slot() == game_slot
+	var passed := setup and resumed and named and noticed and untouched
+	print("play_test: setup %s; sealed again with seed %d it resumes %s; with seed %d load_refusal names LOAD_REGION_REFUSED and load gives nothing %s, and the title shows its notice %s; the game's slot 0 untouched %s: %s" % [
+		setup, SEED, resumed, REFUSED_SEED, named, noticed, untouched, "pass" if passed else "FAIL"])
+	return passed
+
+
+# `bytes`, a save of a generated region, with its region's seed made `region_seed`, below 2^32, and
+# its checksum, FNV-1a over all before it as the core computes it, made to match.
+func _sealed(bytes: PackedByteArray, region_seed: int) -> PackedByteArray:
+	var sealed := bytes.duplicate()
+	sealed.encode_u32(SAVED_SEED_AT, region_seed)
+	sealed.encode_u32(SAVED_SEED_AT + 4, 0)
+	# The 64-bit digest as two 32-bit halves, so no step overflows GDScript's signed integers: the
+	# prime is 2^40 + 0x1B3.
+	var high := 0xCBF29CE4
+	var low := 0x84222325
+	for index in sealed.size() - SAVE_CHECKSUM:
+		low = low ^ sealed[index]
+		var low_product := low * 0x1B3
+		var high_product := high * 0x1B3 + (low_product >> 32)
+		high = (high_product + (low << 8)) & WORD
+		low = low_product & WORD
+	sealed.encode_u32(sealed.size() - SAVE_CHECKSUM, low)
+	sealed.encode_u32(sealed.size() - SAVE_CHECKSUM + 4, high)
+	return sealed
+
+
+func _write_save(bytes: PackedByteArray) -> void:
+	var file := FileAccess.open(TestSaves.path(0), FileAccess.WRITE)
+	file.store_buffer(bytes)
+	file.close()
 
 
 # The scene opens on the title with no world; Enter on a new game opens the new-game panel, and the

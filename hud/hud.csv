@@ -114,6 +114,7 @@ TITLE_LOAD_NOT_A_SAVE,이 게임의 저장이 아니라 이어할 수 없다.,"N
 TITLE_LOAD_UNSUPPORTED_VERSION,다른 판의 게임이 쓴 저장이라 이어할 수 없다.,"Saved by another version, so it cannot continue."
 TITLE_LOAD_TRUNCATED,저장이 잘려 있어 이어할 수 없다.,"The save is cut short, so it cannot continue."
 TITLE_LOAD_CORRUPTED,저장이 손상되어 이어할 수 없다.,"The save is corrupted, so it cannot continue."
+TITLE_LOAD_REGION_REFUSED,저장의 시드로 더는 세상을 만들 수 없어 이어할 수 없다.,"The save's seed no longer makes a world, so it cannot continue."
 NEW_GAME_TITLE,새 게임,New Game
 NEW_GAME_BACK,Esc 뒤로,Esc Back
 NEW_GAME_SEED,시드,Seed
