@@ -612,7 +612,9 @@ void fold_attacks(const Fold& fold, const std::optional<Tokens>& tokens,
   if (!attacks.any()) {
     return;
   }
-  for (const Engaged& each : attacks.engaged()) {
+  const std::vector<Engaged> engaged = attacks.engaged();
+  fold(engaged.size());
+  for (const Engaged& each : engaged) {
     const Engagement& held = each.engagement;
     fold(each.person);
     fold(held.foe);
