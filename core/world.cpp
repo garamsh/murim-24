@@ -829,18 +829,6 @@ bool within(Cell here, Cell there, std::int32_t reach) {
          std::abs(there.y - here.y) <= reach;
 }
 
-// Whether `what` names a person past `people`, an art or skill `life` lacks,
-// or a realm outside its realms.
-bool stray_advance(const Advance& what, std::size_t people, const Life& life) {
-  if (const auto* learned = std::get_if<Learned>(&what)) {
-    return learned->person >= people || learned->art >= life.arts.size() ||
-           learned->skill >= life.arts.at(learned->art).skills.size();
-  }
-  const auto& gained = std::get<RealmGained>(what);
-  return gained.person >= people || gained.rank == 0 ||
-         gained.rank > life.realms.size();
-}
-
 // Whether `person` holds more qi than its store, a store past MAX_TALENT, or
 // a known skill of no art `life` holds.
 bool stray_cultivation(const Person& person, const Life& life) {
@@ -1125,36 +1113,10 @@ void World::restore() {
 // EVENT_CAPACITY, oldest first, numbered one after another, none later than
 // the world's tick, each naming records the world holds.
 bool World::events_kept() const {
-  const std::size_t factions = rules_.hostile.size();
-  const std::size_t people = people_.size();
-  const std::size_t villages = villages_.size();
-  const auto stray_happening = [&](const Happening& what) {
-    if (const auto* founded = std::get_if<Founded>(&what)) {
-      return founded->village >= villages || founded->faction >= factions;
-    }
-    if (const auto* raided = std::get_if<Raided>(&what)) {
-      return raided->village >= villages || raided->owner >= factions ||
-             raided->raider >= factions;
-    }
-    if (const auto* ruined = std::get_if<Ruined>(&what)) {
-      return ruined->village >= villages || ruined->owner >= factions ||
-             ruined->destroyer.army >= armies_.size() ||
-             ruined->destroyer.faction >= factions;
-    }
-    if (const auto* fell = std::get_if<SectFell>(&what)) {
-      return fell->sect >= sects_.size() || fell->faction >= factions;
-    }
-    if (const auto* changed = std::get_if<LeaderChanged>(&what)) {
-      return changed->faction >= factions || changed->leader >= people;
-    }
-    if (const auto* born = std::get_if<Born>(&what)) {
-      return born->person >= people;
-    }
-    const auto* died = std::get_if<Died>(&what);
-    return died == nullptr || died->person >= people;
-  };
-  return events_.kept(tick_count_, [&stray_happening](const Event& event) {
-    return !stray_happening(event.what);
+  const Records held{rules_.hostile.size(), people_.size(), villages_.size(),
+                     armies_.size(), sects_.size()};
+  return events_.kept(tick_count_, [&held](const Event& event) {
+    return names_held(event.what, held);
   });
 }
 
@@ -1497,65 +1459,17 @@ void World::note(Advance what) {
 // holds.
 bool World::progress_kept() const {
   return progress_.kept(tick_count_, [this](const Progress& step) {
-    return !stray_advance(step.what, people_.size(), life_);
+    return names_held(step.what, people_.size(), life_.arts, life_.realms);
   });
-}
-
-// Whether `other` is `one`'s kin: itself, of its family, its spouse, parent
-// or child.
-bool World::related(std::size_t one, std::size_t other) const {
-  const Person& self = people_.at(one);
-  const auto among = [other](const std::vector<std::size_t>& people) {
-    return std::find(people.begin(), people.end(), other) != people.end();
-  };
-  return one == other || self.family == people_.at(other).family ||
-         among(self.spouses) || among(self.parents) || among(self.children);
-}
-
-// Whether event `event` reaches person `person`, of `faction` if it serves
-// in an army, as a rumour.
-bool World::heard_by(const Event& event, std::size_t person,
-                     std::optional<std::size_t> faction) const {
-  if (within(cell_of(people_.at(person).position), event.cell,
-             rules_.rumour_reach)) {
-    return true;
-  }
-  const auto ours = [faction](std::size_t other) { return faction == other; };
-  if (const auto* born = std::get_if<Born>(&event.what)) {
-    return related(person, born->person);
-  }
-  if (const auto* died = std::get_if<Died>(&event.what)) {
-    return related(person, died->person);
-  }
-  if (const auto* founded = std::get_if<Founded>(&event.what)) {
-    return ours(founded->faction);
-  }
-  if (const auto* raided = std::get_if<Raided>(&event.what)) {
-    return ours(raided->owner) || ours(raided->raider);
-  }
-  if (const auto* ruined = std::get_if<Ruined>(&event.what)) {
-    return ours(ruined->owner) || ours(ruined->destroyer.faction);
-  }
-  if (const auto* fell = std::get_if<SectFell>(&event.what)) {
-    return ours(fell->faction);
-  }
-  const auto* changed = std::get_if<LeaderChanged>(&event.what);
-  return changed != nullptr && ours(changed->faction);
 }
 
 std::vector<Event> World::rumours(std::size_t person) const {
   if (person >= people_.size()) {
     throw std::out_of_range("no such person hears rumours");
   }
-  const std::optional<std::size_t> faction = faction_of(person);
-  std::vector<Event> heard;
-  const std::vector<Event>& events = events_.entries();
-  for (auto event = events.rbegin(); event != events.rend(); ++event) {
-    if (heard_by(*event, person, faction)) {
-      heard.push_back(*event);
-    }
-  }
-  return heard;
+  return murim::rumours(
+      events_.entries(),
+      Listener{person, faction_of(person), rules_.rumour_reach}, people_);
 }
 
 TalkRefusal World::talk_refusal(std::size_t person, std::size_t other) const {

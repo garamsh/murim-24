@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <variant>
+#include <vector>
+
+#include "arts.hpp"
 
 namespace murim {
 
@@ -38,5 +41,11 @@ struct Progress {
   std::uint64_t tick = 0;
   Advance what;
 };
+
+/// Returns whether `what` names one of `people` people, an art and skill of
+/// `arts`, and a realm of `realms` by its rank, counted from 1.
+[[nodiscard]] bool names_held(const Advance& what, std::size_t people,
+                              const std::vector<Art>& arts,
+                              const std::vector<Realm>& realms);
 
 }  // namespace murim

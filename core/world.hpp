@@ -738,9 +738,6 @@ class World {
   [[nodiscard]] std::vector<std::size_t> record_deaths();
   [[nodiscard]] bool events_kept() const;
   [[nodiscard]] bool progress_kept() const;
-  [[nodiscard]] bool related(std::size_t one, std::size_t other) const;
-  [[nodiscard]] bool heard_by(const Event& event, std::size_t person,
-                              std::optional<std::size_t> faction) const;
   void settle_duels();
   void negotiate(const Diplomacy& diplomacy);
   void pay(const Trade& trade);

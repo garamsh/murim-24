@@ -24,9 +24,9 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `talk` talk and what a person offers;
   - `leadership` a faction's lead, duels, admission and elections, and the leaders a world keeps: the one place for each faction's leadership and the duels being fought, deciding who may challenge a leader, how a duel ends and whom it leaves leading, and when a faction elects;
   - `sect` sects as created, and applying to one;
-  - `event` the world's events;
+  - `event` the world's events, whether an event names only records the world holds, who is a person's kin, and who hears of an event as a rumour, by where it stands, its kin and its faction;
   - `chronicle` the bounded, numbered record that keeps the latest events and steps of progress, and checks a saved one;
-  - `progress` people's steps in the martial arts;
+  - `progress` people's steps in the martial arts, and whether a step names only a person, art, skill and realm the world holds;
   - `person` a person;
   - `life` the rules of life that gather the rest.
 
@@ -170,7 +170,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 - The world records events in a bounded ring of the latest, `EVENT_CAPACITY`, read oldest first by `events()`: a village founded, raided or ruined, a sect fallen, a lead changing hands, a person born and a person dying.
 - It notes each step of progress in the martial arts, a skill learned or a realm reached, in a store of its own, `PROGRESS_CAPACITY`, read by `progress()`. No rumour is derived from it. The store is hashed and saved.
-- `rumours` derives the events that reach a person, newest first: those within the rules' `rumour_reach`, and wherever they happened, what befell its kin and its faction.
+- `rumours` derives the events that reach a person, newest first: those within the rules' `rumour_reach`, and wherever they happened, what befell its kin and its faction. The `event` unit decides who hears; the World gives it the events kept, the people, the person's faction and the reach, and records each event where it happens.
 
 ### Talking and trade
 
