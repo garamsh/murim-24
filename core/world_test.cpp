@@ -4519,6 +4519,46 @@ TEST(World, AtMostTheFoesTokensStrikeItOnAnyTick) {
   EXPECT_EQ(most_striking(all, 0), RING_ATTACKERS);
 }
 
+// Four attackers of faction 0 crowding RING_FOE from the cell south of it,
+// and a foe of faction 1 there, of no realm, granting `granted` tokens and
+// striking no one.
+World pressed(std::uint32_t granted) {
+  const Skill jab{ARM, 0, 0, 0, 1, 0, Shape::TARGETED};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  Tokens tokens = default_tokens();
+  tokens.by_rank = {granted};
+  rules.tokens = tokens;
+  const std::vector<std::string> rows = open_map(OPEN_SIDE);
+  const Cell south{RING_FOE.x, RING_FOE.y + 1};
+  return World{Seed{1},
+               Map{rows},
+               {army(rows, south, south, 4, TARGET_HEALTH, 0, {jab}),
+                army(rows, RING_FOE, RING_FOE, 1, TARGET_HEALTH, 1, {IDLE})},
+               {},
+               rules};
+}
+
+TEST(World, OneHoldingNoTokenStrikesNotThoughTheFoeIsInItsReach) {
+  constexpr std::uint32_t ONE = 1;
+  World world = pressed(ONE);
+  // Setup: more than one attacker stands within reach of the foe at the
+  // start.
+  const Position foe = world.person(world.roster(1).front()).position;
+  const std::vector<Position> attackers = positions(world, 0);
+  ASSERT_GT(std::count_if(attackers.begin(), attackers.end(),
+                          [&](Position place) {
+                            return distance_squared(place, foe) <=
+                                   std::int64_t{ARM} * ARM;
+                          }),
+            1);
+  EXPECT_EQ(most_striking(world, 0), ONE);
+  // Control: granting each a token, more than one strikes on one tick.
+  constexpr std::uint32_t EACH = 4;
+  World each = pressed(EACH);
+  EXPECT_GT(most_striking(each, 0), ONE);
+}
+
 TEST(World, ThePlayerAsAFoeIsCappedByItsOwnTokens) {
   constexpr std::size_t GRANTED = 4;
   World world = ringed(open_map(OPEN_SIDE), default_tokens(), false);
