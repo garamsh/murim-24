@@ -487,8 +487,7 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
                                   std::nullopt});
   data.factions.at(1).hostile_to.push_back(3);
   // Without sects: four factions' territories leave a sect's seat no room on
-  // 5 of 200 seeds. Without them, seed 19 leaves a village no site its
-  // buildings fit, which the generator reports.
+  // 5 of 200 seeds.
   data.sects.clear();
   data.life.manuals.reset();
 
@@ -496,13 +495,7 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
   EXPECT_TRUE(region.rules.hostile.at(3).at(1));
   EXPECT_TRUE(region.rules.hostile.at(1).at(3));
   EXPECT_NO_THROW(world_of(region));
-  constexpr Seed CROWDED{19};
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
-    if (Seed{seed} == CROWDED) {
-      EXPECT_THROW(static_cast<void>(generate_region(CROWDED, data)),
-                   std::runtime_error);
-      continue;
-    }
     const Region generated = generate_region(Seed{seed}, data);
     EXPECT_TRUE(
         populated(generated, 4) && villages_on_buildable_cells(generated) &&
