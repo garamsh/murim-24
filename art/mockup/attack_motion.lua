@@ -4,8 +4,8 @@
 --   attack_<faction>.aseprite, 16x24 frames, the feet on row 22 as art/bodies' sheets, tagged
 --     swing (three: the weapon raised back, swung level, followed through low), lunge (two: a
 --     thrust two pixels forward, then the recovery), cast (two: the weapon raised overhead, then
---     its tip alight in the faction's accent), hurt (two: flinching a pixel back, eyes shut, then
---     the eyes open), throw (two: the arm drawn back, then flung forward; the Unorthodox's darts),
+--     its tip alight in the faction's accent), hurt (two: recoiling two pixels back with the head
+--     dropped a pixel and the eyes shut, then a pixel back, recovering), throw (two: the arm drawn back, then flung forward; the Unorthodox's darts),
 --     mend (two: a mallet raised, then struck down) and torch (two: a torch held up, then thrust);
 --   attack_effects.aseprite, tagged slash_<faction> (three 24x16 crescents in the faction's accent
 --     ramp, a white-hot edge first), dart (eight 8x8 headings and a streak), burst_<faction>
@@ -32,7 +32,7 @@ local EYES = { { 6, 8 }, { 9, 8 } }
 
 local factions = {
   { name = "orthodox", spec = { faction = "orthodox", head = "topknot" }, weapon = "sword", accent = "azure" },
-  { name = "demonic", spec = { faction = "demonic", head = "spiky", body = "tunic" }, weapon = "saber", accent = "crimson" },
+  { name = "demonic", spec = { faction = "demonic", head = "spiky", body = "tunic" }, weapon = "saber", accent = "violet" },
   { name = "unorthodox", spec = { faction = "unorthodox", head = "topknot", hat = "straw", body = "tunic" }, weapon = "knife",
     accent = "amber" },
 }
@@ -124,9 +124,11 @@ local function frames_of(f)
       cv:set(x - 1, tip, c("fire", 5)); cv:set(x - 2, tip, c(f.accent, 6)); cv:set(x, tip, c(f.accent, 6))
     end),
   } }
+  -- The recoil: two pixels back and the head dropped a pixel, eyes shut, the weapon fallen low;
+  -- then a pixel back, recovering.
   sets[#sets + 1] = { "hurt", {
-    pose(f, {}, -1, 0, function(cv, x, y) blade(cv, k, x, y, math.min(15, x + 2), y + r // 2 + 1) end, true),
-    pose(f, {}, -1, 0, function(cv, x, y) blade(cv, k, x, y - 1, x, y - 1 - r); guard(cv, k, x, y) end),
+    pose(f, {}, -2, 1, function(cv, x, y) blade(cv, k, x, y, math.min(15, x + 2), y + r // 2 + 1) end, true),
+    pose(f, {}, -1, 0, function(cv, x, y) blade(cv, k, x, y - 1, x + 1, y - r); guard(cv, k, x, y) end),
   } }
   sets[#sets + 1] = { "throw", {
     pose(f, {}, -1, 0, function(cv, x, y) cv:hline(x - 6, y - 3, 3, c("stone", 7)); cv:set(x - 3, y - 3, c("wood", 3)) end),
@@ -279,11 +281,11 @@ end
 
 local effects = {
   { "slash_orthodox", { slash("azure", 1), slash("azure", 2), slash("azure", 3) }, 24, 16 },
-  { "slash_demonic", { slash("crimson", 1), slash("crimson", 2), slash("crimson", 3) }, 24, 16 },
+  { "slash_demonic", { slash("violet", 1), slash("violet", 2), slash("violet", 3) }, 24, 16 },
   { "slash_unorthodox", { slash("amber", 1), slash("amber", 2), slash("amber", 3) }, 24, 16 },
   { "dart", { dart(0), dart(45), dart(90), dart(135), dart(180), dart(225), dart(270), dart(315), streak() }, 8, 8 },
   { "burst_orthodox", { burst("azure", 1), burst("azure", 2), burst("azure", 3) }, 32, 20 },
-  { "burst_demonic", { burst("crimson", 1), burst("crimson", 2), burst("crimson", 3) }, 32, 20 },
+  { "burst_demonic", { burst("violet", 1), burst("violet", 2), burst("violet", 3) }, 32, 20 },
   { "burst_unorthodox", { burst("amber", 1), burst("amber", 2), burst("amber", 3) }, 32, 20 },
   { "spark", { spark(1), spark(2), spark(3) }, 8, 8 },
   { "mend", { motes(1), motes(2), motes(3) }, 12, 16 },
