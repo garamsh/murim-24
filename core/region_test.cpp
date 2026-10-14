@@ -17,6 +17,7 @@
 
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "flow_field.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "kinship.hpp"
@@ -960,8 +961,8 @@ constexpr std::size_t RAIDERS = 20;
 // A raid on the walled village, scaled from the hamlet's by its 26
 // residents to the hamlet's 12: at most twice as long.
 constexpr std::uint64_t VILLAGE_RAID_MOST = 2 * RAID_MOST;
-// Seeds a walled village is raided on, the first from 1 with room west of it
-// for the whole band.
+// Seeds a walled village is raided on: the first three from 1 with room
+// round it for the whole band.
 constexpr std::array<Seed, 3> WALLED{Seed{1}, Seed{2}, Seed{3}};
 // How far from the leader a duel's challenger stands, in cells.
 constexpr std::int32_t DUEL_AWAY = 5;
@@ -1127,27 +1128,48 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   const std::size_t residents = village.army;
   const Cell centre = region.armies.at(residents).objective;
   ArmySpec raiders{centre, {}, DEMONIC, data.factions.at(DEMONIC).skills};
-  // The band stands west of everything the village holds, its square and
-  // its structures, on the rows they span, column by column.
+  // The band stands on the open cells round the village two cells clear of
+  // everything it holds, its square and its structures, nearest its centre
+  // by path round what blocks, so it starts on the near side of any water
+  // or range rather than behind another village.
   std::int32_t left = village.corner.x;
   std::int32_t top = village.corner.y;
+  std::int32_t right = village.corner.x + village.area.width;
   std::int32_t bottom = village.corner.y + village.area.height;
+  std::vector<std::string> rows = region.map_rows;
   for (const std::size_t index : village.structures) {
     const Structure& structure = region.structures.at(index);
     left = std::min(left, structure.cell.x);
     top = std::min(top, structure.cell.y);
+    right = std::max(right, structure.cell.x + structure.footprint.width);
     bottom = std::max(bottom, structure.cell.y + structure.footprint.height);
   }
-  std::vector<Cell> cells =
-      cells_of(Cell{0, top}, Footprint{left, bottom - top});
-  std::stable_sort(cells.begin(), cells.end(),
-                   [](Cell one, Cell other) { return one.x > other.x; });
-  const std::vector<Cell> open = open_round(region, village);
+  for (const Structure& structure : region.structures) {
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      if (structure.blocks) {
+        rows.at(static_cast<std::size_t>(cell.y))
+            .at(static_cast<std::size_t>(cell.x)) = tile_of(Footing::BLOCKED);
+      }
+    }
+  }
+  const FlowField paths{Map{rows}, centre};
+  constexpr std::int32_t CLEAR = 2;
+  std::vector<Cell> cells = open_round(region, village);
+  cells.erase(std::remove_if(cells.begin(), cells.end(),
+                             [&](Cell cell) {
+                               const bool near = cell.x >= left - CLEAR &&
+                                                 cell.x < right + CLEAR &&
+                                                 cell.y >= top - CLEAR &&
+                                                 cell.y < bottom + CLEAR;
+                               return near || paths.distance(cell) ==
+                                                  FlowField::UNREACHABLE;
+                             }),
+              cells.end());
+  std::stable_sort(cells.begin(), cells.end(), [&paths](Cell one, Cell other) {
+    return paths.distance(one) < paths.distance(other);
+  });
   for (const Cell cell : cells) {
-    const bool free = std::any_of(open.begin(), open.end(), [cell](Cell each) {
-      return same(each, cell);
-    });
-    if (raiders.members.size() < raid.band && free) {
+    if (raiders.members.size() < raid.band) {
       raiders.members.push_back(Recruit{cell, data.life.newborn_health});
     }
   }
@@ -1630,8 +1652,42 @@ Grew grew(const RegionData& data, Seed seed,
   return result;
 }
 
+// Whether a Demonic village of `region` has a village of a faction it is
+// hostile to with its centre within the growth's reach along each axis, as
+// a raid needs.
+bool raid_in_reach(const Region& region, const RegionData& data) {
+  const std::int32_t reach = data.life.growth.value_or(Growth{}).reach;
+  for (const Village& raider : region.villages) {
+    if (raider.faction != DEMONIC) {
+      continue;
+    }
+    const Cell from = region.armies.at(raider.army).objective;
+    for (const Village& target : region.villages) {
+      const Cell to = region.armies.at(target.army).objective;
+      if (region.rules.hostile.at(DEMONIC).at(target.faction) &&
+          std::abs(to.x - from.x) <= reach &&
+          std::abs(to.y - from.y) <= reach) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// The seed the fifty years of growth are measured on: the first from 0 on
+// which a Demonic village has a hostile one within raiding reach, so a raid
+// can be sent, and on which every outcome the test names occurs.
+constexpr Seed RAIDING{1};
+
 TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
-  const Grew region = grew(base_data(), NEIGHBOURLY);
+  // Setup: the seed holds a raid within reach, the property it was chosen
+  // for, so a layout that loses it fails here rather than below.
+  ASSERT_TRUE(
+      raid_in_reach(generate_region(RAIDING, base_data()), base_data()));
+  // Control: seed 0, the one before it, holds none.
+  ASSERT_FALSE(
+      raid_in_reach(generate_region(Seed{0}, base_data()), base_data()));
+  const Grew region = grew(base_data(), RAIDING);
   // Villages were founded, and one came to house its settlers; a building
   // was raised; a raiding party, an army housing no village, was sent; the
   // factions' territories changed; the living stayed within the bound.
@@ -1642,7 +1698,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_NE(region.territory_after, region.territory_before);
   EXPECT_LE(region.peak, MAX_PEOPLE);
   // The same seed grows the same way; control: another seed does not.
-  EXPECT_EQ(static_cast<std::uint64_t>(grew(base_data(), NEIGHBOURLY).hash),
+  EXPECT_EQ(static_cast<std::uint64_t>(grew(base_data(), RAIDING).hash),
             static_cast<std::uint64_t>(region.hash));
   EXPECT_NE(static_cast<std::uint64_t>(grew(base_data(), OTHER_SEED).hash),
             static_cast<std::uint64_t>(region.hash));
@@ -1651,7 +1707,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   for (Faction& faction : still.factions) {
     faction.stance.clear();
   }
-  const Grew unchanged = grew(still, NEIGHBOURLY);
+  const Grew unchanged = grew(still, RAIDING);
   EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
   EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
   EXPECT_FALSE(unchanged.building_raised);

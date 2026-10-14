@@ -39,6 +39,8 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - a band of raiders leaving a hamlet in ruins
   - a larger band leaving the walled village in ruins
 
+  A raiding band stands on the open cells two cells clear of everything the village holds, nearest its centre by path. With villages laid out by role (ADR 0076), a band set west of a village could start behind water or a range. On 6 of seeds 0 to 19 it then marched round past another village, which killed it before it reached its target. So the band stands nearest by path, and a band of 20 again ruins a hamlet within the target on every one of those seeds.
+
 ### Villages
 
 - A village template, the hamlet or the village, is a name and the buildings a village starts with, each a footprint, a kind and the households it starts with, housing at least one household. Where each stands is not in the template: generation places them by their kinds' roles (ADR 0076). The seat template is authored, with an area and each building at an offset in it, laid inside it, apart, its centre free.
