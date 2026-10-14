@@ -1,6 +1,6 @@
 # ADR 0076: Keep villages a spacing apart, and grow each one's form from its square by the ground it stands on
 
-> Status: proposed
+> Status: accepted; corrected when built, as `simulation.md` records: a village's tier is saved and hashed, since a tier kept once reached needs its peak stored, so saves do gain it; and `apart` is 20, no worse than `main`'s seeds 0 to 999, since no value of 20 to 32 generates all of them and `main` itself fails 5
 > Date: 2026-10-12
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
