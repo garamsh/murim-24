@@ -2204,11 +2204,13 @@ void World::tick() {
   }
   note_falls(std::move(bereft));
   end_intents(crowd);
+  const std::vector<Closing> closings = close_in(crowd);
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
-  steer(crowd, crowd.slot, pulls, standing);
+  std::vector<bool> seeking(crowd.people.size(), false);
+  steer(crowd, crowd.slot, closings, pulls, standing, seeking);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    march(army, crowd, crowd.slot, pulls, standing);
+    march(army, crowd, crowd.slot, pulls, standing, seeking);
   }
   // The newborn first act on the next tick.
   for (const Passing& passing : reborn) {
@@ -2275,9 +2277,12 @@ std::vector<World::Passing> World::passings() const {
 // walking past. A person within two cells of its ring counts as standing
 // still, so a crowd jostled a little stays standing. One no driver steers,
 // with a foe in sight, closes on it instead, or stands to fight one within
-// its reach.
+// its reach; one with an attack slot closes on the slot, `seeking` it until
+// it stands there.
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
-                  std::vector<Step>& pulls, std::vector<bool>& standing) const {
+                  const std::vector<Closing>& closings,
+                  std::vector<Step>& pulls, std::vector<bool>& standing,
+                  std::vector<bool>& seeking) const {
   for (const Army& army : armies_) {
     for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
       const std::size_t index = slot.at(army.roster.at(rank));
@@ -2287,10 +2292,15 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
       const std::uint32_t distance = army.field.distance(cell);
       pulls.at(index) = distance > ring ? army.field.step(cell) : Step{0, 0};
       standing.at(index) = distance <= ring + STANDING_SLACK;
-      if (const std::optional<Step> engaged = closing(index, army, crowd)) {
+      const Closing& close = closings.at(index);
+      if (const std::optional<Step> engaged =
+              closing(index, army, crowd, close)) {
+        const bool still = engaged->x == 0 && engaged->y == 0;
         pulls.at(index) = *engaged;
-        standing.at(index) =
-            standing.at(index) && engaged->x == 0 && engaged->y == 0;
+        // One on its attack slot stands, whatever its objective, so people
+        // closing on slots beyond it pass it.
+        standing.at(index) = still && (close.aim || standing.at(index));
+        seeking.at(index) = close.aim && !still;
       }
     }
   }
@@ -2308,13 +2318,16 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
 // the harder the closer each is, and otherwise along its pull. A person on the
 // move does not give way to people standing still, who give way to it, so a
 // standing crowd parts for a person walking out of it, nor to anyone behind
-// it, so a crowd queues through a gap. A step enters any cell
+// it, so a crowd queues through a gap; and two people both `seeking` an
+// attack slot do not give way to each other, so crossing paths round a foe
+// do not lock (ADR 0068). A step enters any cell
 // the flow field reaches. Positions are read from `crowd`, as the tick began,
 // so the order people move in decides nothing.
 void World::march(std::size_t army, const Crowd& crowd,
                   const std::vector<std::size_t>& slot,
                   const std::vector<Step>& pulls,
-                  const std::vector<bool>& standing) {
+                  const std::vector<bool>& standing,
+                  const std::vector<bool>& seeking) {
   const Army& marching = armies_.at(army);
   const std::int64_t separation = rules_.separation;
   for (const std::size_t member : marching.roster) {
@@ -2330,8 +2343,10 @@ void World::march(std::size_t army, const Crowd& crowd,
       const Position there = crowd.hash.position(other);
       const std::int64_t ahead = ((std::int64_t{there.x} - from.x) * pull.x) +
                                  ((std::int64_t{there.y} - from.y) * pull.y);
-      const bool ignored = other == self || (!standing.at(self) &&
-                                             (standing.at(other) || ahead < 0));
+      const bool ignored =
+          other == self ||
+          (!standing.at(self) && (standing.at(other) || ahead < 0)) ||
+          (seeking.at(self) && seeking.at(other));
       const bool yields = standing.at(self) && !standing.at(other);
       const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
       const Push felt =
@@ -2999,49 +3014,89 @@ bool World::held(std::size_t index, Step pull,
   return engaged;
 }
 
-// The pull of the person at `index` of `crowd`, serving in `army`, engaged
-// with a living foe within the rules' sight, inside its home village's claim
-// unless its army marches on an objective beyond it or it has no home: none
-// while a foe lies within its reach, so it stands and fights, and otherwise the
-// step closing on the nearest, the first in the crowd's order among equals. The
-// step is the one of the eight nearest the line to the foe, open as a flow
-// field's is: into a passable cell, and on a diagonal only where both cells
-// beside it are passable; an attack intent's chase whose diagonal is shut
-// steps along an open axis instead. Nothing, so it keeps its objective, when a
-// driver steers its army and it holds no intent, it reaches no farther than
-// itself, no foe is in sight or no step is open.
+// The foe the person at `index` of `crowd`, serving in `army`, engages, as
+// its index in the crowd: its attack intent's target, whoever steers the army,
+// or else the nearest living foe within the rules' sight, the first in the
+// crowd's order among equals, inside its home village's claim unless its army
+// marches on an objective beyond it or it has no home. None when a driver
+// steers its army and it holds no intent, it reaches no farther than itself,
+// or no foe is in sight.
+std::optional<std::size_t> World::engaged_foe(std::size_t index,
+                                              const Army& army,
+                                              const Crowd& crowd) const {
+  const std::size_t member = crowd.people.at(index);
+  if (army.order.target) {
+    const std::size_t aimed = crowd.slot.at(*army.order.target);
+    return aimed == ABSENT ? std::nullopt : std::optional<std::size_t>{aimed};
+  }
+  if (army.steered || rules_.sight == 0 ||
+      reach(people_.at(member), army) == 0) {
+    return std::nullopt;
+  }
+  // At home, it defends its village's claim; on the march, it fights what
+  // it meets.
+  const std::size_t own = crowd.armies.at(index);
+  const std::optional<std::size_t> home = people_.at(member).home;
+  const bool marching = !home || !claims(*home, army.order.objective);
+  return crowd.hash.nearest(
+      foe_kinds(member, armies_.at(own)), crowd.hash.position(index),
+      rules_.sight * CELL_SIZE, [&](std::size_t other) {
+        return (marching ||
+                claims(*home, cell_of(crowd.hash.position(other)))) &&
+               foes(member, own, crowd.people.at(other),
+                    crowd.armies.at(other));
+      });
+}
+
+// Each living person's foe and the point it closes on, by its index in
+// `crowd`. While the rules set attack tokens, each engaging a foe within
+// LONG_REACH is given an attack slot around it (ADR 0068) and closes on that.
+std::vector<World::Closing> World::close_in(const Crowd& crowd) {
+  std::vector<Closing> closings(crowd.people.size());
+  engaging_.clear();
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      const std::size_t index = crowd.slot.at(member);
+      const std::optional<std::size_t> foe = engaged_foe(index, army, crowd);
+      closings.at(index).foe = foe;
+      if (rules_.tokens && foe) {
+        engaging_.push_back(Engaging{
+            member, crowd.people.at(*foe), reach(people_.at(member), army),
+            crowd.hash.position(index), crowd.hash.position(*foe)});
+      }
+    }
+  }
+  attacks_.assign(engaging_, map_, rules_.separation);
+  for (const Engaging& each : engaging_) {
+    closings.at(crowd.slot.at(each.person)).aim = each.aim;
+  }
+  return closings;
+}
+
+// The pull of the person at `index` of `crowd`, serving in `army`, engaging
+// `close`'s foe: none while it stands on its slot with the foe within its
+// reach, or, with no slot, while the foe lies within its reach, so it stands
+// and fights; and otherwise the step toward its slot, or the foe without one.
+// The step is the one of the eight nearest the line to that point, open as a
+// flow field's is: into a passable cell, and on a diagonal only where both
+// cells beside it are passable; an attack intent's chase whose diagonal is
+// shut steps along an open axis instead. Nothing, so it keeps its objective,
+// when it engages no foe or no step is open.
 std::optional<Step> World::closing(std::size_t index, const Army& army,
-                                   const Crowd& crowd) const {
+                                   const Crowd& crowd,
+                                   const Closing& close) const {
+  if (!close.foe) {
+    return std::nullopt;
+  }
   const std::size_t member = crowd.people.at(index);
   const std::int64_t reached = reach(people_.at(member), army);
   const Position from = crowd.hash.position(index);
-  const std::size_t own = crowd.armies.at(index);
-  std::optional<std::size_t> foe;
-  if (army.order.target) {
-    // An attack intent closes on its target, whoever steers the army.
-    const std::size_t aimed = crowd.slot.at(*army.order.target);
-    foe = aimed == ABSENT ? std::nullopt : std::optional<std::size_t>{aimed};
-  } else if (army.steered || rules_.sight == 0 || reached == 0) {
-    return std::nullopt;
-  } else {
-    // At home, it defends its village's claim; on the march, it fights what
-    // it meets.
-    const std::optional<std::size_t> home = people_.at(member).home;
-    const bool marching = !home || !claims(*home, army.order.objective);
-    foe = crowd.hash.nearest(
-        foe_kinds(member, armies_.at(own)), from, rules_.sight * CELL_SIZE,
-        [&](std::size_t other) {
-          return (marching ||
-                  claims(*home, cell_of(crowd.hash.position(other)))) &&
-                 foes(member, own, crowd.people.at(other),
-                      crowd.armies.at(other));
-        });
-  }
-  if (!foe) {
-    return std::nullopt;
-  }
-  const Position there = crowd.hash.position(*foe);
-  if (distance_squared(from, there) <= reached * reached) {
+  const Position foe_at = crowd.hash.position(*close.foe);
+  const bool in_reach = distance_squared(from, foe_at) <= reached * reached;
+  const Position there = close.aim.value_or(foe_at);
+  const bool on_slot = close.aim && distance_squared(from, there) <=
+                                        std::int64_t{ON_SLOT} * ON_SLOT;
+  if (in_reach && (on_slot || !close.aim)) {
     return Step{0, 0};
   }
   const std::int64_t offset_x = std::int64_t{there.x} - from.x;

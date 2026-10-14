@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "attack.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "skill.hpp"
@@ -62,6 +63,7 @@ Rules rules() {
   Rules live{SEPARATION, hostile, {DURABILITY, DURABILITY / 2, 1}};
   live.sight = SIGHT;
   live.people_capacity = LIVE_CAPACITY;
+  live.tokens = default_tokens();
   return live;
 }
 

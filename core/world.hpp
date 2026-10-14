@@ -686,8 +686,18 @@ class World {
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
   [[nodiscard]] bool claims(std::size_t village, Cell cell) const;
+  // The foe a person engages, as its index in the crowd, and the point it
+  // closes on: its attack slot around the foe, or the foe itself without one.
+  struct Closing {
+    std::optional<std::size_t> foe;
+    std::optional<Position> aim;
+  };
+  [[nodiscard]] std::optional<std::size_t> engaged_foe(
+      std::size_t index, const Army& army, const Crowd& crowd) const;
+  [[nodiscard]] std::vector<Closing> close_in(const Crowd& crowd);
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
-                                            const Crowd& crowd) const;
+                                            const Crowd& crowd,
+                                            const Closing& close) const;
   [[nodiscard]] bool sighted(const std::vector<std::size_t>& roster,
                              Position point) const;
   void end_intents(const Crowd& crowd);
@@ -826,10 +836,12 @@ class World {
   [[nodiscard]] Ground ground() const;
   [[nodiscard]] std::vector<Passing> passings() const;
   void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
-             std::vector<Step>& pulls, std::vector<bool>& standing) const;
+             const std::vector<Closing>& closings, std::vector<Step>& pulls,
+             std::vector<bool>& standing, std::vector<bool>& seeking) const;
   void march(std::size_t army, const Crowd& crowd,
              const std::vector<std::size_t>& slot,
-             const std::vector<Step>& pulls, const std::vector<bool>& standing);
+             const std::vector<Step>& pulls, const std::vector<bool>& standing,
+             const std::vector<bool>& seeking);
   void reachable_from(const FlowField& field,
                       const std::vector<std::size_t>& members) const;
 
@@ -871,6 +883,9 @@ class World {
   std::vector<std::optional<std::size_t>> plans_;
   // Each person's attack slot and token, and each foe's slots taken.
   Attacks attacks_;
+  // The people engaging on the tick being run, kept so a tick allocates
+  // none; neither saved nor hashed.
+  std::vector<Engaging> engaging_;
 };
 
 }  // namespace murim

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "attack.hpp"
 #include "map.hpp"
 #include "skill.hpp"
 #include "village.hpp"
@@ -49,6 +50,7 @@ Rules rules() {
   Rules battle{SEPARATION, hostile, {DURABILITY, DURABILITY / 2, 1}};
   battle.sight = SIGHT;
   battle.people_capacity = M1_CAPACITY;
+  battle.tokens = default_tokens();
   return battle;
 }
 
