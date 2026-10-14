@@ -221,12 +221,13 @@ func _show_lights(on: bool) -> void:
 	_grade.show_lights(lights, view, 1 if on else 0)
 
 
-# Shows the grade again, then holds the fog off unless `fog`, and the clouds' shadows unless
-# `clouds`.
+# Shows the grade again, then holds the fog off unless `fog`, in the pass and in the light field,
+# and the clouds' shadows unless `clouds`.
 func _only(fog: bool, clouds: bool) -> void:
 	_grade.quality = _grade.quality
 	if not fog:
 		(_grade.get_node("Pass").material as ShaderMaterial).set_shader_parameter("fog", 0.0)
+		(_grade.get_node("LightField/Field").material as ShaderMaterial).set_shader_parameter("fog", 0.0)
 	if not clouds:
 		_grade.clouds.set_shader_parameter("clouds", 0.0)
 

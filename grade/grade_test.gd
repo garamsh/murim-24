@@ -11,7 +11,8 @@
 # undrawn at noon and with none (control: drawn at midnight). The fog and the clouds' shadows show
 # by the key's, thickest at morning and the clouds' none at midnight; both show at standard and high
 # and neither at low (control: standard's). The fog reads the relief shown, its cells' levels and
-# size, from the view's corner, and drifts with the clouds; each grade's clouds are a material of
+# size, from the view's corner, and drifts with the clouds; the light field draws them at standard
+# and not at low, and the clouds read their shade from it; each grade's clouds are a material of
 # its own (control: the other grade's).
 extends RefCounted
 
@@ -146,7 +147,7 @@ func _fog_pass() -> bool:
 		shown[quality] = grade.params()
 	var standard: Dictionary = shown[Grade.Quality.STANDARD]
 	# An unset parameter reads as null; as -1 it compares unequal instead.
-	for name: String in ["fog", "clouds", "drift", "cloud_drift"]:
+	for name: String in ["fog", "clouds", "drift"]:
 		for quality: int in shown:
 			if shown[quality][name] == null:
 				shown[quality][name] = -1.0
@@ -159,13 +160,14 @@ func _fog_pass() -> bool:
 	var flat := int(round(cells.get_pixel(1, 1).g * 255.0)) if cells != null else -1
 	var relief_pass: bool = standard.map_size == Vector2i(4, 3) and raised == 3 and flat == 1 \
 			and Vector2(standard.view_origin).is_equal_approx(Vector2(100, 50)) \
-			and standard.drift > 0.0 and is_equal_approx(standard.drift, standard.cloud_drift)
+			and standard.drift > 0.0 and standard.clouds_read_field \
+			and standard.field_drawn and not low.field_drawn
 	var other: Grade = load(SCENE).instantiate()
 	var separate: bool = other.clouds != grade.clouds and other.clouds.shader == grade.clouds.shader
 	other.free()
 	grade.free()
 	var passed := key_pass and quality_pass and relief_pass and separate
-	print("grade_test: fog and clouds at midnight, morning and noon %s; standard fog %.2f clouds %.2f, low fog %.2f clouds %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f and the clouds' %.2f; clouds a material of each grade's own %s: %s" % [
+	print("grade_test: fog and clouds at midnight, morning and noon %s; standard fog %.2f clouds %.2f, low fog %.2f clouds %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f; the clouds read from the light field %s, drawn for the fog and the clouds at standard %s and at low %s; clouds a material of each grade's own %s: %s" % [
 		keyed, standard.fog, standard.clouds, low.fog, low.clouds, standard.map_size, raised, flat,
-		standard.view_origin, standard.drift, standard.cloud_drift, separate, "pass" if passed else "FAIL"])
+		standard.view_origin, standard.drift, standard.clouds_read_field, standard.field_drawn, low.field_drawn, separate, "pass" if passed else "FAIL"])
 	return passed
