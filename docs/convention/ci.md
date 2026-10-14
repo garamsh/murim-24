@@ -66,7 +66,7 @@ For every third-party dependency, also check the ecosystem's advisory source for
 
 The rules above bind. This section does not: it is one toolchain — Make for the entry points, GitHub Actions for the pipeline — that satisfies them. A project on another toolchain replaces this section and keeps every rule.
 
-This project runs its pipeline on the machine, not on GitHub Actions; the owner decided so on 2026-10-09. Before a merge, the PM runs `make ci`, and the core's build and tests under GCC, on the pull request's head merged onto the default branch. The merged tree must equal the tree that ran. A review records that run as its Verification. A hosted run is not expected, so its absence leaves nothing missing.
+This project runs its pipeline on GitHub Actions; the owner made the repository public for it on 2026-10-14, replacing the decision of 2026-10-09 to run it on the machine. A pull request's `ci` run checks out its head merged onto the default branch and runs `make ci` there, the core and extension built with the runner's GCC. Before a merge, the PM confirms that run passed on the current head and on the default branch's current commit, so the merged tree equals the tree that ran, and a review records that run as its Verification. Checks the pipeline does not run stay on the machine: `make sweep` and `make bench` when a rule or a hot path changes, and a macOS build when a change touches what only macOS builds.
 
 ### Entry points as a Makefile
 
