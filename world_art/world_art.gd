@@ -51,7 +51,7 @@ const DECORATIONS := "res://world_art/villages.json"
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
 # The windows lit at night of each kind of structure by its stage, and the steered person's torch,
 # each as a rect, x, y, width and height in its frame's pixels or from the person's feet, and how
-# far its light reaches, in pixels.
+# far its light reaches, in pixels. A structure's light with no width or height is a hearth.
 const LIGHTS := "res://world_art/lights.json"
 ## Floats per light in what lights() gives: its rect, x, y, width and height, and its reach.
 const LIGHT_FLOATS := 5
@@ -133,6 +133,9 @@ var _field_tags := {}
 var _chevron_frames: Array[AtlasTexture] = []
 var _material: ShaderMaterial
 var _lights := {}
+## How many hearths the last lights() listed: a structure's light with no window, its fire drawn in
+## the emitters' colours.
+var hearths := 0
 # Where the steered person's feet were drawn in the last refresh, while it lives.
 var _lead_at := Vector2.ZERO
 var _lead_alive := false
@@ -327,9 +330,10 @@ func refresh(view: Rect2, between := 1.0) -> void:
 
 ## The lights whose light reaches into `view`, in pixels, as of the last refresh, LIGHT_FLOATS
 ## floats each: the steered person's torch while it lives, then each window lit at night of every
-## structure at its stage, by LIGHTS.
+## structure at its stage, by LIGHTS. It counts the hearths among them in `hearths`.
 func lights(view: Rect2) -> PackedFloat32Array:
 	var shown := PackedFloat32Array()
+	hearths = 0
 	if _lead_alive:
 		_add_light(shown, _lights.torch, _lead_at, view)
 	for structure in structure_sprites.size():
@@ -338,15 +342,19 @@ func lights(view: Rect2) -> PackedFloat32Array:
 			continue
 		var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
 		for light: Array in sprite.get_meta("lights").get(STAGES[stage], []):
-			_add_light(shown, light, sprite.position + sprite.offset, view)
+			if _add_light(shown, light, sprite.position + sprite.offset, view) and light[2] == 0 and light[3] == 0:
+				hearths += 1
 	return shown
 
 
-# Adds `light`, a rect and a reach from `origin`, to `shown` when its light reaches into `view`.
-func _add_light(shown: PackedFloat32Array, light: Array, origin: Vector2, view: Rect2) -> void:
+# Adds `light`, a rect and a reach from `origin`, to `shown` when its light reaches into `view`, and
+# returns whether it did.
+func _add_light(shown: PackedFloat32Array, light: Array, origin: Vector2, view: Rect2) -> bool:
 	var rect := Rect2(origin + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
-	if rect.grow(light[4]).intersects(view):
-		shown.append_array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
+	if not rect.grow(light[4]).intersects(view):
+		return false
+	shown.append_array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
+	return true
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map

@@ -7,13 +7,13 @@
 ## night change most of it, night darker; and that standard's vignette darkens pixels toward the
 ## corners only, its middle the same as low's. Then, at night, over a fixture of a dark pane and a
 ## block of the fire ramp's yellow laid in the world, it draws the frame unlit, lit by a light round
-## the pane and one beside it, and lit at standard against low. It checks that the lights brighten
-## the frame within their reach, redder there than green, and leave it unchanged beyond; that the
-## pane takes the fire ramp only when lit, and the ink of an outline across its bottom row never
-## does; and that standard's bloom changes pixels round the fire block, which keeps its colour,
-## and none away from it. It exits 0 when every check passes, 1 when one fails and 2 when it cannot
-## draw, as when its window draws too few frames to reach the last shot within MAX_FRAMES frames.
-## Its window stays on top, since a covered window is not drawn.
+## the pane and one beside it, and lit at standard against low, the lights standing for a hearth.
+## It checks that the lights brighten the frame within their reach, redder there than green, and
+## leave it unchanged beyond; that the pane takes the fire ramp only when lit, and the ink of an
+## outline across its bottom row never does; and that standard's bloom changes pixels round the
+## fire block, which keeps its colour, and none away from it. It exits 0 when every check passes, 1
+## when one fails and 2 when it cannot draw, as when its window draws too few frames to reach the
+## last shot within MAX_FRAMES frames. Its window stays on top, since a covered window is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
@@ -184,7 +184,8 @@ func _show_lights(on: bool) -> void:
 		var pane := _middle + Vector2(PANE.position)
 		lights.append_array([pane.x, pane.y, PANE.size.x, PANE.size.y, REACH])
 		lights.append_array([_middle.x + BESIDE.x, _middle.y + BESIDE.y, 0, 0, REACH])
-	_grade.show_lights(lights, view)
+	# The light round the pane stands for a hearth too, so the bloom shows.
+	_grade.show_lights(lights, view, 1 if on else 0)
 
 
 # Where `art`, art pixels from the middle of the screen, lies on it, in screen pixels.

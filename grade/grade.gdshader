@@ -46,6 +46,10 @@ float luma(vec3 c) {
 }
 
 bool is_emitter(vec3 c) {
+	// Every emitter's red is above 0.95, which turns most pixels away at once.
+	if (c.r < 0.95) {
+		return false;
+	}
 	for (int i = 0; i < 3; i++) {
 		if (distance(c, EMITTERS[i]) < 0.01) {
 			return true;

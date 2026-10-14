@@ -2,9 +2,11 @@
 ## grade.gdshader over the whole screen, under the HUD: each key of grades.json is a grade at a
 ## share of the day, blended linearly between the keys round the time, then by its season's factors.
 ## Lights the world shows, lit windows and the steered person's torch, warm the night round them by
-## each key's `lamp`, and the fire ramp's brightest steps, emitters, keep their colour and bloom.
-## The quality the settings choose sets what it adds: low shows the grade, the hue-shifted shadows
-## and the lights only, standard and high the light vignette and the bloom too. It decides nothing.
+## each key's `lamp`, and the fire ramp's brightest steps, emitters, keep their colour; they bloom
+## while the lamp shows and a hearth, whose fire is drawn in them, is on screen, and the pass skips
+## the bloom otherwise. The quality the settings choose sets what it adds: low shows the grade, the
+## hue-shifted shadows and the lights only, standard and high the light vignette and the bloom too.
+## It decides nothing.
 extends CanvasLayer
 
 const WorldArt := preload("res://world_art/world_art.gd")
@@ -36,6 +38,7 @@ var _table := {}
 var _grade := {}
 var _light_rects := PackedVector4Array()
 var _light_reach := PackedFloat32Array()
+var _hearths := 0
 
 
 ## Shows the grade of `of_day`, the share of the day gone from midnight, 0 to 1, in `season`, 0 to
@@ -47,8 +50,10 @@ func show_time(of_day: float, season: int) -> void:
 
 
 ## Shows `lights`, as WorldArt.lights() gives them for `view`, the part of the world on screen in
-## its pixels: each one's rect and reach in screen pixels, at most MAX_LIGHTS of them.
-func show_lights(lights: PackedFloat32Array, view: Rect2) -> void:
+## its pixels: each one's rect and reach in screen pixels, at most MAX_LIGHTS of them; and how many
+## `hearths` are among them, which the bloom waits for.
+func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
+	_hearths = hearths
 	var count := lights.size() / WorldArt.LIGHT_FLOATS
 	var order := range(count)
 	if count > MAX_LIGHTS:
@@ -113,7 +118,8 @@ func _apply() -> void:
 	material.set_shader_parameter("hue_shift", HUE_SHIFT)
 	material.set_shader_parameter("vignette", 0.0 if quality == Quality.LOW else VIGNETTE)
 	material.set_shader_parameter("art_pixel", art_pixel)
-	material.set_shader_parameter("bloom", 0.0 if quality == Quality.LOW else BLOOM)
+	var blooming: bool = quality != Quality.LOW and _hearths > 0 and _grade.lamp > 0.0
+	material.set_shader_parameter("bloom", BLOOM if blooming else 0.0)
 	material.set_shader_parameter("light_count", _light_rects.size())
 	material.set_shader_parameter("light_rects", _light_rects)
 	material.set_shader_parameter("light_reach", _light_reach)
