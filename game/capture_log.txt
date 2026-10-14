@@ -1,0 +1,8 @@
+capture: wrote seed1_year0_village1_ko.png; hamlet 2 1 (hamlet) square (3, 3) at (40, 9): 3 residents, 7 structures within 20 cells, 2 fields, 2 of them on hills; nearest other village 32.3 cells
+capture: wrote seed1_year0_village4_ko.png; village 5 4 (village) square (3, 3) at (9, 0): 3 residents, 14 structures within 20 cells, 2 fields, 1 of them on hills; nearest other village 32.3 cells
+capture: wrote seed0_year0_village7_ko.png; village 8 7 (village) square (3, 3) at (86, 103): 3 residents, 14 structures within 20 cells, 2 fields, 0 of them on hills; nearest other village 34.8 cells
+capture: wrote seed5_year0_village0_ko.png; hamlet 1 0 (hamlet) square (3, 3) at (82, 116): 3 residents, 6 structures within 20 cells, 1 fields, 0 of them on hills; nearest other village 41.0 cells
+capture: wrote seed0_year0_village2_ko.png; village 3 2 (village) square (3, 3) at (123, 60): 3 residents, 14 structures within 20 cells, 2 fields, 0 of them on hills; nearest other village 41.4 cells
+capture: wrote seed0_year0_village0_ko.png; hamlet 1 0 (hamlet) square (3, 3) at (14, 0): 3 residents, 6 structures within 20 cells, 1 fields, 0 of them on hills; nearest other village 31.8 cells
+capture: wrote seed10_year60_village3_ko.png; village 4 3 (village) square (3, 3) at (42, 53): 0 residents, 21 structures within 20 cells, 4 fields, 0 of them on hills; nearest other village 20.8 cells
+capture: wrote seed6_year60_village7_ko.png; village 8 7 (village) square (3, 3) at (55, 33): 9 residents, 14 structures within 20 cells, 2 fields, 1 of them on hills; nearest other village 29.1 cells
