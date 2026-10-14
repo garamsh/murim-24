@@ -153,6 +153,12 @@ struct VillageRecord {
   Cell centre{};
 };
 
+/// A village and the growth's tier its residents have reached.
+struct Reached {
+  std::size_t village;
+  std::size_t tier;
+};
+
 /// What each village's standing workshops do for its people: the edge they
 /// strike with and the healing they recover, by village, each 0 where its
 /// arms or tends fall short of the people whose home it is.
@@ -233,9 +239,9 @@ class Villages {
   /// Gives village `village` its centre, `centre`.
   void place(std::size_t village, Cell centre);
 
-  /// Has village `village` reach tier `tier`, keeping a higher one it
-  /// reached before.
-  void reach(std::size_t village, std::size_t tier);
+  /// Has `reached`'s village reach its tier, keeping a higher one it reached
+  /// before.
+  void reach(Reached reached);
 
   /// Takes one more structure, belonging to no village.
   void add_structure();

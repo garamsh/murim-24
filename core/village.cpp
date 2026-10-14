@@ -107,9 +107,9 @@ void Villages::place(std::size_t village, Cell centre) {
   records_.at(village).centre = centre;
 }
 
-void Villages::reach(std::size_t village, std::size_t tier) {
-  std::size_t& reached = records_.at(village).tier;
-  reached = std::max(reached, tier);
+void Villages::reach(Reached reached) {
+  std::size_t& tier = records_.at(reached.village).tier;
+  tier = std::max(tier, reached.tier);
 }
 
 void Villages::add_structure() { village_of_.emplace_back(); }

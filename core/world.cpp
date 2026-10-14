@@ -1803,7 +1803,7 @@ void World::add_village(VillageSpec spec) {
   }
   villages_.place(village, armies_.at(residents).order.objective);
   if (life_.growth) {
-    villages_.reach(village, tier_for(*life_.growth, roster));
+    villages_.reach(Reached{village, tier_for(*life_.growth, roster)});
   }
 }
 
@@ -3938,7 +3938,7 @@ void World::grow(const Growth& growth) {
     recall(village);
     const std::size_t owned_by = owner(village);
     const std::uint64_t people = population.at(village);
-    villages_.reach(village, tier_for(growth, people));
+    villages_.reach(Reached{village, tier_for(growth, people)});
     const bool pressed =
         people > 0 &&
         !armies_.at(villages_.at(village).spec.residents).roster.empty() &&
