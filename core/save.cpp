@@ -1143,7 +1143,7 @@ class SaveCodec {
             [&out](std::optional<std::size_t> village) {
               put_index(out, village);
             });
-    put_all(out, world.plans_,
+    put_all(out, world.plans_.laid_from(),
             [&out](std::optional<std::size_t> plan) { put_index(out, plan); });
     put_all(out, world.charts_,
             [&out](const Chart& chart) { put_chart(out, chart); });
@@ -1251,8 +1251,8 @@ class SaveCodec {
         get_all<std::optional<std::size_t>>(
             input, [&input] { return get_index(input); });
     world.villages_ = Villages{std::move(villages), std::move(village_of)};
-    world.plans_ = get_all<std::optional<std::size_t>>(
-        input, [&input] { return get_index(input); });
+    world.plans_ = Plans{get_all<std::optional<std::size_t>>(
+        input, [&input] { return get_index(input); })};
     const Footprint size{world.map_.width(), world.map_.height()};
     world.charts_ = get_all<Chart>(input, [&input, &world, size] {
       Chart chart = get_chart(input, size, world.rules_.hostile.size());
