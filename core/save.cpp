@@ -1182,7 +1182,8 @@ class SaveCodec {
       out.size(each.person);
       out.size(each.engagement.foe);
       out.u8(static_cast<std::uint8_t>(each.engagement.ring));
-      out.u8(each.engagement.slot);
+      put_maybe(out, each.engagement.slot,
+                [&out](std::uint8_t slot) { out.u8(slot); });
       out.flag(each.engagement.token);
       out.u32(each.engagement.waiting_since);
       out.u32(each.engagement.token_since);
@@ -1311,7 +1312,8 @@ class SaveCodec {
       each.person = input.size();
       each.engagement.foe = input.size();
       each.engagement.ring = static_cast<Ring>(input.tag(RING_KINDS));
-      each.engagement.slot = input.u8();
+      each.engagement.slot =
+          get_maybe<std::uint8_t>(input, [&input] { return input.u8(); });
       each.engagement.token = input.flag();
       each.engagement.waiting_since = input.u32();
       each.engagement.token_since = input.u32();
