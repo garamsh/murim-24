@@ -20,6 +20,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "cultivation.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -2693,13 +2694,14 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   }
   striker.qi -= skill.qi_cost;
   const std::uint64_t edge = striker.home ? edges.at(*striker.home) : 0;
-  const std::uint32_t rank = rank_of(striker);
+  const std::uint32_t rank = rank_of(striker, life_);
   const std::uint64_t might =
       rank > 0 ? life_.realms.at(rank - 1).might : PER_MILLE;
   std::uint64_t body_damage =
       skill.body_damage * (PER_MILLE + edge) / PER_MILLE * might / PER_MILLE;
   if (art) {
-    body_damage = body_damage * agreement(striker, *art, true) / PER_MILLE;
+    body_damage =
+        body_damage * agreement(striker, *art, true, life_) / PER_MILLE;
   }
   strikes_.push_back(Strike{self,
                             index,
@@ -2791,55 +2793,6 @@ bool World::ready(const Person& person, std::size_t skill, const Army& army,
           ? person.ready_at
           : person.known.at(skill - army.skills.size()).ready_at;
   return ready_at <= due;
-}
-
-// How many of the realms person `person`'s qi capacity reaches.
-std::uint32_t World::rank_of(const Person& person) const {
-  return static_cast<std::uint32_t>(std::count_if(
-      life_.realms.begin(), life_.realms.end(), [&person](const Realm& realm) {
-        return person.qi_capacity >= realm.qi;
-      }));
-}
-
-std::uint64_t World::agreement(const Person& person, std::size_t art,
-                               bool potency) const {
-  if (person.known.empty()) {
-    return PER_MILLE;
-  }
-  const Nature& heart = life_.arts.at(person.known.front().art).nature;
-  const Nature& nature = life_.arts.at(art).nature;
-  const Learning& learning = life_.learning;
-  std::uint64_t agreed = PER_MILLE;
-  if (heart.orientation != nature.orientation) {
-    agreed =
-        agreed *
-        (potency ? learning.orientation_potency : learning.orientation_ease) /
-        PER_MILLE;
-  }
-  if (heart.polarity != nature.polarity) {
-    agreed = agreed *
-             (potency ? learning.polarity_potency : learning.polarity_ease) /
-             PER_MILLE;
-  }
-  return agreed;
-}
-
-// The first skill of art `art` person `person` lacks, of rank `rank` or below,
-// that it may learn `how`.
-std::optional<std::size_t> World::lesson(const Person& person, std::size_t art,
-                                         Lesson how, std::uint32_t rank) const {
-  const std::vector<ArtSkill>& skills = life_.arts.at(art).skills;
-  for (std::size_t skill = 0; skill < skills.size(); ++skill) {
-    const bool known = std::any_of(
-        person.known.begin(), person.known.end(), [&](const Known& held) {
-          return held.art == art && held.skill == skill;
-        });
-    if (!known && skills.at(skill).rank <= rank &&
-        (how == Lesson::TAUGHT || skills.at(skill).comprehensible)) {
-      return skill;
-    }
-  }
-  return std::nullopt;
 }
 
 // Whether the person at `index` of `crowd`, pulled along `pull`, has a
@@ -3346,14 +3299,11 @@ std::size_t World::army_with(std::size_t person, std::size_t skill) const {
 }
 
 std::uint32_t World::rank(std::size_t person) const {
-  return rank_of(people_.at(person));
+  return rank_of(people_.at(person), life_);
 }
 
 std::optional<Nature> World::nature(std::size_t person) const {
-  const Person& who = people_.at(person);
-  return who.known.empty() ? std::nullopt
-                           : std::optional<Nature>{
-                                 life_.arts.at(who.known.front().art).nature};
+  return nature_of(people_.at(person), life_);
 }
 
 const std::vector<Realm>& World::realms() const { return life_.realms; }
@@ -3380,12 +3330,9 @@ void World::cultivate() {
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
       Person& person = people_.at(member);
-      const std::uint32_t before = rank_of(person);
-      person.qi_capacity =
-          std::max(person.qi_capacity,
-                   std::min(person.cultivation.limit,
-                            person.qi_capacity + person.cultivation.growth));
-      const std::uint32_t after = rank_of(person);
+      const std::uint32_t before = rank_of(person, life_);
+      murim::cultivate(person);
+      const std::uint32_t after = rank_of(person, life_);
       for (std::uint32_t gained = before; gained < after; ++gained) {
         note(RealmGained{member, gained + 1});
         comprehend(member);
@@ -3398,28 +3345,14 @@ void World::cultivate() {
 // to comprehend a skill of it within its realm, noting each learned.
 void World::comprehend(std::size_t learner) {
   Person& person = people_.at(learner);
-  const std::uint32_t rank = rank_of(person);
-  std::vector<std::size_t> practised;
-  for (const Known& known : person.known) {
-    if (std::find(practised.begin(), practised.end(), known.art) ==
-        practised.end()) {
-      practised.push_back(known.art);
-    }
-  }
-  for (const std::size_t art : practised) {
+  const std::uint32_t rank = rank_of(person, life_);
+  for (const std::size_t art : practised(person)) {
     const std::optional<std::size_t> skill =
-        lesson(person, art, Lesson::COMPREHENDED, rank);
+        lesson(person, art, Lesson::COMPREHENDED, rank, life_);
     if (!skill) {
       continue;
     }
-    const std::size_t discipline = life_.arts.at(art).discipline;
-    const std::uint64_t mean =
-        std::max<std::uint64_t>(life_.disciplines.at(discipline).limit.mean, 1);
-    const std::uint64_t talent =
-        person.talent.empty() ? mean : person.talent.at(discipline).limit;
-    const std::uint64_t chance = life_.learning.comprehension * talent / mean *
-                                 agreement(person, art, false) / PER_MILLE;
-    if (next_random() % PER_MILLE < chance) {
+    if (next_random() % PER_MILLE < comprehension_chance(person, art, life_)) {
       person.known.push_back(Known{art, *skill, 0});
       note(Learned{learner, art, *skill, LearnedBy::COMPREHENSION});
     }
@@ -3429,15 +3362,9 @@ void World::comprehend(std::size_t learner) {
 // Every living person's qi recovers its cultivation's recovery per mille of
 // its capacity, rounded up, up to its capacity.
 void World::recover(const Cultivation& cultivation) {
-  const std::uint64_t recovery = cultivation.recovery;
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
-      Person& person = people_.at(member);
-      const std::uint64_t regained =
-          ((std::uint64_t{person.qi_capacity} * recovery) + PER_MILLE - 1) /
-          PER_MILLE;
-      person.qi = static_cast<std::uint32_t>(
-          std::min<std::uint64_t>(person.qi_capacity, person.qi + regained));
+      murim::recover(people_.at(member), cultivation);
     }
   }
 }
@@ -3460,11 +3387,7 @@ void World::read_manuals() {
       for (const std::size_t member : army.roster) {
         const Person& reader = people_.at(member);
         const std::int64_t distance = distance_squared(centre, reader.position);
-        const std::uint64_t ease = agreement(reader, manual.art, false);
-        if (distance > reach * reach || ease == 0 ||
-            !lesson(reader, manual.art, Lesson::TAUGHT, rank_of(reader)) ||
-            std::uint64_t{reader.qi} * ease <
-                std::uint64_t{life_.learning.reading_cost} * PER_MILLE) {
+        if (distance > reach * reach || !may_read(reader, manual.art, life_)) {
           continue;
         }
         const std::pair<std::int64_t, std::size_t> key{distance, member};
@@ -3477,12 +3400,10 @@ void World::read_manuals() {
       continue;
     }
     Person& reader = people_.at(nearest->second);
-    reader.qi -= static_cast<std::uint32_t>(
-        std::uint64_t{life_.learning.reading_cost} * PER_MILLE /
-        agreement(reader, manual.art, false));
-    const std::uint32_t rank = rank_of(reader);
+    reader.qi -= reading_cost(reader, manual.art, life_);
+    const std::uint32_t rank = rank_of(reader, life_);
     while (const std::optional<std::size_t> skill =
-               lesson(reader, manual.art, Lesson::TAUGHT, rank)) {
+               lesson(reader, manual.art, Lesson::TAUGHT, rank, life_)) {
       reader.known.push_back(Known{manual.art, *skill, 0});
       note(Learned{nearest->second, manual.art, *skill, LearnedBy::MANUAL});
     }
@@ -3500,27 +3421,26 @@ void World::teach() {
     }
     std::uint32_t teacher = 0;
     for (const std::size_t elder : sect_elders(sect)) {
-      teacher = std::max(teacher, rank_of(people_.at(elder)));
+      teacher = std::max(teacher, rank_of(people_.at(elder), life_));
     }
     if (teacher == 0) {
       continue;
     }
     for (const std::size_t member : sect_members(sect)) {
       Person& pupil = people_.at(member);
-      const std::uint32_t rank = std::min(teacher, rank_of(pupil));
+      const std::uint32_t rank = std::min(teacher, rank_of(pupil, life_));
       for (const Manual& manual : manuals_) {
         const auto* held = std::get_if<HeldBySect>(&manual.place);
         if (held == nullptr || held->sect != sect) {
           continue;
         }
         const std::optional<std::size_t> skill =
-            lesson(pupil, manual.art, Lesson::TAUGHT, rank);
+            lesson(pupil, manual.art, Lesson::TAUGHT, rank, life_);
         if (!skill) {
           continue;
         }
         const std::uint64_t chance =
-            std::uint64_t{life_.learning.teaching} * teacher *
-            agreement(pupil, manual.art, false) / PER_MILLE;
+            teaching_chance(pupil, manual.art, teacher, life_);
         if (next_random() % (std::uint64_t{PER_MILLE} * DAYS_PER_YEAR) <
             chance) {
           pupil.known.push_back(Known{manual.art, *skill, 0});
