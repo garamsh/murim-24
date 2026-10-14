@@ -152,6 +152,12 @@ std::vector<std::uint8_t> resealed(
   return bytes;
 }
 
+// Where the parts of the save `bytes` end, as save_parts() finds them by
+// decoding it.
+SaveParts parts_of(const std::vector<std::uint8_t>& bytes) {
+  return std::get<SaveParts>(save_parts(bytes));
+}
+
 // The index in `payload` of the last byte it differs in from the payload of
 // the save `other`, both read back from their ends.
 std::size_t last_difference(const std::vector<std::uint8_t>& payload,
@@ -345,9 +351,9 @@ TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
 }
 
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
-  // One structure no village holds and no plan laid: the payload ends with
-  // its plan, absent, as one flag byte, then the count of charts, none. Only
-  // growth lays a planned structure,
+  // One structure no village holds and no plan laid: the plans part ends
+  // with its plan, absent, as one flag byte, and the engaged and charts parts
+  // that follow hold their counts, none. Only growth lays a planned structure,
   // so no legal world differs from this one in that field alone, and the test
   // reads it by its place in the encoding.
   const World world{Seed{1},
@@ -363,11 +369,15 @@ TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  const std::size_t plan = payload.size() - 1 - sizeof(std::uint64_t);
+  const SaveParts parts = parts_of(intact);
+  const std::size_t plan = parts.plans_end - 1;
+  ASSERT_EQ(parts.engaged_end, parts.plans_end + sizeof(std::uint64_t));
+  ASSERT_EQ(parts.charts_end, parts.engaged_end + sizeof(std::uint64_t));
   ASSERT_EQ(payload.at(plan), 0);
-  ASSERT_TRUE(std::all_of(payload.begin() + static_cast<std::ptrdiff_t>(plan),
-                          payload.end(),
-                          [](std::uint8_t byte) { return byte == 0; }));
+  ASSERT_TRUE(std::all_of(
+      payload.begin() + static_cast<std::ptrdiff_t>(plan),
+      payload.begin() + static_cast<std::ptrdiff_t>(parts.charts_end),
+      [](std::uint8_t byte) { return byte == 0; }));
 
   // Control: resealing the same payload loads, so the reseal refuses nothing.
   store.bytes(SLOT) = resealed(header, payload);
@@ -418,24 +428,25 @@ TEST(Save, AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused) {
   }
   EXPECT_EQ(restored.world.chart(0).villages(), chart.villages());
 
-  // The payload ends with the last village remembered, its stage last.
+  // The charts part ends with the last village remembered, its stage last.
   const std::vector<std::uint8_t> intact = store.bytes(SLOT);
   std::array<std::uint8_t, HEADER_BYTES> header{};
   std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  ASSERT_EQ(payload.back(),
+  const std::size_t stage = parts_of(intact).charts_end - 1;
+  ASSERT_EQ(payload.at(stage),
             static_cast<std::uint8_t>(
                 chart.villages()
                     .back()
                     .value_or(VillageMemory{0, false, VillageStage::RUINS})
                     .stage));
   // Control: the last stage there is loads, so the stage byte is read.
-  payload.back() = STAGES - 1;
+  payload.at(stage) = STAGES - 1;
   store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
-  payload.back() = STAGES;
+  payload.at(stage) = STAGES;
   store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
@@ -454,8 +465,10 @@ TEST(Save, ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap) {
   std::vector<std::uint8_t> payload(
       intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  // The last memory ends with its two centre coordinates and its stage.
-  const std::size_t x_offset = payload.size() - 1 - (2 * sizeof(std::int32_t));
+  // The charts part ends with the last memory, which ends with its two centre
+  // coordinates and its stage.
+  const std::size_t x_offset =
+      parts_of(intact).charts_end - 1 - (2 * sizeof(std::int32_t));
   ASSERT_EQ(payload.at(x_offset), static_cast<std::uint8_t>(first.x));
   const auto put_x = [&payload, x_offset](std::uint32_t value) {
     for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
@@ -865,9 +878,10 @@ TEST(Save, ALoadedWorldKeepsItsAttackTokens) {
   EXPECT_NE(tokened(region).hash(), tokened(leased).hash());
 }
 
-// A save of `bytes`' soulless world holding, in place of its empty list of
-// engaged people, the one engaged person `entry` encodes. The payload ends
-// with that list, then the empty list of charts.
+// A save of `bytes`' world holding, in place of its empty list of engaged
+// people, the one engaged person `entry` encodes. The list is the engaged
+// part, which runs from the end of the plans to its own end, found by
+// decoding the save; empty, it is its count alone.
 std::vector<std::uint8_t> engaging(const std::vector<std::uint8_t>& bytes,
                                    const std::vector<std::uint8_t>& entry) {
   std::array<std::uint8_t, HEADER_BYTES> header{};
@@ -875,10 +889,16 @@ std::vector<std::uint8_t> engaging(const std::vector<std::uint8_t>& bytes,
   std::vector<std::uint8_t> payload(
       bytes.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
       bytes.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
-  payload.resize(payload.size() - sizeof(std::uint64_t));
-  write_last_u64(payload, 1);
-  payload.insert(payload.end(), entry.begin(), entry.end());
-  payload.resize(payload.size() + sizeof(std::uint64_t), 0);
+  const SaveParts parts = parts_of(bytes);
+  EXPECT_EQ(parts.engaged_end - parts.plans_end, sizeof(std::uint64_t));
+  std::vector<std::uint8_t> list(sizeof(std::uint64_t), 0);
+  list.front() = 1;
+  list.insert(list.end(), entry.begin(), entry.end());
+  payload.erase(
+      payload.begin() + static_cast<std::ptrdiff_t>(parts.plans_end),
+      payload.begin() + static_cast<std::ptrdiff_t>(parts.engaged_end));
+  payload.insert(payload.begin() + static_cast<std::ptrdiff_t>(parts.plans_end),
+                 list.begin(), list.end());
   return resealed(header, payload);
 }
 
