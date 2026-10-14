@@ -2516,14 +2516,8 @@ void World::settle_duels() {
   for (const Won& won : leaders_.settle(people_)) {
     record(cell_of(people_.at(won.challenger).position),
            LeaderChanged{won.faction, won.challenger, ChosenBy::DUEL});
-    std::vector<std::vector<bool>>& hostility = rules_.hostile;
-    for (std::size_t other = 0; other < hostility.size(); ++other) {
-      const bool ally = other != won.faction &&
-                        !hostility.at(other).at(won.faction) &&
-                        !hostility.at(won.faction).at(other);
-      hostility.at(other).at(won.faction) =
-          hostility.at(other).at(won.faction) ||
-          (ally && won.allies_turn_hostile);
+    if (won.allies_turn_hostile) {
+      turn_allies_hostile(rules_.hostile, won.faction);
     }
   }
 }
@@ -2537,27 +2531,11 @@ bool World::elects(std::size_t faction) const {
 }
 
 bool World::hostile(std::size_t from, std::size_t target) const {
-  const std::optional<Declared>& standing = declarations_.between(from, target);
-  if (standing) {
-    return standing->what == Declaration::WAR;
-  }
-  return rules_.hostile.at(from).at(target);
+  return declarations_.hostile(from, target, rules_.hostile);
 }
 
 Relation World::relation(std::size_t faction, std::size_t other) const {
-  const std::optional<Declared>& standing =
-      declarations_.between(faction, other);
-  if (faction == other) {
-    return Relation::OWN;
-  }
-  if (standing) {
-    return standing->what == Declaration::WAR ? Relation::AT_WAR
-                                              : Relation::NEUTRAL;
-  }
-  return rules_.hostile.at(faction).at(other) ||
-                 rules_.hostile.at(other).at(faction)
-             ? Relation::HOSTILE
-             : Relation::ALLY;
+  return declarations_.relation(faction, other, rules_.hostile);
 }
 
 std::optional<Declared> World::declaration(std::size_t faction,
@@ -2578,26 +2556,12 @@ DeclarationRefusal World::declaration_refusal(std::size_t person,
   if (!own || leaders_.of(*own).leader != person) {
     return DeclarationRefusal::NOT_THE_LEADER;
   }
-  if (*own == faction) {
-    return DeclarationRefusal::SAME_FACTION;
-  }
-  const Relation standing = relation(*own, faction);
-  if (what == Declaration::WAR && standing == Relation::AT_WAR) {
-    return DeclarationRefusal::ALREADY_AT_WAR;
-  }
-  if (what == Declaration::PEACE &&
-      (standing == Relation::ALLY || standing == Relation::NEUTRAL)) {
-    return DeclarationRefusal::ALREADY_AT_PEACE;
-  }
-  const std::optional<Declared>& last = declarations_.between(*own, faction);
   const std::uint64_t hold =
       life_.diplomacy
           ? std::uint64_t{life_.diplomacy->hold_days} * rules_.ticks_per_day
           : 0;
-  if (last && tick_count_ - last->tick < hold) {
-    return DeclarationRefusal::TOO_SOON;
-  }
-  return DeclarationRefusal::NONE;
+  return declarations_.refusal(*own, faction, what, rules_.hostile, tick_count_,
+                               hold);
 }
 
 void World::declare(std::size_t person, std::size_t faction, Declaration what) {
@@ -2610,31 +2574,6 @@ void World::declare(std::size_t person, std::size_t faction, Declaration what) {
         "has held");
   }
   declarations_.declare(*own, faction, Declared{what, *own, tick_count_});
-}
-
-// What faction `faction`'s leader seeks toward faction `other` by the
-// diplomacy, given each faction's living `numbers`, and its chance a year:
-// war on one with living people at peace with it, while its own number at
-// least the margin of the other's, or peace with one at war with it, while
-// its own are fewer; nothing otherwise.
-std::optional<World::Sought> World::sought(
-    const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
-    const std::vector<std::uint64_t>& numbers) const {
-  if (other == faction || numbers.at(other) == 0) {
-    return std::nullopt;
-  }
-  const Relation standing = relation(faction, other);
-  if (standing == Relation::ALLY || standing == Relation::NEUTRAL) {
-    if (numbers.at(faction) * PER_MILLE <
-        numbers.at(other) * diplomacy.war_margin) {
-      return std::nullopt;
-    }
-    return Sought{Declaration::WAR, diplomacy.war_chance};
-  }
-  if (standing == Relation::AT_WAR && numbers.at(faction) < numbers.at(other)) {
-    return Sought{Declaration::PEACE, diplomacy.peace_chance};
-  }
-  return std::nullopt;
 }
 
 void World::steer(std::size_t army, bool steered) {
@@ -2662,8 +2601,8 @@ void World::negotiate(const Diplomacy& diplomacy) {
       continue;
     }
     for (std::size_t other = 0; other < factions; ++other) {
-      const std::optional<Sought> wanted =
-          sought(diplomacy, faction, other, numbers);
+      const std::optional<Sought> wanted = declarations_.sought(
+          diplomacy, faction, other, numbers, rules_.hostile);
       if (wanted &&
           declaration_refusal(*leader, other, wanted->what) ==
               DeclarationRefusal::NONE &&

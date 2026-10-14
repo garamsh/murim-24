@@ -746,14 +746,6 @@ class World {
   void pay(const Trade& trade);
   void shop(const Trade& trade);
   void dose(const Trade& trade);
-  /// A declaration a leader seeks, and its chance a year, per mille.
-  struct Sought {
-    Declaration what;
-    std::uint32_t chance;
-  };
-  [[nodiscard]] std::optional<Sought> sought(
-      const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
-      const std::vector<std::uint64_t>& numbers) const;
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
   [[nodiscard]] std::uint32_t draw(Range range);
