@@ -178,7 +178,6 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Touch layout on a wide screen.** With the touch controls, the HUD keeps its native layout centred, so on a screen wider than 16:9 the world fills the sides while the joystick and the skill buttons stand inward of the screen's edges.
 - **Bodies hidden by bodies.** A body hidden by another body is not outlined, and one outlined behind a building is outlined over another body standing between them too. The ground has no quality profile of ADR 0048's yet (#212).
 - **Levels in the core.** The relief is derived by the view until ADR 0047's map carries levels (#173), which #214's climbing and sight need.
-- **Inner energy.** The core has none. The HUD's inner-energy bar stands empty with a dash for its value until the core holds it.
 - **Rules outside the core.** #190 moves into the core the answers the adapter and GDScript still compute: the player's army, a founded village's name and a grown structure's kind in the adapter; the heart method, the weaker tag and a skill locked by realm in `hud/arts.gd`; the duel tag and a sect's gate in `hud/sect.gd`; and the person to talk to in `play/play.gd`.
 - **Exceptions the adapter does not catch.** An exception from a path outside the handlers above, such as a `.at()` in `person_skills` or `structure_kind`, is not caught by the adapter. Whether any such path can throw on a world the core accepts has not been exercised.
 
