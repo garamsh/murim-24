@@ -58,6 +58,8 @@ const TYPED_SEED := 4817
 # generator refuses.
 const DRAW := 2026
 const DRAWN := 4259094339
+# A seed the region generator refuses: no room for a sect's seat.
+const REFUSED_SEED := 320
 # In the region the scene's seed makes, village 5's residents are army 4, of the Cult; ordered on
 # village 7, of the Orthodox, they take village 5's seat, and its claim, with them.
 const MARCHERS := 4
@@ -124,7 +126,7 @@ func run() -> bool:
 		"pass" if passed else "FAIL"])
 	scene.free()
 	return passed and _challenge_pass() and _factions_pass() and _genealogy_pass() and _sect_pass() and _territory_pass() \
-			and _move_pass() and _cast_pass() and _screens_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
+			and _move_pass() and _cast_pass() and _screens_pass() and _refused_seed_pass() and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _grade_pass()
@@ -591,6 +593,40 @@ func _cast_scene(on_release: bool) -> Node2D:
 # The tick from which the steered person may strike or cast again.
 func _ready(scene: Node2D) -> int:
 	return scene.world.body_ready(scene.steered)[0]
+
+
+# A seed typed whose region the core refuses starts no world: the new-game panel stays open,
+# showing that no world can be made from it. Control: the field emptied and TYPED_SEED typed
+# instead, Enter starts that world and the notice is gone. Setup: the core refuses REFUSED_SEED
+# and generates TYPED_SEED.
+func _refused_seed_pass() -> bool:
+	var setup := WorldAdapter.region_refusal(REFUSED_SEED) == WorldAdapter.REGION_REFUSED \
+			and WorldAdapter.region_refusal(TYPED_SEED) == WorldAdapter.REGION_NONE
+	if not setup:
+		print("play_test: the core refuses %d %s and generates %d %s, as the test needs: FAIL" % [
+			REFUSED_SEED, WorldAdapter.region_refusal(REFUSED_SEED) == WorldAdapter.REGION_REFUSED,
+			TYPED_SEED, WorldAdapter.region_refusal(TYPED_SEED) == WorldAdapter.REGION_NONE])
+		return false
+	var scene: Node2D = load(SCENE).instantiate()
+	scene.notification(Node.NOTIFICATION_READY)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	scene.navigate(_key(KEY_ENTER))
+	for digit in str(REFUSED_SEED):
+		scene.navigate(_key(KEY_0 + int(digit)))
+	scene.navigate(_key(KEY_ENTER))
+	var refused: bool = scene.world == null and hud.screen() == hud.new_game and hud.new_game.refused
+	for digit in str(REFUSED_SEED):
+		scene.navigate(_key(KEY_BACKSPACE))
+	for digit in str(TYPED_SEED):
+		scene.navigate(_key(KEY_0 + int(digit)))
+	var cleared: bool = not hud.new_game.refused
+	scene.navigate(_key(KEY_ENTER))
+	var started: bool = scene.world != null and scene.world_seed == TYPED_SEED and hud.screen() == null
+	var passed := refused and cleared and started
+	print("play_test: %d typed and Enter left the new game open with no world, refused %s; the notice gone once %d is typed %s, and Enter starts it %s: %s" % [
+		REFUSED_SEED, refused, TYPED_SEED, cleared, started, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
 
 
 # The scene opens on the title with no world; Enter on a new game opens the new-game panel, and the

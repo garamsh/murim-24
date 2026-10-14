@@ -1,6 +1,7 @@
 ## The new-game panel over the title screen, drawn as art/mockup/new_game_screen.png lays it out:
 ## the seed typed into its field or drawn at random, a line saying the same seed opens the same
-## world, and the button that starts it. A tap on the field brings up the screen's keyboard for
+## world, or that no world can be made from the seed when the core refuses it, and the button that
+## starts it. A tap on the field brings up the screen's keyboard for
 ## digits, one on the random slip draws a seed, and one on the start button starts. Every word comes
 ## from hud.csv through Godot's translations. It holds no game rule.
 extends "res://hud/panel.gd"
@@ -12,9 +13,14 @@ const RANDOM_X := 290
 const START_WIDTH := 96
 # As many digits as a seed drawn at random has, so the pause panel shows any seed whole.
 const MAX_DIGITS := 10
+## How many seeds a random draw tries before it keeps one the core refuses, which a start then
+## refuses with the notice.
+const MAX_DRAWS := 64
 
 ## The digits typed so far; empty draws the seed at random when the world starts.
 var typed := ""
+## Whether the core refused the last seed started, until the field changes.
+var refused := false
 
 
 func _notification(what: int) -> void:
@@ -25,6 +31,7 @@ func _notification(what: int) -> void:
 ## Opens the panel with its field empty.
 func open() -> void:
 	typed = ""
+	refused = false
 	visible = true
 	queue_redraw()
 
@@ -33,6 +40,7 @@ func open() -> void:
 ## draws a seed at random into it, Enter starts the world and Escape goes back. Returns "start"
 ## or "back" when the key does either, and "" otherwise.
 func key(event: InputEventKey) -> String:
+	refused = false
 	var digit := _digit(event.keycode)
 	# The screen's keyboard may send a digit as its character alone.
 	if digit < 0 and event.unicode >= 0x30 and event.unicode <= 0x39:
@@ -42,7 +50,7 @@ func key(event: InputEventKey) -> String:
 	elif event.keycode == KEY_BACKSPACE:
 		typed = typed.left(-1)
 	elif event.keycode == KEY_R:
-		typed = str(randi())
+		typed = str(_drawn_seed())
 	elif ENTER_KEYS.has(event.keycode):
 		DisplayServer.virtual_keyboard_hide()
 		return "start"
@@ -62,11 +70,12 @@ func tap(at: Vector2) -> String:
 		DisplayServer.virtual_keyboard_hide()
 		close()
 		return "back"
+	refused = false
 	if FIELD.has_point(at):
 		if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
 			DisplayServer.virtual_keyboard_show(typed, FIELD, DisplayServer.KEYBOARD_TYPE_NUMBER, MAX_DIGITS)
 	elif random_slip_rect().has_point(at):
-		typed = str(randi())
+		typed = str(_drawn_seed())
 	elif start_slip_rect().has_point(at):
 		DisplayServer.virtual_keyboard_hide()
 		return "start"
@@ -77,7 +86,25 @@ func tap(at: Vector2) -> String:
 ## Returns the seed the world starts from: the one typed, or one drawn at random when the field
 ## is empty.
 func world_seed() -> int:
-	return int(typed) if not typed.is_empty() else randi()
+	return int(typed) if not typed.is_empty() else _drawn_seed()
+
+
+## Shows that the core refused the seed started, `refusal` a WorldAdapter.REGION_* constant, and
+## keeps the panel open for another.
+func refuse(refusal: int) -> void:
+	refused = refusal != WorldAdapter.REGION_NONE
+	queue_redraw()
+
+
+# Draws seeds from Godot's generator until the core generates a region from one, up to MAX_DRAWS,
+# and returns the last drawn: the same seed for the same generator state.
+func _drawn_seed() -> int:
+	var drawn := randi()
+	for _attempt in MAX_DRAWS - 1:
+		if WorldAdapter.region_refusal(drawn) == WorldAdapter.REGION_NONE:
+			break
+		drawn = randi()
+	return drawn
 
 
 func _digit(keycode: Key) -> int:
@@ -100,7 +127,10 @@ func _draw() -> void:
 	draw_rect(Rect2(FIELD.position.x + 6 + _width(typed), y + 3, 1, 10), Palette.PAPER_6)
 	var random := random_slip_rect()
 	_slip(random.position, random.size.x, tr("NEW_GAME_RANDOM"), false)
-	_text(Vector2(DIALOG.position.x + 12, y + 26), tr("NEW_GAME_SAME"), Palette.STONE_4)
+	if refused:
+		_text(Vector2(DIALOG.position.x + 12, y + 26), tr("NEW_GAME_REFUSED"), Palette.PAPER_4)
+	else:
+		_text(Vector2(DIALOG.position.x + 12, y + 26), tr("NEW_GAME_SAME"), Palette.STONE_4)
 	_text(Vector2(DIALOG.position.x + 12, y + 40), tr("NEW_GAME_EMPTY"), Palette.STONE_3)
 	draw_rect(Rect2(DIALOG.position.x + 6, y + 58, DIALOG.size.x - 12, 1), Palette.INK_4)
 	var start := start_slip_rect()

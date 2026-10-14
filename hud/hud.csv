@@ -119,6 +119,7 @@ NEW_GAME_BACK,Esc 뒤로,Esc Back
 NEW_GAME_SEED,시드,Seed
 NEW_GAME_RANDOM,R 무작위,R Random
 NEW_GAME_SAME,같은 시드에서는 같은 세상이 열린다.,The same seed opens the same world.
+NEW_GAME_REFUSED,이 시드로는 세상을 만들 수 없다.,No world can be made from this seed.
 NEW_GAME_EMPTY,비워 두면 무작위로 정한다.,"Left empty, it is drawn at random."
 NEW_GAME_START,Enter 시작,Enter Start
 NEW_GAME_KEYS,숫자 입력 · R 무작위 · Enter 시작 · Esc 뒤로,Digits · R Random · Enter Start · Esc Back

@@ -26,13 +26,14 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - The library also registers `BodyView`, the view's native module, which keeps the bodies and what the fighting did to them by person, packs the bodies on screen into the rows' buffers each frame and draws the strikes, the target's brackets and the numbers in one call. It holds no game rule; its timings and buffer layout cross as its constants (ADR 0075).
 - Orders go to the core through the port: `order`, `end_intent`, `steer`, `declare`, `apply`, `cast`, `buy` and `consume`.
 - `attack_refusal`, `challenge_refusal`, `declaration_refusal`, `application_refusal`, `cast_refusal`, `talk_refusal`, `buy_refusal` and `consume_refusal` give the core's verdict before an order is made, as one of the class's constants.
+- `region_refusal` gives the core's verdict on a seed, `REGION_REFUSED` when it generates no region from it and `REGION_NONE` when it does, as `load_refusal` gives it on a slot.
 - An order the core refuses is reported with `push_error`, and the call returns false; a factory that fails returns null after `push_error`.
 - `player_army` gives the army the living person carrying the player's soul serves in, so a loaded world finds its player with no field of its own.
 - Saving goes through the core's save port, served by `FileSaves`, which keeps one file per slot in `user://saves` unless a call names another directory. A save of a world with no region is refused.
 - Positions cross as `Vector2`s in sub-cell units. The tick rate, the cell size, an arc's half-width, the structure stages, and every kind, refusal and event the core enumerates cross as the class's integer constants, so GDScript repeats none of them.
 - Converting Godot types to the core's, and the hash back to a signed int, is the adapter's work.
 - Input the core refuses, or that is missing, of the wrong type or outside the core's integer types, makes `create` report it with `push_error` and return null.
-  - `create` catches `std::invalid_argument` alone, and `create_region` and `load` catch `std::logic_error`.
+  - `create` catches `std::invalid_argument` alone, and `create_region` and `load` catch `std::logic_error` and the `std::runtime_error` by which the core refuses to generate a region from a seed, when a village or a sect's seat finds no room.
   - `save`, `load_refusal`, `order`, `declare`, `apply`, `cast`, `cast_refusal`, `aim`, `buy` and `consume` catch `std::invalid_argument`, each reporting it with `push_error`.
   - A read given an index out of range, or called on an adapter no factory made, stops through `CRASH_COND_MSG`.
   - No other exception is caught.
@@ -82,7 +83,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `world_view/world_view.tscn` shows and sounds the M1 scenario through `world_art.tscn` and `sound/sound.tscn`, ticking at the core's tick rate whatever the frame rate, with names shown, so `make bench` measures a frame with names on. `make bench` renders it at the PC's scale and prints where a frame's time goes: the core's tick, the adapter's snapshot, the view's scripts with the native code they call, and rendering. `world_view/village_bench.gd`, run by hand, times a frame in a generated region's village.
 - `world_view/pan_bench.gd` pans the view across a region while the ground streams its areas and the world ticks, and reports frame time against the same budget; `make bench` runs it after the frame bench.
 - The view fills the window at a whole-pixel scale, drawing textures without filtering, as `view_scale.gd` sets it, with a smaller least view on touch than on a PC. Bodies stand on whole world pixels.
-- `play/play.tscn`, the project's main scene, opens on the title screen. A new game has `create_region` make the region of a seed typed or drawn at random, and Continue resumes the world saved in slot 0.
+- `play/play.tscn`, the project's main scene, opens on the title screen. A new game has `create_region` make the region of a seed typed or drawn at random, and Continue resumes the world saved in slot 0. A seed the core refuses starts no world: the new-game screen says so and stays open, and a draw at random passes over refused seeds, drawing again from Godot's generator.
 - The play scene steers the army `player_army` names, re-read when the world is made or loaded and after every tick, so it follows the soul after a rebirth.
 - It turns input into orders through the port:
   - a right click, or the button held, moves the steered person toward a cell
