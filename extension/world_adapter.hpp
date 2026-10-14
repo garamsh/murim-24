@@ -620,11 +620,10 @@ class WorldAdapter : public godot::RefCounted {
       std::vector<murim::VillageSpec> villages = {},
       std::vector<murim::Leadership> leadership = {}, murim::Life life = {},
       std::vector<murim::SectSpec> sects = {});
-  // Returns an adapter over `region`, with one person born into village
-  // `village` as the last army; throws std::out_of_range when there is no
-  // such village, and std::invalid_argument when the core refuses the
-  // region's rules.
+  // Returns an adapter over `region`, with `body`, one person born into
+  // village `village`, as the last army.
   static godot::Ref<WorldAdapter> born_into(murim::Region region,
+                                            murim::ArmySpec body,
                                             std::size_t village);
   // Keeps what the view draws of `region`, made by create_region() with the
   // player born into `origin`'s village as its last army.

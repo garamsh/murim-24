@@ -22,6 +22,7 @@
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector2i.hpp>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -391,29 +392,44 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
 
 godot::Ref<WorldAdapter> WorldAdapter::create_region(
     std::int64_t seed, std::int64_t village, std::int64_t ticks_per_day) {
-  // The one handler for a seed the core generates no region from, a village
-  // the region lacks or a day it refuses: it must not cross into Godot.
-  try {
-    return born_into(
-        region_of(murim::Seed{static_cast<std::uint64_t>(seed)},
-                  narrow<std::uint64_t>(ticks_per_day, "ticks_per_day")),
-        narrow<std::size_t>(village, "village"));
-  } catch (const std::logic_error& error) {
-    godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
-                                        error.what());
+  // Each refusal a caller can meet is reported here and returns null: a day
+  // or a village out of range, a seed the core generates no region from, and
+  // a village the region lacks. A logic_error from region data the core
+  // cannot read is a bug, so nothing here catches it.
+  if (ticks_per_day <= 0 || village < 0) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.create_region: the day must last a positive number of "
+        "ticks and the village be no negative index");
     return {};
+  }
+  // Where the player is born: the region's seed and the village.
+  const murim::Origin origin{murim::Seed{static_cast<std::uint64_t>(seed)},
+                             static_cast<std::size_t>(village)};
+  std::optional<murim::Region> region;
+  try {
+    region =
+        region_of(origin.region, static_cast<std::uint64_t>(ticks_per_day));
   } catch (const std::runtime_error& error) {
     // The core finds no room for a village or a seat on this seed's land.
     godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
                                         error.what());
     return {};
   }
+  std::optional<murim::ArmySpec> body;
+  try {
+    body = murim::born_in(*region, origin.village);
+  } catch (const std::out_of_range& error) {
+    // The region has no such village, or no free cell in it.
+    godot::UtilityFunctions::push_error("WorldAdapter.create_region: ",
+                                        error.what());
+    return {};
+  }
+  return born_into(std::move(*region), std::move(*body), origin.village);
 }
 
 std::int64_t WorldAdapter::region_refusal(std::int64_t seed) {
-  // The one handler for a seed the core generates no region from. A
-  // logic_error, region data the core cannot read, is a bug and no verdict on
-  // the seed, so it is not caught here.
+  // A seed the core generates no region from is a verdict. A logic_error from
+  // region data the core cannot read is a bug, so nothing here catches it.
   try {
     static_cast<void>(murim::generate_region(
         murim::Seed{static_cast<std::uint64_t>(seed)}, base_data()));
@@ -424,8 +440,9 @@ std::int64_t WorldAdapter::region_refusal(std::int64_t seed) {
 }
 
 godot::Ref<WorldAdapter> WorldAdapter::born_into(murim::Region region,
+                                                 murim::ArmySpec body,
                                                  std::size_t village) {
-  region.armies.push_back(murim::born_in(region, village));
+  region.armies.push_back(std::move(body));
   std::vector<murim::VillageSpec> villages = murim::village_specs(region);
   godot::Ref<WorldAdapter> adapter =
       over(region.seed, region.map_rows, region.armies, region.structures,
@@ -449,74 +466,84 @@ void WorldAdapter::show(murim::Region& region, murim::Origin origin) {
 
 godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
                                             const godot::String& directory) {
-  // The one handler for a slot out of range, a seed the save names whose
-  // region the core no longer generates, or a region the save names that
-  // no longer has its village: it must not cross into Godot.
-  try {
-    std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
-        FileSaves{directory}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
-    if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
-      godot::UtilityFunctions::push_error("WorldAdapter.load: ",
-                                          refusal_of(*error));
-      return {};
-    }
-    auto& saved = std::get<murim::Saved>(loaded);
-    if (!saved.origin) {
-      godot::UtilityFunctions::push_error(
-          "WorldAdapter.load: the save holds no generated region");
-      return {};
-    }
-    murim::Region region =
-        region_of(saved.origin->region, murim::TICKS_PER_DAY);
-    region.armies.push_back(murim::born_in(region, saved.origin->village));
-    godot::Ref<WorldAdapter> adapter;
-    adapter.instantiate();
-    adapter->strengths_ = strengths_of(region.armies);
-    adapter->faction_count_ = region.rules.hostile.size();
-    adapter->names_ = region.life.names;
-    adapter->disciplines_ = discipline_names_of(region.life);
-    adapter->map_rows_ = region.map_rows;
-    adapter->world_.emplace(std::move(saved.world));
-    adapter->show(region, *saved.origin);
-    return adapter;
-  } catch (const std::logic_error& error) {
-    godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
+  // Each refusal a caller can meet is reported here and returns null: a slot
+  // out of range, a save the core refuses or that holds no generated region,
+  // a seed the save names whose region the core no longer generates, and a
+  // region that no longer has the save's village. A logic_error from region
+  // data the core cannot read is a bug, so nothing here catches it.
+  if (slot < 0 || slot > std::numeric_limits<std::uint32_t>::max()) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.load: slot is out of range");
     return {};
+  }
+  std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
+      FileSaves{directory}, murim::Slot{static_cast<std::uint32_t>(slot)});
+  if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
+    godot::UtilityFunctions::push_error("WorldAdapter.load: ",
+                                        refusal_of(*error));
+    return {};
+  }
+  auto& saved = std::get<murim::Saved>(loaded);
+  if (!saved.origin) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.load: the save holds no generated region");
+    return {};
+  }
+  std::optional<murim::Region> region;
+  try {
+    region = region_of(saved.origin->region, murim::TICKS_PER_DAY);
   } catch (const std::runtime_error& error) {
     // The core no longer finds room for a village or a seat on the saved
     // seed's land.
     godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
     return {};
   }
+  try {
+    region->armies.push_back(murim::born_in(*region, saved.origin->village));
+  } catch (const std::out_of_range& error) {
+    // The region no longer has the save's village, or a free cell in it.
+    godot::UtilityFunctions::push_error("WorldAdapter.load: ", error.what());
+    return {};
+  }
+  godot::Ref<WorldAdapter> adapter;
+  adapter.instantiate();
+  adapter->strengths_ = strengths_of(region->armies);
+  adapter->faction_count_ = region->rules.hostile.size();
+  adapter->names_ = region->life.names;
+  adapter->disciplines_ = discipline_names_of(region->life);
+  adapter->map_rows_ = region->map_rows;
+  adapter->world_.emplace(std::move(saved.world));
+  adapter->show(*region, *saved.origin);
+  return adapter;
 }
 
 std::int64_t WorldAdapter::load_refusal(std::int64_t slot,
                                         const godot::String& directory) {
-  // The one handler for a slot out of range: it must not cross into Godot. A
-  // seed the core no longer generates a region from is a verdict, not a
-  // failure.
-  try {
-    const std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
-        FileSaves{directory}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
-    if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
-      return static_cast<std::int64_t>(*error);
-    }
-    const std::optional<murim::Origin>& origin =
-        std::get<murim::Saved>(loaded).origin;
-    if (!origin) {
-      return static_cast<std::int64_t>(murim::LoadError::NOT_A_SAVE);
-    }
-    try {
-      static_cast<void>(murim::generate_region(origin->region, base_data()));
-    } catch (const std::runtime_error&) {
-      return LOAD_REGION_REFUSED;
-    }
-    return LOAD_NONE;
-  } catch (const std::invalid_argument& error) {
-    godot::UtilityFunctions::push_error("WorldAdapter.load_refusal: ",
-                                        error.what());
+  // A slot out of range is reported and read as missing; a save the core
+  // refuses, and a seed it no longer generates a region from, are verdicts. A
+  // logic_error from region data the core cannot read is a bug, so nothing
+  // here catches it.
+  if (slot < 0 || slot > std::numeric_limits<std::uint32_t>::max()) {
+    godot::UtilityFunctions::push_error(
+        "WorldAdapter.load_refusal: slot is out of range");
     return static_cast<std::int64_t>(murim::LoadError::MISSING);
   }
+  const std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
+      FileSaves{directory}, murim::Slot{static_cast<std::uint32_t>(slot)});
+  if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
+    return static_cast<std::int64_t>(*error);
+  }
+  const std::optional<murim::Origin>& origin =
+      std::get<murim::Saved>(loaded).origin;
+  if (!origin) {
+    return static_cast<std::int64_t>(murim::LoadError::NOT_A_SAVE);
+  }
+  try {
+    static_cast<void>(murim::generate_region(origin->region, base_data()));
+  } catch (const std::runtime_error&) {
+    return LOAD_REGION_REFUSED;
+  }
+  return LOAD_NONE;
 }
 
 godot::String WorldAdapter::saves_directory() {
