@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261014193909213427
+SCRIPT ERROR: Invalid access to property or key 'fog' on a base object of type 'Dictionary'.
+          at: _apply (res://grade/grade.gd:147)
+          GDScript backtrace (most recent call first):
+              [0] _apply (res://grade/grade.gd:147)
+              [1] show_time (res://grade/grade.gd:62)
+              [2] run (res://grade/grade_test.gd:31)
+              [3] _init (res://run_tests.gd:22)
+SCRIPT ERROR: Invalid access to property or key 'fog' on a base object of type 'Dictionary'.
+          at: _apply (res://grade/grade.gd:147)
+          GDScript backtrace (most recent call first):
+              [0] _apply (res://grade/grade.gd:147)
+              [1] @quality_setter (res://grade/grade.gd:35)
+              [2] run (res://grade/grade_test.gd:33)
+              [3] _init (res://run_tests.gd:22)
+SCRIPT ERROR: Invalid type in utility function "is_equal_approx()". Cannot convert argument 1 from Nil to float.
+          at: run (res://grade/grade_test.gd:37)
+          GDScript backtrace (most recent call first):
+              [0] run (res://grade/grade_test.gd:37)
+              [1] _init (res://run_tests.gd:22)
+res://grade/grade_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
+WARNING: 1 RID of type "Canvas" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 11 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 5 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.
+ERROR: 2 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.

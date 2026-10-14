@@ -1,0 +1,12 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261014193928516779
+ground_test: 8 areas, 8 distinct seeds, the same on a second ground true: pass
+ground_test: 2018 points from seed 7, the same drawn again true, other from seed 8 true, nearest two 4.21 apart against 4.2: pass
+ground_test: on the headless display the ground streamed false, baked false, holds 0 children and shows 0 areas: pass
+ground_test: the first stream drew 16 passes for 8 areas, 16 after moving across and back: pass
+ground_test: at the corner [(0, 0), (0, 1), (1, 0), (1, 1)] shown, the first area's 246 trees; at most 1 new a step; the first freed far away true, shown again with the same trees true: pass
+ground_test: 8 of 8 areas the same ground and trees twice; trees on the cleared cells 0, 29 with all open: pass
+ground_test: 4 ground sprites drawn with the ground's material true, 2 strips false, 1029 trees without it true: FAIL
+res://world_art/ground_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
