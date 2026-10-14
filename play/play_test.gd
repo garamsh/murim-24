@@ -53,6 +53,11 @@ const CAST_OFFSET := Vector2(16, 0)
 const FAR_OFFSET := Vector2(400, 0)
 # The seed the new game is typed with.
 const TYPED_SEED := 4817
+# Godot's random generator is seeded with DRAW before the random slip is tapped, so the slip draws
+# DRAWN, a seed whose region generates (core/region_test.cpp checks it), and never one the region
+# generator refuses.
+const DRAW := 2026
+const DRAWN := 4259094339
 # In the region the scene's seed makes, village 5's residents are army 4, of the Cult; ordered on
 # village 7, of the Orthodox, they take village 5's seat, and its claim, with them.
 const MARCHERS := 4
@@ -338,7 +343,7 @@ func _touch_cast_pass() -> bool:
 # into the field and start tapped starts the world from it. With the touch controls shown, the
 # pause button tapped pauses the world and resume tapped on the panel goes on; the genealogy
 # button tapped opens that panel on the person, and a tap closes it. Control: with the touch
-# controls hidden, a tap on the pause button's place pauses nothing.
+# controls hidden, a tap on the pause button's place pauses nothing. The slip draws DRAWN.
 func _taps_pass() -> bool:
 	var scene := _title()
 	var hud: CanvasLayer = scene.get_node("Hud")
@@ -346,11 +351,15 @@ func _taps_pass() -> bool:
 	var menu: Vector2 = title.MENU.position + title.MENU_INSET
 	scene.navigate(_finger(0, menu + Vector2(20, 5), true))
 	var new_game_open: bool = hud.screen() == hud.new_game
+	seed(DRAW)
 	scene.navigate(_finger(0, hud.new_game.random_slip_rect().get_center(), true))
 	var typed: String = hud.new_game.typed
+	if typed != str(DRAWN):
+		print("play_test: the random slip drew %s, not DRAWN %d, so no region is started from it: FAIL" % [typed, DRAWN])
+		scene.free()
+		return false
 	scene.navigate(_finger(0, hud.new_game.start_slip_rect().get_center(), true))
-	var started: bool = scene.world != null and typed != "" and scene.world_seed == int(typed) \
-			and hud.screen() == null
+	var started: bool = scene.world != null and scene.world_seed == DRAWN and hud.screen() == null
 	var pause_at: Vector2 = hud.touch.PAUSE.get_center()
 	var hidden_ignored: bool = not scene.touch(_finger(0, pause_at, true)) and hud.screen() == null
 	hud.use_touch(true)
