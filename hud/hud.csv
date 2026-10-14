@@ -223,6 +223,10 @@ SETTINGS_SCREEN_LOW,낮음,Low
 SETTINGS_SCREEN_STANDARD,보통,Standard
 SETTINGS_SCREEN_HIGH,높음,High
 SETTINGS_SCREEN_ABOUT,시간과 계절의 빛깔과 화면의 효과. 낮음은 무거운 효과를 끈다.,The light of the hour and season. Low drops the costly effects.
+SETTINGS_RAIN,비,Rain
+SETTINGS_RAIN_OFF,끔,Off
+SETTINGS_RAIN_ON,켬,On
+SETTINGS_RAIN_ABOUT,세상에 날씨가 생기기 전까지 비를 내린다. 낮음에서는 내리지 않는다.,Rain on the view until the world has weather. None at low.
 NOTICE_COMPREHENDED,깨달음: %s,Comprehended: %s
 NOTICE_READ,비급 독파: %s,Read from a manual: %s
 NOTICE_TAUGHT,사문 전수: %s,Taught by the sect: %s

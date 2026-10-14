@@ -10,7 +10,11 @@
 // them lift toward its amber, dithered.
 // By `fog`, a mist the grade tints lies as thick as the light field's blue says, thickening toward
 // the screen's top and clear of high ground, in bands the dither steps.
+// By `rain`, streaks fall slanting over the screen on the art's pixels, each a few art pixels long
+// in a lane of its own, pale and tinted by the grade, moving as `drift` seconds pass.
 shader_type canvas_item;
+
+#include "res://grade/noise.gdshaderinc"
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
 uniform vec3 gain = vec3(1.0);
@@ -31,6 +35,9 @@ uniform int light_count = 0;
 uniform sampler2D light_field : filter_nearest;
 // Whether the fog shows, above 0, its thickness at each art pixel read from the light field.
 uniform float fog = 0.0;
+// 1 while it rains, 0 for none, and the seconds its drops have fallen.
+uniform float rain = 0.0;
+uniform float drift = 0.0;
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
@@ -46,6 +53,16 @@ const vec2 TAPS[8] = vec2[](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec
 		vec2(1.0, 1.0), vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0));
 // The fog's colour before the grade tints it.
 const vec3 FOG_COLOUR = vec3(0.8, 0.84, 0.9);
+// The rain's colour before the grade tints it and how far a streak's pixel leans toward it; how many
+// rows a streak falls for each column it slants; the share of lanes that hold a drop; and a drop's
+// length, the rows between drops in a lane, and how fast drops fall, in art pixels a second.
+const vec3 RAIN_COLOUR = vec3(0.78, 0.84, 0.94);
+const float RAIN_SHARE = 0.5;
+const float RAIN_SLANT = 3.0;
+const float RAIN_LANES = 0.22;
+const float RAIN_LENGTH = 4.0;
+const float RAIN_PERIOD = 46.0;
+const float RAIN_SPEED = 150.0;
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
@@ -98,6 +115,18 @@ void fragment() {
 		float thick = texelFetch(light_field, ivec2(cell), 0).b;
 		float band = floor(thick * 3.0 + dither) / 3.0;
 		g = mix(g, FOG_COLOUR * gain + lift, band * 0.7);
+	}
+	if (rain > 0.0) {
+		// A lane runs down the slant; whether it holds drops, and where they fall in it, come from its
+		// hash.
+		int lane = int(cell.x - floor(cell.y / RAIN_SLANT));
+		float lane_hash = float(noise_hash(lane, 0, 31) & 0xffffu) / 65536.0;
+		if (lane_hash < RAIN_LANES) {
+			float along = mod(cell.y - drift * RAIN_SPEED + lane_hash * 4099.0, RAIN_PERIOD);
+			if (along < RAIN_LENGTH) {
+				g = mix(g, RAIN_COLOUR * gain + lift, RAIN_SHARE * rain);
+			}
+		}
 	}
 	if (vignette > 0.0) {
 		vec2 centred = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE * 2.0 - 1.0;

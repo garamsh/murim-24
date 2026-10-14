@@ -1576,7 +1576,8 @@ func _loadout_save_pass() -> bool:
 	return passed
 
 
-# The pass follows the core's five-tick day, with the settings' quality and the camera's art scale.
+# The pass follows the core's five-tick day, with the settings' quality, their rain row and the
+# camera's art scale.
 func _grade_pass() -> bool:
 	var scene := _title()
 	var grade: CanvasLayer = scene.get_node("Grade")
@@ -1601,11 +1602,15 @@ func _grade_pass() -> bool:
 	settings.chosen.screen = 1
 	scene.show_numbers()
 	var standard: float = grade.params().vignette
+	var dry: bool = not grade.raining
+	settings.chosen.rain = 1
+	scene.show_numbers()
+	var wet: bool = grade.raining
 	var passed: bool = hidden and grade.visible and clock and low == 0.0 and standard > 0.0 \
-			and grade.params().art_pixel == 3.0
-	print("play_test: grade hidden on title %s, shown in play %s; five-tick day at tick %d gain %s against %s, midnight %s; low vignette %.2f standard %.2f art pixel %.1f: %s" % [
+			and grade.params().art_pixel == 3.0 and dry and wet
+	print("play_test: grade hidden on title %s, shown in play %s; five-tick day at tick %d gain %s against %s, midnight %s; low vignette %.2f standard %.2f art pixel %.1f; raining with the row off %s, on %s: %s" % [
 		hidden, grade.visible, date.tick, noon, expected, night, low, standard, grade.params().art_pixel,
-		"pass" if passed else "FAIL"])
+		not dry, wet, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 

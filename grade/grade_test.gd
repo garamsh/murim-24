@@ -13,7 +13,9 @@
 # and neither at low (control: standard's). The fog reads the relief shown, its cells' levels and
 # size, from the view's corner, and drifts with the clouds; the light field draws them at standard
 # and not at low, and the clouds read their shade from it; each grade's clouds are a material of
-# its own (control: the other grade's).
+# its own (control: the other grade's). While it rains at standard the pass draws rain, the gain and
+# saturation dim by grades.json's `rain`, and the clouds cast no shadow; dry, or raining at low, it
+# draws none and the grade is the time's (controls: dry, and low).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -68,7 +70,7 @@ func run() -> bool:
 		noon.gain, noon.saturation, dusk.gain, between.gain, halfway, standard.vignette, standard.hue_shift,
 		low.vignette, low.hue_shift, hidden_before, shown_after, "pass" if passed else "FAIL"])
 	grade.free()
-	return passed and _lights_pass() and _fog_pass()
+	return passed and _lights_pass() and _fog_pass() and _rain_pass()
 
 
 func _lights_pass() -> bool:
@@ -170,4 +172,28 @@ func _fog_pass() -> bool:
 	print("grade_test: fog and clouds at midnight, morning and noon %s; standard fog %.2f clouds %.2f, low fog %.2f clouds %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f; the clouds read from the light field %s, drawn for the fog and the clouds at standard %s and at low %s; clouds a material of each grade's own %s: %s" % [
 		keyed, standard.fog, standard.clouds, low.fog, low.clouds, standard.map_size, raised, flat,
 		standard.view_origin, standard.drift, standard.clouds_read_field, standard.field_drawn, low.field_drawn, separate, "pass" if passed else "FAIL"])
+	return passed
+
+
+func _rain_pass() -> bool:
+	var grade: Grade = load(SCENE).instantiate()
+	var table: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://grade/grades.json"))
+	var noon := grade.grade_at(0.5, SUMMER)
+	grade.show_time(0.5, SUMMER)
+	var dry := grade.params()
+	grade.raining = true
+	var wet := grade.params()
+	grade.quality = Grade.Quality.LOW
+	var low := grade.params()
+	grade.free()
+	var dimmed: Vector3 = noon.gain * Grade._vector(table.rain.gain)
+	var passed: bool = is_equal_approx(dry.rain, 0.0) and Vector3(dry.gain).is_equal_approx(noon.gain) \
+			and is_equal_approx(dry.clouds, noon.clouds) and dry.clouds > 0.0 \
+			and is_equal_approx(wet.rain, 1.0) and Vector3(wet.gain).is_equal_approx(dimmed) \
+			and is_equal_approx(wet.saturation, noon.saturation * float(table.rain.saturation)) \
+			and is_equal_approx(wet.clouds, 0.0) \
+			and is_equal_approx(low.rain, 0.0) and Vector3(low.gain).is_equal_approx(noon.gain)
+	print("grade_test: dry rain %.1f gain %s clouds %.2f; raining rain %.1f gain %s against %s saturation %.3f clouds %.2f; raining at low rain %.1f gain %s: %s" % [
+		dry.rain, dry.gain, dry.clouds, wet.rain, wet.gain, dimmed, wet.saturation, wet.clouds, low.rain, low.gain,
+		"pass" if passed else "FAIL"])
 	return passed

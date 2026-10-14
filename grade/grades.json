@@ -9,6 +9,7 @@
     {"at": 0.84, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "fog": 0.35, "clouds": 0.0, "lamp": 1.0, "contrast": 1.05},
     {"at": 1.0, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "fog": 0.35, "clouds": 0.0, "lamp": 1.0, "contrast": 1.05}
   ],
+  "rain": {"gain": [0.8, 0.84, 0.92], "saturation": 0.78},
   "seasons": [
     {"name": "spring", "gain": [1.0, 1.02, 0.98], "saturation": 1.0},
     {"name": "summer", "gain": [1.02, 1.0, 0.96], "saturation": 1.06},

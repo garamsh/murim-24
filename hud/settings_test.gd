@@ -1,9 +1,9 @@
 # Checks that the settings persist: choices changed on the panel are kept in its file, here one in
 # the test run's own directory, and a panel that reads the file back holds the same choices, its speed, casting on
-# release and everyone's damage numbers among them. Each volume chosen is applied to its audio bus, and a
+# release, everyone's damage numbers and rain among them. Each volume chosen is applied to its audio bus, and a
 # volume of none mutes its bus while the buses turned down but not off stay unmuted. A value out of range in the file is refused for the
 # row's default. Controls: a panel reading a file that does not exist holds every default, casting
-# on press and only the player's own damage numbers among them, and the
+# on press, only the player's own damage numbers and no rain among them, and the
 # in-range values beside the refused one are read. Every word the panel draws from hud.csv fits
 # the room it is given, in each locale.
 extends RefCounted
@@ -26,15 +26,16 @@ func run() -> bool:
 	# resolution and left; down to the language and right; down and left once on the master
 	# volume, twice on the effects and three times on the music; down and right on the casting; down
 	# past the touch and right on the damage numbers; down and right on the blood and on the hit
-	# stop, turning each off.
+	# stop, turning each off; down and right on the screen effects; down and right on the rain.
 	for keycode: Key in [KEY_RIGHT, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_RIGHT,
 			KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT,
 			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT,
-			KEY_DOWN, KEY_RIGHT]:
+			KEY_DOWN, KEY_RIGHT, KEY_DOWN, KEY_RIGHT]:
 		panel.key(_key(keycode))
 	var chosen: Dictionary = panel.chosen.duplicate()
 	var expected := {"speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2,
-		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2}
+		"music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2,
+		"rain": 1}
 	# The buses as the choices left them: the music muted, the others at their share. Control: the
 	# master and the effects, turned down but not off, are not muted.
 	var master := AudioServer.get_bus_index(&"Master")
@@ -56,13 +57,13 @@ func run() -> bool:
 	var kept: bool = chosen == expected and on_disk == expected and read and read_back == expected \
 			and reread.speed() == Settings.SPEEDS[2] and reread.cast_on_release() and volumes_applied \
 			and reread.damage_numbers() == "everyone" and not reread.blood() and not reread.hit_stop() \
-			and reread.screen_quality() == 2
+			and reread.screen_quality() == 2 and reread.rain()
 
 	# Control: a file that does not exist reads as every default.
 	var missing := _panel(_missing)
 	var defaults: bool = not missing.read() and missing.chosen == Settings.DEFAULTS \
 			and not missing.cast_on_release() and missing.damage_numbers() == "mine" and missing.blood() \
-			and missing.hit_stop() and missing.screen_quality() == 1
+			and missing.hit_stop() and missing.screen_quality() == 1 and not missing.rain()
 
 	# A resolution out of range is refused; the speed beside it in range is read.
 	file = ConfigFile.new()
@@ -138,7 +139,8 @@ func _fit_pass() -> bool:
 				"SETTINGS_CAST_RELEASE", "LOCALE_KO", "LOCALE_EN"] + Settings.TOUCH_KEYS + Settings.NUMBERS_KEYS \
 				+ Settings.BLOOD_KEYS \
 				+ Settings.HITSTOP_KEYS \
-				+ Settings.SCREEN_KEYS:
+				+ Settings.SCREEN_KEYS \
+				+ Settings.RAIN_KEYS:
 			fit.say(key)
 		for row: String in Settings.ROWS:
 			var choices: Array[String] = panel.choices(row)
