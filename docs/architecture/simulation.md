@@ -234,8 +234,8 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **The tier is saved.** ADR 0076 holds that saves gain nothing, but a tier kept once reached needs its peak stored, so each village's tier is saved and hashed. So is the centre its square stays round, since its residents' objective moves when another army takes the village over. A plan's and a structure's role are saved too, and `SAVE_VERSION` is 13.
   - **`apart` is 20.** ADR 0076 asks for the largest of 20 to 32 at which seeds 0 to 999 all generate and `make sweep` keeps 48 of 50. No value generates all 1,000:
     - `main` at `8b4bb8d7` itself generates 995, refusing seeds 320, 394, 416 and 864 for a seat and 480 for a village;
-    - at 20, 998 generate, refusing seed 480 for a seat and 533 for a village;
-    - at 24, 983; at 28, 933; at 32, 771;
+    - at 20, 998 generate, refusing seed 480 for a seat and 394 for a village;
+    - at 24, 986; at 28, 949; at 32, 786;
     - so the criterion is read as no worse than `main`, as the PM decided.
   - **The sweep at 20.** `make sweep` keeps every faction peopled on 49 of 50 seeds over 100 years. At 24, seed 25, inside the sweep's seeds, does not generate.
   - **The distribution at 20.** Over seeds 0 to 49, lived 100 years at 5 ticks a day:

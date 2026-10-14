@@ -645,17 +645,23 @@ std::size_t farthest_drawn(const std::vector<Cell>& sites, Random& random,
   return drawn;
 }
 
-// Sites and lays village number `number`, owned by the factions in turn, of a
-// template drawn by the seed, trying the open sites from the drawn one until
-// its buildings fit, and takes what it built from `room`. Throws
-// std::runtime_error when none fits.
+// A village to site: its number, and the template drawn for it.
+struct Drawn {
+  std::int32_t number;
+  std::size_t kind;
+};
+
+// Sites and lays village `drawn_village`, owned by the factions in turn by
+// its number, of the template drawn for it, trying the open sites from the
+// drawn one until its buildings fit, and takes what it built from `room`.
+// Throws std::runtime_error when none fits.
 void site_village(Region& region, Siting& siting, Random& random,
-                  std::int32_t number) {
+                  Drawn drawn_village) {
   const RegionData& data = *siting.data;
+  const std::int32_t number = drawn_village.number;
   const std::size_t owner =
       static_cast<std::size_t>(number) % data.factions.size();
-  const VillageTemplate& kind = data.villages.at(static_cast<std::size_t>(
-      random.below(static_cast<std::int32_t>(data.villages.size()))));
+  const VillageTemplate& kind = data.villages.at(drawn_village.kind);
   std::vector<Cell> centres = centres_of(region);
   centres.insert(centres.end(), siting.seat_centres.begin(),
                  siting.seat_centres.end());
@@ -732,7 +738,18 @@ Region generate_region(Seed seed, const RegionData& data) {
         map.buildable(cell) ? region.territory.at(index_of(cell)) : nobody;
   }
 
-  // Seats are sited first, as the largest fixed layouts, and laid after the
+  // How many villages there are and each one's template are drawn first,
+  // as before villages were kept apart, with the stream stepped once a
+  // village where its corner was drawn, so a seed gives each faction the
+  // same templates.
+  const std::int32_t villages = MIN_VILLAGES + random.below(VILLAGE_COUNTS);
+  std::vector<std::size_t> kinds;
+  for (std::int32_t number = 0; number < villages; ++number) {
+    kinds.push_back(static_cast<std::size_t>(
+        random.below(static_cast<std::int32_t>(data.villages.size()))));
+    static_cast<void>(random.below(1));
+  }
+  // Seats are sited next, as the largest fixed layouts, and laid after the
   // villages, so the first village's residents still lead their factions.
   const Growth growth = data.life.growth.value_or(Growth{});
   const std::vector<Cell> seat_corners =
@@ -742,9 +759,9 @@ Region generate_region(Seed seed, const RegionData& data) {
     const Cell middle = middle_of(data.seat.area);
     siting.seat_centres.push_back(Cell{seat.x + middle.x, seat.y + middle.y});
   }
-  const std::int32_t villages = MIN_VILLAGES + random.below(VILLAGE_COUNTS);
   for (std::int32_t number = 0; number < villages; ++number) {
-    site_village(region, siting, random, number);
+    site_village(region, siting, random,
+                 Drawn{number, kinds.at(static_cast<std::size_t>(number))});
   }
   std::vector<std::size_t> seats;
   for (std::size_t sect = 0; sect < data.sects.size(); ++sect) {
