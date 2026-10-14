@@ -5,6 +5,8 @@
 #include <optional>
 #include <vector>
 
+#include "map.hpp"
+
 namespace murim {
 
 /// The most slots a ring around a foe holds, so a ring's slots fit a 16-bit
@@ -29,6 +31,11 @@ struct Tokens {
   /// Ticks a holder keeps a token while someone waits; 0 for no lease.
   std::uint64_t lease = 0;
 };
+
+/// ADR 0068's default table: 2 tokens for no realm and the lowest rank, 3
+/// for the next two, 4 for the next two and 6 above, a waiter circling every
+/// second and a holder leasing its token for three while others wait.
+[[nodiscard]] Tokens default_tokens();
 
 /// Whether `tokens` gives a row for no realm, no row above MAX_TOKENS, and a
 /// circling period and lease within MAX_HOLD_TICKS.
@@ -63,6 +70,50 @@ struct Engaged {
   Engagement engagement;
 };
 
+/// The longest reach that strikes from a slot at arm's length, and the
+/// longest that strikes from one at long reach; a longer reach strikes from
+/// where it stands.
+constexpr std::int32_t ARM_REACH = 2 * CELL_SIZE;
+constexpr std::int32_t LONG_REACH = 4 * CELL_SIZE;
+
+/// How far inside the shortest reach on it a ring lies: two steps, so a
+/// striker jostled off its slot stays in reach.
+constexpr std::int32_t RING_INSET = 32;
+
+/// How near its slot a striker counts as on it.
+constexpr std::int32_t ON_SLOT = CELL_SIZE / 4;
+
+/// The ring a striker of reach `reach` takes a slot on, or nothing for no
+/// reach or one beyond LONG_REACH.
+[[nodiscard]] std::optional<Ring> ring_for(std::int32_t reach);
+
+/// A ring of attack slots round a foe: how far out it lies and how many
+/// slots it holds.
+struct SlotRing {
+  std::int32_t radius = 0;
+  std::size_t count = 0;
+};
+
+/// The ring of radius `radius` holding the most slots, up to MAX_SLOTS, whose
+/// neighbours lie at least `separation` apart; none for no radius.
+[[nodiscard]] SlotRing slot_ring(std::int32_t radius, std::int32_t separation);
+
+/// Slot `slot` of `ring`, as an offset from its foe: `slot / count` of a turn
+/// from east, toward south, from a fixed table.
+[[nodiscard]] Position slot_offset(const SlotRing& ring, std::size_t slot);
+
+/// A person engaging a foe on this tick, with where both stood as it began,
+/// and the point it closes on, which Attacks::assign gives.
+struct Engaging {
+  std::size_t person = 0;
+  std::size_t foe = 0;
+  std::int32_t reach = 0;
+  Position from{0, 0};
+  Position foe_at{0, 0};
+  std::optional<Position> aim = std::nullopt;
+  std::int64_t distance = 0;
+};
+
 /// The attack slots and tokens of every person, a person's as an engager
 /// and a foe's as the one engaged, in arrays indexed by person that grow
 /// only as the world's people do.
@@ -90,6 +141,17 @@ class Attacks {
 
   /// Frees what `person` holds.
   void release(std::size_t person);
+
+  /// Gives each of `engaging` a slot around its foe, on the ring for its
+  /// reach on `map`, keeping one it holds there; frees what anyone else holds.
+  /// A ring's radius is the shortest reach on it less RING_INSET, and its
+  /// slots are those slot_ring() spaces `separation` apart, each on a
+  /// passable cell. Those without a slot take, in order of distance squared
+  /// from their foe then person, the free slot nearest them, the lower slot
+  /// among equals. Each gets its slot's position as its aim, or none.
+  /// `engaging` is reordered.
+  void assign(std::vector<Engaging>& engaging, const Map& map,
+              std::int32_t separation);
 
   /// What `person` holds, or nothing while it engages no one.
   [[nodiscard]] std::optional<Engagement> engagement(std::size_t person) const;
@@ -125,7 +187,14 @@ class Attacks {
   std::vector<std::uint16_t> waiting_taken_;
   std::vector<std::uint8_t> tokens_held_;
   std::size_t engaged_ = 0;
+  // Whether each person engages on the tick being assigned.
+  std::vector<bool> engaging_;
 
+  // Seats the people of `first` to `last`, all engaging one foe on `ring`, on
+  // its `slots`, as assign() does.
+  void seat(std::vector<Engaging>::iterator first,
+            std::vector<Engaging>::iterator last, Ring ring,
+            const SlotRing& slots, const Map& map);
   [[nodiscard]] std::uint16_t& taken_mask(std::size_t foe, Ring ring);
   [[nodiscard]] std::uint16_t taken_mask(std::size_t foe, Ring ring) const;
 };

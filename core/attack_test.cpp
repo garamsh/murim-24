@@ -2,10 +2,14 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
+
+#include "map.hpp"
 
 namespace murim {
 namespace {
@@ -133,6 +137,199 @@ TEST(Attacks, ASavedEngagementIsRefusedWhenNoWorldCouldHoldIt) {
   for (std::size_t form = 0; form < refused.size(); ++form) {
     EXPECT_FALSE(Attacks::of(PEOPLE, refused.at(form)).has_value()) << form;
   }
+}
+
+// The basic strike's reach, a cell and a half, and the separation people
+// keep, a cell.
+constexpr std::int32_t BASIC_REACH = 3 * CELL_SIZE / 2;
+constexpr std::int32_t APART = CELL_SIZE;
+constexpr std::int32_t BASIC_RING = BASIC_REACH - RING_INSET;
+
+TEST(Slots, AReachTakesARingByItsClass) {
+  EXPECT_EQ(ring_for(BASIC_REACH), std::optional<Ring>{Ring::NEAR});
+  EXPECT_EQ(ring_for(ARM_REACH), std::optional<Ring>{Ring::NEAR});
+  EXPECT_EQ(ring_for(ARM_REACH + 1), std::optional<Ring>{Ring::LONG});
+  EXPECT_EQ(ring_for(LONG_REACH), std::optional<Ring>{Ring::LONG});
+  // A dart's reach strikes from where it stands, and no reach takes none.
+  EXPECT_EQ(ring_for(LONG_REACH + 1), std::nullopt);
+  EXPECT_EQ(ring_for(0), std::nullopt);
+}
+
+std::int64_t distance_squared(Position from, Position toward) {
+  const std::int64_t across = std::int64_t{toward.x} - from.x;
+  const std::int64_t down = std::int64_t{toward.y} - from.y;
+  return (across * across) + (down * down);
+}
+
+// The basic strike's ring, holding as many slots as lie a separation apart.
+SlotRing basic_ring() { return slot_ring(BASIC_RING, APART); }
+
+TEST(Slots, ARingHoldsTheMostSlotsASeparationApart) {
+  // ADR 0068: the basic strike's ring of 352 units holds 8.
+  constexpr std::size_t EIGHT = 8;
+  ASSERT_EQ(basic_ring().count, EIGHT);
+  // Control: a separation just past the 8 slots' spacing leaves 7.
+  const std::int64_t spacing = distance_squared(slot_offset(basic_ring(), 0),
+                                                slot_offset(basic_ring(), 1));
+  std::int32_t past = 0;
+  while (std::int64_t{past} * past <= spacing) {
+    ++past;
+  }
+  EXPECT_EQ(slot_ring(BASIC_RING, past).count, EIGHT - 1);
+  EXPECT_EQ(slot_ring(BASIC_RING, past - 1).count, EIGHT);
+  // A wide ring holds no more than MAX_SLOTS, and no ring holds none.
+  constexpr std::int32_t WIDE = 16 * CELL_SIZE;
+  EXPECT_EQ(slot_ring(WIDE, APART).count, MAX_SLOTS);
+  EXPECT_EQ(slot_ring(0, APART).count, 0U);
+}
+
+// A slot's offset on the basic ring's radius, as pinned.
+struct Pinned {
+  std::size_t count;
+  std::size_t slot;
+  std::int32_t x;
+  std::int32_t y;
+};
+
+TEST(Slots, SlotOffsetsArePinnedFromEastTowardSouth) {
+  constexpr std::array<Pinned, 8> PINNED{{{8, 0, 352, 0},
+                                          {8, 1, 249, 249},
+                                          {8, 2, 0, 352},
+                                          {8, 4, -352, 0},
+                                          {8, 6, 0, -352},
+                                          {3, 1, -176, 305},
+                                          {16, 1, 325, 135},
+                                          {1, 0, 352, 0}}};
+  for (const Pinned& pinned : PINNED) {
+    const Position offset =
+        slot_offset(SlotRing{BASIC_RING, pinned.count}, pinned.slot);
+    EXPECT_TRUE(offset.x == pinned.x && offset.y == pinned.y)
+        << "slot " << pinned.slot << " of " << pinned.count << ": " << offset.x
+        << ", " << offset.y;
+  }
+}
+
+// An open map ten cells a side, the foe at the centre of its cell (5, 5).
+constexpr std::size_t SIDE = 10;
+constexpr std::int32_t FOE_CELL = 5;
+constexpr Position FOE_AT{(FOE_CELL * CELL_SIZE) + (CELL_SIZE / 2),
+                          (FOE_CELL * CELL_SIZE) + (CELL_SIZE / 2)};
+// How far from the foe people stand: well outside the ring, outside it by
+// less, and just outside it.
+constexpr std::int32_t AFAR = 900;
+constexpr std::int32_t NEARBY = 400;
+constexpr std::int32_t BEYOND_RING = 600;
+
+Map open_ground() {
+  return Map{std::vector<std::string>(SIDE, std::string(SIDE, '.'))};
+}
+
+// FOE_AT moved `across` east and `down` south.
+Position from_foe(std::int32_t across, std::int32_t down) {
+  return Position{FOE_AT.x + across, FOE_AT.y + down};
+}
+
+// Person `person` at `from` engaging FOE at FOE_AT with the basic reach.
+Engaging toward(std::size_t person, Position from) {
+  return Engaging{person, FOE, BASIC_REACH, from, FOE_AT};
+}
+
+// The point slot `slot` of the basic ring round FOE_AT lies at.
+Position seat(std::size_t slot) {
+  const Position offset = slot_offset(basic_ring(), slot);
+  return from_foe(offset.x, offset.y);
+}
+
+TEST(Slots, ANewcomerTakesTheFreeSlotNearestItAndAHolderKeepsItsSlot) {
+  constexpr std::uint8_t WEST = 4;
+  // Person 0 west of the foe takes the west slot and closes on it.
+  Attacks attacks{PEOPLE};
+  std::vector<Engaging> engaging{toward(0, from_foe(-AFAR, 0))};
+  attacks.assign(engaging, open_ground(), APART);
+  ASSERT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  EXPECT_EQ(engaging.front().aim.value_or(Position{}).x, seat(WEST).x);
+  // Person 1, nearer the foe and nearer the west slot than person 0, takes
+  // another: person 0 keeps the slot it holds.
+  const Position nearer{seat(WEST).x - 1, seat(WEST).y};
+  engaging = {toward(0, from_foe(-AFAR, 0)), toward(1, nearer)};
+  attacks.assign(engaging, open_ground(), APART);
+  EXPECT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, WEST);
+  EXPECT_NE(attacks.engagement(1).value_or(Engagement{}).slot, WEST);
+  // Control: with nobody holding a slot, person 1 goes first, being nearer
+  // the foe, and takes the west slot.
+  Attacks fresh{PEOPLE};
+  fresh.assign(engaging, open_ground(), APART);
+  EXPECT_EQ(fresh.engagement(1).value_or(Engagement{}).slot, WEST);
+}
+
+TEST(Slots, OfTwoFreeSlotsAsNearAsEachOtherTheLowerIsTaken) {
+  // Person 0, east of the foe and nearer it, takes slot 0; person 1, due east
+  // beyond it, is then as near slot 1 as slot 7, which lie mirrored about
+  // the line it stands on.
+  constexpr std::uint8_t MIRRORED = 7;
+  Attacks attacks{PEOPLE};
+  std::vector<Engaging> engaging{toward(0, from_foe(NEARBY, 0)),
+                                 toward(1, from_foe(AFAR, 0))};
+  attacks.assign(engaging, open_ground(), APART);
+  ASSERT_EQ(attacks.engagement(0).value_or(Engagement{}).slot, 0U);
+  ASSERT_EQ(distance_squared(from_foe(AFAR, 0), seat(1)),
+            distance_squared(from_foe(AFAR, 0), seat(MIRRORED)));
+  EXPECT_EQ(attacks.engagement(1).value_or(Engagement{}).slot, 1U);
+}
+
+TEST(Slots, ASlotFreesWhenItsHolderStopsEngagingOrTurnsToAnotherFoe) {
+  constexpr std::uint8_t WEST = 4;
+  Attacks attacks{PEOPLE};
+  std::vector<Engaging> engaging{toward(0, from_foe(-AFAR, 0)),
+                                 toward(1, from_foe(AFAR, 0))};
+  attacks.assign(engaging, open_ground(), APART);
+  // Setup: both hold a slot round FOE.
+  ASSERT_TRUE(attacks.engagement(0).has_value());
+  ASSERT_TRUE(attacks.engagement(1).has_value());
+  // Person 0 engages no one, and person 1 turns on person 2.
+  Engaging turned = toward(1, from_foe(AFAR, 0));
+  turned.foe = 2;
+  engaging = {turned};
+  attacks.assign(engaging, open_ground(), APART);
+  EXPECT_FALSE(attacks.engagement(0).has_value());
+  EXPECT_EQ(attacks.engagement(1).value_or(Engagement{}).foe, 2U);
+  EXPECT_FALSE(attacks.taken(FOE, Ring::NEAR, 0));
+  EXPECT_FALSE(attacks.taken(FOE, Ring::NEAR, WEST));
+}
+
+TEST(Slots, AReachBeyondTheLongRingTakesNoSlot) {
+  Attacks attacks{PEOPLE};
+  Engaging dart = toward(0, from_foe(-AFAR, 0));
+  dart.reach = LONG_REACH + 1;
+  std::vector<Engaging> engaging{dart};
+  attacks.assign(engaging, open_ground(), APART);
+  EXPECT_FALSE(attacks.engagement(0).has_value());
+  EXPECT_FALSE(engaging.front().aim.has_value());
+  // Control: at the long ring's reach it takes a slot on that ring.
+  engaging.front().reach = LONG_REACH;
+  attacks.assign(engaging, open_ground(), APART);
+  EXPECT_EQ(attacks.engagement(0).value_or(Engagement{}).ring, Ring::LONG);
+  EXPECT_TRUE(engaging.front().aim.has_value());
+}
+
+TEST(Slots, NoSlotIsOfferedOnABlockedCell) {
+  // Everyone east of the foe, a wall in the next column blocking slot 0's
+  // cell.
+  std::vector<std::string> rows(SIDE, std::string(SIDE, '.'));
+  for (std::string& row : rows) {
+    row.at(FOE_CELL + 1) = '#';
+  }
+  const Map walled{rows};
+  ASSERT_FALSE(walled.passable(cell_of(seat(0))));
+  std::vector<Engaging> engaging{toward(0, from_foe(BEYOND_RING, 0))};
+  Attacks attacks{PEOPLE};
+  attacks.assign(engaging, walled, APART);
+  ASSERT_TRUE(attacks.engagement(0).has_value());
+  EXPECT_NE(attacks.engagement(0).value_or(Engagement{}).slot, 0U);
+  // Control: on open ground it takes slot 0, the one nearest it.
+  Attacks open{PEOPLE};
+  open.assign(engaging, open_ground(), APART);
+  EXPECT_EQ(open.engagement(0).value_or(Engagement{}).slot, 0U);
 }
 
 }  // namespace
