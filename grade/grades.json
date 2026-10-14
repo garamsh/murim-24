@@ -1,13 +1,13 @@
 {
   "keys": [
-    {"at": 0.0, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "contrast": 1.05},
-    {"at": 0.22, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "contrast": 1.05},
-    {"at": 0.3, "name": "morning", "gain": [1.02, 0.98, 0.95], "lift": [0.035, 0.03, 0.06], "shadow": [0.86, 0.92, 1.14], "light": [1.06, 1.0, 0.9], "saturation": 0.86, "contrast": 0.95},
-    {"at": 0.42, "name": "noon", "gain": [1.0, 1.0, 1.0], "lift": [0.0, 0.0, 0.0], "shadow": [1.0, 1.0, 1.0], "light": [1.0, 1.0, 1.0], "saturation": 1.0, "contrast": 1.0},
-    {"at": 0.66, "name": "noon", "gain": [1.0, 1.0, 1.0], "lift": [0.0, 0.0, 0.0], "shadow": [1.0, 1.0, 1.0], "light": [1.0, 1.0, 1.0], "saturation": 1.0, "contrast": 1.0},
-    {"at": 0.76, "name": "dusk", "gain": [1.05, 0.9, 0.8], "lift": [0.02, 0.0, 0.04], "shadow": [0.82, 0.72, 1.06], "light": [1.06, 0.96, 0.82], "saturation": 0.98, "contrast": 1.03},
-    {"at": 0.84, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "contrast": 1.05},
-    {"at": 1.0, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "contrast": 1.05}
+    {"at": 0.0, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "lamp": 1.0, "contrast": 1.05},
+    {"at": 0.22, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "lamp": 1.0, "contrast": 1.05},
+    {"at": 0.3, "name": "morning", "gain": [1.02, 0.98, 0.95], "lift": [0.035, 0.03, 0.06], "shadow": [0.86, 0.92, 1.14], "light": [1.06, 1.0, 0.9], "saturation": 0.86, "lamp": 0.0, "contrast": 0.95},
+    {"at": 0.42, "name": "noon", "gain": [1.0, 1.0, 1.0], "lift": [0.0, 0.0, 0.0], "shadow": [1.0, 1.0, 1.0], "light": [1.0, 1.0, 1.0], "saturation": 1.0, "lamp": 0.0, "contrast": 1.0},
+    {"at": 0.66, "name": "noon", "gain": [1.0, 1.0, 1.0], "lift": [0.0, 0.0, 0.0], "shadow": [1.0, 1.0, 1.0], "light": [1.0, 1.0, 1.0], "saturation": 1.0, "lamp": 0.0, "contrast": 1.0},
+    {"at": 0.76, "name": "dusk", "gain": [1.05, 0.9, 0.8], "lift": [0.02, 0.0, 0.04], "shadow": [0.82, 0.72, 1.06], "light": [1.06, 0.96, 0.82], "saturation": 0.98, "lamp": 0.5, "contrast": 1.03},
+    {"at": 0.84, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "lamp": 1.0, "contrast": 1.05},
+    {"at": 1.0, "name": "night", "gain": [0.46, 0.52, 0.72], "lift": [0.012, 0.018, 0.05], "shadow": [0.85, 0.95, 1.25], "light": [0.95, 1.0, 1.08], "saturation": 0.6, "lamp": 1.0, "contrast": 1.05}
   ],
   "seasons": [
     {"name": "spring", "gain": [1.0, 1.02, 0.98], "saturation": 1.0},

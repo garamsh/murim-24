@@ -2,7 +2,13 @@
 # key with summer's factors, while at dusk it is dusk's (control: noon's differs), and between two
 # keys it is the blend of them. At standard the pass draws the hue shift and the vignette, at low
 # the hue shift and no vignette (control: standard's vignette). Until a time is shown the pass is
-# hidden and draws nothing; once one is, it shows (control: the same pass after show_time()).
+# hidden and draws nothing; once one is, it shows (control: the same pass after show_time()). The
+# lights show by the key's lamp, fully at midnight and not at noon; each light given reaches the
+# shader in screen pixels, and of more than MAX_LIGHTS only the nearest the screen's middle (control:
+# under the cap every light is kept). Emitters bloom at standard and high and not at low, while the
+# lamp shows and a hearth is listed (control: standard's bloom at midnight with a hearth), and not
+# at noon nor with no hearth. The light field is drawn at midnight with lights shown, and left
+# undrawn at noon and with none (control: drawn at midnight).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -57,4 +63,61 @@ func run() -> bool:
 		noon.gain, noon.saturation, dusk.gain, between.gain, halfway, standard.vignette, standard.hue_shift,
 		low.vignette, low.hue_shift, hidden_before, shown_after, "pass" if passed else "FAIL"])
 	grade.free()
+	return passed and _lights_pass()
+
+
+func _lights_pass() -> bool:
+	var grade: Grade = load(SCENE).instantiate()
+	var lamps := [grade.grade_at(0.0, SUMMER).lamp, grade.grade_at(0.5, SUMMER).lamp, grade.grade_at(0.76, SUMMER).lamp]
+	var lamp_pass: bool = is_equal_approx(lamps[0], 1.0) and is_equal_approx(lamps[1], 0.0) and is_equal_approx(lamps[2], 0.5)
+	grade.art_pixel = 3.0
+	grade.show_time(0.0, SUMMER)
+	var view := Rect2(100, 50, 640, 360)
+	grade.show_lights(PackedFloat32Array([110, 60, 7, 3, 28, 400, 200, 0, 0, 48]), view)
+	var two := grade.params()
+	var rects: PackedVector4Array = two.light_rects
+	var reach: PackedFloat32Array = two.light_reach
+	var shown_pass: bool = two.light_count == 2 and rects.size() == 2 \
+			and rects[0].is_equal_approx(Vector4(30, 30, 21, 9)) and is_equal_approx(reach[0], 84.0) \
+			and rects[1].is_equal_approx(Vector4(900, 450, 0, 0)) and is_equal_approx(reach[1], 144.0) \
+			and is_equal_approx(two.lamp, 1.0)
+	# Forty lights down a row through the middle, the first at it and each further out.
+	var many := PackedFloat32Array()
+	var middle := view.get_center()
+	for light in Grade.MAX_LIGHTS + 8:
+		many.append_array([middle.x + light * 10, middle.y, 0, 0, 20])
+	grade.show_lights(many, view)
+	var capped := grade.params()
+	var kept: PackedVector4Array = capped.light_rects
+	var farthest_kept := 0.0
+	for rect in kept:
+		farthest_kept = maxf(farthest_kept, rect.x)
+	var cap_pass: bool = capped.light_count == Grade.MAX_LIGHTS and kept.size() == Grade.MAX_LIGHTS \
+			and is_equal_approx(farthest_kept, (middle.x + (Grade.MAX_LIGHTS - 1) * 10 - view.position.x) * 3.0)
+	var no_hearth: float = grade.params().bloom
+	grade.show_lights(many, view, 1)
+	grade.quality = Grade.Quality.STANDARD
+	var standard: float = grade.params().bloom
+	grade.quality = Grade.Quality.HIGH
+	var high: float = grade.params().bloom
+	grade.show_time(0.5, SUMMER)
+	var noon: float = grade.params().bloom
+	grade.show_time(0.0, SUMMER)
+	grade.quality = Grade.Quality.LOW
+	var low := grade.params()
+	var bloom_pass: bool = is_equal_approx(standard, Grade.BLOOM) and standard > 0.0 and is_equal_approx(high, Grade.BLOOM) \
+			and is_equal_approx(low.bloom, 0.0) and low.light_count == Grade.MAX_LIGHTS \
+			and is_equal_approx(noon, 0.0) and is_equal_approx(no_hearth, 0.0)
+	var drawn_night: bool = grade.params().field_drawn
+	grade.show_time(0.5, SUMMER)
+	var drawn_noon: bool = grade.params().field_drawn
+	grade.show_time(0.0, SUMMER)
+	grade.show_lights(PackedFloat32Array(), view)
+	var drawn_unlit: bool = grade.params().field_drawn
+	var field_pass := drawn_night and not drawn_noon and not drawn_unlit
+	grade.free()
+	var passed := lamp_pass and shown_pass and cap_pass and bloom_pass and field_pass
+	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom with a hearth standard %.2f high %.2f low %.2f noon %.2f, without one %.2f, low keeping %d lights; the light field drawn at midnight %s, at noon %s, with no lights %s: %s" % [
+		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, standard, high, low.bloom,
+		noon, no_hearth, low.light_count, drawn_night, drawn_noon, drawn_unlit, "pass" if passed else "FAIL"])
 	return passed
