@@ -1,0 +1,8 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261014160822339044
+grade_test: spring (1.0, 1.02, 0.98), winter (0.96, 0.99, 1.06), midnight (0.4692, 0.52, 0.6912) wrapped (0.4692, 0.52, 0.6912) before (0.4692, 0.52, 0.6912); high vignette 0.18: pass
+grade_test: noon in summer gain (1.02, 1.0, 0.96) saturation 1.06, dusk gain (1.071, 0.9, 0.768), between them (1.0455, 0.95, 0.864) against (1.0455, 0.95, 0.864); standard vignette 0.18 hue shift 1.00, low vignette 0.00 hue shift 1.00; hidden before a time true, shown after true: pass
+grade_test: lamp at midnight, noon and dusk [1.0, 0.0, 0.5]; two lights shown as [(30.0, 30.0, 21.0, 9.0), (900.0, 450.0, 0.0, 0.0)] reaching [84.0, 144.0]; 32 of 40 lights kept, the farthest at x 1890; bloom standard 0.60 high 0.60 low 0.60, low keeping 32 lights: FAIL
+res://grade/grade_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed

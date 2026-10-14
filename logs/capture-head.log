@@ -1,0 +1,7 @@
+capture: seed 2026 birth village, core date { "year": 1, "season": 0, "day": 1, "tick": 49, "ticks_per_day": 1800 }, camera zoom (3.0, 3.0), renderer Apple M1
+capture: day saved true gain (1.02, 1.0, 0.96) vignette 0.18 lamp 0.0 bloom 0.6 lights 21
+capture: dusk saved true gain (1.071, 0.9, 0.768) vignette 0.18 lamp 0.5 bloom 0.6 lights 21
+capture: night saved true gain (0.4692, 0.52, 0.6912) vignette 0.18 lamp 1.0 bloom 0.6 lights 21
+capture: night-low saved true gain (0.4692, 0.52, 0.6912) vignette 0.0 lamp 1.0 bloom 0.0 lights 21
+capture: smithy-night saved true gain (0.4692, 0.52, 0.6912) vignette 0.18 lamp 1.0 bloom 0.6 lights 21
+capture: smithy-night-low saved true gain (0.4692, 0.52, 0.6912) vignette 0.0 lamp 1.0 bloom 0.0 lights 21

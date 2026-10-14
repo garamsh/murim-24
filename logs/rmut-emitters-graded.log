@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+grade_check: the pass hidden changes 0 pixels of the frame drawn without it: pass
+grade_check: dusk changes 1.00 of the frame, night 1.00, night 0.202 darker than the frame against dusk's 0.090: pass
+grade_check: standard's vignette changes 14139 pixels of the top-left corner's 160 x 90 and 0 of the middle's 320 x 170: pass
+grade_check: the light changes 8100 pixels within half its reach, 0.091 brighter, and 0 beyond it: pass
+grade_check: 216 of the pane's 216 pixels take the fire ramp lit, 0 unlit: pass
+grade_check: standard's bloom changes 63 pixels within two art pixels of the fire block, which keeps 0 of its 36, and 0 of the middle beyond two art pixels of every emitter: FAIL
+grade_check: 5 of 6 checks passed
