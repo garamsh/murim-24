@@ -63,8 +63,26 @@ enum class DeclarationRefusal : std::uint8_t {
   TOO_SOON,
 };
 
+/// Whether the people of each faction attack those of each other by their
+/// stances alone, where no declaration stands between them: `[a][b]` for
+/// faction `a` toward `b`.
+using Stances = std::vector<std::vector<bool>>;
+
+/// A declaration a faction's leader seeks toward another, and its chance a
+/// year, per mille.
+struct Sought {
+  Declaration what;
+  std::uint32_t chance;
+};
+
+/// Makes every faction at peace with faction `faction` by `stances`, neither
+/// hostile to the other, hostile to it, as a duel's winner's allies turn.
+void turn_allies_hostile(Stances& stances, std::size_t faction);
+
 /// The declarations standing between factions: one place for each two of
-/// `factions`, so a declaration holds for both whichever names it first.
+/// `factions`, so a declaration holds for both whichever names it first. It
+/// decides how factions stand, by the declaration between them or else their
+/// stances, whether a faction may declare, and what a leader seeks.
 class Declarations {
  public:
   /// No factions and no declarations.
@@ -86,6 +104,38 @@ class Declarations {
   /// Makes `declared` the declaration standing between `faction` and
   /// `other`. Throws std::out_of_range when either is no faction.
   void declare(std::size_t faction, std::size_t other, Declared declared);
+
+  /// Returns whether the people of faction `from` attack those of `target`:
+  /// at a war declared between them, not at a peace declared, and otherwise
+  /// as `stances` say. Throws std::out_of_range when either is no faction.
+  [[nodiscard]] bool hostile(std::size_t from, std::size_t target,
+                             const Stances& stances) const;
+
+  /// Returns how faction `faction` stands toward `other`: its own; at war or
+  /// neutral by a declaration standing between them; otherwise hostile when
+  /// either is hostile to the other by `stances`, and allied when neither is.
+  /// Throws std::out_of_range when either is no faction.
+  [[nodiscard]] Relation relation(std::size_t faction, std::size_t other,
+                                  const Stances& stances) const;
+
+  /// Returns why the leader of faction `faction` may not declare `what` toward
+  /// faction `other` at tick `now`, the first that holds: SAME_FACTION,
+  /// ALREADY_AT_WAR, ALREADY_AT_PEACE, or TOO_SOON within `hold` ticks of the
+  /// two factions' last declaration; NONE when it may.
+  [[nodiscard]] DeclarationRefusal refusal(std::size_t faction,
+                                           std::size_t other, Declaration what,
+                                           const Stances& stances,
+                                           std::uint64_t now,
+                                           std::uint64_t hold) const;
+
+  /// Returns what faction `faction`'s leader seeks toward faction `other` by
+  /// `diplomacy`, given each faction's living `numbers`: war on one with
+  /// living people allied with it or neutral toward it, while its own number
+  /// at least the war margin of the other's, or peace with one at war with
+  /// it, while its own are fewer; nothing otherwise.
+  [[nodiscard]] std::optional<Sought> sought(
+      const Diplomacy& diplomacy, std::size_t faction, std::size_t other,
+      const std::vector<std::uint64_t>& numbers, const Stances& stances) const;
 
   /// Whether the saved-state invariant holds: one place for each two
   /// factions, each standing under the lower's row, made by one of them no
