@@ -85,6 +85,7 @@ func _process(delta: float) -> void:
 	var date := world.date()
 	_grade.art_pixel = _camera.zoom.x
 	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
+	_grade.show_lights(_art.lights(view), view)
 	_sound.hearing = view
 	bodies_drawn = _art.drawn
 	bodies_outlined = _art.outlined

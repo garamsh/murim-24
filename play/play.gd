@@ -492,10 +492,12 @@ func _process(delta: float) -> void:
 ## test, with no window, gives its own.
 func show_view(view: Rect2) -> void:
 	_art.refresh(view, _between())
-	# The screen graded by the time of day and the season the world has reached (#209).
+	# The screen graded by the time of day and the season the world has reached, and lit by the lights
+	# on it (#209).
 	var date := world.date()
 	_grade.art_pixel = _camera.zoom.x
 	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
+	_grade.show_lights(_art.lights(view), view)
 	_view_origin = view.position
 
 

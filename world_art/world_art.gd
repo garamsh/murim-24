@@ -9,8 +9,9 @@
 ## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
 ## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings,
 ## trees and the raised rows of the ground by the row they stand on, their buffers packed natively
-## by combat.gd's BodyView from one WorldAdapter.snapshot() a tick. It reads the world and holds no
-## game rule.
+## by combat.gd's BodyView from one WorldAdapter.snapshot() a tick. It lists the lights on screen,
+## lit windows and the steered person's torch, for the grade to draw. It reads the world and holds
+## no game rule.
 extends Node2D
 
 ## Emitted after a tick changed the territory or the villages, once both are drawn anew.
@@ -48,6 +49,12 @@ const WINTER_SEASON := 3
 const DECORATIONS := "res://world_art/villages.json"
 # The art of each kind of banner a template names, by the key it is named with.
 const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/sect_banner"}
+# The windows lit at night of each kind of structure by its stage, and the steered person's torch,
+# each as a rect, x, y, width and height in its frame's pixels or from the person's feet, and how
+# far its light reaches, in pixels.
+const LIGHTS := "res://world_art/lights.json"
+## Floats per light in what lights() gives: its rect, x, y, width and height, and its reach.
+const LIGHT_FLOATS := 5
 const FOOTPRINT_INSET := 8
 const CHEVRON_FRAME_MS := 400
 # Frame positions in the body atlas built at startup, in pixels.
@@ -125,6 +132,10 @@ var _field_sheet := {}
 var _field_tags := {}
 var _chevron_frames: Array[AtlasTexture] = []
 var _material: ShaderMaterial
+var _lights := {}
+# Where the steered person's feet were drawn in the last refresh, while it lives.
+var _lead_at := Vector2.ZERO
+var _lead_alive := false
 
 var _laid: Node2D
 var _territory: Territory
@@ -167,6 +178,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 		for stage: String in STAGES:
 			frames.append(_region(sheet, stage, 0))
 		_stage_frames[kind] = frames
+	_lights = JSON.parse_string(FileAccess.get_file_as_string(LIGHTS))
 	_lay_decorations()
 	_lay_fields()
 	_mark_built()
@@ -299,16 +311,42 @@ func refresh(view: Rect2, between := 1.0) -> void:
 		"cells": filled.near_cells}
 	# The markers follow the steered person while it lives.
 	var alive: bool = filled.lead
+	_lead_alive = alive
 	_ring.visible = alive
 	_chevron.visible = alive
 	if alive:
 		var lead: Vector2 = filled.lead_at
+		_lead_at = lead
 		_ring.position = lead
 		_chevron.position = lead
 		_chevron.texture = _chevron_frames[(now / CHEVRON_FRAME_MS) % 2]
 	combat.queue_redraw()
 	$Drops.show_at(now)
 	$Sprays.show_at(now)
+
+
+## The lights whose light reaches into `view`, in pixels, as of the last refresh, LIGHT_FLOATS
+## floats each: the steered person's torch while it lives, then each window lit at night of every
+## structure at its stage, by LIGHTS.
+func lights(view: Rect2) -> PackedFloat32Array:
+	var shown := PackedFloat32Array()
+	if _lead_alive:
+		_add_light(shown, _lights.torch, _lead_at, view)
+	for structure in structure_sprites.size():
+		var sprite := structure_sprites[structure]
+		if sprite == null:
+			continue
+		var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
+		for light: Array in sprite.get_meta("lights").get(STAGES[stage], []):
+			_add_light(shown, light, sprite.position + sprite.offset, view)
+	return shown
+
+
+# Adds `light`, a rect and a reach from `origin`, to `shown` when its light reaches into `view`.
+func _add_light(shown: PackedFloat32Array, light: Array, origin: Vector2, view: Rect2) -> void:
+	var rect := Rect2(origin + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
+	if rect.grow(light[4]).intersects(view):
+		shown.append_array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map
@@ -399,6 +437,7 @@ func _lay_structures() -> void:
 		var lift := relief.lift_at(sprite.position + Vector2(footprint.x * CELL.x / 2.0, -CELL.y / 2.0))
 		sprite.offset = -Vector2(FOOTPRINT_INSET, frames[0].get_size().y - FOOTPRINT_INSET) - Vector2(0, lift)
 		sprite.set_meta("frames", frames)
+		sprite.set_meta("lights", _lights.structures.get(kind, {}))
 		if GROUND_KINDS.has(kind):
 			sprite.position += sprite.offset
 			sprite.offset = Vector2.ZERO

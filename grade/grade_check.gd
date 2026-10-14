@@ -5,9 +5,13 @@
 ## no grade pass, with the pass hidden, graded at noon in summer, at dusk and at night, and at
 ## standard against low. It checks that the hidden pass leaves the frame unchanged; that dusk and
 ## night change most of it, night darker; and that standard's vignette darkens pixels toward the
-## corners only, its middle the same as low's. It exits 0 when every check passes, 1 when one fails
-## and 2 when it cannot draw, as when its window draws too few frames to reach the last shot within
-## MAX_FRAMES frames. Its window stays on top, since a covered window is not drawn.
+## corners only, its middle the same as low's. Then, at night, over a fixture of a dark pane laid in
+## the world, it draws the frame unlit and lit by a light round the pane and one beside it. It
+## checks that the lights brighten the frame within their reach and leave it unchanged beyond, and
+## that the pane takes the fire ramp only when lit. It exits 0 when every check passes, 1 when one
+## fails and 2 when
+## it cannot draw, as when its window draws too few frames to reach the last shot within MAX_FRAMES
+## frames. Its window stays on top, since a covered window is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
@@ -17,6 +21,12 @@ const MAX_FRAMES := 600
 # Frames the scene runs before it is held still, and frames drawn after each step before its shot.
 const SETTLE := 60
 const WAIT := 4
+# The fixture's dark pane, of wood's darkest step, in art pixels from the middle of the screen, the
+# light beside it, its reach, and the fire ramp's amber and yellow a lit pane takes.
+const PANE := Rect2i(40, -20, 6, 4)
+const BESIDE := Vector2(-150, -60)
+const REACH := 30.0
+const EMITTERS: Array[Color] = [Color("f5a33c"), Color("fbe37a")]
 
 var _view: Node
 var _grade: Grade
@@ -24,9 +34,11 @@ var _frame := 0
 var _step := 0
 var _shots := {}
 var _failed := 0
+var _zoom := 1.0
 # Frames the renderer has drawn, and how many must be drawn before the next shot.
 var _drawn := 0
 var _next := 0
+var _middle := Vector2.ZERO
 
 
 func _initialize() -> void:
@@ -54,13 +66,16 @@ func _process(_delta: float) -> bool:
 	if _frame == SETTLE:
 		# Held still from here: the world stops ticking and the grade is set by this check alone.
 		_view.set_process(false)
+		_lay_fixture()
 	var steps := [["none", func() -> void: _grade.visible = false; _grade.get_node("Pass").visible = false],
 		["hidden", func() -> void: _grade.get_node("Pass").visible = true; _grade.visible = false],
 		["noon", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.show_time(0.5, SUMMER)],
 		["dusk", func() -> void: _grade.show_time(0.76, SUMMER)],
 		["night", func() -> void: _grade.show_time(0.0, SUMMER)],
 		["low", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.show_time(0.5, SUMMER)],
-		["standard", func() -> void: _grade.quality = Grade.Quality.STANDARD]]
+		["standard", func() -> void: _grade.quality = Grade.Quality.STANDARD],
+		["unlit", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.show_time(0.0, SUMMER); _show_lights(false)],
+		["lit", func() -> void: _show_lights(true)]]
 	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
 	# renderer on a loaded machine.
 	if _drawn < _next:
@@ -90,7 +105,17 @@ func _report() -> void:
 	var middle := _differ(_shots.low, _shots.standard, Rect2i(560, 320, 320, 170))
 	_check("grade_check: standard's vignette changes %d pixels of the top-left corner's 160 x 90 and %d of the middle's 320 x 170" % [
 		corners.count, middle.count], corners.count > 0 and middle.count == 0)
-	print("grade_check: %d of 3 checks passed" % (3 - _failed))
+	var reach := Rect2i(_screen(BESIDE) - Vector2i.ONE * int(REACH * 0.5 * _zoom), Vector2i.ONE * int(REACH * _zoom))
+	var lit := _differ(_shots.unlit, _shots.lit, reach)
+	var beyond := _differ(_shots.unlit, _shots.lit, Rect2i(_screen(BESIDE + Vector2(-REACH - 20, 0)) - Vector2i(10, 10), Vector2i(20, 20)))
+	_check("grade_check: the light changes %d pixels within half its reach, %.3f brighter, and %d beyond it" % [
+		lit.count, -lit.darker, beyond.count], lit.count > 0 and lit.darker < 0.0 and beyond.count == 0)
+	var pane := Rect2i(_screen(Vector2(PANE.position)), PANE.size * int(_zoom))
+	var lit_panes := _emitting(_shots.lit, pane)
+	var unlit_panes := _emitting(_shots.unlit, pane)
+	_check("grade_check: %d of the pane's %d pixels take the fire ramp lit, %d unlit" % [
+		lit_panes, pane.get_area(), unlit_panes], lit_panes > 0 and unlit_panes == 0)
+	print("grade_check: %d of 5 checks passed" % (5 - _failed))
 	quit(0 if _failed == 0 else 1)
 
 
@@ -108,6 +133,51 @@ func _differ(a: Image, b: Image, rect := Rect2i()) -> Dictionary:
 				count += 1
 			darker += ca.get_luminance() - cb.get_luminance()
 	return {"count": count, "darker": darker / (area.size.x * area.size.y)}
+
+
+# Lays the fixture in the world under the grade, on whole art pixels from the middle of the screen,
+# the camera on a whole world pixel.
+func _lay_fixture() -> void:
+	var camera: Camera2D = _view.get_node("Camera")
+	camera.position = camera.position.round()
+	_zoom = camera.zoom.x
+	_middle = camera.position
+	var image := Image.create_empty(160, 80, false, Image.FORMAT_RGBA8)
+	var origin := Vector2i(80, 40)
+	image.fill_rect(Rect2i(origin + PANE.position, PANE.size), Color("22132c"))
+	var sprite := Sprite2D.new()
+	sprite.texture = ImageTexture.create_from_image(image)
+	sprite.centered = false
+	sprite.position = _middle - Vector2(origin)
+	sprite.z_index = 100
+	_view.add_child(sprite)
+
+
+# Gives the grade the light round the pane and the one beside it, or none.
+func _show_lights(on: bool) -> void:
+	var view := Rect2(_middle - Vector2(root.size) / _zoom / 2.0, Vector2(root.size) / _zoom)
+	var lights := PackedFloat32Array()
+	if on:
+		var pane := _middle + Vector2(PANE.position)
+		lights.append_array([pane.x, pane.y, PANE.size.x, PANE.size.y, REACH])
+		lights.append_array([_middle.x + BESIDE.x, _middle.y + BESIDE.y, 0, 0, REACH])
+	_grade.show_lights(lights, view)
+
+
+# Where `art`, art pixels from the middle of the screen, lies on it, in screen pixels.
+func _screen(art: Vector2) -> Vector2i:
+	return Vector2i((Vector2(root.size) / 2.0 + art * _zoom).round())
+
+
+# How many pixels of `image` within `rect` are the fire ramp's amber or yellow.
+func _emitting(image: Image, rect: Rect2i) -> int:
+	var count := 0
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var c := image.get_pixel(x, y)
+			if EMITTERS.any(func(e: Color) -> bool: return c.is_equal_approx(e)):
+				count += 1
+	return count
 
 
 func _check(line: String, passed: bool) -> void:

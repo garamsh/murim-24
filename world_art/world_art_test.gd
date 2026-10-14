@@ -6,7 +6,8 @@
 # its state's tag; each village's ground decorations cover the cells its template's data names, a
 # village the world founds as it runs included, and its banners stand on the cells it names; after the view jumps across the region, every body a
 # band holds lies inside the bounds the renderer culls that band by; and between ticks a body is
-# drawn between the positions of the last two.
+# drawn between the positions of the last two; and it lists the windows lit at night of every
+# structure on screen by its kind and stage, and the steered person's torch.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -200,7 +201,51 @@ func run() -> bool:
 	var passed := relief_right and bodies_right and buildings_right and banners_right and decorations_right \
 			and fields_right
 	art.free()
-	return _bands_pass() and _between_pass() and _founded_pass() and _every_kind_pass() and passed
+	return _bands_pass() and _between_pass() and _founded_pass() and _every_kind_pass() and _lights_pass() and passed
+
+
+# The lights of the region SEED makes, over the whole map: the steered person's torch at its feet
+# by lights.json, then every window that file names for each structure's kind at its stage, at the
+# sprite's frame, and nothing else. Setup: the map holds lit windows and the steered person lives.
+# Controls: a view beside the map lists none, and with no one steered the same view lists every
+# window and no torch, so the count above is the culling's and the torch's.
+func _lights_pass() -> bool:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/lights.json"))
+	var region := WorldAdapter.create_region(SEED)
+	var steered := region.army_count() - 1
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(region, steered)
+	var rows := region.map_rows()
+	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
+	art.refresh(whole)
+	var shown: PackedFloat32Array = art.lights(whole)
+	var expected := PackedFloat32Array()
+	var feet: Vector2 = art.body_at(steered, 0, 1.0)
+	var torch: Array = data.torch
+	expected.append_array([feet.x + torch[0], feet.y + torch[1], torch[2], torch[3], torch[4]])
+	var stages := ["intact", "damaged", "destroyed", "rubble"]
+	for structure in region.structure_count():
+		var sprite: Sprite2D = art.structure_sprites[structure]
+		if sprite == null:
+			continue
+		var of_kind: Dictionary = data.structures.get(region.structure_kind(structure), {})
+		for light: Array in of_kind.get(stages[region.structure_stage(structure)], []):
+			var corner := sprite.position + sprite.offset + Vector2(light[0], light[1])
+			expected.append_array([corner.x, corner.y, light[2], light[3], light[4]])
+	var windows := expected.size() / WorldArt.LIGHT_FLOATS - 1
+	var beside: PackedFloat32Array = art.lights(Rect2(Vector2(-10000, 0), Vector2(480, 270)))
+	art.free()
+	var unsteered: Node2D = load(SCENE).instantiate()
+	unsteered.show_world(region, -1)
+	unsteered.refresh(whole)
+	var untorched: PackedFloat32Array = unsteered.lights(whole)
+	unsteered.free()
+	var passed := windows > 0 and shown == expected and beside.is_empty() \
+			and untorched == expected.slice(WorldArt.LIGHT_FLOATS)
+	print("world_art_test: %d lights listed over the region against %d expected, the torch at %s and %d windows; %d beside the map, %d with no one steered: %s" % [
+		shown.size() / WorldArt.LIGHT_FLOATS, expected.size() / WorldArt.LIGHT_FLOATS, feet, windows,
+		beside.size() / WorldArt.LIGHT_FLOATS, untorched.size() / WorldArt.LIGHT_FLOATS, "pass" if passed else "FAIL"])
+	return passed
 
 
 # Every kind of structure is drawn as the buildings check above draws a region's: the region, on

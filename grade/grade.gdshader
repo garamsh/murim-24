@@ -3,7 +3,9 @@
 // toward `light` by how dark or light each pixel is, then saturation and contrast; the darkest
 // shadows lean further toward blue-violet and the brightest lights warm, by `hue_shift`. A light
 // vignette darkens toward the screen's corners, on the art's pixel grid and by the ordered dither,
-// so its edge steps in whole art pixels and blends nothing.
+// so its edge steps in whole art pixels and blends nothing. By `lamp`, the lights grade.gd gives
+// warm the pixels round them back toward their own colour, in bands stepped by the dither, and the
+// dark panes of a lit window take the fire ramp.
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
@@ -17,8 +19,18 @@ uniform float hue_shift = 0.0;
 // How much the corners darken, 0 for no vignette, and the screen pixels an art pixel spans.
 uniform float vignette = 0.0;
 uniform float art_pixel = 1.0;
+uniform float lamp = 0.0;
+// Each light's rect, x, y, width and height, and how far its light reaches, in screen pixels.
+uniform int light_count = 0;
+uniform vec4 light_rects[32];
+uniform float light_reach[32];
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+
+// The fire ramp's amber and yellow, which a lit window's panes take.
+const vec3 EMITTERS[2] = vec3[](vec3(0.961, 0.639, 0.235), vec3(0.984, 0.890, 0.478));
+// The colour lamplight gives what it falls on.
+const vec3 LAMPLIGHT = vec3(1.12, 0.9, 0.62);
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
@@ -40,12 +52,29 @@ void fragment() {
 		float a = (l - 0.62) * 0.6 * hue_shift;
 		g *= vec3(1.0 + 0.1 * a, 1.0 + 0.03 * a, 1.0 - 0.14 * a);
 	}
+	vec2 cell = floor(FRAGCOORD.xy / art_pixel);
+	float dither = (BAYER[(int(mod(cell.y, 4.0)) * 4) + int(mod(cell.x, 4.0))] + 0.5) / 16.0;
+	if (lamp > 0.0 && light_count > 0) {
+		vec2 at = (cell + 0.5) * art_pixel;
+		float lit = 0.0;
+		bool pane = false;
+		for (int i = 0; i < light_count; i++) {
+			vec4 r = light_rects[i];
+			vec2 off = max(max(r.xy - at, at - (r.xy + r.zw)), vec2(0.0));
+			lit = max(lit, 1.0 - length(off) / light_reach[i]);
+			pane = pane || (r.z > 0.0 && FRAGCOORD.x >= r.x && FRAGCOORD.y >= r.y
+					&& FRAGCOORD.x < r.x + r.z && FRAGCOORD.y < r.y + r.w);
+		}
+		// Three bands, their edges dithered on the art's pixels.
+		float band = floor(clamp(lit, 0.0, 1.0) * 3.0 + dither) / 3.0;
+		g = mix(g, c * LAMPLIGHT, band * lamp * 0.85);
+		if (pane && l < 0.15 && dither < lamp) {
+			g = EMITTERS[dither < 0.5 ? 1 : 0];
+		}
+	}
 	if (vignette > 0.0) {
-		vec2 cell = floor(FRAGCOORD.xy / art_pixel);
 		vec2 centred = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE * 2.0 - 1.0;
-		float reach = smoothstep(0.55, 1.35, length(centred));
-		int k = (int(mod(cell.y, 4.0)) * 4) + int(mod(cell.x, 4.0));
-		if ((BAYER[k] + 0.5) / 16.0 < reach) {
+		if (dither < smoothstep(0.55, 1.35, length(centred))) {
 			g *= 1.0 - vignette;
 		}
 	}
