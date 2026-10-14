@@ -967,12 +967,10 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       !placed || std::any_of(armies.begin(), armies.end(), invalid_army)) {
     throw std::invalid_argument(
         "separation, rumour and talk reach, sight, range and radius must lie "
-        "in "
-        "[0, MAX_REACH], hostility "
-        "must be square, attack tokens must be valid, the world must hold at "
-        "most its rules' capacity of people, itself at most PEOPLE_CEILING, "
-        "each "
-        "with health up to MAX_HEALTH on a passable cell, every army must "
+        "in [0, MAX_REACH], hostility must be square, attack tokens must be "
+        "valid, the world must hold at most its rules' capacity of people, "
+        "itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on "
+        "a passable cell, every army must "
         "have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known "
         "faction, and every structure must cover 1 to MAX_FOOTPRINT cells "
         "along each side, all passable and covered by no other structure");
