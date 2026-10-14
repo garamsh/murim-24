@@ -369,7 +369,7 @@ class BodyView : public godot::RefCounted {
   void draw_target(const godot::RID& canvas_item, Point where) const;
   [[nodiscard]] static std::int64_t motion_of(const Strike& strike);
   void draw_effect(const godot::RID& canvas_item, std::int64_t effect,
-                   std::int64_t frame, Point centre, bool flip) const;
+                   Point centre, bool flip, std::int64_t frame) const;
   void draw_use_effects(const godot::RID& canvas_item, const Strike& strike,
                         std::int64_t age) const;
   [[nodiscard]] bool shows(const Strike& strike, std::int64_t now) const;
@@ -444,7 +444,7 @@ class BodyView : public godot::RefCounted {
   // their user.
   std::vector<Strike> works_;
   godot::Ref<godot::Texture2D> effects_;
-  godot::Vector2i effect_size_;
+  Point effect_size_;
   std::vector<std::int64_t> effect_frames_;
   std::vector<Rgba> technique_;
   std::vector<Death> deaths_;

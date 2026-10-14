@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math_defs.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -535,7 +536,7 @@ void BodyView::set_effects(const godot::Ref<godot::Texture2D>& texture,
                            const godot::Vector2i& size,
                            const godot::PackedInt64Array& firsts) {
   effects_ = texture;
-  effect_size_ = size;
+  effect_size_ = point_of(size);
   effect_frames_ = integers_of(firsts);
   effect_frames_.resize(EFFECTS, -1);
 }
@@ -1573,10 +1574,9 @@ void BodyView::draw_effects(const godot::RID& canvas_item) const {
           has_point(view_, screen_point(work.origin))) {
         draw_effect(canvas_item,
                     work.structure_damage < 0 ? EFFECT_MEND : EFFECT_TORCH,
-                    age / EFFECT_FRAME_MS,
                     screen_point(work.origin) +
                         Point{0.0F, -single(BODY_HEIGHT) - WORK_RISE},
-                    false);
+                    false, age / EFFECT_FRAME_MS);
       }
     }
   }
@@ -1674,13 +1674,13 @@ void BodyView::draw_strike(const godot::RID& canvas_item, const Strike& strike,
 
 // Effect `effect`'s frame `frame` centred at `centre`, mirrored when `flip`.
 void BodyView::draw_effect(const godot::RID& canvas_item, std::int64_t effect,
-                           std::int64_t frame, Point centre, bool flip) const {
+                           Point centre, bool flip, std::int64_t frame) const {
   const std::int64_t first = effect_frames_.at(index_of(effect));
   if (first < 0) {
     return;
   }
-  const auto width = static_cast<float>(effect_size_.x);
-  const auto height = static_cast<float>(effect_size_.y);
+  const float width = effect_size_.x;
+  const float height = effect_size_.y;
   const godot::Rect2 source(static_cast<float>(first + frame) * width, 0.0F,
                             width, height);
   const Point corner =
@@ -1709,9 +1709,9 @@ void BodyView::draw_use_effects(const godot::RID& canvas_item,
   if (shape == murim::Shape::ARC || shape == murim::Shape::TARGETED) {
     const Point way = screen_point(strike.toward) - origin;
     const bool left = way.x < 0.0F;
-    draw_effect(canvas_item, EFFECT_SLASH + sprite, frame,
+    draw_effect(canvas_item, EFFECT_SLASH + sprite,
                 origin + chest + Point{left ? -SLASH_AHEAD : SLASH_AHEAD, 0.0F},
-                left);
+                left, frame);
   } else if (shape == murim::Shape::LINE) {
     if (age < STRIKE_MS) {
       const Point end = screen_point(strike.end);
@@ -1723,21 +1723,21 @@ void BodyView::draw_use_effects(const godot::RID& canvas_item,
               std::lround(angle / (godot::Math::TAU / DART_HEADINGS)) +
               DART_HEADINGS) %
           DART_HEADINGS;
-      draw_effect(canvas_item, EFFECT_DART, heading,
+      draw_effect(canvas_item, EFFECT_DART,
                   lerp(origin, end,
                        single(static_cast<double>(age) /
                               static_cast<double>(STRIKE_MS))) +
                       chest,
-                  false);
+                  false, heading);
     }
   } else {
-    const Point at =
+    const Point lands =
         shape == murim::Shape::SELF ? origin : screen_point(strike.toward);
-    draw_effect(canvas_item, EFFECT_BURST + sprite, frame, at, false);
+    draw_effect(canvas_item, EFFECT_BURST + sprite, lands, false, frame);
   }
   for (const Point struck : strike.struck_points) {
-    draw_effect(canvas_item, EFFECT_SPARK, frame, screen_point(struck) + chest,
-                false);
+    draw_effect(canvas_item, EFFECT_SPARK, screen_point(struck) + chest, false,
+                frame);
   }
 }
 
@@ -1877,10 +1877,10 @@ godot::TypedArray<godot::Dictionary> BodyView::shown_numbers(
     // or paper.
     const bool coloured =
         number.art >= 0 && index_of(number.art) < technique_.size();
-    const Rgba colour =
-        number.own
-            ? paint(CRIMSON)
-            : (coloured ? technique_.at(index_of(number.art)) : paint(PAPER));
+    Rgba colour = coloured ? technique_.at(index_of(number.art)) : paint(PAPER);
+    if (number.own) {
+      colour = paint(CRIMSON);
+    }
     fields.set("colour", colour_of(with_alpha(colour, 1.0 - (age * age))));
     fields.set(
         "at",
