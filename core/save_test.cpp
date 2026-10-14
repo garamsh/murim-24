@@ -351,6 +351,21 @@ TEST(Save, ARefusedSaveNamesWhyAndAnIntactOneLoads) {
   }
 }
 
+TEST(Save, AVersion13SaveFromBeforeVillagesWereLaidOutByRoleIsRefused) {
+  // Version 13 saves hold no village tier or centre, no plan or structure
+  // role, no seed and none of growth's apart, terrace and tiers.
+  constexpr std::uint32_t BEFORE_ROLES = 13;
+  ASSERT_EQ(SAVE_VERSION, BEFORE_ROLES + 1);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_ROLES);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at version 14 load.
+  store.bytes(SLOT) = intact;
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   // One structure no village holds and no plan laid: the plans part ends
   // with its plan, absent, as one flag byte, and the engaged and charts parts

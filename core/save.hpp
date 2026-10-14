@@ -63,7 +63,7 @@ enum class LoadError : std::uint8_t {
 
 /// The format version a save is written in. A change to what a save holds
 /// raises it.
-constexpr std::uint32_t SAVE_VERSION = 13;
+constexpr std::uint32_t SAVE_VERSION = 14;
 
 /// Writes `saved` to `slot` of `store`. Returns whether the store kept it.
 bool save(const Saved& saved, SaveStore& store, Slot slot);
