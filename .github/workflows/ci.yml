@@ -37,16 +37,28 @@ jobs:
       # The runner image's version, which fixes its compilers, read from the environment the image sets.
       - id: image
         run: echo "version=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
-      # build/ holds the fetched and built dependencies: godot-cpp, GoogleTest and the lint sysroot. The key
-      # names the runner image (its compilers), the tool pins and the files pinning each dependency. A
-      # restore-key match restores another pin's tree, which is safe: CMake re-verifies a changed archive hash
-      # and refetches, lint-sysroot.sh refetches when its package list differs, and Ninja rebuilds what a
-      # changed command or a source newer than its output asks for. Checkout gives every tracked source a
-      # newer time than any restored output, so the project's own files are always rebuilt.
+      # build/ holds the fetched and built dependencies: godot-cpp and GoogleTest. The key names the runner
+      # image (its compilers), the tool pins and the files pinning each dependency. A restore-key match
+      # restores another pin's tree, which is safe: CMake re-verifies a changed archive hash and refetches,
+      # and Ninja rebuilds what a changed command or a source newer than its output asks for. Checkout gives
+      # every tracked source a newer time than any restored output, so the project's own files are always
+      # rebuilt. The lint sysroot is left out, so lint-sysroot.sh unpacks it on every run from the packages
+      # below, each checked against its SHA-256.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: build
-          key: build-${{ steps.image.outputs.version }}-${{ hashFiles('core/requirements.txt', 'Makefile') }}-${{ hashFiles('core/CMakeLists.txt', 'extension/CMakeLists.txt', 'lint-sysroot.sh') }}
+          path: |
+            build
+            !build/lint/sysroot
+          key: build-${{ steps.image.outputs.version }}-${{ hashFiles('core/requirements.txt', 'Makefile') }}-${{ hashFiles('core/CMakeLists.txt', 'extension/CMakeLists.txt') }}
           restore-keys: |
             build-${{ steps.image.outputs.version }}-${{ hashFiles('core/requirements.txt', 'Makefile') }}-
+      # The packages lint-sysroot.sh fetches, keyed on the script that pins each by SHA-256, so a run reads
+      # them here and needs the snapshot mirror only when a pin changes. The script checks every package
+      # against its pin, restored or fetched, and fetches again one that fails.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/downloads
+          key: downloads-${{ hashFiles('lint-sysroot.sh') }}
       - run: make ci
+        env:
+          MURIM_DOWNLOADS: ${{ runner.temp }}/downloads

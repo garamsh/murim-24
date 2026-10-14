@@ -4,9 +4,12 @@
 # libstdc++, glibc and the Linux UAPI headers, and GCC's own directory, by which clang finds them.
 # Each package comes from a dated snapshot of the Ubuntu archive and is checked against its SHA-256
 # before it is unpacked; nothing in it is run. A sysroot already unpacked from these packages is kept.
+# Each package fetched is kept, named by its SHA-256, in the directory MURIM_DOWNLOADS names, or else
+# beside the sysroot, and read from there while it matches: CI restores that directory from a cache.
 set -eu
 
 dir=$1
+downloads=${MURIM_DOWNLOADS:-$(dirname "$dir")/downloads}
 snapshot=https://snapshot.ubuntu.com/ubuntu/20261006T000000Z/pool/main
 packages="
 ee5633e863e19c3381ed97842ce35ed32ede96a3d1ae4e94c051d3036fe21347 g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb
@@ -20,13 +23,19 @@ if [ "$(cat "$dir/.packages" 2>/dev/null)" = "$(echo "$packages")" ]; then
   exit 0
 fi
 rm -rf "$dir"
-mkdir -p "$dir/.unpack"
+mkdir -p "$dir/.unpack" "$downloads"
+downloads=$(cd "$downloads" && pwd)
 echo "$packages" | while read -r sha256 path; do
   [ -n "$path" ] || continue
-  deb="$dir/.unpack/package.deb"
-  curl -sSfL -o "$deb" "$snapshot/$path"
-  echo "$sha256  $deb" | shasum -a 256 -c - >/dev/null
-  (cd "$dir/.unpack" && ar x package.deb && tar -xf data.tar.* -C .. && rm -f ./*)
+  deb="$downloads/$sha256.deb"
+  if echo "$sha256  $deb" | shasum -a 256 -c - >/dev/null 2>&1; then
+    echo "read $path from $downloads, checked against its SHA-256"
+  else
+    curl -sSfL -o "$deb" "$snapshot/$path"
+    echo "$sha256  $deb" | shasum -a 256 -c - >/dev/null
+    echo "fetched $path into $downloads, checked against its SHA-256"
+  fi
+  (cd "$dir/.unpack" && ar x "$deb" && tar -xf data.tar.* -C .. && rm -f ./*)
 done
 rm -rf "$dir/.unpack"
 echo "$packages" > "$dir/.packages"
