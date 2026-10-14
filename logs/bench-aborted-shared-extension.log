@@ -1,0 +1,301 @@
+== round 1 main frame 4b0aa956 23:30:02 load { 3.95 4.88 18.07 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+SCRIPT ERROR: Parse Error: Cannot find member "REGION_NONE" in base "WorldAdapter".
+          at: GDScript::reload (res://hud/new_game.gd:95)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://world_view/frame_bench.gd:36)
+SCRIPT ERROR: Parse Error: Static function "region_refusal()" not found in base "GDScriptNativeClass".
+          at: GDScript::reload (res://hud/new_game.gd:104)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://world_view/frame_bench.gd:36)
+SCRIPT ERROR: Parse Error: Cannot find member "REGION_NONE" in base "WorldAdapter".
+          at: GDScript::reload (res://hud/new_game.gd:104)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://world_view/frame_bench.gd:36)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+          at: GDScript::reload (res://hud/hud.gd:0)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://world_view/frame_bench.gd:36)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+          at: GDScript::reload (res://world_view/world_view.gd:0)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://world_view/frame_bench.gd:36)
+ERROR: Failed to load script "res://world_view/world_view.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://world_view/frame_bench.gd:36)
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 249 ticks in 7.8 s timed (30 per second set)
+bodies: 500 in the world, 398 on screen drawn as sprites through MultiMesh bands
+outlines: 122.6 bodies outlined over what hides them a frame on average, 128 in the last frame
+names: 8 shown over the 150 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 42.7 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 6.505 ms, p99 7.528 ms, max 17.195 ms
+frame breakdown, mean a timed frame: core tick 0.259 ms, adapter 0.014 ms, view script 1.090 ms, render CPU 0.636 ms (GPU 0.000 ms), the rest 4.494 ms of 6.493 ms
+PASS: p99 7.528 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 1 main morning 4b0aa956 23:30:15 load { 3.74 4.79 17.80 } Now drawing from 'AC Power' others: 1
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+SCRIPT ERROR: Parse Error: Static function "region_refusal()" not found in base "GDScriptNativeClass".
+          at: GDScript::reload (res://play/play.gd:393)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue209/rain/village.gd:27)
+ERROR: Failed to load script "res://play/play.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://build/issue209/rain/village.gd:27)
+SCRIPT ERROR: Parse Error: Cannot find member "REGION_NONE" in base "WorldAdapter".
+          at: GDScript::reload (res://hud/new_game.gd:95)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue209/rain/village.gd:27)
+SCRIPT ERROR: Parse Error: Static function "region_refusal()" not found in base "GDScriptNativeClass".
+          at: GDScript::reload (res://hud/new_game.gd:104)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue209/rain/village.gd:27)
+SCRIPT ERROR: Parse Error: Cannot find member "REGION_NONE" in base "WorldAdapter".
+          at: GDScript::reload (res://hud/new_game.gd:104)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue209/rain/village.gd:27)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+          at: GDScript::reload (res://hud/hud.gd:0)
+          GDScript backtrace (most recent call first):
+              [0] _initialize (res://build/issue209/rain/village.gd:27)
+ERROR: Failed to load script "res://hud/hud.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://build/issue209/rain/village.gd:27)
+SCRIPT ERROR: Invalid call. Nonexistent function 'new' in base 'GDScript'.
+          at: _build (res://hud/hud.gd:798)
+          GDScript backtrace (most recent call first):
+              [0] _build (res://hud/hud.gd:798)
+              [1] _set_up (res://hud/hud.gd:186)
+              [2] _ready (res://hud/hud.gd:170)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+          GDScript backtrace (most recent call first):
+              [0] _process (res://build/issue209/rain/village.gd:38)
+SCRIPT ERROR: Invalid call. Nonexistent function 'start' in base 'Node2D'.
+          at: _process (res://build/issue209/rain/village.gd:38)
+... (truncated: the hung run wrote 6019806 lines, 379M, repeating the errors above until it was stopped)

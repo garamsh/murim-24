@@ -1,0 +1,95 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (1.7s)
+-- Generating done (0.8s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+[1/3] Building CXX object CMakeFiles/murim_extension.dir/body_view.cpp.o
+[2/3] Linking CXX shared library libmurim.macos.template_debug.arm64.dylib
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+./check-contents-list.sh
+checked 106 Markdown files, selected by: git ls-files --cached --others --exclude-standard -- '*.md'
+./lint-sysroot.sh build/lint/sysroot
+kept the lint sysroot in build/lint/sysroot, unpacked from the same 4 packages
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build/lint/core -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core/_deps/json-src/include/
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/lint/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.9s)
+-- Generating done (0.7s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -C build/lint/extension _deps/godot-cpp-build/generate_bindings
+ninja: Entering directory `build/lint/extension'
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+[1/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/bench.cpp.
+[2/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart.cpp.
+[3/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart_test.cpp.
+[4/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chronicle_test.cpp.
+[5/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content.cpp.
+[6/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content_test.cpp.
+[7/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy.cpp.
+[8/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy_test.cpp.
+[9/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field.cpp.
+[10/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field_test.cpp.
+[11/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/growth.cpp.
+[12/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/life.cpp.
+[13/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/limits.cpp.
+[14/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/live_scenario.cpp.
+[15/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/m1_scenario.cpp.
+[16/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/map.cpp.
+[17/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/random.cpp.
+[18/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region.cpp.
+[19/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region_test.cpp.
+[20/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save.cpp.
+[21/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save_test.cpp.
+[22/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/skill.cpp.
+[23/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash.cpp.
+[24/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash_test.cpp.
+[25/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/sweep.cpp.
+[26/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/talent.cpp.
+[27/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/trade.cpp.
+[28/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village.cpp.
+[29/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_test.cpp.
+[30/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world.cpp.
+[31/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world_test.cpp.
+[32/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs.cpp.
+[33/33] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.
+clang-tidy checked 33 C++ sources and the core/ and packs_json/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'packs_json/*.cpp'
+[1/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp.
+[2/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/extension.cpp.
+[3/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/file_saves.cpp.
+[4/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_adapter.cpp.
+[5/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_hash.cpp.
+clang-tidy checked 5 extension/ C++ sources and the extension/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'

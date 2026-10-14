@@ -1,0 +1,64 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+[1/21] Building CXX object CMakeFiles/murim_core.dir/leadership.cpp.o
+[2/21] Building CXX object CMakeFiles/murim_core.dir/live_scenario.cpp.o
+[3/21] Building CXX object CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[4/21] Building CXX object CMakeFiles/murim_core_bench.dir/bench.cpp.o
+[5/21] Building CXX object CMakeFiles/murim_core_sweep.dir/sweep.cpp.o
+[6/21] Building CXX object CMakeFiles/murim_core.dir/region.cpp.o
+[7/21] Building CXX object CMakeFiles/murim_core_test.dir/leadership_test.cpp.o
+[8/21] Building CXX object CMakeFiles/murim_core_test.dir/Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.o
+[9/21] Building CXX object CMakeFiles/murim_core.dir/save.cpp.o
+[10/21] Building CXX object CMakeFiles/murim_core.dir/content.cpp.o
+[11/21] Building CXX object packs_json/CMakeFiles/murim_packs_json.dir/json_packs.cpp.o
+[12/21] Building CXX object CMakeFiles/murim_core_test.dir/content_test.cpp.o
+[13/21] Building CXX object CMakeFiles/murim_core.dir/world.cpp.o
+[14/21] Linking CXX static library libmurim_core.a
+[15/21] Linking CXX static library packs_json/libmurim_packs_json.a
+[16/21] Linking CXX executable murim_core_bench
+[17/21] Linking CXX executable murim_core_sweep
+[18/21] Building CXX object CMakeFiles/murim_core_test.dir/region_test.cpp.o
+[19/21] Building CXX object CMakeFiles/murim_core_test.dir/save_test.cpp.o
+[20/21] Building CXX object CMakeFiles/murim_core_test.dir/world_test.cpp.o
+[21/21] Linking CXX executable murim_core_test
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.5s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+[1/18] Building CXX object core/CMakeFiles/murim_core.dir/leadership.cpp.o
+[2/18] Building CXX object core/CMakeFiles/murim_core.dir/live_scenario.cpp.o
+[3/18] Building CXX object core/CMakeFiles/murim_core.dir/m1_scenario.cpp.o
+[4/18] Building CXX object CMakeFiles/murim_extension.dir/file_saves.cpp.o
+[5/18] Building CXX object CMakeFiles/murim_extension.dir/extension.cpp.o
+[6/18] Building CXX object CMakeFiles/world_hash.dir/world_hash.cpp.o
+[7/18] Building CXX object core/CMakeFiles/murim_core.dir/region.cpp.o
+[8/18] Building CXX object CMakeFiles/murim_extension.dir/body_view.cpp.o
+[9/18] Building CXX object core/packs_json/CMakeFiles/murim_packs_json.dir/json_packs.cpp.o
+[10/18] Building CXX object core/CMakeFiles/murim_core.dir/content.cpp.o
+[11/18] Building CXX object core/CMakeFiles/murim_core.dir/save.cpp.o
+[12/18] Building CXX object core/CMakeFiles/murim_core.dir/world.cpp.o
+[13/18] Linking CXX static library core/libmurim_core.a
+[14/18] Linking CXX executable world_hash
+[15/18] Linking CXX static library core/packs_json/libmurim_packs_json.a
+[16/18] Building CXX object CMakeFiles/murim_extension.dir/world_adapter.cpp.o
+[17/18] Linking CXX shared library libmurim.macos.template_debug.arm64.dylib
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 52 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'

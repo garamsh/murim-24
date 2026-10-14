@@ -1,0 +1,345 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-202610150035112567137
+selout_test: 26 sheets and 3 bodies, 24652 edge pixels, faults []; the house with its edge in ink: 829 of 932 edge pixels refused; the orthodox body with one edge pixel by the face in skin: 1 refused: pass
+body_view_test: the struck at flash 1.00, knocked (2.0, 0.0), wound 1, numbers ["60"], at (1, 0); the striker at flash 0.00, knocked (0.0, 0.0), wound 0: pass
+body_view_test: in view 2 drawn as 4 sprites, named [1] at [2.0] cells; elsewhere 0 drawn as 0 sprites, named []: pass
+body_view_test: the hit showed flash and numbers [1.0, 1]; begun again [0.0, 0, 0, -1]: pass
+body_view_test: drawn a quarter of the way along half a pixel, at scale 1 the lead at (8.0, 6.0) and sprites at x [8.0, 8.0]; at scale 4 the lead at (8.25, 6.0) and sprites at x [8.25, 8.25]: pass
+cast_test: the bolt aims east at 1, west at 3; the idle skill east at -1: pass
+ERROR: WorldAdapter.cast: a target must be a Vector2 point, an int person or null
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/cast_test.gd:36)
+       [1] _init (res://run_tests.gd:22)
+cast_test: tick_count 0 before the cast's tick and 1 after, the caster ready at 31: pass
+ERROR: WorldAdapter.cast: a cast must come from a living person, ready on the next tick, of a skill its army has, at a living person within its range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/cast_test.gd:44)
+       [1] _init (res://run_tests.gd:22)
+cast_test: at a person true, the far foe at 990 and the near at 1000; out of range 6, on cooldown 3: pass
+cast_test: past the range the far foe at 990; at itself the one behind at 995, the caster at 1000: pass
+ERROR: WorldAdapter.order: a challenge must name a faction that passes its lead by duel and has a leader, from an army whose lead may challenge it, outside a duel
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/challenge_test.gd:33)
+       [1] _init (res://run_tests.gd:22)
+challenge_test: outsider refused true for 4; member may true; duel { "challenger": 1, "leader": 0 }; after 2000 ticks the Cult's leader is 1 (challenger 1), the old leader's health 0, its ally hostile true: pass
+challenge_test: a losing challenger leaves leader 0, its army 0 strong: pass
+ERROR: WorldAdapter.declare: a declaration must come from a living faction's leader, toward another faction, change how the two stand and come after the last has held
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/declaration_test.gd:22)
+       [1] _init (res://run_tests.gd:22)
+declaration_test: allied at first true; a member refused 2, declare() refusing true; the leader may true and declares true, read back { "what": 0, "by": 0, "tick": 0, "year": 1, "season": 0 }: pass
+declaration_test: the region's player army 10 steered true, no other true; steer() marks army 0 true: pass
+ERROR: WorldAdapter.load: the slot holds no save
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:52)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: the slot holds no save of this game
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:60)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.save: only a world made by create_region() is saved
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:64)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: the slot holds no save
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:64)
+       [1] _init (res://run_tests.gd:22)
+file_saves_test: player army 9 of 12 armies, grown past it true; saved true, loaded with the same hash, player, villages, terrain, date and seed true; the same after 1000 more ticks true; another region saved true and loaded as itself true; an empty slot refused as missing true; a saved slot read true and other bytes refused as not a save true; a world without a region refused true; the game's slot 0 untouched true: pass
+talk_test: person 0 within the reach 0, person 2 beyond it 3, the player itself 2; person 0 offers [0]: pass
+trade_test: person 12 offers [0, 1]; the player paid 10 of 30 silver for a herb, holds [1, 0]; the pill 4, a herb at full health 3, a pill held by none 2; person 13, who sells no herb, 3: pass
+world_adapter_test: 2000 ticks, 2 armies, 2 structures; core hash -7842469183209719204, adapter hash -7842469183209719204 for seed 42, -3708329586982014488 for seed 43: pass
+world_adapter_test: 12 people through the adapter, 12 from the core, 12 for seed 43; positions and health equal: pass
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is out of range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: cooldown is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: stage_floors must hold three ints
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] run (res://extension/world_adapter_test.gd:102)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: valid scenario accepted true; 7 of 7 invalid scenarios refused: pass
+ERROR: WorldAdapter.create_region: a day must last at least one tick
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:114)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create_region: ticks_per_day is out of range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:114)
+       [1] _init (res://run_tests.gd:22)
+world_adapter_test: a region of five-tick days accepted true, on day 2 after five ticks from day 1; days of 0 and -1 ticks refused: pass
+world_adapter_test: five-tick days read 5 ticks a day, the tick [0, 3, 0] over five ticks; the default day reads 1800: pass
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _orders_pass (res://extension/world_adapter_test.gd:536)
+       [1] run (res://extension/world_adapter_test.gd:134)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: ordered person accepted true, moved true, camp left 0 of 10; unordered moved false, camp left 10; order for a missing skill refused true: pass
+ERROR: WorldAdapter.create: shape names no shape
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:572)
+       [1] _reads_pass (res://extension/world_adapter_test.gd:512)
+       [2] run (res://extension/world_adapter_test.gd:135)
+       [3] _init (res://run_tests.gd:22)
+world_adapter_test: factions 0, 1; strengths 1200, 1010, bodies 1200; no region from create true; region of 16384 cells: terrain ["plain", "forest", "hills", "water", "mountain"] agrees with blocked cells true, each village's centre in its owner's territory and some cell in none true, 9 villages, person's faction 0, first village's 0; created footprint (1, 1), region footprints [(3, 3), (5, 3), (2, 2), (1, 1), (5, 1), (3, 2), (4, 3), (6, 4), (3, 1)], 89 of 89 structures inside a village: pass
+world_adapter_test: structure kinds: created "", M1 barrels, region ["house", "hall", "well", "barrels", "fence", "field", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate"], first village village; skills read back true: pass
+world_adapter_test: born into village 1 of faction 1, after 600 ticks 95 of 95 region structures intact; the torch beside a structure no village holds breaks it true: pass
+world_adapter_test: the player's body is 이 은비 (Lee Eunbi) of family 10, spouse -1, 0 parents, 0 children; names() holds 24 surnames and 24 given names, every one of 21 people's among them true; a created world names no one true, its names() empty true: pass
+world_adapter_test: 10 villages, first with 3 people under a cap of 50 and 6000 food, 5997 a day later: pass
+world_adapter_test: 3 sects, first Hwasan of faction 0 seated in village 7, members [14, 15], elders [14], master 14, cap 20; manuals [{ "art": 0, "place": "sect", "sect": 0 }, { "art": 1, "place": "sect", "sect": 1 }, { "art": 2, "place": "sect", "sect": 2 }]; player's sect -1; electing factions ["Orthodox"]; a world from create has 0 sects and 0 of 2 factions electing: pass
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:651)
+       [1] run (res://extension/world_adapter_test.gd:144)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:665)
+       [1] run (res://extension/world_adapter_test.gd:144)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: the Cult player may apply to sect 1 true, joins true, is refused again true; the Unorthodox player refused by sect 2 as unproven true (setup true); 5 rumours after ten years, newest first, within the map and 5 of them naming the born or the dead rightly true, the first { "sequence": 19, "tick": 4150, "cell": (54, 90), "kind": "born", "person": 40 }; disciplines ["sword", "saber", "fist", "hidden weapons", "medicine"], master 14 attained [0, 0, 0, 0, 120] true; a world from create() names none true: pass
+world_adapter_test: 8 realms, the first { "korean": "삼류", "romanised": "Third-rate", "qi": 1000, "might": 1100 }; person 4 knows 3 skills, the last { "range": 2048, "radius": 128, "body_damage": 20, "structure_damage": 0, "cooldown": 90, "qi_cost": 100, "shape": 2, "ready_at": 0, "art": 2, "skill": 0, "rank": 1, "korean": "흑아표", "romanised": "Black Fang Dart", "orientation": 1, "polarity": 1 }, qi 3751 of 3752, realm 2, nature { "orientation": 1, "polarity": 1 }; a world from create() reads none true: pass
+world_adapter_test: 3 arts, 9 art skills known named alike, 9 skills learned and 15 realms gained in its progress, none among its events; a world from create() has no arts true: pass
+world_adapter_test: of a region's last 49 events, 45 births and 1 deaths name their person and 3 others none true: pass
+world_adapter_test: after 581 ticks of the M1 battle, 14 uses and 499 of 500 people living, the snapshot reads as the per-army, per-structure and per-use reads true; a tick later it differs true: pass
+grade_test: spring (1.0, 1.02, 0.98), winter (0.96, 0.99, 1.06), midnight (0.4692, 0.52, 0.6912) wrapped (0.4692, 0.52, 0.6912) before (0.4692, 0.52, 0.6912); high vignette 0.18: pass
+grade_test: noon in summer gain (1.02, 1.0, 0.96) saturation 1.06, dusk gain (1.071, 0.9, 0.768), between them (1.0455, 0.95, 0.864) against (1.0455, 0.95, 0.864); standard vignette 0.18 hue shift 1.00, low vignette 0.00 hue shift 1.00; hidden before a time true, shown after true: pass
+grade_test: lamp at midnight, noon and dusk [1.0, 0.0, 0.5]; two lights shown as [(30.0, 30.0, 21.0, 9.0), (900.0, 450.0, 0.0, 0.0)] reaching [84.0, 144.0]; 32 of 40 lights kept, the farthest at x 1890; bloom with a hearth standard 0.60 high 0.60 low 0.00 noon 0.00, without one 0.00, low keeping 32 lights; the light field drawn at midnight true, at noon false, with no lights false: pass
+grade_test: fog and clouds at midnight, morning and noon [(0.35, 0.0), (0.7, 0.7), (0.2, 1.0)]; standard fog 0.20 clouds 1.00, low fog 0.00 clouds 0.00; relief (4, 3) with levels plus one 3 raised and 1 flat, from (100.0, 50.0), drift 10.74; the clouds read from the light field true, drawn for the fog and the clouds at standard true and at low false; clouds a material of each grade's own true: pass
+grade_test: dry rain 0.0 gain (1.02, 1.0, 0.96) clouds 1.00; raining rain 1.0 gain (0.816, 0.84, 0.8832) against (0.816, 0.84, 0.8832) saturation 0.827 clouds 0.00; raining at low rain 0.0 gain (1.02, 1.0, 0.96): pass
+grade_test: a view on whole pixels starts the art pixels at (0.0, 0.0) from (100.0, 50.0); one between them at (-1.000008, -2.000004) from (100.0, 50.0), the clouds at (-1.000008, -2.000004): pass
+arts_test: army 2, person 4 of realm 2, knows 1 skills of 흑아비도술 and 2 of its army; listed ["흑아비도술", "세력 기술"], 2 greyed, 2 past its realm: pass
+arts_test: chosen first { "art": 2, "skill": 0 }; up refused true; down through [{ "art": 2, "skill": 0 }, { "art": -1, "skill": 0 }, { "art": -1, "skill": 1 }], refused past the last true: pass
+arts_test: { "art": 2, "skill": 0 } on slot 2 put on T true, leaving its slot true; Delete took it off true, again false: pass
+arts_test: touch, none chosen on opening true; a tile it lacks refused true; a tile it has chose { "art": 2, "skill": 0 } true; 2 groups scroll nowhere true: pass
+arts_test: heart method 2 given art 0 of another nature, tags [["심법"], ["약화"], []]; made of the heart's nature, [["심법"], [], []] (setup true): pass
+arts_test: 32 keys measured in 293 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+dialogue_test: person 8 tells its 9 rumours newest first true, worded as rumour_text words them true, 9 births and deaths named true; scrolled to 4; back to the menu true; person 4, (82, 36) cells away, tells 5, 0 of them shared: pass
+dialogue_test: person 8 offers [0], the menu [0, -1]; down chooses farewell true; dead person 0 offers [], the menu [-1]: pass
+dialogue_test: seller 2's menu [0, 1, -1], card 의술 · 약장수; wares listed and chosen true, refusal shown true, purchase shown true, back true; person 0's menu [0, -1], card 문파 없음: pass
+dialogue_test: 35 keys measured in 10468 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+faction_test: a member of faction 0 sees 3 factions as relation() reads them true; offered no order true, asking gives -1: pass
+faction_test: the leader (person 0) of faction 0 offered war on its ally 2 true, asked again true, declared true; then war greyed with "이미 전쟁 중이다.", peace DECLARE_TOO_SOON, the basis "정파 수장이 봄 · 1년에 선포", asking gives -1: pass
+faction_test: on a touch screen a row tapped chooses it true, the middle asks nothing true, war tapped lit true, its question answered yes true, the close word closes true: pass
+faction_test: 49 keys measured in 149 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+genealogy_test: 19 keys and 576 names measured in 3588 checks across ["ko", "en"], names cut short { "en": 215 }; unmeasured []; 0 overruns, the first []: pass
+genealogy_test: after 70 days person 8 윤청운, spouse 9, children [21]; cards { "centre": [8], "spouse": [9], "child": [21] }; details match; down and Enter centre on child 21 true, keypad Enter true; the founder 20 shows 0 parents; generations: founder 1대, child 2대; person 12 of faction 0 shows the sect "화산파" and sectless person 0 of it "없음" true (setup true): pass
+hud_test: keys HUD_HP, FACTION_ORTHODOX; Korean ["ko", "체력", "정파"]; in English ["en", "HP", "Orthodox"]; back to ko; HP 100%, qi 0 / 0, its bar 0; 2 skills on the slots ["Q", "W", "E", "R", "T"] with their icons, each key clear of its icon [true, true, true, true, true], the rest empty true: pass
+hud_test: date { "year": 1, "season": 0, "day": 1, "tick": 0, "ticks_per_day": 1800 } shown as "봄 · 1년"; year 3, season 1 as "여름 · 3년": pass
+hud_test: "남궁설화" is 40 px in Galmuri9; refused in a 39 px untrimmed label true, accepted in a 40 px one true (setup true): pass
+hud_test: Cult leader 2 named { "surname": "송", "given": "천명", "surname_en": "Song", "given_en": "Cheonmyeong" }, its given name 68 px wide; leader, duel leader and challenger shown ["송천명", "송천명", "당신"] in Korean, ["Cheonmyeong", "Cheonmyeong", "You"] in English (setup true), within their labels true, the leader's clear of its neighbours true; Orthodox leader 0 shown "한태산" for 한태산: pass
+hud_test: 38 keys measured on 56 label spans and 2304 names across ["ko", "en"] in both layouts; unmeasured []; overruns []: pass
+hud_test: person 0 of realm 2 shown "이류", in English "Second-rate", qi "3,218 / 3,218" with its bar at 100.0; the newborn player shown "—" and "0 / 0"; 18 values measured, overruns []: pass
+hud_test: army 9's person 18 learned within 1746 ticks; waiting ["경지 돌파: 일류", "사문 전수: 흑아표"] against ["경지 돌파: 일류", "사문 전수: 흑아표"]; 2 lessons and realms of others announced none; 70 notices measured, overruns []: pass
+hud_test: 6 cast refusals ["CAST_DEAD", "CAST_NO_SKILL", "CAST_ON_COOLDOWN", "CAST_NO_QI", "CAST_NO_TARGET", "CAST_OUT_OF_RANGE"]; unworded []; a key hud.csv lacks reads "CAST_NOT_A_REASON" (setup true): pass
+hud_test: PC layouts at [(1280, 720), (1920, 1080), (2560, 1440)] in ["ko", "en"], 144 checks, the map moved by the room gained true; faults []; the touch layout kept at [(1920, 1080), (2400, 1080)] true: pass
+hud_test: the purse showed 30 silver at birth true, after a day true with the wares held; faults []; on touch the belt hidden and the strip clear of the buttons and the stick true: pass
+hud_test: full map stays open, player moved (78.0, 95.0) -> (73.0, 90.0) (order true, moved true), dot follows true: pass
+hud_test: partly seen villages keep 49 unseen cells in fog true and 122 seen cells coloured true: pass
+hud_test: the notice's slip against the talk prompt's in 34080 places; on its line with no prompt true; faults []: pass
+map_window_test: a 128x128 map at 1x in the native room and 3x in (960.0, 540.0), the frame inside both true true; N, Escape and 1 give ["close", "close", ""] (setup true): pass
+map_window_test: 10 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+nameplates_test: 6 of 6 within reach named [(0.8392, 0.2588, 0.1804, 1.0), (0.8392, 0.2588, 0.1804, 1.0), (0.8392, 0.2588, 0.1804, 1.0), (0.1686, 0.4471, 0.5294, 1.0), (0.1686, 0.4471, 0.5294, 1.0), (0.7373, 0.6039, 0.4902, 1.0)], none ringed; faults []; person 7 past the reach not named, nor the viewer, true (setup true): pass
+nameplates_test: own nearest and hostile further named in the order [6, 7, 8, 9, 10, 11, 0, 1], hostile first true; own alone [0, 1, 2, 3, 4, 5, 6, 7], the nearest 8 true: pass
+nameplates_test: over a nearer name [0], apart [0, 1]; over a clear place [], beside it [1]; at the edge []: pass
+nameplates_test: a name on the rail [P: (837.0, 70.0), S: (119.0, 118.0)] named 0; beside it at (717.0, 137.0) named 1 (setup true): pass
+nameplates_test: the widest names { "ko": "독고채원", "en": "Wolhyang Namgung" } named over a crowd at [(1280, 720), (1920, 1080), (2560, 1440)] in both locales, 54 checks; faults []: pass
+new_game_test: typed 4, 8, keypad 1, 7 and Backspace as 481, Enter start from seed 481; a full field kept 9999999991 with its last digit taken true; R drew 1824699154; an empty field drew 1998772620; Escape back, closed true: pass
+new_game_test: 9 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+new_game_test: setup true; seeded with 105, R drew 2229168570 past 418156736, an empty field 2229168570; seeded with 2026, R drew 4259094339: pass
+new_game_test: REGION_NONE shows the notice false; REGION_REFUSED shows it true; a digit clears it true; opening again clears it true: pass
+pause_test: opened on resume; down steps ["save", "settings", "title", "quit", "quit"]; Enter takes quit; Escape resume: pass
+pause_test: 26 keys and 12 controls measured in 72 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+rebirth_test: ended ["황보씨 가문", "27세", "화산파", "의술 120", "0명"] against ["황보씨 가문", "27세", "화산파", "의술 120", "0명"], begun ["이씨 가문", "정파", "17세"] against ["이씨 가문", "정파", "17세"] (setup true); swapped ["이씨 가문", "17세", "없음", "—", "0명"]; Enter, Escape and 1 give ["go_on", "go_on", ""]: pass
+rebirth_test: 23 keys measured in 90 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+sect_test: 40 keys, 3 sects and 576 names measured in 3554 checks across ["ko", "en"], cut short { "en": 147 }; unmeasured []; untranslated []; 0 overruns, the first []: pass
+sect_test: after 40 years army 1's lead 2 in sect 1; details match; cards [2, 17, 25, 28] against master 2 and elders [17, 25, 28, 32]; column match; Tab through each faction true, duel tags { "Demonic": true, "Unorthodox": false, "Orthodox": false }, election tags { "Demonic": false, "Unorthodox": false, "Orthodox": true }; a world without sects opens on none true: pass
+sect_test: born in village 1, the player applies to sect 1: admitted true, again true, cleared on Tab true; born in village 2, refused as unproven true (setup true): pass
+settings_test: chosen { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, on disk { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, read back { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 } with speed 4x, casting on release, everyone's damage numbers and the blood and the hit stop off, the music muted and the master and effects at 0.75 and 0.5 unmuted true: true; a missing file reads the defaults true; a resolution out of range refused, the speed beside it read true: pass
+settings_test: the touch row's choices tapped, each [chosen, shown, tap-to-move]: { "auto": [true, false, false], "on": [true, true, false], "tap": [true, true, true], "off": [true, false, false] }, on a phone or tablet false; applied sent 4 times; a tap on the label chose nothing true; outside goes back: pass
+settings_test: 54 keys measured in 148 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+title_test: opened on new; continue between true true; with no save, down to settings, Enter takes settings; up to new, up again stays on new; with a save, down to continue, Enter takes continue: pass
+title_test: 13 keys measured in 24 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+touch_test: stick pressed { "do": "none" }, pushed 40 px right { "do": "steer", "way": (1.0, 0.0) }, let go { "do": "steer", "way": (0.0, 0.0) }; nudged within its dead zone { "do": "steer", "way": (0.0, 0.0) }: pass
+touch_test: tapped { "do": "cast", "slot": 0, "how": "tap" }; moved under the slop { "do": "cast", "slot": 0, "how": "tap" }; dragged past the pad { "do": "cast", "slot": 1, "how": "point", "aim": (0.0, -1.0) }; onto the cancel zone true, released { "do": "none" }: pass
+touch_test: held 500 ms { "do": "cast", "slot": 4, "how": "self" }; held 400 ms { "do": "cast", "slot": 4, "how": "tap" }: pass
+touch_test: buttons ["genealogy", "sect", "factions", "arts", "attack", "cycle", "pause"]; the ground { "do": "world", "at": (240.0, 60.0) }; the fifth button with two skills { "do": "world", "at": (330.0, 238.0) }: pass
+touch_test: an empty fourth slot pressed { "do": "none" }, released { "do": "none" }; the third, holding a skill, { "do": "cast", "slot": 2, "how": "tap" }: pass
+touch_test: placing, the arts button's finger lifted { "do": "none" }, the fourth button { "do": "place", "slot": 3 }, the pause button's place { "do": "button", "button": "close" }, the panel { "do": "panel", "at": (60.0, 60.0) }, moved up { "do": "scroll", "way": 1 }, down { "do": "scroll", "way": -1 }; not placing, the main button { "do": "cast", "slot": 0, "how": "tap" }: pass
+touch_test: 9 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] follow (res://play/play.gd:596)
+       [1] command (res://play/play.gd:551)
+       [2] run (res://play/play_test.gd:119)
+       [3] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] command (res://play/play.gd:582)
+       [1] run (res://play/play_test.gd:127)
+       [2] _init (res://run_tests.gd:22)
+play_test: cells found true; blocked cell refused true; cell (76, 93) accepted true, distance 724 to 178; key 1 accepted true, key 9 refused true: pass
+play_test: key C alone challenges no one true; F opens the faction window true, where C from an Orthodox village is refused true, the window saying CHALLENGE_NO_SUCCESSION; from a Cult village accepted, closing it, true, the duel shown true; again refused true, the window saying CHALLENGE_DUEL_IN_PROGRESS: pass
+play_test: in the faction window a member declares nothing true; its leader is asked war on ally 2 again true, Escape takes it back true, a digit gives no order true, Enter twice declares it true, F closes it true: pass
+play_test: G opens the genealogy on the steered person true, a digit gives no order while open true, G closes it true, then the digit orders true: pass
+play_test: M opens the sect panel on the steered person's faction true, a digit gives no order while open true, Tab shows the next faction true, M closes it true, then the digit orders true: pass
+play_test: a tick with no order keeps the territory and borders, and redraws the map only on a new chart revision true; army 4 ordered on village 6 true, the territory moved by the next tick true; borders follow the territory and the map the chart before true and after true, the borders before stale after true; kept over frames true: pass
+play_test: right button on (76, 93) from (78, 95) ordered true, 724 to 178 away in 60 ticks; held and moved to (74, 91) ordered true, 902 to 171 away; released true, then moved to (78, 95) ordered nothing true; control without input moved 0.00 cells: pass
+play_test: cast on press, Q with no target refused with its reason true; W accepted true and the ready tick moved 0 to 31, the control's staying true; W again refused as on cooldown with its reason true; E refused as no skill true (setup true): pass
+play_test: cast on release, Q's press aims true, the aim at the cursor with range 24 px true and at the ring past it true, nothing cast while held true; its release with no target casts nothing true true; W's release casts true and the ready tick moved true; W again cancels true, its release casts nothing true true; Escape pauses nothing true, cancels true, the release casts nothing true true: pass
+play_test: opens on the title with no world true; Enter opens the new game true; 4817 typed and Enter starts that world true, the same as the core makes from it and not seed 2026's true; Escape pauses it on that seed true, the guide showing ["CONTROLS_CLICK", "CONTROLS_LEFT_CLICK", "C", "Space", "Tab", "QWERT", "1-9", "0", "ZX", "G", "M", "F", "K", "N", "Esc"] true; no tick while paused true; resumed, 3.5 ticks' time runs 3 ticks, at 4x 16: pass
+ERROR: WorldAdapter.create_region: no room for a seat
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] start (res://play/play.gd:227)
+       [1] _take (res://play/play.gd:405)
+       [2] navigate (res://play/play.gd:337)
+       [3] _refused_seed_pass (res://play/play_test.gd:680)
+       [4] run (res://play/play_test.gd:134)
+       [5] _init (res://run_tests.gd:22)
+play_test: 320 typed and Enter left the new game open with no world, refused true; the notice gone once 4817 is typed true, and Enter starts it true: pass
+ERROR: WorldAdapter.load: no room for a seat
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _refused_save_pass (res://play/play_test.gd:716)
+       [1] run (res://play/play_test.gd:134)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: no room for a seat
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] resume_saved (res://play/play.gd:237)
+       [1] _take (res://play/play.gd:408)
+       [2] navigate (res://play/play.gd:337)
+       [3] _refused_save_pass (res://play/play_test.gd:721)
+       [4] run (res://play/play_test.gd:134)
+       [5] _init (res://run_tests.gd:22)
+play_test: setup true; sealed again with seed 2026 it resumes true; with seed 320 load_refusal names LOAD_REGION_REFUSED and load gives nothing true, and the title shows its notice true; the game's slot 0 untouched true: pass
+play_test: each shortcut row clicked against its key, from the world and from the genealogy panel: faults []; the settings row opens them true, no tick while open true, Escape back to the world true, which runs true; from the pause panel true, back to it true; the cursor marks a row true, off it none true; control: clicks on the centre and beside the rail took [false, false], no order true, a row with the rail hidden taken false (setup true): pass
+play_test: damage numbers shown as the scene starts ["7"], for everyone ["7", "9"], off []: pass
+play_test: M opens the sect panel true; Enter applies true and joins true; from an Unorthodox village Enter is refused as unproven true (setup true): pass
+play_test: Cult body 20 ordered on (83, 99) true; after 2041 ticks the rebirth screen shows 20 dead and 21 born true, not open before true; no tick while open true; Enter goes on and ticks run true: pass
+ERROR: WorldAdapter.load: the slot holds no save of this game
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] resume_saved (res://play/play.gd:237)
+       [1] _take (res://play/play.gd:408)
+       [2] navigate (res://play/play.gd:337)
+       [3] _save_pass (res://play/play_test.gd:977)
+       [4] run (res://play/play_test.gd:134)
+       [5] _init (res://run_tests.gd:22)
+play_test: with no save, Continue passed over true; saved from the pause panel true with its notice true, after ticks that changed the world true; on a fresh title Continue chosen true resumes the same hash, seed 2026 and person 20 true; a broken save refused on the title with its reason true; a world grown past the player's army 9 saved true, and Continue steers that army true; the game's slot 0 untouched true: pass
+play_test: autosaved as day 3 began, after 5400 ticks, every 3 days true; none earlier true; it loads as the world then was true; the game's slot 0 untouched true: pass
+play_test: touch shown true; the joystick pushed (0, -1) taken true, walked 9.38 cells its way, past the 3 one order reaches, and 0.00 across in 150 ticks; let go true, then moved 0.00 cells in 60; control with no touch moved 0.00 cells: pass
+play_test: touch shown true; the joystick pushed down the diagonal (1, 1) taken true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+play_test: right button on (22, 120), down the diagonal (1, 1) from (13, 111), ordered true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+play_test: hostile army 4 marched 1114 ticks, foe 8 in range; a tap facing (0.0, -1.0) cast { "skill": 0, "target": 8 } at the aimed 8 true; dragged onto the cancel zone cast {  }, short of it { "skill": 0, "target": 8 } true; held 400 ms { "skill": 1, "target": (20096.0, 24448.0) }, 500 ms { "skill": 1, "target": <null> } true; a tap on cooldown refused 3, the notice CAST_ON_COOLDOWN shown true: pass
+play_test: new game tapped true; random tapped drew 4259094339, start tapped started it true; the pause button with the touch controls hidden ignored true, shown paused true, resume tapped true; the genealogy button opened the panel true, a tap closed it true: pass
+play_test: K opens the arts panel on the first skill true, a digit gives no order true and Escape pauses nothing true while open; down chooses the second true, Q puts it on the first slot, leaving its own true, Delete takes it off true; Escape closes it true, then the digit orders true: pass
+play_test: army 2's person 4 knows 1 skills past its army's 2; the art skill { "art": 2, "skill": 0 } on T shown true; T aims at 128 px true, Q at 24 px true; R's empty slot shows none true, casts none true; the fifth button dragged cast { "skill": 2, "target": (30976.0, 3456.0) } and tapped { "skill": 2, "target": (28928.0, 5504.0) } at range 2048 true; the fourth, empty, cast none true (setup true): pass
+play_test: the loadout [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }] saved true, restored by Continue [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }], T showing true; a new game starts from [{ "art": -1, "skill": 0 }, { "art": -1, "skill": 1 }, {  }, {  }, {  }]; the game's slot 0 untouched true: pass
+play_test: walked 645 ticks up to person 18 of an allied faction, prompted true; C opened the window true, a digit taken true, Enter its 0 rumours true, Escape no pause true, back true, ended true; a left click on it opened it, selecting no one, true, and so did a tap with the touch controls shown true; a tick kept it open true; war declared true closed it true, the prompt refused true, C opened nothing true: pass
+play_test: walked 389 ticks up to seller 12; C opened its menu with wares true; Enter showed them true; bought a herb true, 20 silver left; the pill refused true; back true, ended true; Z at full health refused true, X with no pill true; a digit then ordered true: pass
+play_test: 2 people within reach, 1 named [1], all of them within true, neither the player nor person 0 the prompt names true; G's panel hides them true, closed shows them true (setup true): pass
+play_test: 2 foes in sight after 1069 ticks; a click selected foe 8 with no intent true, the person kept its distance true; Space set the intent true, chased true and closed in true; a click on foe 9 moved it true; a move order replaced it true and the person reached its cell true in 21 ticks; Space again, a chase to (77, 93) and Escape ended it true, the person holding there true, a right click walking it back true; Tab selected the next true; Escape cleared true; Space on one of its own faction refused true; touch next and attack true; with no foe in sight Space did nothing true: pass
+play_test: bounds flat [P: (0.0, 0.0), S: (2048.0, 1536.0)], raised [P: (0.0, 0.0), S: (2048.0, 1472.0)]; the view at the corner [P: (0.0, 0.0), S: (640.0, 360.0)] and at the bottom [P: (680.0, 1112.0), S: (640.0, 360.0)]; centred on the middle at (1000.0, 700.0), on a small map at (160.0, 100.0): pass
+play_test: walked 50.5 pixels in 120 frames; the camera at most 0.87 screen pixels off the person's motion a frame, the person at most 0.00 off its place on the screen; rounded to world pixels the camera 1.88 off: pass
+play_test: grade hidden on title true, shown in play true; five-tick day at tick 3 gain (1.0, 1.02, 0.98) against (1.0, 1.02, 0.98), midnight (0.46, 0.5304, 0.7056); low vignette 0.00 standard 0.18 art pixel 3.0; raining with the row off false, on true: pass
+sound_test: at war over 600 ticks, heard [158, 55, 5, 3, 1, 0] and played [84, 29, 5, 3, 1, 0] by kind ["STRIKE", "HIT", "FALL", "FIRE", "MEND", "BELL"], each kind's stream sounded true; at peace heard [0, 0, 0, 0, 0, 0], silent true; an event outside the hearing unplayed true, inside played true: pass
+sound_test: the region recorded 1 raids after 26700 ticks, the bell heard 1 times, its stream sounded true; before it, 107 other events recorded and the bell heard early false: pass
+sound_test: the M1 battle over 300 ticks sounded at most 12 voices of 12, 1095 events dropped; freed after 2.6 s true, then 6 of 6 kinds heard started: pass
+sound_test: freed while 7 players sounded, the scene left 0 instances leaked and 0 resources in use at exit; 6 bare players left 12 and 6: pass
+view_scale_test: 4 PC and 2 touch windows; at least the least view [true, true, true, true, true, true]; wrong []; 14 windows swept with and without touch, scales not whole []: pass
+blood_test: on the hit tick 0, 1 spray(s) toward (1.0, 0.0) and 5 drop(s), 2 beyond the foe's feet and 2 pooled at them, given to draw as 8 and 15 pixels; out of reach, a use by tick -1, 0 spray(s) and 0 drop(s), 0 and 0 pixels: pass
+blood_test: with blood off, the hit on tick 0 drew 0 spray(s) and 0 drop(s), the foe flashing 1.00: pass
+blood_test: a burst striking 7 foes, by someone else, bled 4 of them; by the steered person, striking 7, bled 7: pass
+blood_test: foes left at 70, 40 and 20 of 100 drawn idle, idle_hurt and idle_maimed, faults []: pass
+blood_test: over 45 ticks a maimed foe dripped 1 drop(s), a hurt one 0: pass
+blood_test: held, the struck foe's white 1.00 then 1.00, 2 hit stop(s); hit stop off 1.00 then 0.48, 0; out of reach 0: pass
+blood_test: the hit of 60 shook the screen (3, 0), a step of the pattern 3 pixels far true, then (0, 0) after 150 ms; hit stop off (0, 0); out of reach (0, 0): pass
+blood_test: a hit stop on the striker true, after 6 frames off screen held false and drawn where it stands true; hit stop off false, false, true; back at once held true: pass
+blood_test: the foe killed true and stopped true, held after the next refresh false; the striker held true: pass
+blood_test: mid-battle { "drops": 15, "pixels": 8, "stops": 2, "held": 2 }, shown anew { "drops": 0, "pixels": 0, "stops": 0, "held": 0 }, a fresh art { "drops": 0, "pixels": 0, "stops": 0, "held": 0 }: pass
+blood_test: one past the rings' most { "drops": [200, 201, 200.0], "pixels": [320, 321, 320.0], "drawn": [600, 200.0] }, one under { "drops": [199, 199, 0.0], "pixels": [319, 319, 0.0], "drawn": [597, 0.0] }: pass
+bodies_test: walking north drawn as back, east as walk; 2 bodies drawn, 2 shadows: pass
+bodies_test: on the tick of a sweep, true, the striker drawn as strike and the foe as idle: pass
+bodies_test: north of house 4 at (77, 100) reached true, hidden by [4], outlined true; south of it at (77, 104) reached true, hidden by [], outlined false: pass
+bodies_test: over the M1 battle 30 outlines read, 0 without their body in a band, 0 carrying another share of white than their body's; 4 of a flashing body and 26 of one not: pass
+combat_test: beside, the sweep on tick 0 lost 60 of 100, shown as 1 arc(s) of the steered, the foe at flash 1.00 knocked (2.0, 0.0), the striker at 0.00, numbers ["60"], target 1 of 1, 1 body drawn white; out of reach no use by tick 90, health 100, 0 use(s) shown, flash 0.00, 0 number(s), target -1, 0 white: pass
+combat_test: the foe died true with nothing dying before true; at its death [{ "army": 1, "at": (56.0, 30.0), "ground": (56.0, 30.0), "fallen": 0.0, "alpha": 1.0, "flash": 1.0 }] with numbers ["60", "40"] against its last loss 40 and 1 body drawn white, halfway [{ "army": 1, "at": (56.0, 30.0), "ground": (56.0, 30.0), "fallen": 1.0, "alpha": 0.5, "flash": 0.0 }], after []; 1 living drawn and 3 sprites in the bands, a body and a shadow for each and the dying body: pass
+combat_test: a region with a tick's day ran 5312 ticks; 1 died struck and 10 of hunger or age, the struck alone falling, flashing and numbered true: pass
+combat_test: in "mine", the steered person's sweep and two bystanders' sweeps on tick 0, each losing 60 true, gave numbers [(50.0, 8.0)], the foe at x 56: pass
+ground_test: 8 areas, 8 distinct seeds, the same on a second ground true: pass
+ground_test: 2018 points from seed 7, the same drawn again true, other from seed 8 true, nearest two 4.21 apart against 4.2: pass
+ground_test: on the headless display the ground streamed false, baked false, holds 0 children and shows 0 areas: pass
+ground_test: the first stream drew 16 passes for 8 areas, 16 after moving across and back: pass
+ground_test: at the corner [(0, 0), (0, 1), (1, 0), (1, 1)] shown, the first area's 246 trees; at most 1 new a step; the first freed far away true, shown again with the same trees true: pass
+ground_test: 8 of 8 areas the same ground and trees twice; trees on the cleared cells 0, 29 with all open: pass
+ground_test: 4 ground sprites drawn with the ground's material true, 2 strips true, 1029 trees without it true: pass
+relief_test: levels by kind and depth, faults []; rock and bank faces true; highest 5: pass
+relief_test: the cells' texture (16, 14), faults []; the same cells twice the same true, a cell changed another true: pass
+relief_test: cliffs between passable points 0, with hills unsloped 122: pass
+relief_test: under (130.5, 20.5) found (130.5, 20.5); the slope's (104.0, 78.0) raised 32.0 to (104.0, 46.0) found (104.0, 78.0); its unraised pixel shows (104.0, 97.0) (setup true): pass
+relief_test: built on the hills' edge [(4, 6), (8, 8), (6, 9)], marked straight [], cliffs between passable points 0; built on the plain at (13, 1) marked true: pass
+world_art_test: 8 of 8 blocked cells raised as rock, 136 of 136 others plain at level 0: pass
+world_art_test: after 2000 ticks 8 bodies, 8 drawn on screen, 0 off it: pass
+world_art_test: 81 of 95 region structures drawn as their kind ["house", "hall", "well", "barrels", "fence", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate"] over their footprints with their stage's frame and shadow, a seat's kinds among them true, 14 fields tiled, 0 left undrawn; 2 of 2 structures without a kind left undrawn: pass
+world_art_test: 19 of 19 banners the templates name stand on their cells in their owner's colours, sect banners at 3 of 3 seats; 0 stand elsewhere: pass
+world_art_test: 14 fields tiled with the sown frames true, none with the burnt true: pass
+world_art_test: 254 of 254 decorated cells carry their template's tile, 81 of them a seat's; cells beside the villages bare true: pass
+world_art_test: 3 bodies drawn at the player's village (1256.0, 1146.0), 4 at the village at (32.0, 240.0); bodies outside their band's bounds: 0 refreshed in place, 0 after the jump []: pass
+world_art_test: a body moved from (8.6875, 6.515625) to (9.375, 7.03125) on the last tick is drawn at (9.03125, 6.773438) halfway to the next true, its ring there true, and at either end at a share of 0 and 1 true; army 1's roster changed, an index's body elsewhere than a tick before true, and its bodies are drawn where that tick left them true: pass
+world_art_test: after 1680 days a village founded hamlet at (61, 66), laid out as hamlet 3 at (110, 9): its 6 structures at the template's offsets true, a cell off not true; 7 of 7 decorated cells carry their template's tile, the cell beside it bare true: pass
+world_art_test: after 7170 days, the workshops at the start [] and now ["smithy", "apothecary"]; 207 of 207 structures drawn as their kind, of every kind world_art.gd draws true (["house", "hall", "well", "barrels", "fence", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate", "smithy", "apothecary"]); 2 hearths counted of 2 smithies with one, none beside the map true: pass
+world_art_test: 105 lights listed over the region against 105 expected, the torch at (1256.0, 1146.0) and 104 windows; 0 beside the map, 104 with no one steered: pass
+run_tests: 33 of 33 GDScript tests passed

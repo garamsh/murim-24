@@ -1,0 +1,18 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+grade_check: the pass hidden changes 0 pixels of the frame drawn without it: pass
+grade_check: dusk changes 1.00 of the frame, night 1.00, night 0.200 darker than the frame against dusk's 0.089: pass
+grade_check: standard's vignette changes 14139 pixels of the top-left corner's 160 x 90 and 0 of the middle's 320 x 170: pass
+grade_check: the light changes 8100 pixels within half its reach, 0.116 brighter, red over green there 0.025, and 0 beyond it: pass
+grade_check: 162 of the pane's 162 pixels take the fire ramp lit, 0 unlit, and 0 of the ink's 54 lit: pass
+grade_check: standard's bloom changes 54 pixels within two art pixels of the fire block, which keeps 36 of its 36, and 0 of the middle beyond two art pixels of every emitter: pass
+grade_check: the fog changes 494148 pixels of the screen's top quarter, 69496 of a quarter lower down, and 0 of its bottom 7%: pass
+grade_check: the fog changes 0 pixels of the high ground's 3024 and 3024 of as many beside it: pass
+grade_check: the clouds' shadows change 541007 pixels of the frame, 0.0227 darker, and 0 of the block standing: pass
+grade_check: the rain changes 2066766 pixels of the frame, 0.063 darker: pass
+grade_check: a moment later the rain's streaks change 82798 pixels, 0.040 of the frame: pass
+grade_check: at low the rain changes 0 pixels: pass
+grade_check: with the camera between world pixels the light changes 17856 pixels round it, and the world's art pixels split there number 2124 lit against 0 unlit: FAIL
+grade_check: round the light, 8500 pixels of the frame lit between world pixels differ from the frame lit before, moved (1, 2) screen pixels: FAIL
+grade_check: 12 of 14 checks passed
