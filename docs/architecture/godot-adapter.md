@@ -29,9 +29,10 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `region_refusal` gives the core's verdict on a seed, `REGION_REFUSED` when it generates no region from it and `REGION_NONE` when it does, as `load_refusal` gives it on a slot.
 - `load_refusal` gives `LOAD_REGION_REFUSED` for a save whose seed the core no longer generates a region from, beside the core's `LoadError` values.
 - An order the core refuses is reported with `push_error`, and the call returns false; a factory that fails returns null after `push_error`.
-- `player_army` gives the army the living person carrying the player's soul serves in, so a loaded world finds its player with no field of its own.
+- `player_army` gives the army the core's `soul_army` names for the player's soul, so a loaded world finds its player with no field of its own. The soul is the first `create_region` gives, soul 0, which the adapter keeps as its own record, `PLAYER_SOUL`, since the core holds no player.
+- The panels and the play scene read the core's answers rather than derive them: `heart_art`, `art_agreement` and `within_realm` for the arts panel's heart method, weaker tag and locked skills; `passes_by_duel` and `sect_gate` for the sect panel's duel tag and gate; and `talk_target` for the person the player would talk to.
 - Saving goes through the core's save port, served by `FileSaves`, which keeps one file per slot in `user://saves` unless a call names another directory. A save of a world with no region is refused.
-- Positions cross as `Vector2`s in sub-cell units. The tick rate, the cell size, an arc's half-width, the structure stages, and every kind, refusal and event the core enumerates cross as the class's integer constants, so GDScript repeats none of them.
+- Positions cross as `Vector2`s in sub-cell units. The tick rate, the per-mille scale, the cell size, an arc's half-width, the structure stages, and every kind, refusal and event the core enumerates cross as the class's integer constants, so GDScript repeats none of them.
 - Converting Godot types to the core's, and the hash back to a signed int, is the adapter's work.
 - Input the core refuses, or that is missing, of the wrong type or outside the core's integer types, makes `create` report it with `push_error` and return null.
   - `create` catches `std::invalid_argument` alone.
@@ -42,7 +43,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - A refusal and a bug are kept apart at the boundary, by `runtime-safety.md` §Errors reach a handler:
   - A refusal a caller can meet, input the core refuses or that is out of range, a seed the core generates no region from, a save the core refuses or whose region lacks its village, is reported with `push_error` and returns null, false or a verdict constant.
   - A bug, region or pack data the core cannot read or an invariant it breaks, is a `std::logic_error` that no handler catches, so it ends the process with its message rather than reading as a refusal. `create_region`, `load`, `region_refusal` and `load_refusal` each catch only the refusals named above.
-- Every order and every verdict is the core's: the adapter passes each order to the core, which decides whether it is valid, and each `*_refusal` read gives the core's own reason. The adapter still derives three answers the core does not give: the player's army, by scanning the rosters for the person carrying the player's soul; a founded village's name; and a grown structure's kind, from its plan (#190).
+- Every order and every verdict is the core's: the adapter passes each order to the core, which decides whether it is valid, and each `*_refusal` read gives the core's own reason. A founded village is named by the core's `village_name`, and a grown structure's kind is the core's `laid_kind`.
 - The genealogy panel reads a person's name, parents, children, spouse, age and sect, and shows the family as its surname. No scene reads `names` or `person_family`, which the tests read.
 - `skills` gives an army's skills, which the tests read. The controls read a skill's range from `person_skills`, and the cooldown indicators read `body_ready` against `tick_count`.
 
@@ -184,7 +185,6 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - **Touch layout on a wide screen.** With the touch controls, the HUD keeps its native layout centred, so on a screen wider than 16:9 the world fills the sides while the joystick and the skill buttons stand inward of the screen's edges.
 - **Bodies hidden by bodies.** A body hidden by another body is not outlined, and one outlined behind a building is outlined over another body standing between them too. The ground has no quality profile of ADR 0048's yet (#212).
 - **Levels in the core.** The relief is derived by the view until ADR 0047's map carries levels (#173), which #214's climbing and sight need.
-- **Rules outside the core.** #190 moves into the core the answers the adapter and GDScript still compute: the player's army, a founded village's name and a grown structure's kind in the adapter; the heart method, the weaker tag and a skill locked by realm in `hud/arts.gd`; the duel tag and a sect's gate in `hud/sect.gd`; and the person to talk to in `play/play.gd`.
 - **Exceptions the adapter does not catch.** An exception from a path outside the handlers above, such as a `.at()` in `person_skills` or `structure_kind`, is not caught by the adapter. Whether any such path can throw on a world the core accepts has not been exercised.
 
 - **Content from packs.** ADR 0049 (`adr/0049-load-the-games-content-from-data-packs-and-let-mods-be-packs-over-the-base.md`), proposed; nothing above changes until the pull requests that build it land.
