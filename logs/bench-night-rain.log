@@ -1,0 +1,33 @@
+== round 1 night-rain 0473304f 04:10:47 load { 3.06 6.28 10.40 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true rain 1.0 setup: bloom 0.6 fog 0.35 clouds 0.0;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.37536, 0.4368, 0.635904) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 261 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 261 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.647 ms p99 13.134 ms max 14.577 ms
+PASS: night village p99 13.134 ms against 16.7 ms
+exit 0
+== round 2 night-rain 0473304f 04:11:00 load { 3.04 6.12 10.27 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true rain 1.0 setup: bloom 0.6 fog 0.35 clouds 0.0;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.37536, 0.4368, 0.635904) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 255 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 255 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.438 ms p99 13.237 ms max 15.243 ms
+PASS: night village p99 13.237 ms against 16.7 ms
+exit 0
+== round 3 night-rain 0473304f 04:11:12 load { 2.82 5.96 10.17 } Now drawing from 'AC Power' others: 2
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+village at 0.0 quality 2 hearth true rain 1.0 setup: bloom 0.6 fog 0.35 clouds 0.0;
+night village setup: production play scene seed 2026, Korean HUD, summer midnight at high, gain (0.37536, 0.4368, 0.635904) vignette 0.18 art pixel 3.0 lamp 1.0 bloom 0.6 lights 21, 17 structures in view, 5 bodies drawn, Apple M1
+night village end: 256 timed ticks, live unpaused player true, high midnight grade true, 5 bodies drawn
+night village: 120 warm-up then 1200 timed frames, 256 core ticks during timed frames, window (1920, 1080), vsync off
+night village frame time: p50 6.586 ms p99 12.748 ms max 15.395 ms
+PASS: night village p99 12.748 ms against 16.7 ms
+exit 0
