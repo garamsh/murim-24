@@ -780,7 +780,6 @@ class World {
                                    const Kinship& kinship) const;
   [[nodiscard]] Cell seat(std::size_t village) const;
   void chart_steered();
-  [[nodiscard]] bool in_view(std::size_t village, Cell from) const;
   [[nodiscard]] VillageMemory memory_of(std::size_t village) const;
   void marry(std::size_t person, const std::vector<std::size_t>& living,
              const Kinship& kinship);

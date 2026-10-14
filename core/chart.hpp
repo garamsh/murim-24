@@ -4,9 +4,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
+#include "village.hpp"
 
 namespace murim {
 
@@ -96,6 +98,13 @@ class Chart {
   /// changes, for a view to redraw on; it is no part of what was seen.
   [[nodiscard]] std::uint64_t revision() const;
 
+  /// Returns the faction each cell's territory lay in as last seen, row by
+  /// row: as claimed() derives it within `claim` cells of the villages
+  /// remembered with living residents, nothing anywhere without a claim, and
+  /// nothing for a cell not seen.
+  [[nodiscard]] std::vector<std::optional<std::size_t>> territory(
+      std::optional<std::int32_t> claim) const;
+
  private:
   [[nodiscard]] std::size_t area_of(Cell cell) const;
 
@@ -108,5 +117,19 @@ class Chart {
   std::vector<std::optional<VillageMemory>> villages_;
   std::uint64_t revision_ = 0;
 };
+
+/// Returns the holder of each cell of a `size` map, row by row: the owner of
+/// the nearest of `centres`, each a village's centre and owner, within
+/// `claim` cells, the earliest among equals, or nothing beyond every one.
+[[nodiscard]] std::vector<std::optional<std::size_t>> claimed(
+    Footprint size, std::int32_t claim,
+    const std::vector<std::pair<Cell, std::size_t>>& centres);
+
+/// Returns whether a cell of one of `built`, a village's structures by index
+/// among `structures`, lies within `reach` cells of `from`: the nearest cell
+/// of its footprint at most `reach` away.
+[[nodiscard]] bool in_view(const std::vector<Structure>& structures,
+                           const std::vector<std::size_t>& built, Cell from,
+                           std::int32_t reach);
 
 }  // namespace murim
