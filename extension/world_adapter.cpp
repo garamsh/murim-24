@@ -308,6 +308,9 @@ std::vector<std::string> discipline_names_of(const murim::Life& life) {
 // load_refusal()'s verdict on a slot the core reads, beside the LoadError
 // values.
 constexpr std::int64_t LOAD_NONE = -1;
+// load_refusal()'s verdict on a save of a seed the core no longer generates a
+// region from.
+constexpr std::int64_t LOAD_REGION_REFUSED = -2;
 
 // region_refusal()'s verdicts: a seed the core generates a region from, and
 // one it refuses.
@@ -388,8 +391,8 @@ godot::Ref<WorldAdapter> WorldAdapter::create_m1() {
 
 godot::Ref<WorldAdapter> WorldAdapter::create_region(
     std::int64_t seed, std::int64_t village, std::int64_t ticks_per_day) {
-  // The one handler for a village the region lacks or a day it refuses: it
-  // must not cross into Godot.
+  // The one handler for a seed the core generates no region from, a village
+  // the region lacks or a day it refuses: it must not cross into Godot.
   try {
     return born_into(
         region_of(murim::Seed{static_cast<std::uint64_t>(seed)},
@@ -408,17 +411,14 @@ godot::Ref<WorldAdapter> WorldAdapter::create_region(
 }
 
 std::int64_t WorldAdapter::region_refusal(std::int64_t seed) {
-  // The one handler for a seed the core generates no region from: it must
-  // not cross into Godot.
+  // The one handler for a seed the core generates no region from. A
+  // logic_error, region data the core cannot read, is a bug and no verdict on
+  // the seed, so it is not caught here.
   try {
     static_cast<void>(murim::generate_region(
         murim::Seed{static_cast<std::uint64_t>(seed)}, base_data()));
     return REGION_NONE;
   } catch (const std::runtime_error&) {
-    return REGION_REFUSED;
-  } catch (const std::logic_error& error) {
-    godot::UtilityFunctions::push_error("WorldAdapter.region_refusal: ",
-                                        error.what());
     return REGION_REFUSED;
   }
 }
@@ -449,7 +449,8 @@ void WorldAdapter::show(murim::Region& region, murim::Origin origin) {
 
 godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
                                             const godot::String& directory) {
-  // The one handler for a slot out of range or a region the save names that
+  // The one handler for a slot out of range, a seed the save names whose
+  // region the core no longer generates, or a region the save names that
   // no longer has its village: it must not cross into Godot.
   try {
     std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
@@ -491,16 +492,26 @@ godot::Ref<WorldAdapter> WorldAdapter::load(std::int64_t slot,
 
 std::int64_t WorldAdapter::load_refusal(std::int64_t slot,
                                         const godot::String& directory) {
-  // The one handler for a slot out of range: it must not cross into Godot.
+  // The one handler for a slot out of range: it must not cross into Godot. A
+  // seed the core no longer generates a region from is a verdict, not a
+  // failure.
   try {
     const std::variant<murim::Saved, murim::LoadError> loaded = murim::load(
         FileSaves{directory}, murim::Slot{narrow<std::uint32_t>(slot, "slot")});
     if (const auto* error = std::get_if<murim::LoadError>(&loaded)) {
       return static_cast<std::int64_t>(*error);
     }
-    return std::get<murim::Saved>(loaded).origin
-               ? LOAD_NONE
-               : static_cast<std::int64_t>(murim::LoadError::NOT_A_SAVE);
+    const std::optional<murim::Origin>& origin =
+        std::get<murim::Saved>(loaded).origin;
+    if (!origin) {
+      return static_cast<std::int64_t>(murim::LoadError::NOT_A_SAVE);
+    }
+    try {
+      static_cast<void>(murim::generate_region(origin->region, base_data()));
+    } catch (const std::runtime_error&) {
+      return LOAD_REGION_REFUSED;
+    }
+    return LOAD_NONE;
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.load_refusal: ",
                                         error.what());
@@ -2135,6 +2146,8 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_integer_constant(name, "", "REGION_REFUSED",
                                         REGION_REFUSED);
   godot::ClassDB::bind_integer_constant(name, "", "LOAD_NONE", LOAD_NONE);
+  godot::ClassDB::bind_integer_constant(name, "", "LOAD_REGION_REFUSED",
+                                        LOAD_REGION_REFUSED);
   const std::array<std::pair<const char*, murim::LoadError>, 5> load_errors{{
       {"LOAD_MISSING", murim::LoadError::MISSING},
       {"LOAD_NOT_A_SAVE", murim::LoadError::NOT_A_SAVE},

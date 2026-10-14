@@ -76,7 +76,8 @@ class WorldAdapter : public godot::RefCounted {
 
   /// Returns why create_region() refuses `seed`: REGION_REFUSED when the core
   /// generates no region from it, as when a village or a sect's seat finds no
-  /// room, and REGION_NONE when it generates one.
+  /// room, and REGION_NONE when it generates one. Region data the core cannot
+  /// read is a bug, not a verdict: its std::logic_error is not caught.
   static std::int64_t region_refusal(std::int64_t seed);
 
   /// Returns an adapter over the world saved in slot `slot` of `directory`,
@@ -89,7 +90,8 @@ class WorldAdapter : public godot::RefCounted {
 
   /// Returns why load() refuses slot `slot` of `directory`, one of the LOAD_*
   /// constants, the core's LoadError: LOAD_NOT_A_SAVE for a save of no world
-  /// made by create_region(), and LOAD_NONE when the core reads it.
+  /// made by create_region(), LOAD_REGION_REFUSED for one whose seed the core
+  /// no longer generates a region from, and LOAD_NONE when the core reads it.
   static std::int64_t load_refusal(
       std::int64_t slot,
       const godot::String& directory = FileSaves::DEFAULT_DIRECTORY);
