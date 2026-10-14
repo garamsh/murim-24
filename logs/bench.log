@@ -1,0 +1,96 @@
+== round 1 main dc4306bc 06:50:58 load { 3.94 9.65 14.29 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 229 ticks in 7.4 s timed (30 per second set)
+bodies: 500 in the world, 404 on screen drawn as sprites through MultiMesh bands
+outlines: 105.5 bodies outlined over what hides them a frame on average, 105 in the last frame
+names: 8 shown over the 144 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 30.9 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.494 ms, p99 11.782 ms, max 16.294 ms
+frame breakdown, mean a timed frame: core tick 0.201 ms, adapter 0.006 ms, view script 0.588 ms, render CPU 1.343 ms (GPU 0.000 ms), the rest 4.065 ms of 6.204 ms
+PASS: p99 11.782 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 1 head 32af0d80 06:51:10 load { 3.89 9.35 14.10 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 228 ticks in 7.4 s timed (30 per second set)
+bodies: 500 in the world, 406 on screen drawn as sprites through MultiMesh bands
+outlines: 105.3 bodies outlined over what hides them a frame on average, 103 in the last frame
+names: 8 shown over the 143 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 30.7 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.598 ms, p99 10.778 ms, max 15.342 ms
+frame breakdown, mean a timed frame: core tick 0.188 ms, adapter 0.007 ms, view script 0.558 ms, render CPU 1.289 ms (GPU 0.000 ms), the rest 4.103 ms of 6.144 ms
+PASS: p99 10.778 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 2 main dc4306bc 06:51:21 load { 3.44 9.08 13.95 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 227 ticks in 7.4 s timed (30 per second set)
+bodies: 500 in the world, 406 on screen drawn as sprites through MultiMesh bands
+outlines: 105.3 bodies outlined over what hides them a frame on average, 102 in the last frame
+names: 8 shown over the 141 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 31.0 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.399 ms, p99 12.075 ms, max 14.166 ms
+frame breakdown, mean a timed frame: core tick 0.197 ms, adapter 0.006 ms, view script 0.586 ms, render CPU 1.338 ms (GPU 0.000 ms), the rest 4.004 ms of 6.131 ms
+PASS: p99 12.075 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 2 head 32af0d80 06:51:32 load { 3.61 8.93 13.84 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 230 ticks in 7.4 s timed (30 per second set)
+bodies: 500 in the world, 406 on screen drawn as sprites through MultiMesh bands
+outlines: 105.0 bodies outlined over what hides them a frame on average, 104 in the last frame
+names: 8 shown over the 144 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 30.6 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.607 ms, p99 11.308 ms, max 14.289 ms
+frame breakdown, mean a timed frame: core tick 0.187 ms, adapter 0.009 ms, view script 0.570 ms, render CPU 1.333 ms (GPU 0.000 ms), the rest 4.099 ms of 6.199 ms
+PASS: p99 11.308 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 3 main dc4306bc 06:51:43 load { 3.60 8.75 13.72 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 231 ticks in 7.5 s timed (30 per second set)
+bodies: 500 in the world, 406 on screen drawn as sprites through MultiMesh bands
+outlines: 105.4 bodies outlined over what hides them a frame on average, 105 in the last frame
+names: 8 shown over the 144 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 30.4 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.546 ms, p99 11.813 ms, max 17.602 ms
+frame breakdown, mean a timed frame: core tick 0.209 ms, adapter 0.007 ms, view script 0.616 ms, render CPU 1.413 ms (GPU 0.000 ms), the rest 3.992 ms of 6.237 ms
+PASS: p99 11.813 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0
+== round 3 head 32af0d80 06:51:54 load { 3.28 8.51 13.57 } Now drawing from 'AC Power' others: 0
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+frame scene: res://world_view/world_view.tscn, M1 scenario (core/m1_scenario.cpp), window (1920, 1080), vsync off, Apple M1, Godot 4.7.2-stable (official)
+frames: 120 warm-up, then 1200 timed; 233 ticks in 7.5 s timed (30 per second set)
+bodies: 500 in the world, 403 on screen drawn as sprites through MultiMesh bands
+outlines: 105.4 bodies outlined over what hides them a frame on average, 106 in the last frame
+names: 8 shown over the 143 people within reach in the last frame
+structures broken: 3 of 10
+combat feedback: 30.8 uses of skills and 0.0 damage numbers drawn a frame on average
+frame time: p50 5.706 ms, p99 12.328 ms, max 14.940 ms
+frame breakdown, mean a timed frame: core tick 0.208 ms, adapter 0.008 ms, view script 0.607 ms, render CPU 1.380 ms (GPU 0.000 ms), the rest 4.078 ms of 6.280 ms
+PASS: p99 12.328 ms against a 16.7 ms budget
+frame time is measured on this machine only: CI has no display and does not run make bench
+exit 0

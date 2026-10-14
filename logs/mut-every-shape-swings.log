@@ -1,0 +1,10 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261015052539786130
+body_view_test: the struck at flash 1.00, knocked (2.0, 0.0), wound 1, numbers ["60"], at (1, 0); the striker at flash 0.00, knocked (0.0, 0.0), wound 0: pass
+body_view_test: in view 2 drawn as 4 sprites, named [1] at [2.0] cells; elsewhere 0 drawn as 0 sprites, named []: pass
+body_view_test: the hit showed flash and numbers [1.0, 1]; begun again [0.0, 0, 0, -1]: pass
+body_view_test: drawn a quarter of the way along half a pixel, at scale 1 the lead at (8.0, 6.0) and sprites at x [8.0, 8.0]; at scale 4 the lead at (8.25, 6.0) and sprites at x [8.25, 8.25]: pass
+body_view_test: drawn on the use's tick [["swing", "recoil"], ["swing", "recoil"], ["swing", "recoil"], ["swing", "recoil"], ["mend", "idle"], ["torch", "idle"]]; with no use ["idle", "idle"]; faults ["lunge: [\"swing\", \"recoil\"]", "throw: [\"swing\", \"recoil\"]", "cast: [\"swing\", \"recoil\"]"]: FAIL
+res://extension/body_view_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed

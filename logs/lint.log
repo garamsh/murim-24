@@ -1,0 +1,132 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.4s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (1.7s)
+-- Generating done (1.8s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 53 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+./check-contents-list.sh
+checked 107 Markdown files, selected by: git ls-files --cached --others --exclude-standard -- '*.md'
+./lint-sysroot.sh build/lint/sysroot
+kept the lint sysroot in build/lint/sysroot, unpacked from the same 4 packages
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build/lint/core -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core/_deps/json-src/include/
+-- Configuring done (0.4s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/lint/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (2.1s)
+-- Generating done (2.1s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -C build/lint/extension _deps/godot-cpp-build/generate_bindings
+ninja: Entering directory `build/lint/extension'
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+[1/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/attack.cpp.
+[2/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/attack_test.cpp.
+[3/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/bench.cpp.
+[4/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart.cpp.
+[5/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart_test.cpp.
+[6/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chronicle_test.cpp.
+[7/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content.cpp.
+[8/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content_test.cpp.
+[9/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy.cpp.
+[10/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy_test.cpp.
+[11/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/event.cpp.
+[12/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/event_test.cpp.
+[13/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field.cpp.
+[14/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field_test.cpp.
+[15/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/growth.cpp.
+[16/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/leadership.cpp.
+[17/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/leadership_test.cpp.
+[18/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/life.cpp.
+[19/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/limits.cpp.
+[20/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/live_scenario.cpp.
+[21/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/m1_scenario.cpp.
+[22/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/map.cpp.
+[23/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/progress.cpp.
+[24/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/progress_test.cpp.
+[25/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/random.cpp.
+[26/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region.cpp.
+[27/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region_test.cpp.
+[28/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save.cpp.
+[29/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save_test.cpp.
+[30/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/skill.cpp.
+[31/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash.cpp.
+[32/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash_test.cpp.
+[33/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/sweep.cpp.
+[34/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/talent.cpp.
+[35/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/trade.cpp.
+[36/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village.cpp.
+[37/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_test.cpp.
+[38/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world.cpp.
+[39/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world_test.cpp.
+[40/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs.cpp.
+[41/41] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.
+clang-tidy checked 41 C++ sources and the core/ and packs_json/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'packs_json/*.cpp'
+[1/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp.
+[2/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/extension.cpp.
+[3/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/file_saves.cpp.
+[4/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_adapter.cpp.
+[5/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_hash.cpp.
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:534:52: error: no header providing "godot::Texture2D" is directly included [misc-include-cleaner,-warnings-as-errors]
+   13 | void BodyView::set_effects(const godot::Ref<godot::Texture2D>& texture,
+      |                                                    ^
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1676:59: error: 2 adjacent parameters of 'draw_effect' of similar type ('std::int64_t') are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+ 1676 | void BodyView::draw_effect(const godot::RID& canvas_item, std::int64_t effect,
+      |                                                           ^~~~~~~~~~~~~~~~~~~~
+ 1677 |                            std::int64_t frame, Point centre, bool flip) const {
+      |                            ~~~~~~~~~~~~~~~~~~
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1676:72: note: the first parameter in the range is 'effect'
+ 1676 | void BodyView::draw_effect(const godot::RID& canvas_item, std::int64_t effect,
+      |                                                                        ^~~~~~
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1677:41: note: the last parameter in the range is 'frame'
+ 1677 |                            std::int64_t frame, Point centre, bool flip) const {
+      |                                         ^~~~~
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1682:54: error: do not access members of unions; consider using (boost::)variant instead [cppcoreguidelines-pro-type-union-access,-warnings-as-errors]
+ 1682 |   const auto width = static_cast<float>(effect_size_.x);
+      |                                                      ^
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1683:55: error: do not access members of unions; consider using (boost::)variant instead [cppcoreguidelines-pro-type-union-access,-warnings-as-errors]
+ 1683 |   const auto height = static_cast<float>(effect_size_.y);
+      |                                                       ^
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1734:17: error: variable name 'at' is too short, expected at least 3 characters [readability-identifier-length,-warnings-as-errors]
+ 1734 |     const Point at =
+      |                 ^
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1883:16: error: conditional operator is used as sub-expression of parent conditional operator, refrain from using nested conditional operators [readability-avoid-nested-conditional-operator,-warnings-as-errors]
+ 1883 |             : (coloured ? technique_.at(index_of(number.art)) : paint(PAPER));
+      |                ^
+/Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp:1881:9: note: parent conditional operator here
+ 1881 |         number.own
+      |         ^
+make: *** [lint] Error 1
+lint exit 2

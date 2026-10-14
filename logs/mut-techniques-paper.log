@@ -1,0 +1,17 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261015051652495155
+world_art_test: 8 of 8 blocked cells raised as rock, 136 of 136 others plain at level 0: pass
+world_art_test: after 2000 ticks 8 bodies, 8 drawn on screen, 0 off it: pass
+world_art_test: 81 of 95 region structures drawn as their kind ["house", "hall", "well", "barrels", "fence", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate"] over their footprints with their stage's frame and shadow, a seat's kinds among them true, 14 fields tiled, 0 left undrawn; 2 of 2 structures without a kind left undrawn: pass
+world_art_test: 19 of 19 banners the templates name stand on their cells in their owner's colours, sect banners at 3 of 3 seats; 0 stand elsewhere: pass
+world_art_test: 14 fields tiled with the sown frames true, none with the burnt true: pass
+world_art_test: 254 of 254 decorated cells carry their template's tile, 81 of them a seat's; cells beside the villages bare true: pass
+world_art_test: 3 bodies drawn at the player's village (1256.0, 1146.0), 4 at the village at (32.0, 240.0); bodies outside their band's bounds: 0 refreshed in place, 0 after the jump []: pass
+world_art_test: a body moved from (8.6875, 6.515625) to (9.375, 7.03125) on the last tick is drawn at (9.03125, 6.773438) halfway to the next true, its ring there true, and at either end at a share of 0 and 1 true; army 1's roster changed, an index's body elsewhere than a tick before true, and its bodies are drawn where that tick left them true: pass
+world_art_test: after 1680 days a village founded hamlet at (61, 66), laid out as hamlet 3 at (110, 9): its 6 structures at the template's offsets true, a cell off not true; 7 of 7 decorated cells carry their template's tile, the cell beside it bare true: pass
+world_art_test: after 6840 days, the workshops at the start [] and now ["smithy", "apothecary"]; 185 of 185 structures drawn as their kind, of every kind world_art.gd draws true (["house", "hall", "well", "barrels", "fence", "granary", "storehouse", "manual_hall", "training_ground", "seat_gate", "smithy", "apothecary"]); 1 hearths counted of 1 smithies with one, none beside the map true: pass
+world_art_test: 105 lights listed over the region against 105 expected, the torch at (1256.0, 1146.0) and 104 windows; 0 beside the map, 104 with no one steered: pass
+world_art_test: the arts rise in ["efe5c9", "efe5c9", "efe5c9"]; an art of an unnamed discipline in efe5c9: FAIL
+res://world_art/world_art_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
