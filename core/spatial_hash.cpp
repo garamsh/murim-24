@@ -35,9 +35,9 @@ Cell block_of(Cell cell) {
 constexpr std::size_t SLOTS_PER_ENTRY = 8;
 
 // Block slots per entry: no more blocks hold an entry than there are entries,
-// and a block of BLOCK_SIDE by BLOCK_SIDE cells is read once for a span of its
-// cells, so one slot an entry keeps sharing rare at an eighth of the cells'.
-constexpr std::size_t BLOCK_SLOTS_PER_ENTRY = 1;
+// so two slots an entry, a quarter of the cells' table, leave at least half the
+// block slots empty.
+constexpr std::size_t BLOCK_SLOTS_PER_ENTRY = 2;
 
 // `per_entry` slots per entry at least, rounded up to a power of two so a mask
 // picks the slot.
