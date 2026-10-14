@@ -1,5 +1,6 @@
 # Checks how world_art.tscn draws bodies at the 2.5D angle: a person walking away from the viewer
-# shows its back and one walking across its walk; a person who just struck shows its strike; every
+# shows its back and one walking across its walk; on the tick a sweep hits, the striker swings and the
+# struck recoils and flashes (#184), and with no strike neither does; every
 # body drawn has a shadow under it in its band; a person standing just north of a house, which
 # hides it, is outlined over the house, while one standing just south of it, in front, is not; and
 # an outlined body's outline carries the share of white its body flashes with as it is struck, for
@@ -64,11 +65,27 @@ func _facing_pass() -> bool:
 	return passed
 
 
-# On the tick a person sweeps a foe beside it, the striker is drawn in a frame of its strike.
-# Control: the foe, which struck no one, is not.
+# On the tick the core records a person's sweep hitting a foe beside it, the striker is drawn in a
+# frame of its swing and the foe in a frame of its recoil, flashing (#184). Control: the same two,
+# the first given no skill that strikes, are drawn in neither, and the second does not flash.
 func _strike_pass() -> bool:
+	var hit := _first_strike(SWEEP)
+	var calm := _first_strike(STEP)
+	var passed: bool = hit.struck and hit.striker == "swing" and hit.foe == "recoil" and hit.flash > 0.0 \
+			and not calm.struck and not calm.striker in ["swing", "recoil"] and calm.foe != "recoil" \
+			and calm.flash == 0.0
+	print("bodies_test: on the tick of a sweep, %s, the striker drawn as %s and the foe as %s flashing %.2f; with no strike, %s, drawn as %s and %s flashing %.2f: %s" % [
+		hit.struck, hit.striker, hit.foe, hit.flash, calm.struck, calm.striker, calm.foe, calm.flash,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+# Two people beside each other, the first with `skill`, the second unable to strike, ticked until a
+# use of the first hits or for 60 ticks, then drawn: whether a use hit, the tags each is drawn in and
+# how white the second flashes.
+func _first_strike(skill: Dictionary) -> Dictionary:
 	var armies: Array[Dictionary] = [
-		{"objective": Vector2i(4, 4), "faction": 0, "skills": [SWEEP], "members": [{"cell": Vector2i(3, 4), "health": 100}]},
+		{"objective": Vector2i(4, 4), "faction": 0, "skills": [skill], "members": [{"cell": Vector2i(3, 4), "health": 100}]},
 		{"objective": Vector2i(4, 4), "faction": 1, "skills": [STEP], "members": [{"cell": Vector2i(4, 4), "health": 100}]},
 	]
 	var world := WorldAdapter.create(1, PackedStringArray(MAP_ROWS), armies, [], RULES)
@@ -82,13 +99,11 @@ func _strike_pass() -> bool:
 			struck = true
 			break
 	art.refresh(VIEW, 1.0)
-	var striker := _tag_at(art, art.body_at(0, 0, 1.0))
-	var foe := _tag_at(art, art.body_at(1, 0, 1.0))
-	var passed := struck and striker == "strike" and foe != "strike" and foe != ""
-	print("bodies_test: on the tick of a sweep, %s, the striker drawn as %s and the foe as %s: %s" % [
-		struck, striker, foe, "pass" if passed else "FAIL"])
+	var found := {"struck": struck, "striker": _tag_at(art, art.body_at(0, 0, 1.0)),
+		"foe": _tag_at(art, art.body_at(1, 0, 1.0)),
+		"flash": art.combat.flash(world.roster(1)[0], Time.get_ticks_msec())}
 	art.free()
-	return passed
+	return found
 
 
 # The steered person, walked to the cell just north of the house nearest it, is outlined over it;

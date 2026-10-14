@@ -22,6 +22,8 @@ const BODY_HEIGHT := 22.0
 ## the screen, as BodyView keeps them.
 const STRIKE_MS := BodyView.STRIKE_MS
 const FLASH_MS := BodyView.FLASH_MS
+## How long a struck body recoils (#184), as BodyView draws it.
+const RECOIL_MS := BodyView.RECOIL_MS
 const DEATH_MS := BodyView.DEATH_MS
 const NUMBER_MS := BodyView.NUMBER_MS
 const SHAKE_MS := BodyView.SHAKE_MS

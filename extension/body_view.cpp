@@ -91,9 +91,10 @@ constexpr auto FEET = static_cast<double>(FEET_ROW);
 constexpr auto HEAD = static_cast<float>(HEAD_RISE);
 // How far in from its frame a body's own pixels lie, for what hides it.
 constexpr float BODY_INSET = 2.0F;
-// How long a body shows its strike frame, and each walking frame, in
-// milliseconds.
-constexpr std::int64_t BODY_STRIKE_MS = 200;
+// How long a body is drawn in the motion of its use (#184), and each walking
+// frame, in milliseconds; a motion's frames are MOTION_FRAME_MS apart.
+constexpr std::int64_t BODY_STRIKE_MS = 240;
+constexpr std::int64_t MOTION_FRAME_MS = 80;
 constexpr std::int64_t WALK_FRAME_MS = 150;
 constexpr std::int64_t WALK_FRAMES = 4;
 // Pixels the occluders are bucketed by, and the fields of one.
@@ -108,7 +109,37 @@ constexpr std::int64_t BODY_FLOATS = 16;
 constexpr std::int64_t TAG_IDLE = 0;
 constexpr std::int64_t TAG_WALK = 1;
 constexpr std::int64_t TAG_BACK = 2;
-constexpr std::int64_t TAG_STRIKE = 3;
+constexpr std::int64_t TAG_SWING = 3;
+constexpr std::int64_t TAG_LUNGE = 8;
+constexpr std::int64_t TAG_CAST = 9;
+constexpr std::int64_t TAG_THROW = 10;
+constexpr std::int64_t TAG_MEND = 11;
+constexpr std::int64_t TAG_TORCH = 12;
+constexpr std::int64_t TAG_RECOIL = 13;
+// How many frames each tag's motion has; a recoil plays for as long.
+constexpr std::int64_t SWING_FRAMES = 3;
+constexpr std::int64_t MOTION_FRAMES = 2;
+// The effects, in world_art.gd's EFFECT_TAGS order: a slash and a burst for
+// each faction's sprite in turn, the dart's eight headings then its streak, the
+// hit spark, mend's motes and torch's flames; each but the dart plays
+// EFFECT_FRAMES frames EFFECT_FRAME_MS apart.
+constexpr std::int64_t EFFECT_SLASH = 0;
+constexpr std::int64_t EFFECT_DART = 3;
+constexpr std::int64_t EFFECT_BURST = 4;
+constexpr std::int64_t EFFECT_SPARK = 7;
+constexpr std::int64_t EFFECT_MEND = 8;
+constexpr std::int64_t EFFECT_TORCH = 9;
+constexpr std::int64_t EFFECTS = 10;
+constexpr std::int64_t EFFECT_FRAMES = 3;
+constexpr std::int64_t EFFECT_FRAME_MS = 60;
+constexpr std::int64_t EFFECT_MS = EFFECT_FRAMES * EFFECT_FRAME_MS;
+constexpr std::int64_t DART_HEADINGS = 8;
+// How far above where a body stands its chest is, where a slash, a dart and a
+// spark are drawn, and how far ahead of it a slash's frame is centred; and
+// how far above its head mend's motes and torch's flames rise from.
+constexpr float CHEST = 9.0F;
+constexpr float SLASH_AHEAD = 14.0F;
+constexpr float WORK_RISE = 14.0F;
 constexpr std::array<std::array<std::int64_t, 3>, 2> WOUND_TAGS{
     {{0, 4, 6}, {1, 5, 7}}};
 
@@ -500,6 +531,22 @@ Point BodyView::on_screen(Point point) const {
                  pixel_scale_)};
 }
 
+void BodyView::set_effects(const godot::Ref<godot::Texture2D>& texture,
+                           const godot::Vector2i& size,
+                           const godot::PackedInt64Array& firsts) {
+  effects_ = texture;
+  effect_size_ = size;
+  effect_frames_ = integers_of(firsts);
+  effect_frames_.resize(EFFECTS, -1);
+}
+
+void BodyView::set_technique_colours(const godot::PackedColorArray& colours) {
+  technique_.clear();
+  for (const godot::Color& colour : colours) {
+    technique_.push_back(Rgba{colour.r, colour.g, colour.b, colour.a});
+  }
+}
+
 void BodyView::set_damage_numbers(std::int64_t which) {
   damage_numbers_ = which;
 }
@@ -530,8 +577,11 @@ void BodyView::clear_people() {
   hit_ms_.clear();
   away_.clear();
   struck_at_.clear();
+  motion_.clear();
+  struck_art_.clear();
   held_.clear();
   strikes_.clear();
+  works_.clear();
   deaths_.clear();
   numbers_.clear();
   hit_stops_.clear();
@@ -598,6 +648,8 @@ void BodyView::grow(std::size_t size) {
   hit_ms_.resize(total, NEVER);
   away_.resize(total, Point{});
   struck_at_.resize(total, -BODY_STRIKE_MS);
+  motion_.resize(total, TAG_SWING);
+  struck_art_.resize(total, -1);
 }
 
 bool BodyView::alive(std::int64_t person) const {
@@ -684,6 +736,10 @@ void BodyView::read_strikes(const godot::Dictionary& snapshot,
   const std::vector<std::int64_t> radii = field("strike_radius");
   const std::vector<std::int64_t> damages = field("strike_body_damage");
   const std::vector<std::int64_t> first = field("strike_first");
+  std::vector<std::int64_t> arts = field("strike_art");
+  std::vector<std::int64_t> works = field("strike_structure_damage");
+  arts.resize(persons.size(), -1);
+  works.resize(persons.size(), 0);
   const std::vector<std::int64_t> struck = field("struck");
   const std::vector<Point> origins =
       points_of(snapshot.get("strike_origin", godot::Variant()));
@@ -691,10 +747,11 @@ void BodyView::read_strikes(const godot::Dictionary& snapshot,
       points_of(snapshot.get("strike_toward", godot::Variant()));
   const std::vector<Point> ends =
       points_of(snapshot.get("strike_end", godot::Variant()));
-  // A use that strikes only structures shows in the structures' stages
-  // alone.
+  // A use that only mends or burns structures shows in their stages, its
+  // user's motion and motes or flames over it; one that does neither shows
+  // nothing.
   for (std::size_t use = 0; use < persons.size(); ++use) {
-    if (damages.at(use) <= 0) {
+    if (damages.at(use) <= 0 && works.at(use) == 0) {
       continue;
     }
     Strike strike{
@@ -710,14 +767,48 @@ void BodyView::read_strikes(const godot::Dictionary& snapshot,
             struck.begin() + static_cast<std::ptrdiff_t>(first.at(use)),
             struck.begin() + static_cast<std::ptrdiff_t>(first.at(use + 1))),
         ms_,
-        persons.at(use) == lead_};
+        persons.at(use) == lead_,
+        arts.at(use),
+        works.at(use),
+        {}};
     const std::size_t striker = index_of(strike.person);
     if (striker >= struck_at_.size()) {
       grow(striker + 1);
     }
     struck_at_.at(striker) = ms_;
+    motion_.at(striker) = motion_of(strike);
+    if (damages.at(use) <= 0) {
+      works_.push_back(std::move(strike));
+      continue;
+    }
     note_struck(strike, stood);
+    for (const std::int64_t person : strike.struck) {
+      const std::size_t index = index_of(person);
+      if (index < seen_.size() && seen_.at(index) == tick_ - 1) {
+        strike.struck_points.push_back(
+            stood.at(index_of(army_.at(index))).at(index_of(body_.at(index))));
+      }
+    }
     strikes_.push_back(std::move(strike));
+  }
+}
+
+// The motion a use plays on its user: a swing for a sweep, a lunge at one
+// person, a throw along a line, a cast on an area, and for a use that only
+// mends or burns structures a mallet or a torch.
+std::int64_t BodyView::motion_of(const Strike& strike) {
+  if (strike.body_damage <= 0) {
+    return strike.structure_damage < 0 ? TAG_MEND : TAG_TORCH;
+  }
+  switch (static_cast<murim::Shape>(strike.shape)) {
+    case murim::Shape::ARC:
+      return TAG_SWING;
+    case murim::Shape::TARGETED:
+      return TAG_LUNGE;
+    case murim::Shape::LINE:
+      return TAG_THROW;
+    default:
+      return TAG_CAST;
   }
 }
 
@@ -741,6 +832,7 @@ void BodyView::note_struck(const Strike& strike,
       nearest_.at(index) = near;
       away_.at(index) = normalized(where - strike.origin);
       striker_.at(index) = strike.person;
+      struck_art_.at(index) = strike.art;
     }
     if (strike.steered) {
       struck_by_lead_.at(index) = true;
@@ -794,8 +886,8 @@ void BodyView::hit(std::int64_t person, std::int64_t lost, Point where) {
   }
   if (damage_numbers_ == NUMBERS_EVERYONE ||
       (damage_numbers_ == NUMBERS_MINE && mine)) {
-    add_number(ms_, godot::String::num_int64(lost), vector_of(where), own,
-               mine);
+    add_number(ms_, godot::String::num_int64(lost), vector_of(where), own, mine,
+               struck ? struck_art_.at(index) : -1);
   }
 }
 
@@ -892,7 +984,8 @@ godot::Dictionary BodyView::drips() const {
 }
 
 void BodyView::add_number(std::int64_t when, const godot::String& text,
-                          const godot::Vector2& where, bool own, bool mine) {
+                          const godot::Vector2& where, bool own, bool mine,
+                          std::int64_t art) {
   double width = 0.0;
   if (font_.is_valid()) {
     width = point_of(font_->get_string_size(
@@ -900,15 +993,22 @@ void BodyView::add_number(std::int64_t when, const godot::String& text,
                          static_cast<std::int32_t>(font_size_)))
                 .x;
   }
-  numbers_.push_back(Number{when, text, point_of(where), own, mine, width});
+  numbers_.push_back(
+      Number{when, text, point_of(where), own, mine, width, art});
 }
 
 void BodyView::forget(std::int64_t now) {
   strikes_.erase(std::remove_if(strikes_.begin(), strikes_.end(),
                                 [now](const Strike& strike) {
-                                  return now - strike.ms >= STRIKE_MS;
+                                  return now - strike.ms >=
+                                         std::max(STRIKE_MS, EFFECT_MS);
                                 }),
                  strikes_.end());
+  works_.erase(std::remove_if(works_.begin(), works_.end(),
+                              [now](const Strike& work) {
+                                return now - work.ms >= EFFECT_MS;
+                              }),
+               works_.end());
   deaths_.erase(std::remove_if(deaths_.begin(), deaths_.end(),
                                [now](const Death& death) {
                                  return now - death.ms >= DEATH_MS;
@@ -1180,11 +1280,21 @@ BodyView::Look BodyView::look_of(const Frame& frame, const Army& army,
   Look look;
   std::int64_t index = 0;
   const std::size_t who = index_of(person);
-  const std::int64_t struck =
+  const std::int64_t used =
       who < struck_at_.size() ? struck_at_.at(who) : -BODY_STRIKE_MS;
-  if (struck > 0 && now - struck < BODY_STRIKE_MS) {
-    look.tag = TAG_STRIKE;
-    index = now - struck < BODY_STRIKE_MS / 2 ? 0 : 1;
+  const std::int64_t motion =
+      who < motion_.size() ? motion_.at(who) : TAG_SWING;
+  const std::int64_t frames =
+      motion == TAG_SWING ? SWING_FRAMES : MOTION_FRAMES;
+  const std::int64_t hit = who < hit_ms_.size() ? hit_ms_.at(who) : NEVER;
+  // Struck, a body recoils; it plays the motion of its own use otherwise.
+  if (hit != NEVER && now >= hit &&
+      now - hit < MOTION_FRAMES * MOTION_FRAME_MS) {
+    look.tag = TAG_RECOIL;
+    index = (now - hit) / MOTION_FRAME_MS;
+  } else if (used > 0 && now >= used && now - used < frames * MOTION_FRAME_MS) {
+    look.tag = motion;
+    index = (now - used) / MOTION_FRAME_MS;
   } else if (!same(heading, Point{})) {
     look.tag = heading.y < 0.0F && -heading.y > std::abs(heading.x) ? TAG_BACK
                                                                     : TAG_WALK;
@@ -1447,6 +1557,29 @@ void BodyView::draw_effects(const godot::RID& canvas_item) const {
                          static_cast<double>(STRIKE_MS)));
     }
   }
+  // Over phase A's shapes, #184's art: each use's slash, dart or burst and
+  // its hits' sparks, and each mend's motes and torch's flames.
+  if (effects_.is_valid()) {
+    for (const Strike& strike : strikes_) {
+      const std::int64_t age = now_ - strike.ms;
+      if (age >= 0 && age < EFFECT_MS &&
+          (strike.steered || has_point(view_, screen_point(strike.origin)))) {
+        draw_use_effects(canvas_item, strike, age);
+      }
+    }
+    for (const Strike& work : works_) {
+      const std::int64_t age = now_ - work.ms;
+      if (age >= 0 && age < EFFECT_MS &&
+          has_point(view_, screen_point(work.origin))) {
+        draw_effect(canvas_item,
+                    work.structure_damage < 0 ? EFFECT_MEND : EFFECT_TORCH,
+                    age / EFFECT_FRAME_MS,
+                    screen_point(work.origin) +
+                        Point{0.0F, -single(BODY_HEIGHT) - WORK_RISE},
+                    false);
+      }
+    }
+  }
   if (target_ >= 0) {
     draw_target(canvas_item, on_screen(target_at_));
   }
@@ -1536,6 +1669,75 @@ void BodyView::draw_strike(const godot::RID& canvas_item, const Strike& strike,
         ring(Arc{0.0F, single(godot::Math::TAU), radius, DISC_POINTS}),
         godot::PackedColorArray{edge}, 1.0F);
     server->canvas_item_add_set_transform(canvas_item, godot::Transform2D());
+  }
+}
+
+// Effect `effect`'s frame `frame` centred at `centre`, mirrored when `flip`.
+void BodyView::draw_effect(const godot::RID& canvas_item, std::int64_t effect,
+                           std::int64_t frame, Point centre, bool flip) const {
+  const std::int64_t first = effect_frames_.at(index_of(effect));
+  if (first < 0) {
+    return;
+  }
+  const auto width = static_cast<float>(effect_size_.x);
+  const auto height = static_cast<float>(effect_size_.y);
+  const godot::Rect2 source(static_cast<float>(first + frame) * width, 0.0F,
+                            width, height);
+  const Point corner =
+      on_screen(centre - Point{width / TWICE_F, height / TWICE_F});
+  // A negative width draws the frame mirrored.
+  const godot::Rect2 drawn(flip ? corner.x + width : corner.x, corner.y,
+                           flip ? -width : width, height);
+  godot::RenderingServer::get_singleton()->canvas_item_add_texture_rect_region(
+      canvas_item, drawn, effects_->get_rid(), source);
+}
+
+// A use's art at `age` milliseconds: a sweep's or a lunge's slash ahead of its
+// user, a dart flying from its user to the line's end, a burst where an area
+// lands, in the user's faction's accent; and a spark on each body it struck.
+void BodyView::draw_use_effects(const godot::RID& canvas_item,
+                                const Strike& strike, std::int64_t age) const {
+  const std::size_t who = index_of(strike.person);
+  const std::int64_t sprite =
+      who < army_.size() && index_of(army_.at(who)) < armies_.size()
+          ? sprite_of(index_of(army_.at(who)))
+          : 0;
+  const std::int64_t frame = age / EFFECT_FRAME_MS;
+  const Point origin = screen_point(strike.origin);
+  const Point chest{0.0F, -CHEST};
+  const auto shape = static_cast<murim::Shape>(strike.shape);
+  if (shape == murim::Shape::ARC || shape == murim::Shape::TARGETED) {
+    const Point way = screen_point(strike.toward) - origin;
+    const bool left = way.x < 0.0F;
+    draw_effect(canvas_item, EFFECT_SLASH + sprite, frame,
+                origin + chest + Point{left ? -SLASH_AHEAD : SLASH_AHEAD, 0.0F},
+                left);
+  } else if (shape == murim::Shape::LINE) {
+    if (age < STRIKE_MS) {
+      const Point end = screen_point(strike.end);
+      const Point way = end - origin;
+      const double angle =
+          std::atan2(static_cast<double>(way.y), static_cast<double>(way.x));
+      const auto heading =
+          static_cast<std::int64_t>(
+              std::lround(angle / (godot::Math::TAU / DART_HEADINGS)) +
+              DART_HEADINGS) %
+          DART_HEADINGS;
+      draw_effect(canvas_item, EFFECT_DART, heading,
+                  lerp(origin, end,
+                       single(static_cast<double>(age) /
+                              static_cast<double>(STRIKE_MS))) +
+                      chest,
+                  false);
+    }
+  } else {
+    const Point at =
+        shape == murim::Shape::SELF ? origin : screen_point(strike.toward);
+    draw_effect(canvas_item, EFFECT_BURST + sprite, frame, at, false);
+  }
+  for (const Point struck : strike.struck_points) {
+    draw_effect(canvas_item, EFFECT_SPARK, frame, screen_point(struck) + chest,
+                false);
   }
 }
 
@@ -1671,9 +1873,15 @@ godot::TypedArray<godot::Dictionary> BodyView::shown_numbers(
     }
     godot::Dictionary fields;
     fields.set("text", number.text);
-    fields.set("colour",
-               colour_of(with_alpha(paint(number.own ? CRIMSON : PAPER),
-                                    1.0 - (age * age))));
+    // The player's own loss in crimson; any other in its technique's colour,
+    // or paper.
+    const bool coloured =
+        number.art >= 0 && index_of(number.art) < technique_.size();
+    const Rgba colour =
+        number.own
+            ? paint(CRIMSON)
+            : (coloured ? technique_.at(index_of(number.art)) : paint(PAPER));
+    fields.set("colour", colour_of(with_alpha(colour, 1.0 - (age * age))));
     fields.set(
         "at",
         vector_of(rounded(number.at +
@@ -1700,6 +1908,10 @@ void BodyView::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_steered", "army"), &BodyView::set_steered);
   ClassDB::bind_method(D_METHOD("set_pixel_scale", "scale"),
                        &BodyView::set_pixel_scale);
+  ClassDB::bind_method(D_METHOD("set_effects", "texture", "size", "firsts"),
+                       &BodyView::set_effects);
+  ClassDB::bind_method(D_METHOD("set_technique_colours", "colours"),
+                       &BodyView::set_technique_colours);
   ClassDB::bind_method(D_METHOD("set_damage_numbers", "which"),
                        &BodyView::set_damage_numbers);
   ClassDB::bind_method(D_METHOD("set_blood", "shown"), &BodyView::set_blood);
@@ -1750,6 +1962,8 @@ void BodyView::_bind_methods() {
   const godot::StringName& name = get_class_static();
   ClassDB::bind_integer_constant(name, "", "STRIKE_MS", STRIKE_MS);
   ClassDB::bind_integer_constant(name, "", "FLASH_MS", FLASH_MS);
+  ClassDB::bind_integer_constant(name, "", "RECOIL_MS",
+                                 MOTION_FRAMES * MOTION_FRAME_MS);
   ClassDB::bind_integer_constant(name, "", "DEATH_MS", DEATH_MS);
   ClassDB::bind_integer_constant(name, "", "NUMBER_MS", NUMBER_MS);
   ClassDB::bind_integer_constant(name, "", "SHAKE_MS", SHAKE_MS);

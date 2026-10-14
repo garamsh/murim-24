@@ -144,12 +144,17 @@ func _off_pass() -> bool:
 	return passed
 
 
-# A foe a sweep leaves at 40 of 100 stands in idle_hurt, one left at 20 in idle_maimed. Control: one
-# left at 70 stands in idle. Setup: each is left at the health asked for.
+# A foe a sweep leaves at 40 of 100 stands in idle_hurt, one left at 20 in idle_maimed, once its
+# hit stop and recoil have passed. Control: one left at 70 stands in idle. Setup: each is left at the health asked
+# for.
 func _wound_pass() -> bool:
 	var faults := []
 	for case: Array in [[30, "idle"], [60, "idle_hurt"], [80, "idle_maimed"]]:
 		var fight := _fight(BESIDE, case[0], true)
+		# Drawn past the hit stop's held frames, then past the recoil.
+		for frame in 8:
+			fight.art.refresh(_view())
+		OS.delay_msec(Combat.RECOIL_MS + 20)
 		fight.art.refresh(_view())
 		var health: int = fight.world.person_health(fight.victim)
 		var tag := _tag_at(fight.art, fight.art.body_at(1, 0, 1.0))

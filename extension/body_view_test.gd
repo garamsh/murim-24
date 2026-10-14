@@ -4,7 +4,10 @@
 # a frame packs both bodies on screen, each with its shadow, and names the second near the first,
 # where a view elsewhere packs none; beginning again shows nothing of the hit; and with a pixel scale
 # set, a body between two places is drawn on whole screen pixels, where at 1 it is drawn on whole
-# world pixels.
+# world pixels. Each kind of use draws its user in its own motion (#184): a sweep a swing, a use at
+# one person a lunge, a dart a throw, an area a cast, a mend and a torch theirs, and the person a use
+# struck in its recoil; with no use the user stands idle. A loss rises in its art's colour, the
+# player's own in crimson, and one of no art in paper.
 extends RefCounted
 
 const CELL_SIZE := WorldAdapter.CELL_SIZE
@@ -16,7 +19,8 @@ const ELSEWHERE := Rect2(Vector2(100000, 100000), Vector2(256, 128))
 
 
 func run() -> bool:
-	return _hit_pass() and _fill_pass() and _begin_pass() and _pixel_scale_pass()
+	return _hit_pass() and _fill_pass() and _begin_pass() and _pixel_scale_pass() and _motion_pass() \
+			and _number_colour_pass()
 
 
 # After the tick the second lost LEFT of HEALTH to the first's use from its left, it flashes fully,
@@ -168,3 +172,118 @@ static func _walker(at: Vector2) -> Dictionary:
 		"strike_first": PackedInt64Array([0]),
 		"struck": PackedInt64Array(),
 	}
+
+
+# The tags in world_art.gd's BODY_TAGS order and, in a sheet made up for the test, the first frame of
+# each, so a sprite's frame tells its tag.
+const TAGS := ["idle", "walk", "back", "swing", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed",
+	"lunge", "cast", "throw", "mend", "torch", "recoil"]
+const FIRSTS := [0, 1, 5, 9, 12, 13, 17, 18, 22, 24, 26, 28, 30, 32]
+const SHEET_FRAMES := 40
+
+
+# On the tick of each kind of use, its user is drawn in that use's motion: a sweep in swing, a use at
+# one person in lunge, a dart in throw, an area in cast, a use that mends structures in mend and one
+# that burns them in torch; the person a use struck is drawn in recoil. Control: on a tick with no
+# use, the first stands idle.
+func _motion_pass() -> bool:
+	var cases := [[WorldAdapter.SHAPE_ARC, 20, 0, "swing"], [WorldAdapter.SHAPE_TARGETED, 20, 0, "lunge"],
+		[WorldAdapter.SHAPE_LINE, 20, 0, "throw"], [WorldAdapter.SHAPE_AREA, 20, 0, "cast"],
+		[WorldAdapter.SHAPE_SELF, 0, -5, "mend"], [WorldAdapter.SHAPE_SELF, 0, 10, "torch"]]
+	var faults := []
+	var drawn := []
+	for case: Array in cases:
+		var view := _tagged_view()
+		var hits: bool = case[1] > 0
+		view.note_tick(_used(case[0], case[1], case[2], hits), PackedInt64Array(), 0, NOW)
+		var tags := _tags_of(view.fill(VIEW, 1.0, NOW))
+		drawn.append(tags)
+		var foe: String = "recoil" if hits else "idle"
+		if tags != [case[3], foe]:
+			faults.append("%s: %s" % [case[3], tags])
+	var calm := _tagged_view()
+	calm.note_tick(_used(WorldAdapter.SHAPE_ARC, 0, 0, false, false), PackedInt64Array(), 0, NOW)
+	var still := _tags_of(calm.fill(VIEW, 1.0, NOW))
+	var passed := faults.is_empty() and still == ["idle", "idle"]
+	print("body_view_test: drawn on the use's tick %s; with no use %s; faults %s: %s" % [drawn, still, faults,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+# A loss dealt by an art's use rises in that art's colour, and the player's own loss in crimson.
+# Control: a loss dealt by a use of no art rises in paper.
+func _number_colour_pass() -> bool:
+	var colours := []
+	# Each case's art, and the army steered: the striker's, or the struck's for the player's own loss.
+	for case: Array in [[0, 0], [-1, 0], [0, 1]]:
+		var view := _tagged_view()
+		view.set_damage_numbers(2)
+		view.set_palette(PackedColorArray([Color("efe5c9"), Color("171229"), Color("4bc89b"), Color("d6422e")]))
+		view.set_technique_colours(PackedColorArray([Color("9ac4cd")]))
+		var snapshot := _used(WorldAdapter.SHAPE_ARC, 20, 0, true)
+		snapshot.strike_art = PackedInt64Array([case[0]])
+		view.note_tick(snapshot, PackedInt64Array(), case[1], NOW)
+		view.show_at(VIEW, NOW, Vector2.ZERO)
+		var shown: Array = view.shown_numbers(NOW)
+		var colour: Color = shown[0].colour if not shown.is_empty() else Color.BLACK
+		colours.append(Color(colour.r, colour.g, colour.b).to_html(false))
+	var passed: bool = colours == ["9ac4cd", "efe5c9", "d6422e"]
+	print("body_view_test: a loss to an art's use rises in %s, to a use of no art in %s, the player's own in %s: %s" % [
+		colours[0], colours[1], colours[2], "pass" if passed else "FAIL"])
+	return passed
+
+
+# A BodyView of SHEET_FRAMES frames a faction at the made-up FIRSTS, begun on both people standing.
+func _tagged_view() -> BodyView:
+	var view := BodyView.new()
+	var outlines := PackedInt64Array()
+	for first: int in FIRSTS:
+		outlines.append(first)
+	view.set_atlas(Vector2(SHEET_FRAMES * 16 * 2 + 16, 24), PackedInt64Array(FIRSTS), outlines,
+			Vector2i(SHEET_FRAMES * 16, SHEET_FRAMES * 16 * 2), PackedInt64Array([0, 1]), PackedColorArray([Color.WHITE]))
+	view.begin(_snapshot(HEALTH, false))
+	view.show_at(VIEW, NOW, Vector2.ZERO)
+	return view
+
+
+# The two people as _snapshot() gives them, the first having used a skill of `shape` dealing
+# `damage` to bodies and `works` to structures toward the second, which it struck when `hits`,
+# leaving it at LEFT; or, without `used`, no use at all.
+func _used(shape: int, damage: int, works: int, hits: bool, used := true) -> Dictionary:
+	var snapshot := _snapshot(LEFT if hits else HEALTH, false)
+	if not used:
+		return snapshot
+	var at := Vector2(CELL_SIZE / 2, CELL_SIZE / 2)
+	var foe := at + Vector2(2 * CELL_SIZE, 0)
+	snapshot.strike_person = PackedInt64Array([0])
+	snapshot.strike_shape = PackedInt64Array([shape])
+	snapshot.strike_range = PackedInt64Array([3 * CELL_SIZE])
+	snapshot.strike_radius = PackedInt64Array([CELL_SIZE])
+	snapshot.strike_body_damage = PackedInt64Array([damage])
+	snapshot.strike_origin = PackedVector2Array([at])
+	snapshot.strike_toward = PackedVector2Array([foe])
+	snapshot.strike_end = PackedVector2Array([foe])
+	snapshot.strike_first = PackedInt64Array([0, 1 if hits else 0])
+	snapshot.struck = PackedInt64Array([1]) if hits else PackedInt64Array()
+	snapshot.strike_art = PackedInt64Array([-1])
+	snapshot.strike_structure_damage = PackedInt64Array([works])
+	return snapshot
+
+
+# The tag each of the two people is drawn in, from its body sprite's frame in `shown`'s bands, the
+# first's then the second's by where they stand, left to right.
+static func _tags_of(shown: Dictionary) -> Array:
+	var found := []
+	for band: PackedFloat32Array in shown.bands:
+		for at in range(0, band.size(), BodyView.BODY_FLOATS):
+			var frame := roundi(band[at + 12] * (SHEET_FRAMES * 16 * 2 + 16)) / 16
+			if frame >= SHEET_FRAMES * 2:
+				continue
+			frame = frame % SHEET_FRAMES
+			var tag := ""
+			for n in FIRSTS.size():
+				if frame >= FIRSTS[n]:
+					tag = TAGS[n]
+			found.append([band[at + 3], tag])
+	found.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	return found.map(func(entry: Array) -> String: return entry[1])
