@@ -2,7 +2,9 @@
 # first striking the second, which lost health on the tick, flashes the second white, knocks it away
 # from the use, draws it wounded and floats its loss up, where the first, unhurt, shows none of it;
 # a frame packs both bodies on screen, each with its shadow, and names the second near the first,
-# where a view elsewhere packs none; and beginning again shows nothing of the hit.
+# where a view elsewhere packs none; beginning again shows nothing of the hit; and with a pixel scale
+# set, a body between two places is drawn on whole screen pixels, where at 1 it is drawn on whole
+# world pixels.
 extends RefCounted
 
 const CELL_SIZE := WorldAdapter.CELL_SIZE
@@ -14,7 +16,7 @@ const ELSEWHERE := Rect2(Vector2(100000, 100000), Vector2(256, 128))
 
 
 func run() -> bool:
-	return _hit_pass() and _fill_pass() and _begin_pass()
+	return _hit_pass() and _fill_pass() and _begin_pass() and _pixel_scale_pass()
 
 
 # After the tick the second lost LEFT of HEALTH to the first's use from its left, it flashes fully,
@@ -106,4 +108,63 @@ func _snapshot(health: int, struck: bool) -> Dictionary:
 		"strike_end": PackedVector2Array([at + Vector2(2 * CELL_SIZE, 0)]).slice(0, uses),
 		"strike_first": PackedInt64Array([0, 1]).slice(0, uses + 1),
 		"struck": PackedInt64Array([1]).slice(0, uses),
+	}
+
+
+# The steered person moves half a world pixel rightward over a tick and is drawn a quarter of the way
+# from there, at 8.25 world pixels: with four screen pixels a world pixel its place and every sprite
+# packed for it lie on quarter world pixels, 8.25 among them. Control: at the default scale of 1
+# they lie on whole world pixels.
+func _pixel_scale_pass() -> bool:
+	var view := BodyView.new()
+	view.set_atlas(Vector2(64, 24), PackedInt64Array([0, 1, 1, 2, 0, 1, 0, 1]), PackedInt64Array([2, 3, 3, 3, 2, 3, 2, 3]),
+			Vector2i(48, 48), PackedInt64Array([0, 0]), PackedColorArray([Color.WHITE]))
+	view.set_steered(0)
+	var at := Vector2(CELL_SIZE / 2, CELL_SIZE / 2)
+	view.begin(_walker(at))
+	view.note_tick(_walker(at + Vector2(CELL_SIZE / 32, 0)), PackedInt64Array(), 0, NOW)
+	var whole: Dictionary = view.fill(VIEW, 0.5, NOW)
+	view.set_pixel_scale(4.0)
+	var quarter: Dictionary = view.fill(VIEW, 0.5, NOW)
+	var whole_xs := _origins(whole)
+	var quarter_xs := _origins(quarter)
+	var on := func(xs: PackedFloat32Array, step: float) -> bool:
+		return xs.size() > 0 and Array(xs).all(func(x: float) -> bool: return is_equal_approx(x * step, roundf(x * step)))
+	var passed: bool = is_equal_approx(whole.lead_at.x, roundf(whole.lead_at.x)) and on.call(whole_xs, 1.0) \
+			and is_equal_approx(quarter.lead_at.x, 8.25) and on.call(quarter_xs, 4.0) \
+			and not on.call(quarter_xs, 1.0)
+	print("body_view_test: drawn a quarter of the way along half a pixel, at scale 1 the lead at %s and sprites at x %s; at scale 4 the lead at %s and sprites at x %s: %s" % [
+		whole.lead_at, whole_xs, quarter.lead_at, quarter_xs, "pass" if passed else "FAIL"])
+	return passed
+
+
+# The x of every sprite `shown` packs, from each band's transforms.
+static func _origins(shown: Dictionary) -> PackedFloat32Array:
+	var xs := PackedFloat32Array()
+	for band: PackedFloat32Array in shown.bands:
+		for at in range(0, band.size(), BodyView.BODY_FLOATS):
+			xs.append(band[at + 3])
+	return xs
+
+
+# The first person alone, standing at `at`, unhurt.
+static func _walker(at: Vector2) -> Dictionary:
+	return {
+		"first": PackedInt64Array([0, 1]),
+		"person": PackedInt64Array([0]),
+		"position": PackedVector2Array([at]),
+		"health": PackedInt64Array([HEALTH]),
+		"ready": PackedInt64Array([0]),
+		"faction": PackedInt64Array([0]),
+		"stage": PackedInt64Array(),
+		"strike_person": PackedInt64Array(),
+		"strike_shape": PackedInt64Array(),
+		"strike_range": PackedInt64Array(),
+		"strike_radius": PackedInt64Array(),
+		"strike_body_damage": PackedInt64Array(),
+		"strike_origin": PackedVector2Array(),
+		"strike_toward": PackedVector2Array(),
+		"strike_end": PackedVector2Array(),
+		"strike_first": PackedInt64Array([0]),
+		"struck": PackedInt64Array(),
 	}

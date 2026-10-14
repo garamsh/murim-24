@@ -488,6 +488,18 @@ void BodyView::set_viewer(std::int64_t army,
 
 void BodyView::set_steered(std::int64_t army) { steered_army_ = army; }
 
+void BodyView::set_pixel_scale(double scale) {
+  pixel_scale_ = scale > 0.0 ? scale : 1.0;
+}
+
+// `point` rounded to the nearest whole screen pixel, in world pixels.
+Point BodyView::on_screen(Point point) const {
+  return {single(std::round(static_cast<double>(point.x) * pixel_scale_) /
+                 pixel_scale_),
+          single(std::round(static_cast<double>(point.y) * pixel_scale_) /
+                 pixel_scale_)};
+}
+
 void BodyView::set_damage_numbers(std::int64_t which) {
   damage_numbers_ = which;
 }
@@ -1129,9 +1141,9 @@ void BodyView::pack(std::vector<float>& buffer, const Sprite& sprite) const {
   const auto height = static_cast<double>(sprite.frame.size.y);
   const double cos_turn = std::cos(sprite.turn);
   const double sin_turn = std::sin(sprite.turn);
-  const Point local =
-      rounded(sprite.centre) + Point{single(height / TWICE * sin_turn),
-                                     single(height / TWICE * (1.0 - cos_turn))};
+  const Point local = on_screen(sprite.centre) +
+                      Point{single(height / TWICE * sin_turn),
+                            single(height / TWICE * (1.0 - cos_turn))};
   const bool body = sprite.outline_of.x < 0.0F;
   const Point custom = body ? Point{single(sprite.white), single(sprite.alpha)}
                             : sprite.outline_of / atlas_size_;
@@ -1228,14 +1240,14 @@ void BodyView::pack_body(Frame& frame, const Army& army, std::size_t body) {
       0.0F, single((static_cast<double>(row) * CELL_Y) + (CELL_Y / TWICE))};
   const Point size{FRAME_W, FRAME_H};
   // Rounded before the band's origin is taken off, so a body stands on the
-  // same whole pixel in every band.
+  // same screen pixel in every band.
   pack(frame.shadows.at(band),
        Sprite{Box{{static_cast<float>(shadow_x_), 0.0F}, size},
-              rounded(spot) - origin});
+              on_screen(spot) - origin});
   const Point centre{spot.x, single(static_cast<double>(spot.y) - FEET +
                                     (static_cast<double>(FRAME_H) / TWICE))};
   pack(frame.bodies.at(band),
-       Sprite{look.frame, rounded(centre) - origin, look.flip, look.white});
+       Sprite{look.frame, on_screen(centre) - origin, look.flip, look.white});
   const Box covers = grown(Box{centre - (size / TWICE_F), size}, -BODY_INSET);
   if (hidden(covers, static_cast<double>(origin.y))) {
     Box outline = look.frame;
@@ -1273,7 +1285,7 @@ void BodyView::pack_dead(Frame& frame) const {
          0.0F},
         {FRAME_W, FRAME_H}};
     pack(frame.bodies.at(index_of(row - frame.first_row)),
-         Sprite{frame_of, rounded(centre) - origin, false,
+         Sprite{frame_of, on_screen(centre) - origin, false,
                 flash(death.person, frame.now), 1.0 - age,
                 std::min(age * DEATH_FALL, 1.0) * godot::Math::PI / TWICE});
   }
@@ -1403,7 +1415,7 @@ godot::Dictionary BodyView::fill(const godot::Rect2& view, double between,
   filled.set("near_relation", near_relation);
   filled.set("near_cells", near_cells);
   filled.set("lead", lead);
-  filled.set("lead_at", lead ? vector_of(rounded(point_of(
+  filled.set("lead_at", lead ? vector_of(on_screen(point_of(
                                    body_at(steered_army_, 0, moment.first))))
                              : godot::Vector2());
   filled.set("target", targeted);
@@ -1436,7 +1448,7 @@ void BodyView::draw_effects(const godot::RID& canvas_item) const {
     }
   }
   if (target_ >= 0) {
-    draw_target(canvas_item, rounded(target_at_));
+    draw_target(canvas_item, on_screen(target_at_));
   }
   if (!font_.is_valid()) {
     return;
@@ -1686,6 +1698,8 @@ void BodyView::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_viewer", "army", "relation_of_faction"),
                        &BodyView::set_viewer);
   ClassDB::bind_method(D_METHOD("set_steered", "army"), &BodyView::set_steered);
+  ClassDB::bind_method(D_METHOD("set_pixel_scale", "scale"),
+                       &BodyView::set_pixel_scale);
   ClassDB::bind_method(D_METHOD("set_damage_numbers", "which"),
                        &BodyView::set_damage_numbers);
   ClassDB::bind_method(D_METHOD("set_blood", "shown"), &BodyView::set_blood);

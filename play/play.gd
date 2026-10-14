@@ -194,6 +194,7 @@ func fit_view() -> void:
 	var touch_shown: bool = _hud.settings.touch_shown()
 	var scale := ViewScale.world_scale(Vector2i(window), touch_shown)
 	_camera.zoom = Vector2(scale, scale)
+	_art.pixel_scale = scale
 	_hud.fit(Vector2i(window), touch_shown)
 
 

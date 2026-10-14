@@ -75,6 +75,11 @@ class BodyView : public godot::RefCounted {
 
   /// Sets the army whose lead carries the player's markers, or -1 for none.
   void set_steered(std::int64_t army);
+  /// Sets how many screen pixels a world pixel spans: bodies, their shadows,
+  /// the lead's place and the target's brackets are drawn on whole screen
+  /// pixels, so they move without stepping a world pixel at a time. 1, the
+  /// default, draws them on whole world pixels.
+  void set_pixel_scale(double scale);
   /// Sets whose losses float up: 0 none, 1 the steered person's own and
   /// those its uses struck, 2 every loss.
   void set_damage_numbers(std::int64_t which);
@@ -338,6 +343,7 @@ class BodyView : public godot::RefCounted {
   [[nodiscard]] Look look_of(const Frame& frame, const Army& army,
                              std::size_t body) const;
   void pack(std::vector<float>& buffer, const Sprite& sprite) const;
+  [[nodiscard]] Point on_screen(Point point) const;
   void pack_body(Frame& frame, const Army& army, std::size_t body);
   void pack_dead(Frame& frame) const;
   void count_holds();
@@ -402,6 +408,7 @@ class BodyView : public godot::RefCounted {
   std::int64_t ms_ = 0;
   std::int64_t lead_ = -1;
   std::int64_t steered_army_ = -1;
+  double pixel_scale_ = 1.0;
   std::int64_t bleeds_ = 0;
   std::int64_t target_ = -1;
   std::int64_t target_ms_ = 0;

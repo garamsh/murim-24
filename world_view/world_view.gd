@@ -43,6 +43,7 @@ var _hud_scale := 1
 func _ready() -> void:
 	var scale := ViewScale.world_scale(Vector2i(get_viewport_rect().size), false)
 	_camera.zoom = Vector2(scale, scale)
+	_art.pixel_scale = scale
 	world = WorldAdapter.create_m1()
 	_art.show_world(world, -1)
 	_art.ground_material = _grade.clouds
