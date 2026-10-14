@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -298,5 +299,12 @@ class Villages {
   std::vector<VillageRecord> records_;
   std::vector<std::optional<std::size_t>> village_of_;
 };
+
+/// Returns the holder of each cell of a `size` map, row by row: the owner of
+/// the nearest of `centres`, each a village's centre and owner, within
+/// `claim` cells, the earliest among equals, or nothing beyond every one.
+[[nodiscard]] std::vector<std::optional<std::size_t>> claimed(
+    Footprint size, std::int32_t claim,
+    const std::vector<std::pair<Cell, std::size_t>>& centres);
 
 }  // namespace murim

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "village.hpp"
 
 namespace murim {
 namespace {
@@ -175,6 +176,58 @@ TEST(Chart, RefusesAVillageClaimCentreOffTheMap) {
   EXPECT_FALSE(accepts({0, -1}));
   EXPECT_FALSE(accepts({MAP.width, 0}));
   EXPECT_FALSE(accepts({0, MAP.height}));
+}
+
+// The holder of `cell` in `held`, a row-by-row grid of `size`.
+std::optional<std::size_t> at(
+    const std::vector<std::optional<std::size_t>>& held, Footprint size,
+    Cell cell) {
+  return held.at((static_cast<std::size_t>(cell.y) *
+                  static_cast<std::size_t>(size.width)) +
+                 static_cast<std::size_t>(cell.x));
+}
+
+TEST(Chart, SeesAVillageWhenOneOfItsStructuresIsWithinReach) {
+  const std::vector<Structure> structures{
+      Structure{Cell{10, 10}, 1, Footprint{2, 2}, true},
+      Structure{Cell{30, 30}, 1, Footprint{1, 1}, true}};
+  const std::vector<std::size_t> village{0};
+  // Three cells east of its footprint's east edge.
+  EXPECT_TRUE(in_view(structures, village, Cell{14, 11}, 3));
+  EXPECT_FALSE(in_view(structures, village, Cell{14, 11}, 2));
+  // Off a corner, by the distance to the nearest cell.
+  EXPECT_FALSE(in_view(structures, village, Cell{13, 13}, 2));
+  EXPECT_TRUE(in_view(structures, village, Cell{13, 13}, 3));
+  // Standing on it, with no reach at all.
+  EXPECT_TRUE(in_view(structures, village, Cell{11, 10}, 0));
+  // Control: a structure of another village does not count.
+  EXPECT_FALSE(in_view(structures, village, Cell{30, 30}, 0));
+  EXPECT_TRUE(in_view(structures, {1}, Cell{30, 30}, 0));
+}
+
+TEST(Chart, DerivesTerritoryFromWhatItSawAndRemembers) {
+  constexpr Footprint SIZE{40, 40};
+  constexpr std::int32_t CLAIM = 3;
+  constexpr std::int32_t SIGHT = 5;
+  constexpr Cell HOME{10, 10};
+  constexpr Cell NEIGHBOUR{12, 10};
+  constexpr Cell AWAY{10, 14};
+  Chart chart{SIZE};
+  chart.see(HOME, SIGHT);
+  chart.remember(0, VillageMemory{1, true, VillageStage::STANDING, HOME});
+  chart.remember(1, VillageMemory{2, false, VillageStage::RUINS, NEIGHBOUR});
+  const std::vector<std::optional<std::size_t>> held = chart.territory(CLAIM);
+  EXPECT_EQ(at(held, SIZE, HOME), std::optional<std::size_t>{1});
+  // An empty village claims nothing, so its centre falls to the peopled one.
+  EXPECT_EQ(at(held, SIZE, NEIGHBOUR), std::optional<std::size_t>{1});
+  // Seen but beyond every claim.
+  EXPECT_FALSE(at(held, SIZE, AWAY).has_value());
+  // Within the claim but never seen.
+  Chart blind{SIZE};
+  blind.remember(0, VillageMemory{1, true, VillageStage::STANDING, HOME});
+  EXPECT_FALSE(at(blind.territory(CLAIM), SIZE, HOME).has_value());
+  // Without a claim, nothing is held even where it was seen.
+  EXPECT_FALSE(at(chart.territory(std::nullopt), SIZE, HOME).has_value());
 }
 
 }  // namespace

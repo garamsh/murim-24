@@ -563,39 +563,6 @@ void fold_chart(const Fold& fold, std::size_t soul, const Chart& chart) {
   }
 }
 
-// The holder of each cell of a `size` map, row by row: the owner of the
-// nearest of `centres`, each a village's centre and owner, within `claim`
-// cells, the earliest among equals, or nothing beyond every one.
-std::vector<std::optional<std::size_t>> claimed(
-    Footprint size, std::int32_t claim,
-    const std::vector<std::pair<Cell, std::size_t>>& centres) {
-  std::vector<std::optional<std::size_t>> held(
-      static_cast<std::size_t>(size.width) *
-      static_cast<std::size_t>(size.height));
-  std::vector<std::int64_t> nearest(held.size(),
-                                    std::numeric_limits<std::int64_t>::max());
-  for (const auto& [centre, owner] : centres) {
-    for (Cell cell{0, std::max(centre.y - claim, 0)};
-         cell.y <= std::min(centre.y + claim, size.height - 1); ++cell.y) {
-      for (cell.x = std::max(centre.x - claim, 0);
-           cell.x <= std::min(centre.x + claim, size.width - 1); ++cell.x) {
-        const std::size_t slot = (static_cast<std::size_t>(cell.y) *
-                                  static_cast<std::size_t>(size.width)) +
-                                 static_cast<std::size_t>(cell.x);
-        const std::int64_t offset_x = cell.x - centre.x;
-        const std::int64_t offset_y = cell.y - centre.y;
-        const std::int64_t distance =
-            (offset_x * offset_x) + (offset_y * offset_y);
-        if (distance < nearest.at(slot)) {
-          nearest.at(slot) = distance;
-          held.at(slot) = owner;
-        }
-      }
-    }
-  }
-  return held;
-}
-
 // Folds the attack tokens' rules, when set, and what each engaged person
 // holds, so a world with neither keeps its hash.
 template <typename Fold>
@@ -3567,31 +3534,13 @@ void World::chart_steered() {
       const Cell here = cell_of(person.position);
       chart.see(here, rules_.map_sight);
       for (std::size_t village = 0; village < villages_.size(); ++village) {
-        if (in_view(village, here)) {
+        if (in_view(structures_, villages_.at(village).spec.structures, here,
+                    rules_.map_sight)) {
           chart.remember(village, memory_of(village));
         }
       }
     }
   }
-}
-
-// Whether a cell under one of village `village`'s structures lies within the
-// map sight of `from`.
-bool World::in_view(std::size_t village, Cell from) const {
-  const std::int64_t reach = rules_.map_sight;
-  const std::vector<std::size_t>& built = villages_.at(village).spec.structures;
-  return std::any_of(
-      built.begin(), built.end(), [this, from, reach](std::size_t index) {
-        const Structure& structure = structures_.at(index);
-        const Cell corner = structure.cell;
-        const Cell far{corner.x + structure.footprint.width - 1,
-                       corner.y + structure.footprint.height - 1};
-        const std::int64_t across =
-            std::max({corner.x - from.x, 0, from.x - far.x});
-        const std::int64_t down =
-            std::max({corner.y - from.y, 0, from.y - far.y});
-        return (across * across) + (down * down) <= reach * reach;
-      });
 }
 
 // Village `village` as it stands: its owner, claim centre, whether it has
@@ -3965,28 +3914,9 @@ std::vector<std::optional<std::size_t>> World::territory() const {
 
 std::vector<std::optional<std::size_t>> World::remembered_territory(
     std::size_t soul) const {
-  const Chart& seen = charts_.at(soul);
-  const Footprint size{map_.width(), map_.height()};
-  std::vector<std::pair<Cell, std::size_t>> centres;
-  const std::vector<std::optional<VillageMemory>>& villages = seen.villages();
-  for (const std::optional<VillageMemory>& memory : villages) {
-    if (memory && memory->peopled) {
-      centres.emplace_back(memory->centre, memory->owner);
-    }
-  }
-  if (!life_.growth) {
-    centres.clear();
-  }
-  std::vector<std::optional<std::size_t>> held =
-      claimed(size, life_.growth ? life_.growth->claim : 0, centres);
-  for (const Cell cell : cells_of(Cell{0, 0}, size)) {
-    if (!seen.seen(cell)) {
-      held.at((static_cast<std::size_t>(cell.y) *
-               static_cast<std::size_t>(size.width)) +
-              static_cast<std::size_t>(cell.x)) = std::nullopt;
-    }
-  }
-  return held;
+  return charts_.at(soul).territory(
+      life_.growth ? std::optional<std::int32_t>{life_.growth->claim}
+                   : std::nullopt);
 }
 
 // Every growth check: each village recalls a raid that is over, then, while

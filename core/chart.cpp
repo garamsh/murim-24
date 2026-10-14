@@ -6,9 +6,11 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
+#include "village.hpp"
 
 namespace murim {
 namespace {
@@ -175,6 +177,48 @@ std::size_t Chart::area_of(Cell cell) const {
   return (static_cast<std::size_t>(cell.y / AREA_SIDE) *
           static_cast<std::size_t>(areas_across_)) +
          static_cast<std::size_t>(cell.x / AREA_SIDE);
+}
+
+std::vector<std::optional<std::size_t>> Chart::territory(
+    std::optional<std::int32_t> claim) const {
+  std::vector<std::pair<Cell, std::size_t>> centres;
+  for (const std::optional<VillageMemory>& memory : villages_) {
+    if (memory && memory->peopled) {
+      centres.emplace_back(memory->centre, memory->owner);
+    }
+  }
+  if (!claim) {
+    centres.clear();
+  }
+  std::vector<std::optional<std::size_t>> held =
+      claimed(size_, claim.value_or(0), centres);
+  for (const Cell cell : cells_of(Cell{0, 0}, size_)) {
+    if (!seen(cell)) {
+      held.at((static_cast<std::size_t>(cell.y) *
+               static_cast<std::size_t>(size_.width)) +
+              static_cast<std::size_t>(cell.x)) = std::nullopt;
+    }
+  }
+  return held;
+}
+
+bool in_view(const std::vector<Structure>& structures,
+             const std::vector<std::size_t>& built, Cell from,
+             std::int32_t reach) {
+  const std::int64_t range = reach;
+  return std::any_of(
+      built.begin(), built.end(),
+      [&structures, from, range](std::size_t index) {
+        const Structure& structure = structures.at(index);
+        const Cell corner = structure.cell;
+        const Cell far{corner.x + structure.footprint.width - 1,
+                       corner.y + structure.footprint.height - 1};
+        const std::int64_t across =
+            std::max({corner.x - from.x, 0, from.x - far.x});
+        const std::int64_t down =
+            std::max({corner.y - from.y, 0, from.y - far.y});
+        return (across * across) + (down * down) <= range * range;
+      });
 }
 
 }  // namespace murim
