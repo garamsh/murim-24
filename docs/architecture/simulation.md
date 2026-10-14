@@ -235,14 +235,14 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - **`apart` is 20.** ADR 0076 asks for the largest of 20 to 32 at which seeds 0 to 999 all generate and `make sweep` keeps 48 of 50. No value generates all 1,000:
     - `main` at `8b4bb8d7` itself generates 995, refusing seeds 320, 394, 416 and 864 for a seat and 480 for a village;
     - at 20, 998 generate, refusing seed 480 for a seat and 533 for a village;
-    - at 24, 983; at 28, 932; at 32, 771;
+    - at 24, 983; at 28, 933; at 32, 771;
     - so the criterion is read as no worse than `main`, as the PM decided.
   - **The sweep at 20.** `make sweep` keeps every faction peopled on 49 of 50 seeds over 100 years. At 24, seed 25, inside the sweep's seeds, does not generate.
   - **The distribution at 20.** Over seeds 0 to 49, lived 100 years at 5 ticks a day:
     - the nearest peopled village is at least 20.0 cells away at both ends, with a median of 38.0 at year 0 and 22.2 at year 100, against ADR 0076's 21.2 and 15.2 at `006d15d`;
-    - 64% of villages lie within 24 cells of another at year 100;
-    - the median village has 8 residents and the largest 42, so 91 of 842 reach the village tier and none the town;
-    - the living number 3.6 for each married woman living with her husband, near the 3.5 a household ADR 0076 assumed.
+    - 62% of villages lie within 24 cells of another at year 100;
+    - the median village has 9 residents and the largest 44, so 103 of 814 reach the village tier and none the town;
+    - the living number 3.65 for each married woman living with her husband, near the 3.5 a household ADR 0076 assumed.
 - Village caps from housing, food and storage, the daily feeding, hunger, migration and starvation, births slowed by headroom, and fields as structures that block nothing: ADR 0022 (`adr/0022-cap-each-village-by-its-housing-food-and-storage.md`), which supersedes ADR 0013's rule that every footprint blocks.
 - Workshops as per-kind capacities and qualities on `Holding`, an edge on the strike rule and daily healing while their capacity covers a village's people, and arms and tends among the holdings growth's scarcity rule compares, rather than shorter cooldowns, healing as a skill, or a trigger of its own: ADR 0029 (`adr/0029-let-villages-build-workshops-that-arm-and-tend-their-people.md`).
 - Sects as data with membership on the person and everything else derived, seats as villages, admission and leaving, the cap from a seat's pupils, falling and manuals, and the election by elders' favour: ADR 0026 (`adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`).
