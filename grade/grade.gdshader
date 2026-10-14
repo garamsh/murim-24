@@ -8,6 +8,8 @@
 // the dither, and a lit window's panes, of wood's darkest step, take the fire ramp. Emitters, the
 // fire ramp's three brightest steps, keep their own colour, and by `bloom` the art pixels round
 // them lift toward its amber, dithered.
+// By `fog`, a mist the grade tints lies as thick as the light field's blue says, thickening toward
+// the screen's top and clear of high ground, in bands the dither steps.
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
@@ -23,10 +25,12 @@ uniform float vignette = 0.0;
 uniform float art_pixel = 1.0;
 uniform float lamp = 0.0;
 uniform float bloom = 0.0;
-// How many lights show, and the light field grade.gd draws them into, one pixel an art pixel: how
-// lit each is in red, and in green 1 within a lit window's rect.
+// How many lights show, and the light field grade.gd draws, one pixel an art pixel: how lit each is
+// in red, 1 within a lit window's rect in green, and how thick the fog is in blue.
 uniform int light_count = 0;
 uniform sampler2D light_field : filter_nearest;
+// Whether the fog shows, above 0, its thickness at each art pixel read from the light field.
+uniform float fog = 0.0;
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
@@ -40,6 +44,8 @@ const float OWN_HUE = 0.25;
 const vec3 PANE = vec3(0.133, 0.075, 0.173);
 const vec2 TAPS[8] = vec2[](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0),
 		vec2(1.0, 1.0), vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0));
+// The fog's colour before the grade tints it.
+const vec3 FOG_COLOUR = vec3(0.8, 0.84, 0.9);
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
@@ -87,6 +93,11 @@ void fragment() {
 		if (pane && distance(c, PANE) < 0.01 && dither < lamp) {
 			g = EMITTERS[dither < 0.5 ? 1 : 0];
 		}
+	}
+	if (fog > 0.0) {
+		float thick = texelFetch(light_field, ivec2(cell), 0).b;
+		float band = floor(thick * 3.0 + dither) / 3.0;
+		g = mix(g, FOG_COLOUR * gain + lift, band * 0.7);
 	}
 	if (vignette > 0.0) {
 		vec2 centred = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE * 2.0 - 1.0;

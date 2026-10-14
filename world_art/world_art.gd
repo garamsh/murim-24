@@ -93,6 +93,11 @@ var owners := PackedInt64Array()
 
 ## The relief the ground is drawn with, and bodies and buildings raised by.
 var relief: Relief
+## The material the ground and its raised strips are drawn with, and nothing standing on them.
+var ground_material: Material:
+	set(value):
+		ground_material = value
+		$Ground.material = value
 
 var _width := 0
 var _height := 0

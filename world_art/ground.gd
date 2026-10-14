@@ -6,7 +6,8 @@
 ## for each raised row and level. stream() then shows the chunks within STREAM_MARGIN of the screen,
 ## at most BUILDS_PER_FRAME a frame once the first are shown, and frees those a chunk further out:
 ## the ground under everything standing, and the strips and trees among what stands, each sorted by
-## its row so whoever is behind a raised row is drawn behind it. It decides nothing.
+## its row so whoever is behind a raised row is drawn behind it. The ground and its strips are drawn
+## with this node's material, and nothing else it shows is. It decides nothing.
 extends Node2D
 
 
@@ -460,6 +461,7 @@ func _show(key: Vector2i) -> void:
 	ground.centered = false
 	ground.texture = ImageTexture.create_from_image(composed.ground)
 	ground.position = composed.ground_at
+	ground.use_parent_material = true
 	add_child(ground)
 	nodes.append(ground)
 	var bytes: int = composed.ground.get_data_size()
@@ -471,6 +473,7 @@ func _show(key: Vector2i) -> void:
 		# Sorted by its row's north edge, so the row's own people stand on it.
 		strip.position = Vector2(piece.at.x, strip_key.x * Relief.CELL.y - 0.5)
 		strip.offset = Vector2(0, piece.at.y - strip.position.y)
+		strip.material = material
 		standing.add_child(strip)
 		nodes.append(strip)
 		bytes += piece.image.get_data_size()

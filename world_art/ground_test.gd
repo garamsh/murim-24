@@ -6,7 +6,8 @@
 # the areas round the view, one more a frame once the first are, frees those it left and shows an
 # area's trees again where they were; the same relief and seeds give the same ground and trees, and
 # no tree stands where the view says none may. Each area has a seed of its own, and Poisson-disc
-# points from one seed are the same, none nearer another than the spacing.
+# points from one seed are the same, none nearer another than the spacing. The ground and its raised
+# strips are drawn with the ground's material, and its trees are not.
 extends RefCounted
 
 const Ground := preload("res://world_art/ground.gd")
@@ -19,11 +20,13 @@ const VIEW := Vector2(640, 360)
 const IMAGE := Vector2i(Ground.CHUNK * 16, Ground.CHUNK * 12 + Ground.TOP_PAD + Ground.BOTTOM_PAD)
 
 var _calls := 0
+# A row of cells the stand-in draws a level up, or -1 for none.
+var _raised_row := -1
 
 
 func run() -> bool:
 	return _seeds_pass() and _poisson_pass() and _waits_pass() and _bake_pass() and _stream_pass() \
-			and _placement_pass()
+			and _placement_pass() and _material_pass()
 
 
 static func _relief() -> Relief:
@@ -43,7 +46,7 @@ func _render(key: Vector2i, pass_kind: int, top: Vector2i, relief: Relief) -> Im
 		for x in range(key.x * Ground.CHUNK, mini((key.x + 1) * Ground.CHUNK, SIZE.x)):
 			var kind := Relief.KINDS.find(relief.kind_at(Vector2i(x, y)))
 			var colour := Color8(kind * 10, 120, 40) if pass_kind == 0 \
-					else Color8(y - key.y * Ground.CHUNK + 1, 2, kind, 255)
+					else Color8(y - key.y * Ground.CHUNK + 1, 3 if y == _raised_row else 2, kind, 255)
 			image.fill_rect(Rect2i(Vector2i(x * 16, y * 12) - top, Vector2i(16, 12)), colour)
 	return image
 
@@ -200,4 +203,29 @@ func _placement_pass() -> bool:
 		same, _keys().size(), on_cleared.call(first), on_cleared.call(open), "pass" if passed else "FAIL"])
 	for ground: Node2D in [first, again, open]:
 		_free(ground)
+	return passed
+
+
+# With a row raised, the ground shown is drawn with the ground's material, as are the raised row's
+# strips, and the trees standing with them are not. Control: the strips and trees are there.
+func _material_pass() -> bool:
+	_raised_row = 5
+	var ground := _ground()
+	ground.material = ShaderMaterial.new()
+	ground.stream(Rect2(Vector2.ZERO, VIEW))
+	_raised_row = -1
+	var grounds: Array = ground.get_children().filter(func(node: Node) -> bool: return node is Sprite2D)
+	var strips: Array = ground.standing.get_children().filter(func(node: Node) -> bool:
+			return node is Sprite2D and not node.texture is AtlasTexture)
+	var trees: Array = ground.standing.get_children().filter(func(node: Node) -> bool:
+			return node is Sprite2D and node.texture is AtlasTexture)
+	var ground_shaded: bool = grounds.all(func(sprite: Sprite2D) -> bool: return sprite.use_parent_material)
+	var strips_shaded: bool = strips.all(func(sprite: Sprite2D) -> bool: return sprite.material == ground.material)
+	var trees_plain: bool = trees.all(func(sprite: Sprite2D) -> bool:
+			return sprite.material == null and not sprite.use_parent_material)
+	var passed: bool = not grounds.is_empty() and not strips.is_empty() and not trees.is_empty() \
+			and ground_shaded and strips_shaded and trees_plain
+	print("ground_test: %d ground sprites drawn with the ground's material %s, %d strips %s, %d trees without it %s: %s" % [
+		grounds.size(), ground_shaded, strips.size(), strips_shaded, trees.size(), trees_plain, "pass" if passed else "FAIL"])
+	_free(ground)
 	return passed
