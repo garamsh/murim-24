@@ -237,7 +237,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
     - at 20, 998 generate, refusing seed 480 for a seat and 394 for a village;
     - at 24, 986; at 28, 949; at 32, 786;
     - so the criterion is read as no worse than `main`, as the PM decided.
-  - **The sweep at 20.** `make sweep` keeps every faction peopled over 100 years on 49 of seeds 0 to 49 (seed 40 loses one) and 48 of seeds 50 to 99 (68 and 85), where `main` at `14ab6461` keeps 48 and 50. Each seed draws `main`'s templates. At 24, a seed inside the sweep's range does not generate.
+  - **The sweep at 20.** `make sweep` keeps every faction peopled over 100 years on 49 of seeds 0 to 49 (seed 40 loses one) and 48 of seeds 50 to 99 (68 and 85), where `main` at `14ab6461` keeps 48 and 50. Each seed draws `main`'s templates. At 24 every one of seeds 0 to 49 generates, but 986 of seeds 0 to 999 do, fewer than `main`'s 995, so 20 is the value.
   - **The distribution at 20.** Over seeds 0 to 49, lived 100 years at 5 ticks a day:
     - the nearest peopled village is at least 20.0 cells away at both ends, with a median of 38.0 at year 0 and 22.2 at year 100, against ADR 0076's 21.2 and 15.2 at `006d15d`;
     - 62% of villages lie within 24 cells of another at year 100;
