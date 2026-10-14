@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
@@ -29,6 +30,7 @@
 #include "leadership.hpp"
 #include "life.hpp"
 #include "limits.hpp"
+#include "m1_scenario.hpp"
 #include "map.hpp"
 #include "person.hpp"
 #include "progress.hpp"
@@ -234,8 +236,10 @@ std::vector<Structure> crossing_structures() {
 // what equal hashes are meant to cover.
 StateHash run_crossing(Seed seed) {
   const std::vector<ArmySpec> armies = crossing_armies();
-  World world{seed, Map{crossing_map()}, armies, crossing_structures(),
-              at_war(SEPARATION)};
+  // With ADR 0068's attack slots, so the pinned hash covers them too.
+  Rules rules = at_war(SEPARATION);
+  rules.tokens = default_tokens();
+  World world{seed, Map{crossing_map()}, armies, crossing_structures(), rules};
   run_ticks(world, TICKS);
   for (std::size_t army = 0; army < armies.size(); ++army) {
     EXPECT_LT(world.roster(army).size(), armies.at(army).members.size())
@@ -262,7 +266,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x5686CDFB091B3C98ULL);
+            0x1CE7D2B929313D5AULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -4022,6 +4026,318 @@ TEST(World, APersonClosesOnAFoeInSightAndStandsToFightIt) {
   EXPECT_TRUE(in(Cell{STAND.x + SIGHT + 1, STAND.y}, apart.person(1).position));
   EXPECT_EQ(lost(apart, 0), 0U);
   EXPECT_EQ(lost(apart, 1), 0U);
+}
+
+// Eight attackers of faction 0 around RING_START, and one foe of faction 1
+// standing at RING_FOE that strikes no one, on `rows`; the attackers close on
+// it within SIGHT cells and strike it at arm's length for nothing. The rules
+// set ADR 0068's attack tokens when `tokened`, and the foe's army is listed
+// first when `foe_first`.
+constexpr Cell RING_FOE{8, 8};
+constexpr Cell RING_START{4, 9};
+constexpr std::size_t RING_ATTACKERS = 8;
+constexpr std::uint64_t RING_TICKS = 300;
+
+World ringed(const std::vector<std::string>& rows, bool tokened,
+             bool foe_first) {
+  const Skill jab{ARM, 0, 0, 0, 1, 0, Shape::TARGETED};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = SIGHT;
+  if (tokened) {
+    rules.tokens = default_tokens();
+  }
+  const ArmySpec attackers = army(rows, RING_START, RING_START, RING_ATTACKERS,
+                                  TARGET_HEALTH, 0, {jab});
+  const ArmySpec foe =
+      army(rows, RING_FOE, RING_FOE, 1, TARGET_HEALTH, 1, {IDLE});
+  std::vector<ArmySpec> armies{attackers, foe};
+  if (foe_first) {
+    std::swap(armies.front(), armies.back());
+  }
+  return World{Seed{1}, Map{rows}, armies, {}, rules};
+}
+
+// The attacking army of a world ringed() made.
+std::size_t attackers_of(bool foe_first) { return foe_first ? 1 : 0; }
+
+// Where each of `world`'s attackers' slots lies, in roster order, after
+// RING_TICKS ticks; nothing for one holding no slot.
+std::vector<std::optional<Position>> seats(World& world, bool foe_first) {
+  run_ticks(world, RING_TICKS);
+  const std::size_t foe = world.roster(attackers_of(!foe_first)).front();
+  const Position centre = world.person(foe).position;
+  const SlotRing ring = slot_ring(ARM - RING_INSET, SEPARATION);
+  std::vector<std::optional<Position>> seated;
+  for (const std::size_t member : world.roster(attackers_of(foe_first))) {
+    const std::optional<Engagement> held = world.attacks().engagement(member);
+    if (!held || held->foe != foe || held->ring != Ring::NEAR) {
+      seated.emplace_back();
+      continue;
+    }
+    const Position offset = slot_offset(ring, held->slot);
+    seated.emplace_back(Position{centre.x + offset.x, centre.y + offset.y});
+  }
+  return seated;
+}
+
+TEST(World, AttackersStandOnDistinctSlotsAroundTheirFoe) {
+  World world = ringed(open_map(OPEN_SIDE), true, false);
+  const std::vector<std::optional<Position>> seated = seats(world, false);
+  // Setup: the foe stood its ground, and its ring has a slot for each.
+  ASSERT_TRUE(in(RING_FOE, world.person(world.roster(1).front()).position));
+  ASSERT_EQ(slot_ring(ARM - RING_INSET, SEPARATION).count, RING_ATTACKERS);
+  std::vector<Position> taken;
+  for (std::size_t rank = 0; rank < seated.size(); ++rank) {
+    ASSERT_TRUE(seated.at(rank).has_value()) << "attacker " << rank;
+    const Position seat = seated.at(rank).value_or(Position{});
+    EXPECT_LE(
+        distance_squared(world.person(world.roster(0).at(rank)).position, seat),
+        std::int64_t{ON_SLOT} * ON_SLOT)
+        << "attacker " << rank;
+    taken.push_back(seat);
+  }
+  // Eight slots, each a separation or more from the next.
+  EXPECT_GE(closest_pair_squared(taken), std::int64_t{SEPARATION} * SEPARATION);
+  // Control: with no attack tokens in the rules nobody takes a slot, and they
+  // close straight on, inside the separation of one another.
+  World straight = ringed(open_map(OPEN_SIDE), false, false);
+  const std::vector<std::optional<Position>> unseated = seats(straight, false);
+  EXPECT_TRUE(std::none_of(
+      unseated.begin(), unseated.end(),
+      [](const std::optional<Position>& seat) { return seat.has_value(); }));
+  EXPECT_LT(closest_pair_squared(positions(straight, 0)),
+            std::int64_t{SEPARATION} * SEPARATION);
+}
+
+// Two people closing on attack slots round one foe pass through each other
+// (ADR 0080, amending ADR 0020's give-way between them), but once both stand
+// on their slots no two overlap, within half the separation, for longer than
+// half a second. Standing within a quarter cell of slots the separation
+// apart, two may rest a little inside the separation itself.
+constexpr std::uint64_t OVERLAP_TICKS = TICKS_PER_SECOND / 2;
+constexpr std::uint64_t RINGING_TICKS = 1'000;
+
+// Whether `member` of `world` stands within a quarter cell of its slot of
+// `ring` round `foe`.
+bool on_its_slot(const World& world, std::size_t member, std::size_t foe,
+                 const SlotRing& ring) {
+  const std::optional<Engagement> held = world.attacks().engagement(member);
+  if (!held) {
+    return false;
+  }
+  const Position centre = world.person(foe).position;
+  const Position offset = slot_offset(ring, held->slot);
+  const Position seat{centre.x + offset.x, centre.y + offset.y};
+  return distance_squared(world.person(member).position, seat) <=
+         std::int64_t{ON_SLOT} * ON_SLOT;
+}
+
+// The longest runs of ticks two of `people` people overlapped: at any time,
+// and once both had stood on their slots.
+class Overlaps {
+ public:
+  explicit Overlaps(std::size_t people)
+      : passing_(people * people, 0), settled_(people * people, 0) {}
+
+  // Counts one tick of pair `pair`, overlapping or not, both having arrived
+  // on their slots or not.
+  void count(std::size_t pair, bool inside, bool arrived) {
+    std::uint64_t& run = passing_.at(pair);
+    run = inside ? run + 1 : 0;
+    longest_passing_ = std::max(longest_passing_, run);
+    std::uint64_t& since = settled_.at(pair);
+    since = inside && arrived ? since + 1 : 0;
+    longest_settled_ = std::max(longest_settled_, since);
+  }
+
+  [[nodiscard]] std::uint64_t longest_passing() const {
+    return longest_passing_;
+  }
+  [[nodiscard]] std::uint64_t longest_settled() const {
+    return longest_settled_;
+  }
+
+ private:
+  std::vector<std::uint64_t> passing_;
+  std::vector<std::uint64_t> settled_;
+  std::uint64_t longest_passing_ = 0;
+  std::uint64_t longest_settled_ = 0;
+};
+
+TEST(World, AttackersOnTheirSlotsStayOverlappedNoLongerThanHalfASecond) {
+  World world = ringed(open_map(OPEN_SIDE), true, false);
+  const std::vector<std::size_t> roster = world.roster(0);
+  const std::size_t foe = world.roster(1).front();
+  const SlotRing ring = slot_ring(ARM - RING_INSET, SEPARATION);
+  const std::int64_t apart = std::int64_t{SEPARATION / 2} * (SEPARATION / 2);
+  const std::size_t people = roster.size();
+  std::vector<bool> arrived(people, false);
+  Overlaps overlaps{people};
+  for (std::uint64_t tick = 0; tick < RINGING_TICKS; ++tick) {
+    world.tick();
+    for (std::size_t rank = 0; rank < people; ++rank) {
+      arrived.at(rank) =
+          arrived.at(rank) || on_its_slot(world, roster.at(rank), foe, ring);
+    }
+    for (std::size_t pair = 0; pair < people * people; ++pair) {
+      const std::size_t one = pair / people;
+      const std::size_t other = pair % people;
+      const bool inside =
+          one < other &&
+          distance_squared(world.person(roster.at(one)).position,
+                           world.person(roster.at(other)).position) < apart;
+      overlaps.count(pair, inside, arrived.at(one) && arrived.at(other));
+    }
+  }
+  // Setup: every attacker reached its slot.
+  ASSERT_EQ(std::count(arrived.begin(), arrived.end(), false), 0);
+  EXPECT_LE(overlaps.longest_settled(), OVERLAP_TICKS);
+  // Control: on the way to their slots, people do pass through each other,
+  // so the measure sees an overlap where there is one.
+  EXPECT_GT(overlaps.longest_passing(), OVERLAP_TICKS);
+}
+
+// Two people of faction 0 on row 8, one at cell 10 with an attack intent on
+// a foe at cell 2 and one at cell 5 on a foe at cell 13, so each walks along
+// the row toward the other, seeking a slot round a different foe.
+constexpr std::int32_t CROSSING_ROW = 8;
+constexpr std::int32_t CROSSING_SIGHT = 10;
+
+World seekers_crossing() {
+  const Skill jab{ARM, 0, 0, 0, 1, 0, Shape::TARGETED};
+  Rules rules = at_war(SEPARATION);
+  rules.sight = CROSSING_SIGHT;
+  rules.tokens = default_tokens();
+  const std::vector<std::string> rows = open_map(OPEN_SIDE);
+  const Cell westward{10, CROSSING_ROW};
+  const Cell eastward{5, CROSSING_ROW};
+  const Cell west_foe{2, CROSSING_ROW};
+  const Cell east_foe{13, CROSSING_ROW};
+  World world{Seed{1},
+              Map{rows},
+              {army(rows, westward, westward, 1, TARGET_HEALTH, 0, {jab}),
+               army(rows, eastward, eastward, 1, TARGET_HEALTH, 0, {jab}),
+               army(rows, west_foe, west_foe, 1, TARGET_HEALTH, 1, {IDLE}),
+               army(rows, east_foe, east_foe, 1, TARGET_HEALTH, 1, {IDLE})},
+              {},
+              rules};
+  world.order(0, Order{westward, {0}, world.roster(2).front()});
+  world.order(1, Order{eastward, {0}, world.roster(3).front()});
+  return world;
+}
+
+TEST(World, PeopleSeekingSlotsRoundDifferentFoesKeepTheSeparation) {
+  World world = seekers_crossing();
+  const std::size_t westward = world.roster(0).front();
+  const std::size_t eastward = world.roster(1).front();
+  std::int64_t closest = std::numeric_limits<std::int64_t>::max();
+  bool both_seeking = false;
+  for (std::uint64_t tick = 0; tick < RING_TICKS; ++tick) {
+    world.tick();
+    const std::optional<Engagement> one = world.attacks().engagement(westward);
+    const std::optional<Engagement> other =
+        world.attacks().engagement(eastward);
+    both_seeking = both_seeking || (one && other && one->foe != other->foe);
+    closest =
+        std::min(closest, distance_squared(world.person(westward).position,
+                                           world.person(eastward).position));
+  }
+  // Setup: both held slots round their own foes on the way.
+  ASSERT_TRUE(both_seeking);
+  EXPECT_GE(closest, std::int64_t{SEPARATION / 2} * (SEPARATION / 2));
+}
+
+TEST(World, AttackersTakeTheSameSlotsWhicheverArmyIsListedFirst) {
+  World attackers_first = ringed(open_map(OPEN_SIDE), true, false);
+  World foe_first = ringed(open_map(OPEN_SIDE), true, true);
+  const std::vector<std::optional<Position>> first =
+      seats(attackers_first, false);
+  // Setup: every attacker holds a slot.
+  ASSERT_EQ(std::count(first.begin(), first.end(), std::nullopt), 0);
+  const std::vector<std::optional<Position>> second = seats(foe_first, true);
+  ASSERT_EQ(first.size(), second.size());
+  for (std::size_t rank = 0; rank < first.size(); ++rank) {
+    const Position one = first.at(rank).value_or(Position{});
+    const Position other = second.at(rank).value_or(Position{-1, -1});
+    EXPECT_EQ(one.x, other.x) << "attacker " << rank;
+    EXPECT_EQ(one.y, other.y) << "attacker " << rank;
+  }
+}
+
+// One attacker of faction 0 at RING_START closing on one foe of faction 1 at
+// RING_FOE, striking it at arm's length for 1; with `guarded`, eight people
+// of faction 2, hostile to no one, stand in the cells round the foe and crowd
+// every slot of its ring.
+constexpr std::size_t NEUTRAL = 2;
+
+World guarded_foe(bool guarded) {
+  const Skill jab{ARM, 0, 1, 0, 1, 0, Shape::TARGETED};
+  Rules rules{
+      SEPARATION,
+      {{false, true, false}, {true, false, false}, {false, false, false}},
+      STAGE_FLOORS};
+  rules.sight = SIGHT;
+  rules.tokens = default_tokens();
+  const std::vector<std::string> rows = open_map(OPEN_SIDE);
+  std::vector<ArmySpec> armies{
+      army(rows, RING_START, RING_START, 1, TARGET_HEALTH, 0, {jab}),
+      army(rows, RING_FOE, RING_FOE, 1, TARGET_HEALTH, 1, {IDLE})};
+  if (guarded) {
+    std::vector<Recruit> guards;
+    for (const Cell cell :
+         cells_of(Cell{RING_FOE.x - 1, RING_FOE.y - 1}, Footprint{3, 3})) {
+      if (cell.x != RING_FOE.x || cell.y != RING_FOE.y) {
+        guards.push_back(Recruit{cell, TARGET_HEALTH});
+      }
+    }
+    armies.push_back(ArmySpec{RING_FOE, guards, NEUTRAL, {IDLE}});
+  }
+  return World{Seed{1}, Map{rows}, armies, {}, rules};
+}
+
+TEST(World, APersonOfferedNoSlotClosesOnTheFoeAndFightsItInReach) {
+  World world = guarded_foe(true);
+  const std::size_t attacker = world.roster(0).front();
+  const std::size_t foe = world.roster(1).front();
+  run_ticks(world, RING_TICKS);
+  // Setup: the guards still stand round the foe.
+  ASSERT_EQ(world.roster(NEUTRAL).size(), 8U);
+  EXPECT_FALSE(world.attacks().engagement(attacker).has_value());
+  EXPECT_LE(distance_squared(world.person(attacker).position,
+                             world.person(foe).position),
+            std::int64_t{ARM} * ARM);
+  EXPECT_LT(world.person(foe).health, TARGET_HEALTH);
+  // Control: with nobody round the foe, the attacker takes a slot.
+  World open = guarded_foe(false);
+  run_ticks(open, RING_TICKS);
+  EXPECT_TRUE(open.attacks().engagement(open.roster(0).front()).has_value());
+}
+
+TEST(World, NoSlotLiesOnABlockedCell) {
+  // A wall down the column east of the foe.
+  std::vector<std::string> walled = open_map(OPEN_SIDE);
+  for (std::string& row : walled) {
+    row.at(static_cast<std::size_t>(RING_FOE.x) + 1) = '#';
+  }
+  const Map wall{walled};
+  World world = ringed(walled, true, false);
+  const std::vector<std::optional<Position>> seated = seats(world, false);
+  // Setup: some attacker holds a slot.
+  ASSERT_TRUE(std::any_of(
+      seated.begin(), seated.end(),
+      [](const std::optional<Position>& seat) { return seat.has_value(); }));
+  for (const std::optional<Position>& seat : seated) {
+    if (seat) {
+      EXPECT_TRUE(wall.passable(cell_of(*seat)));
+    }
+  }
+  // Control: on open ground a slot is taken on a cell the wall blocks.
+  World open = ringed(open_map(OPEN_SIDE), true, false);
+  const std::vector<std::optional<Position>> unwalled = seats(open, false);
+  EXPECT_TRUE(std::any_of(unwalled.begin(), unwalled.end(),
+                          [&wall](const std::optional<Position>& seat) {
+                            return seat && !wall.passable(cell_of(*seat));
+                          }));
 }
 
 // A steered chaser at STAND striking one foe at arm's length, a foe of

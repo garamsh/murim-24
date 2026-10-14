@@ -1,10 +1,14 @@
 #include "attack.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <tuple>
 #include <vector>
+
+#include "map.hpp"
 
 namespace murim {
 
@@ -14,7 +18,74 @@ std::uint16_t bit(std::uint8_t slot) {
   return static_cast<std::uint16_t>(1U << slot);
 }
 
+// The scale of UNIT_CIRCLE's entries.
+constexpr std::int64_t UNIT = 4096;
+
+// Each ring of 1 to MAX_SLOTS slots in turn, slot k of n at the cosine and
+// sine of k / n of a turn times UNIT, rounded; ring n starts at entry
+// n (n - 1) / 2.
+constexpr std::array<std::array<std::int16_t, 2>, MAX_SLOTS*(MAX_SLOTS + 1) / 2>
+    UNIT_CIRCLE{
+        {{4096, 0},      {4096, 0},      {-4096, 0},     {4096, 0},
+         {-2048, 3547},  {-2048, -3547}, {4096, 0},      {0, 4096},
+         {-4096, 0},     {0, -4096},     {4096, 0},      {1266, 3896},
+         {-3314, 2408},  {-3314, -2408}, {1266, -3896},  {4096, 0},
+         {2048, 3547},   {-2048, 3547},  {-4096, 0},     {-2048, -3547},
+         {2048, -3547},  {4096, 0},      {2554, 3202},   {-911, 3993},
+         {-3690, 1777},  {-3690, -1777}, {-911, -3993},  {2554, -3202},
+         {4096, 0},      {2896, 2896},   {0, 4096},      {-2896, 2896},
+         {-4096, 0},     {-2896, -2896}, {0, -4096},     {2896, -2896},
+         {4096, 0},      {3138, 2633},   {711, 4034},    {-2048, 3547},
+         {-3849, 1401},  {-3849, -1401}, {-2048, -3547}, {711, -4034},
+         {3138, -2633},  {4096, 0},      {3314, 2408},   {1266, 3896},
+         {-1266, 3896},  {-3314, 2408},  {-4096, 0},     {-3314, -2408},
+         {-1266, -3896}, {1266, -3896},  {3314, -2408},  {4096, 0},
+         {3446, 2214},   {1702, 3726},   {-583, 4054},   {-2682, 3096},
+         {-3930, 1154},  {-3930, -1154}, {-2682, -3096}, {-583, -4054},
+         {1702, -3726},  {3446, -2214},  {4096, 0},      {3547, 2048},
+         {2048, 3547},   {0, 4096},      {-2048, 3547},  {-3547, 2048},
+         {-4096, 0},     {-3547, -2048}, {-2048, -3547}, {0, -4096},
+         {2048, -3547},  {3547, -2048},  {4096, 0},      {3627, 1904},
+         {2327, 3371},   {494, 4066},    {-1452, 3830},  {-3066, 2716},
+         {-3977, 980},   {-3977, -980},  {-3066, -2716}, {-1452, -3830},
+         {494, -4066},   {2327, -3371},  {3627, -1904},  {4096, 0},
+         {3690, 1777},   {2554, 3202},   {911, 3993},    {-911, 3993},
+         {-2554, 3202},  {-3690, 1777},  {-4096, 0},     {-3690, -1777},
+         {-2554, -3202}, {-911, -3993},  {911, -3993},   {2554, -3202},
+         {3690, -1777},  {4096, 0},      {3742, 1666},   {2741, 3044},
+         {1266, 3896},   {-428, 4074},   {-2048, 3547},  {-3314, 2408},
+         {-4006, 852},   {-4006, -852},  {-3314, -2408}, {-2048, -3547},
+         {-428, -4074},  {1266, -3896},  {2741, -3044},  {3742, -1666},
+         {4096, 0},      {3784, 1567},   {2896, 2896},   {1567, 3784},
+         {0, 4096},      {-1567, 3784},  {-2896, 2896},  {-3784, 1567},
+         {-4096, 0},     {-3784, -1567}, {-2896, -2896}, {-1567, -3784},
+         {0, -4096},     {1567, -3784},  {2896, -2896},  {3784, -1567}}};
+
+// `value` times `radius` over UNIT, rounded half away from zero.
+std::int32_t scaled(std::int16_t value, std::int32_t radius) {
+  const std::int64_t product = std::int64_t{value} * radius;
+  const std::int64_t half = product < 0 ? -(UNIT / 2) : UNIT / 2;
+  return static_cast<std::int32_t>((product + half) / UNIT);
+}
+
+std::int64_t distance_squared(Position from, Position toward) {
+  const std::int64_t across = std::int64_t{toward.x} - from.x;
+  const std::int64_t down = std::int64_t{toward.y} - from.y;
+  return (across * across) + (down * down);
+}
+
+Position shifted(Position origin, Position offset) {
+  return Position{origin.x + offset.x, origin.y + offset.y};
+}
+
 }  // namespace
+
+Tokens default_tokens() {
+  constexpr std::array<std::uint32_t, 7> BY_RANK{2, 2, 3, 3, 4, 4, 6};
+  constexpr std::uint64_t CIRCLING = 30;
+  constexpr std::uint64_t LEASE = 90;
+  return Tokens{{BY_RANK.begin(), BY_RANK.end()}, CIRCLING, LEASE};
+}
 
 bool valid(const Tokens& tokens) {
   const auto too_many = [](std::uint32_t granted) {
@@ -27,6 +98,33 @@ bool valid(const Tokens& tokens) {
 
 bool valid(const std::optional<Tokens>& tokens) {
   return !tokens || valid(*tokens);
+}
+
+std::optional<Ring> ring_for(std::int32_t reach) {
+  if (reach <= 0 || reach > LONG_REACH) {
+    return std::nullopt;
+  }
+  return reach <= ARM_REACH ? Ring::NEAR : Ring::LONG;
+}
+
+SlotRing slot_ring(std::int32_t radius, std::int32_t separation) {
+  std::size_t count = radius > 0 ? MAX_SLOTS : 0;
+  // Neighbouring slots lie closer than the separation.
+  const auto crowded = [](const SlotRing& ring, std::int32_t apart) {
+    return distance_squared(slot_offset(ring, 0), slot_offset(ring, 1)) <
+           std::int64_t{apart} * apart;
+  };
+  while (count > 1 && crowded(SlotRing{radius, count}, separation)) {
+    --count;
+  }
+  return SlotRing{radius, count};
+}
+
+Position slot_offset(const SlotRing& ring, std::size_t slot) {
+  const std::array<std::int16_t, 2>& unit =
+      UNIT_CIRCLE.at((ring.count * (ring.count - 1) / 2) + slot);
+  return Position{scaled(unit.at(0), ring.radius),
+                  scaled(unit.at(1), ring.radius)};
 }
 
 Attacks::Attacks(std::size_t people) { grow_to(people); }
@@ -62,6 +160,7 @@ void Attacks::grow_to(std::size_t people) {
   long_taken_.resize(people, 0);
   waiting_taken_.resize(people, 0);
   tokens_held_.resize(people, 0);
+  engaging_.resize(people, false);
 }
 
 void Attacks::engage(std::size_t person, const Engagement& engagement) {
@@ -93,6 +192,140 @@ void Attacks::release(std::size_t person) {
   foe_.at(person) = NONE;
   flags_.at(person) = 0;
   --engaged_;
+}
+
+void Attacks::assign(std::vector<Engaging>& engaging, const Map& map,
+                     std::int32_t separation, const Crowded& crowded) {
+  // Frees what anyone holds against another foe or on another ring, and
+  // what anyone not engaging holds.
+  for (Engaging& each : engaging) {
+    each.distance = distance_squared(each.from, each.foe_at);
+    each.aim.reset();
+    const std::optional<Engagement> held = engagement(each.person);
+    const std::optional<Ring> ring = ring_for(each.reach);
+    if (held && (!ring || held->foe != each.foe || held->ring != *ring)) {
+      release(each.person);
+    }
+    engaging_.at(each.person) = true;
+  }
+  for (std::size_t person = 0; person < foe_.size(); ++person) {
+    if (!engaging_.at(person)) {
+      release(person);
+    }
+    engaging_.at(person) = false;
+  }
+  // Each foe's rings in turn, the people on one in the order they choose.
+  const auto key = [](const Engaging& each) {
+    const std::optional<Ring> ring = ring_for(each.reach);
+    return std::tuple{each.foe, ring ? static_cast<int>(*ring) : -1,
+                      each.distance, each.person};
+  };
+  std::sort(engaging.begin(), engaging.end(),
+            [&key](const Engaging& left, const Engaging& right) {
+              return key(left) < key(right);
+            });
+  for (auto first = engaging.begin(); first != engaging.end();) {
+    const std::optional<Ring> ring = ring_for(first->reach);
+    const auto last =
+        std::find_if(first, engaging.end(), [&](const Engaging& each) {
+          return each.foe != first->foe || ring_for(each.reach) != ring;
+        });
+    if (ring) {
+      std::int32_t shortest = first->reach;
+      for (auto each = first; each != last; ++each) {
+        shortest = std::min(shortest, each->reach);
+      }
+      seat(first, last, *ring, slot_ring(shortest - RING_INSET, separation),
+           map, crowded);
+    }
+    first = last;
+  }
+}
+
+void Attacks::seat(std::vector<Engaging>::iterator first,
+                   std::vector<Engaging>::iterator last, Ring ring,
+                   const SlotRing& slots, const Map& map,
+                   const Crowded& crowded) {
+  const std::size_t count = slots.count;
+  const Position foe_at = first->foe_at;
+  const std::size_t foe = first->foe;
+  const auto place = [&](std::size_t slot) {
+    return shifted(foe_at, slot_offset(slots, slot));
+  };
+  const std::uint16_t offered = offered_slots(*first, slots, map, crowded);
+  const auto open = [offered](std::size_t slot) {
+    return (offered & bit(static_cast<std::uint8_t>(slot))) != 0;
+  };
+  // A slot held stays held while the ring still offers it.
+  for (auto each = first; each != last; ++each) {
+    const std::optional<Engagement> held = engagement(each->person);
+    if (held && (held->slot >= count || !open(held->slot))) {
+      release(each->person);
+    }
+  }
+  for (auto each = first; each != last; ++each) {
+    std::optional<Engagement> held = engagement(each->person);
+    if (!held) {
+      std::optional<std::size_t> nearest;
+      std::int64_t best = 0;
+      for (std::size_t slot = 0; slot < count; ++slot) {
+        const auto index = static_cast<std::uint8_t>(slot);
+        const std::int64_t distance = distance_squared(each->from, place(slot));
+        if (!taken(foe, ring, index) && open(slot) &&
+            (!nearest || distance < best)) {
+          nearest = slot;
+          best = distance;
+        }
+      }
+      if (nearest) {
+        held = Engagement{foe,   ring, static_cast<std::uint8_t>(*nearest),
+                          false, 0,    0};
+        engage(each->person, *held);
+      }
+    }
+    if (held) {
+      each->aim = place(waypoint(*each, slots, held->slot));
+    }
+  }
+}
+
+std::uint16_t offered_slots(const Engaging& engaging, const SlotRing& slots,
+                            const Map& map, const Crowded& crowded) {
+  std::uint16_t offered = 0;
+  for (std::size_t slot = 0; slot < slots.count; ++slot) {
+    const Position point = shifted(engaging.foe_at, slot_offset(slots, slot));
+    if (map.passable(cell_of(point)) &&
+        !(crowded && crowded(point, engaging.foe))) {
+      offered |= bit(static_cast<std::uint8_t>(slot));
+    }
+  }
+  return offered;
+}
+
+std::size_t waypoint(const Engaging& seeker, const SlotRing& slots,
+                     std::size_t slot) {
+  const std::size_t count = slots.count;
+  std::size_t nearest = 0;
+  std::int64_t best = 0;
+  for (std::size_t other = 0; other < count; ++other) {
+    const std::int64_t distance = distance_squared(
+        seeker.from, shifted(seeker.foe_at, slot_offset(slots, other)));
+    if (other == 0 || distance < best) {
+      nearest = other;
+      best = distance;
+    }
+  }
+  // Slots round from the nearest to its own, the way the slots are numbered.
+  const std::size_t round = (slot + count - nearest) % count;
+  if (round <= 1 || round >= count - 1) {
+    return slot;
+  }
+  const std::int64_t band = std::int64_t{slots.radius} + (CELL_SIZE / 2);
+  if (distance_squared(seeker.from, seeker.foe_at) > band * band) {
+    return nearest;
+  }
+  return round <= count / 2 ? (nearest + 1) % count
+                            : (nearest + count - 1) % count;
 }
 
 std::optional<Engagement> Attacks::engagement(std::size_t person) const {

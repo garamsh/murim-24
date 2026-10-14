@@ -118,8 +118,10 @@ func _cap_pass() -> bool:
 	for i in CAP_TICKS:
 		world.tick()
 		sound.note_tick()
-		sound.advance(STEP)
+		# Counted as the tick's sounds are heard, before the clock frees those that end within the
+		# step: a sound is dropped only while every voice sounds.
 		most = maxi(most, sound.sounding())
+		sound.advance(STEP)
 	var dropped: int = sound.dropped
 	var capped: bool = most == Sound.VOICES and dropped > 0
 	# Control: once the longest sound has ended every voice is free, and below the cap each kind

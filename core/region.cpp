@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "attack.hpp"
 #include "calendar.hpp"
 #include "growth.hpp"
 #include "life.hpp"
@@ -458,6 +459,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 {},
                 {}};
   region.rules.map_sight = MAP_SIGHT;
+  region.rules.tokens = default_tokens();
   for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     region.map_rows.at(static_cast<std::size_t>(cell.y))
         .at(static_cast<std::size_t>(cell.x)) =
