@@ -657,22 +657,10 @@ class World {
              std::uint64_t body_damage, std::vector<std::uint64_t>& damage);
   [[nodiscard]] const Skill& usable(const Person& person, const Army& army,
                                     std::size_t skill) const;
-  [[nodiscard]] std::uint32_t rank_of(const Person& person) const;
   [[nodiscard]] std::size_t army_with(std::size_t person,
                                       std::size_t skill) const;
   [[nodiscard]] static bool ready(const Person& person, std::size_t skill,
                                   const Army& army, std::uint64_t due);
-  /// How far an art's nature agrees with person `person`'s: the product of
-  /// the learning's ease, or its potency, for each axis that differs, per
-  /// mille.
-  [[nodiscard]] std::uint64_t agreement(const Person& person, std::size_t art,
-                                        bool potency) const;
-  /// How a skill is learned: from a teacher or a manual, or by
-  /// comprehension, which only a comprehensible skill allows.
-  enum class Lesson : std::uint8_t { TAUGHT, COMPREHENDED };
-  [[nodiscard]] std::optional<std::size_t> lesson(const Person& person,
-                                                  std::size_t art, Lesson how,
-                                                  std::uint32_t rank) const;
   void train();
   void cultivate();
   void comprehend(std::size_t learner);
