@@ -1736,31 +1736,32 @@ func _apply_pass() -> bool:
 	return passed
 
 
-# A Cult body ordered on the largest army hostile to it dies among its people and its soul is
-# born again: on that tick the rebirth screen opens on the body that died and the new one, and no
-# tick runs while it is open; Enter closes it and the ticks run again. Setup: the screen was not
-# open before the death, and the dead body and the new one differ.
+# A Cult body ordered on the largest army hostile to it, and on the next largest each time the one
+# it marches on has fallen, dies among its people and its soul is born again: on that tick the
+# rebirth screen opens on the body that died and the new one, and no tick runs while it is open;
+# Enter closes it and the ticks run again. Setup: the screen was not open before the death, and the
+# dead body and the new one differ.
 func _rebirth_pass() -> bool:
 	var scene := _scene(CULT_VILLAGE)
 	var world: WorldAdapter = scene.world
 	var hud: CanvasLayer = scene.get_node("Hud")
 	var body := world.roster(scene.steered)[0]
-	# The largest, so that a lone body loses whatever the balance of a fight between equals.
-	var target := Vector2i(-1, -1)
-	var largest := 0
-	for army in world.army_count() - 1:
-		var roster := world.roster(army)
-		if world.hostile(world.army_faction(scene.steered), world.army_faction(army)) \
-				and roster.size() > largest:
-			largest = roster.size()
-			target = Vector2i((world.person_position(roster[0]) / WorldAdapter.CELL_SIZE).floor())
-	var ordered := target.x >= 0 and world.order(scene.steered, target, PackedInt64Array([0]))
+	# A lone body may win one fight: the largest army may be two people who draw their repair as
+	# often as their strike, so the fight turns on the draws. It cannot win them all.
+	var army := _largest_hostile(world, scene.steered)
+	var ordered := army >= 0 and _order_on(world, scene.steered, army)
 	var closed_before := true
 	var ticks := 0
 	while ordered and not hud.rebirth.visible and ticks < MARCH_LIMIT:
 		closed_before = closed_before and hud.screen() == null
 		scene.step()
 		ticks += 1
+		if not hud.rebirth.visible and world.roster(army).is_empty():
+			army = _largest_hostile(world, scene.steered)
+			ordered = army >= 0 and _order_on(world, scene.steered, army)
+	var target := Vector2i(-1, -1)
+	if army >= 0 and not world.roster(army).is_empty():
+		target = Vector2i((world.person_position(world.roster(army)[0]) / WorldAdapter.CELL_SIZE).floor())
 	var reborn: int = world.roster(scene.steered)[0] if not world.roster(scene.steered).is_empty() else -1
 	var shown: bool = hud.rebirth.visible and hud.screen() == hud.rebirth and hud.rebirth.past == body \
 			and hud.rebirth.next == reborn and reborn != body and world.person_health(body) == 0
@@ -1775,6 +1776,26 @@ func _rebirth_pass() -> bool:
 	print("play_test: Cult body %d ordered on %s %s; after %d ticks the rebirth screen shows %d dead and %d born %s, not open before %s; no tick while open %s; Enter goes on and ticks run %s: %s" % [
 		body, target, ordered, ticks, body, reborn, shown, closed_before, held, resumed, "pass" if passed else "FAIL"])
 	return passed
+
+
+# The army of the most living people hostile to army `own`, the first among equals, or -1 for none,
+# among all but the last army, the one the region's steered body serves in.
+func _largest_hostile(world: WorldAdapter, own: int) -> int:
+	var largest := -1
+	var size := 0
+	for army in world.army_count() - 1:
+		var roster := world.roster(army)
+		if world.hostile(world.army_faction(own), world.army_faction(army)) and roster.size() > size:
+			size = roster.size()
+			largest = army
+	return largest
+
+
+# Orders army `own` onto the cell where the first of army `army` stands, striking with its first
+# skill; returns whether the order was taken.
+func _order_on(world: WorldAdapter, own: int, army: int) -> bool:
+	var lead := Vector2i((world.person_position(world.roster(army)[0]) / WorldAdapter.CELL_SIZE).floor())
+	return world.order(own, lead, PackedInt64Array([0]))
 
 
 # Where person `person` of `scene`'s world stands, in the scene's pixels, where a click lands on its
