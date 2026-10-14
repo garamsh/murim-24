@@ -1,0 +1,36 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-2026101421583396826
+SCRIPT ERROR: Invalid access to property or key 'fog' on a base object of type 'Dictionary'.
+          at: _apply (res://grade/grade.gd:156)
+          GDScript backtrace (most recent call first):
+              [0] _apply (res://grade/grade.gd:156)
+              [1] show_time (res://grade/grade.gd:66)
+              [2] run (res://grade/grade_test.gd:35)
+              [3] _init (res://run_tests.gd:22)
+SCRIPT ERROR: Invalid access to property or key 'fog' on a base object of type 'Dictionary'.
+          at: _apply (res://grade/grade.gd:156)
+          GDScript backtrace (most recent call first):
+              [0] _apply (res://grade/grade.gd:156)
+              [1] @quality_setter (res://grade/grade.gd:38)
+              [2] run (res://grade/grade_test.gd:37)
+              [3] _init (res://run_tests.gd:22)
+SCRIPT ERROR: Invalid type in utility function "is_equal_approx()". Cannot convert argument 1 from Nil to float.
+          at: run (res://grade/grade_test.gd:41)
+          GDScript backtrace (most recent call first):
+              [0] run (res://grade/grade_test.gd:41)
+              [1] _init (res://run_tests.gd:22)
+res://grade/grade_test.gd: FAIL
+run_tests: 0 of 1 GDScript tests passed
+WARNING: 2 RIDs of type "Canvas" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 2 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 18 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 6 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+ERROR: 1 RID allocations of type 'N16RendererViewport8ViewportE' were leaked at exit.
+ERROR: 2 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.
+ERROR: 3 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
