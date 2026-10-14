@@ -246,6 +246,10 @@ class World {
   /// Returns person `person`.
   [[nodiscard]] const Person& person(std::size_t person) const;
 
+  /// Returns each person's attack slot and token against the foe it engages,
+  /// with room for every person the world has held (ADR 0068).
+  [[nodiscard]] const Attacks& attacks() const;
+
   /// Returns how many people live.
   [[nodiscard]] std::size_t living() const;
 

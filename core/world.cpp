@@ -3454,6 +3454,7 @@ void World::rebirth(Passing passing) {
     people_.at(parent).children.push_back(born);
   }
   people_.push_back(std::move(person));
+  attacks_.grow_to(people_.size());
   record(cell_of(people_.at(born).position), Born{born});
   // The soul's army takes its new family's faction and skills.
   Army& serving = armies_.at(army);
@@ -3706,6 +3707,8 @@ std::size_t World::ensoul(std::size_t person) {
 
 const Soul& World::soul(std::size_t soul) const { return souls_.at(soul); }
 
+const Attacks& World::attacks() const { return attacks_; }
+
 const Chart& World::chart(std::size_t soul) const { return charts_.at(soul); }
 
 // Charts, for each living person carrying a soul in an army a driver steers,
@@ -3945,6 +3948,7 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   people_.at(father).children.push_back(born);
   people_.at(mother).children.push_back(born);
   people_.push_back(std::move(child));
+  attacks_.grow_to(people_.size());
   record(cell_of(people_.at(born).position), Born{born});
   army_of.push_back(army_of.at(lineage));
   armies_.at(army_of.at(lineage)).roster.push_back(born);
