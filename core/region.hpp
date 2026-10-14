@@ -184,7 +184,8 @@ struct Region {
 /// of the village's faction, with its residents' skills and health, making
 /// the village its home, standing on the first open cell of the village's area,
 /// row by row, that no resident stands on, with that cell as its objective.
-/// Throws std::out_of_range when there is no such village or no such cell.
+/// Throws std::out_of_range when there is no such village, and
+/// std::runtime_error when the village has no such cell.
 [[nodiscard]] ArmySpec born_in(const Region& region, std::size_t village);
 
 }  // namespace murim
