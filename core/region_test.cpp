@@ -277,6 +277,27 @@ TEST(Region, SameSeedGivesTheSameRegionAndWorld) {
   EXPECT_NE(hash_after_ticks(first), hash_after_ticks(other));
 }
 
+// The seeds the Godot tests start regions from: a seed generation came to
+// refuse would end their whole run at its first region, so it fails here,
+// named, instead.
+TEST(Region, TheSeedsTheGodotTestsStartFromGenerate) {
+  const std::vector<std::uint64_t> seeds{
+      0,           // hud/hud_test.gd
+      3,           // extension/file_saves_test.gd, play/play_test.gd GROWN_SEED
+      8,           // extension/file_saves_test.gd OTHER_SEED
+      18,          // hud/hud_test.gd LONG_NAME_SEED
+      42,          // extension/world_adapter_test.gd SEED
+      43,          // extension/world_adapter_test.gd OTHER_SEED
+      2026,        // most Godot tests' SEED or REGION_SEED
+      4817,        // play/play_test.gd TYPED_SEED
+      4259094339,  // play/play_test.gd DRAWN
+  };
+  for (const std::uint64_t seed : seeds) {
+    EXPECT_NO_THROW(static_cast<void>(generate_region(Seed{seed}, base_data())))
+        << "seed " << seed;
+  }
+}
+
 TEST(Region, HasThreeFactionsWithTerritoryAndSixToEightVillages) {
   for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
     const Region region = generate_region(Seed{seed}, base_data());
