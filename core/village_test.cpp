@@ -2,11 +2,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -364,6 +366,38 @@ TEST(Villages, RefuseSavedVillagesNamingWhatDoesNotExist) {
   EXPECT_FALSE(Villages({home}, {0, 1}).kept(structures, ARMIES, FACTIONS));
   // Not one village or none for each structure.
   EXPECT_FALSE(Villages({home}, {0}).kept(structures, ARMIES, FACTIONS));
+}
+
+// The holder of `cell` in `held`, a row-by-row grid of `size`.
+std::optional<std::size_t> holder_at(
+    const std::vector<std::optional<std::size_t>>& held, Footprint size,
+    Cell cell) {
+  return held.at((static_cast<std::size_t>(cell.y) *
+                  static_cast<std::size_t>(size.width)) +
+                 static_cast<std::size_t>(cell.x));
+}
+
+TEST(Villages, ClaimEachCellForTheNearestCentreWithinTheClaim) {
+  constexpr Footprint SIZE{10, 10};
+  constexpr std::int32_t CLAIM = 2;
+  const std::vector<std::pair<Cell, std::size_t>> centres{{Cell{2, 2}, 0},
+                                                          {Cell{6, 2}, 1}};
+  const std::vector<std::optional<std::size_t>> held =
+      claimed(SIZE, CLAIM, centres);
+  ASSERT_EQ(held.size(), 100U);
+  EXPECT_EQ(holder_at(held, SIZE, Cell{2, 2}), std::optional<std::size_t>{0});
+  EXPECT_EQ(holder_at(held, SIZE, Cell{5, 2}), std::optional<std::size_t>{1});
+  // Equally near both, the earlier centre holds it.
+  EXPECT_EQ(holder_at(held, SIZE, Cell{4, 2}), std::optional<std::size_t>{0});
+  EXPECT_EQ(holder_at(held, SIZE, Cell{4, 4}), std::optional<std::size_t>{0});
+  // Beyond the claim along an axis, no one holds it.
+  EXPECT_FALSE(holder_at(held, SIZE, Cell{2, 5}).has_value());
+  // Control: with no centres, no cell is held.
+  const std::vector<std::optional<std::size_t>> none = claimed(SIZE, CLAIM, {});
+  EXPECT_TRUE(std::none_of(none.begin(), none.end(),
+                           [](const std::optional<std::size_t>& holder) {
+                             return holder.has_value();
+                           }));
 }
 
 }  // namespace

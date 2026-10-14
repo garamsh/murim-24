@@ -13,10 +13,10 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `skill` skills, strikes, casts and their refusals;
   - `attack` each person's attack slot and token against the foe it engages, each foe's slots and tokens taken, and the token table's rules (ADR 0068), saved and hashed only when set or held;
   - `talent` talent and its draws, and souls;
-  - `chart` the cells and villages a soul remembers, whether a village is in view of a cell, the territory a soul's chart remembers, and how villages' claims divide the land, which live territory reads too;
+  - `chart` the cells and villages a soul remembers, whether a village is in view of a cell, and the territory a soul's chart remembers;
   - `names` names;
   - `kinship` marriage and births;
-  - `village` villages, their structures and what they hold, and the villages a world keeps: the one place for each village's record and each structure's village, deciding what a village holds, its cap, what its workshops serve, how its stock fills and feeds, which village takes in the hungry, and who ruins and who retakes it;
+  - `village` villages, their structures and what they hold, and the villages a world keeps: the one place for each village's record and each structure's village, deciding what a village holds, its cap, what its workshops serve, how its stock fills and feeds, which village takes in the hungry, and who ruins and who retakes it; and how villages' claims divide the land into territory, which the live territory and a chart's remembered territory both read;
   - `growth` how villages grow;
   - `arts` arts, realms, cultivation, learning and manuals;
   - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two;

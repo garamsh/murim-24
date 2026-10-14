@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -117,13 +116,6 @@ class Chart {
   std::vector<std::optional<VillageMemory>> villages_;
   std::uint64_t revision_ = 0;
 };
-
-/// Returns the holder of each cell of a `size` map, row by row: the owner of
-/// the nearest of `centres`, each a village's centre and owner, within
-/// `claim` cells, the earliest among equals, or nothing beyond every one.
-[[nodiscard]] std::vector<std::optional<std::size_t>> claimed(
-    Footprint size, std::int32_t claim,
-    const std::vector<std::pair<Cell, std::size_t>>& centres);
 
 /// Returns whether a cell of one of `built`, a village's structures by index
 /// among `structures`, lies within `reach` cells of `from`: the nearest cell

@@ -202,36 +202,6 @@ std::vector<std::optional<std::size_t>> Chart::territory(
   return held;
 }
 
-std::vector<std::optional<std::size_t>> claimed(
-    Footprint size, std::int32_t claim,
-    const std::vector<std::pair<Cell, std::size_t>>& centres) {
-  std::vector<std::optional<std::size_t>> held(
-      static_cast<std::size_t>(size.width) *
-      static_cast<std::size_t>(size.height));
-  std::vector<std::int64_t> nearest(held.size(),
-                                    std::numeric_limits<std::int64_t>::max());
-  for (const auto& [centre, owner] : centres) {
-    for (Cell cell{0, std::max(centre.y - claim, 0)};
-         cell.y <= std::min(centre.y + claim, size.height - 1); ++cell.y) {
-      for (cell.x = std::max(centre.x - claim, 0);
-           cell.x <= std::min(centre.x + claim, size.width - 1); ++cell.x) {
-        const std::size_t slot = (static_cast<std::size_t>(cell.y) *
-                                  static_cast<std::size_t>(size.width)) +
-                                 static_cast<std::size_t>(cell.x);
-        const std::int64_t offset_x = cell.x - centre.x;
-        const std::int64_t offset_y = cell.y - centre.y;
-        const std::int64_t distance =
-            (offset_x * offset_x) + (offset_y * offset_y);
-        if (distance < nearest.at(slot)) {
-          nearest.at(slot) = distance;
-          held.at(slot) = owner;
-        }
-      }
-    }
-  }
-  return held;
-}
-
 bool in_view(const std::vector<Structure>& structures,
              const std::vector<std::size_t>& built, Cell from,
              std::int32_t reach) {
