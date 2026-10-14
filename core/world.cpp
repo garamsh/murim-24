@@ -721,77 +721,6 @@ void fold_soul(const Fold& fold, const Soul& soul) {
   }
 }
 
-// How many marked cells of a grid lie under a rectangle, read from a
-// summed-area table in four lookups.
-class Tally {
- public:
-  Tally(const std::vector<bool>& marked, std::int32_t width,
-        std::int32_t height)
-      : width_(width),
-        height_(height),
-        sums_((static_cast<std::size_t>(width) + 1) *
-                  (static_cast<std::size_t>(height) + 1),
-              0) {
-    for (Cell cell{0, 0}; cell.y < height; ++cell.y) {
-      for (cell.x = 0; cell.x < width; ++cell.x) {
-        const std::size_t index = (static_cast<std::size_t>(cell.y) *
-                                   static_cast<std::size_t>(width)) +
-                                  static_cast<std::size_t>(cell.x);
-        sums_.at(slot(cell.x + 1, cell.y + 1)) =
-            static_cast<std::int32_t>(marked.at(index)) +
-            sums_.at(slot(cell.x, cell.y + 1)) +
-            sums_.at(slot(cell.x + 1, cell.y)) - sums_.at(slot(cell.x, cell.y));
-      }
-    }
-  }
-
-  // Whether `area` from `corner` lies on the grid with no cell marked.
-  [[nodiscard]] bool clear(Cell corner, Footprint area) const {
-    return corner.x >= 0 && corner.y >= 0 && corner.x + area.width <= width_ &&
-           corner.y + area.height <= height_ &&
-           count(corner.x, corner.y, corner.x + area.width,
-                 corner.y + area.height) == 0;
-  }
-
-  // Whether no cell within `margin` of `area` from `corner`, on the grid, is
-  // marked.
-  [[nodiscard]] bool clear_around(Cell corner, Footprint area,
-                                  std::int32_t margin) const {
-    return count(std::max(corner.x - margin, 0), std::max(corner.y - margin, 0),
-                 std::min(corner.x + area.width + margin, width_),
-                 std::min(corner.y + area.height + margin, height_)) == 0;
-  }
-
- private:
-  [[nodiscard]] std::size_t slot(std::int32_t column, std::int32_t row) const {
-    return (static_cast<std::size_t>(row) *
-            (static_cast<std::size_t>(width_) + 1)) +
-           static_cast<std::size_t>(column);
-  }
-
-  // The marked cells in columns [left, right) of rows [top, bottom).
-  [[nodiscard]] std::int32_t count(std::int32_t left, std::int32_t top,
-                                   std::int32_t right,
-                                   std::int32_t bottom) const {
-    return sums_.at(slot(right, bottom)) - sums_.at(slot(left, bottom)) -
-           sums_.at(slot(right, top)) + sums_.at(slot(left, top));
-  }
-
-  std::int32_t width_;
-  std::int32_t height_;
-  std::vector<std::int32_t> sums_;
-};
-
-// Twice the squared distance between the centre of `area` from `corner` and
-// the centre of cell `seat`, in half cells, so it stays an integer.
-std::int64_t remoteness(Cell corner, Footprint area, Cell seat) {
-  const std::int64_t offset_x = (2 * std::int64_t{corner.x}) + area.width -
-                                (2 * std::int64_t{seat.x}) - 1;
-  const std::int64_t offset_y = (2 * std::int64_t{corner.y}) + area.height -
-                                (2 * std::int64_t{seat.y}) - 1;
-  return (offset_x * offset_x) + (offset_y * offset_y);
-}
-
 // Whether `there` lies within `reach` cells of `here` along each axis.
 bool within(Cell here, Cell there, std::int32_t reach) {
   return std::abs(there.x - here.x) <= reach &&
@@ -975,7 +904,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     surnames_.push_back(next_random() % life_.names.surnames.size());
   }
   villages_ = Villages{structures_.size()};
-  plans_.resize(structures_.size());
+  plans_ = Plans{structures_.size()};
   if (life_.growth && life_.growth->stances.size() > rules_.hostile.size()) {
     throw std::invalid_argument(
         "growth must give stances for no more factions than hostility names");
@@ -1048,14 +977,9 @@ void World::restore() {
            (!given.empty() && person.given >= given.size()) ||
            stray_cultivation(person, life_) || stray_purse(person, life_);
   };
-  const std::size_t plans = life_.growth ? life_.growth->plans.size() : 0;
-  const auto unplanned = [plans](std::optional<std::size_t> plan) {
-    return !below(plan, plans);
-  };
   const bool bad_structures =
       std::any_of(structures_.begin(), structures_.end(), off_map) ||
-      plans_.size() != structures ||
-      std::any_of(plans_.begin(), plans_.end(), unplanned);
+      !plans_.kept(structures, life_.growth);
   const auto bad_faction = [&](const Leadership& faction) {
     const Admission admission = faction.admission.value_or(Admission{});
     return !below(faction.leader, people) || admission.chance > PER_MILLE ||
@@ -4073,7 +3997,7 @@ std::size_t World::structure_count() const { return structures_.size(); }
 std::size_t World::village_count() const { return villages_.size(); }
 
 std::optional<std::size_t> World::plan_of(std::size_t structure) const {
-  return plans_.at(structure);
+  return plans_.plan_of(structure);
 }
 
 std::vector<std::optional<std::size_t>> World::territory() const {
@@ -4201,7 +4125,7 @@ void World::recall(std::size_t village) {
 
 // Cells of the map: those a structure or a village's clearing covers, those
 // not buildable, and those an army's objective or a living person takes.
-World::Ground World::ground() const {
+Ground World::ground() const {
   const auto width = static_cast<std::size_t>(map_.width());
   const std::size_t cells = width * static_cast<std::size_t>(map_.height());
   Ground marked{std::vector<bool>(cells, false),
@@ -4253,61 +4177,16 @@ bool World::lay_building(std::size_t village, const Growth& growth) {
   if (std::any_of(spec.structures.begin(), spec.structures.end(), unfinished)) {
     return false;
   }
-  const std::uint64_t yearly = std::max<std::uint64_t>(
-      std::uint64_t{life_.husbandry ? life_.husbandry->consumption : 1} *
-          DAYS_PER_YEAR,
-      1);
-  // Housing, food, storage, arms and tends, each in the people it holds,
-  // the last two beyond the `reliance` a village holds with no workshop.
-  constexpr std::size_t HOLDINGS = 5;
-  const auto in_people = [yearly](const Holding& holding,
-                                  std::uint64_t reliance) {
-    return std::array<std::uint64_t, HOLDINGS>{
-        holding.housing, holding.harvest / yearly, holding.storage / yearly,
-        reliance + holding.arms, reliance + holding.tends};
-  };
-  const std::array<std::uint64_t, HOLDINGS> holds = in_people(
-      villages_.held(village, Stage::DAMAGED, stages()), growth.self_reliance);
-  const auto scarcest = static_cast<std::size_t>(
-      std::min_element(holds.begin(), holds.end()) - holds.begin());
-  std::optional<std::size_t> chosen;
-  std::uint64_t most = 0;
-  for (const std::size_t plan : growth.builds) {
-    const std::uint64_t gain =
-        in_people(growth.plans.at(plan).holding, 0).at(scarcest);
-    if (gain > most) {
-      most = gain;
-      chosen = plan;
-    }
-  }
+  const std::optional<std::size_t> chosen =
+      build_plan(villages_.held(village, Stage::DAMAGED, stages()), growth,
+                 life_.husbandry);
   if (!chosen) {
     return false;
   }
-  const Footprint footprint = growth.plans.at(*chosen).footprint;
-  const Ground marked = ground();
-  std::vector<bool> open = marked.covered;
-  for (std::size_t cell = 0; cell < open.size(); ++cell) {
-    open.at(cell) = open.at(cell) || marked.rough.at(cell);
-  }
-  const Tally blocked{open, map_.width(), map_.height()};
-  const Tally taken{marked.taken, map_.width(), map_.height()};
   const Cell centre = seat(village);
-  const std::int32_t vicinity = growth.vicinity;
-  std::optional<Cell> best;
-  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-  for (Cell corner{0, centre.y - vicinity};
-       corner.y + footprint.height - 1 <= centre.y + vicinity; ++corner.y) {
-    for (corner.x = centre.x - vicinity;
-         corner.x + footprint.width - 1 <= centre.x + vicinity; ++corner.x) {
-      const std::int64_t distance = remoteness(corner, footprint, centre);
-      if (distance < nearest && blocked.clear(corner, footprint) &&
-          blocked.clear_around(corner, footprint, 1) &&
-          taken.clear(corner, footprint)) {
-        nearest = distance;
-        best = corner;
-      }
-    }
-  }
+  const std::optional<Cell> best =
+      build_site(growth.plans.at(*chosen).footprint, centre, growth, ground(),
+                 Footprint{map_.width(), map_.height()});
   if (!best) {
     return false;
   }
@@ -4338,57 +4217,19 @@ bool World::found_village(std::size_t village, const Growth& growth) {
   if (settlers.empty()) {
     return false;
   }
-  const Footprint area = growth.settlement;
-  const Cell middle{area.width / 2, area.height / 2};
+  const Cell middle{growth.settlement.width / 2, growth.settlement.height / 2};
   const Cell home = seat(village);
   const std::size_t faction = owner(village);
-  const FlowField paths{map_, home};
-  const Ground marked = ground();
-  std::vector<bool> open = marked.covered;
-  for (std::size_t cell = 0; cell < open.size(); ++cell) {
-    open.at(cell) =
-        open.at(cell) || marked.rough.at(cell) || marked.taken.at(cell);
-  }
-  const Tally blocked{open, map_.width(), map_.height()};
-  const Tally covered{marked.covered, map_.width(), map_.height()};
-  const std::vector<std::optional<std::size_t>> held = territory();
-  const auto claimed = [this, &held, faction](Cell cell) {
-    const std::optional<std::size_t> holder =
-        held.at((static_cast<std::size_t>(cell.y) *
-                 static_cast<std::size_t>(map_.width())) +
-                static_cast<std::size_t>(cell.x));
-    return holder && *holder != faction;
-  };
-  std::vector<Cell> free;
-  for (Cell corner{0, home.y - growth.reach - middle.y};
-       corner.y <= home.y + growth.reach - middle.y; ++corner.y) {
-    for (corner.x = home.x - growth.reach - middle.x;
-         corner.x <= home.x + growth.reach - middle.x; ++corner.x) {
-      const Cell centre{corner.x + middle.x, corner.y + middle.y};
-      if (!blocked.clear(corner, area) ||
-          !covered.clear_around(corner, area, growth.spacing) ||
-          paths.distance(centre) == FlowField::UNREACHABLE) {
-        continue;
-      }
-      const std::vector<Cell> cells = cells_of(corner, area);
-      if (std::none_of(cells.begin(), cells.end(), claimed)) {
-        free.push_back(corner);
-      }
-    }
-  }
+  const std::vector<Cell> free = settlement_sites(
+      home, growth, ground(), Footprint{map_.width(), map_.height()},
+      FlowField{map_, home}, territory(), faction);
   if (free.empty()) {
     return false;
   }
   const Cell corner = free.at(next_random() % free.size());
   const Cell centre{corner.x + middle.x, corner.y + middle.y};
-  std::vector<Laid> layout;
-  layout.reserve(growth.layout.size());
-  for (const Placement& placement : growth.layout) {
-    layout.push_back(Laid{placement.plan, Cell{corner.x + placement.offset.x,
-                                               corner.y + placement.offset.y}});
-  }
   const std::optional<std::vector<std::size_t>> laid =
-      lay(layout, growth, settlers, centre);
+      lay(layout_at(corner, growth), growth, settlers, centre);
   if (!laid) {
     return false;
   }
@@ -4578,7 +4419,7 @@ std::optional<std::vector<std::size_t>> World::lay(
     made.push_back(structures_.size());
     structures_.push_back(Structure{each.cell, 0, plan.footprint, plan.blocks});
     villages_.add_structure();
-    plans_.emplace_back(each.plan);
+    plans_.add(each.plan);
     structure_extent_ =
         std::max({structure_extent_, plan.footprint.width * CELL_SIZE,
                   plan.footprint.height * CELL_SIZE});
@@ -4593,8 +4434,7 @@ void World::attach(std::size_t village,
                    const std::vector<std::size_t>& structures,
                    const Growth& growth) {
   for (const std::size_t structure : structures) {
-    villages_.attach(village, structure,
-                     growth.plans.at(plans_.at(structure).value_or(0)).holding);
+    villages_.attach(village, structure, plans_.holding_of(structure, growth));
   }
 }
 

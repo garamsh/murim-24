@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "flow_field.hpp"
 #include "limits.hpp"
 #include "map.hpp"
 #include "village.hpp"
@@ -79,5 +81,94 @@ struct Growth {
 /// above PER_MILLE, reaches outside [0, MAX_REACH], or lays a footprint or
 /// placement it cannot.
 void check_growth(const Growth& growth);
+
+/// Cells of a map, row by row: those a structure or a village's clearing
+/// covers, those that are not buildable, and those an objective or a living
+/// person takes.
+struct Ground {
+  std::vector<bool> covered;
+  std::vector<bool> rough;
+  std::vector<bool> taken;
+};
+
+/// Plan `plan` laid from `cell`, its top-left cell.
+struct Laid {
+  std::size_t plan;
+  Cell cell;
+};
+
+/// The plan each structure was laid from, the one place it is kept: none for
+/// a structure the world was created with.
+class Plans {
+ public:
+  /// No structures.
+  Plans() = default;
+
+  /// `structures` structures, laid from no plan.
+  explicit Plans(std::size_t structures);
+
+  /// The plan of each structure as a save holds them, unchecked until kept()
+  /// is asked.
+  explicit Plans(std::vector<std::optional<std::size_t>> laid_from);
+
+  /// Returns the plan each structure was laid from, by structure.
+  [[nodiscard]] const std::vector<std::optional<std::size_t>>& laid_from()
+      const;
+
+  /// Returns the plan structure `structure` was laid from, if any. Throws
+  /// std::out_of_range when there is no such structure.
+  [[nodiscard]] const std::optional<std::size_t>& plan_of(
+      std::size_t structure) const;
+
+  /// Takes one more structure, laid from `plan` if it names one.
+  void add(std::optional<std::size_t> plan);
+
+  /// Returns what structure `structure` holds by the plan it was laid from in
+  /// `growth`, the first plan's for one laid from none.
+  [[nodiscard]] Holding holding_of(std::size_t structure,
+                                   const Growth& growth) const;
+
+  /// Whether the saved-state invariant holds: a plan or none for each of
+  /// `structures` structures, each naming one of `growth`'s plans, and none
+  /// without it.
+  [[nodiscard]] bool kept(std::size_t structures,
+                          const std::optional<Growth>& growth) const;
+
+ private:
+  std::vector<std::optional<std::size_t>> laid_from_;
+};
+
+/// Returns the plan of the growth's builds that most raises the scarcest of
+/// what `held` holds, in people: its housing, the people its harvest and its
+/// storage feed a year by `husbandry` (one a day without it), and the people
+/// it arms and tends beyond the growth's self-reliance; the first among
+/// equals, or nothing when none raises it.
+[[nodiscard]] std::optional<std::size_t> build_plan(
+    const Holding& held, const Growth& growth,
+    const std::optional<Husbandry>& husbandry);
+
+/// Returns the corner from which `footprint` lies within the growth's
+/// vicinity of `centre`, on cells of a map of `size` that `ground` leaves
+/// free: no cell covered or rough within one cell of it and none taken under
+/// it; the nearest `centre`, the first row by row among equals, or nothing
+/// when there is none.
+[[nodiscard]] std::optional<Cell> build_site(Footprint footprint, Cell centre,
+                                             const Growth& growth,
+                                             const Ground& ground,
+                                             Footprint size);
+
+/// Returns, row by row, the corners of the growth's settlement whose centre
+/// lies within its reach of `home` along each axis and `paths` reaches, on
+/// cells of a map of `size` that `ground` leaves free, no cell covered within
+/// its spacing, and none of whose cells `territory` gives to a faction other
+/// than `faction`.
+[[nodiscard]] std::vector<Cell> settlement_sites(
+    Cell home, const Growth& growth, const Ground& ground, Footprint size,
+    const FlowField& paths,
+    const std::vector<std::optional<std::size_t>>& territory,
+    std::size_t faction);
+
+/// Returns the growth's layout laid from a settlement's `corner`.
+[[nodiscard]] std::vector<Laid> layout_at(Cell corner, const Growth& growth);
 
 }  // namespace murim

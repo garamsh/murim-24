@@ -804,11 +804,6 @@ class World {
   [[nodiscard]] bool settling(std::size_t village) const;
   [[nodiscard]] std::vector<std::size_t> levy(std::size_t village) const;
   [[nodiscard]] std::vector<std::size_t> households(std::size_t village) const;
-  /// A plan laid from a corner cell.
-  struct Laid {
-    std::size_t plan;
-    Cell cell;
-  };
   [[nodiscard]] std::optional<std::vector<std::size_t>> lay(
       const std::vector<Laid>& laid, const Growth& growth,
       const std::vector<std::size_t>& movers, Cell destination);
@@ -816,14 +811,6 @@ class World {
               const Growth& growth);
   std::size_t form(std::size_t village, const std::vector<std::size_t>& members,
                    Cell objective, std::optional<std::size_t> into);
-  /// Cells of the map, row by row: those a structure or a village's clearing
-  /// covers, those that are not buildable, and those an objective or a
-  /// living person takes.
-  struct Ground {
-    std::vector<bool> covered;
-    std::vector<bool> rough;
-    std::vector<bool> taken;
-  };
   [[nodiscard]] Ground ground() const;
   [[nodiscard]] std::vector<Passing> passings() const;
   void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
@@ -869,8 +856,7 @@ class World {
   std::vector<Chart> charts_;
   /// Each family's surname, by index among the life's surnames.
   std::vector<std::size_t> surnames_;
-  // The growth plan each structure was laid from, if any.
-  std::vector<std::optional<std::size_t>> plans_;
+  Plans plans_;
 };
 
 }  // namespace murim
