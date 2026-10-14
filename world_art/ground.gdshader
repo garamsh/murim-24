@@ -191,6 +191,18 @@ vec3 ramp(int kind, int step) {
 	return ramps[kind * 7 + clamp(step, 0, 6)];
 }
 
+// Is something built `r` pixels from `p`, along a side or a diagonal?
+bool near_built(vec2 p, int r) {
+	for (int dy = -r; dy <= r; dy += r) {
+		for (int dx = -r; dx <= r; dx += r) {
+			if ((dx != 0 || dy != 0) && built(p + vec2(float(dx), float(dy)))) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 // Within `r` pixels of `p` on its level, is there ground of another kind than `kind`?
 bool near_other(vec2 p, int level, int kind, int r) {
 	for (int dy = -r; dy <= r; dy += r) {
@@ -237,10 +249,25 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	if (drops(p, p + vec2(0.0, 1.0))) {
 		colour = ramp(kind == ROCK || kind == WATER ? kind : HILLS, 6);
 	}
+	// Ground trodden bare round what is built, a road's or paving's edge among it: a dithered band
+	// of earth, thinning from three pixels in four beside it to one in five three pixels out.
+	if (kind != WATER && !built(p)) {
+		for (int r = 1; r <= 3; r++) {
+			if (near_built(p, r)) {
+				if (hash01(px.x, px.y, 42) < 0.95 - float(r) * 0.25) {
+					colour = ramp(BANK, hash01(px.x, px.y, 43) > 0.5 ? 4 : 3);
+				}
+				break;
+			}
+		}
+	}
 	// The foot of a face is in its shadow, thinning away from it, and scree lies there in
-	// clusters, more of it nearer the face.
+	// clusters, more of it nearer the face; where water meets a bank's foot, a strip of wet sand.
 	for (int d = 1; d <= 6; d++) {
 		if (drops(p - vec2(0.0, float(d)), p - vec2(0.0, float(d - 1)))) {
+			if (kind == WATER && d <= 2) {
+				colour = ramp(BANK, d == 1 ? 4 : 3);
+			}
 			if (kind != WATER && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
 				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 6 : 2);
 			}

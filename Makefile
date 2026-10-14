@@ -82,8 +82,9 @@ bench: build
 	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_bench
 	@$(BENCH_DIR)/murim_core_bench; tick=$$?; \
 	$(GODOT) --path . --script res://world_view/frame_bench.gd; frame=$$?; \
-	echo "make bench ran the tick benchmark (exit $$tick) and the frame benchmark (exit $$frame)"; \
-	test $$tick -eq 0 && test $$frame -eq 0
+	$(GODOT) --path . --script res://world_view/pan_bench.gd; pan=$$?; \
+	echo "make bench ran the tick benchmark (exit $$tick), the frame benchmark (exit $$frame) and the pan benchmark (exit $$pan)"; \
+	test $$tick -eq 0 && test $$frame -eq 0 && test $$pan -eq 0
 
 # Not part of ci: it measures how regions grow over seeds and years, which tunes data and gates nothing.
 FIRST_SEED ?= 0
