@@ -157,6 +157,9 @@ class Reader {
 
   [[nodiscard]] bool done() const { return next_ == last_; }
 
+  // The index of the next byte to be read.
+  [[nodiscard]] std::size_t next() const { return next_; }
+
  private:
   void take(std::size_t count) {
     if (count > last_ - next_) {
@@ -1173,7 +1176,9 @@ class SaveCodec {
             [&out](const Chart& chart) { put_chart(out, chart); });
   }
 
-  static World read(Reader& input) {
+  // Reads a world from `input`, noting in `parts`, if given, where its parts
+  // end.
+  static World read(Reader& input, SaveParts* parts) {
     const std::uint64_t rng_state = input.u64();
     const std::uint64_t tick_count = input.u64();
     Map map = get_map(input);
@@ -1277,6 +1282,9 @@ class SaveCodec {
     world.villages_ = Villages{std::move(villages), std::move(village_of)};
     world.plans_ = get_all<std::optional<std::size_t>>(
         input, [&input] { return get_index(input); });
+    if (parts != nullptr) {
+      parts->plans_end = input.next() - HEADER_BYTES;
+    }
     const std::vector<Engaged> engaged = get_all<Engaged>(input, [&input] {
       Engaged each;
       each.person = input.size();
@@ -1293,6 +1301,9 @@ class SaveCodec {
       throw Refusal{LoadError::CORRUPTED};
     }
     world.attacks_ = std::move(*attacks);
+    if (parts != nullptr) {
+      parts->engaged_end = input.next() - HEADER_BYTES;
+    }
     const Footprint size{world.map_.width(), world.map_.height()};
     world.charts_ = get_all<Chart>(input, [&input, &world, size] {
       Chart chart = get_chart(input, size, world.rules_.hostile.size());
@@ -1302,6 +1313,9 @@ class SaveCodec {
       }
       return chart;
     });
+    if (parts != nullptr) {
+      parts->charts_end = input.next() - HEADER_BYTES;
+    }
     if (world.charts_.size() != world.souls_.size()) {
       throw Refusal{LoadError::CORRUPTED};
     }
@@ -1329,12 +1343,11 @@ bool save(const Saved& saved, SaveStore& store, Slot slot) {
   return store.put(slot, bytes);
 }
 
-std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
-  const std::optional<std::vector<std::uint8_t>> held = store.get(slot);
-  if (!held) {
-    return LoadError::MISSING;
-  }
-  const std::vector<std::uint8_t>& bytes = *held;
+namespace {
+
+// Reads the save `bytes`, noting in `parts`, if given, where its parts end.
+std::variant<Saved, LoadError> decode(const std::vector<std::uint8_t>& bytes,
+                                      SaveParts* parts) {
   // The one handler for a refused save: every refusal while it is read ends
   // here as its LoadError.
   try {
@@ -1367,7 +1380,7 @@ std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
       const Seed region{input.u64()};
       return Origin{region, input.size()};
     });
-    World world = SaveCodec::read(input);
+    World world = SaveCodec::read(input, parts);
     if (!input.done()) {
       return LoadError::CORRUPTED;
     }
@@ -1377,6 +1390,26 @@ std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
   } catch (const std::invalid_argument&) {
     return LoadError::CORRUPTED;
   }
+}
+
+}  // namespace
+
+std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
+  const std::optional<std::vector<std::uint8_t>> held = store.get(slot);
+  if (!held) {
+    return LoadError::MISSING;
+  }
+  return decode(*held, nullptr);
+}
+
+std::variant<SaveParts, LoadError> save_parts(
+    const std::vector<std::uint8_t>& bytes) {
+  SaveParts parts;
+  const std::variant<Saved, LoadError> decoded = decode(bytes, &parts);
+  if (const auto* error = std::get_if<LoadError>(&decoded)) {
+    return *error;
+  }
+  return parts;
 }
 
 }  // namespace murim

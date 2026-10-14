@@ -73,4 +73,21 @@ bool save(const Saved& saved, SaveStore& store, Slot slot);
 [[nodiscard]] std::variant<Saved, LoadError> load(const SaveStore& store,
                                                   Slot slot);
 
+/// Where parts of a save's payload end, each as the offset from the
+/// payload's first byte to just past its last: the plan each structure was
+/// laid from, the people engaging a foe from its attack slots, and each soul's
+/// chart.
+struct SaveParts {
+  std::size_t plans_end = 0;
+  std::size_t engaged_end = 0;
+  std::size_t charts_end = 0;
+};
+
+/// Returns where the parts of the save `bytes` end, found by decoding it as
+/// load() does, or why load() would refuse it. A test reads a field by the
+/// end of its part through this, so a part the format later adds after it
+/// leaves the test standing.
+[[nodiscard]] std::variant<SaveParts, LoadError> save_parts(
+    const std::vector<std::uint8_t>& bytes);
+
 }  // namespace murim
