@@ -311,6 +311,12 @@ class World {
   /// with.
   [[nodiscard]] std::optional<std::size_t> plan_of(std::size_t structure) const;
 
+  /// Returns the kind of the plan structure `structure` was laid from, or
+  /// nothing for one the world was created with. Throws std::out_of_range
+  /// when there is no such structure.
+  [[nodiscard]] std::optional<std::string> laid_kind(
+      std::size_t structure) const;
+
   /// Returns the faction whose territory each cell of the map lies in, row by
   /// row: the owner of the nearest village with living residents whose
   /// centre lies within the growth's claim, the lowest village among equals,
@@ -321,6 +327,10 @@ class World {
   /// born again when it dies. Returns the soul. Throws std::invalid_argument
   /// when the person is dead or does not exist.
   std::size_t ensoul(std::size_t person);
+
+  /// Returns the army the latest body carrying soul `soul` serves in, or
+  /// nothing when it serves in none, as once it has died.
+  [[nodiscard]] std::optional<std::size_t> soul_army(std::size_t soul) const;
 
   /// Returns soul `soul`'s history.
   [[nodiscard]] const Soul& soul(std::size_t soul) const;
@@ -397,6 +407,24 @@ class World {
   /// when there is no such person.
   [[nodiscard]] std::optional<Nature> nature(std::size_t person) const;
 
+  /// Returns the art person `person` learned first, its heart method, or
+  /// nothing while it knows no art. Throws std::out_of_range when there is no
+  /// such person.
+  [[nodiscard]] std::optional<std::size_t> heart_art(std::size_t person) const;
+
+  /// Returns how far art `art`'s nature agrees with person `person`'s, per
+  /// mille, as the learning eases it: PER_MILLE for an art of its own nature
+  /// or while it knows none, less for one of another. Throws
+  /// std::out_of_range when there is no such person or art.
+  [[nodiscard]] std::uint64_t art_agreement(std::size_t person,
+                                            std::size_t art) const;
+
+  /// Returns whether skill `skill` of art `art` lies within person
+  /// `person`'s realm, so that its rank does not bar the person from it.
+  /// Throws std::out_of_range when there is no such person, art or skill.
+  [[nodiscard]] bool within_realm(std::size_t person, std::size_t art,
+                                  std::size_t skill) const;
+
   /// Returns the realms people cultivate into, ascending.
   [[nodiscard]] const std::vector<Realm>& realms() const;
 
@@ -408,6 +436,10 @@ class World {
 
   /// Returns whether faction `faction` elects its leader.
   [[nodiscard]] bool elects(std::size_t faction) const;
+
+  /// Returns whether faction `faction`'s lead passes by duel. Throws
+  /// std::out_of_range when there is no such faction.
+  [[nodiscard]] bool passes_by_duel(std::size_t faction) const;
 
   /// Returns why army `army`'s lead may not challenge faction `faction`'s
   /// leader, which is why order() would refuse that challenge, or
@@ -561,6 +593,13 @@ class World {
   /// is no such person.
   [[nodiscard]] TalkRefusal talk_refusal(std::size_t person,
                                          std::size_t other) const;
+
+  /// Returns whom person `person` would talk to: the nearest person it may
+  /// talk to, or would but for hostility, the first in army and roster order
+  /// among equals; nothing when there is none. Throws std::out_of_range when
+  /// there is no such person.
+  [[nodiscard]] std::optional<std::size_t> talk_target(
+      std::size_t person) const;
 
   /// Returns what person `person` offers one who talks to it, in the order
   /// they are offered: nothing once it is dead, and otherwise its news, then

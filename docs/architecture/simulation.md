@@ -19,7 +19,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - `village` villages, their structures and what they hold, and the villages a world keeps: the one place for each village's record and each structure's village, deciding what a village holds, its cap, what its workshops serve, how its stock fills and feeds, which village takes in the hungry, and who ruins and who retakes it; and how villages' claims divide the land into territory, which the live territory and a chart's remembered territory both read;
   - `growth` how villages grow;
   - `arts` arts, realms, cultivation, learning and manuals;
-  - `cultivation` the rules of cultivation and the martial arts: a person's realm rank and nature, how far an art agrees with it, the skill it may learn next, how its qi capacity grows and its qi recovers, and the chances it comprehends, reads a manual or is taught;
+  - `cultivation` the rules of cultivation and the martial arts: a person's realm rank, nature and heart method, whether a skill lies within its realm, how far an art agrees with it, the skill it may learn next, how its qi capacity grows and its qi recovers, and the chances it comprehends, reads a manual or is taught;
   - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two, deciding how two factions stand by the declaration between them or else their stances, which declarations a faction may make and when, what a leader no driver steers seeks, and which factions a duel's winner's allies turn hostile;
   - `trade` wares and trade;
   - `talk` talk and what a person offers;
@@ -178,6 +178,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 ### Talking and trade
 
 - One person may talk to another within the rules' `talk_reach`. `talk_refusal` names the first reason it may not: either is dead, the two are one person, the other is beyond reach, or their factions are hostile or at war as `relation` reads them.
+- `talk_target` names whom a person would talk to: the nearest it may talk to, or would but for hostility, the first in army and roster order among equals.
 - `offers` lists what a person offers one who talks to it: its news while it lives, then its wares while it sells any. The player hears rumours by talking.
 - Silver and wares go round by one rule, `Trade` in `Life`, for every person alike:
   - a ware is data: its name, its price, the health and qi it restores, and the discipline whose people sell it

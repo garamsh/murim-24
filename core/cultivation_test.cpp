@@ -88,6 +88,30 @@ TEST(Cultivation, TakesAPersonsNatureFromTheArtItLearnedFirst) {
   EXPECT_EQ(nature.value_or(Nature{}).polarity, Polarity::YIN);
 }
 
+TEST(Cultivation, NamesTheArtLearnedFirstAsTheHeartMethod) {
+  EXPECT_FALSE(heart_of(knowing({}, 0)).has_value());
+  const Person turned =
+      knowing({Known{DEMONIC_ART, 0, 0}, Known{ORTHODOX_ART, 0, 0}}, 0);
+  EXPECT_EQ(heart_of(turned), std::optional<std::size_t>{DEMONIC_ART});
+  // Control: learned the other way about, the other art.
+  const Person orthodox =
+      knowing({Known{ORTHODOX_ART, 0, 0}, Known{DEMONIC_ART, 0, 0}}, 0);
+  EXPECT_EQ(heart_of(orthodox), std::optional<std::size_t>{ORTHODOX_ART});
+}
+
+TEST(Cultivation, HoldsASkillWithinARealmItsRankDoesNotPass) {
+  const Life life = arts_life();
+  // Rank 0 reaches the orthodox art's first skill, of rank 0, alone.
+  EXPECT_TRUE(within_realm(knowing({}, 0), ORTHODOX_ART, 0, life));
+  EXPECT_FALSE(within_realm(knowing({}, 0), ORTHODOX_ART, 1, life));
+  // Control: at the first realm, rank 1, the second skill too.
+  EXPECT_TRUE(within_realm(knowing({}, FIRST_REALM), ORTHODOX_ART, 1, life));
+  EXPECT_TRUE(within_realm(knowing({}, FIRST_REALM), DEMONIC_ART, 0, life));
+  EXPECT_THROW(
+      static_cast<void>(within_realm(knowing({}, 0), DEMONIC_ART, 1, life)),
+      std::out_of_range);
+}
+
 TEST(Cultivation, EasesAnArtByHowFarItsNatureAgrees) {
   const Life life = arts_life();
   const Person orthodox = knowing({Known{ORTHODOX_ART, 0, 0}}, 0);

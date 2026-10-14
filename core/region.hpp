@@ -180,6 +180,22 @@ struct Region {
 [[nodiscard]] std::vector<Cell> open_cells(const Region& region,
                                            const Village& village);
 
+/// The kind, as the seats data names it, of the structure that is a sect's
+/// gate.
+inline constexpr const char* SEAT_GATE = "seat_gate";
+
+/// Returns the name of village `village`, by index, laid out from a template
+/// or a settlement of `kind`: the kind and the village's number, counted
+/// from 1.
+[[nodiscard]] std::string village_name(const std::string& kind,
+                                       std::size_t village);
+
+/// Returns the structure that is `village`'s gate, by index: the first of
+/// its structures whose kind among `kinds`, the region's structure kinds by
+/// index, is SEAT_GATE; nothing for a village with none.
+[[nodiscard]] std::optional<std::size_t> gate_of(
+    const Village& village, const std::vector<std::string>& kinds);
+
 /// Returns an army of one person born into village `village` of `region`:
 /// of the village's faction, with its residents' skills and health, making
 /// the village its home, standing on the first open cell of the village's area,

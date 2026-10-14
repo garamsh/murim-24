@@ -159,6 +159,9 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns whether faction `faction` elects its leader.
   [[nodiscard]] bool elects(std::int64_t faction) const;
 
+  /// Returns whether faction `faction`'s lead passes by duel.
+  [[nodiscard]] bool passes_by_duel(std::int64_t faction) const;
+
   /// Returns why army `army`'s lead may not challenge faction `faction`'s
   /// leader, one of the CHALLENGE_* constants; CHALLENGE_NONE when it may.
   [[nodiscard]] std::int64_t challenge_refusal(std::int64_t army,
@@ -361,6 +364,21 @@ class WorldAdapter : public godot::RefCounted {
   /// reaches, 0 for none.
   [[nodiscard]] std::int64_t person_realm(std::int64_t person) const;
 
+  /// Returns the art person `person` learned first, its heart method, or -1
+  /// while it knows no art.
+  [[nodiscard]] std::int64_t heart_art(std::int64_t person) const;
+
+  /// Returns how far art `art`'s nature agrees with person `person`'s, per
+  /// mille, as the core's learning eases it: 1000 for an art of its own
+  /// nature or while it knows none.
+  [[nodiscard]] std::int64_t art_agreement(std::int64_t person,
+                                           std::int64_t art) const;
+
+  /// Returns whether skill `skill` of art `art` lies within person
+  /// `person`'s realm, so that its rank does not bar the person from it.
+  [[nodiscard]] bool within_realm(std::int64_t person, std::int64_t art,
+                                  std::int64_t skill) const;
+
   /// Returns person `person`'s nature, its heart method's, as a Dictionary
   /// of `orientation`, one of the ORIENTATION_* constants, and `polarity`,
   /// one of the POLARITY_* constants; empty while it knows no art.
@@ -398,6 +416,10 @@ class WorldAdapter : public godot::RefCounted {
 
   /// Returns the village that is sect `sect`'s seat.
   [[nodiscard]] std::int64_t sect_seat(std::int64_t sect) const;
+
+  /// Returns the structure that is sect `sect`'s gate, as the core's region
+  /// names it among its seat's structures, or -1 when the seat has none.
+  [[nodiscard]] std::int64_t sect_gate(std::int64_t sect) const;
 
   /// Returns whether sect `sect`'s seat is held by its faction.
   [[nodiscard]] bool sect_seat_held(std::int64_t sect) const;
@@ -462,6 +484,11 @@ class WorldAdapter : public godot::RefCounted {
   /// and `by`, "election" or "duel"; "born" and "died" with `person`.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> rumours(
       std::int64_t person) const;
+
+  /// Returns whom person `person` would talk to, as the core chooses: the
+  /// nearest it may talk to, or would but for hostility; -1 when there is
+  /// none.
+  [[nodiscard]] std::int64_t talk_target(std::int64_t person) const;
 
   /// Returns why person `person` may not talk to person `other`, one of the
   /// TALK_* constants; TALK_NONE when it may.
@@ -636,6 +663,9 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] const murim::World& world() const;
   [[nodiscard]] std::size_t army_index(std::int64_t army) const;
   [[nodiscard]] std::size_t structure_index(std::int64_t structure) const;
+  [[nodiscard]] std::size_t art_index(std::int64_t art) const;
+  [[nodiscard]] std::size_t skill_index(std::int64_t art,
+                                        std::int64_t skill) const;
   [[nodiscard]] std::size_t ware_index(std::int64_t ware) const;
   [[nodiscard]] std::size_t village_index(std::int64_t village) const;
   [[nodiscard]] std::size_t faction_index(std::int64_t faction) const;

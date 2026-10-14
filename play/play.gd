@@ -888,17 +888,9 @@ func talk_target() -> Dictionary:
 	if roster.is_empty():
 		return found
 	var speaker := roster[0]
-	var here := world.person_position(speaker)
-	var nearest := INF
-	for army in world.army_count():
-		for person in world.roster(army):
-			var refusal := world.talk_refusal(speaker, person)
-			if refusal != WorldAdapter.TALK_NONE and refusal != WorldAdapter.TALK_HOSTILE:
-				continue
-			var apart := here.distance_squared_to(world.person_position(person))
-			if apart < nearest:
-				nearest = apart
-				found = {"person": person, "hostile": refusal == WorldAdapter.TALK_HOSTILE}
+	var person := world.talk_target(speaker)
+	if person >= 0:
+		found = {"person": person, "hostile": world.talk_refusal(speaker, person) == WorldAdapter.TALK_HOSTILE}
 	return found
 
 

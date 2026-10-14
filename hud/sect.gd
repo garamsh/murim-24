@@ -185,12 +185,13 @@ func _compose() -> void:
 		"leader": PersonName.of(_world, leader, true) if leader >= 0 else tr("HUD_LEADER_NONE"),
 		"leader_sect": Affiliation.sect_name(_world, leader_sect) if leader_sect >= 0 else "",
 		"elects": _world.elects(faction),
-		"duel": _world.challenge_refusal(_army, faction) != WorldAdapter.CHALLENGE_NO_SUCCESSION,
+		"duel": _world.passes_by_duel(faction),
 		"sects": sects,
 	}
 	_gate_frame = 0
-	if sect >= 0:
-		_gate_frame = _gate_stage(_world.sect_seat(sect))
+	var gate := _world.sect_gate(sect) if sect >= 0 else -1
+	if gate >= 0:
+		_gate_frame = _world.structure_stage(gate)
 	queue_redraw()
 
 
@@ -205,16 +206,6 @@ func _seat_state(index: int) -> String:
 	if not _world.sect_stands(index):
 		return "fallen"
 	return "held" if _world.sect_seat_held(index) else "lost"
-
-
-# The stage of the gate in `village`'s area, as WorldAdapter.structure_stage gives it.
-func _gate_stage(village: int) -> int:
-	var seat: Dictionary = _world.villages()[village]
-	var area := Rect2i(seat.corner, seat.area)
-	for structure in _world.structure_count():
-		if _world.structure_kind(structure) == "seat_gate" and area.has_point(_world.structure_cell(structure)):
-			return _world.structure_stage(structure)
-	return 0
 
 
 ## Returns the width of each of `tabs` faction tabs.

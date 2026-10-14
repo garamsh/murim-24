@@ -39,10 +39,10 @@
 #include "event.hpp"
 #include "file_saves.hpp"
 #include "flow_field.hpp"
-#include "growth.hpp"
 #include "json_packs.hpp"
 #include "leadership.hpp"
 #include "life.hpp"
+#include "limits.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "names.hpp"
@@ -586,21 +586,8 @@ bool WorldAdapter::save(std::int64_t slot,
 }
 
 std::int64_t WorldAdapter::player_army() const {
-  const murim::World& held = world();
-  // The soul's latest body is the last person carrying it.
-  for (std::size_t person = held.population(); person-- > 0;) {
-    if (held.person(person).soul != PLAYER_SOUL) {
-      continue;
-    }
-    for (std::size_t army = 0; army < held.army_count(); ++army) {
-      const std::vector<std::size_t>& roster = held.roster(army);
-      if (std::find(roster.begin(), roster.end(), person) != roster.end()) {
-        return static_cast<std::int64_t>(army);
-      }
-    }
-    return -1;
-  }
-  return -1;
+  const std::optional<std::size_t> army = world().soul_army(PLAYER_SOUL);
+  return army ? static_cast<std::int64_t>(*army) : -1;
 }
 
 std::int64_t WorldAdapter::region_seed() const {
@@ -662,6 +649,22 @@ std::size_t WorldAdapter::person_index(std::int64_t person) const {
       person < 0 || static_cast<std::uint64_t>(person) >= world().population(),
       "person index out of range");
   return static_cast<std::size_t>(person);
+}
+
+std::size_t WorldAdapter::art_index(std::int64_t art) const {
+  CRASH_COND_MSG(
+      art < 0 || static_cast<std::uint64_t>(art) >= world().arts().size(),
+      "art index out of range");
+  return static_cast<std::size_t>(art);
+}
+
+std::size_t WorldAdapter::skill_index(std::int64_t art,
+                                      std::int64_t skill) const {
+  CRASH_COND_MSG(
+      skill < 0 || static_cast<std::uint64_t>(skill) >=
+                       world().arts().at(art_index(art)).skills.size(),
+      "skill index out of range");
+  return static_cast<std::size_t>(skill);
 }
 
 std::size_t WorldAdapter::ware_index(std::int64_t ware) const {
@@ -810,11 +813,9 @@ godot::String WorldAdapter::structure_kind(std::int64_t structure) const {
   if (index < structure_kinds_.size()) {
     return {structure_kinds_.at(index).c_str()};
   }
-  // A structure growth laid takes its plan's kind.
-  const std::optional<std::size_t> plan = world().plan_of(index);
-  const std::optional<murim::Growth>& growth = region_data_.life.growth;
-  return plan && growth ? godot::String(growth->plans.at(*plan).kind.c_str())
-                        : godot::String();
+  // A structure growth laid takes the kind the core gives its plan.
+  const std::optional<std::string> kind = world().laid_kind(index);
+  return kind ? godot::String(kind->c_str()) : godot::String();
 }
 
 godot::TypedArray<godot::Dictionary> WorldAdapter::skills(
@@ -1122,8 +1123,8 @@ std::vector<godot::Dictionary> WorldAdapter::village_fields() const {
        village < world().village_count(); ++village) {
     const std::optional<murim::Settlement> land = world().settlement(village);
     CRASH_COND_MSG(!land, "a village added as the world runs was not founded");
-    add(land->kind + " " + std::to_string(village + 1), land->kind,
-        land->corner, land->area);
+    add(murim::village_name(land->kind, village), land->kind, land->corner,
+        land->area);
   }
   return villages;
 }
@@ -1196,6 +1197,10 @@ std::int64_t WorldAdapter::leader(std::int64_t faction) const {
 
 bool WorldAdapter::elects(std::int64_t faction) const {
   return world().elects(faction_index(faction));
+}
+
+bool WorldAdapter::passes_by_duel(std::int64_t faction) const {
+  return world().passes_by_duel(faction_index(faction));
 }
 
 std::int64_t WorldAdapter::challenge_refusal(std::int64_t army,
@@ -1423,6 +1428,12 @@ std::int64_t WorldAdapter::aim(std::int64_t person, std::int64_t skill,
   }
 }
 
+std::int64_t WorldAdapter::talk_target(std::int64_t person) const {
+  const std::optional<std::size_t> other =
+      world().talk_target(person_index(person));
+  return other ? static_cast<std::int64_t>(*other) : -1;
+}
+
 std::int64_t WorldAdapter::talk_refusal(std::int64_t person,
                                         std::int64_t other) const {
   return static_cast<std::int64_t>(
@@ -1586,6 +1597,24 @@ std::int64_t WorldAdapter::person_realm(std::int64_t person) const {
   return world().rank(person_index(person));
 }
 
+std::int64_t WorldAdapter::heart_art(std::int64_t person) const {
+  const std::optional<std::size_t> art =
+      world().heart_art(person_index(person));
+  return art ? static_cast<std::int64_t>(*art) : -1;
+}
+
+std::int64_t WorldAdapter::art_agreement(std::int64_t person,
+                                         std::int64_t art) const {
+  return static_cast<std::int64_t>(
+      world().art_agreement(person_index(person), art_index(art)));
+}
+
+bool WorldAdapter::within_realm(std::int64_t person, std::int64_t art,
+                                std::int64_t skill) const {
+  return world().within_realm(person_index(person), art_index(art),
+                              skill_index(art, skill));
+}
+
 godot::Dictionary WorldAdapter::person_nature(std::int64_t person) const {
   godot::Dictionary fields;
   if (const std::optional<murim::Nature> nature =
@@ -1696,6 +1725,16 @@ std::int64_t WorldAdapter::sect_seat(std::int64_t sect) const {
   return static_cast<std::int64_t>(world().sect_seat(sect_index(sect)));
 }
 
+std::int64_t WorldAdapter::sect_gate(std::int64_t sect) const {
+  const std::size_t seat = world().sect_seat(sect_index(sect));
+  if (seat >= villages_.size()) {
+    return -1;
+  }
+  const std::optional<std::size_t> gate =
+      murim::gate_of(villages_.at(seat), structure_kinds_);
+  return gate ? static_cast<std::int64_t>(*gate) : -1;
+}
+
 bool WorldAdapter::sect_seat_held(std::int64_t sect) const {
   return world().seat_held(sect_index(sect));
 }
@@ -1795,6 +1834,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::faction_count);
   godot::ClassDB::bind_method(godot::D_METHOD("leader", "faction"),
                               &WorldAdapter::leader);
+  godot::ClassDB::bind_method(godot::D_METHOD("passes_by_duel", "faction"),
+                              &WorldAdapter::passes_by_duel);
   godot::ClassDB::bind_method(godot::D_METHOD("elects", "faction"),
                               &WorldAdapter::elects);
   godot::ClassDB::bind_method(
@@ -1857,6 +1898,8 @@ void WorldAdapter::_bind_methods() {
       godot::D_METHOD("aim", "person", "skill", "facing"), &WorldAdapter::aim);
   godot::ClassDB::bind_method(godot::D_METHOD("rumours", "person"),
                               &WorldAdapter::rumours);
+  godot::ClassDB::bind_method(godot::D_METHOD("talk_target", "person"),
+                              &WorldAdapter::talk_target);
   godot::ClassDB::bind_method(
       godot::D_METHOD("talk_refusal", "person", "other"),
       &WorldAdapter::talk_refusal);
@@ -1891,6 +1934,13 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_qi_capacity);
   godot::ClassDB::bind_method(godot::D_METHOD("person_realm", "person"),
                               &WorldAdapter::person_realm);
+  godot::ClassDB::bind_method(godot::D_METHOD("heart_art", "person"),
+                              &WorldAdapter::heart_art);
+  godot::ClassDB::bind_method(godot::D_METHOD("art_agreement", "person", "art"),
+                              &WorldAdapter::art_agreement);
+  godot::ClassDB::bind_method(
+      godot::D_METHOD("within_realm", "person", "art", "skill"),
+      &WorldAdapter::within_realm);
   godot::ClassDB::bind_method(godot::D_METHOD("person_nature", "person"),
                               &WorldAdapter::person_nature);
   godot::ClassDB::bind_method(godot::D_METHOD("person_skills", "person"),
@@ -1901,6 +1951,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::sect_name);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_faction", "sect"),
                               &WorldAdapter::sect_faction);
+  godot::ClassDB::bind_method(godot::D_METHOD("sect_gate", "sect"),
+                              &WorldAdapter::sect_gate);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_seat", "sect"),
                               &WorldAdapter::sect_seat);
   godot::ClassDB::bind_method(godot::D_METHOD("sect_seat_held", "sect"),
@@ -1988,6 +2040,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::villages);
   godot::ClassDB::bind_integer_constant(name, "", "TICKS_PER_SECOND",
                                         murim::TICKS_PER_SECOND);
+  godot::ClassDB::bind_integer_constant(name, "", "PER_MILLE",
+                                        murim::PER_MILLE);
   godot::ClassDB::bind_integer_constant(name, "", "CELL_SIZE",
                                         murim::CELL_SIZE);
   godot::ClassDB::bind_integer_constant(name, "", "ARC_HALF_WIDTH_DEGREES",

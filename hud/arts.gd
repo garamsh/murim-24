@@ -233,22 +233,34 @@ func _compose() -> void:
 
 
 ## Returns what the panel reads of `person` from `world`: the world's `realms` and `arts`, and the
-## person's realm `rank`, `qi`, `capacity`, `nature` and `skills`, as the adapter gives them.
+## person's realm `rank`, `qi`, `capacity`, `nature` and `skills`, its `heart` art, how far each
+## art agrees with it, `agreement` by art, and whether each skill lies `within` its realm, by art
+## and skill, as the adapter gives them.
 static func read(world: WorldAdapter, person: int) -> Dictionary:
-	return {"realms": world.realms(), "arts": world.arts(), "rank": world.person_realm(person),
+	var arts := world.arts()
+	var agreement: Array[int] = []
+	var within: Array = []
+	for art in arts.size():
+		agreement.append(world.art_agreement(person, art))
+		var skills: Array[bool] = []
+		for skill in arts[art].skills.size():
+			skills.append(world.within_realm(person, art, skill))
+		within.append(skills)
+	return {"realms": world.realms(), "arts": arts, "rank": world.person_realm(person),
 			"qi": world.person_qi(person), "capacity": world.person_qi_capacity(person),
-			"nature": world.person_nature(person), "skills": world.person_skills(person)}
+			"nature": world.person_nature(person), "skills": world.person_skills(person),
+			"heart": world.heart_art(person), "agreement": agreement, "within": within}
 
 
 ## Returns what the panel shows of `reads`, as read() gives them, in the current locale: `realm`,
 ## `rank`, `realms`, `next` and `next_qi`, `qi` and `capacity`, `heart`, and `groups`, as `shown`
-## holds them. An art of another nature than the person's, in orientation or polarity, carries the
-## weaker tag; the art learned first, the heart method's.
+## holds them. The heart art the core names carries the heart method's tag, and an art the core
+## eases, agreeing with the person less than fully, the weaker tag; a skill outside the person's
+## realm by the core is locked.
 static func compose(reads: Dictionary) -> Dictionary:
 	var realms: Array = reads.realms
 	var arts: Array = reads.arts
 	var skills: Array = reads.skills
-	var nature: Dictionary = reads.nature
 	var rank: int = reads.rank
 	var composed := {"groups": [], "rank": rank, "realms": realms.size(), "qi": reads.qi,
 			"capacity": reads.capacity, "realm": _realm_of(realms, rank),
@@ -258,24 +270,24 @@ static func compose(reads: Dictionary) -> Dictionary:
 	for skill: Dictionary in skills:
 		if skill.art >= 0 and not order.has(int(skill.art)):
 			order.append(int(skill.art))
+	var heart: int = reads.heart
 	composed.heart = {}
-	if not order.is_empty():
-		composed.heart = {"name": named(arts[order[0]]), "nature": _nature_words(arts[order[0]]),
-				"ramp": NATURE_RAMPS[int(arts[order[0]].orientation)]}
+	if heart >= 0:
+		composed.heart = {"name": named(arts[heart]), "nature": _nature_words(arts[heart]),
+				"ramp": NATURE_RAMPS[int(arts[heart].orientation)]}
 	for art: int in order:
 		var group := {"name": named(arts[art]), "nature": _nature_words(arts[art]),
 				"ramp": NATURE_RAMPS[int(arts[art].orientation)], "tags": [], "skills": []}
-		if art == order[0]:
+		if art == heart:
 			group.tags.append({"text": _tr("ARTS_HEART_TAG"), "fill": Palette.JADE_2})
-		elif not nature.is_empty() and (arts[art].orientation != nature.orientation \
-				or arts[art].polarity != nature.polarity):
+		elif int(reads.agreement[art]) < WorldAdapter.PER_MILLE:
 			group.tags.append({"text": _tr("ARTS_WEAKER"), "fill": Palette.CRIMSON_2})
 		for index in arts[art].skills.size():
 			var taught: Dictionary = arts[art].skills[index]
 			var held := {"art": art, "skill": index}
 			group.skills.append({"held": held, "name": named(taught),
 					"icon": _icon(taught), "known": _held_index(skills, held) >= 0,
-					"locked": int(taught.rank) > rank, "cost": grouped(taught.qi_cost),
+					"locked": not reads.within[art][index], "cost": grouped(taught.qi_cost),
 					"realm": _realm_of(realms, taught.rank),
 					"cooldown": _tr("ARTS_SECONDS") % ceili(float(taught.cooldown) / WorldAdapter.TICKS_PER_SECOND),
 					"range": _tr("ARTS_CELLS") % (int(taught.range) / WorldAdapter.CELL_SIZE),

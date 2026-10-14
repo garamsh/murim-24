@@ -28,6 +28,17 @@ std::optional<Nature> nature_of(const Person& person, const Life& life) {
                    life.arts.at(person.known.front().art).nature};
 }
 
+std::optional<std::size_t> heart_of(const Person& person) {
+  return person.known.empty()
+             ? std::nullopt
+             : std::optional<std::size_t>{person.known.front().art};
+}
+
+bool within_realm(const Person& person, std::size_t art, std::size_t skill,
+                  const Life& life) {
+  return life.arts.at(art).skills.at(skill).rank <= rank_of(person, life);
+}
+
 std::uint64_t agreement(const Person& person, std::size_t art, bool potency,
                         const Life& life) {
   if (person.known.empty()) {

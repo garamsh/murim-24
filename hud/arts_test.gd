@@ -48,7 +48,8 @@ func run() -> bool:
 	var heart: Dictionary = groups[0]
 	var listed_right: bool = heart.name == arts[art].korean and heart.skills.size() == arts[art].skills.size() \
 			and heart.tags.size() == 1 and heart.tags[0].text == "심법" and groups.back().has("faction") \
-			and groups.back().skills.size() == drilled and panel.shown.heart.name == arts[art].korean
+			and groups.back().skills.size() == drilled and panel.shown.heart.name == arts[art].korean \
+			and world.heart_art(person) == art
 	var greyed := 0
 	var locked := 0
 	for index in heart.skills.size():
@@ -57,7 +58,7 @@ func run() -> bool:
 		var learned := false
 		for at in skills.size():
 			learned = learned or Loadout.identity(skills, at) == {"art": art, "skill": index}
-		listed_right = listed_right and shown.known == learned and shown.locked == (int(taught.rank) > rank) \
+		listed_right = listed_right and shown.known == learned and shown.locked == not world.within_realm(person, art, index) \
 				and shown.cost == Arts.grouped(taught.qi_cost) and shown.realm == Arts.realm_name(world, taught.rank) \
 				and shown.cooldown == "%d초" % ceili(float(taught.cooldown) / WorldAdapter.TICKS_PER_SECOND)
 		greyed += 0 if shown.known else 1
@@ -127,15 +128,12 @@ func run() -> bool:
 			and _fit_pass(world)
 
 
-# The same person's reads, given the first skill of an art of another nature than its heart
-# method's: that art is listed second, tagged weaker, the heart method keeping its own tag. Control:
-# the same art made of the heart method's nature, in orientation and polarity, carries no tag.
+# The same person's reads, given the first skill of an art the core eases for it, of another nature
+# than its heart method's: that art is listed second, tagged weaker, the heart method keeping its
+# own tag. Control: the same art read as agreeing fully carries no tag.
 func _weaker_pass(world: WorldAdapter, person: int) -> bool:
 	var reads := Arts.read(world, person)
-	var heart := -1
-	for skill: Dictionary in reads.skills:
-		if skill.art >= 0 and heart < 0:
-			heart = skill.art
+	var heart: int = reads.heart
 	var other := -1
 	for art in reads.arts.size():
 		if other < 0 and (reads.arts[art].orientation != reads.arts[heart].orientation \
@@ -153,16 +151,17 @@ func _weaker_pass(world: WorldAdapter, person: int) -> bool:
 			return group.tags.map(func(tag: Dictionary) -> String: return tag.text))
 	var weaker: Array = tags.call(Arts.compose(given))
 	var alike := given.duplicate(true)
-	alike.arts[other].orientation = alike.arts[heart].orientation
-	alike.arts[other].polarity = alike.arts[heart].polarity
+	alike.agreement[other] = WorldAdapter.PER_MILLE
 	var unmarked: Array = tags.call(Arts.compose(alike))
-	# Setup: the person's nature is its heart method's, and the art given is not yet known to it.
+	# Setup: the person's nature is its heart method's, the core eases the art given, and that art is
+	# not yet known to it.
 	var set_up: bool = heart >= 0 and other >= 0 and reads.nature.orientation == reads.arts[heart].orientation \
 			and reads.nature.polarity == reads.arts[heart].polarity \
+			and int(reads.agreement[other]) < WorldAdapter.PER_MILLE \
 			and reads.skills.all(func(skill: Dictionary) -> bool: return skill.art != other)
 	var passed: bool = set_up and weaker.size() == 3 and weaker[0] == ["심법"] and weaker[1] == ["약화"] \
 			and unmarked.size() == 3 and unmarked[0] == ["심법"] and unmarked[1] == []
-	print("arts_test: heart method %d given art %d of another nature, tags %s; made of the heart's nature, %s (setup %s): %s" % [
+	print("arts_test: heart method %d given art %d of another nature, tags %s; read as agreeing fully, %s (setup %s): %s" % [
 		heart, other, weaker, unmarked, set_up, "pass" if passed else "FAIL"])
 	return passed
 
