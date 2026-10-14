@@ -114,7 +114,8 @@ return function(px)
   }
 
   -- Builds one body on a fresh 16x18 canvas, anchored so its feet sit on row 16.
-  -- spec: faction, head, hat, body, weapon, over (letter overrides).
+  -- spec: faction, head, hat, body, weapon, over (letter overrides), raw (true leaves the
+  -- silhouette unoutlined, for a pose that adds to it before outlining it whole).
   function S.body(spec)
     local cv = px.canvas(16, 18)
     local map = scheme(spec.faction, spec.over)
@@ -145,7 +146,7 @@ return function(px)
     if spec.weapon then weapons[spec.weapon](cv, bx + bw - 1, by + 3) end
     -- The whole silhouette in the darkest step of the body's garment, so no edge takes a step of
     -- its skin or hair and the figure stays dark against the ground.
-    cv:selout(0, 0, 16, 18, px.ramp_of[map.R][1])
+    if not spec.raw then cv:selout(0, 0, 16, 18, px.ramp_of[map.R][1]) end
     return cv
   end
 
