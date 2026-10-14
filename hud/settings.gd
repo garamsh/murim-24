@@ -3,8 +3,9 @@
 ## volume of all sound, of the effects and of the music, whether a cast key casts on its press or on
 ## its release, the touch controls, on a phone or a tablet, forced on, forced on with a tap on the
 ## ground walking there, or off, and whose damage floats up as numbers over the struck, no one's,
-## the player's own or everyone's, whether a hit draws blood, and whether a hit on or from the
-## player holds the frame a moment and shakes the screen, each a row of its choices with the chosen
+## the player's own or everyone's, whether a hit draws blood, whether a hit on or from the player
+## holds the frame a moment and shakes the screen, how much the screen's effects show, and whether
+## it rains, until the world holds weather, each a row of its choices with the chosen
 ## one in jade, and a line saying what the row being changed sets. The choices are the player's preferences, not the world's
 ## state: they are kept in a file under user:// and applied to the window, the translations, the
 ## audio buses, the HUD's layout, the play scene's pace and the world's drawing. A row's choice is
@@ -18,28 +19,30 @@ signal applied
 const PATH := "user://settings.cfg"
 const SECTION := "settings"
 # The mockup's layout, in the native 480x270.
-const DIALOG := Rect2(60, 4, 360, 256)
+const DIALOG := Rect2(60, 1, 360, 268)
 # The mockup's rows were 26 pixels apart; the rows for casting, touch, damage numbers, blood, hit
-# stop and screen effects close them up, and the dialog stands 6 pixels higher, to keep the line
-# under them within the panel.
+# stop, screen effects and rain close them up, the first stands 3 pixels nearer the title, and the
+# dialog stands 9 pixels higher and 12 taller, to keep the line under them within the panel and the
+# panel within the native height.
 const ROW_STEP := 15
-const ROW_TOP := 27
+const ROW_TOP := 24
 const CHOICE_WIDTH := 64
 const VOLUME_WIDTH := 40
 ## The rows, in the order they are drawn, each with the hud.csv keys of its label and what it sets.
 const ROWS := ["speed", "window", "resolution", "language", "master", "effects", "music", "cast",
-		"touch", "numbers", "blood", "hitstop", "screen"]
+		"touch", "numbers", "blood", "hitstop", "screen", "rain"]
 const LABEL_KEYS := {"speed": "SETTINGS_SPEED", "window": "SETTINGS_WINDOW",
 		"resolution": "SETTINGS_RESOLUTION", "language": "SETTINGS_LANGUAGE",
 		"master": "SETTINGS_MASTER", "effects": "SETTINGS_EFFECTS", "music": "SETTINGS_MUSIC",
 		"cast": "SETTINGS_CAST", "touch": "SETTINGS_TOUCH", "numbers": "SETTINGS_NUMBERS",
-		"blood": "SETTINGS_BLOOD", "hitstop": "SETTINGS_HITSTOP", "screen": "SETTINGS_SCREEN"}
+		"blood": "SETTINGS_BLOOD", "hitstop": "SETTINGS_HITSTOP", "screen": "SETTINGS_SCREEN",
+		"rain": "SETTINGS_RAIN"}
 const ABOUT_KEYS := {"speed": "SETTINGS_SPEED_ABOUT", "window": "SETTINGS_WINDOW_ABOUT",
 		"resolution": "SETTINGS_RESOLUTION_ABOUT", "language": "SETTINGS_LANGUAGE_ABOUT",
 		"master": "SETTINGS_MASTER_ABOUT", "effects": "SETTINGS_EFFECTS_ABOUT",
 		"music": "SETTINGS_MUSIC_ABOUT", "cast": "SETTINGS_CAST_ABOUT", "touch": "SETTINGS_TOUCH_ABOUT",
 		"numbers": "SETTINGS_NUMBERS_ABOUT", "blood": "SETTINGS_BLOOD_ABOUT",
-		"hitstop": "SETTINGS_HITSTOP_ABOUT", "screen": "SETTINGS_SCREEN_ABOUT"}
+		"hitstop": "SETTINGS_HITSTOP_ABOUT", "screen": "SETTINGS_SCREEN_ABOUT", "rain": "SETTINGS_RAIN_ABOUT"}
 ## How many times the core's tick rate the world runs at.
 const SPEEDS := [1, 2, 4]
 const WINDOW_MODES := [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN]
@@ -66,12 +69,16 @@ const HITSTOP_KEYS := ["SETTINGS_HITSTOP_ON", "SETTINGS_HITSTOP_OFF"]
 ## How much the screen's effects (#209) show, low dropping the costly ones, as grade.gd's Quality
 ## counts them. ADR 0048's quality profile takes this row's place once it is accepted.
 const SCREEN_KEYS := ["SETTINGS_SCREEN_LOW", "SETTINGS_SCREEN_STANDARD", "SETTINGS_SCREEN_HIGH"]
+## Whether it rains on the view (#209), off or on: a switch until the world holds weather, which
+## then takes this row's place. Low screen effects draw no rain whatever it says.
+const RAIN_KEYS := ["SETTINGS_RAIN_OFF", "SETTINGS_RAIN_ON"]
 ## What each row starts at before anything is kept: the native size at 4x is the project's window,
 ## the music sits under the effects, a cast key casts on its press, as Albion Online's quick
 ## cast does, and only the player's own damage floats up as numbers, which a battle of hundreds
-## would otherwise bury; and a hit draws blood and holds the frame.
+## would otherwise bury; a hit draws blood and holds the frame; and it does not rain.
 const DEFAULTS := {"speed": 0, "window": 0, "resolution": 2, "language": 0, "master": 4,
-		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 1, "blood": 0, "hitstop": 0, "screen": 1}
+		"effects": 4, "music": 3, "cast": 0, "touch": 0, "numbers": 1, "blood": 0, "hitstop": 0, "screen": 1,
+		"rain": 0}
 
 ## The index of each row's chosen choice, by row.
 var chosen := DEFAULTS.duplicate()
@@ -153,6 +160,9 @@ func choices(name: String) -> Array[String]:
 		"screen":
 			for screen_key: String in SCREEN_KEYS:
 				words.append(tr(screen_key))
+		"rain":
+			for rain_key: String in RAIN_KEYS:
+				words.append(tr(rain_key))
 		_:
 			for volume: float in VOLUMES:
 				words.append("%d%%" % roundi(volume * 100))
@@ -201,6 +211,11 @@ func hit_stop() -> bool:
 ## Returns how much the screen's effects show: 0 low, 1 standard, 2 high.
 func screen_quality() -> int:
 	return chosen.screen
+
+
+## Returns whether the rain row is on; the screen's effects at low still draw none.
+func rain() -> bool:
+	return chosen.rain == 1
 
 
 ## Returns whether a tap on the ground walks the steered person there.

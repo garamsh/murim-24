@@ -198,12 +198,13 @@ func fit_view() -> void:
 
 
 ## Shows the damage the struck take as numbers over them, or not, blood on a hit and the hit stop, or
-## not, and the screen's effects at their quality, as the settings choose.
+## not, the screen's effects at their quality, and rain or none, as the settings choose.
 func show_numbers() -> void:
 	_art.get_node("Combat").damage_numbers = _hud.settings.damage_numbers()
 	_art.get_node("Combat").blood = _hud.settings.blood()
 	_art.get_node("Combat").hit_stop = _hud.settings.hit_stop()
 	_grade.quality = _hud.settings.screen_quality()
+	_grade.raining = _hud.settings.rain()
 
 
 ## Opens the settings over the world, which stays paused while they are open; going back from
