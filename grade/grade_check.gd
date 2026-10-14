@@ -9,10 +9,11 @@
 ## block of the fire ramp's yellow laid in the world, it draws the frame unlit, lit by a light round
 ## the pane and one beside it, and lit at standard against low. It checks that the lights brighten
 ## the frame within their reach, redder there than green, and leave it unchanged beyond; that the
-## pane takes the fire ramp only when lit; and that standard's bloom changes pixels round the fire
-## block, which keeps its colour, and none away from it. It exits 0 when every check passes, 1 when one fails and 2 when
-## it cannot draw, as when its window draws too few frames to reach the last shot within MAX_FRAMES
-## frames. Its window stays on top, since a covered window is not drawn.
+## pane takes the fire ramp only when lit, and the ink of an outline across its bottom row never
+## does; and that standard's bloom changes pixels round the fire block, which keeps its colour,
+## and none away from it. It exits 0 when every check passes, 1 when one fails and 2 when it cannot
+## draw, as when its window draws too few frames to reach the last shot within MAX_FRAMES frames.
+## Its window stays on top, since a covered window is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
@@ -30,6 +31,8 @@ const BESIDE := Vector2(-150, -60)
 const REACH := 30.0
 const EMITTERS: Array[Color] = [Color("f5a33c"), Color("fbe37a"), Color("fff8dc")]
 const MIDDLE := Rect2i(560, 320, 320, 170)
+# The darkest ink, as a body's outline is drawn in.
+const INK := Color("171229")
 
 var _view: Node
 var _grade: Grade
@@ -116,11 +119,13 @@ func _report() -> void:
 	var warmth := _warmth(_shots.lit, reach)
 	_check("grade_check: the light changes %d pixels within half its reach, %.3f brighter, red over green there %.3f, and %d beyond it" % [
 		lit.count, -lit.darker, warmth, beyond.count], lit.count > 0 and lit.darker < 0.0 and warmth > 0.0 and beyond.count == 0)
-	var pane := Rect2i(_screen(Vector2(PANE.position)), PANE.size * int(_zoom))
+	var pane := Rect2i(_screen(Vector2(PANE.position)), (PANE.size - Vector2i(0, 1)) * int(_zoom))
+	var ink := Rect2i(_screen(Vector2(PANE.position + Vector2i(0, PANE.size.y - 1))), Vector2i(PANE.size.x, 1) * int(_zoom))
 	var lit_panes := _emitting(_shots.lit, pane)
 	var unlit_panes := _emitting(_shots.unlit, pane)
-	_check("grade_check: %d of the pane's %d pixels take the fire ramp lit, %d unlit" % [
-		lit_panes, pane.get_area(), unlit_panes], lit_panes > 0 and unlit_panes == 0)
+	var lit_ink := _emitting(_shots.lit, ink)
+	_check("grade_check: %d of the pane's %d pixels take the fire ramp lit, %d unlit, and %d of the ink's %d lit" % [
+		lit_panes, pane.get_area(), unlit_panes, lit_ink, ink.get_area()], lit_panes > 0 and unlit_panes == 0 and lit_ink == 0)
 	var fire := Rect2i(_screen(Vector2(FIRE.position)), FIRE.size * int(_zoom))
 	var round_fire := _differ(_shots.lit, _shots.bloom, fire.grow(int(2 * _zoom)))
 	var kept := _emitting(_shots.bloom, fire)
@@ -157,6 +162,7 @@ func _lay_fixture() -> void:
 	var image := Image.create_empty(160, 80, false, Image.FORMAT_RGBA8)
 	var origin := Vector2i(80, 40)
 	image.fill_rect(Rect2i(origin + PANE.position, PANE.size), Color("22132c"))
+	image.fill_rect(Rect2i(origin + PANE.position + Vector2i(0, PANE.size.y - 1), Vector2i(PANE.size.x, 1)), INK)
 	image.fill_rect(Rect2i(origin + FIRE.position, FIRE.size), EMITTERS[1])
 	var sprite := Sprite2D.new()
 	sprite.texture = ImageTexture.create_from_image(image)
