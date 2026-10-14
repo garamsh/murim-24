@@ -615,18 +615,6 @@ class World {
     Duel rule;
   };
 
-  struct Village {
-    VillageSpec spec;
-    std::optional<Destroyer> destroyer;
-    std::uint64_t stock = 0;
-    /// The army its raids are fought by, once it has raided, and the village
-    /// its party is out against.
-    std::optional<std::size_t> party;
-    std::optional<std::size_t> raiding;
-    /// The corner of the land it was founded on, if it was founded.
-    std::optional<Cell> founded;
-  };
-
   struct Army {
     std::size_t faction;
     std::vector<Skill> skills;
@@ -775,14 +763,7 @@ class World {
   void found(Person& person, std::optional<Sex> sex);
   void kin(const Kinship& kinship);
   void husband(const Husbandry& husbandry);
-  [[nodiscard]] Holding held(std::size_t village, Stage worst) const;
-  /// What a village's standing workshops do for its people: the edge they
-  /// strike with and the healing they recover, by village, each 0 where its
-  /// arms or tends fall short of the people whose home it is.
-  struct Service {
-    std::vector<std::uint32_t> edge;
-    std::vector<std::uint32_t> healing;
-  };
+  [[nodiscard]] Stages stages() const;
   [[nodiscard]] Service served() const;
   void tend();
   [[nodiscard]] std::vector<std::size_t> homes() const;
@@ -864,7 +845,7 @@ class World {
   // The widest footprint's side, in sub-cell units: a structure's centre lies
   // within it of every point of its footprint.
   std::int32_t structure_extent_ = 0;
-  std::vector<Village> villages_;
+  Villages villages_;
   std::vector<Leadership> leadership_;
   /// A sect: its name, its faction and its seat village.
   struct Sect {
@@ -888,8 +869,6 @@ class World {
   std::vector<Chart> charts_;
   /// Each family's surname, by index among the life's surnames.
   std::vector<std::size_t> surnames_;
-  // The village each structure belongs to, if any.
-  std::vector<std::optional<std::size_t>> village_of_;
   // The growth plan each structure was laid from, if any.
   std::vector<std::optional<std::size_t>> plans_;
 };

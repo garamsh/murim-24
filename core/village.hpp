@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -104,5 +106,197 @@ struct Destroyer {
 
 /// How broken a structure is, from durability by the floors in Rules.
 enum class Stage : std::uint8_t { INTACT, DAMAGED, DESTROYED, RUBBLE };
+
+/// The stage each of a world's structures is in, read from its durability by
+/// the lowest durability of the intact, damaged and destroyed stages. It reads
+/// the structures where they stand, so it outlives neither them nor a change
+/// to how many there are.
+class Stages {
+ public:
+  Stages(const std::vector<Structure>& structures,
+         std::array<std::uint32_t, 3> floors);
+
+  /// Returns the stage structure `structure` is in: below all three floors it
+  /// is rubble. Throws std::out_of_range when there is no such structure.
+  [[nodiscard]] Stage of(std::size_t structure) const;
+
+ private:
+  const std::vector<Structure>* structures_;
+  std::array<std::uint32_t, 3> floors_;
+};
+
+/// A village as a world keeps it: as it was created or founded, who last
+/// brought it to ruins, the food it holds, its raids, and the land it was
+/// founded on.
+struct VillageRecord {
+  VillageSpec spec;
+  std::optional<Destroyer> destroyer;
+  std::uint64_t stock = 0;
+  /// The army its raids are fought by, once it has raided, and the village
+  /// its party is out against.
+  std::optional<std::size_t> party;
+  std::optional<std::size_t> raiding;
+  /// The corner of the land it was founded on, if it was founded.
+  std::optional<Cell> founded;
+};
+
+/// What each village's standing workshops do for its people: the edge they
+/// strike with and the healing they recover, by village, each 0 where its
+/// arms or tends fall short of the people whose home it is.
+struct Service {
+  std::vector<std::uint32_t> edge;
+  std::vector<std::uint32_t> healing;
+};
+
+/// A raid a village sends: the army fighting it, its `party`, and the village
+/// it is out against, its `target`.
+struct Raid {
+  std::size_t party;
+  std::size_t target;
+};
+
+/// What a strike changing one of a village's structures did to the village:
+/// nothing, brought it to ruins, or gave it to the striking army as its
+/// residents.
+enum class VillageChange : std::uint8_t { NONE, RUINED, RETAKEN };
+
+/// The villages of a world, numbered in the order they were added, and the
+/// village each structure belongs to: the one place either is kept. It
+/// decides what a village holds, how many people it can hold, what its
+/// workshops do for them, how its stock fills and feeds them, which village
+/// takes in the hungry, and who ruins and who retakes it. Who makes it home,
+/// and the armies they serve in, the world keeps.
+class Villages {
+ public:
+  /// No villages and no structures.
+  Villages() = default;
+
+  /// No villages, and `structures` structures belonging to none.
+  explicit Villages(std::size_t structures);
+
+  /// The villages and the village of each structure, as a save holds them,
+  /// unchecked until kept() is asked.
+  Villages(std::vector<VillageRecord> records,
+           std::vector<std::optional<std::size_t>> village_of);
+
+  /// Returns how many villages there are.
+  [[nodiscard]] std::size_t size() const;
+
+  /// Returns whether there are none.
+  [[nodiscard]] bool empty() const;
+
+  /// Returns village `village`. Throws std::out_of_range when there is no
+  /// such village.
+  [[nodiscard]] const VillageRecord& at(std::size_t village) const;
+
+  /// Returns every village, in order.
+  [[nodiscard]] const std::vector<VillageRecord>& records() const;
+
+  /// Returns the village each structure belongs to, if any, by structure.
+  [[nodiscard]] const std::vector<std::optional<std::size_t>>& membership()
+      const;
+
+  /// Returns the village structure `structure` belongs to, if any. Throws
+  /// std::out_of_range when there is no such structure.
+  [[nodiscard]] const std::optional<std::size_t>& village_of(
+      std::size_t structure) const;
+
+  /// Returns whether army `army` is a village's residents.
+  [[nodiscard]] bool houses(std::size_t army) const;
+
+  /// Adds the village `spec` describes, among `armies` armies, its residents'
+  /// roster `roster` people long, with its storage full. Returns its index.
+  /// Throws std::invalid_argument when it names a structure that does not
+  /// exist or another village names, an army that does not exist or another
+  /// village houses, or holdings that are not one for each of its structures,
+  /// or more households than its residents pair into.
+  std::size_t add(VillageSpec spec, std::size_t armies, std::size_t roster,
+                  const Stages& stages);
+
+  /// Adds a village founded on the land from `corner`, with army `residents`
+  /// as its residents and no structure or food yet. Returns its index.
+  std::size_t found(std::size_t residents, Cell corner);
+
+  /// Takes one more structure, belonging to no village.
+  void add_structure();
+
+  /// Makes structure `structure` village `village`'s, holding `holding`.
+  void attach(std::size_t village, std::size_t structure, Holding holding);
+
+  /// Records `raid` as village `village`'s: its party out against its target.
+  void send(std::size_t village, Raid raid);
+
+  /// Ends village `village`'s raid; its party stays its own.
+  void end_raid(std::size_t village);
+
+  /// Ends village `village`'s raid and lets its party go.
+  void release(std::size_t village);
+
+  /// Returns what village `village`'s structures no worse than `worst` hold
+  /// together, the greatest edge and healing among them, and the harvest of
+  /// its intact fields.
+  [[nodiscard]] Holding held(std::size_t village, Stage worst,
+                             const Stages& stages) const;
+
+  /// Returns whether every structure of village `village` is in `stage`.
+  [[nodiscard]] bool all_in(std::size_t village, Stage stage,
+                            const Stages& stages) const;
+
+  /// Returns how many people village `village` can hold: the least of the
+  /// housing of its standing structures, the people its intact fields'
+  /// harvests feed for a year, and the people a year's food its standing
+  /// structures store feeds; `capacity` without `husbandry`.
+  [[nodiscard]] std::size_t cap(std::size_t village, const Stages& stages,
+                                const std::optional<Husbandry>& husbandry,
+                                std::size_t capacity) const;
+
+  /// Returns each village's edge and healing from its standing structures,
+  /// each kept only while `reliance` and what they arm, or tend, cover the
+  /// `population` people whose home it is.
+  [[nodiscard]] Service served(const std::vector<std::size_t>& population,
+                               std::uint64_t reliance,
+                               const Stages& stages) const;
+
+  /// Fills each village's stock with its intact fields' harvest when
+  /// `harvest`, up to its standing storage, then feeds the `population`
+  /// people whose home it is `consumption` each from it, or none of them
+  /// while it cannot feed them all. Returns whether each village fed them.
+  std::vector<bool> feed(const std::vector<std::size_t>& population,
+                         std::uint32_t consumption, bool harvest,
+                         const Stages& stages);
+
+  /// Returns whether village `village`, home to `people`, takes in a person
+  /// unfed too long: while it has room under its cap and food in store.
+  [[nodiscard]] bool shelters(std::size_t village, std::size_t people,
+                              const Stages& stages,
+                              const std::optional<Husbandry>& husbandry,
+                              std::size_t capacity) const;
+
+  /// Returns what structure `structure` shows as a field in season `season`,
+  /// or nothing when it yields no harvest. Throws std::out_of_range when
+  /// there is no such structure.
+  [[nodiscard]] std::optional<FieldState> field_state(
+      std::size_t structure, const Stages& stages, std::uint64_t season) const;
+
+  /// Takes the strike of `striker` that changed one of village `village`'s
+  /// structures, which stood above rubble before it if `stood` and gained
+  /// durability if `raised`, while its residents had a living member if
+  /// `peopled`. Leaving every structure rubble after one stood records the
+  /// striker as the village's destroyer; raising one while no resident lives
+  /// makes the striker's army its residents.
+  VillageChange shifted(std::size_t village, bool stood, bool raised,
+                        bool peopled, Destroyer striker, const Stages& stages);
+
+  /// Whether the saved-state invariant holds among `structures`, `armies`
+  /// armies and `factions` factions: a village for each structure or
+  /// none, and every structure, army and village a village names one that
+  /// exists, with what each of its structures holds, if anything.
+  [[nodiscard]] bool kept(const std::vector<Structure>& structures,
+                          std::size_t armies, std::size_t factions) const;
+
+ private:
+  std::vector<VillageRecord> records_;
+  std::vector<std::optional<std::size_t>> village_of_;
+};
 
 }  // namespace murim
