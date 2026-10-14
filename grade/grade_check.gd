@@ -8,9 +8,9 @@
 ## corners only, its middle the same as low's. Then, at night, over a fixture of a dark pane and a
 ## block of the fire ramp's yellow laid in the world, it draws the frame unlit, lit by a light round
 ## the pane and one beside it, and lit at standard against low. It checks that the lights brighten
-## the frame within their reach and leave it unchanged beyond; that the pane takes the fire ramp
-## only when lit; and that standard's bloom changes pixels round the fire block, which keeps its
-## colour, and none away from it. It exits 0 when every check passes, 1 when one fails and 2 when
+## the frame within their reach, redder there than green, and leave it unchanged beyond; that the
+## pane takes the fire ramp only when lit; and that standard's bloom changes pixels round the fire
+## block, which keeps its colour, and none away from it. It exits 0 when every check passes, 1 when one fails and 2 when
 ## it cannot draw, as when its window draws too few frames to reach the last shot within MAX_FRAMES
 ## frames. Its window stays on top, since a covered window is not drawn.
 extends SceneTree
@@ -113,8 +113,9 @@ func _report() -> void:
 	var reach := Rect2i(_screen(BESIDE) - Vector2i.ONE * int(REACH * 0.5 * _zoom), Vector2i.ONE * int(REACH * _zoom))
 	var lit := _differ(_shots.unlit, _shots.lit, reach)
 	var beyond := _differ(_shots.unlit, _shots.lit, Rect2i(_screen(BESIDE + Vector2(-REACH - 20, 0)) - Vector2i(10, 10), Vector2i(20, 20)))
-	_check("grade_check: the light changes %d pixels within half its reach, %.3f brighter, and %d beyond it" % [
-		lit.count, -lit.darker, beyond.count], lit.count > 0 and lit.darker < 0.0 and beyond.count == 0)
+	var warmth := _warmth(_shots.lit, reach)
+	_check("grade_check: the light changes %d pixels within half its reach, %.3f brighter, red over green there %.3f, and %d beyond it" % [
+		lit.count, -lit.darker, warmth, beyond.count], lit.count > 0 and lit.darker < 0.0 and warmth > 0.0 and beyond.count == 0)
 	var pane := Rect2i(_screen(Vector2(PANE.position)), PANE.size * int(_zoom))
 	var lit_panes := _emitting(_shots.lit, pane)
 	var unlit_panes := _emitting(_shots.unlit, pane)
@@ -200,6 +201,16 @@ func _blooming(images: Array[Image], rect: Rect2i) -> Dictionary:
 						for dx in range(-reach, reach + 1):
 							near[Vector2i(x + dx, y + dy)] = true
 	return near
+
+
+# How much redder than green `image` is within `rect` on average, so lamplight reads warm.
+func _warmth(image: Image, rect: Rect2i) -> float:
+	var sum := 0.0
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var c := image.get_pixel(x, y)
+			sum += c.r - c.g
+	return sum / rect.get_area()
 
 
 # How many pixels of `image` within `rect` are an emitter's colour.

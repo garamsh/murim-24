@@ -4,9 +4,10 @@
 // shadows lean further toward blue-violet and the brightest lights warm, by `hue_shift`. A light
 // vignette darkens toward the screen's corners, on the art's pixel grid and by the ordered dither,
 // so its edge steps in whole art pixels and blends nothing. By `lamp`, the lights grade.gd gives
-// warm the pixels round them back toward their own colour, in bands stepped by the dither, and the
-// dark panes of a lit window take the fire ramp. Emitters, the fire ramp's three brightest steps,
-// keep their own colour, and by `bloom` the art pixels round them lift toward its amber, dithered.
+// warm the pixels round them toward the lamp's amber at their own lightness, in bands stepped by
+// the dither, and the dark panes of a lit window take the fire ramp. Emitters, the fire ramp's
+// three brightest steps, keep their own colour, and by `bloom` the art pixels round them lift
+// toward its amber, dithered.
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
@@ -31,8 +32,10 @@ const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 
 
 // The emitters, the fire ramp's three brightest steps: amber, yellow and white-hot.
 const vec3 EMITTERS[3] = vec3[](vec3(0.961, 0.639, 0.235), vec3(0.984, 0.890, 0.478), vec3(1.0, 0.973, 0.863));
-// The colour lamplight gives what it falls on, and the eight directions bloom looks for emitters in.
-const vec3 LAMPLIGHT = vec3(1.12, 0.9, 0.62);
+// The colour lamplight gives what it falls on, as a gain on its lightness, and how much of the lit
+// colour's own hue it keeps; and the eight directions bloom looks for emitters in.
+const vec3 LAMPLIGHT = vec3(1.45, 1.02, 0.56);
+const float OWN_HUE = 0.25;
 const vec2 TAPS[8] = vec2[](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0),
 		vec2(1.0, 1.0), vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0));
 
@@ -80,7 +83,8 @@ void fragment() {
 		}
 		// Three bands, their edges dithered on the art's pixels.
 		float band = floor(clamp(lit, 0.0, 1.0) * 3.0 + dither) / 3.0;
-		g = mix(g, c * LAMPLIGHT, band * lamp * 0.85);
+		vec3 warm = mix(vec3(l), c, OWN_HUE) * LAMPLIGHT;
+		g = mix(g, warm, band * lamp * 0.85);
 		if (pane && l < 0.15 && dither < lamp) {
 			g = EMITTERS[dither < 0.5 ? 1 : 0];
 		}
