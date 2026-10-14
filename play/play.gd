@@ -265,6 +265,14 @@ static func view_centre(at: Vector2, screen: Vector2, bounds: Rect2) -> Vector2:
 			clampf(at.y, low.y, high.y) if low.y <= high.y else centre.y)
 
 
+## Returns where the camera centres to follow `at` as view_centre() gives it, on a screen `screen`
+## wide and high within `bounds`, rounded to the nearest whole screen pixel at `zoom` screen pixels a
+## world pixel: the camera moves a screen pixel at a time, not a world pixel (#209). The world's art
+## stays on its pixel grid, all of it shifted alike.
+static func camera_centre(at: Vector2, screen: Vector2, bounds: Rect2, zoom: float) -> Vector2:
+	return (view_centre(at, screen, bounds) * zoom).round() / zoom
+
+
 ## Returns the part of a map `size` pixels across and down, on the unraised ground, that the view
 ## draws ground over: all of it, but where raised ground along its last row is drawn above the
 ## map's bottom edge, the bottom comes up to the highest of it, since nothing is drawn below.
@@ -474,7 +482,7 @@ func _process(delta: float) -> void:
 	if world == null or _hud.screen() != null:
 		return
 	var screen := get_viewport_rect().size / _camera.zoom
-	_camera.position = view_centre(drawn_lead().round(), screen, _bounds).round()
+	_camera.position = camera_centre(drawn_lead(), screen, _bounds, _camera.zoom.x)
 	var view := Rect2(_camera.position - screen / 2.0, screen)
 	show_view(view)
 	# A hit on or from the player shakes the screen by whole screen pixels, never past the bounds.
