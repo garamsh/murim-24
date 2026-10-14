@@ -419,14 +419,14 @@ func _mark_built() -> void:
 			relief.build(cell)
 
 
-# Prepares the ground to be baked from the relief, with a decorative tree on no village and no
-# structure.
+# Prepares the ground to be baked from the relief, with a decorative tree on no village's square
+# and none on or beside a structure, so the lanes between houses stay open.
 func _lay_ground() -> void:
 	var cleared: Array[Rect2i] = []
 	for village: Dictionary in world.villages():
 		cleared.append(Rect2i(village.corner, village.area).grow(1))
 	for structure in world.structure_count():
-		cleared.append(Rect2i(world.structure_cell(structure), world.structure_footprint(structure)))
+		cleared.append(Rect2i(world.structure_cell(structure), world.structure_footprint(structure)).grow(1))
 	var ground: Node2D = $Ground
 	ground.standing = _standing
 	ground.prepare(relief, {"open_at": func(cell: Vector2i) -> bool:

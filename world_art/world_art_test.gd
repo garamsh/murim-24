@@ -350,17 +350,15 @@ func _placed(world: WorldAdapter, art: Node2D) -> Dictionary:
 	return {"placed": placed, "fields": fields, "kinds": kinds, "batched": batched}
 
 
-# A village the region founds is drawn as its template is: its structures stand at the offsets a
-# generated village of that template has from its corner, and its ground decorations cover the
-# cells the template's data names. Setup: the region, on short days, founds a village within
-# FOUNDING_DAYS. Control:
-# a corner a cell off matches no structure layout, and the cell west of the village is bare.
+# A village the region founds is drawn as a generated one is: every structure it lays has a
+# sprite, and its square, the land the core says it was founded on, carries the ground
+# decorations its template's data names, from the square's corner. Setup: the region, on short
+# days, founds a village within FOUNDING_DAYS. Control: the cell west of its square is bare.
 func _founded_pass() -> bool:
 	var region := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
 	var art: Node2D = load(SCENE).instantiate()
 	art.show_world(region, region.army_count() - 1)
 	var generated := region.villages()
-	var created := region.structure_count()
 	var ticks := 0
 	while region.villages().size() == generated.size() and ticks < FOUNDING_DAYS * SHORT_DAY:
 		region.tick()
@@ -368,28 +366,16 @@ func _founded_pass() -> bool:
 	art.note_tick()
 	var villages := region.villages()
 	var founded: Dictionary = villages[-1] if villages.size() > generated.size() else {}
-	var model := {}
-	for village: Dictionary in generated:
-		if not founded.is_empty() and village.kind == founded.kind:
-			model = village
-			break
-	var set_up := not founded.is_empty() and not model.is_empty()
-	var layout := _layout(region, model, 0, created) if set_up else []
-	var laid := _layout(region, founded, created, region.structure_count()) if set_up else []
-	var off := founded.duplicate()
-	off.corner = founded.get("corner", Vector2i.ZERO) + Vector2i(1, 0)
-	var laid_off := _layout(region, off, created, region.structure_count()) if set_up else []
-	var at_offsets := set_up and layout.all(func(placed: String) -> bool: return laid.has(placed))
-	var off_apart := not layout.all(func(placed: String) -> bool: return laid_off.has(placed))
-	var structures_right := at_offsets and off_apart
+	var set_up := not founded.is_empty()
+	var undrawn := _undrawn(region, art) if set_up else -1
 	var counts := _decorated(art.built, founded) if set_up else Vector2i.ZERO
 	var outside_bare: bool = set_up \
-			and art.built.get_cell_source_id(founded.corner + Vector2i(-1, 4)) == -1
-	var passed := structures_right and counts.y > 0 and counts.x == counts.y and outside_bare
-	print("world_art_test: after %d days a village founded %s at %s, laid out as %s at %s: its %d structures at the template's offsets %s, a cell off not %s; %d of %d decorated cells carry their template's tile, the cell beside it bare %s: %s" % [
+			and art.built.get_cell_source_id(founded.corner + Vector2i(-1, 0)) == -1
+	var passed := undrawn == 0 and counts.y > 0 and counts.x == counts.y and outside_bare
+	print("world_art_test: after %d days a village founded %s on its square at %s of %s: %d structures without a sprite; %d of %d decorated cells carry their template's tile, the cell west of it bare %s: %s" % [
 		ticks / SHORT_DAY, founded.get("kind", "none"), founded.get("corner", "none"),
-		model.get("name", "none"), model.get("corner", "none"), layout.size(), at_offsets,
-		off_apart, counts.x, counts.y, outside_bare, "pass" if passed else "FAIL"])
+		founded.get("area", "none"), undrawn, counts.x, counts.y, outside_bare,
+		"pass" if passed else "FAIL"])
 	art.free()
 	return passed
 
@@ -401,18 +387,6 @@ func _undrawn(world: WorldAdapter, art: Node2D) -> int:
 		if world.structure_kind(structure) != "field" and art.structure_sprites[structure] == null:
 			undrawn += 1
 	return undrawn
-
-
-# Each structure among `from` to `to` of `world` inside `village`'s area, as its kind and its
-# cell's offset from the village's corner.
-func _layout(world: WorldAdapter, village: Dictionary, from: int, to: int) -> Array[String]:
-	var placed: Array[String] = []
-	var area := Rect2i(village.corner, village.area)
-	for structure in range(from, to):
-		var cell := world.structure_cell(structure)
-		if area.has_point(cell):
-			placed.append("%s at %s" % [world.structure_kind(structure), cell - area.position])
-	return placed
 
 
 # How many of the cells `village`'s template's data names carry a frame of their tile on `built`,
