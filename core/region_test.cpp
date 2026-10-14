@@ -1200,6 +1200,33 @@ TEST(Region, BirthsStopAtTheCapacityTheRulesSet) {
   EXPECT_GT(peak(std::nullopt).second, founders + ROOM);
 }
 
+TEST(Region, EveryChildBornHasRoomForAnAttackSlot) {
+  // As fertile as above, a tick a day, until the first child is born.
+  RegionData fertile = grown();
+  fertile.life.husbandry.reset();
+  ASSERT_TRUE(fertile.life.kinship.has_value());
+  Kinship kinship = fertile.life.kinship.value_or(Kinship{});
+  kinship.marriage_chance = PER_MILLE;
+  kinship.birth_chance = PER_MILLE;
+  kinship.birth_spacing = 0;
+  fertile.life.kinship = kinship;
+  Region region = generate_region(SEED, fertile);
+  region.rules.ticks_per_day = 1;
+  World world = world_of(region);
+  const std::size_t founders = world.population();
+  ASSERT_EQ(world.attacks().people(), founders);
+  for (std::uint64_t day = 0;
+       day < DAYS_PER_YEAR && world.population() == founders; ++day) {
+    world.tick();
+  }
+
+  // Setup: a child was born, not a soul born again.
+  ASSERT_GT(world.population(), founders);
+  ASSERT_FALSE(world.person(founders).parents.empty());
+  ASSERT_FALSE(world.person(founders).soul.has_value());
+  EXPECT_EQ(world.attacks().people(), world.population());
+}
+
 // Whether every child born to a couple bears its father's surname.
 bool fathers_surnames(const Lived& region) {
   for (std::size_t person = 0; person < region.people.size(); ++person) {

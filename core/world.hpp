@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "chronicle.hpp"
@@ -101,6 +102,9 @@ struct Rules {
   /// Cells within which a person a driver steers, carrying a soul, sees the
   /// land for its soul's chart; 0 charts nothing.
   std::int32_t map_sight = 0;
+  /// How many may strike one person at once and how those waiting circle
+  /// (ADR 0068); none for no limit.
+  std::optional<Tokens> tokens = std::nullopt;
 };
 
 /// Sub-cell units a person moves per tick.
@@ -122,6 +126,7 @@ class World {
   /// square, a recruit has no health or more than MAX_HEALTH, the world would
   /// hold more than MAX_PEOPLE people, an army has no skills or a faction
   /// outside `hostile` or a home that is no village,
+  /// the rules' attack tokens are not valid(),
   /// a skill does more than MAX_BODY_DAMAGE to a person or
   /// waits longer than MAX_COOLDOWN, a structure's footprint is not 1 to
   /// MAX_FOOTPRINT cells along each side or covers a cell that is not
@@ -240,6 +245,10 @@ class World {
 
   /// Returns person `person`.
   [[nodiscard]] const Person& person(std::size_t person) const;
+
+  /// Returns each person's attack slot and token against the foe it engages,
+  /// with room for every person the world has held (ADR 0068).
+  [[nodiscard]] const Attacks& attacks() const;
 
   /// Returns how many people live.
   [[nodiscard]] std::size_t living() const;
@@ -871,6 +880,8 @@ class World {
   std::vector<std::size_t> surnames_;
   // The growth plan each structure was laid from, if any.
   std::vector<std::optional<std::size_t>> plans_;
+  // Each person's attack slot and token, and each foe's slots taken.
+  Attacks attacks_;
 };
 
 }  // namespace murim

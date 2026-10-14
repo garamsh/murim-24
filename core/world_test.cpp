@@ -2122,6 +2122,18 @@ TEST(World, ARebirthContinuesTheWorldInsteadOfResettingIt) {
   EXPECT_GT(world.date().day, fresh.date().day);
 }
 
+TEST(World, ASoulBornAgainHasRoomForAnAttackSlot) {
+  World world = soul_world();
+  const std::size_t before = world.population();
+  ASSERT_EQ(world.attacks().people(), before);
+  run_ticks(world, ARRIVAL_TICKS);
+
+  // Setup: the soul was born again as the world's last person.
+  ASSERT_EQ(world.population(), before + 1);
+  ASSERT_TRUE(world.person(before).soul.has_value());
+  EXPECT_EQ(world.attacks().people(), world.population());
+}
+
 // The post's soul, steered, in conscription_world() with a map sight of
 // CHART_SIGHT; returns the soul.
 constexpr std::int32_t CHART_SIGHT = 3;

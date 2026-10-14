@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "attack.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
@@ -635,6 +636,12 @@ void put_rules(Writer& out, const Rules& rules) {
   out.i32(rules.sight);
   out.u64(rules.people_capacity);
   out.i32(rules.map_sight);
+  put_maybe(out, rules.tokens, [&out](const Tokens& tokens) {
+    put_all(out, tokens.by_rank,
+            [&out](std::uint32_t granted) { out.u32(granted); });
+    out.u64(tokens.circling);
+    out.u64(tokens.lease);
+  });
 }
 
 Rules get_rules(Reader& input) {
@@ -652,6 +659,14 @@ Rules get_rules(Reader& input) {
   rules.sight = input.i32();
   rules.people_capacity = input.u64();
   rules.map_sight = input.i32();
+  rules.tokens = get_maybe<Tokens>(input, [&input] {
+    Tokens tokens;
+    tokens.by_rank =
+        get_all<std::uint32_t>(input, [&input] { return input.u32(); });
+    tokens.circling = input.u64();
+    tokens.lease = input.u64();
+    return tokens;
+  });
   return rules;
 }
 
@@ -1145,6 +1160,15 @@ class SaveCodec {
             });
     put_all(out, world.plans_,
             [&out](std::optional<std::size_t> plan) { put_index(out, plan); });
+    put_all(out, world.attacks_.engaged(), [&out](const Engaged& each) {
+      out.size(each.person);
+      out.size(each.engagement.foe);
+      out.u8(static_cast<std::uint8_t>(each.engagement.ring));
+      out.u8(each.engagement.slot);
+      out.flag(each.engagement.token);
+      out.u32(each.engagement.waiting_since);
+      out.u32(each.engagement.token_since);
+    });
     put_all(out, world.charts_,
             [&out](const Chart& chart) { put_chart(out, chart); });
   }
@@ -1253,6 +1277,22 @@ class SaveCodec {
     world.villages_ = Villages{std::move(villages), std::move(village_of)};
     world.plans_ = get_all<std::optional<std::size_t>>(
         input, [&input] { return get_index(input); });
+    const std::vector<Engaged> engaged = get_all<Engaged>(input, [&input] {
+      Engaged each;
+      each.person = input.size();
+      each.engagement.foe = input.size();
+      each.engagement.ring = static_cast<Ring>(input.tag(RING_KINDS));
+      each.engagement.slot = input.u8();
+      each.engagement.token = input.flag();
+      each.engagement.waiting_since = input.u32();
+      each.engagement.token_since = input.u32();
+      return each;
+    });
+    std::optional<Attacks> attacks = Attacks::of(world.people_.size(), engaged);
+    if (!attacks) {
+      throw Refusal{LoadError::CORRUPTED};
+    }
+    world.attacks_ = std::move(*attacks);
     const Footprint size{world.map_.width(), world.map_.height()};
     world.charts_ = get_all<Chart>(input, [&input, &world, size] {
       Chart chart = get_chart(input, size, world.rules_.hostile.size());

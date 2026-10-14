@@ -1,6 +1,6 @@
 # ADR 0068: Surround a foe from attack slots, and let only its token holders strike it
 
-> Status: proposed; its slots and tokens for anyone engaging amended by ADR-0071, under which a person backing off or fleeing takes no slot or token and frees those it held
+> Status: proposed; its slots and tokens for anyone engaging amended by ADR-0071, under which a person backing off or fleeing takes no slot or token and frees those it held; its per-person state sized to the capacity at construction and on load corrected by #282's first step: the arrays grow with the people list, as it grows on a birth
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
