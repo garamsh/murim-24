@@ -55,6 +55,7 @@ var _light_rects := PackedVector4Array()
 var _light_reach := PackedFloat32Array()
 var _hearths := 0
 var _view_origin := Vector2.ZERO
+var _grid_offset := Vector2.ZERO
 var _cells: ImageTexture
 var _map_size := Vector2i.ZERO
 var _drift := 0.0
@@ -83,10 +84,12 @@ func show_relief(relief: Relief) -> void:
 ## Shows `lights`, as WorldArt.lights() gives them for `view`, the part of the world on screen in
 ## its pixels: each one's rect and reach in screen pixels, at most MAX_LIGHTS of them; and how many
 ## `hearths` are among them, which the bloom waits for. The fog drifts over the world from `view`'s
-## corner.
+## corner, which may lie between world pixels as the camera moves a screen pixel at a time: the art
+## pixels the pass steps in begin where the world's whole pixels fall on the screen.
 func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
 	_hearths = hearths
-	_view_origin = view.position
+	_view_origin = view.position.floor()
+	_grid_offset = (_view_origin - view.position) * art_pixel
 	var count := lights.size() / WorldArt.LIGHT_FLOATS
 	var order := range(count)
 	if count > MAX_LIGHTS:
@@ -135,7 +138,8 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 
 
 ## What the pass draws with, as its shader's parameters: the grade's but `clouds`, `gain` and
-## `saturation` dimmed while it rains, `hue_shift`, `vignette`, `art_pixel`, `bloom`, `light_count`,
+## `saturation` dimmed while it rains, `hue_shift`, `vignette`, `art_pixel`, `grid_offset`, where
+## the world's art pixels begin on the screen, `bloom`, `light_count`,
 ## `rain`, 1 while it rains, its `drift`, and `fog`; what the light field draws with, the lights
 ## shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`, `cells`
 ## and `map_size`, and whether it draws, `field_drawn`; and `clouds`, how dark the clouds' material
@@ -143,7 +147,7 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
-			"vignette", "art_pixel", "bloom", "light_count", "rain", "fog"]:
+			"vignette", "art_pixel", "grid_offset", "bloom", "light_count", "rain", "fog"]:
 		shown[name] = ($Pass.material as ShaderMaterial).get_shader_parameter(name)
 	for name: String in ["light_rects", "light_reach", "view_origin", "drift", "cells", "map_size"]:
 		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
@@ -173,6 +177,8 @@ func _apply() -> void:
 	clouds.set_shader_parameter("clouds", shade)
 	clouds.set_shader_parameter("field", $LightField.get_texture())
 	clouds.set_shader_parameter("art_pixel", art_pixel)
+	clouds.set_shader_parameter("grid_offset", _grid_offset)
+	material.set_shader_parameter("grid_offset", _grid_offset)
 	material.set_shader_parameter("hue_shift", HUE_SHIFT)
 	material.set_shader_parameter("vignette", 0.0 if low else VIGNETTE)
 	material.set_shader_parameter("art_pixel", art_pixel)
@@ -188,14 +194,15 @@ func _apply() -> void:
 	field.set_shader_parameter("fog", fog)
 	field.set_shader_parameter("clouds", shade)
 	field.set_shader_parameter("view_origin", _view_origin)
+	field.set_shader_parameter("grid_offset", _grid_offset)
 	field.set_shader_parameter("drift", _drift)
 	field.set_shader_parameter("cells", _cells)
 	field.set_shader_parameter("map_size", _map_size)
 	var drawn: bool = (_light_rects.size() > 0 and _grade.lamp > 0.0) or fog > 0.0 or shade > 0.0
 	$LightField.render_target_update_mode = SubViewport.UPDATE_ALWAYS if drawn else SubViewport.UPDATE_DISABLED
 	if is_inside_tree():
-		# One pixel an art pixel, the screen's last part pixel included.
-		var cells := Vector2i((get_viewport().get_visible_rect().size / art_pixel).ceil())
+		# One pixel an art pixel, the part pixels at both of the screen's edges included.
+		var cells := Vector2i((get_viewport().get_visible_rect().size / art_pixel).ceil()) + Vector2i.ONE
 		$LightField.size = cells
 		$LightField/Field.size = Vector2(cells)
 

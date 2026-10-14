@@ -43,6 +43,7 @@ var _hud_scale := 1
 func _ready() -> void:
 	var scale := ViewScale.world_scale(Vector2i(get_viewport_rect().size), false)
 	_camera.zoom = Vector2(scale, scale)
+	_art.pixel_scale = scale
 	world = WorldAdapter.create_m1()
 	_art.show_world(world, -1)
 	_art.ground_material = _grade.clouds
@@ -64,6 +65,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_camera.position += Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down") \
 			* CAMERA_PIXELS_PER_SECOND * delta / _camera.zoom.x
+	# On whole screen pixels, so the art keeps its grid as the view pans (#209).
+	_camera.position = (_camera.position * _camera.zoom).round() / _camera.zoom
 	var step := 1.0 / WorldAdapter.TICKS_PER_SECOND
 	_since_tick = minf(_since_tick + delta, step * MAX_TICKS_PER_FRAME)
 	while _since_tick >= step:

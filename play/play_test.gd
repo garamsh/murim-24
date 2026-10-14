@@ -136,7 +136,7 @@ func run() -> bool:
 			and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _grade_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _camera_walk_pass() and _grade_pass()
 
 
 # The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom
@@ -164,6 +164,63 @@ func _camera_pass() -> bool:
 			and middle == Vector2(1000, 700) and small == Vector2(160, 100)
 	print("play_test: bounds flat %s, raised %s; the view at the corner %s and at the bottom %s; centred on the middle at %s, on a small map at %s: %s" % [
 		flat_bounds, raised_bounds, corner, bottom, middle, small, "pass" if passed else "FAIL"])
+	return passed
+
+
+# Walking at 60 frames a second at three screen pixels a world pixel, the camera moves each frame
+# within a screen pixel of how far the steered person moved, and the person, where the view draws it
+# at that scale (read from its torch, which world_art lists from where BodyView drew it), stays on
+# the screen pixel it stood on: neither jumps (#209). Control: the camera
+# rounded to whole world pixels, as before, jumps three screen pixels where the person moved one or
+# two. Setup: the person walks some way.
+func _camera_walk_pass() -> bool:
+	var Play := preload("res://play/play.gd")
+	var scene := _scene(0)
+	var rows: PackedStringArray = scene.world.map_rows()
+	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
+	var far := _cell_near(rows, home + Vector2i(12, 0), ".")
+	scene.command(_click(far, scene))
+	var screen := Vector2(640, 360)
+	var zoom := 3.0
+	var anywhere := Rect2(-100000, -100000, 200000, 200000)
+	var art: Node2D = scene.get_node("WorldArt")
+	art.pixel_scale = zoom
+	var lights: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/lights.json"))
+	var torch := Vector2(lights.torch[0], lights.torch[1])
+	# Where the view draws the person, in the world's pixels, the view centred on `centre`.
+	var drawn_at := func(centre: Vector2) -> Vector2:
+		var view := Rect2(centre - screen / 2.0, screen)
+		scene.show_view(view)
+		var listed: PackedFloat32Array = art.lights(view)
+		return Vector2(listed[0], listed[1]) - torch
+	var from: Vector2 = scene.drawn_lead()
+	var last: Vector2 = from
+	var last_centre: Vector2 = Play.camera_centre(from, screen, anywhere, zoom)
+	var last_rounded: Vector2 = Play.view_centre(from.round(), screen, anywhere).round()
+	var on_screen: Vector2 = (drawn_at.call(last_centre) - last_centre) * zoom
+	var worst := 0.0
+	var worst_rounded := 0.0
+	var drift := 0.0
+	for frame in 120:
+		scene.advance(1.0 / 60.0)
+		var lead: Vector2 = scene.drawn_lead()
+		var centre: Vector2 = Play.camera_centre(lead, screen, anywhere, zoom)
+		var rounded: Vector2 = Play.view_centre(lead.round(), screen, anywhere).round()
+		var moved := (lead - last) * zoom
+		var off := (centre - last_centre) * zoom - moved
+		var off_rounded := (rounded - last_rounded) * zoom - moved
+		worst = maxf(worst, maxf(absf(off.x), absf(off.y)))
+		worst_rounded = maxf(worst_rounded, maxf(absf(off_rounded.x), absf(off_rounded.y)))
+		var drawn: Vector2 = (drawn_at.call(centre) - centre) * zoom - on_screen
+		drift = maxf(drift, maxf(absf(drawn.x), absf(drawn.y)))
+		last = lead
+		last_centre = centre
+		last_rounded = rounded
+	var walked: float = (last - from).length()
+	var passed: bool = walked > 20.0 and worst <= 1.0 + 0.001 and drift <= 0.001 and worst_rounded > 1.0
+	print("play_test: walked %.1f pixels in 120 frames; the camera at most %.2f screen pixels off the person's motion a frame, the person at most %.2f off its place on the screen; rounded to world pixels the camera %.2f off: %s" % [
+		walked, worst, drift, worst_rounded, "pass" if passed else "FAIL"])
+	scene.free()
 	return passed
 
 

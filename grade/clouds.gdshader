@@ -8,11 +8,12 @@ shader_type canvas_item;
 
 #include "res://world_art/dither.gdshaderinc"
 
-// Whether the shadows show, above 0; the light field they are read from; and the screen pixels an
-// art pixel spans.
+// Whether the shadows show, above 0; the light field they are read from; the screen pixels an art
+// pixel spans; and where the world's art pixels begin on the screen, as grade.gdshader's.
 uniform float clouds = 0.0;
 uniform sampler2D field : filter_nearest;
 uniform float art_pixel = 1.0;
+uniform vec2 grid_offset = vec2(0.0);
 
 // The shade the ground leans toward and how far, as world_art/ground.gd's SHADE and SHADE_SHARE.
 const vec3 SHADE = vec3(0.078, 0.094, 0.157);
@@ -26,7 +27,7 @@ void vertex() {
 
 void fragment() {
 	if (clouds > 0.0) {
-		float shade = texelFetch(field, ivec2(floor(FRAGCOORD.xy / art_pixel)), 0).a;
+		float shade = texelFetch(field, ivec2(floor((FRAGCOORD.xy - grid_offset) / art_pixel)), 0).a;
 		float band = floor(shade * 2.0 + dither_threshold(floor(world))) / 2.0;
 		COLOR.rgb = mix(COLOR.rgb, SHADE, band * SHARE);
 	}

@@ -5,7 +5,8 @@
 ## the steered person's markers, and what the fighting did
 ## through combat.gd, the struck drawn in the impact colour and knocked back and the dead falling
 ## and fading. Bodies are drawn between the positions of the last two ticks, as far between as the
-## caller says the frame is, so they move on every frame; the core's positions stay the only truth.
+## caller says the frame is, on whole screen pixels at `pixel_scale`, so they move on every frame; the
+## core's positions stay the only truth.
 ## Each refresh also lists the people within NAME_REACH of that person, for their names to be drawn
 ## over them. Bodies are batched: one MultiMesh per row of cells on screen, sorted with buildings,
 ## trees and the raised rows of the ground by the row they stand on, their buffers packed natively
@@ -79,6 +80,14 @@ var steered := -1:
 		steered = value
 		if combat != null:
 			combat.bodies.set_steered(value)
+## How many screen pixels a world pixel spans, the view's whole-pixel scale: bodies, the lead's
+## markers and the target's brackets are drawn on whole screen pixels, so they move as smoothly as
+## the camera does, while the ground and what is built stay on whole world pixels.
+var pixel_scale := 1.0:
+	set(value):
+		pixel_scale = value
+		if combat != null:
+			combat.bodies.set_pixel_scale(value)
 ## The army whose lead names are read around and relations read toward, or -1 for none.
 var viewer := -1
 ## The people within NAME_REACH of the viewer's lead in the last refresh, the lead itself left out,
@@ -205,6 +214,7 @@ func show_world(shown: WorldAdapter, steered_army: int) -> void:
 	_factions = snapshot.faction
 	combat.begin(world, snapshot)
 	combat.bodies.set_steered(steered)
+	combat.bodies.set_pixel_scale(pixel_scale)
 	$Drops.rebuild(combat)
 	$Sprays.rebuild(combat)
 	_occluders_for = Vector3i(-1, -1, -1)

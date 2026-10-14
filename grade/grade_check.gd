@@ -20,7 +20,12 @@
 ## see neither. Then, at noon, it draws the frame dry and raining at standard, raining again a moment
 ## later, and dry and raining at low. It checks that the rain dims the frame; that its streaks move,
 ## changing some pixels from one moment to the next but few; and that at low the rain changes
-## nothing. It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw, as
+## nothing. Last, with the camera moved a third and two thirds of a world pixel, as it moves a
+## screen pixel at a time, it draws the night unlit and lit, and checks that the light changes the
+## frame round it and splits no more of the world's art pixels than the unlit frame does: the pass
+## steps in the world's art pixels, not the screen's; and that round the light the lit frame is the
+## one lit before the move, moved by the camera's screen pixels, so the light moves with the world.
+## It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw, as
 ## when its window draws too few frames to reach the last shot within MAX_FRAMES frames. Its window
 ## stays on top, since a covered window is not drawn.
 extends SceneTree
@@ -59,6 +64,8 @@ var _zoom := 1.0
 var _drawn := 0
 var _next := 0
 var _middle := Vector2.ZERO
+# How far the camera is moved off the fixture's whole pixel, in world pixels.
+var _shift := Vector2.ZERO
 
 
 func _initialize() -> void:
@@ -104,7 +111,9 @@ func _process(_delta: float) -> bool:
 		["wet", func() -> void: _grade.raining = true],
 		["wet_later", func() -> void: _grade.show_time(0.5, SUMMER)],
 		["dry_low", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.raining = false],
-		["wet_low", func() -> void: _grade.raining = true]]
+		["wet_low", func() -> void: _grade.raining = true],
+		["shifted_unlit", func() -> void: _shift_camera(); _grade.raining = false; _grade.show_time(0.0, SUMMER); _show_lights(false)],
+		["shifted_lit", func() -> void: _show_lights(true)]]
 	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
 	# renderer on a loaded machine.
 	if _drawn < _next:
@@ -181,7 +190,19 @@ func _report() -> void:
 		moved.count, float(moved.count) / frame_size], moved.count > 0 and moved.count < frame_size / 5)
 	var at_low := _differ(_shots.dry_low, _shots.wet_low)
 	_check("grade_check: at low the rain changes %d pixels" % at_low.count, at_low.count == 0)
-	print("grade_check: %d of 12 checks passed" % (12 - _failed))
+	var view := _view_rect()
+	var grid := (view.position.floor() - view.position) * _zoom
+	var around := Rect2i(Vector2i(((_middle + BESIDE - view.position) * _zoom).round()) - Vector2i.ONE * int(REACH * _zoom),
+			Vector2i.ONE * int(2 * REACH * _zoom))
+	var lit_shifted := _differ(_shots.shifted_unlit, _shots.shifted_lit, around)
+	var split_unlit := _split(_shots.shifted_unlit, around, grid)
+	var split_lit := _split(_shots.shifted_lit, around, grid)
+	_check("grade_check: with the camera between world pixels the light changes %d pixels round it, and the world's art pixels split there number %d lit against %d unlit" % [
+		lit_shifted.count, split_lit, split_unlit], lit_shifted.count > 0 and split_lit <= split_unlit)
+	var unmoved := _moved_differ(_shots.lit, _shots.shifted_lit, around, Vector2i((_shift * _zoom).round()))
+	_check("grade_check: round the light, %d pixels of the frame lit between world pixels differ from the frame lit before, moved %s screen pixels" % [
+		unmoved, Vector2i((_shift * _zoom).round())], unmoved == 0)
+	print("grade_check: %d of 14 checks passed" % (14 - _failed))
 	quit(0 if _failed == 0 else 1)
 
 
@@ -228,7 +249,7 @@ func _lay_fixture() -> void:
 
 # Gives the grade the light round the pane and the one beside it, or none.
 func _show_lights(on: bool) -> void:
-	var view := Rect2(_middle - Vector2(root.size) / _zoom / 2.0, Vector2(root.size) / _zoom)
+	var view := _view_rect()
 	var lights := PackedFloat32Array()
 	if on:
 		var pane := _middle + Vector2(PANE.position)
@@ -261,6 +282,47 @@ func _high_relief() -> Relief:
 		for x in range(first.x, last.x + 1):
 			relief.lay(Vector2i(x, y), "rock", Relief.TOP, "rock_face", false)
 	return relief
+
+
+# The part of the world on screen, in its pixels, the camera moved by `_shift`.
+func _view_rect() -> Rect2:
+	return Rect2(_middle + _shift - Vector2(root.size) / _zoom / 2.0, Vector2(root.size) / _zoom)
+
+
+# Moves the camera a third and two thirds of a world pixel, a screen pixel and two at three a world
+# pixel, as the camera following the steered person leaves it between world pixels.
+func _shift_camera() -> void:
+	_shift = Vector2(1.0, 2.0) / _zoom
+	(_view.get_node("Camera") as Camera2D).position = _middle + _shift
+
+
+# How many pixels within `rect` of `a` differ from those of `b` `moved` screen pixels back, as the
+# world moves on the screen when the camera moves `moved` the other way.
+func _moved_differ(a: Image, b: Image, rect: Rect2i, moved: Vector2i) -> int:
+	var count := 0
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			if not a.get_pixel(x, y).is_equal_approx(b.get_pixel(x - moved.x, y - moved.y)):
+				count += 1
+	return count
+
+
+# How many of the world's art pixels wholly within `rect` of `image` are not one colour, the art
+# pixels' corners `grid` screen pixels from the screen's, a step of `_zoom`.
+func _split(image: Image, rect: Rect2i, grid: Vector2) -> int:
+	var step := int(_zoom)
+	var first := Vector2i(int(grid.x) + int(ceil((rect.position.x - grid.x) / _zoom)) * step,
+			int(grid.y) + int(ceil((rect.position.y - grid.y) / _zoom)) * step)
+	var count := 0
+	for y in range(first.y, rect.end.y - step + 1, step):
+		for x in range(first.x, rect.end.x - step + 1, step):
+			var colour := image.get_pixel(x, y)
+			var one := true
+			for dy in step:
+				for dx in step:
+					one = one and image.get_pixel(x + dx, y + dy).is_equal_approx(colour)
+			count += 0 if one else 1
+	return count
 
 
 # Where `art`, art pixels from the middle of the screen, lies on it, in screen pixels.

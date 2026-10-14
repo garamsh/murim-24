@@ -24,9 +24,12 @@ uniform vec3 light = vec3(1.0);
 uniform float saturation = 1.0;
 uniform float contrast = 1.0;
 uniform float hue_shift = 0.0;
-// How much the corners darken, 0 for no vignette, and the screen pixels an art pixel spans.
+// How much the corners darken, 0 for no vignette; the screen pixels an art pixel spans; and where,
+// in screen pixels from the screen's corner, the world's art pixels begin, from minus an art pixel
+// to 0, as the camera moves a screen pixel at a time.
 uniform float vignette = 0.0;
 uniform float art_pixel = 1.0;
+uniform vec2 grid_offset = vec2(0.0);
 uniform float lamp = 0.0;
 uniform float bloom = 0.0;
 // How many lights show, and the light field grade.gd draws, one pixel an art pixel: how lit each is
@@ -97,7 +100,7 @@ void fragment() {
 		float a = (l - 0.62) * 0.6 * hue_shift;
 		g *= vec3(1.0 + 0.1 * a, 1.0 + 0.03 * a, 1.0 - 0.14 * a);
 	}
-	vec2 cell = floor(FRAGCOORD.xy / art_pixel);
+	vec2 cell = floor((FRAGCOORD.xy - grid_offset) / art_pixel);
 	float dither = (BAYER[(int(mod(cell.y, 4.0)) * 4) + int(mod(cell.x, 4.0))] + 0.5) / 16.0;
 	if (lamp > 0.0 && light_count > 0) {
 		vec2 field = texelFetch(light_field, ivec2(cell), 0).rg;

@@ -11,14 +11,17 @@ render_mode blend_disabled;
 
 #include "res://grade/noise.gdshaderinc"
 
-// The screen pixels an art pixel spans, and each light's rect, x, y, width and height, and how far
-// its light reaches, in screen pixels.
+// The screen pixels an art pixel spans; where the world's art pixels begin on the screen, in screen
+// pixels from its corner, from minus an art pixel to 0, so this field's first pixel is the art
+// pixel the screen's corner shows; and each light's rect, x, y, width and height, and how far its
+// light reaches, in screen pixels.
 uniform float art_pixel = 1.0;
+uniform vec2 grid_offset = vec2(0.0);
 uniform int light_count = 0;
 uniform vec4 light_rects[32];
 uniform float light_reach[32];
 // How thick the fog is, 0 for none; how dark the clouds' shadows are, 0 for none; the world's pixel
-// at the screen's top-left; the seconds the wind has blown; and the relief's cells, one texel a
+// of this field's first pixel; the seconds the wind has blown; and the relief's cells, one texel a
 // cell, its level plus one in green, `map_size` of them.
 uniform float fog = 0.0;
 uniform float clouds = 0.0;
@@ -58,7 +61,7 @@ float level_at(vec2 world) {
 }
 
 void fragment() {
-	vec2 at = FRAGCOORD.xy * art_pixel;
+	vec2 at = FRAGCOORD.xy * art_pixel + grid_offset;
 	float lit = 0.0;
 	float pane = 0.0;
 	for (int i = 0; i < light_count; i++) {

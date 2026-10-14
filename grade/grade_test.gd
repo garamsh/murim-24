@@ -15,7 +15,11 @@
 # and not at low, and the clouds read their shade from it; each grade's clouds are a material of
 # its own (control: the other grade's). While it rains at standard the pass draws rain, the gain and
 # saturation dim by grades.json's `rain`, and the clouds cast no shadow; dry, or raining at low, it
-# draws none and the grade is the time's (controls: dry, and low).
+# draws none and the grade is the time's (controls: dry, and low). A view whose corner lies between
+# world pixels, as the camera moving a screen pixel at a time leaves it, starts the art pixels the
+# pass, the light field and the clouds step in where the world's whole pixels fall on the screen,
+# and the light field reads the world from that whole pixel (control: a view on whole pixels starts
+# them at the screen's corner).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -70,7 +74,7 @@ func run() -> bool:
 		noon.gain, noon.saturation, dusk.gain, between.gain, halfway, standard.vignette, standard.hue_shift,
 		low.vignette, low.hue_shift, hidden_before, shown_after, "pass" if passed else "FAIL"])
 	grade.free()
-	return passed and _lights_pass() and _fog_pass() and _rain_pass()
+	return passed and _lights_pass() and _fog_pass() and _rain_pass() and _grid_pass()
 
 
 func _lights_pass() -> bool:
@@ -195,5 +199,24 @@ func _rain_pass() -> bool:
 			and is_equal_approx(low.rain, 0.0) and Vector3(low.gain).is_equal_approx(noon.gain)
 	print("grade_test: dry rain %.1f gain %s clouds %.2f; raining rain %.1f gain %s against %s saturation %.3f clouds %.2f; raining at low rain %.1f gain %s: %s" % [
 		dry.rain, dry.gain, dry.clouds, wet.rain, wet.gain, dimmed, wet.saturation, wet.clouds, low.rain, low.gain,
+		"pass" if passed else "FAIL"])
+	return passed
+
+
+func _grid_pass() -> bool:
+	var grade: Grade = load(SCENE).instantiate()
+	grade.art_pixel = 3.0
+	grade.show_time(0.5, SUMMER)
+	grade.show_lights(PackedFloat32Array(), Rect2(Vector2(100, 50), Vector2(640, 360)))
+	var whole := grade.params()
+	grade.show_lights(PackedFloat32Array(), Rect2(Vector2(100.0 + 1.0 / 3.0, 50.0 + 2.0 / 3.0), Vector2(640, 360)))
+	var between := grade.params()
+	var clouds_offset: Vector2 = grade.clouds.get_shader_parameter("grid_offset")
+	grade.free()
+	var passed: bool = Vector2(whole.grid_offset).is_zero_approx() and Vector2(whole.view_origin) == Vector2(100, 50) \
+			and Vector2(between.grid_offset).is_equal_approx(Vector2(-1, -2)) and Vector2(between.view_origin) == Vector2(100, 50) \
+			and clouds_offset.is_equal_approx(Vector2(-1, -2))
+	print("grade_test: a view on whole pixels starts the art pixels at %s from %s; one between them at %s from %s, the clouds at %s: %s" % [
+		whole.grid_offset, whole.view_origin, between.grid_offset, between.view_origin, clouds_offset,
 		"pass" if passed else "FAIL"])
 	return passed
