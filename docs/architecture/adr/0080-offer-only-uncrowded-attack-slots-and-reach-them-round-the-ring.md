@@ -43,7 +43,15 @@ What the table shows:
 
 ## Decision
 
-A slot is offered only on a passable cell where nobody stands within the separation, other than the foe and the people engaging it. A held slot that becomes crowded is freed, like one that becomes blocked.
+A slot is offered only on a passable cell where nobody stands within the separation, other than the foe and the people engaging it. A held slot that becomes crowded is freed, like one that becomes blocked, and its holder takes the nearest free slot still offered on the same tick.
+
+A person engaging a foe that offers it no free slot does as on `main` (ADR 0046):
+- it closes on the foe itself and stands to fight once the foe is within its reach;
+- it is no seeker, so it gives way as anyone does;
+- it keeps the same foe, neither waiting on a ring nor turning to another;
+- it takes a slot on a later tick, once one is offered.
+
+This is how the measured prototype behaved.
 
 A seeker off the ring's band, its radius plus half a cell, closes on the slot nearest its own bearing. Once on the band, it walks round the ring one slot at a time toward its own slot, the shorter way.
 
@@ -53,7 +61,7 @@ This amends ADR 0068's offer of every passable slot and its straight approach to
 
 ## Consequences
 
-- **Line battles:** the lines meet as they did before slots. Slots open only on a foe's free side, so a ring forms round a foe in the open and not round one inside its own line.
+- **Line battles:** the lines meet as they did before slots. Slots open only on a foe's free side, so a ring forms round a foe in the open and not round one inside its own line; those engaging a foe with no slot to offer fight it from where they reach it, as on `main`.
 - **Who strikes:** strikes a tick in the M1 battle fall from 18.0 to about 16. The measured 16.1 sits on ADR 0068's floor, so #331 runs the M1 bench and reports it against the floor, and step 3's token table is tuned with that margin in view.
 - **Cost:** offering a slot reads the spatial hash within the separation round it, at most 16 reads for each person engaging, each tick. #331's bench measures the cost against the live scenario's tick.
 - **Stability:** a slot can be freed by a passer-by standing on it, so people near a crowded foe change slots more often. Nothing remembers the change, and the slot is retaken by distance as ADR 0068 assigns it.
@@ -64,7 +72,7 @@ This amends ADR 0068's offer of every passable slot and its straight approach to
 
 ## Signs the decision was wrong
 
-- The M1 bench measures fewer than 16 strikes a tick before step 3's tokens limit any.
+- The M1 bench, run with ADR 0068's default token table set in the scenario as #331 sets it, measures fewer than 16 strikes a tick while tokens still gate no strike, that is, before step 3 lands.
 - Foes inside a line never draw a ring however long a fight lasts, because their own allies keep every slot crowded.
 - People round one foe change slots often enough to show as dithering on the captures.
 - The stacked share in a line battle rises above about twice `main`'s once tokens and the waiting ring are added.
