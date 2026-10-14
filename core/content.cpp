@@ -37,6 +37,7 @@ constexpr std::array<std::string_view, 3> FOOTINGS{"buildable", "rough",
 constexpr std::array<std::string_view, 5> SHAPES{"area", "arc", "line", "self",
                                                  "targeted"};
 constexpr std::array<std::string_view, 3> EXPANSIONS{"build", "found", "raid"};
+constexpr std::array<std::string_view, 3> ROLES{"square", "home", "edge"};
 constexpr std::array<std::string_view, 3> ORIENTATIONS{"orthodox", "unorthodox",
                                                        "demonic"};
 constexpr std::array<std::string_view, 2> POLARITIES{"yang", "yin"};
@@ -412,22 +413,28 @@ std::string id_of(const Context& context, const std::string& kind,
 }
 
 // A template of a village or a seat, by id `name`; the kinds of its
-// buildings name structure kinds by id.
+// buildings name structure kinds by id. Only the seat's is `authored`, with an
+// area and each building at an offset in it; a village's places its
+// buildings by their roles.
 VillageTemplate read_template(Reader& reader, const std::string& name,
-                              const Context& context) {
+                              const Context& context, bool authored) {
   VillageTemplate made{};
   made.name = name;
-  made.area = read_footprint(reader);
-  reader.each("buildings", false, [&made, &context](Reader& building) {
-    const Cell cell = read_cell(building);
-    const Footprint footprint = read_footprint(building);
-    const auto durability = building.number<std::uint32_t>("durability", 1);
-    const std::size_t kind = building.reference("kind", "structure_kinds");
-    const auto households = building.number<std::uint32_t>("households", 0, 0U);
-    made.buildings.push_back(Building{Structure{cell, durability, footprint},
-                                      id_of(context, "structure_kinds", kind),
-                                      households});
-  });
+  if (authored) {
+    made.area = read_footprint(reader);
+  }
+  reader.each(
+      "buildings", false, [&made, &context, authored](Reader& building) {
+        const Cell cell = authored ? read_cell(building) : Cell{0, 0};
+        const Footprint footprint = read_footprint(building);
+        const auto durability = building.number<std::uint32_t>("durability", 1);
+        const std::size_t kind = building.reference("kind", "structure_kinds");
+        const auto households =
+            building.number<std::uint32_t>("households", 0, 0U);
+        made.buildings.push_back(
+            Building{Structure{cell, durability, footprint},
+                     id_of(context, "structure_kinds", kind), households});
+      });
   reader.each("clearings", true, [&made](Reader& clearing) {
     const Cell corner = read_cell(clearing);
     made.clearings.push_back(Clearing{corner, read_footprint(clearing)});
@@ -481,6 +488,7 @@ StructureKind read_structure_kind(Reader& reader, const std::string& name) {
   made.tends = reader.number<std::uint32_t>("tends", 0, 0U);
   made.edge = reader.number<std::uint32_t>("edge", 0, 0U);
   made.healing = reader.number<std::uint32_t>("healing", 0, 0U);
+  made.role = static_cast<Role>(reader.choice("role", ROLES));
   return made;
 }
 
@@ -530,9 +538,17 @@ void read_growth(Reader& reader, Built& built, const Context& context) {
   growth.interval = reader.number<std::uint32_t>("interval", 1);
   growth.pressure = reader.number<std::uint32_t>("pressure", 0);
   growth.reach = reader.number<std::int32_t>("reach", 0);
-  growth.vicinity = reader.number<std::int32_t>("vicinity", 0);
   growth.spacing = reader.number<std::int32_t>("spacing", 0);
   growth.claim = reader.number<std::int32_t>("claim", 0);
+  growth.apart = reader.number<std::int32_t>("apart", 0);
+  growth.terrace = reader.number<std::uint32_t>("terrace", 1);
+  growth.tiers.clear();
+  reader.each("tiers", false, [&growth](Reader& tier) {
+    const auto residents = tier.number<std::uint32_t>("residents", 0, 0U);
+    const Footprint square = read_footprint(tier);
+    growth.tiers.push_back(
+        Tier{residents, square, tier.number<std::int32_t>("vicinity", 0)});
+  });
   growth.settlers = reader.number<std::uint32_t>("settlers", 0);
   growth.raiders = reader.number<std::uint32_t>("raiders", 0);
   growth.self_reliance = reader.number<std::uint32_t>("self_reliance", 0);
@@ -676,9 +692,9 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
   } else if (kind == "structure_kinds") {
     data.kinds.push_back(read_structure_kind(reader, name));
   } else if (kind == "villages") {
-    data.villages.push_back(read_template(reader, name, context));
+    data.villages.push_back(read_template(reader, name, context, false));
   } else if (kind == "seats") {
-    data.seat = read_template(reader, name, context);
+    data.seat = read_template(reader, name, context, true);
   } else if (kind == "disciplines") {
     data.life.disciplines.push_back(read_discipline(reader));
   } else if (kind == "arts") {

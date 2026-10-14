@@ -18,6 +18,7 @@
 #include "flow_field.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
+#include "layout.hpp"
 #include "leadership.hpp"
 #include "life.hpp"
 #include "limits.hpp"
@@ -513,6 +514,11 @@ class World {
   /// is kept when the village is rebuilt.
   [[nodiscard]] std::optional<Destroyer> destroyer(std::size_t village) const;
 
+  /// Returns the index of the growth's tier village `village` has reached,
+  /// kept once reached (ADR 0076); 0 for a world that does not grow. Throws
+  /// std::out_of_range when there is no such village.
+  [[nodiscard]] std::size_t tier(std::size_t village) const;
+
   /// Returns the land village `village` was founded on, or nothing for a
   /// village the world was created with.
   [[nodiscard]] std::optional<Settlement> settlement(std::size_t village) const;
@@ -833,6 +839,8 @@ class World {
     std::size_t plan;
     Cell cell;
   };
+  [[nodiscard]] std::optional<std::vector<Laid>> core_layout(
+      Cell centre, const Growth& growth, const Lot& ground) const;
   [[nodiscard]] std::optional<std::vector<std::size_t>> lay(
       const std::vector<Laid>& laid, const Growth& growth,
       const std::vector<std::size_t>& movers, Cell destination);
@@ -849,6 +857,13 @@ class World {
     std::vector<bool> taken;
   };
   [[nodiscard]] Ground ground() const;
+  [[nodiscard]] Lot lot() const;
+  [[nodiscard]] bool unplaced(const VillageRecord& village) const;
+  [[nodiscard]] std::vector<Cell> open_sites(std::size_t village,
+                                             const Growth& growth) const;
+  [[nodiscard]] Townsite site(std::size_t village, const Growth& growth) const;
+  [[nodiscard]] Clearing square(std::size_t village) const;
+  [[nodiscard]] std::vector<Structure> homes(std::size_t village) const;
   [[nodiscard]] std::vector<Passing> passings() const;
   void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
              const std::vector<Closing>& closings, std::vector<Step>& pulls,
@@ -862,6 +877,8 @@ class World {
                       const std::vector<std::size_t>& members) const;
 
   std::uint64_t rng_state_;
+  /// The seed the world was created from, which keys its counter-based draws.
+  std::uint64_t seed_;
   std::uint64_t tick_count_ = 0;
   Map map_;
   Rules rules_;

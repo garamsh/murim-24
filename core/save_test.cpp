@@ -18,6 +18,7 @@
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
+#include "growth.hpp"
 #include "json_packs.hpp"
 #include "leadership.hpp"
 #include "limits.hpp"
@@ -717,6 +718,52 @@ World facing(bool intent) {
     world.order(0, Order{{0, 0}, {0}, 1});
   }
   return world;
+}
+
+// A village of `people` with no food, whose growth's second tier is reached
+// at four residents, lived STARVING_DAYS days of a tick each, unfed people
+// dying after a day.
+constexpr int STARVING_DAYS = 5;
+
+World starving(std::size_t people) {
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  Life life;
+  life.husbandry = Husbandry{1, 1, 0};
+  Growth growth;
+  growth.tiers = {Tier{0, {1, 1}, 1}, Tier{4, {3, 3}, 1}};
+  growth.stances = {{}};
+  life.growth = growth;
+  std::vector<Recruit> residents;
+  residents.reserve(people);
+  for (std::size_t person = 0; person < people; ++person) {
+    residents.push_back(Recruit{{static_cast<std::int32_t>(person), 0}, 1});
+  }
+  World world{Seed{1},
+              Map{{"......", "......", "......"}},
+              {ArmySpec{{2, 2}, residents, 0, {Skill{0, 0, 0, 0, 1}}}},
+              {},
+              rules,
+              {VillageSpec{{}, 0, {}, 0, {}}},
+              {},
+              life};
+  return ticked(std::move(world), STARVING_DAYS);
+}
+
+TEST(Save, AVillageThatShrankKeepsTheTierItReachedAfterLoading) {
+  const World shrunk = starving(4);
+  ASSERT_EQ(shrunk.residents_of(0), 0U);
+  ASSERT_EQ(shrunk.tier(0), 1U);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, shrunk}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.tier(0), 1U);
+  EXPECT_EQ(restored.world.hash(), shrunk.hash());
+  // Control: three people never reach the tier, so the same village starved
+  // keeps the first: the tier kept is the one its peak reached.
+  const World never = starving(3);
+  ASSERT_EQ(never.residents_of(0), 0U);
+  EXPECT_EQ(never.tier(0), 0U);
 }
 
 TEST(Save, ALoadedWorldKeepsItsAttackIntent) {

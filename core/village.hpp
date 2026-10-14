@@ -48,6 +48,11 @@ struct Holding {
   std::uint32_t healing = 0;
 };
 
+/// Where a structure stands in its village (ADR 0076): on the square's edge,
+/// among the homes nearest the square, or at the edge beyond the farthest
+/// home.
+enum class Role : std::uint8_t { SQUARE, HOME, EDGE };
+
 /// A breakable object covering `footprint` from `cell`, its top-left cell.
 /// Its cells block movement for as long as the world runs, whatever its
 /// stage.
@@ -57,6 +62,7 @@ struct Structure {
   Footprint footprint{1, 1};
   /// Whether its footprint blocks movement; a field does not.
   bool blocks = true;
+  Role role = Role::HOME;
 };
 
 /// Land growth keeps clear as though a structure covered it: `area` from
@@ -139,6 +145,12 @@ struct VillageRecord {
   std::optional<std::size_t> raiding;
   /// The corner of the land it was founded on, if it was founded.
   std::optional<Cell> founded;
+  /// The growth's tier it has reached, kept once reached (ADR 0076).
+  std::size_t tier = 0;
+  /// Where its residents were bound as it was created or founded: the
+  /// centre its square is kept round and its distance from others is
+  /// measured from, which stays where it was laid.
+  Cell centre{};
 };
 
 /// What each village's standing workshops do for its people: the edge they
@@ -217,6 +229,13 @@ class Villages {
   /// Adds a village founded on the land from `corner`, with army `residents`
   /// as its residents and no structure or food yet. Returns its index.
   std::size_t found(std::size_t residents, Cell corner);
+
+  /// Gives village `village` its centre, `centre`.
+  void place(std::size_t village, Cell centre);
+
+  /// Has village `village` reach tier `tier`, keeping a higher one it
+  /// reached before.
+  void reach(std::size_t village, std::size_t tier);
 
   /// Takes one more structure, belonging to no village.
   void add_structure();

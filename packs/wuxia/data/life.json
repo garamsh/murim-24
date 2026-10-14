@@ -38,9 +38,30 @@
       "interval": 30,
       "pressure": 200,
       "reach": 40,
-      "vicinity": 8,
       "spacing": 3,
       "claim": 16,
+      "apart": 20,
+      "terrace": 2000,
+      "tiers": [
+        {
+          "residents": 0,
+          "width": 3,
+          "height": 3,
+          "vicinity": 8
+        },
+        {
+          "residents": 20,
+          "width": 6,
+          "height": 4,
+          "vicinity": 12
+        },
+        {
+          "residents": 150,
+          "width": 10,
+          "height": 8,
+          "vicinity": 20
+        }
+      ],
       "builds": [
         {
           "kind": "house",
