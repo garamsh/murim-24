@@ -8,7 +8,9 @@
 # under the cap every light is kept). Emitters bloom at standard and high and not at low, while the
 # lamp shows and a hearth is listed (control: standard's bloom at midnight with a hearth), and not
 # at noon nor with no hearth. The light field is drawn at midnight with lights shown, and left
-# undrawn at noon and with none (control: drawn at midnight).
+# undrawn at noon and with none (control: drawn at midnight). The fog shows by the key's, thickest
+# at morning, at standard and high and not at low (control: standard's). It reads the relief shown,
+# its cells' levels and size, from the view's corner, and drifts.
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -63,7 +65,7 @@ func run() -> bool:
 		noon.gain, noon.saturation, dusk.gain, between.gain, halfway, standard.vignette, standard.hue_shift,
 		low.vignette, low.hue_shift, hidden_before, shown_after, "pass" if passed else "FAIL"])
 	grade.free()
-	return passed and _lights_pass()
+	return passed and _lights_pass() and _fog_pass()
 
 
 func _lights_pass() -> bool:
@@ -120,4 +122,42 @@ func _lights_pass() -> bool:
 	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom with a hearth standard %.2f high %.2f low %.2f noon %.2f, without one %.2f, low keeping %d lights; the light field drawn at midnight %s, at noon %s, with no lights %s: %s" % [
 		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, standard, high, low.bloom,
 		noon, no_hearth, low.light_count, drawn_night, drawn_noon, drawn_unlit, "pass" if passed else "FAIL"])
+	return passed
+
+
+func _fog_pass() -> bool:
+	var grade: Grade = load(SCENE).instantiate()
+	var keyed := []
+	for at: float in [0.0, 0.3, 0.5]:
+		keyed.append(grade.grade_at(at, SUMMER).get("fog", -1.0))
+	var key_pass: bool = is_equal_approx(keyed[0], 0.35) and is_equal_approx(keyed[1], 0.7) and is_equal_approx(keyed[2], 0.2)
+	var relief := Relief.new(Vector2i(4, 3))
+	relief.lay(Vector2i(2, 1), "rock", 2, "rock_face", false)
+	grade.show_relief(relief)
+	grade.show_time(0.5, SUMMER)
+	grade.show_lights(PackedFloat32Array(), Rect2(100, 50, 640, 360))
+	var shown := {}
+	for quality: int in [Grade.Quality.STANDARD, Grade.Quality.HIGH, Grade.Quality.LOW]:
+		grade.quality = quality
+		shown[quality] = grade.params()
+	var standard: Dictionary = shown[Grade.Quality.STANDARD]
+	# An unset parameter reads as null; as -1 it compares unequal instead.
+	for name: String in ["fog", "drift"]:
+		for quality: int in shown:
+			if shown[quality][name] == null:
+				shown[quality][name] = -1.0
+	var low: Dictionary = shown[Grade.Quality.LOW]
+	var quality_pass: bool = is_equal_approx(standard.fog, 0.2) and is_equal_approx(shown[Grade.Quality.HIGH].fog, 0.2) \
+			and is_equal_approx(low.fog, 0.0)
+	var cells: Image = (standard.cells as ImageTexture).get_image() if standard.cells != null else null
+	var raised := int(round(cells.get_pixel(2, 1).g * 255.0)) if cells != null else -1
+	var flat := int(round(cells.get_pixel(1, 1).g * 255.0)) if cells != null else -1
+	var relief_pass: bool = standard.map_size == Vector2i(4, 3) and raised == 3 and flat == 1 \
+			and Vector2(standard.view_origin).is_equal_approx(Vector2(100, 50)) \
+			and standard.drift > 0.0
+	grade.free()
+	var passed := key_pass and quality_pass and relief_pass
+	print("grade_test: fog at midnight, morning and noon %s; standard fog %.2f, low %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f: %s" % [
+		keyed, standard.fog, low.fog, standard.map_size, raised, flat, standard.view_origin, standard.drift,
+		"pass" if passed else "FAIL"])
 	return passed

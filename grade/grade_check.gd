@@ -11,9 +11,14 @@
 ## It checks that the lights brighten the frame within their reach, redder there than green, and
 ## leave it unchanged beyond; that the pane takes the fire ramp only when lit, and the ink of an
 ## outline across its bottom row never does; and that standard's bloom changes pixels round the
-## fire block, which keeps its colour, and none away from it. It exits 0 when every check passes, 1
-## when one fails and 2 when it cannot draw, as when its window draws too few frames to reach the
-## last shot within MAX_FRAMES frames. Its window stays on top, since a covered window is not drawn.
+## fire block, which keeps its colour, and none away from it. Last, over a relief of its own, flat
+## but for a block of the highest level near the screen's top, it draws a morning at standard clear
+## and with fog. It checks that the fog changes the screen's top more than its lower part and none
+## of its bottom, nor the pixels the high block shows, while the same pixels beside it change. Until
+## then every step holds the fog off, so the checks before do not see it. It exits 0 when every
+## check passes, 1 when one fails and 2 when it cannot draw, as when its window draws too few frames
+## to reach the last shot within MAX_FRAMES frames. Its window stays on top, since a covered window
+## is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
@@ -33,6 +38,10 @@ const EMITTERS: Array[Color] = [Color("f5a33c"), Color("fbe37a"), Color("fff8dc"
 const MIDDLE := Rect2i(560, 320, 320, 170)
 # The darkest ink, as a body's outline is drawn in.
 const INK := Color("171229")
+# The pixels the fog fixture's high block shows, in art pixels from the middle of the screen, and
+# those beside it, likewise.
+const HIGH := Rect2i(-30, -110, 24, 14)
+const BESIDE_HIGH := Vector2i(60, 0)
 
 var _view: Node
 var _grade: Grade
@@ -82,7 +91,9 @@ func _process(_delta: float) -> bool:
 		["standard", func() -> void: _grade.quality = Grade.Quality.STANDARD],
 		["unlit", func() -> void: _grade.quality = Grade.Quality.LOW; _grade.show_time(0.0, SUMMER); _show_lights(false)],
 		["lit", func() -> void: _show_lights(true)],
-		["bloom", func() -> void: _grade.quality = Grade.Quality.STANDARD]]
+		["bloom", func() -> void: _grade.quality = Grade.Quality.STANDARD],
+		["clear", func() -> void: _show_lights(false); _grade.show_relief(_high_relief()); _grade.show_time(0.3, SUMMER)],
+		["fog", func() -> void: _only(true)]]
 	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
 	# renderer on a loaded machine.
 	if _drawn < _next:
@@ -92,6 +103,8 @@ func _process(_delta: float) -> bool:
 		if _step > 0:
 			_shots[steps[_step - 1][0]] = root.get_texture().get_image()
 		steps[_step][1].call()
+		if steps[_step][0] != "fog":
+			_only(false)
 		_step += 1
 	elif _step == steps.size():
 		_shots[steps[_step - 1][0]] = root.get_texture().get_image()
@@ -132,7 +145,19 @@ func _report() -> void:
 	var away := _differ(_shots.lit, _shots.bloom, MIDDLE, _blooming([_shots.lit, _shots.bloom], MIDDLE))
 	_check("grade_check: standard's bloom changes %d pixels within two art pixels of the fire block, which keeps %d of its %d, and %d of the middle beyond two art pixels of every emitter" % [
 		round_fire.count, kept, fire.get_area(), away.count], round_fire.count > 0 and kept == fire.get_area() and away.count == 0)
-	print("grade_check: %d of 6 checks passed" % (6 - _failed))
+	var height: int = _shots.clear.get_height()
+	var width: int = _shots.clear.get_width()
+	var top := _differ(_shots.clear, _shots.fog, Rect2i(0, 0, width, height / 4))
+	var lower := _differ(_shots.clear, _shots.fog, Rect2i(0, height * 5 / 8, width, height / 4))
+	var bottom := _differ(_shots.clear, _shots.fog, Rect2i(0, height * 93 / 100, width, height * 7 / 100))
+	_check("grade_check: the fog changes %d pixels of the screen's top quarter, %d of a quarter lower down, and %d of its bottom 7%%" % [
+		top.count, lower.count, bottom.count], top.count > lower.count and lower.count >= 0 and bottom.count == 0 and top.count > 0)
+	var high := Rect2i(_screen(Vector2(HIGH.position)), HIGH.size * int(_zoom))
+	var on_high := _differ(_shots.clear, _shots.fog, high)
+	var beside := _differ(_shots.clear, _shots.fog, Rect2i(high.position + BESIDE_HIGH * int(_zoom), high.size))
+	_check("grade_check: the fog changes %d pixels of the high ground's %d and %d of as many beside it" % [
+		on_high.count, high.get_area(), beside.count], on_high.count == 0 and beside.count > 0)
+	print("grade_check: %d of 8 checks passed" % (8 - _failed))
 	quit(0 if _failed == 0 else 1)
 
 
@@ -186,6 +211,27 @@ func _show_lights(on: bool) -> void:
 		lights.append_array([_middle.x + BESIDE.x, _middle.y + BESIDE.y, 0, 0, REACH])
 	# The light round the pane stands for a hearth too, so the bloom shows.
 	_grade.show_lights(lights, view, 1 if on else 0)
+
+
+# Shows the grade again, then holds the fog off unless `fog`.
+func _only(fog: bool) -> void:
+	_grade.quality = _grade.quality
+	if not fog:
+		(_grade.get_node("Pass").material as ShaderMaterial).set_shader_parameter("fog", 0.0)
+
+
+# A relief the size of the world's, flat but for the highest level under the cells the fog reads
+# for the pixels HIGH covers, and a cell round them: those of a pixel's world point lowered by the
+# highest level's lift.
+func _high_relief() -> Relief:
+	var relief := Relief.new(_view.get_node("WorldArt").relief.size)
+	var world := Rect2(_middle + Vector2(HIGH.position) + Vector2(0, Relief.TOP * Relief.LEVEL_PX), Vector2(HIGH.size))
+	var first := Vector2i((world.position / Relief.CELL).floor()) - Vector2i.ONE
+	var last := Vector2i((world.end / Relief.CELL).floor()) + Vector2i.ONE
+	for y in range(first.y, last.y + 1):
+		for x in range(first.x, last.x + 1):
+			relief.lay(Vector2i(x, y), "rock", Relief.TOP, "rock_face", false)
+	return relief
 
 
 # Where `art`, art pixels from the middle of the screen, lies on it, in screen pixels.
