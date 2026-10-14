@@ -1,6 +1,6 @@
 # ADR 0020: Let a person on the move ignore people behind it
 
-> Status: accepted; its rejection of a pull toward hostiles superseded by ADR-0046, under which people no driver steers close on a foe in sight
+> Status: accepted; its rejection of a pull toward hostiles superseded by ADR-0046, under which people no driver steers close on a foe in sight; its give-way between two people seeking attack slots round the same foe amended by ADR-0080, under which they do not give way to each other
 > Date: 2026-10-07
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
