@@ -45,6 +45,7 @@ func _ready() -> void:
 	_camera.zoom = Vector2(scale, scale)
 	world = WorldAdapter.create_m1()
 	_art.show_world(world, -1)
+	_art.ground_material = _grade.clouds
 	_grade.show_relief(_art.relief)
 	bodies = world.snapshot().person.size()
 	_camera.position = _art.to_screen(Vector2(WorldAdapter.m1_centre()))

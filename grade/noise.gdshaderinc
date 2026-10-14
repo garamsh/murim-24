@@ -1,4 +1,4 @@
-// Value noise for what drifts over the world, the fog: smooth from 0 to 1
+// Value noise for what drifts over the world, the fog and the clouds' shadows: smooth from 0 to 1
 // over a lattice of one unit, the same at the same point and salt, as ground.gdshader's.
 uint noise_hash(int x, int y, int salt) {
 	uint n = uint(x) * 374761393u + uint(y) * 668265263u + uint(salt) * 2246822519u;

@@ -287,7 +287,8 @@ func _play(made: WorldAdapter) -> void:
 	_objective = Vector2i((lead() / WorldAdapter.CELL_SIZE).floor())
 	_skills = _all_skills()
 	_art.show_world(world, steered)
-	# The fog over its relief (#209).
+	# The fog over its relief, and the clouds' shadows on its ground (#209).
+	_art.ground_material = _grade.clouds
 	_grade.show_relief(_art.relief)
 	_camera.position = _to_pixels(lead()).floor()
 	_sound.show_world(world, _art.to_screen)

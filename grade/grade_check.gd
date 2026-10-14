@@ -12,13 +12,14 @@
 ## leave it unchanged beyond; that the pane takes the fire ramp only when lit, and the ink of an
 ## outline across its bottom row never does; and that standard's bloom changes pixels round the
 ## fire block, which keeps its colour, and none away from it. Last, over a relief of its own, flat
-## but for a block of the highest level near the screen's top, it draws a morning at standard clear
-## and with fog. It checks that the fog changes the screen's top more than its lower part and none
-## of its bottom, nor the pixels the high block shows, while the same pixels beside it change. Until
-## then every step holds the fog off, so the checks before do not see it. It exits 0 when every
-## check passes, 1 when one fails and 2 when it cannot draw, as when its window draws too few frames
-## to reach the last shot within MAX_FRAMES frames. Its window stays on top, since a covered window
-## is not drawn.
+## but for a block of the highest level near the screen's top, it draws a morning at standard clear,
+## with fog, and with the clouds' shadows. It checks that the fog changes the screen's top more than
+## its lower part and none of its bottom, nor the pixels the high block shows, while the same pixels
+## beside it change; and that the clouds' shadows darken the frame and leave a block standing in the
+## fixture unchanged. Until then every step holds the fog and the clouds off, so the checks before
+## see neither. It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw, as
+## when its window draws too few frames to reach the last shot within MAX_FRAMES frames. Its window
+## stays on top, since a covered window is not drawn.
 extends SceneTree
 
 const SCENE := "res://world_view/world_view.tscn"
@@ -38,8 +39,9 @@ const EMITTERS: Array[Color] = [Color("f5a33c"), Color("fbe37a"), Color("fff8dc"
 const MIDDLE := Rect2i(560, 320, 320, 170)
 # The darkest ink, as a body's outline is drawn in.
 const INK := Color("171229")
-# The pixels the fog fixture's high block shows, in art pixels from the middle of the screen, and
-# those beside it, likewise.
+# A block standing in the fixture, in art pixels from the middle of the screen; and the pixels the
+# fog fixture's high block shows, and those beside it, likewise.
+const STANDING := Rect2i(-20, -40, 16, 12)
 const HIGH := Rect2i(-30, -110, 24, 14)
 const BESIDE_HIGH := Vector2i(60, 0)
 
@@ -93,7 +95,8 @@ func _process(_delta: float) -> bool:
 		["lit", func() -> void: _show_lights(true)],
 		["bloom", func() -> void: _grade.quality = Grade.Quality.STANDARD],
 		["clear", func() -> void: _show_lights(false); _grade.show_relief(_high_relief()); _grade.show_time(0.3, SUMMER)],
-		["fog", func() -> void: _only(true)]]
+		["fog", func() -> void: _only(true, false)],
+		["clouds", func() -> void: _only(false, true)]]
 	# A shot waits for frames drawn since its step, not frames processed, which run ahead of the
 	# renderer on a loaded machine.
 	if _drawn < _next:
@@ -103,8 +106,8 @@ func _process(_delta: float) -> bool:
 		if _step > 0:
 			_shots[steps[_step - 1][0]] = root.get_texture().get_image()
 		steps[_step][1].call()
-		if steps[_step][0] != "fog":
-			_only(false)
+		if not ["fog", "clouds"].has(steps[_step][0]):
+			_only(false, false)
 		_step += 1
 	elif _step == steps.size():
 		_shots[steps[_step - 1][0]] = root.get_texture().get_image()
@@ -157,7 +160,11 @@ func _report() -> void:
 	var beside := _differ(_shots.clear, _shots.fog, Rect2i(high.position + BESIDE_HIGH * int(_zoom), high.size))
 	_check("grade_check: the fog changes %d pixels of the high ground's %d and %d of as many beside it" % [
 		on_high.count, high.get_area(), beside.count], on_high.count == 0 and beside.count > 0)
-	print("grade_check: %d of 8 checks passed" % (8 - _failed))
+	var shaded := _differ(_shots.clear, _shots.clouds)
+	var standing := _differ(_shots.clear, _shots.clouds, Rect2i(_screen(Vector2(STANDING.position)), STANDING.size * int(_zoom)))
+	_check("grade_check: the clouds' shadows change %d pixels of the frame, %.4f darker, and %d of the block standing" % [
+		shaded.count, shaded.darker, standing.count], shaded.count > 0 and shaded.darker > 0.0 and standing.count == 0)
+	print("grade_check: %d of 9 checks passed" % (9 - _failed))
 	quit(0 if _failed == 0 else 1)
 
 
@@ -189,6 +196,7 @@ func _lay_fixture() -> void:
 	image.fill_rect(Rect2i(origin + PANE.position, PANE.size), Color("22132c"))
 	image.fill_rect(Rect2i(origin + PANE.position + Vector2i(0, PANE.size.y - 1), Vector2i(PANE.size.x, 1)), INK)
 	image.fill_rect(Rect2i(origin + FIRE.position, FIRE.size), EMITTERS[1])
+	image.fill_rect(Rect2i(origin + STANDING.position, STANDING.size), Color("8a6f4e"))
 	var sprite := Sprite2D.new()
 	sprite.texture = ImageTexture.create_from_image(image)
 	sprite.centered = false
@@ -213,11 +221,14 @@ func _show_lights(on: bool) -> void:
 	_grade.show_lights(lights, view, 1 if on else 0)
 
 
-# Shows the grade again, then holds the fog off unless `fog`.
-func _only(fog: bool) -> void:
+# Shows the grade again, then holds the fog off unless `fog`, and the clouds' shadows unless
+# `clouds`.
+func _only(fog: bool, clouds: bool) -> void:
 	_grade.quality = _grade.quality
 	if not fog:
 		(_grade.get_node("Pass").material as ShaderMaterial).set_shader_parameter("fog", 0.0)
+	if not clouds:
+		_grade.clouds.set_shader_parameter("clouds", 0.0)
 
 
 # A relief the size of the world's, flat but for the highest level under the cells the fog reads

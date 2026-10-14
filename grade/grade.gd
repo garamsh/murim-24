@@ -6,15 +6,18 @@
 ## while the lamp shows and a hearth, whose fire is drawn in them, is on screen, and the pass skips
 ## the bloom otherwise. The lights are drawn once a frame into the light field, a viewport of one
 ## pixel an art pixel, which the pass reads; the field is left undrawn while no light shows. By each
-## key's `fog`, a mist thickens toward the screen's top, clear of high ground, drifting with the
-## wind as the time shown passes. The quality the settings choose sets what it adds: low shows the
-## grade, the hue-shifted shadows and the lights only, standard and high the light vignette, the
-## bloom and the fog too. It decides nothing.
+## key's `fog`, a mist thickens toward the screen's top, clear of high ground; and by its `clouds`,
+## the shadows of clouds drift over the ground, drawn by `clouds`, the material the caller gives
+## world_art's ground, so nothing standing on it is shaded. Both drift with the wind as the time
+## shown passes. The quality the settings choose sets what it adds: low shows the grade, the
+## hue-shifted shadows and the lights only, standard and high the light vignette, the bloom, the fog
+## and the clouds' shadows too. It decides nothing.
 extends CanvasLayer
 
 const WorldArt := preload("res://world_art/world_art.gd")
 
 const GRADES := "res://grade/grades.json"
+const CLOUDS := preload("res://grade/clouds.gdshader")
 ## The qualities, as the settings' screen effects row holds them.
 enum Quality { LOW, STANDARD, HIGH }
 ## How far the darkest shadows lean blue-violet and the lights warm, and how much the corners
@@ -26,6 +29,8 @@ const BLOOM := 0.6
 ## The most lights drawn at once, those nearest the screen's middle.
 const MAX_LIGHTS := 32
 
+## The material the ground is drawn with, for the clouds' shadows to fall on it.
+var clouds := ShaderMaterial.new()
 ## The quality shown, of Quality.
 var quality := Quality.STANDARD:
 	set(value):
@@ -46,6 +51,10 @@ var _view_origin := Vector2.ZERO
 var _cells: ImageTexture
 var _map_size := Vector2i.ZERO
 var _drift := 0.0
+
+
+func _init() -> void:
+	clouds.shader = CLOUDS
 
 
 ## Shows the grade of `of_day`, the share of the day gone from midnight, 0 to 1, in `season`, 0 to
@@ -92,7 +101,8 @@ func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
 
 
 ## The grade of `of_day` in `season`: `gain`, `lift`, `shadow` and `light` as Vector3s, and
-## `saturation`, `contrast`, and `lamp` and `fog`, how much the lights and the fog show, 0 to 1.
+## `saturation`, `contrast`, and `lamp`, `fog` and `clouds`, how much the lights, the fog and the
+## clouds' shadows show, 0 to 1.
 func grade_at(of_day: float, season: int) -> Dictionary:
 	if _table.is_empty():
 		_table = JSON.parse_string(FileAccess.get_file_as_string(GRADES))
@@ -112,15 +122,16 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 	grade.gain *= _vector(of_season.gain)
 	grade.saturation = lerpf(a.saturation, b.saturation, share) * float(of_season.saturation)
 	grade.contrast = lerpf(a.contrast, b.contrast, share)
-	for field: String in ["lamp", "fog"]:
+	for field: String in ["lamp", "fog", "clouds"]:
 		grade[field] = lerpf(a[field], b[field], share)
 	return grade
 
 
-## What the pass draws with, as its shader's parameters: the grade's, `hue_shift`, `vignette`,
-## `art_pixel`, `bloom`, `light_count`, and the fog's `fog`, `view_origin`, `drift`, `cells` and
-## `map_size`; and what the light field draws the lights shown with, `light_rects` and
-## `light_reach`, and whether it draws them, `field_drawn`.
+## What the pass draws with, as its shader's parameters: the grade's but `clouds`, `hue_shift`,
+## `vignette`, `art_pixel`, `bloom`, `light_count`, and the fog's `fog`, `view_origin`, `drift`,
+## `cells` and `map_size`; what the light field draws the lights shown with, `light_rects` and
+## `light_reach`, and whether it draws them, `field_drawn`; and `clouds` and `cloud_drift`, as
+## `clouds` draws with them.
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
@@ -129,6 +140,8 @@ func params() -> Dictionary:
 	for name: String in ["light_rects", "light_reach"]:
 		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
 	shown.field_drawn = $LightField.render_target_update_mode == SubViewport.UPDATE_ALWAYS
+	shown.clouds = clouds.get_shader_parameter("clouds")
+	shown.cloud_drift = clouds.get_shader_parameter("drift")
 	return shown
 
 
@@ -138,13 +151,15 @@ func _apply() -> void:
 	var material := $Pass.material as ShaderMaterial
 	var low := quality == Quality.LOW
 	for field: String in _grade:
-		if field != "fog":
+		if not ["fog", "clouds"].has(field):
 			material.set_shader_parameter(field, _grade[field])
 	material.set_shader_parameter("fog", 0.0 if low else _grade.fog)
 	material.set_shader_parameter("view_origin", _view_origin)
 	material.set_shader_parameter("drift", _drift)
 	material.set_shader_parameter("cells", _cells)
 	material.set_shader_parameter("map_size", _map_size)
+	clouds.set_shader_parameter("clouds", 0.0 if low else _grade.clouds)
+	clouds.set_shader_parameter("drift", _drift)
 	material.set_shader_parameter("hue_shift", HUE_SHIFT)
 	material.set_shader_parameter("vignette", 0.0 if low else VIGNETTE)
 	material.set_shader_parameter("art_pixel", art_pixel)

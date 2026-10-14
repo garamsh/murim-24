@@ -8,9 +8,11 @@
 # under the cap every light is kept). Emitters bloom at standard and high and not at low, while the
 # lamp shows and a hearth is listed (control: standard's bloom at midnight with a hearth), and not
 # at noon nor with no hearth. The light field is drawn at midnight with lights shown, and left
-# undrawn at noon and with none (control: drawn at midnight). The fog shows by the key's, thickest
-# at morning, at standard and high and not at low (control: standard's). It reads the relief shown,
-# its cells' levels and size, from the view's corner, and drifts.
+# undrawn at noon and with none (control: drawn at midnight). The fog and the clouds' shadows show
+# by the key's, thickest at morning and the clouds' none at midnight; both show at standard and high
+# and neither at low (control: standard's). The fog reads the relief shown, its cells' levels and
+# size, from the view's corner, and drifts with the clouds; each grade's clouds are a material of
+# its own (control: the other grade's).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -129,8 +131,10 @@ func _fog_pass() -> bool:
 	var grade: Grade = load(SCENE).instantiate()
 	var keyed := []
 	for at: float in [0.0, 0.3, 0.5]:
-		keyed.append(grade.grade_at(at, SUMMER).get("fog", -1.0))
-	var key_pass: bool = is_equal_approx(keyed[0], 0.35) and is_equal_approx(keyed[1], 0.7) and is_equal_approx(keyed[2], 0.2)
+		var key := grade.grade_at(at, SUMMER)
+		keyed.append(Vector2(key.get("fog", -1.0), key.get("clouds", -1.0)))
+	var key_pass: bool = keyed[0].is_equal_approx(Vector2(0.35, 0.0)) and keyed[1].is_equal_approx(Vector2(0.7, 0.7)) \
+			and keyed[2].is_equal_approx(Vector2(0.2, 1.0))
 	var relief := Relief.new(Vector2i(4, 3))
 	relief.lay(Vector2i(2, 1), "rock", 2, "rock_face", false)
 	grade.show_relief(relief)
@@ -142,22 +146,26 @@ func _fog_pass() -> bool:
 		shown[quality] = grade.params()
 	var standard: Dictionary = shown[Grade.Quality.STANDARD]
 	# An unset parameter reads as null; as -1 it compares unequal instead.
-	for name: String in ["fog", "drift"]:
+	for name: String in ["fog", "clouds", "drift", "cloud_drift"]:
 		for quality: int in shown:
 			if shown[quality][name] == null:
 				shown[quality][name] = -1.0
 	var low: Dictionary = shown[Grade.Quality.LOW]
-	var quality_pass: bool = is_equal_approx(standard.fog, 0.2) and is_equal_approx(shown[Grade.Quality.HIGH].fog, 0.2) \
-			and is_equal_approx(low.fog, 0.0)
+	var quality_pass: bool = is_equal_approx(standard.fog, 0.2) and is_equal_approx(standard.clouds, 1.0) \
+			and is_equal_approx(shown[Grade.Quality.HIGH].fog, 0.2) and is_equal_approx(shown[Grade.Quality.HIGH].clouds, 1.0) \
+			and is_equal_approx(low.fog, 0.0) and is_equal_approx(low.clouds, 0.0)
 	var cells: Image = (standard.cells as ImageTexture).get_image() if standard.cells != null else null
 	var raised := int(round(cells.get_pixel(2, 1).g * 255.0)) if cells != null else -1
 	var flat := int(round(cells.get_pixel(1, 1).g * 255.0)) if cells != null else -1
 	var relief_pass: bool = standard.map_size == Vector2i(4, 3) and raised == 3 and flat == 1 \
 			and Vector2(standard.view_origin).is_equal_approx(Vector2(100, 50)) \
-			and standard.drift > 0.0
+			and standard.drift > 0.0 and is_equal_approx(standard.drift, standard.cloud_drift)
+	var other: Grade = load(SCENE).instantiate()
+	var separate: bool = other.clouds != grade.clouds and other.clouds.shader == grade.clouds.shader
+	other.free()
 	grade.free()
-	var passed := key_pass and quality_pass and relief_pass
-	print("grade_test: fog at midnight, morning and noon %s; standard fog %.2f, low %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f: %s" % [
-		keyed, standard.fog, low.fog, standard.map_size, raised, flat, standard.view_origin, standard.drift,
-		"pass" if passed else "FAIL"])
+	var passed := key_pass and quality_pass and relief_pass and separate
+	print("grade_test: fog and clouds at midnight, morning and noon %s; standard fog %.2f clouds %.2f, low fog %.2f clouds %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f and the clouds' %.2f; clouds a material of each grade's own %s: %s" % [
+		keyed, standard.fog, standard.clouds, low.fog, low.clouds, standard.map_size, raised, flat,
+		standard.view_origin, standard.drift, standard.cloud_drift, separate, "pass" if passed else "FAIL"])
 	return passed
