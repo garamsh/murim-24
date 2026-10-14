@@ -5,7 +5,8 @@
 # hidden and draws nothing; once one is, it shows (control: the same pass after show_time()). The
 # lights show by the key's lamp, fully at midnight and not at noon; each light given reaches the
 # shader in screen pixels, and of more than MAX_LIGHTS only the nearest the screen's middle (control:
-# under the cap every light is kept), at every quality.
+# under the cap every light is kept). Emitters bloom at standard and high and not at low (control:
+# standard's bloom).
 extends RefCounted
 
 const SCENE := "res://grade/grade.tscn"
@@ -91,12 +92,17 @@ func _lights_pass() -> bool:
 		farthest_kept = maxf(farthest_kept, rect.x)
 	var cap_pass: bool = capped.light_count == Grade.MAX_LIGHTS and kept.size() == Grade.MAX_LIGHTS \
 			and is_equal_approx(farthest_kept, (middle.x + (Grade.MAX_LIGHTS - 1) * 10 - view.position.x) * 3.0)
+	grade.quality = Grade.Quality.STANDARD
+	var standard: float = grade.params().bloom
+	grade.quality = Grade.Quality.HIGH
+	var high: float = grade.params().bloom
 	grade.quality = Grade.Quality.LOW
 	var low := grade.params()
-	var quality_pass: bool = low.light_count == Grade.MAX_LIGHTS
+	var bloom_pass: bool = is_equal_approx(standard, Grade.BLOOM) and standard > 0.0 and is_equal_approx(high, Grade.BLOOM) \
+			and is_equal_approx(low.bloom, 0.0) and low.light_count == Grade.MAX_LIGHTS
 	grade.free()
-	var passed := lamp_pass and shown_pass and cap_pass and quality_pass
-	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; low keeping %d lights: %s" % [
-		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, low.light_count,
-		"pass" if passed else "FAIL"])
+	var passed := lamp_pass and shown_pass and cap_pass and bloom_pass
+	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom standard %.2f high %.2f low %.2f, low keeping %d lights: %s" % [
+		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, standard, high, low.bloom,
+		low.light_count, "pass" if passed else "FAIL"])
 	return passed

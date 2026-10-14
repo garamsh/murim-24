@@ -5,7 +5,8 @@
 // vignette darkens toward the screen's corners, on the art's pixel grid and by the ordered dither,
 // so its edge steps in whole art pixels and blends nothing. By `lamp`, the lights grade.gd gives
 // warm the pixels round them back toward their own colour, in bands stepped by the dither, and the
-// dark panes of a lit window take the fire ramp.
+// dark panes of a lit window take the fire ramp. Emitters, the fire ramp's three brightest steps,
+// keep their own colour, and by `bloom` the art pixels round them lift toward its amber, dithered.
 shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
@@ -20,6 +21,7 @@ uniform float hue_shift = 0.0;
 uniform float vignette = 0.0;
 uniform float art_pixel = 1.0;
 uniform float lamp = 0.0;
+uniform float bloom = 0.0;
 // Each light's rect, x, y, width and height, and how far its light reaches, in screen pixels.
 uniform int light_count = 0;
 uniform vec4 light_rects[32];
@@ -27,13 +29,24 @@ uniform float light_reach[32];
 
 const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
-// The fire ramp's amber and yellow, which a lit window's panes take.
-const vec3 EMITTERS[2] = vec3[](vec3(0.961, 0.639, 0.235), vec3(0.984, 0.890, 0.478));
-// The colour lamplight gives what it falls on.
+// The emitters, the fire ramp's three brightest steps: amber, yellow and white-hot.
+const vec3 EMITTERS[3] = vec3[](vec3(0.961, 0.639, 0.235), vec3(0.984, 0.890, 0.478), vec3(1.0, 0.973, 0.863));
+// The colour lamplight gives what it falls on, and the eight directions bloom looks for emitters in.
 const vec3 LAMPLIGHT = vec3(1.12, 0.9, 0.62);
+const vec2 TAPS[8] = vec2[](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0),
+		vec2(1.0, 1.0), vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, -1.0));
 
 float luma(vec3 c) {
 	return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+bool is_emitter(vec3 c) {
+	for (int i = 0; i < 3; i++) {
+		if (distance(c, EMITTERS[i]) < 0.01) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void fragment() {
@@ -76,6 +89,21 @@ void fragment() {
 		vec2 centred = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE * 2.0 - 1.0;
 		if (dither < smoothstep(0.55, 1.35, length(centred))) {
 			g *= 1.0 - vignette;
+		}
+	}
+	if (is_emitter(c)) {
+		g = c;
+	} else if (bloom > 0.0) {
+		// Emitters within one and two art pixels, the nearer counting twice.
+		vec2 centre = (cell + 0.5) * art_pixel * SCREEN_PIXEL_SIZE;
+		vec2 step = art_pixel * SCREEN_PIXEL_SIZE;
+		float near = 0.0;
+		for (int i = 0; i < 8; i++) {
+			near += is_emitter(texture(screen, centre + TAPS[i] * step).rgb) ? 2.0 : 0.0;
+			near += is_emitter(texture(screen, centre + TAPS[i] * step * 2.0).rgb) ? 1.0 : 0.0;
+		}
+		if (dither < near / 8.0 * bloom * mix(0.6, 1.0, lamp)) {
+			g = mix(g, EMITTERS[0], 0.5);
 		}
 	}
 	COLOR = vec4(clamp(g, 0.0, 1.0), 1.0);
