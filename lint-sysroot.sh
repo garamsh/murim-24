@@ -31,7 +31,8 @@ echo "$packages" | while read -r sha256 path; do
   if echo "$sha256  $deb" | shasum -a 256 -c - >/dev/null 2>&1; then
     echo "read $path from $downloads, checked against its SHA-256"
   else
-    curl -sSfL -o "$deb" "$snapshot/$path"
+    # A brief outage of the mirror, a 5xx or a timeout, is tried again a few times before it fails.
+    curl -sSfL --retry 4 --retry-delay 15 -o "$deb" "$snapshot/$path"
     echo "$sha256  $deb" | shasum -a 256 -c - >/dev/null
     echo "fetched $path into $downloads, checked against its SHA-256"
   fi
