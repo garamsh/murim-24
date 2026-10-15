@@ -30,18 +30,30 @@ Cell block_of(Cell cell) {
   return Cell{floor_div(cell.x), floor_div(cell.y)};
 }
 
-// Slots per entry: with few, most empty cells share a slot with an occupied
-// one, and a search walking them reads that slot's kinds and entries.
+// Cell slots per entry: with few, most empty cells share a slot with an
+// occupied one, and a search walking them reads that slot's kinds and entries.
 constexpr std::size_t SLOTS_PER_ENTRY = 8;
 
-// SLOTS_PER_ENTRY slots per entry at least, rounded up to a power of two so a
-// mask picks the slot.
-std::size_t slot_count_for(std::size_t entries) {
+// Block slots per entry: no more blocks hold an entry than there are entries,
+// so two slots an entry, a quarter of the cells' table, leave at least half the
+// block slots empty.
+constexpr std::size_t BLOCK_SLOTS_PER_ENTRY = 2;
+
+// `per_entry` slots per entry at least, rounded up to a power of two so a mask
+// picks the slot.
+std::size_t slot_count_for(std::size_t entries, std::size_t per_entry) {
   std::size_t slots = 1;
-  while (slots < entries * SLOTS_PER_ENTRY) {
+  while (slots < entries * per_entry) {
     slots *= 2;
   }
   return slots;
+}
+
+// The slot of a table of `mask` + 1 slots that `cell` hashes to.
+std::size_t hashed(Cell cell, std::size_t mask) {
+  const std::uint64_t key = (static_cast<std::uint64_t>(cell.x) * PRIME_X) ^
+                            (static_cast<std::uint64_t>(cell.y) * PRIME_Y);
+  return static_cast<std::size_t>(key) & mask;
 }
 
 // `positions`, each of every kind.
@@ -67,18 +79,19 @@ SpatialHash::SpatialHash(std::vector<Placed> placed)
              std::numeric_limits<std::int32_t>::max()},
       last_{std::numeric_limits<std::int32_t>::min(),
             std::numeric_limits<std::int32_t>::min()},
-      slot_mask_(slot_count_for(placed_.size()) - 1),
+      slot_mask_(slot_count_for(placed_.size(), SLOTS_PER_ENTRY) - 1),
+      block_mask_(slot_count_for(placed_.size(), BLOCK_SLOTS_PER_ENTRY) - 1),
       slot_starts_(slot_mask_ + 2, 0),
       entries_(placed_.size()),
       slot_kinds_(slot_mask_ + 1, 0),
-      block_kinds_(slot_mask_ + 1, 0) {
+      block_kinds_(block_mask_ + 1, 0) {
   for (const Placed& each : placed_) {
     const Cell cell = cell_of(each.position);
     first_ = Cell{std::min(first_.x, cell.x), std::min(first_.y, cell.y)};
     last_ = Cell{std::max(last_.x, cell.x), std::max(last_.y, cell.y)};
     ++slot_starts_.at(slot_of(cell) + 1);
     slot_kinds_.at(slot_of(cell)) |= each.kinds;
-    block_kinds_.at(slot_of(block_of(cell))) |= each.kinds;
+    block_kinds_.at(hashed(block_of(cell), block_mask_)) |= each.kinds;
   }
   std::partial_sum(slot_starts_.begin(), slot_starts_.end(),
                    slot_starts_.begin());
@@ -107,7 +120,7 @@ bool SpatialHash::holds(std::pair<Cell, Cell> span, std::uint64_t kinds) const {
   const Cell last = block_of(span.second);
   for (Cell block{first.x, first.y}; block.y <= last.y; ++block.y) {
     for (block.x = first.x; block.x <= last.x; ++block.x) {
-      if ((block_kinds_.at(slot_of(block)) & kinds) != 0) {
+      if ((block_kinds_.at(hashed(block, block_mask_)) & kinds) != 0) {
         return true;
       }
     }
@@ -116,9 +129,7 @@ bool SpatialHash::holds(std::pair<Cell, Cell> span, std::uint64_t kinds) const {
 }
 
 std::size_t SpatialHash::slot_of(Cell cell) const {
-  const std::uint64_t key = (static_cast<std::uint64_t>(cell.x) * PRIME_X) ^
-                            (static_cast<std::uint64_t>(cell.y) * PRIME_Y);
-  return static_cast<std::size_t>(key) & slot_mask_;
+  return hashed(cell, slot_mask_);
 }
 
 }  // namespace murim
