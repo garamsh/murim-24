@@ -6559,30 +6559,38 @@ constexpr std::size_t SECOND_SELLER = 2;
 
 // Faction 0's buyer at (4, 4), steered by no driver, with a purse for one
 // herb, and two steered sellers of it within its talk reach of 2 cells, the
-// first at `first` and the second at `second`. Days last a tick.
+// first at `first` and the second at `second`, each its own village's one
+// resident and herbalist. No one earns a wage, and days last a tick.
 World two_sellers(Cell first, Cell second) {
   Life life;
-  life.disciplines = {{"medicine", {0, 0}, {WHOLE, 0}}};
   life.newborn_health = WHOLE;
   life.founding_age = Spread{DAYS_PER_YEAR, 0};
-  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, 0}},
+  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0}},
                      HERB_PRICE,
-                     1,
+                     0,
                      PER_MILLE / 2,
                      PER_MILLE / 4};
+  const std::vector<Band> day{{0, Where::HOME}};
+  life.occupations =
+      Occupations{{Occupation{"herbalist", OnSquare{1}, day, {HERB}},
+                   Occupation{"beggar", Nowhere{}, day, {}}},
+                  0,
+                  1,
+                  day};
   Rules rules = peaceful(0);
   rules.talk_reach = 2;
   rules.ticks_per_day = 1;
-  World world{Seed{1},
-              Map{open_map(OPEN_SIDE)},
-              {ArmySpec{SHOPPER_AT, {Recruit{SHOPPER_AT, WHOLE}}, 0, {IDLE}},
-               ArmySpec{first, {Recruit{first, WHOLE}}, 0, {IDLE}},
-               ArmySpec{second, {Recruit{second, WHOLE}}, 0, {IDLE}}},
-              {},
-              rules,
-              {},
-              {},
-              life};
+  World world{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {ArmySpec{SHOPPER_AT, {Recruit{SHOPPER_AT, WHOLE}}, 0, {IDLE}},
+       ArmySpec{first, {Recruit{first, WHOLE}}, 0, {IDLE}},
+       ArmySpec{second, {Recruit{second, WHOLE}}, 0, {IDLE}}},
+      {},
+      rules,
+      {VillageSpec{{}, 1, {}, 0, {}, {}}, VillageSpec{{}, 2, {}, 0, {}, {}}},
+      {},
+      life};
   for (std::size_t army = 1; army < world.army_count(); ++army) {
     world.steer(army, true);
   }
