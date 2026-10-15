@@ -1,6 +1,6 @@
 # ADR 0070: Double the map to 8,192 cells of half a li, so every journey takes twice as long
 
-> Status: proposed
+> Status: proposed; its first step built, as `world-generation.md` records: a key route's walk is 8-connected, steps only between levels at most one apart, costs 7 a diagonal step to 5 a straight one and is measured as the cost over 5, rounded down; and its bounds of 65,536 areas and 1,024 regions hold by its side's bound of 8,192
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
