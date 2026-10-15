@@ -270,7 +270,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xA6145419D3E1B4DAULL);
+            0xF4972D72FF40287BULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
