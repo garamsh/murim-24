@@ -13,6 +13,7 @@
 #include <variant>
 #include <vector>
 
+#include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
 #include "calendar.hpp"
@@ -377,6 +378,172 @@ TEST(Save, AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused) {
   // Control: the same bytes at the current version load.
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, AVersion15SaveFromBeforeTiersIsRefused) {
+  // Version 15 saves hold no area's tier and no army's far anchor.
+  constexpr std::uint32_t BEFORE_TIERS = 15;
+  ASSERT_LT(BEFORE_TIERS, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_TIERS);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+// The side of the tier tests' map, 8 by 8 areas, how far from its edges
+// their armies stand, a cell's further step inward, and a third army's
+// distance in.
+constexpr std::int32_t TIERED_SIDE = 8 * AREA_SIDE;
+constexpr std::int32_t EDGE = 4;
+constexpr std::int32_t INWARD = EDGE + 1;
+constexpr std::int32_t DEEPER = 2 * EDGE;
+
+// A map of 8 by 8 areas with an army at either corner, the first steered on
+// the standard profile, so the second, 7 areas away, is far.
+World tiered() {
+  constexpr std::int32_t SIDE = TIERED_SIDE;
+  const std::vector<std::string> rows(static_cast<std::size_t>(SIDE),
+                                      std::string(SIDE, '.'));
+  const Skill guard{1, 0, 1, 0, 1};
+  World world{Seed{1},
+              Map{rows},
+              {ArmySpec{{EDGE, EDGE}, {Recruit{{EDGE, EDGE}, 1}}, 0, {guard}},
+               ArmySpec{{SIDE - EDGE, SIDE - EDGE},
+                        {Recruit{{SIDE - EDGE, SIDE - EDGE}, 1},
+                         Recruit{{SIDE - INWARD, SIDE - EDGE}, 1}},
+                        0,
+                        {guard}}},
+              {},
+              Rules{0, {{false}}, STAGE_FLOORS}};
+  world.set_profile(STANDARD_PROFILE);
+  world.steer(0, true);
+  world.retier();
+  return world;
+}
+
+// A world of one army, steered at a corner of a map of 8 by 8 areas, on
+// `profile`, its tiers just recomputed.
+World alone(std::optional<Profile> profile) {
+  const std::vector<std::string> rows(static_cast<std::size_t>(TIERED_SIDE),
+                                      std::string(TIERED_SIDE, '.'));
+  World world{
+      Seed{1},
+      Map{rows},
+      {ArmySpec{
+          {EDGE, EDGE}, {Recruit{{EDGE, EDGE}, 1}}, 0, {Skill{1, 0, 1, 0, 1}}}},
+      {},
+      Rules{0, {{false}}, STAGE_FLOORS}};
+  world.set_profile(profile);
+  world.steer(0, true);
+  world.retier();
+  return world;
+}
+
+TEST(Save, TheAreasTiersAreHashed) {
+  // The same army on the same cell: only the areas' tiers differ.
+  const World tiered_alone = alone(STANDARD_PROFILE);
+  const World untiered = alone(std::nullopt);
+  ASSERT_EQ(tiered_alone.areas().tier(tiered_alone.areas().count() - 1),
+            AreaTier::FAR);
+  ASSERT_EQ(untiered.areas().tier(untiered.areas().count() - 1),
+            AreaTier::LIVE);
+  EXPECT_NE(tiered_alone.hash(), untiered.hash());
+  // Control: the same tiers hash the same.
+  EXPECT_EQ(alone(STANDARD_PROFILE).hash(), tiered_alone.hash());
+}
+
+// A world whose second army, far at the map's far corner, loses its first
+// member to a third far army after it went far, when `left_before` is false,
+// so its anchor is that member's cell; or before, so its anchor is its second
+// member's. Either way it ends with the same member on the same cell, under
+// the same tiers.
+World left_far_army(bool left_before) {
+  constexpr std::int32_t SIDE = TIERED_SIDE;
+  const std::vector<std::string> rows(static_cast<std::size_t>(SIDE),
+                                      std::string(SIDE, '.'));
+  const Skill guard{1, 0, 1, 0, 1};
+  World world{Seed{1},
+              Map{rows},
+              {ArmySpec{{EDGE, EDGE}, {Recruit{{EDGE, EDGE}, 1}}, 0, {guard}},
+               ArmySpec{{SIDE - EDGE, SIDE - EDGE},
+                        {Recruit{{SIDE - EDGE, SIDE - EDGE}, 1},
+                         Recruit{{SIDE - INWARD, SIDE - EDGE}, 1}},
+                        0,
+                        {guard}},
+               ArmySpec{{SIDE - DEEPER, SIDE - DEEPER},
+                        {Recruit{{SIDE - DEEPER, SIDE - DEEPER}, 1}},
+                        0,
+                        {guard}}},
+              {},
+              Rules{0, {{false}}, STAGE_FLOORS}};
+  world.set_profile(STANDARD_PROFILE);
+  world.steer(0, true);
+  const std::size_t first = world.roster(1).front();
+  if (left_before) {
+    world.conscript(first, 2);
+  }
+  world.retier();
+  if (!left_before) {
+    world.conscript(first, 2);
+  }
+  return world;
+}
+
+// The cell army `army` of `world` is anchored on while far, or none.
+std::optional<Cell> anchor_of(const World& world, std::size_t army) {
+  const std::optional<FarAnchor> far = world.far(army);
+  return far ? std::optional<Cell>{far.value_or(FarAnchor{}).cell}
+             : std::nullopt;
+}
+
+TEST(Save, AFarArmysAnchorIsHashed) {
+  const World after = left_far_army(false);
+  const World before = left_far_army(true);
+  const std::optional<Cell> after_anchor = anchor_of(after, 1);
+  const std::optional<Cell> before_anchor = anchor_of(before, 1);
+  ASSERT_TRUE(after_anchor.has_value());
+  ASSERT_TRUE(before_anchor.has_value());
+  ASSERT_NE(after_anchor.value_or(Cell{}).x, before_anchor.value_or(Cell{}).x);
+  ASSERT_EQ(after.roster(1), before.roster(1));
+  ASSERT_EQ(after.areas().tiers(), before.areas().tiers());
+  EXPECT_NE(after.hash(), before.hash());
+  // Control: made the same way, the same hash.
+  EXPECT_EQ(left_far_army(false).hash(), after.hash());
+}
+
+TEST(Save, ASaveKeepsTheAreasTiersAndAFarArmysAnchor) {
+  const World world = tiered();
+  ASSERT_TRUE(world.far(1).has_value());
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.hash(), world.hash());
+  const std::optional<FarAnchor> held = world.far(1);
+  const std::optional<FarAnchor> kept = restored.world.far(1);
+  ASSERT_TRUE(kept.has_value());
+  EXPECT_EQ(kept.value_or(FarAnchor{}).area, held.value_or(FarAnchor{}).area);
+  EXPECT_EQ(anchor_of(restored.world, 1).value_or(Cell{}).x,
+            anchor_of(world, 1).value_or(Cell{}).x);
+  EXPECT_EQ(anchor_of(restored.world, 1).value_or(Cell{}).y,
+            anchor_of(world, 1).value_or(Cell{}).y);
+  EXPECT_EQ(restored.world.areas().tiers(), world.areas().tiers());
+  // Given its profile again, the loaded world ticks on as the saved one.
+  World saved = world;
+  restored.world.set_profile(STANDARD_PROFILE);
+  for (int tick = 0; tick < 2 * TICKS_PER_SECOND; ++tick) {
+    saved.tick();
+    restored.world.tick();
+  }
+  EXPECT_EQ(restored.world.hash(), saved.hash());
+  // Control: a world whose second army was never far hashes otherwise.
+  World near = tiered();
+  near.steer(0, false);
+  near.retier();
+  ASSERT_FALSE(near.far(1).has_value());
+  EXPECT_NE(near.hash(), world.hash());
 }
 
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {

@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
 #include "chart.hpp"
@@ -36,6 +37,8 @@ namespace {
 
 // The roles a structure or a plan may take, Role's members.
 constexpr std::uint8_t ROLES = 3;
+// The tiers an area may be at.
+constexpr std::uint8_t AREA_TIERS = 3;
 
 // "MURIMSAV": the bytes every save begins with.
 constexpr std::array<std::uint8_t, 8> MAGIC{0x4D, 0x55, 0x52, 0x49,
@@ -1115,7 +1118,16 @@ class SaveCodec {
       put_index(out, army.order.target);
       put_sizes(out, army.roster);
       out.flag(army.steered);
+      const auto* far = std::get_if<FarAnchor>(&army.course);
+      out.flag(far != nullptr);
+      if (far != nullptr) {
+        out.size(far->area);
+        put_cell(out, far->cell);
+        out.u32(far->progress);
+      }
     });
+    put_all(out, world.areas_.tiers(),
+            [&out](AreaTier tier) { out.u8(static_cast<std::uint8_t>(tier)); });
     put_all(out, world.structures_, [&out](const Structure& structure) {
       put_cell(out, structure.cell);
       out.u32(structure.durability);
@@ -1217,13 +1229,35 @@ class SaveCodec {
         throw Refusal{LoadError::CORRUPTED};
       }
       std::vector<std::size_t> roster = get_sizes(input);
+      const bool steered = input.flag();
+      // A far army holds its anchor and no field, which is rebuilt when it
+      // comes back.
+      const auto course = [&input, &world, objective]() -> World::Course {
+        if (!input.flag()) {
+          return FlowField{world.map_, objective};
+        }
+        const std::size_t area = input.size();
+        const Cell cell = get_cell(input);
+        if (area >= world.areas_.count() || !world.map_.passable(cell) ||
+            world.areas_.area_of(cell) != area) {
+          throw Refusal{LoadError::CORRUPTED};
+        }
+        return FarAnchor{area, cell, input.u32()};
+      };
       return World::Army{faction,
                          std::move(skills),
                          Order{objective, std::move(order_skills), target},
-                         FlowField{world.map_, objective},
+                         course(),
                          std::move(roster),
-                         input.flag()};
+                         steered};
     });
+    std::vector<AreaTier> tiers = get_all<AreaTier>(input, [&input] {
+      return static_cast<AreaTier>(input.tag(AREA_TIERS));
+    });
+    if (tiers.size() != world.areas_.count()) {
+      throw Refusal{LoadError::CORRUPTED};
+    }
+    world.areas_ = Areas{world.areas_.columns(), std::move(tiers)};
     world.structures_ = get_all<Structure>(input, [&input] {
       Structure structure;
       structure.cell = get_cell(input);

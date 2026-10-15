@@ -1,6 +1,6 @@
 # ADR 0042: Simulate the world in three tiers by distance from the people a driver steers
 
-> Status: proposed; its one set of tier values for every device superseded by ADR-0048
+> Status: proposed; its one set of tier values for every device superseded by ADR-0048; its tier state folded only while tiers are in the rules superseded by ADR-0049's rule that no fold is conditional (#188), so the areas' tiers and the far anchors are always folded; its stepped tier's stride and its far rules not yet built, as `simulation.md` records: step 3 of ADR 0077 computes, saves and hands over the tiers, and the stepped and far rules come with its step 5
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

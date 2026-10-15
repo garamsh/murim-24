@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 
+#include "areas.hpp"
 #include "map.hpp"
 #include "village.hpp"
 

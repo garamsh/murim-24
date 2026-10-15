@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "attack.hpp"
+#include "calendar.hpp"
 #include "map.hpp"
 #include "skill.hpp"
 #include "village.hpp"
