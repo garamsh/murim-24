@@ -1118,6 +1118,7 @@ void World::restore() {
         "every reference must name a record it holds, and every living "
         "person must stand on exactly one roster");
   }
+  index_rosters();
   structure_extent_ = 0;
   for (const Structure& structure : structures_) {
     structure_extent_ =
@@ -1173,15 +1174,15 @@ bool World::rostered() const {
 void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
   std::vector<std::size_t> every_skill(army.skills.size());
   std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
-  std::vector<std::size_t> roster;
+  std::vector<std::size_t> members;
   for (const Recruit& recruit : army.members) {
-    const bool housed = roster.size() < pairs;
-    const bool wife = housed && roster.size() % 2 == 1;
+    const bool housed = members.size() < pairs;
+    const bool wife = housed && members.size() % 2 == 1;
     std::optional<Sex> sex;
     if (housed) {
       sex = wife ? Sex::FEMALE : Sex::MALE;
     }
-    roster.push_back(people_.size());
+    members.push_back(people_.size());
     Person person;
     person.position = centre_of(recruit.cell);
     person.health = recruit.health;
@@ -1196,10 +1197,16 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
     people_.push_back(std::move(person));
   }
   FlowField field{map_, army.objective};
-  reachable_from(field, roster);
-  armies_.push_back(Army{army.faction, std::move(army.skills),
+  reachable_from(field, members);
+  armies_.push_back(Army{army.faction,
+                         std::move(army.skills),
                          Order{army.objective, std::move(every_skill)},
-                         std::move(field), std::move(roster), false});
+                         std::move(field),
+                         {},
+                         false});
+  for (const std::size_t member : members) {
+    enrol(member, armies_.size() - 1);
+  }
 }
 
 // Adds the sects `sects` describe, each founder joining its sect with its
@@ -1271,12 +1278,10 @@ std::uint32_t World::best_attainment(std::size_t person) const {
 // leaves its sect; a fallen sect's manuals each scatter or are lost; then the
 // faction's people are admitted.
 World::Living World::living_people() const {
-  Living living{{}, std::vector<std::size_t>(people_.size())};
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    for (const std::size_t member : armies_.at(army).roster) {
-      living.people.push_back(member);
-      living.army_of.at(member) = army;
-    }
+  Living living;
+  for (const Army& army : armies_) {
+    living.people.insert(living.people.end(), army.roster.begin(),
+                         army.roster.end());
   }
   std::sort(living.people.begin(), living.people.end());
   return living;
@@ -1287,8 +1292,8 @@ void World::keep_sects() {
   std::vector<std::size_t> bereft;
   for (const std::size_t member : living.people) {
     std::optional<std::size_t>& sect = people_.at(member).sect;
-    if (sect && armies_.at(living.army_of.at(member)).faction !=
-                    sects_.at(*sect).faction) {
+    if (sect &&
+        armies_.at(army_serving(member)).faction != sects_.at(*sect).faction) {
       bereft.push_back(*sect);
       sect.reset();
     }
@@ -1384,8 +1389,7 @@ void World::admit(const Living& living) {
     openings.push_back(opening(sect));
   }
   for (const std::size_t candidate : living.people) {
-    const std::size_t faction =
-        armies_.at(living.army_of.at(candidate)).faction;
+    const std::size_t faction = armies_.at(army_serving(candidate)).faction;
     const std::optional<Admission>& admission = leaders_.of(faction).admission;
     std::vector<std::size_t> sects;
     for (std::size_t sect = 0; sect < sects_.size(); ++sect) {
@@ -2115,12 +2119,7 @@ std::optional<std::size_t> World::aim(std::size_t person, std::size_t skill,
 }
 
 void World::conscript(std::size_t person, std::size_t army) {
-  const auto serving = [person](const Army& candidate) {
-    return std::find(candidate.roster.begin(), candidate.roster.end(),
-                     person) != candidate.roster.end();
-  };
-  const auto from = std::find_if(armies_.begin(), armies_.end(), serving);
-  if (army >= armies_.size() || from == armies_.end()) {
+  if (army >= armies_.size() || !army_of(person)) {
     throw std::invalid_argument(
         "only a living person can be conscripted, into an existing army");
   }
@@ -2129,9 +2128,8 @@ void World::conscript(std::size_t person, std::size_t army) {
   if (const auto* field = std::get_if<FlowField>(&armies_.at(army).course)) {
     reachable_from(*field, {person});
   }
-  from->roster.erase(
-      std::find(from->roster.begin(), from->roster.end(), person));
-  armies_.at(army).roster.push_back(person);
+  strike_off(person);
+  enrol(person, army);
 }
 
 void World::disband(std::size_t army) {
@@ -2197,13 +2195,7 @@ void World::tick() {
   // A soul whose body died this tick is born again, into the army it served.
   const std::vector<Passing> reborn = passings();
   std::vector<std::size_t> bereft = record_deaths();
-  for (Army& army : armies_) {
-    army.roster.erase(std::remove_if(army.roster.begin(), army.roster.end(),
-                                     [this](std::size_t member) {
-                                       return people_.at(member).health == 0;
-                                     }),
-                      army.roster.end());
-  }
+  strike_off_dead();
   note_falls(std::move(bereft));
   end_intents(crowd);
   const std::vector<Closing> closings = close_in(crowd);
@@ -3395,13 +3387,71 @@ CastRefusal World::assess_cast(std::size_t person,
 }
 
 std::optional<std::size_t> World::army_of(std::size_t person) const {
+  return person < serving_.size() ? serving_.at(person) : std::nullopt;
+}
+
+// Appends person `person` to army `army`'s roster.
+void World::enrol(std::size_t person, std::size_t army) {
+  armies_.at(army).roster.push_back(person);
+  if (person >= serving_.size()) {
+    serving_.resize(person + 1);
+  }
+  serving_.at(person) = army;
+}
+
+// The army whose roster holds person `person`. Throws std::logic_error when
+// none does, for a person the caller holds to be living.
+std::size_t World::army_serving(std::size_t person) const {
+  const std::optional<std::size_t> army = army_of(person);
+  if (!army) {
+    throw std::logic_error("a living person must stand on a roster");
+  }
+  return *army;
+}
+
+// Takes person `person` off the roster it stands on. Throws std::logic_error
+// when the roster serving_ names does not hold it.
+void World::strike_off(std::size_t person) {
+  std::vector<std::size_t>& roster = armies_.at(army_serving(person)).roster;
+  const auto held = std::find(roster.begin(), roster.end(), person);
+  if (held == roster.end()) {
+    throw std::logic_error("a person's army must hold it on its roster");
+  }
+  roster.erase(held);
+  serving_.at(person).reset();
+}
+
+// Takes every dead person off the roster it stands on.
+void World::strike_off_dead() {
+  const auto dead = [this](std::size_t member) {
+    return people_.at(member).health == 0;
+  };
+  for (Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
+      if (dead(member)) {
+        serving_.at(member).reset();
+      }
+    }
+    army.roster.erase(
+        std::remove_if(army.roster.begin(), army.roster.end(), dead),
+        army.roster.end());
+  }
+}
+
+// Gives army `army` everything of `refitted` but its roster, which it keeps.
+void World::refit(std::size_t army, Army refitted) {
+  refitted.roster = std::move(armies_.at(army).roster);
+  armies_.at(army) = std::move(refitted);
+}
+
+// Sets each person's army from the rosters, which rostered() has checked.
+void World::index_rosters() {
+  serving_.assign(people_.size(), std::nullopt);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    const std::vector<std::size_t>& roster = armies_.at(army).roster;
-    if (std::find(roster.begin(), roster.end(), person) != roster.end()) {
-      return army;
+    for (const std::size_t member : armies_.at(army).roster) {
+      serving_.at(member) = army;
     }
   }
-  return std::nullopt;
 }
 
 // Lowers a structure's durability by `effect`, or raises it by a negative
@@ -3594,7 +3644,7 @@ void World::rebirth(Passing passing) {
   // The soul's army takes its new family's faction and skills.
   Army& serving = armies_.at(army);
   const Army& family = armies_.at(villages_.at(village).spec.residents);
-  serving.roster.push_back(born);
+  enrol(born, army);
   serving.faction = family.faction;
   serving.skills = family.skills;
   serving.order.skills.resize(serving.skills.size());
@@ -3887,13 +3937,11 @@ std::int64_t World::age_in_years(std::size_t person) const {
 }
 
 std::optional<std::size_t> World::faction_of(std::size_t person) const {
-  for (const Army& army : armies_) {
-    if (std::find(army.roster.begin(), army.roster.end(), person) !=
-        army.roster.end()) {
-      return army.faction;
-    }
+  const std::optional<std::size_t> army = army_of(person);
+  if (!army) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  return armies_.at(*army).faction;
 }
 
 Date World::date() const { return date_at(tick_count_); }
@@ -3910,12 +3958,8 @@ Date World::date_at(std::uint64_t tick) const {
 // children, each in order of person.
 void World::kin(const Kinship& kinship) {
   std::vector<std::size_t> alive;
-  std::vector<std::size_t> army_of(people_.size());
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    for (const std::size_t member : armies_.at(army).roster) {
-      alive.push_back(member);
-      army_of.at(member) = army;
-    }
+  for (const Army& army : armies_) {
+    alive.insert(alive.end(), army.roster.begin(), army.roster.end());
   }
   std::sort(alive.begin(), alive.end());
   std::vector<std::size_t> population = homes();
@@ -3943,7 +3987,7 @@ void World::kin(const Kinship& kinship) {
         capped ? full - std::min<std::uint64_t>(full, population.at(village))
                : 1;
     if (room > 0 && chance(kinship.birth_chance * room / full)) {
-      bear_child(mother, army_of, kinship);
+      bear_child(mother, kinship);
       population.at(village) += capped ? 1 : 0;
     }
   }
@@ -4038,8 +4082,7 @@ void World::marry(std::size_t person, const std::vector<std::size_t>& living,
 // Bears a child to `mother` and her husband by the one birth rule, into the
 // family, home and army of the parent the lineage follows, at its side; with
 // balanced sexes, of the sex scarcer among its home's unmarried.
-void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
-                       const Kinship& kinship) {
+void World::bear_child(std::size_t mother, const Kinship& kinship) {
   const std::size_t father = people_.at(mother).spouses.back();
   const std::size_t lineage = kinship.fathers_family ? father : mother;
   const Person& parent = people_.at(lineage);
@@ -4058,8 +4101,7 @@ void World::bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
   people_.push_back(std::move(child));
   attacks_.grow_to(people_.size());
   record(cell_of(people_.at(born).position), Born{born});
-  army_of.push_back(army_of.at(lineage));
-  armies_.at(army_of.at(lineage)).roster.push_back(born);
+  enrol(born, army_serving(lineage));
 }
 
 std::size_t World::cap(std::size_t village) const {
@@ -4133,23 +4175,22 @@ void World::husband(const Husbandry& husbandry) {
   std::vector<std::size_t> population = homes();
   const std::vector<bool> fed =
       villages_.feed(population, husbandry.consumption, harvest, stages());
-  std::vector<Unfed> unfed;
-  for (std::size_t army = 0; army < armies_.size(); ++army) {
-    for (const std::size_t member : armies_.at(army).roster) {
+  std::vector<std::size_t> unfed;
+  for (const Army& army : armies_) {
+    for (const std::size_t member : army.roster) {
       Person& person = people_.at(member);
       if (person.health == 0 || !person.home) {
         continue;
       }
       person.hunger = fed.at(*person.home) ? 0 : person.hunger + 1;
       if (person.hunger >= husbandry.hunger_days) {
-        unfed.push_back(Unfed{member, army});
+        unfed.push_back(member);
       }
     }
   }
-  std::sort(unfed.begin(), unfed.end(),
-            [](Unfed left, Unfed right) { return left.person < right.person; });
-  for (const Unfed& each : unfed) {
-    migrate_or_starve(each, husbandry.migration_reach, population);
+  std::sort(unfed.begin(), unfed.end());
+  for (const std::size_t person : unfed) {
+    migrate_or_starve(person, population, husbandry.migration_reach);
   }
 }
 
@@ -4176,13 +4217,12 @@ void World::settle() {
   }
 }
 
-// Moves person `person`, unfed too long, from army `army` to the residents of
+// Moves person `person`, unfed too long, from its army to the residents of
 // a village drawn by the seed among those within the migration reach of its
 // home with room under their cap and food in store, or ends its life.
-void World::migrate_or_starve(Unfed unfed, std::int32_t reach,
-                              std::vector<std::size_t>& population) {
-  const std::size_t person = unfed.person;
-  const std::size_t army = unfed.army;
+void World::migrate_or_starve(std::size_t person,
+                              std::vector<std::size_t>& population,
+                              std::int32_t reach) {
   Person& hungry = people_.at(person);
   const std::size_t home = hungry.home.value_or(0);
   const Cell from = seat(home);
@@ -4201,9 +4241,8 @@ void World::migrate_or_starve(Unfed unfed, std::int32_t reach,
     return;
   }
   const std::size_t refuge = refuges.at(next_random() % refuges.size());
-  std::vector<std::size_t>& from_roster = armies_.at(army).roster;
-  from_roster.erase(std::find(from_roster.begin(), from_roster.end(), person));
-  armies_.at(villages_.at(refuge).spec.residents).roster.push_back(person);
+  strike_off(person);
+  enrol(person, villages_.at(refuge).spec.residents);
   hungry.home = refuge;
   hungry.hunger = 0;
   --population.at(home);
@@ -4308,7 +4347,7 @@ void World::recall(std::size_t village) {
     return;
   }
   const std::size_t target = *raiding.raiding;
-  Army& out = armies_.at(party);
+  const Army& out = armies_.at(party);
   const bool over =
       out.roster.empty() ||
       armies_.at(villages_.at(target).spec.residents).roster.empty() ||
@@ -4334,8 +4373,8 @@ void World::recall(std::size_t village) {
     if (!reached) {
       continue;
     }
-    out.roster.erase(std::find(out.roster.begin(), out.roster.end(), member));
-    residents.roster.push_back(member);
+    strike_off(member);
+    enrol(member, villages_.at(*home).spec.residents);
   }
 }
 
@@ -4848,9 +4887,8 @@ std::size_t World::form(std::size_t village,
                         const std::vector<std::size_t>& members, Cell objective,
                         std::optional<std::size_t> into) {
   const std::size_t from = villages_.at(village).spec.residents;
-  std::vector<std::size_t>& roster = armies_.at(from).roster;
   for (const std::size_t member : members) {
-    roster.erase(std::find(roster.begin(), roster.end(), member));
+    strike_off(member);
   }
   std::vector<std::size_t> every_skill(armies_.at(from).skills.size());
   std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
@@ -4861,15 +4899,15 @@ std::size_t World::form(std::size_t village,
               {},
               false};
   if (into) {
-    formed.roster = std::move(armies_.at(*into).roster);
+    refit(*into, std::move(formed));
+  } else {
+    armies_.push_back(std::move(formed));
   }
-  formed.roster.insert(formed.roster.end(), members.begin(), members.end());
-  if (into) {
-    armies_.at(*into) = std::move(formed);
-    return *into;
+  const std::size_t army = into.value_or(armies_.size() - 1);
+  for (const std::size_t member : members) {
+    enrol(member, army);
   }
-  armies_.push_back(std::move(formed));
-  return armies_.size() - 1;
+  return army;
 }
 
 }  // namespace murim
