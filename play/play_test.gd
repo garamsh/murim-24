@@ -169,7 +169,7 @@ func _camera_pass() -> bool:
 
 # Walking at 60 frames a second at three screen pixels a world pixel, the camera moves each frame
 # within a screen pixel of how far the steered person moved, and the person, where the view draws it
-# at that scale (read from its torch, which world_art lists from where BodyView drew it), stays on
+# at that scale (read from its torch, which world_art gives from where BodyView drew it), stays on
 # the screen pixel it stood on: neither jumps (#209). Control: the camera
 # rounded to whole world pixels, as before, jumps three screen pixels where the person moved one or
 # two. Setup: the person walks some way.
@@ -191,7 +191,7 @@ func _camera_walk_pass() -> bool:
 	var drawn_at := func(centre: Vector2) -> Vector2:
 		var view := Rect2(centre - screen / 2.0, screen)
 		scene.show_view(view)
-		var listed: PackedFloat32Array = art.lights(view)
+		var listed: PackedFloat32Array = art.torch(view)
 		return Vector2(listed[0], listed[1]) - torch
 	var from: Vector2 = scene.drawn_lead()
 	var last: Vector2 = from

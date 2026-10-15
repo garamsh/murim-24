@@ -89,9 +89,22 @@ func _lights_pass() -> bool:
 	var rects: PackedVector4Array = two.light_rects
 	var reach: PackedFloat32Array = two.light_reach
 	var shown_pass: bool = two.light_count == 2 and rects.size() == 2 \
-			and rects[0].is_equal_approx(Vector4(30, 30, 21, 9)) and is_equal_approx(reach[0], 84.0) \
-			and rects[1].is_equal_approx(Vector4(900, 450, 0, 0)) and is_equal_approx(reach[1], 144.0) \
-			and is_equal_approx(two.lamp, 1.0)
+			and rects[0].is_equal_approx(Vector4(110, 60, 7, 3)) and is_equal_approx(reach[0], 28.0) \
+			and rects[1].is_equal_approx(Vector4(400, 200, 0, 0)) and is_equal_approx(reach[1], 48.0) \
+			and is_equal_approx(two.lamp, 1.0) and is_equal_approx(two.torch_reach, 0.0)
+	# The torch beside the windows, then a list of the version shown, not read again, and a new one.
+	var windows := PackedFloat32Array([110, 60, 7, 3, 28])
+	grade.show_lights(windows, view, 0, 5, PackedFloat32Array([300, 100, 2, 2, 40]))
+	var torched := grade.params()
+	grade.show_lights(PackedFloat32Array(), view, 0, 5)
+	var same_version: int = (grade.params().light_rects as PackedVector4Array).size()
+	var untorched: float = grade.params().torch_reach
+	grade.show_lights(PackedFloat32Array(), view, 0, 6)
+	var new_version: int = (grade.params().light_rects as PackedVector4Array).size()
+	var torch_pass: bool = torched.light_count == 2 and (torched.light_rects as PackedVector4Array).size() == 1 \
+			and Vector4(torched.torch_rect).is_equal_approx(Vector4(300, 100, 2, 2)) and is_equal_approx(torched.torch_reach, 40.0) \
+			and is_equal_approx(untorched, 0.0)
+	var version_pass := same_version == 1 and new_version == 0
 	# Forty lights down a row through the middle, the first at it and each further out.
 	var many := PackedFloat32Array()
 	var middle := view.get_center()
@@ -104,7 +117,7 @@ func _lights_pass() -> bool:
 	for rect in kept:
 		farthest_kept = maxf(farthest_kept, rect.x)
 	var cap_pass: bool = capped.light_count == Grade.MAX_LIGHTS and kept.size() == Grade.MAX_LIGHTS \
-			and is_equal_approx(farthest_kept, (middle.x + (Grade.MAX_LIGHTS - 1) * 10 - view.position.x) * 3.0)
+			and is_equal_approx(farthest_kept, middle.x + (Grade.MAX_LIGHTS - 1) * 10)
 	var no_hearth: float = grade.params().bloom
 	grade.show_lights(many, view, 1)
 	grade.quality = Grade.Quality.STANDARD
@@ -127,7 +140,10 @@ func _lights_pass() -> bool:
 	var drawn_unlit: bool = grade.params().field_drawn
 	var field_pass := drawn_night and not drawn_noon and not drawn_unlit
 	grade.free()
-	var passed := lamp_pass and shown_pass and cap_pass and bloom_pass and field_pass
+	var passed := lamp_pass and shown_pass and torch_pass and version_pass and cap_pass and bloom_pass and field_pass
+	print("grade_test: torch at %s reaching %.0f beside %d window, counted as %d lights, none after; of a version shown %d lights kept, of a new one %d: %s" % [
+		torched.torch_rect, torched.torch_reach, (torched.light_rects as PackedVector4Array).size(), torched.light_count,
+		same_version, new_version, "pass" if torch_pass and version_pass else "FAIL"])
 	print("grade_test: lamp at midnight, noon and dusk %s; two lights shown as %s reaching %s; %d of %d lights kept, the farthest at x %.0f; bloom with a hearth standard %.2f high %.2f low %.2f noon %.2f, without one %.2f, low keeping %d lights; the light field drawn at midnight %s, at noon %s, with no lights %s: %s" % [
 		lamps, rects, reach, capped.light_count, many.size() / 5, farthest_kept, standard, high, low.bloom,
 		noon, no_hearth, low.light_count, drawn_night, drawn_noon, drawn_unlit, "pass" if passed else "FAIL"])

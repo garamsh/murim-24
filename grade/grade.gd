@@ -51,8 +51,14 @@ var art_pixel := 1.0:
 
 var _table := {}
 var _grade := {}
+# The windows shown, each its rect and its reach in the world's pixels, and the version of the list
+# they were read from, so a list read before is not read again (#336); the torch, its rect and reach,
+# none at 0.
 var _light_rects := PackedVector4Array()
 var _light_reach := PackedFloat32Array()
+var _lights_version := -2
+var _torch := Vector4.ZERO
+var _torch_reach := 0.0
 var _hearths := 0
 var _view_origin := Vector2.ZERO
 var _grid_offset := Vector2.ZERO
@@ -86,17 +92,37 @@ func show_relief(relief: Relief) -> void:
 	_apply()
 
 
-## Shows `lights`, as WorldArt.lights() gives them for `view`, the part of the world on screen in
-## its pixels: each one's rect and reach in screen pixels, at most MAX_LIGHTS of them; and how many
-## `hearths` are among them, which the bloom waits for. The fog drifts over the world from `view`'s
-## corner, which may lie between world pixels as the camera moves a screen pixel at a time: the art
-## pixels the pass steps in begin where the world's whole pixels fall on the screen. The fog reads
-## the relief's cells in view, and as far below as raised ground lifts.
-func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
+## Shows `lights`, the windows WorldArt.lights() gives for `view`, the part of the world on screen in
+## its pixels, at most MAX_LIGHTS of them, those nearest the view's middle when there are more; how
+## many `hearths` are among them, which the bloom waits for; and the steered person's `torch`, as
+## WorldArt.torch() gives it. Given the list's `version`, a list read before is not read again, so a
+## steady view sends the shader nothing new: the light field turns the lights' world pixels into the
+## screen's from `view`'s corner. That corner may lie between world pixels as the camera moves a
+## screen pixel at a time: the art pixels the pass steps in begin where the world's whole pixels fall
+## on the screen. The fog reads the relief's cells in view, and as far below as raised ground lifts.
+func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0, version := -1,
+		torch := PackedFloat32Array()) -> void:
 	_hearths = hearths
 	_view_origin = view.position.floor()
 	_grid_offset = (_view_origin - view.position) * art_pixel
 	var count := lights.size() / WorldArt.LIGHT_FLOATS
+	if version < 0 or version != _lights_version or count > MAX_LIGHTS:
+		_read_lights(lights, view, count)
+		_lights_version = version
+	_torch = Vector4.ZERO
+	_torch_reach = 0.0
+	if torch.size() == WorldArt.LIGHT_FLOATS:
+		_torch = Vector4(torch[0], torch[1], torch[2], torch[3])
+		_torch_reach = torch[4]
+	_view = view
+	if _relief != null:
+		_show_cells(view)
+	_apply()
+
+
+# Reads `count` of `lights` into the arrays the light field is given, new ones, as the material keeps
+# those it was last given: of more than MAX_LIGHTS, those nearest `view`'s middle.
+func _read_lights(lights: PackedFloat32Array, view: Rect2, count: int) -> void:
 	var order := range(count)
 	if count > MAX_LIGHTS:
 		var middle := view.get_center()
@@ -105,18 +131,12 @@ func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
 			return Rect2(lights[at], lights[at + 1], lights[at + 2], lights[at + 3]).get_center().distance_squared_to(middle)
 		order.sort_custom(func(a: int, b: int) -> bool: return apart.call(a) < apart.call(b))
 		order.resize(MAX_LIGHTS)
-	# New arrays, as the material keeps the ones it was last given.
 	_light_rects = PackedVector4Array()
 	_light_reach = PackedFloat32Array()
 	for light: int in order:
 		var at := light * WorldArt.LIGHT_FLOATS
-		var corner := (Vector2(lights[at], lights[at + 1]) - view.position) * art_pixel
-		_light_rects.append(Vector4(corner.x, corner.y, lights[at + 2] * art_pixel, lights[at + 3] * art_pixel))
-		_light_reach.append(lights[at + 4] * art_pixel)
-	_view = view
-	if _relief != null:
-		_show_cells(view)
-	_apply()
+		_light_rects.append(Vector4(lights[at], lights[at + 1], lights[at + 2], lights[at + 3]))
+		_light_reach.append(lights[at + 4])
 
 
 # Gives the fog the relief's cells within `view` and a cell round it, and as many rows below as the
@@ -162,16 +182,18 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 ## `saturation` dimmed while it rains, `hue_shift`, `vignette`, `art_pixel`, `grid_offset`, where
 ## the world's art pixels begin on the screen, `bloom`, `light_count`,
 ## `rain`, 1 while it rains, its `drift`, and `fog`; what the light field draws with, the lights
-## shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`, the
-## relief's `cells` in view, `cells_size` of them from cell `cells_origin`, and whether it draws,
-## `field_drawn`; and `clouds`, how dark the clouds' material draws their shadows, and
-## `clouds_read_field`, whether it reads them from the light field.
+## shown, `light_rects` and `light_reach`, and the torch's, `torch_rect` and `torch_reach`, in the
+## world's pixels, the fog's and the clouds' `view_origin`, `drift`, the relief's `cells` in view,
+## `cells_size` of them from cell `cells_origin`, and whether it draws, `field_drawn`; and `clouds`,
+## how dark the clouds' material draws their shadows, and `clouds_read_field`, whether it reads them
+## from the light field.
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
 			"vignette", "art_pixel", "grid_offset", "bloom", "light_count", "rain", "fog"]:
 		shown[name] = ($Pass.material as ShaderMaterial).get_shader_parameter(name)
-	for name: String in ["light_rects", "light_reach", "view_origin", "drift", "cells", "cells_origin", "cells_size"]:
+	for name: String in ["light_rects", "light_reach", "torch_rect", "torch_reach", "view_origin", "drift", "cells",
+			"cells_origin", "cells_size"]:
 		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
 	shown.field_drawn = $LightField.render_target_update_mode == SubViewport.UPDATE_ALWAYS
 	shown.clouds = clouds.get_shader_parameter("clouds")
@@ -206,11 +228,14 @@ func _apply() -> void:
 	material.set_shader_parameter("art_pixel", art_pixel)
 	var blooming: bool = not low and _hearths > 0 and _grade.lamp > 0.0
 	material.set_shader_parameter("bloom", BLOOM if blooming else 0.0)
-	material.set_shader_parameter("light_count", _light_rects.size())
+	var lit := _light_rects.size() + (1 if _torch_reach > 0.0 else 0)
+	material.set_shader_parameter("light_count", lit)
 	material.set_shader_parameter("light_field", $LightField.get_texture())
 	var field := $LightField/Field.material as ShaderMaterial
 	field.set_shader_parameter("art_pixel", art_pixel)
 	field.set_shader_parameter("light_count", _light_rects.size())
+	field.set_shader_parameter("torch_rect", _torch)
+	field.set_shader_parameter("torch_reach", _torch_reach)
 	field.set_shader_parameter("light_rects", _light_rects)
 	field.set_shader_parameter("light_reach", _light_reach)
 	field.set_shader_parameter("fog", fog)
@@ -221,7 +246,7 @@ func _apply() -> void:
 	field.set_shader_parameter("cells", _cells)
 	field.set_shader_parameter("cells_origin", _cells_window.position)
 	field.set_shader_parameter("cells_size", _cells_window.size if _cells != null else Vector2i.ZERO)
-	var drawn: bool = (_light_rects.size() > 0 and _grade.lamp > 0.0) or fog > 0.0 or shade > 0.0
+	var drawn: bool = (lit > 0 and _grade.lamp > 0.0) or fog > 0.0 or shade > 0.0
 	$LightField.render_target_update_mode = SubViewport.UPDATE_ALWAYS if drawn else SubViewport.UPDATE_DISABLED
 	if is_inside_tree():
 		# One pixel an art pixel, the part pixels at both of the screen's edges included.

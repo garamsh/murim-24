@@ -13,13 +13,16 @@ render_mode blend_disabled;
 
 // The screen pixels an art pixel spans; where the world's art pixels begin on the screen, in screen
 // pixels from its corner, from minus an art pixel to 0, so this field's first pixel is the art
-// pixel the screen's corner shows; and each light's rect, x, y, width and height, and how far its
-// light reaches, in screen pixels.
+// pixel the screen's corner shows; each window's rect, x, y, width and height, and how far its
+// light reaches, and the torch's, none at a reach of 0, in the world's pixels, turned into the
+// screen's from `view_origin` (#336).
 uniform float art_pixel = 1.0;
 uniform vec2 grid_offset = vec2(0.0);
 uniform int light_count = 0;
 uniform vec4 light_rects[32];
 uniform float light_reach[32];
+uniform vec4 torch_rect = vec4(0.0);
+uniform float torch_reach = 0.0;
 // How thick the fog is, 0 for none; how dark the clouds' shadows are, 0 for none; the world's pixel
 // of this field's first pixel; the seconds the wind has blown; and the relief's cells in view, one
 // texel a cell, its level plus one in green, `cells_size` of them from cell `cells_origin`.
@@ -65,10 +68,16 @@ void fragment() {
 	vec2 at = FRAGCOORD.xy * art_pixel + grid_offset;
 	float lit = 0.0;
 	float pane = 0.0;
-	for (int i = 0; i < light_count; i++) {
-		vec4 r = light_rects[i];
+	for (int i = 0; i <= light_count; i++) {
+		// The windows, then the torch.
+		vec4 world_rect = i < light_count ? light_rects[i] : torch_rect;
+		float reach = (i < light_count ? light_reach[i] : torch_reach) * art_pixel;
+		if (reach <= 0.0) {
+			continue;
+		}
+		vec4 r = vec4((world_rect.xy - view_origin) * art_pixel + grid_offset, world_rect.zw * art_pixel);
 		vec2 off = max(max(r.xy - at, at - (r.xy + r.zw)), vec2(0.0));
-		lit = max(lit, 1.0 - length(off) / light_reach[i]);
+		lit = max(lit, 1.0 - length(off) / reach);
 		if (r.z > 0.0 && at.x >= r.x && at.y >= r.y && at.x < r.x + r.z && at.y < r.y + r.w) {
 			pane = 1.0;
 		}
