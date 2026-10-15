@@ -1,0 +1,83 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+probe: tick 30 person 25 at (16527.0, 9935.0) hostile 6 (striking band 3, standing back 3), allies 8
+probe: tick 60 person 4 at (16340.0, 9820.0) hostile 9 (striking band 5, standing back 4), allies 6
+capture: before-tick0090 hash -3205455102812120467 bodies 500 ringed person 495 at (16434.0, 23116.0) screen (945.0, 1469.0): hostile within 3.2 cells 8 (striking band 4, standing back 4), allies 6
+probe: tick 120 person 495 at (16440.0, 23240.0) hostile 7 (striking band 5, standing back 2), allies 5
+probe: tick 150 person 472 at (16524.0, 23546.0) hostile 6 (striking band 2, standing back 4), allies 4
+capture: before-tick0180 hash -5705049651758350351 bodies 500 ringed person 472 at (16634.0, 23700.0) screen (983.0, 1551.0): hostile within 3.2 cells 6 (striking band 2, standing back 4), allies 4
+probe: tick 210 person 472 at (16645.0, 23711.0) hostile 6 (striking band 4, standing back 2), allies 4
+probe: tick 240 person 474 at (16615.0, 23811.0) hostile 7 (striking band 3, standing back 4), allies 4
+capture: before-tick0270 hash -3194880212893730947 bodies 500 ringed person 472 at (16623.0, 23787.0) screen (981.0, 1563.0): hostile within 3.2 cells 8 (striking band 6, standing back 2), allies 6
+probe: tick 300 person 472 at (16678.0, 23798.0) hostile 9 (striking band 7, standing back 2), allies 7
+probe: tick 330 person 472 at (16694.0, 23798.0) hostile 9 (striking band 7, standing back 2), allies 7
+capture: before-tick0360 hash -8827301971693401414 bodies 500 ringed person 474 at (16549.0, 23995.0) screen (967.0, 1592.0): hostile within 3.2 cells 9 (striking band 5, standing back 4), allies 7
+probe: tick 390 person 474 at (16560.0, 24028.0) hostile 9 (striking band 5, standing back 4), allies 7
+probe: tick 420 person 469 at (16900.0, 23554.0) hostile 12 (striking band 9, standing back 3), allies 6
+capture: before-tick0450 hash -7913590063654435162 bodies 500 ringed person 469 at (16900.0, 23554.0) screen (1033.0, 1530.0): hostile within 3.2 cells 12 (striking band 9, standing back 3), allies 7
+probe: tick 480 person 469 at (16900.0, 23554.0) hostile 13 (striking band 9, standing back 4), allies 7
+probe: tick 510 person 469 at (16900.0, 23554.0) hostile 13 (striking band 9, standing back 4), allies 7
+probe: tick 540 person 469 at (16900.0, 23554.0) hostile 14 (striking band 10, standing back 4), allies 7
+probe: tick 570 person 31 at (16212.0, 8888.0) hostile 8 (striking band 4, standing back 4), allies 5
+capture: before-tick0600 hash -1804497912799900821 bodies 499 ringed person 31 at (16190.0, 8866.0) screen (900.0, -535.0): hostile within 3.2 cells 8 (striking band 4, standing back 4), allies 6
+probe: tick 630 person 31 at (16157.0, 8833.0) hostile 8 (striking band 4, standing back 4), allies 6
+probe: tick 660 person 31 at (16124.0, 8800.0) hostile 7 (striking band 4, standing back 3), allies 6
+probe: tick 690 person 31 at (16129.0, 8789.0) hostile 8 (striking band 4, standing back 4), allies 6
+probe: tick 720 person 492 at (16404.0, 23810.0) hostile 14 (striking band 11, standing back 3), allies 7
+capture: before-tick0750 hash -4298530510915196854 bodies 497 ringed person 31 at (16107.0, 8767.0) screen (884.0, -549.0): hostile within 3.2 cells 10 (striking band 4, standing back 6), allies 6
+probe: tick 780 person 31 at (16080.0, 8734.0) hostile 9 (striking band 4, standing back 5), allies 6
+probe: tick 810 person 31 at (16080.0, 8734.0) hostile 10 (striking band 4, standing back 6), allies 6
+probe: tick 840 person 31 at (16080.0, 8734.0) hostile 11 (striking band 5, standing back 6), allies 6
+probe: tick 870 person 31 at (16069.0, 8723.0) hostile 11 (striking band 5, standing back 6), allies 6
+capture: before-tick0900 hash 1715264389813728340 bodies 495 ringed person 26 at (15938.0, 9130.0) screen (852.0, -498.0): hostile within 3.2 cells 15 (striking band 12, standing back 3), allies 7
+probe: tick 930 person 26 at (15907.0, 9141.0) hostile 15 (striking band 12, standing back 3), allies 7
+probe: tick 960 person 31 at (16003.0, 8657.0) hostile 11 (striking band 5, standing back 6), allies 5
+probe: tick 990 person 26 at (15858.0, 9136.0) hostile 16 (striking band 12, standing back 4), allies 4
+probe: tick 1020 person 26 at (15858.0, 9136.0) hostile 16 (striking band 12, standing back 4), allies 4
+capture: before-tick1050 hash -7886790301264361038 bodies 488 ringed person 26 at (15858.0, 9136.0) screen (837.0, -497.0): hostile within 3.2 cells 16 (striking band 12, standing back 4), allies 4
+probe: tick 1080 person 98 at (15475.0, 12619.0) hostile 18 (striking band 11, standing back 7), allies 4
+probe: tick 1110 person 98 at (15388.0, 12696.0) hostile 17 (striking band 11, standing back 6), allies 4
+probe: tick 1140 person 98 at (15355.0, 12729.0) hostile 20 (striking band 12, standing back 8), allies 5
+probe: tick 1170 person 98 at (15355.0, 12729.0) hostile 20 (striking band 12, standing back 8), allies 5
+capture: before-tick1200 hash 2948854260500922662 bodies 477 ringed person 98 at (15355.0, 12729.0) screen (743.0, 8.0): hostile within 3.2 cells 21 (striking band 14, standing back 7), allies 6
+probe: tick 1230 person 98 at (15355.0, 12729.0) hostile 22 (striking band 14, standing back 8), allies 6
+probe: tick 1260 person 90 at (15433.0, 12405.0) hostile 22 (striking band 13, standing back 9), allies 6
+probe: tick 1290 person 98 at (15355.0, 12597.0) hostile 23 (striking band 14, standing back 9), allies 6
+probe: tick 1320 person 98 at (15355.0, 12597.0) hostile 23 (striking band 15, standing back 8), allies 7
+capture: before-tick1350 hash -8845379694031561340 bodies 475 ringed person 18 at (17127.0, 9495.0) screen (1075.0, -447.0): hostile within 3.2 cells 15 (striking band 9, standing back 6), allies 5
+probe: tick 1380 person 18 at (17166.0, 9418.0) hostile 14 (striking band 9, standing back 5), allies 5
+probe: tick 1410 person 374 at (16763.0, 20365.0) hostile 32 (striking band 15, standing back 17), allies 9
+probe: tick 1440 person 374 at (16812.0, 20376.0) hostile 31 (striking band 16, standing back 15), allies 9
+probe: tick 1470 person 27 at (16825.0, 8195.0) hostile 8 (striking band 5, standing back 3), allies 5
+capture: before-tick1500 hash -8896984681952666804 bodies 474 ringed person 374 at (16817.0, 20365.0) screen (1017.0, 1082.0): hostile within 3.2 cells 33 (striking band 16, standing back 17), allies 9
+probe: tick 1530 person 374 at (16806.0, 20360.0) hostile 33 (striking band 16, standing back 17), allies 9
+probe: tick 1560 person 374 at (16795.0, 20367.0) hostile 31 (striking band 15, standing back 16), allies 9
+probe: tick 1590 person 374 at (16844.0, 20378.0) hostile 31 (striking band 15, standing back 16), allies 9
+probe: tick 1620 person 27 at (16946.0, 8108.0) hostile 8 (striking band 5, standing back 3), allies 5
+capture: before-tick1650 hash -6574445356228143231 bodies 460 ringed person 27 at (16968.0, 8086.0) screen (1046.0, -645.0): hostile within 3.2 cells 7 (striking band 5, standing back 2), allies 5
+probe: tick 1680 person 29 at (17194.0, 8240.0) hostile 8 (striking band 4, standing back 4), allies 5
+probe: tick 1710 person 27 at (17034.0, 8020.0) hostile 7 (striking band 5, standing back 2), allies 5
+probe: tick 1740 person 27 at (17067.0, 7987.0) hostile 6 (striking band 4, standing back 2), allies 5
+probe: tick 1770 person 27 at (17067.0, 7987.0) hostile 6 (striking band 4, standing back 2), allies 5
+capture: before-tick1800 hash 4036879193198416204 bodies 447 ringed person 137 at (15382.0, 12734.0) screen (748.0, 9.0): hostile within 3.2 cells 23 (striking band 15, standing back 8), allies 9
+probe: tick 1830 person 27 at (17067.0, 7987.0) hostile 6 (striking band 4, standing back 2), allies 5
+probe: tick 1860 person 27 at (17067.0, 7987.0) hostile 7 (striking band 5, standing back 2), allies 5
+probe: tick 1890 person 358 at (17020.0, 19396.0) hostile 21 (striking band 10, standing back 11), allies 7
+probe: tick 1920 person 358 at (17124.0, 19478.0) hostile 21 (striking band 10, standing back 11), allies 5
+probe: tick 1950 person 358 at (17167.0, 19489.0) hostile 21 (striking band 10, standing back 11), allies 5
+probe: tick 1980 person 111 at (16448.0, 12987.0) hostile 28 (striking band 16, standing back 12), allies 10
+probe: tick 2010 person 354 at (16906.0, 19326.0) hostile 23 (striking band 12, standing back 11), allies 8
+probe: tick 2040 person 352 at (16896.0, 19048.0) hostile 25 (striking band 12, standing back 13), allies 9
+probe: tick 2070 person 27 at (17254.0, 7822.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2100 person 27 at (17265.0, 7811.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2130 person 354 at (16906.0, 19326.0) hostile 24 (striking band 16, standing back 8), allies 9
+probe: tick 2160 person 354 at (16906.0, 19326.0) hostile 25 (striking band 15, standing back 10), allies 9
+probe: tick 2190 person 354 at (16906.0, 19326.0) hostile 25 (striking band 14, standing back 11), allies 9
+probe: tick 2220 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2250 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2280 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2310 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2340 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2370 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
+probe: tick 2400 person 27 at (17265.0, 7789.0) hostile 6 (striking band 5, standing back 1), allies 5
