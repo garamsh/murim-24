@@ -95,6 +95,8 @@ The base pack takes the seven trades the owner named:
 - the innkeeper works at the hall, until a pack adds an inn;
 - the monk opens no place until a pack adds a kind it works at: the base pack has no temple and no monastery sect.
 
+A temple and an inn for the base pack are #364's, not this decision's.
+
 **Assignment is one daily rule.** Once a day, each village fills its openings from its residents of working age, in trade order as the pack lists them, then by residents' index:
 - a person keeps its trade while the village is its home and a standing structure of its workplace kind remains;
 - the rest take the first open trade, and an adult left over takes the pack's default.
@@ -150,7 +152,7 @@ Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of
 - **A rule change.** Every pinned hash of a world with trades data changes, and `make sweep` must keep ci.md's 200-seed bar. The sweep lives the region at 5 ticks a day, so a band of hours spans a tick or less there. Its movement is a few steps a tick, not a day's walk.
 - **`sells` reads the trade.** That closes `simulation.md`'s open question on who sells once people have trades.
 - **Memory.** One byte a person for its trade, saved. The path fields are kept per place; their size and the window's are pending with the cost.
-- **Monks wait for content.** The base pack opens no place for a monk until a pack adds a temple kind or a monastery sect. The looks exist, but no monk appears in the base pack's villages.
+- **Monks wait for content.** The base pack opens no place for a monk until a pack adds a temple kind or a monastery sect, which #364 tracks with the inn. Until then the looks exist, but no monk appears in the base pack's villages, and the innkeeper works at the hall.
 - **The tiers.** ADR 0042, proposed, runs the daily rules in every tier. The schedule moves people only where they are simulated in full, and a person whose area becomes live starts at its spot for the hour.
 
 ## Signs the decision was wrong
