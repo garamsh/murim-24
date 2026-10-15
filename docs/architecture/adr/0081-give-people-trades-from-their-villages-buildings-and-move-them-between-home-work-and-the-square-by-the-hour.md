@@ -132,7 +132,7 @@ Awake, a person wanders within a cell of its spot, to a new one every 90 ticks, 
 **Determinism, saving and the hash.**
 - The hour comes from the tick count, every spot from a counter-based stream, and assignment runs in village and then residents' index order, so nothing draws from the world's shared random stream.
 - A person's trade is saved, and `SAVE_VERSION` rises. A load refuses a trade the pack does not list.
-- The hash folds a person's trade only while it has one, so a world with no trades data keeps its pinned hashes.
+- The hash folds every person's trade, with none as a value of its own, whatever the packs hold: no fold is conditional, by ADR 0049's rule that #188 asks of every fold. Every pinned hash therefore changes once, in step 1.
 - Homes, places, spots and path fields are derived from what is saved, and neither saved nor hashed.
 
 **The budget.** The schedule must hold:
@@ -149,11 +149,11 @@ Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of
 ## Consequences
 
 - **People live on their own.** A village's people walk to work in the morning and to the square in the evening. In the prototype at 500, 28% are moving at 08, against none today.
-- **A rule change.** Every pinned hash of a world with trades data changes, and `make sweep` must keep ci.md's 200-seed bar. The sweep lives the region at 5 ticks a day, so a band of hours spans a tick or less there. Its movement is a few steps a tick, not a day's walk.
+- **A rule change.** Every pinned hash changes once in step 1, when the trade is folded, and again in step 2 for a world with trades data, when people start to move by it; and `make sweep` must keep ci.md's 200-seed bar. The sweep lives the region at 5 ticks a day, so a band of hours spans a tick or less there. Its movement is a few steps a tick, not a day's walk.
 - **`sells` reads the trade.** That closes `simulation.md`'s open question on who sells once people have trades.
 - **Memory.** One byte a person for its trade, saved. The path fields are kept per place; their size and the window's are pending with the cost.
 - **Monks wait for content.** The base pack opens no place for a monk until a pack adds a temple kind or a monastery sect, which #364 tracks with the inn. Until then the looks exist, but no monk appears in the base pack's villages, and the innkeeper works at the hall.
-- **The tiers.** ADR 0042, proposed, runs the daily rules in every tier. The schedule moves people only where they are simulated in full, and a person whose area becomes live starts at its spot for the hour.
+- **The tiers.** ADR 0042, proposed, runs the daily rules in every tier. The schedule moves people only where they are simulated in full. When a person's area becomes live, ADR 0077's handover places it first; it then walks to its spot for the hour, as from anywhere else, so this decision adds nothing to the handover.
 
 ## Signs the decision was wrong
 
