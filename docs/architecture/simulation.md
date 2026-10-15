@@ -52,8 +52,9 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 - Every NPC is a person, with a position, health, a cooldown, a home village or none, its qi and known art skills, its marriages and children, its silver and wares, and what its birth gave it.
 - A person's identity is its index among the world's people, kept for as long as the world runs, through every army it serves in and after it dies.
-- `age_in_years` reads a person's age in whole years, and `faction_of` the faction of the army it serves in, none once dead.
+- `age_in_years` reads a person's age in whole years, `army_of` the army whose roster holds it, and `faction_of` that army's faction, none once dead.
 - An army is a roster of the living people serving in it, never a count, with an objective, a faction and skills. Every living person stands on exactly one roster. A person who dies leaves its roster but keeps its record, so the dead cost no work on a tick and stay out of the spatial index.
+- Each person's army is also kept by person, so `army_of` and `faction_of` read it without scanning the rosters. The rosters' only writers keep both together, and loading rebuilds it from the rosters once they are checked, so it is neither saved nor hashed.
 - `conscript()` moves one living person to another army's roster, and `disband()` returns every member with a home to that village's residents. Neither creates nor removes a person.
 - Every army follows an order: an objective cell, the skills it strikes with, and an attack intent's target or none. `order()` gives an army another order, which it follows from the next tick. That is the port through which a driver steers a body, Godot input or a test, and the same type and resolution serve an NPC and the player alike.
 - A driver marks the armies it steers through `steer`, saved and hashed; any driver may still order any army. The rules that decide for people on their own decide nothing for a steered army's members.
