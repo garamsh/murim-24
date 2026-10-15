@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -13,7 +14,10 @@
 #include <utility>
 #include <vector>
 
+#include "compiled_map.hpp"
+#include "growth.hpp"
 #include "json_packs.hpp"
+#include "map.hpp"
 #include "region.hpp"
 #include "skill.hpp"
 #include "world.hpp"
@@ -712,6 +716,317 @@ TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
   EXPECT_EQ(after.structure_kinds, before.structure_kinds);
   EXPECT_EQ(after.villages.size(), before.villages.size());
   EXPECT_EQ(after_data.life.newborn_health, before_data.life.newborn_health);
+}
+
+// A map a mod paints over the base pack: `side` cells square per `block`,
+// each block's ground mark (`.` plain, `#` mountain) and level digit given by
+// `paint` from the block's column and row, its land west or east of the
+// middle, with places and key routes. The map states `stated_block` as its
+// block where that is not 0.
+struct Painting {
+  std::int32_t side = 0;
+  std::int32_t block = 0;
+  std::int32_t stated_block = 0;
+  std::function<std::pair<char, char>(std::int32_t, std::int32_t)> paint;
+  std::vector<std::pair<std::string, Cell>> places;
+  std::vector<std::pair<std::string, Route>> routes;
+};
+
+constexpr const char* PAINTER = "painter";
+
+// Adds pack PAINTER, whose map is `painting`.
+void add_map(MemoryPacks& packs, const Painting& painting) {
+  add_mod(packs, PAINTER);
+  packs.entry(PAINTER, "map/lands", "west");
+  packs.entry(PAINTER, "map/lands", "east");
+  const std::int32_t blocks = painting.side / painting.block;
+  std::vector<std::string> ground;
+  std::vector<std::string> levels;
+  std::vector<std::string> lands;
+  for (std::int32_t row = 0; row < blocks; ++row) {
+    std::string marks;
+    std::string digits;
+    std::string halves;
+    for (std::int32_t column = 0; column < blocks; ++column) {
+      const auto [mark, level] = painting.paint(column, row);
+      marks.push_back(mark);
+      digits.push_back(level);
+      halves.push_back(column < blocks / 2 ? 'w' : 'e');
+    }
+    ground.push_back(marks);
+    levels.push_back(digits);
+    lands.push_back(halves);
+  }
+  Node map =
+      packs.entry(PAINTER, "map/map", "test")
+          .set("side", painting.side)
+          .set("block", painting.stated_block != 0 ? painting.stated_block
+                                                   : painting.block);
+  Node ground_layer = map.map("ground");
+  Node ground_legend = ground_layer.list("legend");
+  ground_legend.item().text("mark", ".").text("terrain", "plain");
+  ground_legend.item().text("mark", "#").text("terrain", "mountain");
+  ground_layer.words("rows", ground);
+  map.words("levels", levels);
+  Node land_layer = map.map("lands");
+  Node land_legend = land_layer.list("legend");
+  land_legend.item().text("mark", "w").text("land", "west");
+  land_legend.item().text("mark", "e").text("land", "east");
+  land_layer.words("rows", lands);
+  for (const auto& [name, cell] : painting.places) {
+    packs.entry(PAINTER, "map/places", name).set("x", cell.x).set("y", cell.y);
+  }
+  for (const auto& [name, route] : painting.routes) {
+    packs.entry(PAINTER, "map/routes", name)
+        .text("from", painting.places.at(route.from).first)
+        .text("to", painting.places.at(route.to).first)
+        .set("length", route.length);
+  }
+}
+
+// Whether `loaded` holds an error of `reason` at `path` of entry `entry` in
+// document `document`, set by PAINTER.
+bool painting_refused(const LoadedContent& loaded, const std::string& document,
+                      const std::string& entry, const std::string& path,
+                      ContentRefusal reason) {
+  return std::any_of(loaded.errors.begin(), loaded.errors.end(),
+                     [&](const ContentError& error) {
+                       return error.pack == PAINTER &&
+                              error.document == document &&
+                              error.entry == entry && error.path == path &&
+                              error.reason == reason;
+                     });
+}
+
+// Loads the base pack under PAINTER, painting `painting`.
+LoadedContent load_painting(const Painting& painting) {
+  MemoryPacks mods;
+  add_map(mods, painting);
+  return load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+}
+
+constexpr std::int32_t FULL_SIDE = 8'192;
+constexpr std::int32_t ROUTE_SIDE = 1'024;
+constexpr std::int32_t BLOCK = 16;
+// The places stand this far west and east of the range, and this far north
+// of the pass as designed.
+constexpr std::int32_t WEST_OF_RANGE = 80;
+constexpr std::int32_t EAST_OF_RANGE = 120;
+constexpr std::int32_t NORTH_OF_PASS = 200;
+// The pass as designed lies this many blocks south of the middle.
+constexpr std::int32_t PASS_SOUTH = 8;
+// The key route's designed length. Over the pass as designed it is walked in
+// 499 cells, within a fifth over; moved a block north, in 467, and two
+// north, in 435, short of it; a block south, in 531, and two south, in 563,
+// past 540, a fifth over. Measured by a reference search of the same rule.
+constexpr std::int32_t OVER_THE_PASS = 450;
+
+// A map of `side` cells painted per BLOCK: open ground at level 0 west of
+// the middle and 1 east of it, split by a range two blocks wide at the
+// middle, crossed by a pass two blocks high moved `shift` blocks south of
+// where it is designed, with places either side and the key route between
+// them.
+// How many blocks south of where it is designed a pass is moved.
+struct PassShift {
+  std::int32_t blocks;
+};
+
+Painting ranged_map(std::int32_t side, PassShift moved) {
+  const std::int32_t shift = moved.blocks;
+  const std::int32_t range = (side / BLOCK / 2) - 1;
+  const std::int32_t pass = (side / BLOCK / 2) + PASS_SOUTH;
+  Painting painting;
+  painting.side = side;
+  painting.block = BLOCK;
+  painting.paint = [range, pass, shift](std::int32_t column, std::int32_t row) {
+    const bool ridge = (column == range || column == range + 1) &&
+                       row != pass + shift && row != pass + shift + 1;
+    return std::pair<char, char>{ridge ? '#' : '.', column > range ? '1' : '0'};
+  };
+  const std::int32_t north = (pass * BLOCK) - NORTH_OF_PASS;
+  painting.places = {{"west", Cell{(range * BLOCK) - WEST_OF_RANGE, north}},
+                     {"east", Cell{(range * BLOCK) + EAST_OF_RANGE, north}}};
+  painting.routes = {{"over_the_pass", Route{0, 1, OVER_THE_PASS}}};
+  return painting;
+}
+
+// The pinned hash of the test map.
+constexpr MapHash TEST_MAP_HASH{0x5C63D24FABE73302ULL};
+
+TEST(MapContent, ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash) {
+  const Painting painting = ranged_map(FULL_SIDE, PassShift{0});
+  const LoadedContent loaded = load_painting(painting);
+  ASSERT_TRUE(loaded.errors.empty());
+  if (!loaded.map) {
+    FAIL() << "the test map is refused";
+  }
+  const CompiledMap& map = *loaded.map;
+  EXPECT_EQ(map.side(), FULL_SIDE);
+  EXPECT_EQ(map.block(), BLOCK);
+  const Cell west = painting.places.front().second;
+  const Cell east = painting.places.back().second;
+  const Cell ridge{(FULL_SIDE / 2) - 1, west.y};
+  EXPECT_EQ(map.footing(ridge), Footing::BLOCKED);
+  EXPECT_EQ(map.footing(west), Footing::BUILDABLE);
+  EXPECT_EQ(map.level(west), 0);
+  EXPECT_EQ(map.level(east), 1);
+  EXPECT_EQ(map.land(west), 0);
+  EXPECT_EQ(map.land(east), 1);
+  ASSERT_EQ(map.places().size(), 2U);
+  EXPECT_EQ(map.places().back().x, east.x);
+  EXPECT_EQ(map.places().back().y, east.y);
+  EXPECT_EQ(map.hash(), TEST_MAP_HASH);
+  // Control: the same map with its pass a block south hashes otherwise.
+  const LoadedContent moved =
+      load_painting(ranged_map(FULL_SIDE, PassShift{1}));
+  if (!moved.map) {
+    FAIL() << "the moved map is refused";
+  }
+  EXPECT_NE(moved.map->hash(), TEST_MAP_HASH);
+}
+
+TEST(MapContent, AKeyRouteWalkedWithinAFifthOverItsLengthIsKept) {
+  for (const std::int32_t shift : {-1, 0, 1}) {
+    const LoadedContent kept =
+        load_painting(ranged_map(ROUTE_SIDE, PassShift{shift}));
+    EXPECT_TRUE(kept.errors.empty()) << shift;
+    EXPECT_TRUE(kept.map.has_value()) << shift;
+  }
+}
+
+TEST(MapContent, AKeyRouteWalkedOutsideItsLengthRefusesTheMap) {
+  // Control: over the pass as designed the route is kept.
+  EXPECT_TRUE(
+      load_painting(ranged_map(ROUTE_SIDE, PassShift{0})).errors.empty());
+  // Shorter than its length, or more than a fifth over, it is refused.
+  for (const std::int32_t shift : {-2, 2}) {
+    const LoadedContent refused =
+        load_painting(ranged_map(ROUTE_SIDE, PassShift{shift}));
+    EXPECT_FALSE(refused.map.has_value()) << shift;
+    EXPECT_TRUE(painting_refused(refused, "map/routes", "over_the_pass",
+                                 "length", ContentRefusal::INCONSISTENT))
+        << shift;
+    EXPECT_EQ(refused.errors.size(), 1U) << shift;
+  }
+}
+
+TEST(MapContent, AKeyRouteIsNotWalkedUpACliff) {
+  // Control: east of the range one level up, a step, the route is walked.
+  const Painting stepped = ranged_map(ROUTE_SIDE, PassShift{0});
+  EXPECT_TRUE(load_painting(stepped).errors.empty());
+  // Two levels up is a cliff, which a walk never climbs.
+  Painting cliffed = stepped;
+  cliffed.paint = [&stepped](std::int32_t column, std::int32_t row) {
+    auto [mark, level] = stepped.paint(column, row);
+    return std::pair<char, char>{mark, level == '1' ? '2' : level};
+  };
+  const LoadedContent refused = load_painting(cliffed);
+  EXPECT_FALSE(refused.map.has_value());
+  EXPECT_TRUE(painting_refused(refused, "map/routes", "over_the_pass", "length",
+                               ContentRefusal::INCONSISTENT));
+}
+
+// A small map of open ground, 256 cells painted per 16, with one place.
+constexpr std::int32_t SMALL_SIDE = 256;
+constexpr Cell FIRST_PLACE{100, 100};
+
+Painting small_map() {
+  Painting painting;
+  painting.side = SMALL_SIDE;
+  painting.block = BLOCK;
+  painting.paint = [](std::int32_t /*column*/, std::int32_t /*row*/) {
+    return std::pair<char, char>{'.', '0'};
+  };
+  painting.places = {{"first", FIRST_PLACE}};
+  return painting;
+}
+
+// How far apart the crowded places stand.
+constexpr std::int32_t CLOSE = 10;
+
+TEST(MapContent, TwoPlacesCloserThanApartRefuseTheMap) {
+  Painting painting = small_map();
+  painting.places.emplace_back("second",
+                               Cell{FIRST_PLACE.x + CLOSE, FIRST_PLACE.y});
+  MemoryPacks mods;
+  add_map(mods, painting);
+  const BaseAndMods source{mods};
+  // The base pack keeps villages further apart than the two places stand.
+  const LoadedContent base = load_content(source, murim_packs::BASE_PACK, {});
+  ASSERT_TRUE(base.data.has_value());
+  const RegionData base_data = base.data.value_or(RegionData{});
+  ASSERT_TRUE(base_data.life.growth.has_value());
+  ASSERT_GT(base_data.life.growth.value_or(Growth{}).apart, CLOSE);
+  const LoadedContent crowded =
+      load_content(source, murim_packs::BASE_PACK, {PAINTER});
+  EXPECT_FALSE(crowded.map.has_value());
+  EXPECT_TRUE(painting_refused(crowded, "map/places", "second", "",
+                               ContentRefusal::INCONSISTENT));
+  EXPECT_EQ(crowded.errors.size(), 1U);
+  // Control: with `apart` 0 the same map loads.
+  mods.entry(PAINTER, "life", "life").map("growth").set("apart", 0);
+  const LoadedContent spread =
+      load_content(source, murim_packs::BASE_PACK, {PAINTER});
+  EXPECT_TRUE(spread.errors.empty());
+  EXPECT_TRUE(spread.map.has_value());
+}
+
+TEST(MapContent, APlaceOnABlockedCellRefusesTheMap) {
+  Painting painting = small_map();
+  painting.paint = [](std::int32_t column, std::int32_t row) {
+    return std::pair<char, char>{column == 0 && row == 0 ? '#' : '.', '0'};
+  };
+  painting.places = {{"walled_in", Cell{3, 3}}};
+  const LoadedContent walled = load_painting(painting);
+  EXPECT_FALSE(walled.map.has_value());
+  EXPECT_TRUE(painting_refused(walled, "map/places", "walled_in", "",
+                               ContentRefusal::INCONSISTENT));
+  // Control: the same place a block east stands on open ground.
+  painting.places = {{"walled_in", Cell{BLOCK + 3, 3}}};
+  EXPECT_TRUE(load_painting(painting).errors.empty());
+}
+
+TEST(MapContent, AMapPastTheCoresBoundsIsRefused) {
+  // Control: a map of 256 cells painted per 16 loads, as does one of 32,
+  // the smallest, painted per 8.
+  EXPECT_TRUE(load_painting(small_map()).errors.empty());
+  Painting smallest = small_map();
+  smallest.side = MIN_MAP_SIDE;
+  smallest.block = BLOCK / 2;
+  smallest.places.clear();
+  EXPECT_TRUE(load_painting(smallest).errors.empty());
+  for (const std::int32_t side : {MAX_MAP_SIDE * 2, 384, MIN_MAP_SIDE / 2}) {
+    Painting painting = small_map();
+    painting.side = side;
+    painting.places.clear();
+    EXPECT_TRUE(painting_refused(load_painting(painting), "map/map", "test",
+                                 "side", ContentRefusal::OUT_OF_RANGE))
+        << side;
+  }
+  for (const std::int32_t block : {4, 12, 32}) {
+    Painting painting = small_map();
+    painting.block = block;
+    EXPECT_TRUE(painting_refused(load_painting(painting), "map/map", "test",
+                                 "block", ContentRefusal::OUT_OF_RANGE))
+        << block;
+  }
+}
+
+TEST(MapContent, RowsNotOfTheMapsShapeAreRefused) {
+  // Rows painted per 16 are half as many as a map painted per 8 needs.
+  Painting painting = small_map();
+  painting.stated_block = BLOCK / 2;
+  const LoadedContent loaded = load_painting(painting);
+  EXPECT_FALSE(loaded.map.has_value());
+  EXPECT_TRUE(painting_refused(loaded, "map/map", "test", "ground.rows",
+                               ContentRefusal::OUT_OF_RANGE));
+  EXPECT_TRUE(painting_refused(loaded, "map/map", "test", "levels",
+                               ContentRefusal::OUT_OF_RANGE));
+  EXPECT_TRUE(painting_refused(loaded, "map/map", "test", "lands.rows",
+                               ContentRefusal::OUT_OF_RANGE));
+  // Control: rows painted per 8 load.
+  painting.block = BLOCK / 2;
+  EXPECT_TRUE(load_painting(painting).errors.empty());
 }
 
 }  // namespace
