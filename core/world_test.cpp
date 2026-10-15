@@ -266,7 +266,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0x1CE7D2B929313D5AULL);
+            0x1D6042BFD5EFECB9ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -2505,10 +2505,11 @@ constexpr std::int32_t MEND_RADIUS = 6 * CELL_SIZE;
 constexpr Skill MEND{0, MEND_RADIUS, 0, -10, 1};
 constexpr Skill GUARD{3 * CELL_SIZE, 0, 10, 0, 1};
 constexpr std::uint64_t SETTLING_TICKS = 400;
-// Each village's three structures, a house, a granary and a field; the
-// settlement's side.
+// Each village's three structures, a house, a granary and a field; the side
+// of a village's square, and the cells from its centre it builds within.
 constexpr std::size_t STRUCTURES_AT_START = 6;
-constexpr std::int32_t SETTLEMENT_SIDE = 5;
+constexpr std::int32_t SQUARE_SIDE = 3;
+constexpr std::int32_t VICINITY = 6;
 
 // What the growth tests vary: A's stance, the pressure, the reach, the plans
 // A builds, whether B's faction is hostile to A's, and B's residents'
@@ -2524,36 +2525,47 @@ struct Growing {
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
   // Whether village A's first resident, person 0, leads faction 0.
   bool led = false;
+  // The least distance between villages' centres.
+  std::int32_t apart = 0;
+  // Residents reaching a second tier, with a square two cells wider; none
+  // at 0.
+  std::uint32_t second_tier = 0;
 };
 
-// Growth of five plans, a granary, a house for four, a field, a smithy and an
-// apothecary each serving four, a 5 x 5 settlement of one of the first three
-// each, two settlers and two raiders.
+// Growth of five plans, a granary and a house for four, homes, a field, an
+// edge, and a smithy and an apothecary each serving four, of the square; one
+// tier with a 3 x 3 square, building within six cells; a core of one of the
+// first three each; two settlers and two raiders.
 Growth growth_of(const Growing& growing) {
   Growth growth;
   growth.interval = 1;
   growth.pressure = growing.pressure;
   growth.reach = growing.reach;
-  growth.vicinity = 4;
   growth.spacing = 1;
   growth.claim = 4;
-  growth.plans = {Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}},
-                  Plan{"house", {2, 2}, true, Holding{HOUSE_FOR_FOUR, 0, 0}},
-                  Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}}};
+  growth.apart = growing.apart;
+  growth.tiers = {Tier{0, {SQUARE_SIDE, SQUARE_SIDE}, VICINITY}};
+  if (growing.second_tier > 0) {
+    growth.tiers.push_back(Tier{
+        growing.second_tier, {SQUARE_SIDE + 2, SQUARE_SIDE + 2}, VICINITY});
+  }
+  growth.plans = {
+      Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}, Role::HOME},
+      Plan{"house", {2, 2}, true, Holding{HOUSE_FOR_FOUR, 0, 0}, Role::HOME},
+      Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}, Role::EDGE}};
   Holding smithy;
   smithy.arms = HOUSE_FOR_FOUR;
   smithy.edge = HALF_AGAIN;
   Holding apothecary;
   apothecary.tends = HOUSE_FOR_FOUR;
   apothecary.healing = DAILY_HEALING;
-  growth.plans.push_back(Plan{"smithy", {1, 1}, true, smithy});
-  growth.plans.push_back(Plan{"apothecary", {1, 1}, true, apothecary});
+  growth.plans.push_back(Plan{"smithy", {1, 1}, true, smithy, Role::SQUARE});
+  growth.plans.push_back(
+      Plan{"apothecary", {1, 1}, true, apothecary, Role::SQUARE});
   growth.self_reliance = growing.self_reliance;
   growth.builds = growing.builds;
-  growth.settlement = {SETTLEMENT_SIDE, SETTLEMENT_SIDE};
   growth.settlement_kind = "hamlet";
-  growth.layout = {Placement{1, {0, 0}}, Placement{0, {3, 0}},
-                   Placement{2, {0, 3}}};
+  growth.core = {1, 0, 2};
   growth.settlers = 2;
   growth.raiders = 2;
   growth.stances = {growing.stance, {}};
@@ -2813,20 +2825,33 @@ TEST(World, AFoundedVillageNamesTheLandItWasLaidOutOn) {
   ASSERT_TRUE(land.has_value());
   const Settlement laid_on = land.value_or(Settlement{"", {-1, -1}, {0, 0}});
   EXPECT_EQ(laid_on.kind, "hamlet");
-  EXPECT_EQ(laid_on.area.width, SETTLEMENT_SIDE);
-  EXPECT_EQ(laid_on.area.height, SETTLEMENT_SIDE);
-  // Each placement of the layout stands at its offset from the corner.
+  // The land is the first tier's square round the new village's centre.
+  EXPECT_EQ(laid_on.area.width, SQUARE_SIDE);
+  EXPECT_EQ(laid_on.area.height, SQUARE_SIDE);
+  const std::size_t settlers = world.army_count() - 1;
+  const Cell centre = world.objective(settlers);
+  EXPECT_EQ(laid_on.corner.x, centre.x - (SQUARE_SIDE / 2));
+  EXPECT_EQ(laid_on.corner.y, centre.y - (SQUARE_SIDE / 2));
+  // Each plan of the core is laid once, within the vicinity of the centre and
+  // off its square.
   const Growth growth = growth_of(Growing{{Expansion::FOUND}});
-  for (const Placement& placement : growth.layout) {
-    bool laid = false;
-    for (std::size_t structure = 0; structure < world.structure_count();
-         ++structure) {
-      const Cell cell = world.structure(structure).cell;
-      laid = laid || (world.plan_of(structure) == placement.plan &&
-                      cell.x == laid_on.corner.x + placement.offset.x &&
-                      cell.y == laid_on.corner.y + placement.offset.y);
+  for (const std::size_t plan : growth.core) {
+    std::size_t laid = 0;
+    for (std::size_t structure = STRUCTURES_AT_START;
+         structure < world.structure_count(); ++structure) {
+      const Structure built = world.structure(structure);
+      const bool on_square =
+          built.cell.x < laid_on.corner.x + SQUARE_SIDE &&
+          laid_on.corner.x < built.cell.x + built.footprint.width &&
+          built.cell.y < laid_on.corner.y + SQUARE_SIDE &&
+          laid_on.corner.y < built.cell.y + built.footprint.height;
+      const bool near = std::abs(built.cell.x - centre.x) <= VICINITY &&
+                        std::abs(built.cell.y - centre.y) <= VICINITY;
+      if (world.plan_of(structure) == plan && !on_square && near) {
+        ++laid;
+      }
     }
-    EXPECT_TRUE(laid);
+    EXPECT_EQ(laid, 1U) << "plan " << plan;
   }
   // Control: a village the world was created with was founded on no land.
   EXPECT_FALSE(world.settlement(VILLAGE_A).has_value());
@@ -2847,6 +2872,95 @@ TEST(World, SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem) {
   EXPECT_EQ(world.residents_of(VILLAGE_A), FOUNDERS - 2);
   EXPECT_GE(world.cap(FOUNDED), 2U);
   EXPECT_GT(world.stock(FOUNDED), 0U);
+}
+
+// The squared distance between two cells.
+std::int64_t apart_squared(Cell one, Cell other) {
+  const std::int64_t across = std::int64_t{one.x} - other.x;
+  const std::int64_t down = std::int64_t{one.y} - other.y;
+  return (across * across) + (down * down);
+}
+
+TEST(World, NoVillageIsFoundedNearerThanApartToAnother) {
+  // Sixteen cells apart, the village is founded at least sixteen cells from
+  // both.
+  constexpr std::int32_t APART = 16;
+  Growing spaced{{Expansion::FOUND}};
+  spaced.apart = APART;
+  World world = growth_world(spaced);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.village_count(), 3U);
+  const Cell centre = world.objective(world.army_count() - 1);
+  EXPECT_GE(apart_squared(centre, GROWING_SEAT), APART * APART);
+  EXPECT_GE(apart_squared(centre, NEIGHBOUR_SEAT), APART * APART);
+  // Control: at an apart of 0 the same village founds nearer than sixteen
+  // cells to its own.
+  World close = growth_world(Growing{{Expansion::FOUND}});
+  run_ticks(close, 1);
+  ASSERT_EQ(close.village_count(), 3U);
+  EXPECT_LT(
+      apart_squared(close.objective(close.army_count() - 1), GROWING_SEAT),
+      APART * APART);
+  // Forty-eight cells apart, beyond every site within its reach of 24 that
+  // the 32-cell map holds, it founds nothing.
+  Growing far{{Expansion::FOUND}};
+  far.apart = 3 * APART;
+  World nowhere = growth_world(far);
+  run_ticks(nowhere, 1);
+  EXPECT_EQ(nowhere.village_count(), 2U);
+}
+
+TEST(World, AVillageKeepsTheTierItReachedAsItsPeopleLeave) {
+  // A second tier at four residents, which village A starts with.
+  Growing growing{{Expansion::FOUND}};
+  growing.second_tier = FOUNDERS;
+  World world = growth_world(growing);
+  EXPECT_EQ(world.tier(VILLAGE_A), 1U);
+  // Two settle the village A founds, leaving it two, and it keeps its tier.
+  run_ticks(world, 1 + SETTLING_TICKS);
+  ASSERT_EQ(world.village_count(), 3U);
+  ASSERT_EQ(world.residents_of(VILLAGE_A), FOUNDERS - 2);
+  EXPECT_EQ(world.tier(VILLAGE_A), 1U);
+  // Control: the founded village, as many as A now, has not reached it.
+  ASSERT_EQ(world.residents_of(FOUNDED), FOUNDERS - 2);
+  EXPECT_EQ(world.tier(FOUNDED), 0U);
+}
+
+// A world of one village whose residents mend every tick, holding a rubble
+// field of its own over a 2 x 2 patch of the map's `ground`, after one tick.
+World mended_field(char ground) {
+  std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  for (std::size_t row = 2; row < 4; ++row) {
+    rows.at(row).replace(2, 2, 2, ground);
+  }
+  Life life = one_discipline(0);
+  Growth growth = growth_of(Growing{});
+  growth.terrace = 2 * PER_MILLE;
+  growth.stances = {{}};
+  life.growth = growth;
+  Rules rules{SEPARATION, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  World world{Seed{3},
+              Map{rows},
+              {army(rows, GROWING_SEAT, GROWING_SEAT, FOUNDERS, 1, 0, {MEND})},
+              {Structure{{2, 2}, 0, {2, 2}, false, Role::EDGE}},
+              rules,
+              {VillageSpec{{0}, 0, {Holding{0, 0, TEN_YEARS_FOOD}}, 0, {}}},
+              {},
+              life};
+  run_ticks(world, 1);
+  return world;
+}
+
+TEST(World, ATerracedFieldIsRaisedAtTheTerracesShareOfTheLabour) {
+  // On hills, at a terrace of 2,000 per mille, the field takes half the
+  // repair a field on flat ground takes.
+  const std::uint32_t flat =
+      mended_field(tile_of(Footing::BUILDABLE)).structure(0).durability;
+  const std::uint32_t terraced =
+      mended_field(tile_of(Footing::ROUGH)).structure(0).durability;
+  ASSERT_GT(flat, 0U);
+  EXPECT_EQ(terraced * 2, flat);
 }
 
 // Ticks `world` until village B's residents are struck down, for at most
@@ -2982,15 +3096,28 @@ TEST(World, GrowthPastItsLimitsIsRefused) {
   Growth unknown = valid;
   unknown.builds = {valid.plans.size()};
   EXPECT_FALSE(grows_by(unknown));
-  Growth overlapping = valid;
-  overlapping.layout.push_back(Placement{0, {1, 1}});
-  EXPECT_FALSE(grows_by(overlapping));
-  Growth outside = valid;
-  outside.layout.push_back(Placement{0, {SETTLEMENT_SIDE, 0}});
-  EXPECT_FALSE(grows_by(outside));
-  Growth over_centre = valid;
-  over_centre.layout.push_back(Placement{0, {2, 2}});
-  EXPECT_FALSE(grows_by(over_centre));
+  Growth unknown_core = valid;
+  unknown_core.core = {valid.plans.size()};
+  EXPECT_FALSE(grows_by(unknown_core));
+  Growth untiered = valid;
+  untiered.tiers.clear();
+  EXPECT_FALSE(grows_by(untiered));
+  Growth late_first = valid;
+  late_first.tiers.front().residents = 1;
+  EXPECT_FALSE(grows_by(late_first));
+  Growth unordered = valid;
+  unordered.tiers.push_back(Tier{0, {1, 1}, 1});
+  EXPECT_FALSE(grows_by(unordered));
+  Growth squareless = valid;
+  squareless.tiers.front().square = {0, 1};
+  EXPECT_FALSE(grows_by(squareless));
+  Growth effortless = valid;
+  effortless.terrace = 0;
+  EXPECT_FALSE(grows_by(effortless));
+  // Control: a second tier past the first is accepted.
+  Growth two_tiers = valid;
+  two_tiers.tiers.push_back(Tier{2, {1, 1}, 1});
+  EXPECT_TRUE(grows_by(two_tiers));
   Growth too_many = valid;
   too_many.stances = {{}, {}, {}};
   EXPECT_FALSE(grows_by(too_many));

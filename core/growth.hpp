@@ -17,18 +17,22 @@ namespace murim {
 enum class Expansion : std::uint8_t { BUILD, FOUND, RAID };
 
 /// A structure growth may lay: the `kind` of building it is, which names its
-/// art, its footprint, whether it blocks movement and what it holds.
+/// art, its footprint, whether it blocks movement, what it holds and its role.
 struct Plan {
   std::string kind;
   Footprint footprint{1, 1};
   bool blocks = true;
   Holding holding;
+  Role role = Role::HOME;
 };
 
-/// Plan `plan` laid at `offset` from a new village's corner.
-struct Placement {
-  std::size_t plan = 0;
-  Cell offset{};
+/// A size of village (ADR 0076): reached once `residents` people make it home,
+/// it keeps a `square` clear round its centre and builds within `vicinity`
+/// cells of it.
+struct Tier {
+  std::uint32_t residents = 0;
+  Footprint square{1, 1};
+  std::int32_t vicinity = 0;
 };
 
 /// How villages grow, as data, checked every `interval` days. A village with
@@ -36,21 +40,24 @@ struct Placement {
 /// reach `pressure` per mille of it; it then takes the first expansion of its
 /// owner's stance, `stances` by faction, that it can:
 /// - build: while every structure of its own is intact, it lays the plan of
-///   `builds` that most raises its scarcest holding, in people, as rubble
-///   on free buildable cells within `vicinity` cells of its centre, nearest
-///   it, a cell clear of any structure or village's clearing, for its
-///   residents to raise by the repair rule
+///   `builds` that most raises its scarcest holding, in people, as rubble,
+///   placed by its role within its tier's vicinity, for its residents to raise
+///   by the repair rule
 /// - found: with more residents than `settlers` and none of its people still
-///   settling, it lays `layout` as rubble on a `settlement` area of free
-///   buildable land, drawn by the seed among those whose centre lies within
-///   `reach` cells of its own, `spacing` cells clear of any structure or
-///   village's clearing and held by no other faction; `settlers` of its
-///   residents, a founder's household first, march there as the new village's
-///   residents, and the founder heads a new family; the layout makes a village
-///   of `settlement_kind`, which names its art
+///   settling, it lays the plans of `core` as rubble round a new centre drawn
+///   by the seed among the open sites within `reach` cells of its own: on
+///   free buildable land room for the first tier's square, `spacing` cells
+///   clear of any structure or village's clearing, held by no other faction
+///   and no nearer than `apart` cells to any village's centre; `settlers` of
+///   its residents, a founder's household first, march there as the new
+///   village's residents, and the founder heads a new family; it makes a
+///   village of `settlement_kind`, which names its art
 /// - raid: with more residents than `raiders` and no party out, it sends
 ///   `raiders` of them against the nearest village of a faction it is hostile
 ///   to, with living residents and its centre within `reach` cells
+/// A village takes the last of `tiers` its residents have reached and keeps
+/// it. An edge plan may lie on rough cells as a terraced field, which repair
+/// raises at `terrace` per mille of the labour of one on buildable cells.
 /// A village arms and tends `self_reliance` people with no workshop, beside
 /// what its standing workshops arm and tend; building counts both among its
 /// holdings, after housing, food and storage. By default it arms and tends
@@ -61,14 +68,15 @@ struct Growth {
   std::uint32_t interval = 1;
   std::uint32_t pressure = PER_MILLE;
   std::int32_t reach = 0;
-  std::int32_t vicinity = 0;
   std::int32_t spacing = 0;
   std::int32_t claim = 0;
+  std::int32_t apart = 0;
+  std::uint32_t terrace = PER_MILLE;
+  std::vector<Tier> tiers{Tier{}};
   std::vector<Plan> plans;
   std::vector<std::size_t> builds;
-  Footprint settlement{1, 1};
   std::string settlement_kind;
-  std::vector<Placement> layout;
+  std::vector<std::size_t> core;
   std::uint32_t settlers = 0;
   std::uint32_t raiders = 0;
   std::vector<std::vector<Expansion>> stances;
@@ -76,8 +84,13 @@ struct Growth {
 };
 
 /// Throws std::invalid_argument when `growth` checks at no interval, presses
-/// above PER_MILLE, reaches outside [0, MAX_REACH], or lays a footprint or
-/// placement it cannot.
+/// above PER_MILLE, reaches outside [0, MAX_REACH], raises terraces at no
+/// labour, has no tiers, a first tier past no one, tiers out of order or a
+/// square of no cell, or names a plan it does not have.
 void check_growth(const Growth& growth);
+
+/// Returns the index of the last of `growth`'s tiers that `residents` reach.
+[[nodiscard]] std::size_t tier_for(const Growth& growth,
+                                   std::uint64_t residents);
 
 }  // namespace murim

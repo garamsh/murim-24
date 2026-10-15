@@ -51,8 +51,9 @@ struct SectData {
 /// A kind of structure, by `name`: the people it houses, the food it stores,
 /// the food each cell of its footprint yields each harvest, which makes it a
 /// field, whether it blocks movement, the pupils it teaches a sect seated in
-/// its village, and, for a workshop, the people it arms and tends, the edge
-/// per mille they strike with and the health a day they recover (Holding).
+/// its village, for a workshop, the people it arms and tends, the edge per
+/// mille they strike with and the health a day they recover (Holding), and
+/// the role by which a village places it (ADR 0076).
 struct StructureKind {
   std::string name;
   std::uint32_t housing;
@@ -64,21 +65,24 @@ struct StructureKind {
   std::uint32_t tends = 0;
   std::uint32_t edge = 0;
   std::uint32_t healing = 0;
+  Role role = Role::HOME;
 };
 
 /// A structure a village template places, its cell an offset from the area's
-/// corner; the `kind` of building it is, which names its art and its data;
-/// and how many `households` the village starts with in it, each a married
-/// man and woman.
+/// corner in the seat's authored template and unused in a village's; the `kind`
+/// of building it is, which names its art and its data; and how many
+/// `households` the village starts with in it, each a married man and woman.
 struct Building {
   Structure structure;
   std::string kind;
   std::uint32_t households;
 };
 
-/// A kind of village: the `area` it occupies, and its `buildings`. Its
+/// A kind of village: its `buildings`, which a village starts with and places
+/// by their roles round its square (ADR 0076), and for the seat's authored
+/// template the `area` it occupies with each building at its offset. Its
 /// resident army, two people for each household its buildings start with,
-/// stands on the open cells nearest the area's centre.
+/// stands on the open cells nearest its centre.
 struct VillageTemplate {
   std::string name;
   Footprint area{};
@@ -104,9 +108,9 @@ struct RegionData {
   std::vector<SectData> sects;
 };
 
-/// A village as generated: the `area` from `corner` it occupies, its owner,
-/// its structures and its resident army, by their indices in the region's
-/// lists.
+/// A village as generated: its owner, the `area` from `corner` of its square,
+/// or of the seat's template for a seat, its structures and its resident
+/// army, by their indices in the region's lists.
 struct Village {
   std::string name;
   /// The name of the template it was laid out from.
@@ -149,7 +153,7 @@ struct Region {
 
 /// Returns `rules` with the plans growth lays: a plan for each of `builds`,
 /// from what its kind holds in `data`, its builds, then one for each of
-/// `settlement`'s buildings, laid out for a new village of that template.
+/// `settlement`'s buildings, the core a new village of that template lays.
 [[nodiscard]] Growth growth_for(const RegionData& data, Growth rules,
                                 const std::vector<Building>& builds,
                                 const VillageTemplate& settlement);
@@ -159,15 +163,21 @@ struct Region {
 
 /// Generates a region from `seed` and `data`: terrain and territories, six
 /// to eight villages owned in turn by each faction, and a seat for each sect
-/// in its faction's territory, each village on buildable cells in its owner's
-/// territory and overlapping no other. The same seed and data give the same
-/// region. Throws std::invalid_argument when a table is empty, the terrain
-/// weights are not positive, a faction has no skills, a village template or
-/// the seat template has no buildings, houses no household, has one outside
-/// its area, two that overlap, one over the area's centre, or one of a kind
-/// the kinds do not name, a faction is hostile to one that does not exist, or
-/// a sect names a faction that does not exist; throws std::runtime_error when
-/// a village or a seat finds no room.
+/// in its faction's territory. Each village's centre is drawn among the open
+/// sites, where the growth's first tier's square lies on free buildable cells
+/// of its owner's and no village's centre lies nearer than the growth's
+/// `apart`; its buildings are placed by their roles round the square on its
+/// owner's cells, buildable or, for an edge, rough. A seat is laid as its
+/// template is, at a corner whose centre is as open. The same seed and data
+/// give the same region. Throws std::invalid_argument when a table is empty,
+/// the rules of life do not grow, the terrain weights are not positive, a
+/// faction has no skills, a village template has no buildings, houses no
+/// household or has a building of no cell, the seat template has no
+/// buildings, houses no household, has one outside its area, two that
+/// overlap or one over the area's centre, a template names a kind the kinds
+/// do not, a faction is hostile to one that does not exist, or a sect names a
+/// faction that does not exist; throws std::runtime_error when a village or a
+/// seat finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Returns the villages of `region` as a World is created with them: each

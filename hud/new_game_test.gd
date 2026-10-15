@@ -10,11 +10,11 @@ const NewGame := preload("res://hud/new_game.gd")
 const Hud := preload("res://hud/hud.gd")
 const WordFit := preload("res://hud/word_fit.gd")
 # Seeded with SKIP_DRAW, Godot's generator draws REFUSED_DRAW, a seed the core generates no region
-# from, then KEPT_DRAW, one it does; seeded with PLAIN_DRAW, it draws PLAIN_KEPT first, one the core
-# generates.
-const SKIP_DRAW := 105
-const REFUSED_DRAW := 418156736
-const KEPT_DRAW := 2229168570
+# from, then KEPT_DRAW, one it does: the first generator seed from 0 that draws a refused seed and
+# then a kept one. Seeded with PLAIN_DRAW, it draws PLAIN_KEPT first, one the core generates.
+const SKIP_DRAW := 156
+const REFUSED_DRAW := 4170797617
+const KEPT_DRAW := 3755607802
 const PLAIN_DRAW := 2026
 const PLAIN_KEPT := 4259094339
 

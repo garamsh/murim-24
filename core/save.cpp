@@ -34,6 +34,9 @@
 namespace murim {
 namespace {
 
+// The roles a structure or a plan may take, Role's members.
+constexpr std::uint8_t ROLES = 3;
+
 // "MURIMSAV": the bytes every save begins with.
 constexpr std::array<std::uint8_t, 8> MAGIC{0x4D, 0x55, 0x52, 0x49,
                                             0x4D, 0x53, 0x41, 0x56};
@@ -353,22 +356,25 @@ void put_growth(Writer& out, const Growth& growth) {
   out.u32(growth.interval);
   out.u32(growth.pressure);
   out.i32(growth.reach);
-  out.i32(growth.vicinity);
   out.i32(growth.spacing);
   out.i32(growth.claim);
+  out.i32(growth.apart);
+  out.u32(growth.terrace);
+  put_all(out, growth.tiers, [&out](const Tier& tier) {
+    out.u32(tier.residents);
+    put_footprint(out, tier.square);
+    out.i32(tier.vicinity);
+  });
   put_all(out, growth.plans, [&out](const Plan& plan) {
     out.text(plan.kind);
     put_footprint(out, plan.footprint);
     out.flag(plan.blocks);
     put_holding(out, plan.holding);
+    out.u8(static_cast<std::uint8_t>(plan.role));
   });
   put_sizes(out, growth.builds);
-  put_footprint(out, growth.settlement);
   out.text(growth.settlement_kind);
-  put_all(out, growth.layout, [&out](const Placement& placement) {
-    out.size(placement.plan);
-    put_cell(out, placement.offset);
-  });
+  put_sizes(out, growth.core);
   out.u32(growth.settlers);
   out.u32(growth.raiders);
   put_all(out, growth.stances, [&out](const std::vector<Expansion>& stance) {
@@ -385,24 +391,29 @@ Growth get_growth(Reader& input) {
   growth.interval = input.u32();
   growth.pressure = input.u32();
   growth.reach = input.i32();
-  growth.vicinity = input.i32();
   growth.spacing = input.i32();
   growth.claim = input.i32();
+  growth.apart = input.i32();
+  growth.terrace = input.u32();
+  growth.tiers = get_all<Tier>(input, [&input] {
+    Tier tier;
+    tier.residents = input.u32();
+    tier.square = get_footprint(input);
+    tier.vicinity = input.i32();
+    return tier;
+  });
   growth.plans = get_all<Plan>(input, [&input] {
     Plan plan;
     plan.kind = input.text();
     plan.footprint = get_footprint(input);
     plan.blocks = input.flag();
     plan.holding = get_holding(input);
+    plan.role = static_cast<Role>(input.tag(ROLES));
     return plan;
   });
   growth.builds = get_sizes(input);
-  growth.settlement = get_footprint(input);
   growth.settlement_kind = input.text();
-  growth.layout = get_all<Placement>(input, [&input] {
-    const std::size_t plan = input.size();
-    return Placement{plan, get_cell(input)};
-  });
+  growth.core = get_sizes(input);
   growth.settlers = input.u32();
   growth.raiders = input.u32();
   growth.stances = get_all<std::vector<Expansion>>(input, [&input] {
@@ -1088,6 +1099,7 @@ class SaveCodec {
  public:
   static void write(Writer& out, const World& world) {
     out.u64(world.rng_state_);
+    out.u64(world.seed_);
     out.u64(world.tick_count_);
     put_map(out, world.map_);
     put_rules(out, world.rules_);
@@ -1109,6 +1121,7 @@ class SaveCodec {
       out.u32(structure.durability);
       put_footprint(out, structure.footprint);
       out.flag(structure.blocks);
+      out.u8(static_cast<std::uint8_t>(structure.role));
     });
     put_all(out, world.villages_.records(),
             [&out](const VillageRecord& village) {
@@ -1122,6 +1135,8 @@ class SaveCodec {
               put_index(out, village.raiding);
               put_maybe(out, village.founded,
                         [&out](Cell cell) { put_cell(out, cell); });
+              out.size(village.tier);
+              put_cell(out, village.centre);
             });
     put_all(out, world.leaders_.factions(), [&out](const Leadership& faction) {
       put_leadership(out, faction);
@@ -1180,11 +1195,13 @@ class SaveCodec {
   // end.
   static World read(Reader& input, SaveParts* parts) {
     const std::uint64_t rng_state = input.u64();
+    const std::uint64_t seed = input.u64();
     const std::uint64_t tick_count = input.u64();
     Map map = get_map(input);
     Rules rules = get_rules(input);
     World world{std::move(map), std::move(rules), get_life(input)};
     world.rng_state_ = rng_state;
+    world.seed_ = seed;
     world.tick_count_ = tick_count;
     world.people_ =
         get_all<Person>(input, [&input] { return get_person(input); });
@@ -1212,6 +1229,7 @@ class SaveCodec {
       structure.durability = input.u32();
       structure.footprint = get_footprint(input);
       structure.blocks = input.flag();
+      structure.role = static_cast<Role>(input.tag(ROLES));
       return structure;
     });
     std::vector<VillageRecord> villages =
@@ -1231,6 +1249,8 @@ class SaveCodec {
           village.raiding = get_index(input);
           village.founded =
               get_maybe<Cell>(input, [&input] { return get_cell(input); });
+          village.tier = input.size();
+          village.centre = get_cell(input);
           return village;
         });
     std::vector<Leadership> leadership =

@@ -103,6 +103,15 @@ std::size_t Villages::found(std::size_t residents, Cell corner) {
   return records_.size() - 1;
 }
 
+void Villages::place(std::size_t village, Cell centre) {
+  records_.at(village).centre = centre;
+}
+
+void Villages::reach(Reached reached) {
+  std::size_t& tier = records_.at(reached.village).tier;
+  tier = std::max(tier, reached.tier);
+}
+
 void Villages::add_structure() { village_of_.emplace_back(); }
 
 void Villages::attach(std::size_t village, std::size_t structure,

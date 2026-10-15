@@ -85,10 +85,18 @@ func _news_pass(world: WorldAdapter, panel: Control, near: int, far: int) -> boo
 func _menu_pass(world: WorldAdapter, panel: Control, living: int) -> bool:
 	panel.open(world, living)
 	var offered := world.offers(living)
-	var expected: Array[int] = [WorldAdapter.OFFER_NEWS, Dialogue.FAREWELL]
-	var rows_right: bool = offered == PackedInt64Array([WorldAdapter.OFFER_NEWS]) and panel.rows == expected \
-			and panel.choice() == WorldAdapter.OFFER_NEWS
-	var moved: bool = panel.move(1) and panel.choice() == Dialogue.FAREWELL and not panel.move(1)
+	var expected: Array[int] = []
+	for offer in offered:
+		expected.append(offer)
+	expected.append(Dialogue.FAREWELL)
+	# Setup: the person offers its news first, whatever else it offers.
+	var rows_right: bool = not offered.is_empty() and offered[0] == WorldAdapter.OFFER_NEWS \
+			and panel.rows == expected and panel.choice() == WorldAdapter.OFFER_NEWS
+	# Down steps through each offer to farewell, and no further.
+	var moved := true
+	for step in offered.size():
+		moved = moved and panel.move(1)
+	moved = moved and panel.choice() == Dialogue.FAREWELL and not panel.move(1)
 	# A person struck dead by a hostile neighbour in a world of two.
 	var struck := _struck()
 	var dead := 0

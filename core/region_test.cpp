@@ -17,6 +17,7 @@
 
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "flow_field.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "kinship.hpp"
@@ -110,6 +111,7 @@ std::vector<std::int64_t> flatten(const Region& region) {
     add(structure.durability);
     add(structure.footprint.width);
     add(structure.footprint.height);
+    add(structure.role);
   }
   add(region.rules.separation);
   for (const std::vector<bool>& row : region.rules.hostile) {
@@ -170,14 +172,17 @@ StateHash hash_after_ticks(const Region& region) {
   return world.hash();
 }
 
-// Whether every cell of each village's area is buildable, every cell of its
-// structures' footprints lies inside that area, and each of its residents
-// stands inside it on a cell no structure covers.
+// Whether every cell of each village's area, its square or a seat's, is
+// buildable, every cell of its structures lies on buildable cells, or on rough
+// ones for an edge, within the last tier's vicinity of its centre, and each
+// of its residents stands inside its area on a cell no structure covers.
 bool villages_on_buildable_cells(const Region& region) {
   const Map map{region.map_rows};
+  const std::int32_t vicinity =
+      region.life.growth.value_or(Growth{}).tiers.back().vicinity;
   for (const Village& village : region.villages) {
-    const std::vector<Recruit>& residents =
-        region.armies.at(village.army).members;
+    const ArmySpec& army = region.armies.at(village.army);
+    const std::vector<Recruit>& residents = army.members;
     bool fits = true;
     for (const Cell cell : area_of(village)) {
       fits = fits && map.buildable(cell);
@@ -189,7 +194,12 @@ bool villages_on_buildable_cells(const Region& region) {
     for (const std::size_t index : village.structures) {
       const Structure& structure = region.structures.at(index);
       for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
-        fits = fits && inside(village, cell) &&
+        const bool footed =
+            map.buildable(cell) ||
+            (structure.role == Role::EDGE && map.passable(cell));
+        fits = fits && footed &&
+               std::abs(cell.x - army.objective.x) <= vicinity &&
+               std::abs(cell.y - army.objective.y) <= vicinity &&
                std::none_of(residents.begin(), residents.end(),
                             [cell](const Recruit& resident) {
                               return same(cell, resident.cell);
@@ -219,10 +229,20 @@ bool villages_in_owner_territory(const Region& region) {
   return true;
 }
 
+// Whether no cell lies in two villages' areas or structures.
 bool villages_disjoint(const Region& region) {
   std::vector<bool> taken(region.territory.size(), false);
   for (const Village& village : region.villages) {
-    for (const Cell cell : area_of(village)) {
+    std::vector<Cell> cells = area_of(village);
+    for (const std::size_t index : village.structures) {
+      const Structure& structure = region.structures.at(index);
+      for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+        if (!inside(village, cell)) {
+          cells.push_back(cell);
+        }
+      }
+    }
+    for (const Cell cell : cells) {
       if (taken.at(index_of(cell))) {
         return false;
       }
@@ -365,6 +385,98 @@ TEST(Region, VillagesDoNotOverlap) {
   }
 }
 
+// The least squared distance between two villages' centres in `region`.
+std::int64_t nearest_centres(const Region& region) {
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (std::size_t one = 0; one < region.villages.size(); ++one) {
+    for (std::size_t other = one + 1; other < region.villages.size(); ++other) {
+      const Cell first =
+          region.armies.at(region.villages.at(one).army).objective;
+      const Cell second =
+          region.armies.at(region.villages.at(other).army).objective;
+      const std::int64_t across = std::int64_t{first.x} - second.x;
+      const std::int64_t down = std::int64_t{first.y} - second.y;
+      nearest = std::min(nearest, (across * across) + (down * down));
+    }
+  }
+  return nearest;
+}
+
+TEST(Region, NoTwoVillagesOrSeatsStandNearerThanApart) {
+  const std::int32_t apart = base_data().life.growth.value_or(Growth{}).apart;
+  ASSERT_GT(apart, 0);
+  bool closer_without = false;
+  RegionData unspaced = base_data();
+  Growth growth = unspaced.life.growth.value_or(Growth{});
+  growth.apart = 0;
+  unspaced.life.growth = growth;
+  for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
+    const Region region = generate_region(Seed{seed}, base_data());
+    EXPECT_GE(nearest_centres(region), std::int64_t{apart} * apart)
+        << "seed " << seed;
+    // Control: at an apart of 0 some seed sets two centres nearer.
+    closer_without = closer_without ||
+                     nearest_centres(generate_region(Seed{seed}, unspaced)) <
+                         std::int64_t{apart} * apart;
+  }
+  EXPECT_TRUE(closer_without);
+}
+
+// The structures of `village` as kinds at offsets from its centre, in the
+// order they were laid.
+std::vector<std::pair<std::string, std::pair<std::int32_t, std::int32_t>>>
+layout_of(const Region& region, const Village& village) {
+  const Cell centre = region.armies.at(village.army).objective;
+  std::vector<std::pair<std::string, std::pair<std::int32_t, std::int32_t>>>
+      laid;
+  for (const std::size_t structure : village.structures) {
+    const Cell cell = region.structures.at(structure).cell;
+    laid.emplace_back(region.structure_kinds.at(structure),
+                      std::make_pair(cell.x - centre.x, cell.y - centre.y));
+  }
+  return laid;
+}
+
+// How many pairs of villages of one template, seats left out, `region`
+// holds, and how many of them share a layout round their centres.
+std::pair<std::size_t, std::size_t> pairs_alike(const Region& region,
+                                                const RegionData& data) {
+  std::pair<std::size_t, std::size_t> counted{0, 0};
+  for (std::size_t one = 0; one < region.villages.size(); ++one) {
+    for (std::size_t other = one + 1; other < region.villages.size(); ++other) {
+      const Village& first = region.villages.at(one);
+      const Village& second = region.villages.at(other);
+      if (first.kind == second.kind && first.kind != data.seat.name) {
+        ++counted.first;
+        counted.second += static_cast<std::size_t>(layout_of(region, first) ==
+                                                   layout_of(region, second));
+      }
+    }
+  }
+  return counted;
+}
+
+TEST(Region, TwoVillagesOfOneTemplateOnTwoSitesAreLaidOutApart) {
+  // Every pair of villages of one template on other sites of the same
+  // region has its own layout round its centre.
+  const RegionData& data = base_data();
+  std::size_t pairs = 0;
+  for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
+    const auto [counted, alike] =
+        pairs_alike(generate_region(Seed{seed}, data), data);
+    pairs += counted;
+    EXPECT_EQ(alike, 0U) << "seed " << seed;
+  }
+  EXPECT_GT(pairs, 0U);
+  // Control: the same site and seed give the same layout.
+  const Region once = generate_region(SEED, data);
+  const Region again = generate_region(SEED, data);
+  for (std::size_t village = 0; village < once.villages.size(); ++village) {
+    EXPECT_EQ(layout_of(once, once.villages.at(village)),
+              layout_of(again, again.villages.at(village)));
+  }
+}
+
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = base_data();
   data.factions.push_back(Faction{"Martial clans",
@@ -408,25 +520,34 @@ TEST(Region, RejectsInconsistentData) {
   EXPECT_THROW(static_cast<void>(generate_region(SEED, weightless)),
                std::invalid_argument);
 
+  RegionData shapeless = base_data();
+  shapeless.villages.at(0).buildings.push_back(
+      Building{Structure{{0, 0}, 1, {0, 1}}, "house", 0});
+  EXPECT_THROW(static_cast<void>(generate_region(SEED, shapeless)),
+               std::invalid_argument);
+
   RegionData outside = base_data();
-  VillageTemplate& beyond = outside.villages.at(0);
-  beyond.buildings.push_back(
-      Building{Structure{{beyond.area.width - 1, 0}, 1, {2, 1}}, "house", 1});
+  outside.seat.buildings.push_back(Building{
+      Structure{{outside.seat.area.width - 1, 0}, 1, {2, 1}}, "house", 1});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, outside)),
                std::invalid_argument);
 
   RegionData overlapping = base_data();
-  VillageTemplate& doubled = overlapping.villages.at(0);
-  doubled.buildings.push_back(doubled.buildings.front());
+  overlapping.seat.buildings.push_back(overlapping.seat.buildings.front());
   EXPECT_THROW(static_cast<void>(generate_region(SEED, overlapping)),
                std::invalid_argument);
 
   RegionData over_centre = base_data();
-  VillageTemplate& central = over_centre.villages.at(0);
+  VillageTemplate& central = over_centre.seat;
   central.buildings.push_back(Building{
       Structure{{central.area.width / 2, central.area.height / 2}, 1, {1, 1}},
       "barrels", 0});
   EXPECT_THROW(static_cast<void>(generate_region(SEED, over_centre)),
+               std::invalid_argument);
+
+  RegionData ungrowing = base_data();
+  ungrowing.life.growth.reset();
+  EXPECT_THROW(static_cast<void>(generate_region(SEED, ungrowing)),
                std::invalid_argument);
 
   RegionData empty = base_data();
@@ -452,20 +573,23 @@ const VillageTemplate* template_of(const RegionData& data,
   return made_from == data.villages.end() ? nullptr : &*made_from;
 }
 
-// Whether each of the village's structures carries its template building's
-// kind, in order.
+// Whether the village's structures carry its template buildings' kinds, one
+// each, in whatever order their roles placed them.
 bool kinds_follow(const Region& region, const Village& village,
                   const VillageTemplate& made_from) {
-  if (village.structures.size() != made_from.buildings.size()) {
-    return false;
+  std::vector<std::string> laid;
+  laid.reserve(village.structures.size());
+  for (const std::size_t structure : village.structures) {
+    laid.push_back(region.structure_kinds.at(structure));
   }
-  for (std::size_t index = 0; index < village.structures.size(); ++index) {
-    if (region.structure_kinds.at(village.structures.at(index)) !=
-        made_from.buildings.at(index).kind) {
-      return false;
-    }
+  std::vector<std::string> listed;
+  listed.reserve(made_from.buildings.size());
+  for (const Building& building : made_from.buildings) {
+    listed.push_back(building.kind);
   }
-  return true;
+  std::sort(laid.begin(), laid.end());
+  std::sort(listed.begin(), listed.end());
+  return laid == listed;
 }
 
 // The people `made_from`'s buildings start with: two for each household.
@@ -608,11 +732,12 @@ std::size_t sect_of_faction(const World& world, std::size_t faction) {
   return sect;
 }
 
-// The region of seed 7, with days of one tick and a person born into village
+// The region of seed 1, with days of one tick and a person born into village
 // `village`, homed there unless `homeless`, as the last army, lived `days`
-// days. On that seed partners free to marry come of age within 20 years,
-// with no diplomacy, whose wars would change who lives to marry.
-constexpr Seed MARRYING_SEED{7};
+// days. On that seed, with no diplomacy, whose wars would change who lives
+// to marry, partners for the body marry in its village within 40 years, as
+// the test's setup checks; on seed 7, where they once did, none does now.
+constexpr Seed MARRYING_SEED{1};
 
 World born_and_lived(std::size_t village, bool homeless, std::uint64_t days) {
   RegionData data = base_data();
@@ -671,17 +796,52 @@ TEST(Region, APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith) {
 // Health of each person gathered().
 constexpr std::uint64_t GATHERED_HEALTH = 100'000;
 
-// `people` people of GATHERED_HEALTH on the open cells of village `home`
-// that none of its residents stands on, row by row.
+// The cells round village `home`'s centre that bodies pass, no structure of
+// the region covers and none of its people stands on, nearest the centre
+// first, row by row among equals.
+std::vector<Cell> open_round(const Region& region, const Village& home) {
+  const Map map{region.map_rows};
+  const Cell centre = region.armies.at(home.army).objective;
+  std::vector<bool> taken(region.territory.size(), false);
+  for (const Structure& structure : region.structures) {
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      taken.at(index_of(cell)) = true;
+    }
+  }
+  for (const ArmySpec& army : region.armies) {
+    for (const Recruit& member : army.members) {
+      taken.at(index_of(member.cell)) = true;
+    }
+  }
+  const std::int32_t reach =
+      region.life.growth.value_or(Growth{}).tiers.back().vicinity;
+  std::vector<Cell> open;
+  for (Cell cell{0, std::max(centre.y - reach, 0)};
+       cell.y <= std::min(centre.y + reach, REGION_SIDE - 1); ++cell.y) {
+    for (cell.x = std::max(centre.x - reach, 0);
+         cell.x <= std::min(centre.x + reach, REGION_SIDE - 1); ++cell.x) {
+      if (map.passable(cell) && !taken.at(index_of(cell))) {
+        open.push_back(cell);
+      }
+    }
+  }
+  std::stable_sort(open.begin(), open.end(), [centre](Cell one, Cell other) {
+    const auto far = [centre](Cell cell) {
+      return ((cell.x - centre.x) * (cell.x - centre.x)) +
+             ((cell.y - centre.y) * (cell.y - centre.y));
+    };
+    return far(one) < far(other);
+  });
+  return open;
+}
+
+// `people` people of GATHERED_HEALTH on the open cells round village
+// `home`'s centre, nearest first.
 std::vector<Recruit> gathered(const Region& region, const Village& home,
                               std::size_t people) {
-  const std::vector<Recruit>& residents = region.armies.at(home.army).members;
   std::vector<Recruit> members;
-  for (const Cell cell : open_cells(region, home)) {
-    const bool taken = std::any_of(
-        residents.begin(), residents.end(),
-        [cell](const Recruit& resident) { return same(resident.cell, cell); });
-    if (!taken && members.size() < people) {
+  for (const Cell cell : open_round(region, home)) {
+    if (members.size() < people) {
       members.push_back(Recruit{cell, GATHERED_HEALTH});
     }
   }
@@ -801,9 +961,11 @@ constexpr std::size_t RAIDERS = 20;
 // A raid on the walled village, scaled from the hamlet's by its 26
 // residents to the hamlet's 12: at most twice as long.
 constexpr std::uint64_t VILLAGE_RAID_MOST = 2 * RAID_MOST;
-// Seeds a walled village is raided on, each with room west of it for the
-// whole band.
-constexpr std::array<Seed, 3> WALLED{SEED, Seed{7}, Seed{1}};
+// Seeds a walled village is raided on: the first three from 1 with room
+// round it for the whole band.
+constexpr std::array<Seed, 3> WALLED{Seed{1}, Seed{2}, Seed{3}};
+// How far from the leader a duel's challenger stands, in cells.
+constexpr std::int32_t DUEL_AWAY = 5;
 // Seeds the pace is measured on, the region tests' own first.
 constexpr std::array<Seed, 3> PACED{SEED, Seed{2026}, Seed{5}};
 
@@ -815,10 +977,29 @@ bool within(std::uint64_t ticks, std::uint64_t least, std::uint64_t most) {
 // The ticks from a person born into the first Demonic village of the region
 // `data` generates from `seed` challenging its leader, as the player does,
 // until the duel is settled, or `limit` if it is not by then.
-std::uint64_t duel_ticks(const RegionData& data, Seed seed,
-                         std::uint64_t limit) {
+std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
+                         bool beside = false) {
   Region region = generate_region(seed, data);
-  region.armies.push_back(born_in(region, first_of(region, DEMONIC)));
+  const std::size_t home = first_of(region, DEMONIC);
+  ArmySpec born = born_in(region, home);
+  if (!beside) {
+    // The challenger stands DUEL_AWAY cells from the leader, the first
+    // resident, on the first open cell that far, row by row: where the
+    // village templates' corner once had it born.
+    const Cell lead =
+        region.armies.at(region.villages.at(home).army).members.front().cell;
+    const std::vector<Cell> open = open_round(region, region.villages.at(home));
+    const auto away = std::find_if(open.begin(), open.end(), [lead](Cell cell) {
+      return std::max(std::abs(cell.x - lead.x), std::abs(cell.y - lead.y)) ==
+             DUEL_AWAY;
+    });
+    EXPECT_NE(away, open.end());
+    if (away != open.end()) {
+      born.members.front().cell = *away;
+      born.objective = *away;
+    }
+  }
+  region.armies.push_back(born);
   const std::size_t challenger = region.armies.size() - 1;
   World world = world_of(region);
   const std::size_t leader = world.leader(DEMONIC).value_or(0);
@@ -947,13 +1128,48 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   const std::size_t residents = village.army;
   const Cell centre = region.armies.at(residents).objective;
   ArmySpec raiders{centre, {}, DEMONIC, data.factions.at(DEMONIC).skills};
-  const Footprint west{village.corner.x, village.area.height};
-  std::vector<Cell> cells = cells_of(Cell{0, village.corner.y}, west);
-  std::stable_sort(cells.begin(), cells.end(),
-                   [](Cell left, Cell right) { return left.x > right.x; });
-  const Map map{region.map_rows};
+  // The band stands on the open cells round the village two cells clear of
+  // everything it holds, its square and its structures, nearest its centre
+  // by path round what blocks, so it starts on the near side of any water
+  // or range rather than behind another village.
+  std::int32_t left = village.corner.x;
+  std::int32_t top = village.corner.y;
+  std::int32_t right = village.corner.x + village.area.width;
+  std::int32_t bottom = village.corner.y + village.area.height;
+  std::vector<std::string> rows = region.map_rows;
+  for (const std::size_t index : village.structures) {
+    const Structure& structure = region.structures.at(index);
+    left = std::min(left, structure.cell.x);
+    top = std::min(top, structure.cell.y);
+    right = std::max(right, structure.cell.x + structure.footprint.width);
+    bottom = std::max(bottom, structure.cell.y + structure.footprint.height);
+  }
+  for (const Structure& structure : region.structures) {
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      if (structure.blocks) {
+        rows.at(static_cast<std::size_t>(cell.y))
+            .at(static_cast<std::size_t>(cell.x)) = tile_of(Footing::BLOCKED);
+      }
+    }
+  }
+  const FlowField paths{Map{rows}, centre};
+  constexpr std::int32_t CLEAR = 2;
+  std::vector<Cell> cells = open_round(region, village);
+  cells.erase(std::remove_if(cells.begin(), cells.end(),
+                             [&](Cell cell) {
+                               const bool near = cell.x >= left - CLEAR &&
+                                                 cell.x < right + CLEAR &&
+                                                 cell.y >= top - CLEAR &&
+                                                 cell.y < bottom + CLEAR;
+                               return near || paths.distance(cell) ==
+                                                  FlowField::UNREACHABLE;
+                             }),
+              cells.end());
+  std::stable_sort(cells.begin(), cells.end(), [&paths](Cell one, Cell other) {
+    return paths.distance(one) < paths.distance(other);
+  });
   for (const Cell cell : cells) {
-    if (raiders.members.size() < raid.band && map.passable(cell)) {
+    if (raiders.members.size() < raid.band) {
       raiders.members.push_back(Recruit{cell, data.life.newborn_health});
     }
   }
@@ -1005,6 +1221,11 @@ TEST(Region, ADuelEndsWithinItsTargetTime) {
   }
   // Control: the placeholder strike of 1 leaves the duel fought past it.
   EXPECT_GT(duel_ticks(striking(1), SEED, DUEL_MOST + 1), DUEL_MOST);
+  // Control: born beside the leader on its village's square, the challenger
+  // settles the duel on seed 2026 before the target's floor, so the walk-in
+  // the test places is part of what it measures.
+  EXPECT_LT(duel_ticks(base_data(), Seed{2026}, DUEL_MOST + 1, true),
+            DUEL_LEAST);
 }
 
 TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
@@ -1348,7 +1569,9 @@ TEST(Region, VillagesFillToTheirCapsAndNoFurther) {
   // which raises the caps measured against, is left out, and the villages
   // start as full as grown ones.
   RegionData fertile = grown();
-  fertile.life.growth.reset();
+  for (Faction& faction : fertile.factions) {
+    faction.stance.clear();
+  }
   ASSERT_TRUE(fertile.life.kinship.has_value());
   Kinship kinship = fertile.life.kinship.value_or(Kinship{});
   kinship.marriage_chance = PER_MILLE;
@@ -1429,8 +1652,42 @@ Grew grew(const RegionData& data, Seed seed,
   return result;
 }
 
+// Whether a Demonic village of `region` has a village of a faction it is
+// hostile to with its centre within the growth's reach along each axis, as
+// a raid needs.
+bool raid_in_reach(const Region& region, const RegionData& data) {
+  const std::int32_t reach = data.life.growth.value_or(Growth{}).reach;
+  for (const Village& raider : region.villages) {
+    if (raider.faction != DEMONIC) {
+      continue;
+    }
+    const Cell origin = region.armies.at(raider.army).objective;
+    for (const Village& target : region.villages) {
+      const Cell reached = region.armies.at(target.army).objective;
+      if (region.rules.hostile.at(DEMONIC).at(target.faction) &&
+          std::abs(reached.x - origin.x) <= reach &&
+          std::abs(reached.y - origin.y) <= reach) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// The seed the fifty years of growth are measured on: the first from 0 on
+// which a Demonic village has a hostile one within raiding reach, so a raid
+// can be sent, and on which every outcome the test names occurs.
+constexpr Seed RAIDING{1};
+
 TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
-  const Grew region = grew(base_data(), NEIGHBOURLY);
+  // Setup: the seed holds a raid within reach, the property it was chosen
+  // for, so a layout that loses it fails here rather than below.
+  ASSERT_TRUE(
+      raid_in_reach(generate_region(RAIDING, base_data()), base_data()));
+  // Control: seed 0, the one before it, holds none.
+  ASSERT_FALSE(
+      raid_in_reach(generate_region(Seed{0}, base_data()), base_data()));
+  const Grew region = grew(base_data(), RAIDING);
   // Villages were founded, and one came to house its settlers; a building
   // was raised; a raiding party, an army housing no village, was sent; the
   // factions' territories changed; the living stayed within the bound.
@@ -1441,7 +1698,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_NE(region.territory_after, region.territory_before);
   EXPECT_LE(region.peak, MAX_PEOPLE);
   // The same seed grows the same way; control: another seed does not.
-  EXPECT_EQ(static_cast<std::uint64_t>(grew(base_data(), NEIGHBOURLY).hash),
+  EXPECT_EQ(static_cast<std::uint64_t>(grew(base_data(), RAIDING).hash),
             static_cast<std::uint64_t>(region.hash));
   EXPECT_NE(static_cast<std::uint64_t>(grew(base_data(), OTHER_SEED).hash),
             static_cast<std::uint64_t>(region.hash));
@@ -1450,7 +1707,7 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   for (Faction& faction : still.factions) {
     faction.stance.clear();
   }
-  const Grew unchanged = grew(still, NEIGHBOURLY);
+  const Grew unchanged = grew(still, RAIDING);
   EXPECT_EQ(unchanged.villages_after, unchanged.villages_before);
   EXPECT_EQ(unchanged.armies_after, unchanged.villages_after);
   EXPECT_FALSE(unchanged.building_raised);
@@ -1499,7 +1756,11 @@ void hold_in_first(Region& region, std::size_t village, const RegionData& data,
 constexpr std::uint64_t WORKSHOP_YEARS = 40;
 
 Workshops workshops_raised(std::uint32_t cap) {
-  const RegionData& data = base_data();
+  // No other faction grows, so no raid ruins the village the test watches.
+  RegionData data = base_data();
+  for (std::size_t faction = 1; faction < data.factions.size(); ++faction) {
+    data.factions.at(faction).stance.clear();
+  }
   Region region = generate_region(NEIGHBOURLY, data);
   region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
   const Growth growth = data.life.growth.value_or(Growth{});
@@ -1525,17 +1786,20 @@ Workshops workshops_raised(std::uint32_t cap) {
   World world = world_of(region);
   const bool capped = world.cap(chosen) == cap;
   // A workshop the village laid: growth lays its buildings within the
-  // vicinity of its seat, its residents' objective, on each axis.
+  // vicinity of its seat, its residents' objective, on each axis, at most the
+  // last tier's.
   const Cell seat = residents.objective;
-  const auto workshop = [&growth, &world, seat](std::size_t structure) {
+  const std::int32_t vicinity = growth.tiers.back().vicinity;
+  const auto workshop = [&growth, &world, seat,
+                         vicinity](std::size_t structure) {
     const std::size_t plan =
         world.plan_of(structure).value_or(growth.plans.size());
     const Cell cell = world.structure(structure).cell;
     return plan < growth.plans.size() &&
            (growth.plans.at(plan).holding.arms > 0 ||
             growth.plans.at(plan).holding.tends > 0) &&
-           std::abs(cell.x - seat.x) <= growth.vicinity &&
-           std::abs(cell.y - seat.y) <= growth.vicinity;
+           std::abs(cell.x - seat.x) <= vicinity &&
+           std::abs(cell.y - seat.y) <= vicinity;
   };
   // Whether its people pressed against its cap before it laid a workshop.
   bool pressed = false;
@@ -1792,9 +2056,12 @@ TEST(Region, NoOutcomeReadsTheChart) {
   EXPECT_NE(charted.hash(), blind.hash());
   // ...and in nothing else.
   EXPECT_EQ(outcomes(charted), outcomes(blind));
-  // Control: one tick more is an outcome the comparison sees.
+  // Control: a day more, five ticks, is an outcome the comparison sees.
+  constexpr int A_DAY = 5;
   World later = charted_lived(MAP_SIGHT);
-  later.tick();
+  for (int tick = 0; tick < A_DAY; ++tick) {
+    later.tick();
+  }
   EXPECT_NE(outcomes(later), outcomes(charted));
 }
 
@@ -1808,10 +2075,12 @@ TEST(Region, AFewHouseholdsGrowIntoACivilisationOverACentury) {
   EXPECT_EQ(grew.fewest_factions, base_data().factions.size());
   EXPECT_LE(grew.peak, MAX_PEOPLE);
 
-  // Control: without growth no village is founded, although births still
-  // fill the villages there are.
+  // Control: with no faction growing, no village is founded, although
+  // births still fill the villages there are.
   RegionData still = base_data();
-  still.life.growth.reset();
+  for (Faction& faction : still.factions) {
+    faction.stance.clear();
+  }
   const Century kept = century(still, NEIGHBOURLY);
   EXPECT_LE(kept.villages_after, kept.villages_before);
   // Control: without kinship no one is born, and the living do not rise.

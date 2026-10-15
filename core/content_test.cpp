@@ -196,15 +196,34 @@ constexpr const char* TINY = "tiny";
 constexpr std::int64_t TINY_VERSION = 2;
 constexpr std::int64_t JAB_DAMAGE = 4;
 // The hamlet's area: room for its house and the army its household raises.
-constexpr std::int64_t HAMLET_WIDTH = 7;
-constexpr std::int64_t HAMLET_HEIGHT = 9;
 
 // A complete set of rules of life, `name`, in pack `pack`.
+// A terrace raised at the labour of a field on buildable cells.
+constexpr std::int64_t PER_MILLE_TERRACE = 1'000;
+
 void add_life(MemoryPacks& packs, const std::string& pack,
               const std::string& name) {
-  packs.entry(pack, "life", name)
-      .set("newborn_health", 4)
-      .map("learning")
+  Node life = packs.entry(pack, "life", name).set("newborn_health", 4);
+  Node growth = life.map("growth")
+                    .set("interval", 1)
+                    .set("pressure", 0)
+                    .set("reach", 0)
+                    .set("spacing", 0)
+                    .set("claim", 0)
+                    .set("apart", 0)
+                    .set("terrace", PER_MILLE_TERRACE)
+                    .set("settlers", 0)
+                    .set("raiders", 0)
+                    .set("self_reliance", 0)
+                    .text("settlement", "hamlet");
+  growth.list("tiers")
+      .item()
+      .set("residents", 0)
+      .set("width", 1)
+      .set("height", 1)
+      .set("vicinity", 4);
+  growth.list("builds");
+  life.map("learning")
       .set("comprehension", 0)
       .set("teaching", 0)
       .set("reading_cost", 0)
@@ -238,14 +257,11 @@ void add_tiny_base(MemoryPacks& packs) {
       .set("storage", 0)
       .set("yield", 0)
       .flag("blocks", true)
-      .set("pupils", 0);
-  Node hamlet = packs.entry(TINY, "villages", "hamlet")
-                    .set("width", HAMLET_WIDTH)
-                    .set("height", HAMLET_HEIGHT);
-  hamlet.list("buildings")
+      .set("pupils", 0)
+      .text("role", "home");
+  packs.entry(TINY, "villages", "hamlet")
+      .list("buildings")
       .item()
-      .set("x", 0)
-      .set("y", 0)
       .set("width", 3)
       .set("height", 3)
       .set("durability", 4)
@@ -605,8 +621,15 @@ TEST(Content, AMergedSetFailingTheRegionsChecksIsRefused) {
   MemoryPacks packs;
   add_tiny_base(packs);
   add_mod(packs, "cramped");
-  // Too small to hold the hamlet's house and its household's army.
-  packs.entry("cramped", "villages", "hamlet").set("width", 4).set("height", 4);
+  // A hamlet whose only house holds no household houses no one.
+  packs.entry("cramped", "villages", "hamlet")
+      .list("buildings")
+      .item()
+      .set("width", 3)
+      .set("height", 3)
+      .set("durability", 4)
+      .text("kind", "house")
+      .set("households", 0);
   const LoadedContent loaded = load_content(packs, TINY, {"cramped"});
   EXPECT_TRUE(refused_for(loaded, "cramped", "", ContentRefusal::INCONSISTENT));
   EXPECT_FALSE(loaded.data.has_value());
@@ -618,13 +641,18 @@ TEST(Content, AMergedSetFailingTheRegionsChecksIsRefused) {
   EXPECT_TRUE(refused_for(load_content(lives, TINY, {"twin"}), "twin", "",
                           ContentRefusal::INCONSISTENT));
 
-  // Control: the hamlet at its own size loads.
+  // Control: the same house holding a household loads.
   MemoryPacks control;
   add_tiny_base(control);
   add_mod(control, "cramped");
   control.entry("cramped", "villages", "hamlet")
-      .set("width", HAMLET_WIDTH)
-      .set("height", HAMLET_HEIGHT);
+      .list("buildings")
+      .item()
+      .set("width", 3)
+      .set("height", 3)
+      .set("durability", 4)
+      .text("kind", "house")
+      .set("households", 1);
   EXPECT_TRUE(load_content(control, TINY, {"cramped"}).errors.empty());
 }
 

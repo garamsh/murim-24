@@ -1,8 +1,8 @@
 # Checks that trade passes through the adapter as the core decides it: in a region made by
 # create_region(), the player, steered, walked up to the nearest person who sells the herb, is
 # offered its wares, buys a herb for its price, and is refused the pill it cannot pay for, a herb at
-# full health and a pill it holds none of; the same herb asked of a person who does not sell it is
-# refused, where the seller's is sold.
+# full health and a pill it holds none of; walked on to the nearest person who does not sell it,
+# the same herb asked of that person is refused, where the seller's was sold.
 extends RefCounted
 
 const REACH := 2
@@ -22,26 +22,26 @@ func run() -> bool:
 	var pill := names.find("elixir")
 	var seller := _nearest(world, player, func(person: int) -> bool: return world.sells(person, herb))
 	var skills := PackedInt64Array(range(world.skill_count(world.player_army())))
-	for tick in WALK_TICKS:
-		if seller < 0 or _apart(world, player, seller) <= REACH:
-			break
-		if tick % 20 == 0:
-			world.order(world.player_army(), _cell(world, seller), skills)
-		world.tick()
-	var other := _nearest(world, player, func(person: int) -> bool: return not world.sells(person, herb))
-	# Setup: a seller stands within the reach, and so does someone who sells no herb.
-	if seller < 0 or other < 0 or _apart(world, player, seller) > REACH or _apart(world, player, other) > REACH:
-		print("trade_test: no seller and no other person within %d cells of the player: FAIL" % REACH)
+	_walk_to(world, player, seller, skills)
+	# Setup: a seller stands within the reach.
+	if seller < 0 or _apart(world, player, seller) > REACH:
+		print("trade_test: no seller within %d cells of the player: FAIL" % REACH)
 		return false
 	var silver := world.person_silver(player)
 	var offered := world.offers(seller)
-	var not_sold := world.buy_refusal(player, other, herb)
 	var bought := world.buy(player, seller, herb)
 	var held := world.person_held(player)
 	var paid := silver - world.person_silver(player)
 	var dear := world.buy_refusal(player, seller, pill)
 	var full := world.consume_refusal(player, herb)
 	var none := world.consume_refusal(player, pill)
+	var other := _nearest(world, player, func(person: int) -> bool: return not world.sells(person, herb))
+	_walk_to(world, player, other, skills)
+	# Setup: someone who sells no herb stands within the reach in turn.
+	if other < 0 or _apart(world, player, other) > REACH:
+		print("trade_test: no person who sells no herb within %d cells of the player: FAIL" % REACH)
+		return false
+	var not_sold := world.buy_refusal(player, other, herb)
 	var passed: bool = offered == PackedInt64Array([WorldAdapter.OFFER_NEWS, WorldAdapter.OFFER_TRADE]) and bought \
 			and paid == wares[herb].price and held == PackedInt64Array([1, 0]) \
 			and not_sold == WorldAdapter.BUY_NOT_SOLD \
@@ -50,6 +50,17 @@ func run() -> bool:
 	print("trade_test: person %d offers %s; the player paid %d of %d silver for a herb, holds %s; the pill %d, a herb at full health %d, a pill held by none %d; person %d, who sells no herb, %d: %s" % [
 		seller, offered, paid, silver, held, dear, full, none, other, not_sold, "pass" if passed else "FAIL"])
 	return passed
+
+
+# Walks the steered player `player` up to `person`, for at most WALK_TICKS ticks, until it stands
+# within REACH of it.
+func _walk_to(world: WorldAdapter, player: int, person: int, skills: PackedInt64Array) -> void:
+	for tick in WALK_TICKS:
+		if person < 0 or _apart(world, player, person) <= REACH:
+			return
+		if tick % 20 == 0:
+			world.order(world.player_army(), _cell(world, person), skills)
+		world.tick()
 
 
 # The living person nearest `person` for whom `test` holds, other than itself, or -1.
