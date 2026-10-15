@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -15,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "areas.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "compiled_map.hpp"
@@ -30,6 +32,7 @@
 #include "person.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
+#include "talent.hpp"
 #include "village.hpp"
 #include "world.hpp"
 
@@ -2337,6 +2340,377 @@ TEST(SettledMap, ASectWithoutASeatPlaceIsRefused) {
   // Control: a seat place for each sect settles.
   EXPECT_NO_THROW(static_cast<void>(
       settle_map(SEED, base_data(), CompiledMap{map_source()})));
+}
+
+// The settled map's armies the tier tests use: the residents of its first
+// village, at (40, 120) in area (1, 3), of its fourth, at (120, 200) in area
+// (3, 6), and of its third sect's seat, at (200, 200) in area (6, 6).
+constexpr std::size_t WEST_VILLAGE = 0;
+constexpr std::size_t SOUTH_VILLAGE = 3;
+constexpr std::size_t SOUTH_EAST_SEAT = 6;
+
+std::size_t residents(const Region& region, std::size_t village) {
+  return region.villages.at(village).army;
+}
+
+TEST(Tiers, TiersFollowTheSteeredArmyAndAWorldWithoutOneRunsLive) {
+  const Region region =
+      settle_map(SEED, base_data(), CompiledMap{map_source()});
+  World world = world_of(region);
+  world.set_profile(STANDARD_PROFILE);
+  world.steer(residents(region, WEST_VILLAGE), true);
+  world.retier();
+  // From area (1, 3), every area live before: area (3, 6), 3 areas away,
+  // one past the live radius, stays live; (5, 4), 4 away, is stepped; and
+  // (6, 6), 5 away, past the stepped radius, is far.
+  EXPECT_EQ(world.areas().tier(world.areas().area_of(Cell{40, 120})),
+            AreaTier::LIVE);
+  EXPECT_EQ(world.areas().tier(world.areas().area_of(Cell{120, 200})),
+            AreaTier::LIVE);
+  EXPECT_EQ(world.areas().tier(world.areas().area_of(Cell{176, 144})),
+            AreaTier::STEPPED);
+  EXPECT_FALSE(world.far(residents(region, SOUTH_VILLAGE)).has_value());
+  EXPECT_TRUE(world.far(residents(region, SOUTH_EAST_SEAT)).has_value());
+  // Control: with no steered army every area is live, and the far army
+  // comes back.
+  world.steer(residents(region, WEST_VILLAGE), false);
+  world.retier();
+  EXPECT_FALSE(world.far(residents(region, SOUTH_EAST_SEAT)).has_value());
+  for (const AreaTier tier : world.areas().tiers()) {
+    EXPECT_EQ(tier, AreaTier::LIVE);
+  }
+  // Control: steered, but with no profile, every area is live.
+  world.set_profile(std::nullopt);
+  world.steer(residents(region, WEST_VILLAGE), true);
+  world.retier();
+  EXPECT_FALSE(world.far(residents(region, SOUTH_EAST_SEAT)).has_value());
+}
+
+// The names of the fields of `made` that differ from `held`'s, every saved
+// field of a person but its position, which a handover moves.
+std::vector<std::string> differing(const Person& held, const Person& made) {
+  std::vector<std::string> fields;
+  const auto check = [&fields](bool same_value, const char* name) {
+    if (!same_value) {
+      fields.emplace_back(name);
+    }
+  };
+  const auto same_aptitude = [](const Aptitude& one, const Aptitude& other) {
+    return one.growth == other.growth && one.limit == other.limit;
+  };
+  check(held.health == made.health, "health");
+  check(held.ready_at == made.ready_at, "ready_at");
+  check(held.home == made.home, "home");
+  check(held.born == made.born, "born");
+  check(held.family == made.family, "family");
+  check(held.parents == made.parents, "parents");
+  check(held.sex == made.sex, "sex");
+  check(held.given == made.given, "given");
+  check(held.spouses == made.spouses, "spouses");
+  check(held.children == made.children, "children");
+  check(held.hunger == made.hunger, "hunger");
+  check(std::equal(held.talent.begin(), held.talent.end(), made.talent.begin(),
+                   made.talent.end(), same_aptitude),
+        "talent");
+  check(held.attainment == made.attainment, "attainment");
+  check(held.lifespan == made.lifespan, "lifespan");
+  check(held.soul == made.soul, "soul");
+  check(held.sect == made.sect, "sect");
+  check(held.casting.has_value() == made.casting.has_value() &&
+            (!held.casting ||
+             (held.casting->skill == made.casting->skill &&
+              held.casting->target.index() == made.casting->target.index())),
+        "casting");
+  check(same_aptitude(held.cultivation, made.cultivation), "cultivation");
+  check(held.qi == made.qi, "qi");
+  check(held.qi_capacity == made.qi_capacity, "qi_capacity");
+  check(std::equal(held.known.begin(), held.known.end(), made.known.begin(),
+                   made.known.end(),
+                   [](const Known& one, const Known& other) {
+                     return one.art == other.art && one.skill == other.skill &&
+                            one.ready_at == other.ready_at;
+                   }),
+        "known");
+  check(held.silver == made.silver, "silver");
+  check(held.held == made.held, "held");
+  return fields;
+}
+
+// The fields a person holds other than at their defaults, by the names
+// differing() gives them.
+std::vector<std::string> set_fields(const Person& person) {
+  return differing(Person{}, person);
+}
+
+// The days of food the far-going army's village starts with, short of the
+// first harvest of the field its growth lays, about day 90; and the most the
+// handover's world lives waiting for that village to run out.
+constexpr std::uint64_t STORED_DAYS = 85;
+constexpr std::uint64_t HUNGRY_BY = 90;
+
+// Whether a member of army `army` has gone hungry.
+bool hungry(const World& world, std::size_t army) {
+  const std::vector<std::size_t>& roster = world.roster(army);
+  return std::any_of(
+      roster.begin(), roster.end(),
+      [&world](std::size_t member) { return world.person(member).hunger > 0; });
+}
+
+// The settled map with the handover test's one premise apart from the base
+// pack, on the far-going army's own village, the seat, alone: it harvests
+// nothing, and its stores hold what its first residents eat in STORED_DAYS,
+// so its stock runs out before the first harvest of the field its growth
+// lays, and its people go hungry. On the base pack no one on the settled map
+// goes hungry within three years, and with only its harvest gone the seat's
+// full granary lasts its two people some 1,200 days. Every other village is
+// as the base pack has it.
+Region starving_seat() {
+  Region region = settle_map(SEED, base_data(), CompiledMap{map_source()});
+  const Village& seat = region.villages.at(SOUTH_EAST_SEAT);
+  const std::uint64_t eaten =
+      region.armies.at(seat.army).members.size() *
+      region.life.husbandry.value_or(Husbandry{}).consumption * STORED_DAYS;
+  bool stored = false;
+  for (const std::size_t structure : seat.structures) {
+    Holding& holding = region.holdings.at(structure);
+    holding.harvest = 0;
+    holding.storage =
+        !stored && holding.storage > 0 ? static_cast<std::uint32_t>(eaten) : 0;
+    stored = stored || holding.storage > 0;
+  }
+  return region;
+}
+
+// The cells east of which the handed army is far from the steered one: 5 or
+// more areas east of its area, x of 192 cells or more, in sub-cell units.
+constexpr std::int32_t FAR_EAST = 192 * CELL_SIZE;
+
+// Gathers into army `handed` a living person standing far east from each
+// other army but `steered` holding a field its people hold only at its
+// default, gives its first member a soul, and returns the fields its people
+// then hold set.
+std::set<std::string> gather(World& world, std::size_t handed,
+                             std::size_t steered) {
+  std::set<std::string> held;
+  for (const std::size_t member : world.roster(handed)) {
+    const std::vector<std::string> fields = set_fields(world.person(member));
+    held.insert(fields.begin(), fields.end());
+  }
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    const std::vector<std::size_t> roster = army == handed || army == steered
+                                                ? std::vector<std::size_t>{}
+                                                : world.roster(army);
+    for (const std::size_t member : roster) {
+      const std::vector<std::string> fields = set_fields(world.person(member));
+      const bool adds = world.person(member).position.x >= FAR_EAST &&
+                        std::any_of(fields.begin(), fields.end(),
+                                    [&held](const std::string& field) {
+                                      return held.count(field) == 0;
+                                    });
+      if (adds) {
+        world.conscript(member, handed);
+        held.insert(fields.begin(), fields.end());
+      }
+    }
+  }
+  static_cast<void>(world.ensoul(world.roster(handed).front()));
+  held.insert("soul");
+  return held;
+}
+
+// Has the first member of army `army` that may cast anything cast it, so a
+// cast is pending. Returns whether one did.
+bool cast_any(World& world, std::size_t army) {
+  for (const std::size_t member : world.roster(army)) {
+    const std::vector<Target> targets{Point{world.person(member).position},
+                                      Itself{}};
+    for (std::size_t skill = 0; skill < world.skill_count(member); ++skill) {
+      for (const Target& target : targets) {
+        if (world.cast_refusal(member, skill, target) == CastRefusal::NONE) {
+          world.cast(member, skill, target);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// The fields in which army `army`'s people differ from `snapshot`, rank by
+// rank.
+std::vector<std::string> changed_since(const World& world, std::size_t army,
+                                       const std::vector<Person>& snapshot) {
+  std::vector<std::string> changed;
+  for (std::size_t rank = 0; rank < snapshot.size(); ++rank) {
+    const std::vector<std::string> fields =
+        differing(snapshot.at(rank), world.person(world.roster(army).at(rank)));
+    changed.insert(changed.end(), fields.begin(), fields.end());
+  }
+  return changed;
+}
+
+// Every saved field of a person but its position, by differing()'s names.
+const std::set<std::string>& every_field() {
+  static const std::set<std::string> fields{
+      "health",  "ready_at", "home",        "born",     "family",
+      "parents", "sex",      "given",       "spouses",  "children",
+      "hunger",  "talent",   "attainment",  "lifespan", "soul",
+      "sect",    "casting",  "cultivation", "qi",       "qi_capacity",
+      "known",   "silver",   "held"};
+  return fields;
+}
+
+// Lives `world` until a member of army `army` goes hungry, or HUNGRY_BY
+// days, whichever is first.
+void live_until_hungry(World& world, std::size_t army) {
+  for (std::uint64_t day = 0; day < HUNGRY_BY && !hungry(world, army); ++day) {
+    for (std::uint64_t tick = 0; tick < world.ticks_per_day(); ++tick) {
+      world.tick();
+    }
+  }
+}
+
+// The records of army `army`'s people, rank by rank.
+std::vector<Person> records_of(const World& world, std::size_t army) {
+  std::vector<Person> records;
+  for (const std::size_t member : world.roster(army)) {
+    records.push_back(world.person(member));
+  }
+  return records;
+}
+
+TEST(Tiers, AHandoverFarAndBackKeepsEveryPersonsRecord) {
+  const Region region = starving_seat();
+  World world = world_of(region);
+  const std::size_t steered = residents(region, WEST_VILLAGE);
+  const std::size_t handed = residents(region, SOUTH_EAST_SEAT);
+  // It lives until the seat's stock runs out, and is handed over on the
+  // first day a member goes hungry, within the husbandry's hunger days; by
+  // then its people have families, attainment, stores and wares.
+  live_until_hungry(world, handed);
+  ASSERT_TRUE(hungry(world, handed));
+  std::set<std::string> held = gather(world, handed, steered);
+  ASSERT_TRUE(cast_any(world, handed));
+  held.insert("casting");
+  EXPECT_EQ(held, every_field());
+  const std::vector<Person> snapshot = records_of(world, handed);
+  world.set_profile(STANDARD_PROFILE);
+  world.steer(steered, true);
+  world.retier();
+  ASSERT_TRUE(world.far(handed).has_value());
+  EXPECT_EQ(changed_since(world, handed, snapshot), std::vector<std::string>{});
+  world.steer(steered, false);
+  world.retier();
+  ASSERT_FALSE(world.far(handed).has_value());
+  EXPECT_EQ(changed_since(world, handed, snapshot), std::vector<std::string>{});
+  // Control: a handover that dropped a member's qi to its default is seen,
+  // on that field alone.
+  Person dropped = world.person(world.roster(handed).front());
+  ASSERT_GT(dropped.qi, 0U);
+  dropped.qi = 0;
+  EXPECT_EQ(differing(snapshot.front(), dropped),
+            std::vector<std::string>{"qi"});
+}
+
+// The ticks the steered army takes to walk away and back.
+constexpr int WALK_TICKS = 3'000;
+constexpr Cell FAR_CORNER{230, 230};
+
+// The hash of a world on the settled map, settled from `seed`, whose fourth
+// village's residents, steered on `profile`, walk to the far corner and back,
+// and whether its first village's residents were far between and live
+// after.
+struct Walked {
+  StateHash hash;
+  bool far_between;
+  bool live_after;
+};
+
+Walked walked(Seed seed, std::optional<Profile> profile) {
+  const Region region =
+      settle_map(seed, base_data(), CompiledMap{map_source()});
+  World world = world_of(region);
+  world.set_profile(profile);
+  const std::size_t walker = residents(region, SOUTH_VILLAGE);
+  const std::size_t watched = residents(region, WEST_VILLAGE);
+  world.steer(walker, true);
+  std::vector<std::size_t> skills(world.skills(walker).size());
+  std::iota(skills.begin(), skills.end(), std::size_t{0});
+  const Cell home = world.objective(walker);
+  world.order(walker, Order{FAR_CORNER, skills});
+  for (int tick = 0; tick < WALK_TICKS; ++tick) {
+    world.tick();
+  }
+  const bool far_between = world.far(watched).has_value();
+  world.order(walker, Order{home, skills});
+  for (int tick = 0; tick < WALK_TICKS; ++tick) {
+    world.tick();
+  }
+  return Walked{world.hash(), far_between, !world.far(watched).has_value()};
+}
+
+TEST(Tiers, ALiveFarAndLiveRunHashesTheSameTwice) {
+  const Walked first = walked(SEED, STANDARD_PROFILE);
+  ASSERT_TRUE(first.far_between);
+  ASSERT_TRUE(first.live_after);
+  EXPECT_EQ(walked(SEED, STANDARD_PROFILE).hash, first.hash);
+  // Controls: another seed, and the same run with no tiers, so the far phase
+  // is seen to act.
+  EXPECT_NE(walked(OTHER_SEED, STANDARD_PROFILE).hash, first.hash);
+  const Walked untiered = walked(SEED, std::nullopt);
+  ASSERT_FALSE(untiered.far_between);
+  EXPECT_NE(untiered.hash, first.hash);
+}
+
+// How far from the map's far edges the far fight stands, the second army a
+// cell inside the first, and the structure stages' floors it is fought with.
+constexpr std::int32_t CORNER = 4;
+constexpr std::int32_t BESIDE = CORNER + 1;
+constexpr std::array<std::uint32_t, 3> FIGHT_FLOORS{75, 25, 1};
+
+// Two hostile armies side by side at the far corner of a map of 8 by 8 areas,
+// and a third, steered, at the near one, on `profile`, after two seconds.
+World far_fight(std::optional<Profile> profile) {
+  constexpr std::int32_t SIDE = 8 * AREA_SIDE;
+  const std::vector<std::string> rows(static_cast<std::size_t>(SIDE),
+                                      std::string(SIDE, '.'));
+  constexpr std::uint64_t HEALTH = 100;
+  const Skill blow{2 * CELL_SIZE, 0, 1, 0, 1};
+  World world{Seed{1},
+              Map{rows},
+              {ArmySpec{{4, 4}, {Recruit{{4, 4}, HEALTH}}, 0, {blow}},
+               ArmySpec{{SIDE - CORNER, SIDE - CORNER},
+                        {Recruit{{SIDE - CORNER, SIDE - CORNER}, HEALTH}},
+                        1,
+                        {blow}},
+               ArmySpec{{SIDE - BESIDE - 1, SIDE - CORNER},
+                        {Recruit{{SIDE - BESIDE, SIDE - CORNER}, HEALTH}},
+                        0,
+                        {blow}}},
+              {},
+              Rules{CELL_SIZE, {{false, true}, {true, false}}, FIGHT_FLOORS}};
+  world.set_profile(profile);
+  world.steer(0, true);
+  world.retier();
+  for (int tick = 0; tick < 2 * TICKS_PER_SECOND; ++tick) {
+    world.tick();
+  }
+  return world;
+}
+
+TEST(Tiers, AFarArmyNeitherStrikesNorMoves) {
+  const World far = far_fight(STANDARD_PROFILE);
+  ASSERT_TRUE(far.far(1).has_value());
+  ASSERT_TRUE(far.far(2).has_value());
+  const Person& one = far.person(far.roster(1).front());
+  const Person& other = far.person(far.roster(2).front());
+  // Struck by no one, and standing where it stood once far.
+  EXPECT_EQ(one.health, 100U);
+  EXPECT_EQ(other.health, 100U);
+  EXPECT_EQ(cell_of(other.position).x, (8 * AREA_SIDE) - BESIDE);
+  // Control: with no tiers the two fight, and the second walks.
+  const World live = far_fight(std::nullopt);
+  EXPECT_LT(live.person(live.roster(1).front()).health, 100U);
 }
 
 }  // namespace

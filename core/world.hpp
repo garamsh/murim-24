@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
 #include "calendar.hpp"
@@ -46,6 +47,15 @@ enum class StateHash : std::uint64_t {};
 struct Recruit {
   Cell cell;
   std::uint64_t health;
+};
+
+/// Where a far army stands (ADR 0077): the area and cell its lead stood on
+/// when it went far, and how far along its coarse path it has come since,
+/// which no rule advances until the far tier's rules are built.
+struct FarAnchor {
+  std::size_t area;
+  Cell cell;
+  std::uint32_t progress;
 };
 
 /// An army as a world is created with: its `members`, each a new person,
@@ -510,6 +520,30 @@ class World {
   /// when there is no such army.
   [[nodiscard]] bool steered(std::size_t army) const;
 
+  /// Gives the world the tier values of a quality profile, or none, so that
+  /// it runs live everywhere (ADR 0048); a world is created with none. The
+  /// profile is neither saved nor hashed, so a loaded world is given one
+  /// again. Takes effect when the tiers are next recomputed.
+  void set_profile(std::optional<Profile> profile);
+
+  /// Recomputes every area's tier from where the steered armies' living
+  /// members stand (ADR 0042), as tick() does on each tick a second divides,
+  /// and hands each army whose tier changes over: an army acts at the nearest
+  /// tier among the areas its living members stand in. An army going far
+  /// keeps every member's record and takes its lead's area and cell as its
+  /// anchor; one coming back stands its lead on the open cell nearest the
+  /// anchor and the rest, in roster order, on the open cells nearest it, with
+  /// every record otherwise as it was. With no profile, or no steered army,
+  /// every area is live.
+  void retier();
+
+  /// Returns every area's tier.
+  [[nodiscard]] const Areas& areas() const;
+
+  /// Returns where army `army` stands while it is far; nothing while it is
+  /// live or stepped. Throws std::out_of_range when there is no such army.
+  [[nodiscard]] std::optional<FarAnchor> far(std::size_t army) const;
+
   /// Returns who last brought village `village` to ruins, if anyone has; it
   /// is kept when the village is rebuilt.
   [[nodiscard]] std::optional<Destroyer> destroyer(std::size_t village) const;
@@ -661,13 +695,15 @@ class World {
   void restore();
   [[nodiscard]] bool rostered() const;
 
+  // An army's field toward its objective is held only while it is not far.
   struct Army {
     std::size_t faction;
     std::vector<Skill> skills;
     Order order;
-    FlowField field;
+    std::optional<FlowField> field;
     std::vector<std::size_t> roster;
     bool steered = false;
+    std::optional<FarAnchor> far;
   };
 
   /// A crowd slot no person holds.
@@ -879,6 +915,8 @@ class World {
              const std::vector<std::size_t>& seeking);
   void reachable_from(const FlowField& field,
                       const std::vector<std::size_t>& members) const;
+  void go_far(Army& army);
+  void come_back(Army& army);
 
   std::uint64_t rng_state_;
   /// The seed the world was created from, which keys its counter-based draws.
@@ -888,6 +926,8 @@ class World {
   Rules rules_;
   std::vector<Person> people_;
   std::vector<Army> armies_;
+  Areas areas_;
+  std::optional<Profile> profile_;
   std::vector<Structure> structures_;
   SpatialHash structure_index_;
   // The widest footprint's side, in sub-cell units: a structure's centre lies
