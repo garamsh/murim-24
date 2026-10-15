@@ -6,14 +6,11 @@
 #include <optional>
 #include <vector>
 
+#include "areas.hpp"
 #include "map.hpp"
 #include "village.hpp"
 
 namespace murim {
-
-/// Cells along each side of an area, the square the chart keeps seen cells
-/// in.
-constexpr std::int32_t AREA_SIDE = 32;
 
 /// Bytes of one area's seen cells, a bit a cell, row by row, the lowest bit
 /// of each byte first.
