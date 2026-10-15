@@ -191,6 +191,28 @@ TEST(SpatialHash, AnyWithinMatchesABruteForceScan) {
   EXPECT_GT(alone, 0U);
 }
 
+TEST(SpatialHash, NearestLooksOneRingFurtherWhileANearerPositionMayLieThere) {
+  // The centre lies on its cell's west side, so a cell two rings west lies
+  // just over a cell away. The nearer position, 257 units west in that cell,
+  // lies past one a ring out, 257 units east and 1 south.
+  const Position centre{10 * CELL_SIZE, (10 * CELL_SIZE) + (CELL_SIZE / 2)};
+  const std::vector<Position> positions{
+      centre, Position{centre.x - CELL_SIZE - 1, centre.y},
+      Position{centre.x + CELL_SIZE + 1, centre.y + 1}};
+  ASSERT_EQ(cell_of(positions.at(1)).x, 8);
+  ASSERT_EQ(cell_of(positions.at(2)).x, 11);
+  const SpatialHash hash{positions};
+  constexpr std::int32_t SIGHT = 6 * CELL_SIZE;
+
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
+                         [](std::size_t other) { return other != 0; }),
+            std::optional<std::size_t>{1});
+  // The control: the one a ring out is found when the other is not offered.
+  EXPECT_EQ(hash.nearest(UINT64_LIMIT, centre, SIGHT,
+                         [](std::size_t other) { return other == 2; }),
+            std::optional<std::size_t>{2});
+}
+
 TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
   const Position centre = centre_of(Cell{10, 10});
   constexpr std::uint64_t NEAR_KIND = 0b01U;
