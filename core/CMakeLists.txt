@@ -36,7 +36,7 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)
 
-add_executable(murim_core_test attack_test.cpp chart_test.cpp chronicle_test.cpp content_test.cpp cultivation_test.cpp diplomacy_test.cpp event_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../packs_json/json_packs_test.cpp flow_field_test.cpp layout_test.cpp leadership_test.cpp progress_test.cpp region_test.cpp save_test.cpp spatial_hash_test.cpp village_test.cpp world_test.cpp)
+add_executable(murim_core_test attack_test.cpp chart_test.cpp chronicle_test.cpp compiled_map_test.cpp content_test.cpp cultivation_test.cpp diplomacy_test.cpp event_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../packs_json/json_packs_test.cpp flow_field_test.cpp layout_test.cpp leadership_test.cpp progress_test.cpp region_test.cpp save_test.cpp spatial_hash_test.cpp village_test.cpp world_test.cpp)
 target_link_libraries(murim_core_test PRIVATE murim_core murim_packs_json GTest::gtest_main)
 target_compile_definitions(murim_core_test PRIVATE MURIM_PACKS_DIR="${MURIM_PACKS_DIR}")
 target_compile_options(murim_core_test PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
