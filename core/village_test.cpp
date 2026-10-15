@@ -53,7 +53,7 @@ VillageSpec homestead() {
   field.housing = 4;
   field.storage = FIELD_STORAGE;
   field.harvest = FIELD_HARVEST;
-  return VillageSpec{{0, 1}, 0, {house, field}, 0, {}};
+  return VillageSpec{{0, 1}, 0, {house, field}, 0, {}, {}};
 }
 
 // Two structures in one village, added with both at `durability`.
@@ -93,29 +93,29 @@ TEST(Villages, RefuseAVillageNamingWhatIsNotFreeToName) {
   const Stages stages{structures, FLOORS};
   Villages villages = one_village(structures);
   // Control: structure 2 and army 1 are free, and one household pairs two.
-  const VillageSpec free{{2}, 1, {}, 1, {}};
+  const VillageSpec free{{2}, 1, {}, 1, {}, {}};
   EXPECT_NO_THROW(villages.add(free, ARMIES, 2, stages));
 
   Villages fresh = one_village(structures);
   // A structure another village names.
-  EXPECT_THROW(fresh.add(VillageSpec{{1}, 1, {}, 0, {}}, ARMIES, 2, stages),
+  EXPECT_THROW(fresh.add(VillageSpec{{1}, 1, {}, 0, {}, {}}, ARMIES, 2, stages),
                std::invalid_argument);
   // A structure that does not exist.
-  EXPECT_THROW(fresh.add(VillageSpec{{3}, 1, {}, 0, {}}, ARMIES, 2, stages),
+  EXPECT_THROW(fresh.add(VillageSpec{{3}, 1, {}, 0, {}, {}}, ARMIES, 2, stages),
                std::invalid_argument);
   // An army another village houses.
-  EXPECT_THROW(fresh.add(VillageSpec{{2}, 0, {}, 0, {}}, ARMIES, 2, stages),
+  EXPECT_THROW(fresh.add(VillageSpec{{2}, 0, {}, 0, {}, {}}, ARMIES, 2, stages),
                std::invalid_argument);
   // An army that does not exist.
   EXPECT_THROW(
-      fresh.add(VillageSpec{{2}, ARMIES, {}, 0, {}}, ARMIES, 2, stages),
+      fresh.add(VillageSpec{{2}, ARMIES, {}, 0, {}, {}}, ARMIES, 2, stages),
       std::invalid_argument);
   // Holdings that are not one for each structure.
-  EXPECT_THROW(fresh.add(VillageSpec{{2}, 1, {Holding{}, Holding{}}, 0, {}},
+  EXPECT_THROW(fresh.add(VillageSpec{{2}, 1, {Holding{}, Holding{}}, 0, {}, {}},
                          ARMIES, 2, stages),
                std::invalid_argument);
   // More households than its residents pair into.
-  EXPECT_THROW(fresh.add(VillageSpec{{2}, 1, {}, 1, {}}, ARMIES, 1, stages),
+  EXPECT_THROW(fresh.add(VillageSpec{{2}, 1, {}, 1, {}, {}}, ARMIES, 1, stages),
                std::invalid_argument);
   // Nothing was added by a refusal.
   EXPECT_EQ(fresh.size(), 1U);
@@ -170,7 +170,7 @@ TEST(Villages, CapAtTheLeastOfHousingHarvestAndStorage) {
   Holding field;
   field.harvest = BIG_HARVEST;
   Villages small_store{intact.size()};
-  small_store.add(VillageSpec{{0, 1}, 0, {barn, field}, 0, {}}, ARMIES, 0,
+  small_store.add(VillageSpec{{0, 1}, 0, {barn, field}, 0, {}, {}}, ARMIES, 0,
                   stages);
   // Housing 9, harvest 10, storage 2: what it stores binds.
   EXPECT_EQ(small_store.cap(0, stages, eating, CAPACITY), 2U);
@@ -212,7 +212,7 @@ TEST(Villages, ServeOnlyWhileTheirWorkshopsCoverTheirPeople) {
   const std::vector<Structure> intact = built({INTACT, INTACT});
   const Stages stages{intact, FLOORS};
   Villages villages{intact.size()};
-  villages.add(VillageSpec{{0, 1}, 0, {smithy, healer}, 0, {}}, ARMIES, 0,
+  villages.add(VillageSpec{{0, 1}, 0, {smithy, healer}, 0, {}, {}}, ARMIES, 0,
                stages);
   // Control: within what they arm and tend, both serve.
   const Service covered = villages.served({2}, 0, stages);
@@ -307,7 +307,7 @@ TEST(Villages, TakeLaidStructuresAndFoundedVillages) {
   EXPECT_TRUE(villages.houses(3));
   Holding house;
   house.housing = 2;
-  villages.attach(founded, 2, house);
+  villages.attach(founded, 2, house, "house");
   EXPECT_EQ(villages.village_of(2), std::optional<std::size_t>{founded});
   EXPECT_EQ(villages.at(founded).spec.structures, std::vector<std::size_t>{2});
   EXPECT_EQ(villages.at(founded).spec.holdings.size(), 1U);

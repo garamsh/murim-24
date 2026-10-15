@@ -1,0 +1,155 @@
+[
+  {
+    "id": "merchant",
+    "per_residents": 30,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 7,
+        "where": "work"
+      },
+      {
+        "from": 20,
+        "where": "home"
+      }
+    ],
+    "wares": [
+      "herb",
+      "elixir"
+    ]
+  },
+  {
+    "id": "physician",
+    "workplace": "apothecary",
+    "per_workplace": 2,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 7,
+        "where": "work"
+      },
+      {
+        "from": 19,
+        "where": "square"
+      },
+      {
+        "from": 21,
+        "where": "home"
+      }
+    ],
+    "wares": [
+      "herb",
+      "elixir"
+    ]
+  },
+  {
+    "id": "smith",
+    "workplace": "smithy",
+    "per_workplace": 2,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 7,
+        "where": "work"
+      },
+      {
+        "from": 19,
+        "where": "square"
+      },
+      {
+        "from": 21,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  },
+  {
+    "id": "innkeeper",
+    "workplace": "hall",
+    "per_workplace": 1,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 8,
+        "where": "work"
+      },
+      {
+        "from": 22,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  },
+  {
+    "id": "farmer",
+    "workplace": "field",
+    "per_workplace": 2,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 6,
+        "where": "work"
+      },
+      {
+        "from": 18,
+        "where": "square"
+      },
+      {
+        "from": 21,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  },
+  {
+    "id": "monk",
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 5,
+        "where": "work"
+      },
+      {
+        "from": 21,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  },
+  {
+    "id": "beggar",
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 7,
+        "where": "work"
+      },
+      {
+        "from": 22,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  }
+]

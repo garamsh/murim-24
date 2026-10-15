@@ -7,6 +7,7 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -73,8 +74,11 @@ std::size_t Villages::add(VillageSpec spec, std::size_t armies,
     return structure >= village_of_.size() ||
            village_of_.at(structure).has_value();
   };
+  const auto unmatched = [&spec](std::size_t count) {
+    return count != 0 && count != spec.structures.size();
+  };
   const bool unheld =
-      !spec.holdings.empty() && spec.holdings.size() != spec.structures.size();
+      unmatched(spec.holdings.size()) || unmatched(spec.kinds.size());
   if (spec.residents >= armies ||
       std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
       houses(spec.residents) || unheld ||
@@ -82,8 +86,8 @@ std::size_t Villages::add(VillageSpec spec, std::size_t armies,
     throw std::invalid_argument(
         "a village must name existing structures no other village names, "
         "an existing army no other village houses as its residents, what "
-        "each of its structures holds, if anything, and no more households "
-        "than its residents pair into");
+        "each of its structures holds and its kind, if anything, and no more "
+        "households than its residents pair into");
   }
   const std::size_t village = records_.size();
   for (const std::size_t structure : spec.structures) {
@@ -97,7 +101,7 @@ std::size_t Villages::add(VillageSpec spec, std::size_t armies,
 }
 
 std::size_t Villages::found(std::size_t residents, Cell corner) {
-  records_.push_back(VillageRecord{VillageSpec{{}, residents, {}, 0, {}},
+  records_.push_back(VillageRecord{VillageSpec{{}, residents, {}, 0, {}, {}},
                                    std::nullopt, 0, std::nullopt, std::nullopt,
                                    corner});
   return records_.size() - 1;
@@ -115,12 +119,14 @@ void Villages::reach(Reached reached) {
 void Villages::add_structure() { village_of_.emplace_back(); }
 
 void Villages::attach(std::size_t village, std::size_t structure,
-                      Holding holding) {
+                      Holding holding, std::string kind) {
   VillageSpec& spec = records_.at(village).spec;
   spec.holdings.resize(spec.structures.size());
+  spec.kinds.resize(spec.structures.size());
   village_of_.at(structure) = village;
   spec.structures.push_back(structure);
   spec.holdings.push_back(holding);
+  spec.kinds.push_back(std::move(kind));
 }
 
 void Villages::send(std::size_t village, Raid raid) {

@@ -996,13 +996,16 @@ std::vector<VillageSpec> village_specs(const Region& region) {
   specs.reserve(region.villages.size());
   for (const Village& village : region.villages) {
     std::vector<Holding> holdings;
+    std::vector<std::string> kinds;
     holdings.reserve(village.structures.size());
+    kinds.reserve(village.structures.size());
     for (const std::size_t structure : village.structures) {
       holdings.push_back(region.holdings.at(structure));
+      kinds.push_back(region.structure_kinds.at(structure));
     }
     specs.push_back(VillageSpec{village.structures, village.army,
                                 std::move(holdings), village.households,
-                                village.clearings});
+                                village.clearings, std::move(kinds)});
   }
   return specs;
 }

@@ -34,6 +34,7 @@
 #include "limits.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "sect.hpp"
@@ -705,6 +706,9 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent,
     fold(child);
   }
   fold(person.hunger);
+  // Folded for everyone, none included, whatever the packs hold (ADR 0081).
+  fold(person.occupation.has_value());
+  fold(person.occupation.value_or(0));
   // Folded only when held, so a world where no one cultivates or knows an
   // art hashes as before.
   if (cultivates) {
@@ -855,6 +859,49 @@ std::size_t best_discipline(const Person& person) {
       person.talent.begin());
 }
 
+// Folds `text` into `fold`: its length, then each byte.
+template <typename Fold>
+void fold_text(const Fold& fold, const std::string& text) {
+  fold(text.size());
+  for (const char each : text) {
+    fold(static_cast<unsigned char>(each));
+  }
+}
+
+template <typename Fold>
+void fold_bands(const Fold& fold, const std::vector<Band>& schedule) {
+  fold(schedule.size());
+  for (const Band& band : schedule) {
+    fold(band.from);
+    fold(band.where);
+  }
+}
+
+// Folds the occupations, or their absence, whatever the packs hold (ADR 0049).
+template <typename Fold>
+void fold_occupations(const Fold& fold,
+                      const std::optional<Occupations>& occupations) {
+  fold(occupations.has_value());
+  if (!occupations) {
+    return;
+  }
+  for (const Occupation& occupation : occupations->list) {
+    fold_text(fold, occupation.name);
+    fold(occupation.workplace.has_value());
+    fold_text(fold, occupation.workplace.value_or(std::string{}));
+    fold(occupation.per_workplace);
+    fold(occupation.per_residents);
+    fold_bands(fold, occupation.schedule);
+    fold(occupation.wares.size());
+    for (const std::size_t ware : occupation.wares) {
+      fold(ware);
+    }
+  }
+  fold(occupations->working_age);
+  fold(occupations->fallback);
+  fold_bands(fold, occupations->idle);
+}
+
 // Folds the trade's data into `fold`, only when given, so a world without
 // one keeps its hash.
 template <typename Fold>
@@ -866,7 +913,6 @@ void fold_trade(const Fold& fold, const std::optional<Trade>& trade) {
     fold(ware.price);
     fold(ware.health);
     fold(ware.qi);
-    fold(ware.discipline);
   }
   fold(trade->purse);
   fold(trade->wage);
@@ -908,6 +954,10 @@ void fold_village(const Fold& fold, const Village& village) {
     fold(holding.tends);
     fold(holding.edge);
     fold(holding.healing);
+  }
+  fold(village.spec.kinds.size());
+  for (const std::string& kind : village.spec.kinds) {
+    fold_text(fold, kind);
   }
 }
 
@@ -1009,6 +1059,8 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   leaders_ = Leaders{std::move(leadership), rules_.hostile.size(), people_};
   declarations_ = Declarations{rules_.hostile.size()};
   add_sects(std::move(sects));
+  // The first day's assignment, so a world has its occupations from tick 0.
+  assign_occupations();
 }
 
 World::World(Map map, Rules rules, Life life)
@@ -1070,7 +1122,9 @@ void World::restore() {
            person.talent.size() != disciplines ||
            person.attainment.size() != disciplines ||
            (!given.empty() && person.given >= given.size()) ||
-           stray_cultivation(person, life_) || stray_purse(person, life_);
+           stray_cultivation(person, life_) || stray_purse(person, life_) ||
+           !below(person.occupation,
+                  life_.occupations ? life_.occupations->list.size() : 0);
   };
   const std::size_t plans = life_.growth ? life_.growth->plans.size() : 0;
   const auto unplanned = [plans](std::optional<std::size_t> plan) {
@@ -1555,14 +1609,69 @@ const std::vector<Ware>& World::wares() const {
   return life_.trade ? life_.trade->wares : none;
 }
 
+const std::vector<Occupation>& World::occupations() const {
+  static const std::vector<Occupation> none;
+  return life_.occupations ? life_.occupations->list : none;
+}
+
 bool World::sells(std::size_t person, std::size_t ware) const {
   if (person >= people_.size() || ware >= wares().size()) {
     throw std::out_of_range("no such person sells no such ware");
   }
   const Person& seller = people_.at(person);
-  const Ware& sold = wares().at(ware);
-  return seller.health > 0 && !seller.talent.empty() &&
-         best_discipline(seller) == sold.discipline;
+  if (seller.health == 0 || !seller.occupation || !life_.occupations) {
+    return false;
+  }
+  const std::vector<std::size_t>& sold =
+      life_.occupations->list.at(*seller.occupation).wares;
+  return std::find(sold.begin(), sold.end(), ware) != sold.end();
+}
+
+std::optional<std::size_t> World::occupation_of(std::size_t person) const {
+  return people_.at(person).occupation;
+}
+
+// Fills each village's occupations' openings from the living people whose
+// home it is, and takes the occupation of each living person with none.
+void World::assign_occupations() {
+  if (!life_.occupations) {
+    return;
+  }
+  const Occupations& occupations = *life_.occupations;
+  std::vector<std::vector<std::size_t>> homed(villages_.size());
+  for (std::size_t person = 0; person < people_.size(); ++person) {
+    Person& each = people_.at(person);
+    if (each.health == 0) {
+      continue;
+    }
+    if (each.home) {
+      homed.at(*each.home).push_back(person);
+    } else {
+      each.occupation.reset();
+    }
+  }
+  const Stages built = stages();
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const VillageSpec& spec = villages_.at(village).spec;
+    std::vector<std::string> standing;
+    for (std::size_t index = 0; index < spec.kinds.size(); ++index) {
+      if (built.of(spec.structures.at(index)) <= Stage::DAMAGED) {
+        standing.push_back(spec.kinds.at(index));
+      }
+    }
+    std::vector<Candidate> candidates;
+    candidates.reserve(homed.at(village).size());
+    for (const std::size_t person : homed.at(village)) {
+      candidates.push_back(Candidate{
+          age_in_years(person) >= std::int64_t{occupations.working_age},
+          people_.at(person).occupation});
+    }
+    const std::vector<std::optional<std::size_t>> held =
+        assign(occupations, candidates, standing);
+    for (std::size_t index = 0; index < held.size(); ++index) {
+      people_.at(homed.at(village).at(index)).occupation = held.at(index);
+    }
+  }
 }
 
 BuyRefusal World::buy_refusal(std::size_t buyer, std::size_t seller,
@@ -2234,6 +2343,7 @@ void World::tick() {
   }
   if (tick_count_ % rules_.ticks_per_day == 0) {
     tend();
+    assign_occupations();
     if (life_.trade) {
       pay(*life_.trade);
       shop(*life_.trade);
@@ -2464,6 +2574,7 @@ StateHash World::hash() const {
   }
   fold_reaches(fold, rules_);
   fold_trade(fold, life_.trade);
+  fold_occupations(fold, life_.occupations);
   for (const Event& event : events_.entries()) {
     fold_event(fold, event);
   }
@@ -4836,8 +4947,8 @@ void World::attach(std::size_t village,
                    const std::vector<std::size_t>& structures,
                    const Growth& growth) {
   for (const std::size_t structure : structures) {
-    villages_.attach(village, structure,
-                     growth.plans.at(plans_.at(structure).value_or(0)).holding);
+    const Plan& plan = growth.plans.at(plans_.at(structure).value_or(0));
+    villages_.attach(village, structure, plan.holding, plan.kind);
   }
 }
 

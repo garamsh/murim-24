@@ -85,6 +85,9 @@ struct VillageSpec {
   /// The land growth keeps clear in it, such as a seat's court; cells off the
   /// map are ignored.
   std::vector<Clearing> clearings;
+  /// The kind of each of `structures`, in their order, which an occupation
+  /// names as its workplace; none names no kind.
+  std::vector<std::string> kinds;
 };
 
 /// Where a village stands in its life cycle, derived from its structures,
@@ -227,8 +230,8 @@ class Villages {
   /// roster `roster` people long, with its storage full. Returns its index.
   /// Throws std::invalid_argument when it names a structure that does not
   /// exist or another village names, an army that does not exist or another
-  /// village houses, or holdings that are not one for each of its structures,
-  /// or more households than its residents pair into.
+  /// village houses, holdings or kinds that are not one for each of its
+  /// structures, or more households than its residents pair into.
   std::size_t add(VillageSpec spec, std::size_t armies, std::size_t roster,
                   const Stages& stages);
 
@@ -246,8 +249,10 @@ class Villages {
   /// Takes one more structure, belonging to no village.
   void add_structure();
 
-  /// Makes structure `structure` village `village`'s, holding `holding`.
-  void attach(std::size_t village, std::size_t structure, Holding holding);
+  /// Makes structure `structure` village `village`'s, of kind `kind` and
+  /// holding `holding`.
+  void attach(std::size_t village, std::size_t structure, Holding holding,
+              std::string kind);
 
   /// Records `raid` as village `village`'s: its party out against its target.
   void send(std::size_t village, Raid raid);

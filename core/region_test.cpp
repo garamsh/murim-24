@@ -28,6 +28,7 @@
 #include "limits.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
@@ -653,6 +654,66 @@ TEST(Region, EachSeatKeepsItsOpenCourtClearOfGrowth) {
   }
   // Control: an ordinary village keeps nothing clear.
   EXPECT_TRUE(specs.front().clearings.empty());
+}
+
+// The index of the occupation named `name`, or how many there are for none.
+std::size_t occupation_named(const Occupations& occupations,
+                             const std::string& name) {
+  const auto found = std::find_if(
+      occupations.list.begin(), occupations.list.end(),
+      [&name](const Occupation& each) { return each.name == name; });
+  return static_cast<std::size_t>(found - occupations.list.begin());
+}
+
+// Whether a village is home to someone of working age, and to someone
+// holding a given occupation.
+struct Staffed {
+  bool adult = false;
+  bool holding = false;
+};
+
+// Each of `region`'s villages' staffing in `world`, for occupation
+// `occupation` of `occupations`, from its working age.
+std::vector<Staffed> staffing(const World& world, const Region& region,
+                              const Occupations& occupations,
+                              std::size_t occupation) {
+  std::vector<Staffed> staffed(region.villages.size());
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    if (const std::optional<std::size_t> home = world.person(person).home) {
+      Staffed& village = staffed.at(*home);
+      village.adult =
+          village.adult ||
+          world.age_in_years(person) >= std::int64_t{occupations.working_age};
+      village.holding =
+          village.holding || world.occupation_of(person) == occupation;
+    }
+  }
+  return staffed;
+}
+
+TEST(Region, EveryPeopledVillageHasAMerchantFromTheStart) {
+  const Region region = generate_region(SEED, base_data());
+  const World world = world_of(region);
+  // An empty table leaves no merchant, which the assertion below catches.
+  const Occupations occupations =
+      region.life.occupations.value_or(Occupations{});
+  const std::size_t merchant = occupation_named(occupations, "merchant");
+  ASSERT_LT(merchant, occupations.list.size());
+  const std::vector<Staffed> staffed =
+      staffing(world, region, occupations, merchant);
+  // The world fills its openings as it is created, so every village with a
+  // resident of working age has its merchant before the first tick.
+  std::size_t peopled = 0;
+  for (std::size_t village = 0; village < staffed.size(); ++village) {
+    peopled += staffed.at(village).adult ? 1 : 0;
+    EXPECT_EQ(staffed.at(village).holding, staffed.at(village).adult)
+        << region.villages.at(village).name;
+  }
+  EXPECT_GT(peopled, 0U);
+  // The base pack's merchant sells the herb, so each of those villages has
+  // a seller of it.
+  const std::vector<std::size_t>& sold = occupations.list.at(merchant).wares;
+  EXPECT_NE(std::find(sold.begin(), sold.end(), 0), sold.end());
 }
 
 TEST(Region, AVillageIsNamedForItsKindAndNumber) {

@@ -31,6 +31,7 @@
 #include "life.hpp"
 #include "limits.hpp"
 #include "map.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "sect.hpp"
@@ -852,7 +853,7 @@ World conscription_world(std::int32_t map_sight = 0) {
   rules.map_sight = map_sight;
   return World{Seed{1}, Map{open_map(OPEN_SIDE)},
                armies,  {{{2, 2}, HOME_DURABILITY}},
-               rules,   {{{0}, HOME_ARMY, {}, 0, {}}}};
+               rules,   {{{0}, HOME_ARMY, {}, 0, {}, {}}}};
 }
 
 TEST(World, APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding) {
@@ -1162,7 +1163,7 @@ constexpr std::int64_t TORCH_REACH = std::int64_t{3} * CELL_SIZE;
 constexpr std::uint64_t RESIDENT_HEALTH = 100;
 
 VillageSpec small_village() {
-  return VillageSpec{{0, 1}, RESIDENTS, {}, 0, {}};
+  return VillageSpec{{0, 1}, RESIDENTS, {}, 0, {}, {}};
 }
 
 World village_world(std::uint64_t health) {
@@ -1485,13 +1486,14 @@ TEST(World, VillageNamingAMissingOrClaimedStructureOrArmyIsRefused) {
       return true;
     }
   };
-  EXPECT_FALSE(refused({{{0, 1}, 0, {}, 0, {}}}));
+  EXPECT_FALSE(refused({{{0, 1}, 0, {}, 0, {}, {}}}));
 
   // A structure the world lacks, one two villages name, an army it lacks.
-  EXPECT_TRUE(refused({{{0, 2}, 0, {}, 0, {}}}));
-  EXPECT_TRUE(
-      refused({{{0}, 0, {}, 0, {}}, {{1}, 0, {}, 0, {}}, {{0}, 0, {}, 0, {}}}));
-  EXPECT_TRUE(refused({{{0, 1}, 1, {}, 0, {}}}));
+  EXPECT_TRUE(refused({{{0, 2}, 0, {}, 0, {}, {}}}));
+  EXPECT_TRUE(refused({{{0}, 0, {}, 0, {}, {}},
+                       {{1}, 0, {}, 0, {}, {}},
+                       {{0}, 0, {}, 0, {}, {}}}));
+  EXPECT_TRUE(refused({{{0, 1}, 1, {}, 0, {}, {}}}));
 }
 
 // The durability left on a village's house after a torch-bearer of
@@ -1504,7 +1506,7 @@ std::uint32_t house_after_torch(std::size_t faction) {
   };
   World world{Seed{1},   Map{open_map(OPEN_SIDE)},
               armies,    {{{4, 4}, HOUSE_DURABILITY}},
-              at_war(0), {{{0}, 0, {}, 0, {}}}};
+              at_war(0), {{{0}, 0, {}, 0, {}, {}}}};
   run_ticks(world, ARRIVAL_TICKS);
   return world.structure(0).durability;
 }
@@ -1872,6 +1874,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               {},
               {Art{{"검법", "Sword art"}, 0, Nature{}, {}}},
               Learning{},
+              std::nullopt,
               std::nullopt,
               std::nullopt};
 }
@@ -2295,11 +2298,13 @@ World economy_world(const Holdings& first, const Holdings& second,
                             0,
                             {first.house, first.granary, first.field},
                             0,
+                            {},
                             {}},
                 VillageSpec{second_structures,
                             1,
                             {second.house, second.granary, second.field},
                             0,
+                            {},
                             {}}},
                {},
                life};
@@ -2346,13 +2351,14 @@ TEST(World, AFieldBlocksNoOneAndATorchBurnsIt) {
   EXPECT_FALSE(world.field_state(0).has_value());
   // A torch of a hostile faction, used beside the field, burns it.
   const Skill torch{0, 2 * CELL_SIZE, 0, BURNT, 1};
-  World raided{Seed{1},
-               Map{open_map(OPEN_SIDE)},
-               {army(SQUARE, SQUARE, 1, 1, 0, {IDLE}),
-                army({4, 1}, {4, 1}, 1, 1, 1, {torch})},
-               {Structure{{3, 1}, INTACT, {1, 1}, false}},
-               at_war(0),
-               {VillageSpec{{0}, 0, {Holding{0, 0, DAYS_PER_YEAR}}, 0, {}}}};
+  World raided{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {army(SQUARE, SQUARE, 1, 1, 0, {IDLE}),
+       army({4, 1}, {4, 1}, 1, 1, 1, {torch})},
+      {Structure{{3, 1}, INTACT, {1, 1}, false}},
+      at_war(0),
+      {VillageSpec{{0}, 0, {Holding{0, 0, DAYS_PER_YEAR}}, 0, {}, {}}}};
   run_ticks(raided, 2);
   EXPECT_EQ(raided.field_state(0),
             std::optional<FieldState>{FieldState::BURNT});
@@ -2432,7 +2438,7 @@ World workshop_world(const Workshop& workshop) {
        army(stranger, stranger, 1, STRANGER_HEALTH, 1, {IDLE})},
       {Structure{{1, 1}, workshop.durability, {1, 1}, true}},
       daily,
-      {VillageSpec{{0}, 0, {workshop.holding}, 0, {}}},
+      {VillageSpec{{0}, 0, {workshop.holding}, 0, {}, {}}},
       {},
       life};
 }
@@ -2617,8 +2623,8 @@ World growth_world(const Growing& growing, const std::vector<Cell>& rough = {},
             growing.neighbour_health, 1, {IDLE})},
       structures,
       daily,
-      {VillageSpec{{0, 1, 2}, 0, holdings, 0, clearings},
-       VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings, 0, {}}},
+      {VillageSpec{{0, 1, 2}, 0, holdings, 0, clearings, {}},
+       VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings, 0, {}, {}}},
       growing.led ? std::vector<Leadership>{Leadership{
                         0, std::nullopt, std::nullopt, std::nullopt}}
                   : std::vector<Leadership>{},
@@ -2948,7 +2954,7 @@ World mended_field(char ground) {
               {army(rows, GROWING_SEAT, GROWING_SEAT, FOUNDERS, 1, 0, {MEND})},
               {Structure{{2, 2}, 0, {2, 2}, false, Role::EDGE}},
               rules,
-              {VillageSpec{{0}, 0, {Holding{0, 0, TEN_YEARS_FOOD}}, 0, {}}},
+              {VillageSpec{{0}, 0, {Holding{0, 0, TEN_YEARS_FOOD}}, 0, {}, {}}},
               {},
               life};
   run_ticks(world, 1);
@@ -3136,7 +3142,7 @@ World housed(std::uint32_t households) {
                {army(HOME, HOME, RESIDENTS, 1, 0, {GUARD})},
                {},
                at_war(SEPARATION),
-               {VillageSpec{{}, 0, {}, households, {}}},
+               {VillageSpec{{}, 0, {}, households, {}, {}}},
                {},
                one_discipline(0)};
 }
@@ -3217,8 +3223,9 @@ World sect_world(const Sectarian& sectarian) {
       {Structure{{SEAT_HOME.x, 0}, sectarian.durability, {1, 1}, true},
        Structure{{VILLAGE_HOME.x, 0}, INTACT, {1, 1}, true}},
       peace,
-      {VillageSpec{{0}, SEAT_ARMY, {Holding{0, 0, 0, sectarian.pupils}}, 0, {}},
-       VillageSpec{{1}, VILLAGE_ARMY, {Holding{}}, 0, {}}},
+      {VillageSpec{
+           {0}, SEAT_ARMY, {Holding{0, 0, 0, sectarian.pupils}}, 0, {}, {}},
+       VillageSpec{{1}, VILLAGE_ARMY, {Holding{}}, 0, {}, {}}},
       {faction, faction},
       life,
       {SectSpec{
@@ -3713,7 +3720,7 @@ std::optional<std::optional<std::size_t>> homed(
                       {army(SEAT_HOME, SEAT_HOME, 1, 1, 0, {IDLE}), born},
                       {Structure{{SEAT_HOME.x, 0}, INTACT, {1, 1}, true}},
                       peaceful(0),
-                      {VillageSpec{{0}, 0, {Holding{}}, 0, {}}}};
+                      {VillageSpec{{0}, 0, {Holding{}}, 0, {}, {}}}};
     return world.person(1).home;
   } catch (const std::invalid_argument&) {
     return std::nullopt;
@@ -5133,7 +5140,7 @@ World defending(std::int32_t apart, Cell objective, bool homed) {
                 army(foe, foe, 1, TARGET_HEALTH, 1, {IDLE}), defender},
                {},
                rules,
-               {VillageSpec{{}, 0, {}, 0, {}}},
+               {VillageSpec{{}, 0, {}, 0, {}, {}}},
                {},
                life};
 }
@@ -5163,7 +5170,7 @@ World territory_chart_world() {
                army(CHART_WATCH, CHART_WATCH, 1, TARGET_HEALTH, 0, {IDLE})},
               {Structure{CHART_HOUSE, INTACT}},
               rules,
-              {VillageSpec{{0}, 0, {}, 0, {}}},
+              {VillageSpec{{0}, 0, {}, 0, {}, {}}},
               {},
               life};
   world.ensoul(world.roster(CHART_WATCHER).front());
@@ -5525,7 +5532,7 @@ World qi_world(const Cultivating& cultivating) {
        army(QI_FOE_CELL, QI_FOE_CELL, 1, QI_FOE_HEALTH, 2, {IDLE})},
       {Structure{{SEAT_HOME.x, 0}, INTACT, {1, 1}, true}},
       rules,
-      {VillageSpec{{0}, QI_SEAT_ARMY, {Holding{0, 0, 0, 4}}, 0, {}}},
+      {VillageSpec{{0}, QI_SEAT_ARMY, {Holding{0, 0, 0, 4}}, 0, {}, {}}},
       {members, Leadership{}, Leadership{}},
       life,
       {SectSpec{
@@ -6240,10 +6247,9 @@ constexpr std::uint64_t PILL_PRICE = 60;
 constexpr std::uint32_t PILL_QI = 500;
 constexpr std::uint32_t STORE = 1'000;
 constexpr std::uint32_t DRAIN = 800;
-constexpr std::size_t MEDICINE = 1;
 constexpr std::size_t HERB = 0;
 constexpr std::size_t PILL = 1;
-// Sold by those whose best discipline is the sword, which no one's is.
+// Sold by the salve seller's occupation, which opens no place.
 constexpr std::size_t SALVE = 2;
 constexpr std::size_t BUYER = 0;
 constexpr std::size_t SELLER = 1;
@@ -6266,12 +6272,14 @@ struct Stall {
 
 // Faction 0's buyer at (2, 2), whose second skill drains 800 qi, a seller 2
 // cells east and a person away 6 cells east, each with a store of 1,000 qi,
-// full, and a talent limit higher in medicine than the sword. The trade sells
-// a herb restoring 30 health and a pill restoring 500 qi, both by medicine,
-// and a salve by the sword; people use them at half health or a quarter of
-// their store. With `homed` the buyer's army are a village's residents; with
-// `foe`, faction 1's person beside the seller strikes it dead on the first
-// tick. Days last a tick, and only the buyer may go unsteered.
+// full. The trade sells a herb restoring 30 health and a pill restoring 500
+// qi, and a salve; people use them at half health or a quarter of their
+// store. The seller's army are the first village's residents, where the
+// herbalist, selling the herb and the pill, opens a place for each of them;
+// the salve seller opens none. With `homed` the buyer's army are the second
+// village's residents; with `foe`, faction 1's person beside the seller
+// strikes it dead on the first tick. Days last a tick, and only the buyer may
+// go unsteered.
 World market(const Stall& stall) {
   Life life;
   life.disciplines = {{"sword", {0, 0}, {WHOLE, 0}},
@@ -6279,13 +6287,20 @@ World market(const Stall& stall) {
   life.newborn_health = WHOLE;
   life.founding_age = Spread{DAYS_PER_YEAR, 0};
   life.cultivation = Cultivation{{STORE, 0}, {STORE, 0}, 0, 1};
-  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, MEDICINE},
-                      Ware{"pill", PILL_PRICE, 0, PILL_QI, MEDICINE},
-                      Ware{"salve", HERB_PRICE, HERB_HEALTH, 0, 0}},
+  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0},
+                      Ware{"pill", PILL_PRICE, 0, PILL_QI},
+                      Ware{"salve", HERB_PRICE, HERB_HEALTH, 0}},
                      stall.purse,
                      1,
                      PER_MILLE / 2,
                      PER_MILLE / 4};
+  const std::vector<Band> day{{0, Where::HOME}};
+  life.occupations = Occupations{
+      {Occupation{"herbalist", std::nullopt, 0, 1, day, {HERB, PILL}},
+       Occupation{"salve_seller", std::nullopt, 0, 0, day, {SALVE}}},
+      0,
+      1,
+      day};
   Rules rules = stall.foe ? at_war(0) : peaceful(0);
   rules.talk_reach = 2;
   rules.ticks_per_day = 1;
@@ -6299,9 +6314,9 @@ World market(const Stall& stall) {
     armies.push_back(
         ArmySpec{BESIDE_SELLER, {Recruit{BESIDE_SELLER, WHOLE}}, 1, {once}});
   }
-  std::vector<VillageSpec> villages;
+  std::vector<VillageSpec> villages{VillageSpec{{}, 1, {}, 0, {}, {}}};
   if (stall.homed) {
-    villages.push_back(VillageSpec{{}, 0, {}, 0, {}});
+    villages.push_back(VillageSpec{{}, 0, {}, 0, {}, {}});
   }
   World world{Seed{1},
               Map{open_map(OPEN_SIDE)},
@@ -6353,16 +6368,69 @@ Stall beset_stall() {
   return stall;
 }
 
-TEST(World, APersonSellsTheWaresOfItsBestDiscipline) {
+TEST(World, APersonSellsTheWaresOfItsOccupation) {
   const World world = market({});
   ASSERT_EQ(world.wares().size(), 3U);
+  ASSERT_EQ(world.occupation_of(SELLER), std::optional<std::size_t>{0});
   EXPECT_TRUE(world.sells(SELLER, HERB));
   EXPECT_TRUE(world.sells(SELLER, PILL));
-  // Control: the salve is the sword's, which is not the seller's best.
+  // Control: the salve is the salve seller's, which is not the seller's.
   EXPECT_FALSE(world.sells(SELLER, SALVE));
+  // Control: the person away, with no home, holds no occupation and sells
+  // nothing.
+  EXPECT_FALSE(world.occupation_of(AWAY).has_value());
+  EXPECT_FALSE(world.sells(AWAY, HERB));
   EXPECT_EQ(world.offers(SELLER),
             (std::vector<Offer>{Offer::NEWS, Offer::TRADE}));
   EXPECT_THROW(static_cast<void>(world.sells(SELLER, 3)), std::out_of_range);
+}
+
+// A village of three founders at home, a household and one more, with a
+// smithy of `durability`; smiths take two places at each standing smithy,
+// beggars are the fallback. Days last a tick.
+World smithing(std::uint32_t durability) {
+  const std::vector<Band> day{{0, Where::HOME}};
+  Life life;
+  life.newborn_health = WHOLE;
+  life.founding_age = Spread{2 * DAYS_PER_YEAR, 0};
+  life.occupations =
+      Occupations{{Occupation{"smith", "smithy", 2, 0, day, {}},
+                   Occupation{"beggar", std::nullopt, 0, 0, day, {}}},
+                  1,
+                  1,
+                  day};
+  Rules rules = peaceful(0);
+  rules.ticks_per_day = 1;
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army({1, 1}, {1, 1}, 3, WHOLE, 0, {IDLE})},
+               {Structure{{1, 4}, durability, {2, 2}, true, Role::SQUARE}},
+               rules,
+               {VillageSpec{{0}, 0, {}, 1, {}, {"smithy"}}},
+               {},
+               life};
+}
+
+// The occupation each of smithing()'s three founders holds.
+std::vector<std::optional<std::size_t>> founders_held(const World& world) {
+  return {world.occupation_of(0), world.occupation_of(1),
+          world.occupation_of(2)};
+}
+
+TEST(World, AVillagesPeopleTakeOccupationsFromItsStandingBuildings) {
+  using Held = std::vector<std::optional<std::size_t>>;
+  constexpr std::size_t SMITH = 0;
+  constexpr std::size_t BEGGAR = 1;
+  World world = smithing(STAGE_FLOORS.at(0));
+  // The first two take the smithy's places and the third the fallback, from
+  // the world's creation and on the next day.
+  EXPECT_EQ(founders_held(world), (Held{SMITH, SMITH, BEGGAR}));
+  world.tick();
+  EXPECT_EQ(founders_held(world), (Held{SMITH, SMITH, BEGGAR}));
+  // Control: with the smithy in rubble, no place opens and all three beg.
+  const World ruined = smithing(0);
+  ASSERT_EQ(ruined.stage(0), Stage::RUBBLE);
+  EXPECT_EQ(founders_held(ruined), (Held{BEGGAR, BEGGAR, BEGGAR}));
 }
 
 TEST(World, NoOneSellsWithoutATrade) {
@@ -6576,22 +6644,18 @@ bool trades(const Trade& trade) {
 }
 
 TEST(World, ATradeOutsideItsLimitsIsRefused) {
-  const Ware herb{"herb", HERB_PRICE, HERB_HEALTH, 0, 0};
+  const Ware herb{"herb", HERB_PRICE, HERB_HEALTH, 0};
   const Trade sound{{herb}, PURSE, 1, PER_MILLE, PER_MILLE};
   // Control: the limits themselves are accepted.
   EXPECT_TRUE(trades(sound));
-  EXPECT_TRUE(
-      trades(Trade{{Ware{"herb", MAX_TALENT, MAX_HEALTH, MAX_TALENT, 0}},
-                   MAX_TALENT,
-                   MAX_TALENT,
-                   PER_MILLE,
-                   PER_MILLE}));
+  EXPECT_TRUE(trades(Trade{{Ware{"herb", MAX_TALENT, MAX_HEALTH, MAX_TALENT}},
+                           MAX_TALENT,
+                           MAX_TALENT,
+                           PER_MILLE,
+                           PER_MILLE}));
   Trade free = sound;
   free.wares.at(0).price = 0;
   EXPECT_FALSE(trades(free));
-  Trade stray = sound;
-  stray.wares.at(0).discipline = 1;
-  EXPECT_FALSE(trades(stray));
   Trade lavish = sound;
   lavish.wage = MAX_TALENT + 1;
   EXPECT_FALSE(trades(lavish));

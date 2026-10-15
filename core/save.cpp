@@ -24,6 +24,7 @@
 #include "life.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "skill.hpp"
@@ -39,6 +40,8 @@ namespace {
 constexpr std::uint8_t ROLES = 3;
 // The tiers an area may be at.
 constexpr std::uint8_t AREA_TIERS = 3;
+// Where a schedule's band may send a person, Where's members.
+constexpr std::uint8_t WHERES = 3;
 
 // "MURIMSAV": the bytes every save begins with.
 constexpr std::array<std::uint8_t, 8> MAGIC{0x4D, 0x55, 0x52, 0x49,
@@ -240,6 +243,20 @@ void put_index(Writer& out, const std::optional<std::size_t>& index) {
 
 std::optional<std::size_t> get_index(Reader& input) {
   return get_maybe<std::size_t>(input, [&input] { return input.size(); });
+}
+
+void put_bands(Writer& out, const std::vector<Band>& schedule) {
+  put_all(out, schedule, [&out](const Band& band) {
+    out.u32(band.from);
+    out.u8(static_cast<std::uint8_t>(band.where));
+  });
+}
+
+std::vector<Band> get_bands(Reader& input) {
+  return get_all<Band>(input, [&input] {
+    const std::uint32_t from = input.u32();
+    return Band{from, static_cast<Where>(input.tag(WHERES))};
+  });
 }
 
 void put_cell(Writer& out, Cell cell) {
@@ -512,12 +529,25 @@ void put_life(Writer& out, const Life& life) {
       out.u64(ware.price);
       out.u64(ware.health);
       out.u32(ware.qi);
-      out.size(ware.discipline);
     });
     out.u64(trade.purse);
     out.u64(trade.wage);
     out.u32(trade.wounded);
     out.u32(trade.drained);
+  });
+  put_maybe(out, life.occupations, [&out](const Occupations& occupations) {
+    put_all(out, occupations.list, [&out](const Occupation& occupation) {
+      out.text(occupation.name);
+      put_maybe(out, occupation.workplace,
+                [&out](const std::string& kind) { out.text(kind); });
+      out.u32(occupation.per_workplace);
+      out.u32(occupation.per_residents);
+      put_bands(out, occupation.schedule);
+      put_sizes(out, occupation.wares);
+    });
+    out.u32(occupations.working_age);
+    out.size(occupations.fallback);
+    put_bands(out, occupations.idle);
   });
 }
 
@@ -627,7 +657,6 @@ Life get_life(Reader& input) {
       ware.price = input.u64();
       ware.health = input.u64();
       ware.qi = input.u32();
-      ware.discipline = input.size();
       return ware;
     });
     trade.purse = input.u64();
@@ -635,6 +664,24 @@ Life get_life(Reader& input) {
     trade.wounded = input.u32();
     trade.drained = input.u32();
     return trade;
+  });
+  life.occupations = get_maybe<Occupations>(input, [&input] {
+    Occupations occupations;
+    occupations.list = get_all<Occupation>(input, [&input] {
+      Occupation occupation;
+      occupation.name = input.text();
+      occupation.workplace =
+          get_maybe<std::string>(input, [&input] { return input.text(); });
+      occupation.per_workplace = input.u32();
+      occupation.per_residents = input.u32();
+      occupation.schedule = get_bands(input);
+      occupation.wares = get_sizes(input);
+      return occupation;
+    });
+    occupations.working_age = input.u32();
+    occupations.fallback = input.size();
+    occupations.idle = get_bands(input);
+    return occupations;
   });
   return life;
 }
@@ -817,6 +864,7 @@ void put_person(Writer& out, const Person& person) {
   });
   out.u64(person.silver);
   put_all(out, person.held, [&out](std::uint64_t held) { out.u64(held); });
+  put_index(out, person.occupation);
 }
 
 Person get_person(Reader& input) {
@@ -877,6 +925,7 @@ Person get_person(Reader& input) {
   });
   person.silver = input.u64();
   person.held = get_all<std::uint64_t>(input, [&input] { return input.u64(); });
+  person.occupation = get_index(input);
   return person;
 }
 
@@ -890,6 +939,7 @@ void put_village_spec(Writer& out, const VillageSpec& spec) {
     put_cell(out, clearing.corner);
     put_footprint(out, clearing.area);
   });
+  put_all(out, spec.kinds, [&out](const std::string& kind) { out.text(kind); });
 }
 
 VillageSpec get_village_spec(Reader& input) {
@@ -903,6 +953,7 @@ VillageSpec get_village_spec(Reader& input) {
     const Cell corner = get_cell(input);
     return Clearing{corner, get_footprint(input)};
   });
+  spec.kinds = get_all<std::string>(input, [&input] { return input.text(); });
   return spec;
 }
 

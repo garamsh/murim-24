@@ -22,6 +22,7 @@
 #include "leadership.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "region.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
@@ -42,15 +43,16 @@ constexpr std::array<std::string_view, 3> ROLES{"square", "home", "edge"};
 constexpr std::array<std::string_view, 3> ORIENTATIONS{"orthodox", "unorthodox",
                                                        "demonic"};
 constexpr std::array<std::string_view, 2> POLARITIES{"yang", "yin"};
+constexpr std::array<std::string_view, 3> WHERES{"home", "work", "square"};
 
 // The kinds of content a pack may hold, in the order their tables are built,
 // so a kind is built after every kind it names. A map's kinds are its
 // authored sources (ADR 0049), named for the pack's `map/` documents.
-constexpr std::array<std::string_view, 19> KINDS{
-    "terrain",   "skills",       "factions",   "structure_kinds", "villages",
-    "seats",     "disciplines",  "arts",       "sects",           "realms",
-    "surnames",  "female_names", "male_names", "wares",           "life",
-    "map/lands", "map/places",   "map/routes", "map/map"};
+constexpr std::array<std::string_view, 20> KINDS{
+    "terrain",  "skills",       "factions",   "structure_kinds", "villages",
+    "seats",    "disciplines",  "arts",       "sects",           "realms",
+    "surnames", "female_names", "male_names", "wares",           "occupations",
+    "life",     "map/lands",    "map/places", "map/routes",      "map/map"};
 
 // Whether `name` is lowercase ASCII letters, digits and underscores, and not
 // empty.
@@ -618,6 +620,36 @@ Learning read_learning(Reader& reader) {
 }
 
 // The rules of life, the one entry of kind `life`.
+std::vector<Band> read_bands(Reader& reader, const std::string& key) {
+  std::vector<Band> schedule;
+  reader.each(key, false, [&schedule](Reader& band) {
+    const auto from = band.number<std::uint32_t>("from", 0, 0U);
+    schedule.push_back(
+        Band{from, static_cast<Where>(band.choice("where", WHERES))});
+  });
+  return schedule;
+}
+
+// An occupation (ADR 0081): it works at the structure kind `workplace` names
+// or, without one, on the square.
+Occupation read_occupation(Reader& reader, const std::string& name,
+                           const Context& context) {
+  Occupation occupation;
+  occupation.name = name;
+  if (reader.has("workplace")) {
+    occupation.workplace =
+        id_of(context, "structure_kinds",
+              reader.reference("workplace", "structure_kinds"));
+  }
+  occupation.per_workplace =
+      reader.number<std::uint32_t>("per_workplace", 0, 0U);
+  occupation.per_residents =
+      reader.number<std::uint32_t>("per_residents", 0, 0U);
+  occupation.schedule = read_bands(reader, "schedule");
+  occupation.wares = reader.references("wares", "wares");
+  return occupation;
+}
+
 void read_life(Reader& reader, Built& built, const Context& context) {
   Life& life = built.data.life;
   life.newborn_health = reader.number<std::uint64_t>("newborn_health", 1);
@@ -672,6 +704,13 @@ void read_life(Reader& reader, Built& built, const Context& context) {
     diplomacy.hold_days = inner.number<std::uint32_t>("hold_days", 0);
     life.diplomacy = diplomacy;
   });
+  reader.object("occupations", true, [&life](Reader& inner) {
+    Occupations occupations = life.occupations.value_or(Occupations{});
+    occupations.working_age = inner.number<std::uint32_t>("working_age", 0, 0U);
+    occupations.fallback = inner.reference("fallback", "occupations");
+    occupations.idle = read_bands(inner, "idle");
+    life.occupations = occupations;
+  });
   reader.object("trade", true, [&life](Reader& inner) {
     Trade trade = life.trade.value_or(Trade{});
     trade.purse = inner.number<std::uint64_t>("purse", 0);
@@ -696,7 +735,6 @@ Ware read_ware(Reader& reader, const std::string& name) {
   ware.price = reader.number<std::uint64_t>("price", 0);
   ware.health = reader.number<std::uint64_t>("health", 0, std::uint64_t{0});
   ware.qi = reader.number<std::uint32_t>("qi", 0, 0U);
-  ware.discipline = reader.reference("discipline", "disciplines");
   return ware;
 }
 
@@ -810,6 +848,22 @@ MapSource read_map(Reader& reader, const RegionData& data,
 }
 
 // Reads the entry the context names, of kind `kind`, into `built`.
+// Adds `ware` to the trade's wares, giving `life` a trade if it has none.
+void add_ware(Life& life, Ware ware) {
+  if (!life.trade) {
+    life.trade = Trade{};
+  }
+  life.trade->wares.push_back(std::move(ware));
+}
+
+// Adds `occupation` to the occupations, giving `life` them if it has none.
+void add_occupation(Life& life, Occupation occupation) {
+  if (!life.occupations) {
+    life.occupations = Occupations{};
+  }
+  life.occupations->list.push_back(std::move(occupation));
+}
+
 void read_entry(const std::string& kind, Reader& reader, Built& built,
                 const Context& context) {
   RegionData& data = built.data;
@@ -847,10 +901,9 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
   } else if (kind == "male_names") {
     data.life.names.male.push_back(read_name(reader));
   } else if (kind == "wares") {
-    if (!data.life.trade) {
-      data.life.trade = Trade{};
-    }
-    data.life.trade->wares.push_back(read_ware(reader, name));
+    add_ware(data.life, read_ware(reader, name));
+  } else if (kind == "occupations") {
+    add_occupation(data.life, read_occupation(reader, name, context));
   } else if (kind == "life") {
     ++built.lives;
     read_life(reader, built, context);

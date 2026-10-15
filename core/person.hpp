@@ -67,6 +67,7 @@ struct Person {
   std::vector<Known> known;
   std::uint64_t silver = 0;
   std::vector<std::uint64_t> held;
+  std::optional<std::size_t> occupation;
 };
 
 }  // namespace murim

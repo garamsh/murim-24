@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <string>
@@ -24,6 +25,7 @@
 #include "leadership.hpp"
 #include "limits.hpp"
 #include "map.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "region.hpp"
@@ -213,6 +215,7 @@ World cultivated(const std::vector<Realm>& realms) {
                   {},
                   Learning{},
                   std::nullopt,
+                  std::nullopt,
                   std::nullopt};
   Rules rules{0, {{false}}, STAGE_FLOORS};
   rules.ticks_per_day = 1;
@@ -387,6 +390,21 @@ TEST(Save, AVersion15SaveFromBeforeTiersIsRefused) {
   MemorySaves store;
   ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_TIERS);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, AVersion16SaveFromBeforeOccupationsIsRefused) {
+  // Version 16 saves hold no structure's kind, no person's occupation and no
+  // occupations (ADR 0081).
+  constexpr std::uint32_t BEFORE_OCCUPATIONS = 16;
+  ASSERT_LT(BEFORE_OCCUPATIONS, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) =
+      static_cast<std::uint8_t>(BEFORE_OCCUPATIONS);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
   // Control: the same bytes at the current version load.
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
@@ -939,7 +957,7 @@ World starving(std::size_t people) {
               {ArmySpec{{2, 2}, residents, 0, {Skill{0, 0, 0, 0, 1}}}},
               {},
               rules,
-              {VillageSpec{{}, 0, {}, 0, {}}},
+              {VillageSpec{{}, 0, {}, 0, {}, {}}},
               {},
               life};
   return ticked(std::move(world), STARVING_DAYS);
@@ -984,9 +1002,12 @@ TEST(Save, ALoadedWorldKeepsItsTalkReach) {
   EXPECT_NE(talkers(2).hash(), talkers(3).hash());
 }
 
-// Two people of one faction side by side, whose best discipline sells a
-// herb for 10 silver, the first having bought `bought` of them from the
-// second.
+// A day spent at home, the schedule of every occupation below.
+std::vector<Band> at_home() { return {{0, Where::HOME}}; }
+
+// Two people of one faction side by side, the second at home in a village
+// where it is the herbalist, who sells a herb for 10 silver; the first has
+// bought `bought` of them from the second.
 World traders(std::uint64_t bought) {
   constexpr std::uint64_t PRICE = 10;
   constexpr std::uint64_t PURSE = 50;
@@ -994,7 +1015,12 @@ World traders(std::uint64_t bought) {
   rules.talk_reach = 2;
   Life life;
   life.disciplines = {{"medicine", {0, 0}, {1, 0}}};
-  life.trade = Trade{{Ware{"herb", PRICE, 1, 0, 0}}, PURSE, 1, 0, 0};
+  life.trade = Trade{{Ware{"herb", PRICE, 1, 0}}, PURSE, 1, 0, 0};
+  life.occupations =
+      Occupations{{Occupation{"herbalist", std::nullopt, 0, 1, at_home(), {0}}},
+                  0,
+                  0,
+                  at_home()};
   World world{
       Seed{1},
       Map{{"....", "...."}},
@@ -1002,7 +1028,7 @@ World traders(std::uint64_t bought) {
        ArmySpec{{1, 0}, {Recruit{{1, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
       {},
       rules,
-      {},
+      {VillageSpec{{}, 1, {}, 0, {}, {}}},
       {},
       life};
   for (std::uint64_t each = 0; each < bought; ++each) {
@@ -1023,6 +1049,104 @@ TEST(Save, ALoadedWorldKeepsItsSilverWaresAndTrade) {
   EXPECT_EQ(restored.world.hash(), traders(2).hash());
   // Control: one herb fewer bought is another state.
   EXPECT_NE(traders(1).hash(), traders(2).hash());
+}
+
+// The position of `text` as the save encodes it, its length then its
+// bytes, in `payload`, which holds it once.
+std::size_t encoded_at(const std::vector<std::uint8_t>& payload,
+                       const std::string& text) {
+  std::vector<std::uint8_t> encoded(sizeof(std::uint64_t), 0);
+  encoded.at(0) = static_cast<std::uint8_t>(text.size());
+  encoded.insert(encoded.end(), text.begin(), text.end());
+  const auto found = std::search(payload.begin(), payload.end(),
+                                 encoded.begin(), encoded.end());
+  EXPECT_NE(found, payload.end()) << text;
+  EXPECT_EQ(std::search(std::next(found), payload.end(), encoded.begin(),
+                        encoded.end()),
+            payload.end())
+      << text;
+  return static_cast<std::size_t>(found - payload.begin());
+}
+
+TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
+  // One person at home in a village where `first` opens no place, so it
+  // takes the fallback, `spare`, the second and last occupation.
+  Life life;
+  life.occupations =
+      Occupations{{Occupation{"first", std::nullopt, 0, 0, at_home(), {}},
+                   Occupation{"spare", std::nullopt, 0, 0, at_home(), {}}},
+                  0,
+                  1,
+                  at_home()};
+  const World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      Rules{0, {{false}}, STAGE_FLOORS},
+      {VillageSpec{{}, 0, {}, 0, {}, {}}},
+      {},
+      life};
+  ASSERT_EQ(world.occupation_of(0), std::optional<std::size_t>{1});
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  EXPECT_EQ(restored.world.occupation_of(0), std::optional<std::size_t>{1});
+  EXPECT_EQ(restored.world.hash(), world.hash());
+
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // Control: resealing the same payload loads, so the reseal refuses nothing.
+  store.bytes(SLOT) = resealed(header, payload);
+  ASSERT_EQ(loaded(load(store, SLOT)).world.hash(), world.hash());
+
+  // The person's record ends with its silver, none, its wares, none, and its
+  // occupation, the second. Holding the first instead, the world loads and
+  // hashes otherwise, so the hash folds the occupation itself.
+  std::vector<std::uint8_t> held(2 * sizeof(std::uint64_t), 0);
+  held.push_back(1);
+  held.push_back(1);
+  held.insert(held.end(), sizeof(std::uint64_t) - 1, 0);
+  const auto record =
+      std::search(payload.begin(), payload.end(), held.begin(), held.end());
+  ASSERT_NE(record, payload.end());
+  ASSERT_EQ(
+      std::search(std::next(record), payload.end(), held.begin(), held.end()),
+      payload.end());
+  std::vector<std::uint8_t> other = payload;
+  other.at(static_cast<std::size_t>(record - payload.begin()) +
+           (2 * sizeof(std::uint64_t)) + 1) = 0;
+  store.bytes(SLOT) = resealed(header, other);
+  const Saved first = loaded(load(store, SLOT));
+  EXPECT_EQ(first.world.occupation_of(0), std::optional<std::size_t>{0});
+  EXPECT_NE(first.world.hash(), world.hash());
+
+  // Drop `spare` from the data: its name, no workplace, two counts, one band
+  // and no wares; then its count of occupations falls to one and the
+  // fallback, after the working age, becomes `first`. The person still
+  // holds the second occupation, which the data no longer lists.
+  constexpr std::size_t BAND_BYTES = sizeof(std::uint32_t) + 1;
+  const std::size_t spare = encoded_at(payload, "spare");
+  const std::size_t spare_bytes =
+      sizeof(std::uint64_t) + std::string{"spare"}.size() + 1 +
+      (2 * sizeof(std::uint32_t)) + sizeof(std::uint64_t) + BAND_BYTES +
+      sizeof(std::uint64_t);
+  const std::size_t count =
+      encoded_at(payload, "first") - sizeof(std::uint64_t);
+  ASSERT_EQ(payload.at(count), 2);
+  const std::size_t fallback = spare + spare_bytes + sizeof(std::uint32_t);
+  ASSERT_EQ(payload.at(fallback), 1);
+  payload.at(fallback) = 0;
+  payload.at(count) = 1;
+  payload.erase(
+      payload.begin() + static_cast<std::ptrdiff_t>(spare),
+      payload.begin() + static_cast<std::ptrdiff_t>(spare + spare_bytes));
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
 // Two hostile people 4 cells apart, each sweeping an arc of `shape` at arm's

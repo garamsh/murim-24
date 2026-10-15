@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,14 +8,13 @@ namespace murim {
 
 /// A ware people buy and consume, as data: its `name`, its `price` in
 /// silver, the `health` it restores, up to `newborn_health`, and the `qi` it
-/// restores, up to the consumer's store. It is sold by people whose best
-/// discipline, their highest talent limit, is `discipline`.
+/// restores, up to the consumer's store. It is sold by people whose
+/// occupation sells it (ADR 0081).
 struct Ware {
   std::string name;
   std::uint64_t price = 0;
   std::uint64_t health = 0;
   std::uint32_t qi = 0;
-  std::size_t discipline = 0;
 };
 
 /// How silver and wares go round, as data, one rule for every person. Each
@@ -65,7 +63,7 @@ enum class ConsumeRefusal : std::uint8_t {
 };
 
 /// Throws std::invalid_argument when `trade` lies outside the limits the
-/// constructor documents, given `disciplines` drawn.
-void check_trade(const Trade& trade, std::size_t disciplines);
+/// constructor documents.
+void check_trade(const Trade& trade);
 
 }  // namespace murim

@@ -131,6 +131,24 @@
       "wage": 1,
       "wounded": 500,
       "drained": 250
+    },
+    "occupations": {
+      "working_age": 16,
+      "fallback": "beggar",
+      "idle": [
+        {
+          "from": 0,
+          "where": "home"
+        },
+        {
+          "from": 8,
+          "where": "square"
+        },
+        {
+          "from": 18,
+          "where": "home"
+        }
+      ]
     }
   }
 ]
