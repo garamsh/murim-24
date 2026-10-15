@@ -1118,11 +1118,13 @@ class SaveCodec {
       put_index(out, army.order.target);
       put_sizes(out, army.roster);
       out.flag(army.steered);
-      put_maybe(out, army.far, [&out](const FarAnchor& far) {
-        out.size(far.area);
-        put_cell(out, far.cell);
-        out.u32(far.progress);
-      });
+      const auto* far = std::get_if<FarAnchor>(&army.course);
+      out.flag(far != nullptr);
+      if (far != nullptr) {
+        out.size(far->area);
+        put_cell(out, far->cell);
+        out.u32(far->progress);
+      }
     });
     put_all(out, world.areas_.tiers(),
             [&out](AreaTier tier) { out.u8(static_cast<std::uint8_t>(tier)); });
@@ -1228,28 +1230,26 @@ class SaveCodec {
       }
       std::vector<std::size_t> roster = get_sizes(input);
       const bool steered = input.flag();
-      const std::optional<FarAnchor> far =
-          get_maybe<FarAnchor>(input, [&input, &world] {
-            const std::size_t area = input.size();
-            const Cell cell = get_cell(input);
-            if (area >= world.areas_.count() || !world.map_.passable(cell) ||
-                world.areas_.area_of(cell) != area) {
-              throw Refusal{LoadError::CORRUPTED};
-            }
-            return FarAnchor{area, cell, input.u32()};
-          });
-      // A far army holds no field; it is rebuilt when the army comes back.
-      std::optional<FlowField> field;
-      if (!far) {
-        field = FlowField{world.map_, objective};
-      }
+      // A far army holds its anchor and no field, which is rebuilt when it
+      // comes back.
+      const auto course = [&input, &world, objective]() -> World::Course {
+        if (!input.flag()) {
+          return FlowField{world.map_, objective};
+        }
+        const std::size_t area = input.size();
+        const Cell cell = get_cell(input);
+        if (area >= world.areas_.count() || !world.map_.passable(cell) ||
+            world.areas_.area_of(cell) != area) {
+          throw Refusal{LoadError::CORRUPTED};
+        }
+        return FarAnchor{area, cell, input.u32()};
+      };
       return World::Army{faction,
                          std::move(skills),
                          Order{objective, std::move(order_skills), target},
-                         std::move(field),
+                         course(),
                          std::move(roster),
-                         steered,
-                         far};
+                         steered};
     });
     std::vector<AreaTier> tiers = get_all<AreaTier>(input, [&input] {
       return static_cast<AreaTier>(input.tag(AREA_TIERS));

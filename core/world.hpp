@@ -6,6 +6,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "areas.hpp"
@@ -695,16 +696,21 @@ class World {
   void restore();
   [[nodiscard]] bool rostered() const;
 
-  // An army's field toward its objective is held only while it is not far.
+  // An army's course: its field toward its objective while it is live or
+  // stepped, or where it stands while it is far, never both.
+  using Course = std::variant<FlowField, FarAnchor>;
+
   struct Army {
     std::size_t faction;
     std::vector<Skill> skills;
     Order order;
-    std::optional<FlowField> field;
+    Course course;
     std::vector<std::size_t> roster;
     bool steered = false;
-    std::optional<FarAnchor> far;
   };
+
+  // Whether `army` is far.
+  [[nodiscard]] static bool far_off(const Army& army);
 
   /// A crowd slot no person holds.
   static constexpr std::size_t ABSENT = std::numeric_limits<std::size_t>::max();
@@ -916,7 +922,7 @@ class World {
   void reachable_from(const FlowField& field,
                       const std::vector<std::size_t>& members) const;
   void go_far(Army& army);
-  void come_back(Army& army);
+  void come_back(Army& army, FarAnchor far);
 
   std::uint64_t rng_state_;
   /// The seed the world was created from, which keys its counter-based draws.

@@ -32,7 +32,6 @@
 #include "leadership.hpp"
 #include "life.hpp"
 #include "limits.hpp"
-#include "m1_scenario.hpp"
 #include "map.hpp"
 #include "names.hpp"
 #include "person.hpp"
@@ -453,13 +452,14 @@ std::vector<Cell> ring_round(Cell centre, std::int32_t ring) {
 
 // Folds where far army anchor `far` stands, or that the army is not far.
 template <typename Fold>
-void fold_far(const Fold& fold, const std::optional<FarAnchor>& far) {
-  fold(far.has_value());
-  const FarAnchor held = far.value_or(FarAnchor{0, Cell{0, 0}, 0});
-  fold(held.area);
-  fold(held.cell.x);
-  fold(held.cell.y);
-  fold(held.progress);
+void fold_far(const Fold& fold, const FarAnchor* far) {
+  fold(far != nullptr);
+  if (far != nullptr) {
+    fold(far->area);
+    fold(far->cell.x);
+    fold(far->cell.y);
+    fold(far->progress);
+  }
 }
 
 // Folds order `order` into `fold`; its attack intent's target only when it
@@ -1194,8 +1194,7 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
   reachable_from(field, roster);
   armies_.push_back(Army{army.faction, std::move(army.skills),
                          Order{army.objective, std::move(every_skill)},
-                         std::move(field), std::move(roster), false,
-                         std::nullopt});
+                         std::move(field), std::move(roster), false});
 }
 
 // Adds the sects `sects` describe, each founder joining its sect with its
@@ -1878,8 +1877,8 @@ void World::order(std::size_t army, Order order,
   if (challenge) {
     start_duel(army, *challenge);
   }
-  if (!ordered.far) {
-    ordered.field = std::move(field);
+  if (!far_off(ordered)) {
+    ordered.course = std::move(field);
   }
   ordered.order = std::move(order);
 }
@@ -1991,8 +1990,8 @@ void World::hold(Army& chasing) {
   order.target.reset();
   if (!chasing.roster.empty()) {
     order.objective = cell_of(people_.at(chasing.roster.front()).position);
-    if (!chasing.far) {
-      chasing.field = FlowField{map_, order.objective};
+    if (!far_off(chasing)) {
+      chasing.course = FlowField{map_, order.objective};
     }
   }
 }
@@ -2090,11 +2089,10 @@ void World::conscript(std::size_t person, std::size_t army) {
     throw std::invalid_argument(
         "only a living person can be conscripted, into an existing army");
   }
-  const Army& into = armies_.at(army);
-  if (into.field) {
-    reachable_from(*into.field, {person});
-  } else {
-    reachable_from(FlowField{map_, into.order.objective}, {person});
+  // A far army is reached from anywhere: coming back, it stands every member
+  // round its anchor.
+  if (const auto* field = std::get_if<FlowField>(&armies_.at(army).course)) {
+    reachable_from(*field, {person});
   }
   from->roster.erase(
       std::find(from->roster.begin(), from->roster.end(), person));
@@ -2124,7 +2122,7 @@ void World::tick() {
   std::vector<std::size_t> slot(people_.size(), ABSENT);
   // A far army runs no per-tick rule, so it is not in the crowd.
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    if (armies_.at(army).far) {
+    if (far_off(armies_.at(army))) {
       continue;
     }
     for (const std::size_t member : armies_.at(army).roster) {
@@ -2255,10 +2253,11 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
                   std::vector<Step>& pulls, std::vector<bool>& standing,
                   std::vector<std::size_t>& seeking) const {
   for (const Army& army : armies_) {
-    if (!army.field) {
+    const auto* course = std::get_if<FlowField>(&army.course);
+    if (course == nullptr) {
       continue;
     }
-    const FlowField& field = *army.field;
+    const FlowField& field = *course;
     for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
       const std::size_t index = slot.at(army.roster.at(rank));
       const Cell cell = cell_of(crowd.hash.position(index));
@@ -2306,10 +2305,11 @@ void World::march(std::size_t army, const Crowd& crowd,
                   const std::vector<bool>& standing,
                   const std::vector<std::size_t>& seeking) {
   const Army& marching = armies_.at(army);
-  if (!marching.field) {
+  const auto* course = std::get_if<FlowField>(&marching.course);
+  if (course == nullptr) {
     return;
   }
-  const FlowField& field = *marching.field;
+  const FlowField& field = *course;
   const std::int64_t separation = rules_.separation;
   for (const std::size_t member : marching.roster) {
     const std::size_t self = slot.at(member);
@@ -2396,7 +2396,7 @@ StateHash World::hash() const {
     for (const std::size_t member : army.roster) {
       fold(member);
     }
-    fold_far(fold, army.far);
+    fold_far(fold, std::get_if<FarAnchor>(&army.course));
   }
   for (const AreaTier tier : areas_.tiers()) {
     fold(static_cast<std::uint8_t>(tier));
@@ -2595,7 +2595,8 @@ void World::set_profile(std::optional<Profile> profile) { profile_ = profile; }
 const Areas& World::areas() const { return areas_; }
 
 std::optional<FarAnchor> World::far(std::size_t army) const {
-  return armies_.at(army).far;
+  const auto* anchor = std::get_if<FarAnchor>(&armies_.at(army).course);
+  return anchor != nullptr ? std::optional<FarAnchor>{*anchor} : std::nullopt;
 }
 
 void World::retier() {
@@ -2611,6 +2612,9 @@ void World::retier() {
       }
     }
   }
+  // Each area once, however many steered people stand in it.
+  std::sort(focus.begin(), focus.end());
+  focus.erase(std::unique(focus.begin(), focus.end()), focus.end());
   if (profile_ && !focus.empty()) {
     areas_.recompute(Census{std::move(focus), std::move(people)}, *profile_);
   } else {
@@ -2626,10 +2630,11 @@ void World::retier() {
           nearest,
           areas_.tier(areas_.area_of(cell_of(people_.at(member).position))));
     }
-    if (nearest == AreaTier::FAR && !army.far) {
+    const auto* anchor = std::get_if<FarAnchor>(&army.course);
+    if (nearest == AreaTier::FAR && anchor == nullptr) {
       go_far(army);
-    } else if (nearest != AreaTier::FAR && army.far) {
-      come_back(army);
+    } else if (nearest != AreaTier::FAR && anchor != nullptr) {
+      come_back(army, *anchor);
     }
   }
 }
@@ -2639,8 +2644,7 @@ void World::retier() {
 // its field is dropped.
 void World::go_far(Army& army) {
   const Cell lead = cell_of(people_.at(army.roster.front()).position);
-  army.far = FarAnchor{areas_.area_of(lead), lead, 0};
-  army.field.reset();
+  army.course = FarAnchor{areas_.area_of(lead), lead, 0};
 }
 
 // Hands `army` far to live (ADR 0077): its lead stands on the open cell
@@ -2648,9 +2652,8 @@ void World::go_far(Army& army) {
 // nearest, nearer by distance and then by cell index; an open cell is
 // passable and holds no one of an army that is not far. Every record but the
 // members' positions carries over, and the army's field is rebuilt.
-void World::come_back(Army& army) {
-  const Cell anchor = army.far.value_or(FarAnchor{0, Cell{0, 0}, 0}).cell;
-  army.far.reset();
+void World::come_back(Army& army, FarAnchor far) {
+  const Cell anchor = far.cell;
   const auto width = static_cast<std::size_t>(map_.width());
   const auto index_of = [width](Cell cell) {
     return (static_cast<std::size_t>(cell.y) * width) +
@@ -2659,7 +2662,7 @@ void World::come_back(Army& army) {
   std::vector<bool> held(width * static_cast<std::size_t>(map_.height()),
                          false);
   for (const Army& other : armies_) {
-    if (other.far || &other == &army) {
+    if (far_off(other) || &other == &army) {
       continue;
     }
     for (const std::size_t member : other.roster) {
@@ -2696,7 +2699,11 @@ void World::come_back(Army& army) {
       ++placed;
     }
   }
-  army.field = FlowField{map_, army.order.objective};
+  army.course = FlowField{map_, army.order.objective};
+}
+
+bool World::far_off(const Army& army) {
+  return std::holds_alternative<FarAnchor>(army.course);
 }
 
 // Has each living leader no driver steers declare toward each other faction
@@ -3124,7 +3131,7 @@ std::vector<World::Closing> World::close_in(const Crowd& crowd) {
   engaging_.clear();
   const std::vector<bool> free = granting(crowd);
   for (const Army& army : armies_) {
-    if (army.far) {
+    if (far_off(army)) {
       continue;
     }
     for (const std::size_t member : army.roster) {
@@ -3559,8 +3566,8 @@ void World::rebirth(Passing passing) {
   std::iota(serving.order.skills.begin(), serving.order.skills.end(),
             std::size_t{0});
   const Cell birthplace = cell_of(people_.at(born).position);
-  if (!serving.far) {
-    serving.field = FlowField{map_, birthplace};
+  if (!far_off(serving)) {
+    serving.course = FlowField{map_, birthplace};
   }
   serving.order.objective = birthplace;
 }
@@ -4282,12 +4289,13 @@ void World::recall(std::size_t village) {
       continue;
     }
     Army& residents = armies_.at(villages_.at(*home).spec.residents);
-    const Cell standing = cell_of(people_.at(member).position);
+    // Far residents are reached from anywhere: coming back, they stand round
+    // their anchor.
+    const auto* field = std::get_if<FlowField>(&residents.course);
     const bool reached =
-        residents.field
-            ? residents.field->distance(standing) != FlowField::UNREACHABLE
-            : FlowField{map_, residents.order.objective}.distance(standing) !=
-                  FlowField::UNREACHABLE;
+        field == nullptr ||
+        field->distance(cell_of(people_.at(member).position)) !=
+            FlowField::UNREACHABLE;
     if (!reached) {
       continue;
     }
@@ -4751,7 +4759,7 @@ std::optional<std::vector<std::size_t>> World::lay(
   std::vector<std::optional<FlowField>> fields;
   fields.reserve(armies_.size());
   for (const Army& army : armies_) {
-    if (army.far) {
+    if (far_off(army)) {
       fields.emplace_back();
       continue;
     }
@@ -4766,7 +4774,10 @@ std::optional<std::vector<std::size_t>> World::lay(
   }
   map_ = std::move(built);
   for (std::size_t army = 0; army < armies_.size(); ++army) {
-    armies_.at(army).field = std::move(fields.at(army));
+    std::optional<FlowField>& field = fields.at(army);
+    if (field) {
+      armies_.at(army).course = std::move(*field);
+    }
   }
   std::vector<std::size_t> made;
   for (const Laid& each : laid) {
@@ -4813,8 +4824,7 @@ std::size_t World::form(std::size_t village,
               Order{objective, std::move(every_skill)},
               FlowField{map_, objective},
               {},
-              false,
-              std::nullopt};
+              false};
   if (into) {
     formed.roster = std::move(armies_.at(*into).roster);
   }
