@@ -1302,11 +1302,10 @@ class SaveCodec {
       }
       std::vector<std::size_t> roster = get_sizes(input);
       const bool steered = input.flag();
-      // A far army holds its anchor and no field, which is rebuilt when it
-      // comes back.
-      const auto course = [&input, &world, objective]() -> World::Course {
+      // A far army holds its anchor; any other is bound for its objective.
+      const auto course = [&input, &world]() -> World::Course {
         if (!input.flag()) {
-          return FlowField{world.map_, objective};
+          return World::Bound{};
         }
         const std::size_t area = input.size();
         const Cell cell = get_cell(input);
