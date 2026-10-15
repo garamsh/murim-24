@@ -133,5 +133,43 @@ TEST(CoarseGraph, ARebuildAfterBlockingCellsMatchesAGraphBuiltAfresh) {
                map.passable(Cell{SMALL_SIDE - 1, 0}));
 }
 
+TEST(CoarseGraph, ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers) {
+  // A map of 3 by 2 areas. Blocking two cells of the lower middle area's top
+  // row splits the entrance it shares with the upper middle area, so that
+  // area is rebuilt with one node more along its bottom side, numbered before
+  // its left and right sides' nodes. Its western neighbour, diagonal to the
+  // blocked area, holds links to those renumbered nodes.
+  constexpr std::int32_t WIDE = 96;
+  constexpr std::int32_t HIGH = 64;
+  constexpr std::int32_t ROW = 32;
+  constexpr std::int32_t SPLIT = 48;
+  Map map{std::vector<std::string>(HIGH, std::string(WIDE, '.'))};
+  CoarseGraph graph{map};
+  const CoarseGraph before = graph;
+  map.block(Cell{SPLIT, ROW});
+  map.block(Cell{SPLIT + 1, ROW});
+  graph.rebuild(map, {Cell{SPLIT, ROW}, Cell{SPLIT + 1, ROW}});
+  const CoarseGraph fresh{map};
+  // The upper middle area's nodes are numbered afresh: one is not where it
+  // was, so a link not relinked would name the wrong node.
+  constexpr std::size_t MIDDLE = 1;
+  bool moved = false;
+  for (std::size_t node = 0; node < 3; ++node) {
+    const Cell was = before.node(NodeRef{MIDDLE, node}).cell;
+    const Cell now = fresh.node(NodeRef{MIDDLE, node}).cell;
+    moved = moved || was.x != now.x || was.y != now.y;
+  }
+  ASSERT_TRUE(moved);
+  // A walk from the western area through the middle one to the eastern costs
+  // what it does over a graph built afresh.
+  const Cell west{5, 5};
+  const Cell east{90, 5};
+  EXPECT_EQ(graph.path_cost(map, west, east, true),
+            fresh.path_cost(map, west, east, true));
+  EXPECT_EQ(graph.path_cost(map, west, east, false),
+            fresh.path_cost(map, west, east, false));
+  EXPECT_TRUE(graph.joined(map, west, Cell{SPLIT, ROW + 5}));
+}
+
 }  // namespace
 }  // namespace murim
