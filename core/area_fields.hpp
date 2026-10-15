@@ -56,7 +56,7 @@ class AreaFields {
   };
   struct Search {
     GoalSearch search;
-    bool read;
+    bool read = false;
   };
 
   [[nodiscard]] std::vector<FieldSeed> seeds(const Map& map,

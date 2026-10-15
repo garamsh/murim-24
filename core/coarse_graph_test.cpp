@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "flow_field.hpp"
@@ -15,18 +16,28 @@
 namespace murim {
 namespace {
 
-// Rows of `side` cells, each blocked with `blocked` chances in 100, drawn
-// from `seed`.
-std::vector<std::string> random_rows(std::uint64_t seed, std::int32_t side,
-                                     std::int32_t blocked) {
+constexpr std::int32_t SMALL_SIDE = 96;
+constexpr std::int32_t DENSE = 40;
+constexpr int PAIRS = 40;
+constexpr std::uint64_t MAPS = 6;
+// The draws of the pairs of cells start this far past the map's seed.
+constexpr std::uint64_t PAIR_DRAWS = 100;
+
+// A map of SMALL_SIDE cells, each blocked with `blocked` chances in 100,
+// drawn from `seed`.
+struct Scatter {
+  std::uint64_t seed;
+  std::int32_t blocked;
+};
+
+std::vector<std::string> random_rows(Scatter scatter) {
   constexpr std::int32_t HUNDRED = 100;
-  Random random{seed};
-  std::vector<std::string> rows(
-      static_cast<std::size_t>(side),
-      std::string(static_cast<std::size_t>(side), '.'));
+  Random random{scatter.seed};
+  std::vector<std::string> rows(static_cast<std::size_t>(SMALL_SIDE),
+                                std::string(SMALL_SIDE, '.'));
   for (std::string& row : rows) {
     for (char& cell : row) {
-      cell = random.below(HUNDRED) < blocked ? '#' : '.';
+      cell = random.below(HUNDRED) < scatter.blocked ? '#' : '.';
     }
   }
   return rows;
@@ -34,38 +45,52 @@ std::vector<std::string> random_rows(std::uint64_t seed, std::int32_t side,
 
 // A passable cell of `map` drawn from `random`.
 Cell passable_cell(const Map& map, Random& random) {
-  Cell cell{0, 0};
-  do {
+  Cell cell{random.below(map.width()), random.below(map.height())};
+  while (!map.passable(cell)) {
     cell = Cell{random.below(map.width()), random.below(map.height())};
-  } while (!map.passable(cell));
+  }
   return cell;
 }
 
-constexpr std::int32_t SMALL_SIDE = 96;
-constexpr std::int32_t DENSE = 40;
-constexpr int PAIRS = 40;
-
-TEST(CoarseGraph, TwoCellsAreJoinedExactlyWhereAFullFieldReachesOne) {
+// Over PAIRS pairs of passable cells of `map` drawn from `draws`, how many a
+// whole-map field joins, how many it parts, and how many the graph answers
+// otherwise, by joined() or by whether path_cost() finds a walk.
+struct Agreement {
   std::size_t reached = 0;
   std::size_t apart = 0;
-  for (std::uint64_t seed = 1; seed <= 6; ++seed) {
-    const Map map{random_rows(seed, SMALL_SIDE, DENSE)};
+  std::size_t disagreed = 0;
+};
+
+Agreement agreement(const Map& map, const CoarseGraph& graph, Random& draws) {
+  Agreement found;
+  for (int pair = 0; pair < PAIRS; ++pair) {
+    const Cell from = passable_cell(map, draws);
+    const Cell goal = passable_cell(map, draws);
+    const bool full =
+        FlowField{map, goal}.distance(from) != FlowField::UNREACHABLE;
+    const Walk walk{from, goal};
+    const bool agrees = graph.joined(map, walk) == full &&
+                        graph.path_cost(map, walk, true).has_value() == full;
+    ++(full ? found.reached : found.apart);
+    found.disagreed += agrees ? 0 : 1;
+  }
+  return found;
+}
+
+TEST(CoarseGraph, TwoCellsAreJoinedExactlyWhereAFullFieldReachesOne) {
+  Agreement total;
+  for (std::uint64_t seed = 1; seed <= MAPS; ++seed) {
+    const Map map{random_rows(Scatter{seed, DENSE})};
     const CoarseGraph graph{map};
-    Random draws{seed + 100};
-    for (int pair = 0; pair < PAIRS; ++pair) {
-      const Cell from = passable_cell(map, draws);
-      const Cell to = passable_cell(map, draws);
-      const bool full =
-          FlowField{map, to}.distance(from) != FlowField::UNREACHABLE;
-      EXPECT_EQ(graph.joined(map, from, to), full) << seed << " " << pair;
-      EXPECT_EQ(graph.path_cost(map, from, to, true).has_value(), full)
-          << seed << " " << pair;
-      ++(full ? reached : apart);
-    }
+    Random draws{seed + PAIR_DRAWS};
+    const Agreement found = agreement(map, graph, draws);
+    EXPECT_EQ(found.disagreed, 0U) << seed;
+    total.reached += found.reached;
+    total.apart += found.apart;
   }
   // The maps hold both joined and parted pairs, so both answers are tried.
-  EXPECT_GT(reached, 0U);
-  EXPECT_GT(apart, 0U);
+  EXPECT_GT(total.reached, 0U);
+  EXPECT_GT(total.apart, 0U);
 }
 
 // An open map of four regions, 512 cells square, crossed by a wall with a
@@ -77,10 +102,10 @@ std::vector<std::string> walled_rows() {
   constexpr std::int32_t GAP = 6;
   std::vector<std::string> rows(static_cast<std::size_t>(SIDE),
                                 std::string(SIDE, '.'));
-  for (std::int32_t y = 0; y < SIDE; ++y) {
-    if (y % GAP_EVERY >= GAP) {
-      rows.at(static_cast<std::size_t>(y)).at(static_cast<std::size_t>(WALL)) =
-          '#';
+  for (std::int32_t row = 0; row < SIDE; ++row) {
+    if (row % GAP_EVERY >= GAP) {
+      rows.at(static_cast<std::size_t>(row))
+          .at(static_cast<std::size_t>(WALL)) = '#';
     }
   }
   return rows;
@@ -93,42 +118,44 @@ TEST(CoarseGraph, APathOverTheRegionsCostsWhatOneOverTheAreasDoes) {
       {Cell{10, 10}, Cell{500, 500}},
       {Cell{20, 400}, Cell{480, 30}},
       {Cell{100, 250}, Cell{310, 260}}};
-  for (const auto& [from, to] : walks) {
+  for (const auto& [from, goal] : walks) {
     const std::optional<CoarseCost> regions =
-        graph.path_cost(map, from, to, true);
+        graph.path_cost(map, Walk{from, goal}, true);
     const std::optional<CoarseCost> areas =
-        graph.path_cost(map, from, to, false);
+        graph.path_cost(map, Walk{from, goal}, false);
     ASSERT_TRUE(regions.has_value());
     ASSERT_TRUE(areas.has_value());
     EXPECT_EQ(regions, areas) << from.x << "," << from.y;
     // Neither is shorter than the full field's exact shortest walk.
-    const std::uint32_t exact = FlowField{map, to}.distance(from);
+    const std::uint32_t exact = FlowField{map, goal}.distance(from);
     EXPECT_GE(regions.value_or(0) / 5, exact) << from.x << "," << from.y;
   }
 }
 
+// The map the rebuild test blocks a wall across.
+constexpr std::uint64_t REBUILT_SEED = 7;
+
 TEST(CoarseGraph, ARebuildAfterBlockingCellsMatchesAGraphBuiltAfresh) {
-  Map map{random_rows(7, SMALL_SIDE, DENSE / 2)};
+  Map map{random_rows(Scatter{REBUILT_SEED, DENSE / 2})};
   CoarseGraph graph{map};
   // A wall down the middle area's column, with no gap.
   std::vector<Cell> blocked;
-  for (std::int32_t y = 0; y < SMALL_SIDE; ++y) {
-    blocked.push_back(Cell{SMALL_SIDE / 2, y});
+  for (std::int32_t row = 0; row < SMALL_SIDE; ++row) {
+    blocked.push_back(Cell{SMALL_SIDE / 2, row});
     map.block(blocked.back());
   }
   graph.rebuild(map, blocked);
   const CoarseGraph fresh{map};
   EXPECT_EQ(graph.node_count(), fresh.node_count());
-  Random draws{77};
+  Random draws{REBUILT_SEED + PAIR_DRAWS};
   for (int pair = 0; pair < PAIRS; ++pair) {
-    const Cell from = passable_cell(map, draws);
-    const Cell to = passable_cell(map, draws);
-    EXPECT_EQ(graph.joined(map, from, to), fresh.joined(map, from, to));
-    EXPECT_EQ(graph.path_cost(map, from, to, true),
-              fresh.path_cost(map, from, to, true));
+    const Walk walk{passable_cell(map, draws), passable_cell(map, draws)};
+    EXPECT_EQ(graph.joined(map, walk), fresh.joined(map, walk));
+    EXPECT_EQ(graph.path_cost(map, walk, true),
+              fresh.path_cost(map, walk, true));
   }
   // The wall parts its halves.
-  EXPECT_FALSE(graph.joined(map, Cell{0, 0}, Cell{SMALL_SIDE - 1, 0}) &&
+  EXPECT_FALSE(graph.joined(map, Walk{Cell{0, 0}, Cell{SMALL_SIDE - 1, 0}}) &&
                map.passable(Cell{0, 0}) &&
                map.passable(Cell{SMALL_SIDE - 1, 0}));
 }
@@ -164,11 +191,11 @@ TEST(CoarseGraph, ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers) {
   // what it does over a graph built afresh.
   const Cell west{5, 5};
   const Cell east{90, 5};
-  EXPECT_EQ(graph.path_cost(map, west, east, true),
-            fresh.path_cost(map, west, east, true));
-  EXPECT_EQ(graph.path_cost(map, west, east, false),
-            fresh.path_cost(map, west, east, false));
-  EXPECT_TRUE(graph.joined(map, west, Cell{SPLIT, ROW + 5}));
+  EXPECT_EQ(graph.path_cost(map, Walk{west, east}, true),
+            fresh.path_cost(map, Walk{west, east}, true));
+  EXPECT_EQ(graph.path_cost(map, Walk{west, east}, false),
+            fresh.path_cost(map, Walk{west, east}, false));
+  EXPECT_TRUE(graph.joined(map, Walk{west, Cell{SPLIT, ROW + 5}}));
 }
 
 }  // namespace

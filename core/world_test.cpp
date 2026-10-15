@@ -297,8 +297,7 @@ struct Walk {
   std::int64_t strayed;
 };
 
-Walk walk_alone(Cell start, Cell objective, std::size_t side = OPEN_SIDE,
-                int ticks = ARRIVAL_TICKS) {
+Walk walk_alone(Cell start, Cell objective, std::size_t side = OPEN_SIDE) {
   World world{Seed{1},
               Map{open_map(side)},
               {army(start, objective, 1, 1, 0, {IDLE})},
@@ -310,8 +309,8 @@ Walk walk_alone(Cell start, Cell objective, std::size_t side = OPEN_SIDE,
   const std::int64_t along_y = std::int64_t{end.y} - from.y;
   const auto length = static_cast<std::int64_t>(std::sqrt(
       static_cast<double>((along_x * along_x) + (along_y * along_y))));
-  Walk walk{ticks, 0};
-  for (int tick = 1; tick <= ticks; ++tick) {
+  Walk walk{ARRIVAL_TICKS, 0};
+  for (int tick = 1; tick <= ARRIVAL_TICKS; ++tick) {
     world.tick();
     const Position here = lead(world, 0);
     const std::int64_t cross = (along_x * (here.y - from.y)) -
@@ -345,10 +344,8 @@ TEST(World, APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed) {
   EXPECT_EQ(diagonal.ticks, 222);
 }
 
-// An open map of 4 by 4 areas, and the ticks a walk across most of it takes
-// at most.
+// An open map of 4 by 4 areas.
 constexpr std::size_t AREAS_SIDE = 128;
-constexpr int ACROSS_TICKS = 3'000;
 // The walk from (2, 10) to (100, 70) by one field over the whole map, on
 // main 5477540 before fields within areas: its ticks, and how far it strays
 // from the line, 7.4 cells, since each step is the one nearest the line from
@@ -361,9 +358,9 @@ TEST(World, AWalkAcrossThreeAreasOnOpenGroundIsTheWholeMapFieldsWalk) {
   // the areas it crosses (ADR 0043).
   const Cell start{2, 10};
   const Cell objective{100, 70};
-  const Walk across = walk_alone(start, objective, AREAS_SIDE, ACROSS_TICKS);
+  const Walk across = walk_alone(start, objective, AREAS_SIDE);
   // Setup: it arrived, across three areas or more.
-  ASSERT_LT(across.ticks, ACROSS_TICKS);
+  ASSERT_LT(across.ticks, ARRIVAL_TICKS);
   ASSERT_GE((objective.x / AREA_SIDE) - (start.x / AREA_SIDE), 3);
   EXPECT_EQ(across.ticks, WHOLE_MAP_TICKS);
   EXPECT_EQ(across.strayed, WHOLE_MAP_STRAY);

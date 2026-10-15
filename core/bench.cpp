@@ -310,9 +310,9 @@ Map ranged_map() {
        range += RANGE_EVERY) {
     const std::int32_t pass =
         (range / RANGE_EVERY * PASS_STRIDE) % (MAP_SIDE - PASS_WIDTH);
-    for (std::int32_t y = 0; y < MAP_SIDE; ++y) {
-      if (y < pass || y >= pass + PASS_WIDTH) {
-        rows.at(static_cast<std::size_t>(y))
+    for (std::int32_t row = 0; row < MAP_SIDE; ++row) {
+      if (row < pass || row >= pass + PASS_WIDTH) {
+        rows.at(static_cast<std::size_t>(row))
             .at(static_cast<std::size_t>(range)) = '#';
       }
     }
@@ -344,13 +344,15 @@ void run_paths() {
   const double build_ms =
       milliseconds(std::chrono::steady_clock::now() - built_at);
   const Cell from{10, 10};
-  const Cell to{MAP_SIDE - 10, MAP_SIDE - 10};
+  const Cell corner{MAP_SIDE - 10, MAP_SIDE - 10};
   std::optional<CoarseCost> by_regions;
   std::optional<CoarseCost> by_areas;
-  const double regions_ms = median_ms(
-      PATH_RUNS, [&] { by_regions = graph.path_cost(map, from, to, true); });
-  const double areas_ms = median_ms(
-      PATH_RUNS, [&] { by_areas = graph.path_cost(map, from, to, false); });
+  const double regions_ms = median_ms(PATH_RUNS, [&] {
+    by_regions = graph.path_cost(map, Walk{from, corner}, true);
+  });
+  const double areas_ms = median_ms(PATH_RUNS, [&] {
+    by_areas = graph.path_cost(map, Walk{from, corner}, false);
+  });
   require(by_regions.has_value() && by_areas.has_value(),
           "the path measure's corners must be joined");
   std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "

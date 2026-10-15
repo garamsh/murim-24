@@ -15,22 +15,22 @@
 namespace murim {
 namespace {
 
-// Whether the segment between the centres of `from` and `to` crosses only
-// passable cells, read at two points a cell along it.
-bool clear_line(const Map& map, Cell from, Cell to) {
+// Whether the segment between the centres of `from` and `goal` crosses
+// only passable cells, read at two points a cell along it.
+bool clear_line(const Map& map, Cell from, Cell goal) {
   const Position start = centre_of(from);
-  const Position end = centre_of(to);
+  const Position end = centre_of(goal);
   const std::int64_t points =
-      2 *
-      std::max<std::int64_t>(std::abs(to.x - from.x), std::abs(to.y - from.y));
+      2 * std::max<std::int64_t>(std::abs(goal.x - from.x),
+                                 std::abs(goal.y - from.y));
+  const std::int64_t parts = std::max<std::int64_t>(points, 1);
   for (std::int64_t point = 0; point <= points; ++point) {
-    const Position at{static_cast<std::int32_t>(
-                          start.x + ((std::int64_t{end.x} - start.x) * point /
-                                     std::max<std::int64_t>(points, 1))),
-                      static_cast<std::int32_t>(
-                          start.y + ((std::int64_t{end.y} - start.y) * point /
-                                     std::max<std::int64_t>(points, 1)))};
-    if (!map.passable(cell_of(at))) {
+    const Position along{
+        static_cast<std::int32_t>(
+            start.x + ((std::int64_t{end.x} - start.x) * point / parts)),
+        static_cast<std::int32_t>(
+            start.y + ((std::int64_t{end.y} - start.y) * point / parts))};
+    if (!map.passable(cell_of(along))) {
       return false;
     }
   }

@@ -22,6 +22,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "cultivation.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
@@ -2002,8 +2003,8 @@ void World::add_village(VillageSpec spec) {
 void World::reachable_from(Cell objective,
                            const std::vector<std::size_t>& members) const {
   const auto cut_off = [this, objective](std::size_t member) {
-    return !graph_.joined(map_, cell_of(people_.at(member).position),
-                          objective);
+    return !graph_.joined(
+        map_, Walk{cell_of(people_.at(member).position), objective});
   };
   if (std::any_of(members.begin(), members.end(), cut_off)) {
     throw std::invalid_argument(
@@ -4666,8 +4667,8 @@ void World::recall(std::size_t village) {
     // their anchor.
     const bool reached =
         far_off(residents) ||
-        graph_.joined(map_, cell_of(people_.at(member).position),
-                      residents.order.objective);
+        graph_.joined(map_, Walk{cell_of(people_.at(member).position),
+                                 residents.order.objective});
     if (!reached) {
       continue;
     }
@@ -4912,7 +4913,7 @@ std::vector<Cell> World::open_sites(std::size_t village,
     const std::vector<Cell> cells = cells_of(corner, area);
     return blocked.clear(corner, area) &&
            covered.clear_around(corner, area, growth.spacing) &&
-           graph_.joined(map_, home, centre) &&
+           graph_.joined(map_, Walk{home, centre}) &&
            open_site(centre, centres, growth.apart) &&
            std::none_of(cells.begin(), cells.end(), claimed);
   };
@@ -5052,7 +5053,8 @@ bool World::send_raid(std::size_t village, const Growth& growth) {
   raiders.resize(std::min<std::size_t>(raiders.size(), growth.raiders));
   const Cell aimed = seat(*target);
   const auto cut_off = [this, aimed](std::size_t member) {
-    return !graph_.joined(map_, cell_of(people_.at(member).position), aimed);
+    return !graph_.joined(map_,
+                          Walk{cell_of(people_.at(member).position), aimed});
   };
   if (raiders.empty() || std::any_of(raiders.begin(), raiders.end(), cut_off)) {
     return false;
@@ -5158,8 +5160,8 @@ std::optional<std::vector<std::size_t>> World::lay(
                            Cell objective,
                            const std::vector<std::size_t>& members) {
     return std::all_of(members.begin(), members.end(), [&](std::size_t member) {
-      return rebuilt.joined(built, cell_of(people_.at(member).position),
-                            objective);
+      return rebuilt.joined(
+          built, Walk{cell_of(people_.at(member).position), objective});
     });
   };
   for (const Army& army : armies_) {
