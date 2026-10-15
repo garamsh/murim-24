@@ -321,7 +321,8 @@ class Villages {
   /// Whether the saved-state invariant holds among `structures`, `armies`
   /// armies and `factions` factions: a village for each structure or
   /// none, and every structure, army and village a village names one that
-  /// exists, with what each of its structures holds, if anything.
+  /// exists, with what each of its structures holds and its kind, if
+  /// anything.
   [[nodiscard]] bool kept(const std::vector<Structure>& structures,
                           std::size_t armies, std::size_t factions) const;
 

@@ -23,6 +23,15 @@ bool below(std::optional<std::size_t> index, std::size_t count) {
   return !index || *index < count;
 }
 
+// Whether `spec` gives what each of its structures holds, and its kind, for
+// all of them or for none.
+bool matched(const VillageSpec& spec) {
+  const auto each = [&spec](std::size_t count) {
+    return count == 0 || count == spec.structures.size();
+  };
+  return each(spec.holdings.size()) && each(spec.kinds.size());
+}
+
 }  // namespace
 
 Stages::Stages(const std::vector<Structure>& structures,
@@ -74,11 +83,7 @@ std::size_t Villages::add(VillageSpec spec, std::size_t armies,
     return structure >= village_of_.size() ||
            village_of_.at(structure).has_value();
   };
-  const auto unmatched = [&spec](std::size_t count) {
-    return count != 0 && count != spec.structures.size();
-  };
-  const bool unheld =
-      unmatched(spec.holdings.size()) || unmatched(spec.kinds.size());
+  const bool unheld = !matched(spec);
   if (spec.residents >= armies ||
       std::any_of(spec.structures.begin(), spec.structures.end(), claimed) ||
       houses(spec.residents) || unheld ||
@@ -277,9 +282,7 @@ bool Villages::kept(const std::vector<Structure>& structures,
     };
     return std::any_of(spec.structures.begin(), spec.structures.end(),
                        missing) ||
-           spec.residents >= armies ||
-           (!spec.holdings.empty() &&
-            spec.holdings.size() != spec.structures.size()) ||
+           spec.residents >= armies || !matched(spec) ||
            (village.destroyer && (village.destroyer->army >= armies ||
                                   village.destroyer->faction >= factions)) ||
            !below(village.party, armies) || !below(village.raiding, villages);

@@ -1065,6 +1065,45 @@ std::size_t encoded_at(const std::vector<std::uint8_t>& payload,
   return static_cast<std::size_t>(found - payload.begin());
 }
 
+TEST(Save, AVillageNamingMoreKindsThanStructuresIsRefused) {
+  // One village of one structure, a workshop, and its residents.
+  const World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {Structure{{3, 1}, 100, {1, 1}, true}},
+      Rules{0, {{false}}, STAGE_FLOORS},
+      {VillageSpec{{0}, 0, {}, 0, {}, {"workshop"}}}};
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // Control: resealing the same payload loads, so the reseal refuses nothing.
+  store.bytes(SLOT) = resealed(header, payload);
+  ASSERT_EQ(loaded(load(store, SLOT)).world.hash(), world.hash());
+
+  // The village's kinds, a count then each, gain a second workshop, so they
+  // are two for its one structure.
+  const std::size_t kind = encoded_at(payload, "workshop");
+  const std::size_t count = kind - sizeof(std::uint64_t);
+  ASSERT_EQ(payload.at(count), 1);
+  payload.at(count) = 2;
+  const std::size_t kind_bytes =
+      sizeof(std::uint64_t) + std::string{"workshop"}.size();
+  const std::vector<std::uint8_t> again(
+      payload.begin() + static_cast<std::ptrdiff_t>(kind),
+      payload.begin() + static_cast<std::ptrdiff_t>(kind + kind_bytes));
+  payload.insert(
+      payload.begin() + static_cast<std::ptrdiff_t>(kind + kind_bytes),
+      again.begin(), again.end());
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
 TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
   // One person at home in a village where `first` opens no place, so it
   // takes the fallback, `spare`, the second and last occupation.
