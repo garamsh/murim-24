@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -151,20 +152,22 @@ struct Push {
   std::int64_t y;
 };
 
-// The integer square root, rounded down.
+// The integer square root of `value`, rounded down, and 0 for a value of 0
+// or less.
 std::int64_t root(std::int64_t value) {
-  std::int64_t low = 0;
-  constexpr std::int64_t ABOVE_ANY_ROOT = std::int64_t{1} << 32;
-  std::int64_t high = std::min<std::int64_t>(value, ABOVE_ANY_ROOT);
-  while (low < high) {
-    const std::int64_t middle = (low + high + 1) / 2;
-    if (middle <= value / middle) {
-      low = middle;
-    } else {
-      high = middle - 1;
-    }
+  if (value <= 0) {
+    return 0;
   }
-  return low;
+  // The floating-point root is only a guess: it is corrected to the exact
+  // floor in whole numbers, so every platform returns the same root.
+  auto guess = static_cast<std::int64_t>(std::sqrt(static_cast<double>(value)));
+  while (guess > 0 && guess > value / guess) {
+    --guess;
+  }
+  while (guess + 1 <= value / (guess + 1)) {
+    ++guess;
+  }
+  return guess;
 }
 
 // `point` brought within `range` of `from`, along the line between them.
@@ -2267,13 +2270,16 @@ void World::march(std::size_t army, const Crowd& crowd,
           other == self ||
           (!standing.at(self) && (standing.at(other) || ahead < 0)) ||
           (seeking.at(self) != ABSENT && seeking.at(self) == seeking.at(other));
+      if (ignored) {
+        return;
+      }
       const bool yields = standing.at(self) && !standing.at(other);
       const Step lean{crowd.people.at(other) < member ? 1 : -1, 0};
       const Push felt =
           yields ? aside(from, there, separation, pulls.at(other), side)
                  : repulsion(from, there, separation, lean);
-      push.x += ignored ? 0 : felt.x;
-      push.y += ignored ? 0 : felt.y;
+      push.x += felt.x;
+      push.y += felt.y;
     });
     const Step direction{sign((push.x * 2) + pull.x),
                          sign((push.y * 2) + pull.y)};
