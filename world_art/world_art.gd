@@ -61,6 +61,8 @@ const LIGHTS := "res://world_art/lights.json"
 const LIGHT_FLOATS := 5
 # Pixels across and down an area of LIGHTS' index, which lights() reads only round the view (#336).
 const LIGHT_AREA := 256.0
+# What a structure's stage with no lights lists, one array shared rather than one made per visit.
+const NO_LIGHTS: Array = []
 const FOOTPRINT_INSET := 8
 const CHEVRON_FRAME_MS := 400
 # Frame positions in the body atlas built at startup, in pixels.
@@ -171,6 +173,8 @@ var lights_visited := 0
 # structures as it was built for; and how far round its frame's corner a structure's light can reach.
 var _shown_lights := PackedFloat32Array()
 var _next_lights := PackedFloat32Array()
+# What torch() gives, refilled rather than made anew.
+var _torch_light := PackedFloat32Array()
 var _light_areas := {}
 var _light_areas_for := -1
 var _light_margin := 0.0
@@ -390,7 +394,7 @@ func lights(view: Rect2) -> PackedFloat32Array:
 					continue
 				lights_visited += 1
 				var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
-				for light: Array in sprite.get_meta("lights").get(STAGES[stage], []):
+				for light: Array in sprite.get_meta("lights").get(STAGES[stage], NO_LIGHTS):
 					if _add_light(count, light, sprite.position + sprite.offset, view):
 						count += 1
 						if light[2] == 0 and light[3] == 0:
@@ -405,16 +409,21 @@ func lights(view: Rect2) -> PackedFloat32Array:
 
 
 ## The steered person's torch while it lives and its light reaches into `view`, as one entry of
-## lights() gives a window, LIGHT_FLOATS floats; empty otherwise.
+## lights() gives a window, LIGHT_FLOATS floats; empty otherwise. The array is kept and refilled:
+## read it before the next call.
 func torch(view: Rect2) -> PackedFloat32Array:
-	var lit := PackedFloat32Array()
-	if not _lead_alive:
-		return lit
 	var light: Array = _lights.torch
 	var rect := Rect2(_lead_at + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
-	if rect.grow(light[4]).intersects(view):
-		lit = PackedFloat32Array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
-	return lit
+	if not _lead_alive or not rect.grow(light[4]).intersects(view):
+		_torch_light.resize(0)
+		return _torch_light
+	_torch_light.resize(LIGHT_FLOATS)
+	_torch_light[0] = rect.position.x
+	_torch_light[1] = rect.position.y
+	_torch_light[2] = rect.size.x
+	_torch_light[3] = rect.size.y
+	_torch_light[4] = light[4]
+	return _torch_light
 
 
 # Writes `light`, a rect and a reach from `origin`, as entry `at` of the list lights() builds, when its
