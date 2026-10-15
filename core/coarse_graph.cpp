@@ -40,10 +40,10 @@ Key key_of(NodeRef ref) { return Key{ref.area, ref.node}; }
 // where both cells beside it are passable too.
 bool opens(const Map& map, Cell corner, Footprint size, Cell cell,
            std::int32_t column, std::int32_t row) {
-  const auto inside = [&](Cell at) {
-    return at.x >= corner.x && at.y >= corner.y &&
-           at.x < corner.x + size.width && at.y < corner.y + size.height &&
-           map.passable(at);
+  const auto inside = [&](Cell place) {
+    return place.x >= corner.x && place.y >= corner.y &&
+           place.x < corner.x + size.width &&
+           place.y < corner.y + size.height && map.passable(place);
   };
   const Cell next{cell.x + column, cell.y + row};
   return inside(next) &&
@@ -53,9 +53,9 @@ bool opens(const Map& map, Cell corner, Footprint size, Cell cell,
 
 }  // namespace
 
-CoarseCost octile(Cell from, Cell to) {
-  const auto across = static_cast<CoarseCost>(std::abs(to.x - from.x));
-  const auto down = static_cast<CoarseCost>(std::abs(to.y - from.y));
+CoarseCost octile(Cell from, Cell goal) {
+  const auto across = static_cast<CoarseCost>(std::abs(goal.x - from.x));
+  const auto down = static_cast<CoarseCost>(std::abs(goal.y - from.y));
   const CoarseCost diagonal = std::min(across, down);
   return (diagonal * DIAGONAL) +
          ((std::max(across, down) - diagonal) * STRAIGHT);
@@ -95,13 +95,14 @@ void CoarseGraph::rebuild(const Map& map, const std::vector<Cell>& cells) {
         static_cast<std::int32_t>(area / static_cast<std::size_t>(columns_));
     const std::array<std::array<std::int32_t, 2>, 5> beside{
         {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
-    for (const auto& [dx, dy] : beside) {
-      const std::int32_t x = column + dx;
-      const std::int32_t y = row + dy;
-      if (x >= 0 && y >= 0 && x < columns_ && y < rows_) {
-        into.insert(
-            (static_cast<std::size_t>(y) * static_cast<std::size_t>(columns_)) +
-            static_cast<std::size_t>(x));
+    for (const auto& [across, down] : beside) {
+      const std::int32_t next_column = column + across;
+      const std::int32_t next_row = row + down;
+      if (next_column >= 0 && next_row >= 0 && next_column < columns_ &&
+          next_row < rows_) {
+        into.insert((static_cast<std::size_t>(next_row) *
+                     static_cast<std::size_t>(columns_)) +
+                    static_cast<std::size_t>(next_column));
       }
     }
   };
@@ -186,11 +187,11 @@ std::vector<std::int16_t> CoarseGraph::labels(const Map& map,
       label.at(slot(cell)) = next;
       waiting.push_back(cell);
       while (!waiting.empty()) {
-        const Cell at = waiting.back();
+        const Cell reached = waiting.back();
         waiting.pop_back();
         for (const auto& [column, row] : DIRECTIONS) {
-          const Cell beside{at.x + column, at.y + row};
-          if (opens(map, corner, size, at, column, row) &&
+          const Cell beside{reached.x + column, reached.y + row};
+          if (opens(map, corner, size, reached, column, row) &&
               label.at(slot(beside)) == UNLABELLED) {
             label.at(slot(beside)) = next;
             waiting.push_back(beside);
@@ -318,13 +319,13 @@ std::vector<CoarseCost> CoarseGraph::area_costs(const Map& map,
   cost.at(slot(from)) = 0;
   frontier.emplace(0, slot(from));
   while (!frontier.empty()) {
-    const auto [held, at] = frontier.top();
+    const auto [held, place] = frontier.top();
     frontier.pop();
-    if (held != cost.at(at)) {
+    if (held != cost.at(place)) {
       continue;
     }
-    const Cell cell{corner.x + static_cast<std::int32_t>(at % width),
-                    corner.y + static_cast<std::int32_t>(at / width)};
+    const Cell cell{corner.x + static_cast<std::int32_t>(place % width),
+                    corner.y + static_cast<std::int32_t>(place / width)};
     for (const auto& [column, row] : DIRECTIONS) {
       if (!opens(map, corner, size, cell, column, row)) {
         continue;
@@ -451,6 +452,7 @@ std::vector<std::size_t> CoarseGraph::sets_of(const Map& map, Cell cell) const {
     }
   }
   std::vector<std::size_t> sets;
+  sets.reserve(ends.size());
   for (const Cell end : ends) {
     sets.push_back(
         joined_.at(first_component_.at(area_of(end)) + component_of(map, end)));
@@ -458,9 +460,9 @@ std::vector<std::size_t> CoarseGraph::sets_of(const Map& map, Cell cell) const {
   return sets;
 }
 
-bool CoarseGraph::joined(const Map& map, Cell from, Cell to) const {
-  const std::vector<std::size_t> one = sets_of(map, from);
-  const std::vector<std::size_t> other = sets_of(map, to);
+bool CoarseGraph::joined(const Map& map, Walk walk) const {
+  const std::vector<std::size_t> one = sets_of(map, walk.from);
+  const std::vector<std::size_t> other = sets_of(map, walk.to);
   return std::any_of(one.begin(), one.end(), [&other](std::size_t set) {
     return std::find(other.begin(), other.end(), set) != other.end();
   });
@@ -470,12 +472,12 @@ const std::vector<CoarseExit>& CoarseGraph::exits(std::size_t area) const {
   return areas_.at(area).exits;
 }
 
-std::vector<std::pair<NodeRef, CoarseCost>> CoarseGraph::inserted(
-    const Map& map, Cell cell) const {
+CoarseGraph::Costs CoarseGraph::inserted(const Map& map, Cell cell) const {
   const std::size_t area = area_of(cell);
   const std::vector<std::optional<CoarseCost>> costs =
       node_costs(map, area, cell);
-  std::vector<std::pair<NodeRef, CoarseCost>> found;
+  Costs found;
+  found.reserve(costs.size());
   for (std::size_t node = 0; node < costs.size(); ++node) {
     if (costs.at(node)) {
       found.emplace_back(NodeRef{area, node}, costs.at(node).value_or(0));
@@ -484,18 +486,44 @@ std::vector<std::pair<NodeRef, CoarseCost>> CoarseGraph::inserted(
   return found;
 }
 
-std::optional<CoarseCost> CoarseGraph::over_areas(
-    const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-    const std::vector<std::pair<NodeRef, CoarseCost>>& goals) const {
-  // A* over the nodes, ordered by estimate, then by the nodes' order; its
-  // estimate the least octile cost to a goal node, which never overestimates.
+void CoarseGraph::expand_areas(NodeRef ref, const Relax& relax) const {
+  const AreaGraph& area = areas_.at(ref.area);
+  for (const Edge& edge : area.within.at(ref.node)) {
+    relax(NodeRef{ref.area, edge.to}, edge.cost);
+  }
+  for (const CoarseExit& exit : area.exits) {
+    if (exit.node == ref.node) {
+      relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
+    }
+  }
+}
+
+void CoarseGraph::expand_regions(NodeRef ref, const Relax& relax) const {
+  const std::size_t region = region_of_area(ref.area);
+  const RegionGraph& graph = regions_.at(region);
+  const auto index =
+      static_cast<std::size_t>(areas_.at(ref.area).border.at(ref.node));
+  for (const Edge& edge : graph.within.at(index)) {
+    relax(graph.border.at(edge.to), edge.cost);
+  }
+  for (const CoarseExit& exit : areas_.at(ref.area).exits) {
+    if (exit.node == ref.node && region_of_area(exit.area) != region) {
+      relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
+    }
+  }
+}
+
+std::optional<CoarseCost> CoarseGraph::a_star(const Terminals& ends,
+                                              const Expand& expand) const {
+  // Ordered by estimate, then by the nodes' order; the estimate is the least
+  // octile cost to a goal node, which never overestimates.
   std::map<Key, CoarseCost> goal_cost;
-  for (const auto& [ref, cost] : goals) {
+  for (const auto& [ref, cost] : ends.goals) {
     goal_cost.emplace(key_of(ref), cost);
   }
   const auto estimate = [&](NodeRef ref) {
-    CoarseCost least = std::numeric_limits<CoarseCost>::max();
-    for (const auto& [goal, cost] : goals) {
+    CoarseCost least = UNREACHED;
+    for (const auto& [goal, cost] : ends.goals) {
       least = std::min(least, octile(node(ref).cell, node(goal).cell));
     }
     return least;
@@ -503,177 +531,111 @@ std::optional<CoarseCost> CoarseGraph::over_areas(
   using Entry = std::pair<CoarseCost, Key>;
   std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
   std::map<Key, CoarseCost> cost;
-  for (const auto& [ref, held] : starts) {
-    const auto [place, fresh] = cost.emplace(key_of(ref), held);
-    if (fresh || held < place->second) {
-      place->second = held;
-      frontier.emplace(held + estimate(ref), key_of(ref));
+  const auto offer = [&](NodeRef next, CoarseCost through) {
+    const auto [place, fresh] = cost.emplace(key_of(next), through);
+    if (fresh || through < place->second) {
+      place->second = through;
+      frontier.emplace(through + estimate(next), key_of(next));
     }
+  };
+  for (const auto& [ref, held] : ends.starts) {
+    offer(ref, held);
   }
   std::optional<CoarseCost> best;
   while (!frontier.empty()) {
-    const auto [bound, at] = frontier.top();
+    const CoarseCost bound = frontier.top().first;
+    const NodeRef ref{frontier.top().second.first,
+                      frontier.top().second.second};
     frontier.pop();
     if (best && bound >= *best) {
       break;
     }
-    const NodeRef ref{at.first, at.second};
-    const CoarseCost held = cost.at(at);
+    const CoarseCost held = cost.at(key_of(ref));
     if (bound != held + estimate(ref)) {
       continue;
     }
-    const auto goal = goal_cost.find(at);
+    const auto goal = goal_cost.find(key_of(ref));
     if (goal != goal_cost.end()) {
-      best = std::min(best.value_or(std::numeric_limits<CoarseCost>::max()),
-                      held + goal->second);
+      best = std::min(best.value_or(UNREACHED), held + goal->second);
     }
-    const AreaGraph& area = areas_.at(ref.area);
-    const auto relax = [&](NodeRef next, CoarseCost step) {
-      const CoarseCost through = held + step;
-      const auto [place, fresh] = cost.emplace(key_of(next), through);
-      if (fresh || through < place->second) {
-        place->second = through;
-        frontier.emplace(through + estimate(next), key_of(next));
-      }
-    };
-    for (const Edge& edge : area.within.at(ref.node)) {
-      relax(NodeRef{ref.area, edge.to}, edge.cost);
-    }
-    for (const CoarseExit& exit : area.exits) {
-      if (exit.node == ref.node) {
-        relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
-      }
-    }
+    expand(ref, [&offer, held](NodeRef next, CoarseCost step) {
+      offer(next, held + step);
+    });
   }
   return best;
 }
 
-std::vector<std::pair<NodeRef, CoarseCost>> CoarseGraph::settle_region(
-    const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-    std::size_t region) const {
+CoarseGraph::Costs CoarseGraph::settle_region(const Costs& starts,
+                                              std::size_t region) const {
   using Entry = std::pair<CoarseCost, Key>;
   std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
   std::map<Key, CoarseCost> cost;
-  for (const auto& [ref, held] : starts) {
-    const auto [place, fresh] = cost.emplace(key_of(ref), held);
-    if (fresh || held < place->second) {
-      place->second = held;
-      frontier.emplace(held, key_of(ref));
+  const auto offer = [&](NodeRef next, CoarseCost through) {
+    if (region_of_area(next.area) != region) {
+      return;
     }
+    const auto [place, fresh] = cost.emplace(key_of(next), through);
+    if (fresh || through < place->second) {
+      place->second = through;
+      frontier.emplace(through, key_of(next));
+    }
+  };
+  for (const auto& [ref, held] : starts) {
+    offer(ref, held);
   }
   while (!frontier.empty()) {
     const CoarseCost held = frontier.top().first;
-    const Key at = frontier.top().second;
+    const NodeRef ref{frontier.top().second.first,
+                      frontier.top().second.second};
     frontier.pop();
-    if (held != cost.at(at)) {
+    if (held != cost.at(key_of(ref))) {
       continue;
     }
-    const AreaGraph& area = areas_.at(at.first);
-    const auto relax = [&](NodeRef next, CoarseCost step) {
-      if (region_of_area(next.area) != region) {
-        return;
-      }
-      const CoarseCost through = held + step;
-      const auto [place, fresh] = cost.emplace(key_of(next), through);
-      if (fresh || through < place->second) {
-        place->second = through;
-        frontier.emplace(through, key_of(next));
-      }
-    };
-    for (const Edge& edge : area.within.at(at.second)) {
-      relax(NodeRef{at.first, edge.to}, edge.cost);
-    }
-    for (const CoarseExit& exit : area.exits) {
-      if (exit.node == at.second) {
-        relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
-      }
-    }
+    expand_areas(ref, [&offer, held](NodeRef next, CoarseCost step) {
+      offer(next, held + step);
+    });
   }
-  std::vector<std::pair<NodeRef, CoarseCost>> settled;
-  for (const auto& [at, held] : cost) {
-    settled.emplace_back(NodeRef{at.first, at.second}, held);
+  Costs settled;
+  settled.reserve(cost.size());
+  for (const auto& [key, held] : cost) {
+    settled.emplace_back(NodeRef{key.first, key.second}, held);
   }
   return settled;
 }
 
-std::optional<CoarseCost> CoarseGraph::over_regions(
-    const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-    const std::vector<std::pair<NodeRef, CoarseCost>>& goals) const {
+CoarseGraph::Costs CoarseGraph::on_border(const Costs& settled) const {
+  Costs border;
+  for (const auto& [ref, cost] : settled) {
+    if (areas_.at(ref.area).border.at(ref.node) >= 0) {
+      border.emplace_back(ref, cost);
+    }
+  }
+  return border;
+}
+
+std::optional<CoarseCost> CoarseGraph::between(const Terminals& ends,
+                                               bool by_regions) const {
+  if (ends.starts.empty() || ends.goals.empty()) {
+    return std::nullopt;
+  }
+  const std::size_t start_region =
+      region_of_area(ends.starts.front().first.area);
+  const std::size_t goal_region = region_of_area(ends.goals.front().first.area);
+  const Expand by_areas = [this](NodeRef ref, const Relax& relax) {
+    expand_areas(ref, relax);
+  };
+  if (!by_regions || start_region == goal_region) {
+    return a_star(ends, by_areas);
+  }
   // The start's and the goal's region border nodes, at their cost from the
-  // start and to the goal within their regions; then A* over the regions'
-  // border nodes, through the shortest walks within each region and the
-  // entrances across their borders, ordered by estimate and then by the
-  // nodes' order.
-  const auto bordering = [this](const auto& settled) {
-    std::vector<std::pair<NodeRef, CoarseCost>> border;
-    for (const auto& [ref, cost] : settled) {
-      if (areas_.at(ref.area).border.at(ref.node) >= 0) {
-        border.emplace_back(ref, cost);
-      }
-    }
-    return border;
-  };
-  const auto from = bordering(
-      settle_region(starts, region_of_area(starts.front().first.area)));
-  const auto to =
-      bordering(settle_region(goals, region_of_area(goals.front().first.area)));
-  std::map<Key, CoarseCost> goal_cost;
-  for (const auto& [ref, cost] : to) {
-    goal_cost.emplace(key_of(ref), cost);
-  }
-  const auto estimate = [&](NodeRef ref) {
-    CoarseCost least = std::numeric_limits<CoarseCost>::max();
-    for (const auto& [goal, held] : to) {
-      least = std::min(least, octile(node(ref).cell, node(goal).cell));
-    }
-    return least;
-  };
-  using Entry = std::pair<CoarseCost, Key>;
-  std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
-  std::map<Key, CoarseCost> cost;
-  for (const auto& [ref, held] : from) {
-    cost[key_of(ref)] = held;
-    frontier.emplace(held + estimate(ref), key_of(ref));
-  }
-  std::optional<CoarseCost> best;
-  while (!frontier.empty()) {
-    const auto [bound, at] = frontier.top();
-    frontier.pop();
-    if (best && bound >= *best) {
-      break;
-    }
-    const NodeRef ref{at.first, at.second};
-    const CoarseCost held = cost.at(at);
-    if (bound != held + estimate(ref)) {
-      continue;
-    }
-    const auto goal = goal_cost.find(at);
-    if (goal != goal_cost.end()) {
-      best = std::min(best.value_or(std::numeric_limits<CoarseCost>::max()),
-                      held + goal->second);
-    }
-    const auto relax = [&](NodeRef next, CoarseCost step) {
-      const CoarseCost through = held + step;
-      const auto [place, fresh] = cost.emplace(key_of(next), through);
-      if (fresh || through < place->second) {
-        place->second = through;
-        frontier.emplace(through + estimate(next), key_of(next));
-      }
-    };
-    const std::size_t region = region_of_area(ref.area);
-    const RegionGraph& graph = regions_.at(region);
-    const auto index =
-        static_cast<std::size_t>(areas_.at(ref.area).border.at(ref.node));
-    for (const Edge& edge : graph.within.at(index)) {
-      relax(graph.border.at(edge.to), edge.cost);
-    }
-    for (const CoarseExit& exit : areas_.at(ref.area).exits) {
-      if (exit.node == ref.node && region_of_area(exit.area) != region) {
-        relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
-      }
-    }
-  }
-  return best;
+  // start and to the goal within their regions; then over the regions'
+  // border nodes, through the walks within each region and the entrances
+  // across their borders.
+  const Terminals borders{on_border(settle_region(ends.starts, start_region)),
+                          on_border(settle_region(ends.goals, goal_region))};
+  return a_star(borders, [this](NodeRef ref, const Relax& relax) {
+    expand_regions(ref, relax);
+  });
 }
 
 GoalSearch CoarseGraph::toward(const Map& map, Cell objective) const {
@@ -693,29 +655,22 @@ std::optional<CoarseCost> CoarseGraph::cost_from(GoalSearch& search,
   const Key wanted = key_of(from);
   while (search.settled.count(wanted) == 0 && !search.frontier.empty()) {
     const CoarseCost held = search.frontier.top().first;
-    const Key at = search.frontier.top().second;
+    const NodeRef ref{search.frontier.top().second.first,
+                      search.frontier.top().second.second};
     search.frontier.pop();
-    if (search.settled.count(at) != 0 || held != search.cost.at(at)) {
+    if (search.settled.count(key_of(ref)) != 0 ||
+        held != search.cost.at(key_of(ref))) {
       continue;
     }
-    search.settled.insert(at);
-    const AreaGraph& area = areas_.at(at.first);
-    const auto relax = [&search, held](NodeRef next, CoarseCost step) {
+    search.settled.insert(key_of(ref));
+    expand_areas(ref, [&search, held](NodeRef next, CoarseCost step) {
       const CoarseCost through = held + step;
       const auto [place, fresh] = search.cost.emplace(key_of(next), through);
       if (fresh || through < place->second) {
         place->second = through;
         search.frontier.emplace(through, key_of(next));
       }
-    };
-    for (const Edge& edge : area.within.at(at.second)) {
-      relax(NodeRef{at.first, edge.to}, edge.cost);
-    }
-    for (const CoarseExit& exit : area.exits) {
-      if (exit.node == at.second) {
-        relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
-      }
-    }
+    });
   }
   if (search.settled.count(wanted) == 0) {
     return std::nullopt;
@@ -723,37 +678,20 @@ std::optional<CoarseCost> CoarseGraph::cost_from(GoalSearch& search,
   return search.cost.at(wanted);
 }
 
-std::optional<CoarseCost> CoarseGraph::between(
-    const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-    const std::vector<std::pair<NodeRef, CoarseCost>>& goals,
-    bool by_regions) const {
-  if (starts.empty() || goals.empty()) {
-    return std::nullopt;
-  }
-  const bool apart = region_of_area(starts.front().first.area) !=
-                     region_of_area(goals.front().first.area);
-  return by_regions && apart ? over_regions(starts, goals)
-                             : over_areas(starts, goals);
-}
-
-std::optional<CoarseCost> CoarseGraph::cost_to(const Map& map, NodeRef from,
-                                               Cell to) const {
-  return between({{from, 0}}, inserted(map, to), true);
-}
-
-std::optional<CoarseCost> CoarseGraph::path_cost(const Map& map, Cell from,
-                                                 Cell to,
+std::optional<CoarseCost> CoarseGraph::path_cost(const Map& map, Walk walk,
                                                  bool by_regions) const {
-  if (!joined(map, from, to)) {
+  if (!joined(map, walk)) {
     return std::nullopt;
   }
-  if (area_of(from) == area_of(to) &&
-      component_of(map, from) == component_of(map, to)) {
+  const std::size_t area = area_of(walk.from);
+  if (area == area_of(walk.to) &&
+      component_of(map, walk.from) == component_of(map, walk.to)) {
     // Within one component of one area, the walk within it, as a field
     // restricted to the area finds it.
-    return area_costs(map, area_of(from), from).at(slot_in(area_of(from), to));
+    return area_costs(map, area, walk.from).at(slot_in(area, walk.to));
   }
-  return between(inserted(map, from), inserted(map, to), by_regions);
+  return between(Terminals{inserted(map, walk.from), inserted(map, walk.to)},
+                 by_regions);
 }
 
 }  // namespace murim

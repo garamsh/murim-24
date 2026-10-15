@@ -51,7 +51,13 @@ using CoarseCost = std::uint32_t;
 
 /// Returns the least a walk between two cells can cost: a diagonal step for
 /// each cell both axes differ by, a straight one for the rest.
-[[nodiscard]] CoarseCost octile(Cell from, Cell to);
+[[nodiscard]] CoarseCost octile(Cell from, Cell goal);
+
+/// A walk's two ends.
+struct Walk {
+  Cell from;
+  Cell to;
+};
 
 /// A search outward from an objective over the coarse graph's level of areas,
 /// kept between queries: what it has settled, and what it would settle next.
@@ -88,15 +94,9 @@ class CoarseGraph {
   /// lies in.
   [[nodiscard]] std::uint16_t component_of(const Map& map, Cell cell) const;
 
-  /// Returns whether a walk joins the cells `from` and `to`; a blocked cell
-  /// is joined to whatever the cells it could step onto are.
-  [[nodiscard]] bool joined(const Map& map, Cell from, Cell to) const;
-
-  /// Returns the cost of the shortest walk the graph finds from node `from`
-  /// to the passable cell `to`, searched over the regions and then the areas
-  /// they cross; nothing when no walk joins them.
-  [[nodiscard]] std::optional<CoarseCost> cost_to(const Map& map, NodeRef from,
-                                                  Cell to) const;
+  /// Returns whether a walk joins `walk`'s ends; a blocked cell is joined to
+  /// whatever the cells it could step onto are.
+  [[nodiscard]] bool joined(const Map& map, Walk walk) const;
 
   /// Starts a search outward from `objective`, from its area's nodes at
   /// their cost to it.
@@ -109,12 +109,10 @@ class CoarseGraph {
   [[nodiscard]] std::optional<CoarseCost> cost_from(GoalSearch& search,
                                                     NodeRef from) const;
 
-  /// Returns the cost of the shortest walk the graph finds from the passable
-  /// cell `from` to the passable cell `to`, over the regions when
-  /// `by_regions` and over the areas alone otherwise; nothing when no walk
-  /// joins them.
-  [[nodiscard]] std::optional<CoarseCost> path_cost(const Map& map, Cell from,
-                                                    Cell to,
+  /// Returns the cost of the shortest walk the graph finds between `walk`'s
+  /// passable ends, over the regions when `by_regions` and over the areas
+  /// alone otherwise; nothing when no walk joins them.
+  [[nodiscard]] std::optional<CoarseCost> path_cost(const Map& map, Walk walk,
                                                     bool by_regions) const;
 
   /// Returns the ways out of area `area`, in node order.
@@ -162,21 +160,26 @@ class CoarseGraph {
   [[nodiscard]] std::size_t slot_in(std::size_t area, Cell cell) const;
   [[nodiscard]] std::vector<std::optional<CoarseCost>> node_costs(
       const Map& map, std::size_t area, Cell from) const;
-  [[nodiscard]] std::vector<std::pair<NodeRef, CoarseCost>> inserted(
-      const Map& map, Cell cell) const;
-  [[nodiscard]] std::optional<CoarseCost> over_areas(
-      const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-      const std::vector<std::pair<NodeRef, CoarseCost>>& goals) const;
-  [[nodiscard]] std::vector<std::pair<NodeRef, CoarseCost>> settle_region(
-      const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-      std::size_t region) const;
-  [[nodiscard]] std::optional<CoarseCost> over_regions(
-      const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-      const std::vector<std::pair<NodeRef, CoarseCost>>& goals) const;
-  [[nodiscard]] std::optional<CoarseCost> between(
-      const std::vector<std::pair<NodeRef, CoarseCost>>& starts,
-      const std::vector<std::pair<NodeRef, CoarseCost>>& goals,
-      bool by_regions) const;
+  // Nodes at a cost: a search's starts or goals, or what it settled.
+  using Costs = std::vector<std::pair<NodeRef, CoarseCost>>;
+  // A search's starts and goals.
+  struct Terminals {
+    Costs starts;
+    Costs goals;
+  };
+  using Relax = std::function<void(NodeRef, CoarseCost)>;
+  using Expand = std::function<void(NodeRef, const Relax&)>;
+
+  [[nodiscard]] Costs inserted(const Map& map, Cell cell) const;
+  void expand_areas(NodeRef ref, const Relax& relax) const;
+  void expand_regions(NodeRef ref, const Relax& relax) const;
+  [[nodiscard]] std::optional<CoarseCost> a_star(const Terminals& ends,
+                                                 const Expand& expand) const;
+  [[nodiscard]] Costs settle_region(const Costs& starts,
+                                    std::size_t region) const;
+  [[nodiscard]] Costs on_border(const Costs& settled) const;
+  [[nodiscard]] std::optional<CoarseCost> between(const Terminals& ends,
+                                                  bool by_regions) const;
   [[nodiscard]] Cell area_corner(std::size_t area) const;
   [[nodiscard]] Footprint area_size(std::size_t area) const;
 

@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -28,14 +29,11 @@ constexpr Cell JOINED{20, 16};
 Map split_map() {
   std::vector<std::string> rows(static_cast<std::size_t>(HEIGHT),
                                 std::string(WIDTH, '.'));
-  for (std::int32_t y = 0; y < HEIGHT; ++y) {
-    rows.at(static_cast<std::size_t>(y)).at(static_cast<std::size_t>(WALL)) =
-        '#';
+  for (std::string& row : rows) {
+    row.at(static_cast<std::size_t>(WALL)) = '#';
   }
-  for (std::int32_t x = 0; x < WALL; ++x) {
-    rows.at(static_cast<std::size_t>(POCKET_FLOOR))
-        .at(static_cast<std::size_t>(x)) = '#';
-  }
+  std::string& floor = rows.at(static_cast<std::size_t>(POCKET_FLOOR));
+  std::fill_n(floor.begin(), WALL, '#');
   return Map{rows};
 }
 
@@ -44,8 +42,8 @@ TEST(AreaFields, AComponentCutOffFromTheObjectiveGetsNoStep) {
   const CoarseGraph graph{map};
   // The strip leaves its area only into the pocket, which reaches nothing.
   ASSERT_EQ(graph.area_of(CUT_OFF), graph.area_of(JOINED));
-  ASSERT_FALSE(graph.joined(map, CUT_OFF, OBJECTIVE));
-  ASSERT_TRUE(graph.joined(map, JOINED, OBJECTIVE));
+  ASSERT_FALSE(graph.joined(map, Walk{CUT_OFF, OBJECTIVE}));
+  ASSERT_TRUE(graph.joined(map, Walk{JOINED, OBJECTIVE}));
   AreaFields fields;
   const FlowField& cut_off =
       fields.field(fields.field_for(map, graph, CUT_OFF, OBJECTIVE));
