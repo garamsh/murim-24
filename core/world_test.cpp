@@ -6481,6 +6481,72 @@ TEST(World, ThoseWithAHomeEarnAWageADay) {
   EXPECT_EQ(world.person(AWAY).silver, PURSE);
 }
 
+constexpr Cell SHOPPER_AT{4, 4};
+// A cell north of the buyer, where a seller lies nearest it.
+constexpr Cell NORTH_OF_SHOPPER{4, 3};
+// Two cells south and east of the buyer, the edge of its talk reach.
+constexpr Cell SOUTH_EAST_OF_SHOPPER{6, 6};
+constexpr std::size_t FIRST_SELLER = 1;
+constexpr std::size_t SECOND_SELLER = 2;
+
+// Faction 0's buyer at (4, 4), steered by no driver, with a purse for one
+// herb, and two steered sellers of it within its talk reach of 2 cells, the
+// first at `first` and the second at `second`. Days last a tick.
+World two_sellers(Cell first, Cell second) {
+  Life life;
+  life.disciplines = {{"medicine", {0, 0}, {WHOLE, 0}}};
+  life.newborn_health = WHOLE;
+  life.founding_age = Spread{DAYS_PER_YEAR, 0};
+  life.trade = Trade{{Ware{"herb", HERB_PRICE, HERB_HEALTH, 0, 0}},
+                     HERB_PRICE,
+                     1,
+                     PER_MILLE / 2,
+                     PER_MILLE / 4};
+  Rules rules = peaceful(0);
+  rules.talk_reach = 2;
+  rules.ticks_per_day = 1;
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {ArmySpec{SHOPPER_AT, {Recruit{SHOPPER_AT, WHOLE}}, 0, {IDLE}},
+               ArmySpec{first, {Recruit{first, WHOLE}}, 0, {IDLE}},
+               ArmySpec{second, {Recruit{second, WHOLE}}, 0, {IDLE}}},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  for (std::size_t army = 1; army < world.army_count(); ++army) {
+    world.steer(army, true);
+  }
+  return world;
+}
+
+// Whether person `person` of `world` stands in cell `cell`.
+bool stands_in(const World& world, std::size_t person, Cell cell) {
+  const Cell here = cell_of(world.person(person).position);
+  return here.x == cell.x && here.y == cell.y;
+}
+
+TEST(World, ABuyerBuysFromTheFirstSellerByIndexInReachNotTheNearest) {
+  World world = two_sellers(SOUTH_EAST_OF_SHOPPER, NORTH_OF_SHOPPER);
+  ASSERT_EQ(world.buy_refusal(BUYER, FIRST_SELLER, HERB), BuyRefusal::NONE);
+  ASSERT_EQ(world.buy_refusal(BUYER, SECOND_SELLER, HERB), BuyRefusal::NONE);
+  run_ticks(world, 1);
+  ASSERT_TRUE(stands_in(world, BUYER, SHOPPER_AT));
+  ASSERT_TRUE(stands_in(world, SECOND_SELLER, NORTH_OF_SHOPPER));
+  EXPECT_EQ(world.person(BUYER).held, std::vector<std::uint64_t>{1});
+  EXPECT_EQ(world.person(FIRST_SELLER).silver, 2 * HERB_PRICE);
+  EXPECT_EQ(world.person(SECOND_SELLER).silver, HERB_PRICE);
+  // Control: with the places swapped, the seller nearest the buyer is the
+  // first, and it is the one that sells.
+  World swapped = two_sellers(NORTH_OF_SHOPPER, SOUTH_EAST_OF_SHOPPER);
+  run_ticks(swapped, 1);
+  ASSERT_TRUE(stands_in(swapped, FIRST_SELLER, NORTH_OF_SHOPPER));
+  EXPECT_EQ(swapped.person(BUYER).held, std::vector<std::uint64_t>{1});
+  EXPECT_EQ(swapped.person(FIRST_SELLER).silver, 2 * HERB_PRICE);
+  EXPECT_EQ(swapped.person(SECOND_SELLER).silver, HERB_PRICE);
+}
+
 TEST(World, SilverAndWaresHeldArePartOfTheHash) {
   const World one = market({});
   World other = market({});
