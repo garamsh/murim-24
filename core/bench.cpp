@@ -10,11 +10,13 @@
 #include <exception>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <ratio>
 #include <string>
 #include <vector>
 
 #include "calendar.hpp"
+#include "coarse_graph.hpp"
 #include "limits.hpp"
 #include "live_scenario.hpp"
 #include "m1_scenario.hpp"
@@ -290,6 +292,78 @@ struct Met {
   bool live;
 };
 
+// The 8,192-cell map the path measure crosses: open ground split by seven
+// ranges, one every 1,024 cells, each crossed by one pass of 16 cells at a
+// row that moves from range to range.
+constexpr std::int32_t MAP_SIDE = 8'192;
+constexpr std::int32_t RANGE_EVERY = 1'024;
+constexpr std::int32_t PASS_WIDTH = 16;
+constexpr std::int32_t PASS_STRIDE = 1'777;
+constexpr int PATH_RUNS = 5;
+// A frame at 60 frames a second, in milliseconds.
+constexpr double FRAME_MS = 16.7;
+
+Map ranged_map() {
+  std::vector<std::string> rows(static_cast<std::size_t>(MAP_SIDE),
+                                std::string(MAP_SIDE, '.'));
+  for (std::int32_t range = RANGE_EVERY; range < MAP_SIDE;
+       range += RANGE_EVERY) {
+    const std::int32_t pass =
+        (range / RANGE_EVERY * PASS_STRIDE) % (MAP_SIDE - PASS_WIDTH);
+    for (std::int32_t y = 0; y < MAP_SIDE; ++y) {
+      if (y < pass || y >= pass + PASS_WIDTH) {
+        rows.at(static_cast<std::size_t>(y))
+            .at(static_cast<std::size_t>(range)) = '#';
+      }
+    }
+  }
+  return Map{rows};
+}
+
+// The median of `runs` timings of `measure`, in milliseconds.
+template <typename Measure>
+double median_ms(int runs, Measure measure) {
+  std::vector<double> times;
+  for (int run = 0; run < runs; ++run) {
+    const auto start = std::chrono::steady_clock::now();
+    measure();
+    times.push_back(milliseconds(std::chrono::steady_clock::now() - start));
+  }
+  std::sort(times.begin(), times.end());
+  return times.at(times.size() / 2);
+}
+
+// Times a path corner to corner across the 8,192-cell map over the coarse
+// graph with its level of regions, against a frame, with the graph of areas
+// alone as the control (ADR 0070, step 2). Reports only: no budget in force
+// reads it.
+void run_paths() {
+  const Map map = ranged_map();
+  const auto built_at = std::chrono::steady_clock::now();
+  const CoarseGraph graph{map};
+  const double build_ms =
+      milliseconds(std::chrono::steady_clock::now() - built_at);
+  const Cell from{10, 10};
+  const Cell to{MAP_SIDE - 10, MAP_SIDE - 10};
+  std::optional<CoarseCost> by_regions;
+  std::optional<CoarseCost> by_areas;
+  const double regions_ms = median_ms(
+      PATH_RUNS, [&] { by_regions = graph.path_cost(map, from, to, true); });
+  const double areas_ms = median_ms(
+      PATH_RUNS, [&] { by_areas = graph.path_cost(map, from, to, false); });
+  require(by_regions.has_value() && by_areas.has_value(),
+          "the path measure's corners must be joined");
+  std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "
+            << graph.node_count() << " nodes, built in " << build_ms << " ms\n"
+            << "path by regions: median " << regions_ms << " ms of "
+            << PATH_RUNS << ", cost " << by_regions.value_or(0) << "; "
+            << (regions_ms <= FRAME_MS ? "within" : "past") << " a frame of "
+            << FRAME_MS << " ms\n"
+            << "control, by areas alone: median " << areas_ms << " ms, cost "
+            << by_areas.value_or(0) << "; "
+            << (areas_ms <= FRAME_MS ? "within" : "past") << " a frame\n";
+}
+
 // The bench's exit status: failure when a budget in force is missed. Only
 // M1's tick is in force; the live scenario's is a target until ADR 0053
 // binds it, so missing it leaves the status a success. A failed setup or a
@@ -305,6 +379,7 @@ int run() {
           "the exit status must follow M1's budget and not the live target");
   const bool m1_met = run_m1();
   const bool live_met = run_live();
+  run_paths();
   return exit_status(Met{m1_met, live_met});
 }
 
