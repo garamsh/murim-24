@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "compiled_map.hpp"
@@ -774,7 +775,11 @@ void add_map(MemoryPacks& packs, const Painting& painting) {
   land_legend.item().text("mark", "e").text("land", "east");
   land_layer.words("rows", lands);
   for (const auto& [name, cell] : painting.places) {
-    packs.entry(PAINTER, "map/places", name).set("x", cell.x).set("y", cell.y);
+    packs.entry(PAINTER, "map/places", name)
+        .set("x", cell.x)
+        .set("y", cell.y)
+        .text("owner", "orthodox")
+        .text("settlement", "hamlet");
   }
   for (const auto& [name, route] : painting.routes) {
     packs.entry(PAINTER, "map/routes", name)
@@ -851,7 +856,7 @@ Painting ranged_map(std::int32_t side, PassShift moved) {
 }
 
 // The pinned hash of the test map.
-constexpr MapHash TEST_MAP_HASH{0x5C63D24FABE73302ULL};
+constexpr MapHash TEST_MAP_HASH{0x34785E9345E4CAB6ULL};
 
 TEST(MapContent, ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash) {
   const Painting painting = ranged_map(FULL_SIDE, PassShift{0});
@@ -873,8 +878,8 @@ TEST(MapContent, ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash) {
   EXPECT_EQ(map.land(west), 0);
   EXPECT_EQ(map.land(east), 1);
   ASSERT_EQ(map.places().size(), 2U);
-  EXPECT_EQ(map.places().back().x, east.x);
-  EXPECT_EQ(map.places().back().y, east.y);
+  EXPECT_EQ(map.places().back().cell.x, east.x);
+  EXPECT_EQ(map.places().back().cell.y, east.y);
   EXPECT_EQ(map.hash(), TEST_MAP_HASH);
   // Control: the same map with its pass a block south hashes otherwise.
   const LoadedContent moved =
@@ -1027,6 +1032,69 @@ TEST(MapContent, RowsNotOfTheMapsShapeAreRefused) {
   // Control: rows painted per 8 load.
   painting.block = BLOCK / 2;
   EXPECT_TRUE(load_painting(painting).errors.empty());
+}
+
+TEST(MapContent, APlaceSettlesAFactionsVillageOrASectsSeat) {
+  MemoryPacks mods;
+  add_map(mods, small_map());
+  mods.entry(PAINTER, "map/places", "seated")
+      .set("x", FIRST_PLACE.x + (SMALL_SIDE / 2))
+      .set("y", FIRST_PLACE.y)
+      .text("sect", "black_fang");
+  const LoadedContent loaded =
+      load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+  ASSERT_TRUE(loaded.errors.empty());
+  if (!loaded.map) {
+    FAIL() << "the map is refused";
+  }
+  const std::vector<Place>& places = loaded.map->places();
+  ASSERT_EQ(places.size(), 2U);
+  const auto* village = std::get_if<VillagePlace>(&places.front().settles);
+  const auto* seat = std::get_if<SeatPlace>(&places.back().settles);
+  ASSERT_NE(village, nullptr);
+  ASSERT_NE(seat, nullptr);
+  // The base pack's orthodox faction, hamlet and third sect, by index.
+  EXPECT_EQ(village->owner, 0U);
+  EXPECT_EQ(village->settlement, 0U);
+  EXPECT_EQ(seat->sect, 2U);
+  // A place naming both is refused for the field it may not hold.
+  mods.entry(PAINTER, "map/places", "both")
+      .set("x", FIRST_PLACE.x)
+      .set("y", FIRST_PLACE.y + (SMALL_SIDE / 2))
+      .text("sect", "hwasan")
+      .text("owner", "orthodox");
+  EXPECT_TRUE(painting_refused(
+      load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER}),
+      "map/places", "both", "owner", ContentRefusal::UNKNOWN_FIELD));
+}
+
+// The most terrain kinds a painted map's blocks hold.
+constexpr std::size_t MOST_TERRAINS = 256;
+
+TEST(MapContent, APaintedMapWithMoreThan256TerrainKindsIsRefused) {
+  const auto with_kinds = [](std::size_t kinds) {
+    MemoryPacks mods;
+    add_map(mods, small_map());
+    const BaseAndMods base{mods};
+    const std::size_t held = load_content(base, murim_packs::BASE_PACK, {})
+                                 .data.value_or(RegionData{})
+                                 .terrain.size();
+    for (std::size_t kind = held; kind < kinds; ++kind) {
+      mods.entry(PAINTER, "terrain", "kind_" + std::to_string(kind))
+          .text("footing", "buildable")
+          .set("weight", 1);
+    }
+    return load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+  };
+  // Control: 256 kinds load.
+  EXPECT_TRUE(with_kinds(MOST_TERRAINS).errors.empty());
+  const LoadedContent refused = with_kinds(MOST_TERRAINS + 1);
+  EXPECT_FALSE(refused.map.has_value());
+  EXPECT_TRUE(std::any_of(refused.errors.begin(), refused.errors.end(),
+                          [](const ContentError& error) {
+                            return error.document == "terrain" &&
+                                   error.reason == ContentRefusal::OUT_OF_RANGE;
+                          }));
 }
 
 }  // namespace

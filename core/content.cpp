@@ -431,7 +431,7 @@ struct Built {
   // and pack each came from.
   std::optional<MapSource> map;
   std::size_t maps = 0;
-  std::vector<Cell> places;
+  std::vector<Place> places;
   std::vector<Route> routes;
   std::vector<std::pair<std::string, std::string>> place_origins;
   std::vector<std::pair<std::string, std::string>> route_origins;
@@ -791,6 +791,7 @@ MapSource read_map(Reader& reader, const RegionData& data,
   reader.object("ground", false, [&](Reader& ground) {
     for (const std::size_t terrain :
          read_legend_layer(ground, "terrain", "terrain", blocks)) {
+      source.terrains.push_back(static_cast<std::uint8_t>(terrain));
       source.footings.push_back(terrain < data.terrain.size()
                                     ? data.terrain.at(terrain).footing
                                     : Footing::BLOCKED);
@@ -854,7 +855,17 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     ++built.lives;
     read_life(reader, built, context);
   } else if (kind == "map/places") {
-    built.places.push_back(read_cell(reader));
+    const Cell cell = read_cell(reader);
+    // A place is a sect's seat, or a village of a faction's.
+    if (reader.has("sect")) {
+      built.places.push_back(
+          Place{cell, SeatPlace{reader.reference("sect", "sects")}});
+    } else {
+      const std::size_t owner = reader.reference("owner", "factions");
+      built.places.push_back(Place{
+          cell,
+          VillagePlace{owner, reader.reference("settlement", "villages")}});
+    }
     built.place_origins.emplace_back(context.pack, name);
   } else if (kind == "map/routes") {
     const std::size_t from = reader.reference("from", "map/places");
@@ -1165,10 +1176,14 @@ Built build_tables(const std::map<std::string, Merged>& merged,
     errors.push_back(ContentError{order.back(), "map/map", "", "",
                                   ContentRefusal::INCONSISTENT});
   }
-  // A land is a byte of its block.
-  constexpr std::size_t MOST_LANDS = 256;
-  if (ids.at("map/lands").size() > MOST_LANDS) {
+  // A land, and a painted map's terrain kind, is a byte of its block.
+  constexpr std::size_t MOST_BY_BLOCK = 256;
+  if (ids.at("map/lands").size() > MOST_BY_BLOCK) {
     errors.push_back(ContentError{order.back(), "map/lands", "", "",
+                                  ContentRefusal::OUT_OF_RANGE});
+  }
+  if (built.maps > 0 && ids.at("terrain").size() > MOST_BY_BLOCK) {
+    errors.push_back(ContentError{order.back(), "terrain", "", "",
                                   ContentRefusal::OUT_OF_RANGE});
   }
   return built;
@@ -1181,7 +1196,7 @@ std::optional<CompiledMap> compile_map(const Built& built, MapSource source,
                                        std::vector<ContentError>& errors) {
   const std::size_t before = errors.size();
   for (std::size_t place = 0; place < built.places.size(); ++place) {
-    const Cell cell = built.places.at(place);
+    const Cell cell = built.places.at(place).cell;
     if (cell.x < 0 || cell.y < 0 || cell.x >= source.side ||
         cell.y >= source.side) {
       const auto& [pack, entry] = built.place_origins.at(place);
