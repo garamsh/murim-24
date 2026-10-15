@@ -96,7 +96,7 @@ TEST(Occupation, SquarePlacesAreOneForEverySoManyPeopleRoundedUp) {
         assign(occupations(), std::vector<Candidate>(people, adult()), {});
     std::size_t count = 0;
     for (const std::optional<std::size_t>& each : held) {
-      count += each == MERCHANT ? 1 : 0;
+      count += each == MERCHANT ? std::size_t{1} : std::size_t{0};
     }
     return count;
   };

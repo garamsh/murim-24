@@ -705,7 +705,7 @@ TEST(Region, EveryPeopledVillageHasAMerchantFromTheStart) {
   // resident of working age has its merchant before the first tick.
   std::size_t peopled = 0;
   for (std::size_t village = 0; village < staffed.size(); ++village) {
-    peopled += staffed.at(village).adult ? 1 : 0;
+    peopled += staffed.at(village).adult ? std::size_t{1} : std::size_t{0};
     EXPECT_EQ(staffed.at(village).holding, staffed.at(village).adult)
         << region.villages.at(village).name;
   }
