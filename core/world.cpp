@@ -817,6 +817,11 @@ class Tally {
 // turn from the one drawn, before it founds nothing at that check.
 constexpr std::size_t FOUNDING_TRIES = 16;
 
+// Whether cell `one` comes before cell `other` row by row, west to east.
+bool row_major(Cell one, Cell other) {
+  return one.y < other.y || (one.y == other.y && one.x < other.x);
+}
+
 // Whether `there` lies within `reach` cells of `here` along each axis.
 bool within(Cell here, Cell there, std::int32_t reach) {
   return std::abs(there.x - here.x) <= reach &&
@@ -1640,12 +1645,19 @@ void World::pay(const Trade& trade) {
 // holds none of from the first seller, by index, it may buy it from.
 void World::shop(const Trade& trade) {
   for (std::size_t ware = 0; ware < trade.wares.size(); ++ware) {
-    std::vector<std::size_t> sellers;
+    sellers_.clear();
     for (std::size_t person = 0; person < people_.size(); ++person) {
       if (sells(person, ware)) {
-        sellers.push_back(person);
+        sellers_.push_back(
+            Seller{cell_of(people_.at(person).position), person});
       }
     }
+    std::sort(sellers_.begin(), sellers_.end(),
+              [](const Seller& one, const Seller& other) {
+                return row_major(one.cell, other.cell) ||
+                       (!row_major(other.cell, one.cell) &&
+                        one.person < other.person);
+              });
     for (const Army& army : armies_) {
       if (army.steered) {
         continue;
@@ -1654,16 +1666,39 @@ void World::shop(const Trade& trade) {
         if (people_.at(buyer).held.at(ware) > 0) {
           continue;
         }
-        const auto seller = std::find_if(
-            sellers.begin(), sellers.end(), [&](std::size_t candidate) {
-              return buy_refusal(buyer, candidate, ware) == BuyRefusal::NONE;
-            });
-        if (seller != sellers.end()) {
+        if (const std::optional<std::size_t> seller =
+                first_seller(buyer, ware)) {
           buy(buyer, *seller, ware);
         }
       }
     }
   }
+}
+
+// The first of sellers_ by index that `buyer` may buy `ware` from. Only a
+// seller within talk reach along each axis can sell, so it reads only the
+// rows in reach.
+std::optional<std::size_t> World::first_seller(std::size_t buyer,
+                                               std::size_t ware) const {
+  const auto before = [](const Seller& seller, Cell cell) {
+    return row_major(seller.cell, cell);
+  };
+  const std::int32_t reach = rules_.talk_reach;
+  const Cell here = cell_of(people_.at(buyer).position);
+  std::optional<std::size_t> first;
+  for (std::int32_t row = here.y - reach; row <= here.y + reach; ++row) {
+    for (auto seller = std::lower_bound(sellers_.begin(), sellers_.end(),
+                                        Cell{here.x - reach, row}, before);
+         seller != sellers_.end() && seller->cell.y == row &&
+         seller->cell.x <= here.x + reach;
+         ++seller) {
+      if ((!first || seller->person < *first) &&
+          buy_refusal(buyer, seller->person, ware) == BuyRefusal::NONE) {
+        first = seller->person;
+      }
+    }
+  }
+  return first;
 }
 
 // Each tick, every living person no driver steers consumes the first ware it

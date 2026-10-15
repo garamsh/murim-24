@@ -831,6 +831,8 @@ class World {
   void negotiate(const Diplomacy& diplomacy);
   void pay(const Trade& trade);
   void shop(const Trade& trade);
+  [[nodiscard]] std::optional<std::size_t> first_seller(std::size_t buyer,
+                                                        std::size_t ware) const;
   void dose(const Trade& trade);
   void bear(Person& person, const Soul& soul,
             std::optional<Sex> sex = std::nullopt);
@@ -969,6 +971,14 @@ class World {
   // The people engaging on the tick being run, kept so a tick allocates
   // none; neither saved nor hashed.
   std::vector<Engaging> engaging_;
+  /// A seller of the ware being shopped for, and the cell it stands in.
+  struct Seller {
+    Cell cell{};
+    std::size_t person = 0;
+  };
+  // The sellers of the ware being shopped for, by row, column and index,
+  // kept so a day allocates none; neither saved nor hashed.
+  std::vector<Seller> sellers_;
 };
 
 }  // namespace murim
