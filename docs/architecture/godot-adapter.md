@@ -121,7 +121,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - `hud/genealogy.gd`: a three-generation tree round the steered person, counting the person's generation from `person_parents`
   - `hud/sect.gd`: a sect, its seat, master, elders and members against its cap, and its faction's leadership and sects
   - `hud/faction.gd`: every faction with how it stands toward the player's, and the leader's war, peace and the challenge, each greyed with the core's refusal
-  - `hud/dialogue.gd`: the person talked to, a menu of the core's `offers`, its own `rumours` as news, and its wares. The world runs on while it is open, and it closes once `talk_refusal` stops letting the two talk
+  - `hud/dialogue.gd`: the person talked to, a menu of the core's `offers`, its own `rumours` as news, and its wares; a seller's card names its occupation from `person_occupation` and `occupation_names`. The world runs on while it is open, and it closes once `talk_refusal` stops letting the two talk
   - `hud/arts.gd`: the person's realm, qi, heart method and known arts, and the loadout's five slots. Its left column is wider than the mockup's, so the longest English names fit, and every skill's icon is the technique bar's, since the mockups' own icons for each art skill are not in the production set
   - `hud/title.gd`, `hud/new_game.gd`, `hud/pause.gd` and `hud/settings.gd`: the screens. The title names the core's `LoadError` when slot 0 does not load
   - `hud/rebirth.gd`: the life just ended beside the life begun, in the panels' frame, with no mockup
