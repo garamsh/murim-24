@@ -604,6 +604,72 @@ Saved charted_region(Seed seed, std::uint64_t ticks) {
   return Saved{Origin{seed, 0}, std::move(world)};
 }
 
+constexpr std::size_t FIRST_ARMY_PEOPLE = 5;
+// The one person of the second army, after the first army's.
+constexpr std::size_t LONE = FIRST_ARMY_PEOPLE;
+// The column the lone person stands in.
+constexpr std::int32_t LONE_AT = 5;
+
+// An army of persons 0 to 4 of faction 0 and an army of person 5 alone, of
+// faction 1.
+World two_rosters() {
+  std::vector<Recruit> first;
+  first.reserve(FIRST_ARMY_PEOPLE);
+  for (std::int32_t column = 0;
+       column < static_cast<std::int32_t>(FIRST_ARMY_PEOPLE); ++column) {
+    first.push_back(Recruit{{column, 0}, 1});
+  }
+  return World{
+      Seed{1},
+      Map{{"......", "......"}},
+      {ArmySpec{{0, 0}, std::move(first), 0, {Skill{}}},
+       ArmySpec{{LONE_AT, 1}, {Recruit{{LONE_AT, 1}, 1}}, 1, {Skill{}}}},
+      {},
+      Rules{0, {{false, false}, {false, false}}, STAGE_FLOORS}};
+}
+
+TEST(Save, ASaveWithAPersonOnTwoRostersIsRefused) {
+  const World world = two_rosters();
+  ASSERT_EQ(world.roster(1), std::vector<std::size_t>{LONE});
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // The second army's roster as saved: a count of one, then person 5. Setup:
+  // it is found once, so the edit below changes that roster and nothing else.
+  std::vector<std::uint8_t> lone(2 * sizeof(std::uint64_t), 0);
+  lone.at(0) = 1;
+  lone.at(sizeof(std::uint64_t)) = static_cast<std::uint8_t>(LONE);
+  std::vector<std::size_t> found;
+  for (auto at = payload.begin();
+       (at = std::search(at, payload.end(), lone.begin(), lone.end())) !=
+       payload.end();
+       ++at) {
+    found.push_back(static_cast<std::size_t>(at - payload.begin()));
+  }
+  ASSERT_EQ(found.size(), 1U);
+
+  // Control: resealed unchanged, it loads, and each person serves in the
+  // army whose roster holds it.
+  store.bytes(SLOT) = resealed(header, payload);
+  const Saved kept = loaded(load(store, SLOT));
+  for (std::size_t person = 0; person < LONE; ++person) {
+    EXPECT_EQ(kept.world.faction_of(person), std::optional<std::size_t>{0});
+  }
+  EXPECT_EQ(kept.world.faction_of(LONE), std::optional<std::size_t>{1});
+
+  // The second army now names person 4, who stands on the first army's
+  // roster too, and person 5 stands on none.
+  payload.at(found.front() + sizeof(std::uint64_t)) =
+      static_cast<std::uint8_t>(LONE - 1);
+  store.bytes(SLOT) = resealed(header, payload);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
 TEST(Save, AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused) {
   constexpr std::uint8_t STAGES = 3;
   const Saved saved = charted_region(REGION_SEED, TICKS_PER_SHORT_DAY);

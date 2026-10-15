@@ -2999,6 +2999,71 @@ TEST(World, APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome) {
   EXPECT_EQ(world.roster(VILLAGE_A).size(), FOUNDERS);
 }
 
+// Whether every person of `world` serves in the army whose roster holds it,
+// of that army's faction, and a person on no roster in none.
+bool serves_as_rostered(const World& world) {
+  std::vector<std::optional<std::size_t>> rostered(world.population());
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    for (const std::size_t member : world.roster(army)) {
+      rostered.at(member) = army;
+    }
+  }
+  for (std::size_t person = 0; person < rostered.size(); ++person) {
+    const std::optional<std::size_t> army = rostered.at(person);
+    const std::optional<std::size_t> faction =
+        army ? std::optional<std::size_t>{world.faction(*army)} : std::nullopt;
+    if (world.army_of(person) != army || world.faction_of(person) != faction) {
+      return false;
+    }
+  }
+  return true;
+}
+
+TEST(World,
+     EveryPersonServesInTheArmyWhoseRosterHoldsItAsAPartyGoesAndComesHome) {
+  // A party formed from village A's residents raids village B and is recalled
+  // to them.
+  Growing raiding{{Expansion::RAID}};
+  raiding.neighbour_health = GUARD.body_damage;
+  World world = growth_world(raiding);
+  bool agreed = serves_as_rostered(world);
+  constexpr std::size_t PARTY = 2;
+  constexpr std::uint64_t MARCH_LIMIT = 2'000;
+  for (std::uint64_t tick = 0;
+       tick < MARCH_LIMIT &&
+       (world.army_count() <= PARTY || !world.roster(VILLAGE_B).empty());
+       ++tick) {
+    world.tick();
+    agreed = agreed && serves_as_rostered(world);
+  }
+  // Setup: the party was formed, the raid ended, and its members went home.
+  ASSERT_EQ(world.army_count(), PARTY + 1);
+  ASSERT_TRUE(world.roster(VILLAGE_B).empty());
+  ASSERT_TRUE(world.roster(PARTY).empty());
+  ASSERT_EQ(world.roster(VILLAGE_A).size(), FOUNDERS);
+  EXPECT_TRUE(agreed);
+}
+
+TEST(World, EveryPersonServesInTheArmyWhoseRosterHoldsItAsTheHungryMove) {
+  // Village 0's people, their field burnt, move to village 1 as they go
+  // hungry.
+  constexpr std::uint32_t STORED = 600;
+  constexpr std::uint64_t DAYS = 200;
+  Holdings starving = holding(FOR_TEN, STORED, STORED);
+  starving.field_durability = BURNT;
+  World world =
+      economy_world(starving, holding(FOR_TEN, 2 * STORED, STORED), 1);
+  bool agreed = serves_as_rostered(world);
+  for (std::uint64_t tick = 0; tick < DAYS; ++tick) {
+    world.tick();
+    agreed = agreed && serves_as_rostered(world);
+  }
+  // Setup: all of village 0's people moved.
+  ASSERT_EQ(world.residents_of(0), 0U);
+  ASSERT_EQ(world.residents_of(1), FOUNDERS + 1);
+  EXPECT_TRUE(agreed);
+}
+
 TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
   // The same village raids a hostile neighbour within its reach (above).
   ASSERT_EQ(grown_armies(Growing{{Expansion::RAID}}), 3U);

@@ -1745,6 +1745,109 @@ TEST(Region, VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound) {
   EXPECT_FALSE(unchanged.building_raised);
 }
 
+// What the rosters of a region went through over a run, and whether at the
+// end of every day each person's army and faction read back as the army
+// whose roster held it and its faction, or as none for a person on no roster.
+struct Rostering {
+  bool agreed = true;
+  bool conscripted = false;
+  std::size_t born = 0;
+  std::size_t reborn = 0;
+  std::size_t died = 0;
+  std::size_t formed = 0;
+};
+
+// Every tenth founder carries a soul, so deaths bring rebirths.
+constexpr std::size_t ENSOULED_EVERY = 10;
+
+// Conscripts person 0 of `world` into the first army of another faction.
+// Returns whether it then serves in that army.
+bool conscripted_abroad(World& world) {
+  const std::optional<std::size_t> own = world.faction_of(0);
+  for (std::size_t army = 0; own && army < world.army_count(); ++army) {
+    if (world.faction(army) != *own) {
+      world.conscript(0, army);
+      return world.army_of(0) == army;
+    }
+  }
+  return false;
+}
+
+// The army whose roster holds each person of `world`, or none.
+std::vector<std::optional<std::size_t>> rostered_in(const World& world) {
+  std::vector<std::optional<std::size_t>> rostered(world.population());
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    for (const std::size_t member : world.roster(army)) {
+      rostered.at(member) = army;
+    }
+  }
+  return rostered;
+}
+
+// Notes in `seen` whether each person of `world` serves in the army `now`
+// names, of its faction, and how the rosters changed since `before`, when
+// the world held `armies` armies.
+void tally(const World& world,
+           const std::vector<std::optional<std::size_t>>& before,
+           const std::vector<std::optional<std::size_t>>& now,
+           std::size_t armies, Rostering& seen) {
+  for (std::size_t person = 0; person < now.size(); ++person) {
+    const std::optional<std::size_t> army = now.at(person);
+    const std::optional<std::size_t> faction =
+        army ? std::optional<std::size_t>{world.faction(*army)} : std::nullopt;
+    seen.agreed = seen.agreed && world.army_of(person) == army &&
+                  world.faction_of(person) == faction;
+    if (person >= before.size()) {
+      seen.born += army ? 1 : 0;
+      seen.reborn += army && world.person(person).soul ? 1 : 0;
+    } else if (before.at(person) && !army) {
+      ++seen.died;
+    } else if (before.at(person) != army && army && *army >= armies) {
+      ++seen.formed;
+    }
+  }
+}
+
+// The region of seed RAIDING over `years` years of GROWTH_TICKS_PER_DAY-tick
+// days, its first person conscripted into an army of another faction.
+Rostering rostered_over(std::uint64_t years) {
+  Region region = generate_region(RAIDING, base_data());
+  region.rules.ticks_per_day = GROWTH_TICKS_PER_DAY;
+  World world = world_of(region);
+  for (std::size_t person = 0; person < world.population();
+       person += ENSOULED_EVERY) {
+    world.ensoul(person);
+  }
+  Rostering seen;
+  seen.conscripted = conscripted_abroad(world);
+  std::vector<std::optional<std::size_t>> before;
+  std::size_t armies = world.army_count();
+  for (std::uint64_t day = 0; day <= years * DAYS_PER_YEAR; ++day) {
+    std::vector<std::optional<std::size_t>> now = rostered_in(world);
+    tally(world, before, now, armies, seen);
+    before = std::move(now);
+    armies = world.army_count();
+    for (std::uint64_t tick = 0; tick < GROWTH_TICKS_PER_DAY; ++tick) {
+      world.tick();
+    }
+  }
+  return seen;
+}
+
+TEST(Region, EveryPersonServesInTheArmyWhoseRosterHoldsItThroughFiftyYears) {
+  const Rostering seen = rostered_over(GROWTH_YEARS);
+  // Setup: the person conscripted serves in its new army, and people were
+  // born, born again from a soul, died, and moved into armies formed as the
+  // run went. World's tests cover recall and migration, which this run does
+  // not reach.
+  ASSERT_TRUE(seen.conscripted);
+  ASSERT_GT(seen.born, 0U);
+  ASSERT_GT(seen.reborn, 0U);
+  ASSERT_GT(seen.died, 0U);
+  ASSERT_GT(seen.formed, 0U);
+  EXPECT_TRUE(seen.agreed);
+}
+
 // The workshops one village raises in the region of seed NEIGHBOURLY within
 // WORKSHOP_YEARS years of GROWTH_TICKS_PER_DAY-tick days, in the order laid.
 // The village is its first Orthodox one, a seat aside. All its housing, food
