@@ -99,7 +99,15 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 ### Movement
 
-- People move toward their order's objective along their army's flow field, rebuilt when an order changes the objective. An objective must be reachable from where each member stands.
+- People move toward their order's objective by fields within areas (ADR 0043, ADR 0077's step 4). No army holds a field over the whole map.
+  - **The coarse graph.** `CoarseGraph` labels each 32-cell area's passable cells into components. A node stands at the middle cell, the lower one when the run is even, of each run of cells passable on both sides of a shared border, one a side. Nodes of one component are joined at the cost of the shortest walk between them within the area, and the two sides of an entrance at a straight step's cost.
+  - **The region level (ADR 0070).** Above the areas, regions of 8 × 8 areas join their border nodes at the cost of the shortest walk over the areas within the region. Nodes are numbered in area order, then by side, top, bottom, left and right, then by cell, and every search breaks ties in that order.
+  - **Building and rebuilding.** The graph is derived: built when a world is created, after its structures block their cells, and on load, and never saved. When growth lays a blocking structure, the touched areas and their neighbours are rebuilt, every neighbour of a rebuilt area is relinked, and their regions are rebuilt.
+  - **Reachability.** It is read from the graph: whether two cells' components are joined through the entrances. A blocked cell is joined to whatever the cells it could step onto are. An objective must be reachable from where each member stands; a far army is reached from anywhere, since coming back stands every member round its anchor.
+  - **Fields.** `AreaFields` builds one field for each area and objective, over the area and a cell's margin, 34 × 34 cells. It is seeded on the objective when it lies in the area, and on the far side of every exit whose node a walk joins to the objective. Each seed cell's cost is the octile cost to the objective where the line to it is clear, and otherwise the exit node's cost by a search outward from the objective plus the octile cost to the node.
+    - A field is a function of the map, the graph and its key alone, so what is cached changes no step, and every field a tick asks for is built that tick, with no per-tick limit (the PM's ruling on #371).
+    - A field asked for by no one in a tick returns its buffers to a pool, and so does the search toward an objective no build read; a tick asking for the last tick's fields allocates nothing in the cache.
+  - Over open ground a walk across areas takes the steps one field over the whole map would.
 - The field is 8-connected. A diagonal step is open only where both cells beside it are passable, so no step cuts or grazes a blocked corner, and a diagonal step moves at about the straight speed.
 - A cell's step is the one, of those beginning a shortest path, whose cell lies nearest the straight line to the objective, so a diagonal over open ground is walked on its line.
 - People keep the separation from neighbours found through a spatial hash rebuilt each tick:
