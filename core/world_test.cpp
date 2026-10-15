@@ -6295,12 +6295,12 @@ World market(const Stall& stall) {
                      PER_MILLE / 2,
                      PER_MILLE / 4};
   const std::vector<Band> day{{0, Where::HOME}};
-  life.occupations = Occupations{
-      {Occupation{"herbalist", std::nullopt, 0, 1, day, {HERB, PILL}},
-       Occupation{"salve_seller", std::nullopt, 0, 0, day, {SALVE}}},
-      0,
-      1,
-      day};
+  life.occupations =
+      Occupations{{Occupation{"herbalist", OnSquare{1}, day, {HERB, PILL}},
+                   Occupation{"salve_seller", Nowhere{}, day, {SALVE}}},
+                  0,
+                  1,
+                  day};
   Rules rules = stall.foe ? at_war(0) : peaceful(0);
   rules.talk_reach = 2;
   rules.ticks_per_day = 1;
@@ -6394,8 +6394,8 @@ World smithing(std::uint32_t durability) {
   life.newborn_health = WHOLE;
   life.founding_age = Spread{2 * DAYS_PER_YEAR, 0};
   life.occupations =
-      Occupations{{Occupation{"smith", "smithy", 2, 0, day, {}},
-                   Occupation{"beggar", std::nullopt, 0, 0, day, {}}},
+      Occupations{{Occupation{"smith", AtWorkplace{"smithy", 2}, day, {}},
+                   Occupation{"beggar", Nowhere{}, day, {}}},
                   1,
                   1,
                   day};

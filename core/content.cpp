@@ -619,7 +619,7 @@ Learning read_learning(Reader& reader) {
   return learning;
 }
 
-// The rules of life, the one entry of kind `life`.
+// The schedule the list field `key` gives, a band of hours each.
 std::vector<Band> read_bands(Reader& reader, const std::string& key) {
   std::vector<Band> schedule;
   reader.each(key, false, [&schedule](Reader& band) {
@@ -630,26 +630,41 @@ std::vector<Band> read_bands(Reader& reader, const std::string& key) {
   return schedule;
 }
 
-// An occupation (ADR 0081): it works at the structure kind `workplace` names
-// or, without one, on the square.
+// Where an occupation's places open: at the structure kind `workplace`
+// names, `per_workplace` at each; on the square, one for every
+// `per_residents`; or, naming neither, nowhere. Places on the square beside a
+// workplace, or per workplace without one, are refused.
+Openings read_openings(Reader& reader, const Context& context) {
+  const bool at_workplace = reader.has("workplace");
+  const char* stray = at_workplace ? "per_residents" : "per_workplace";
+  if (reader.has(stray)) {
+    reader.refuse(stray, ContentRefusal::OUT_OF_RANGE);
+    reader.skip(stray);
+  }
+  if (at_workplace) {
+    std::string kind = id_of(context, "structure_kinds",
+                             reader.reference("workplace", "structure_kinds"));
+    return AtWorkplace{std::move(kind),
+                       reader.number<std::uint32_t>("per_workplace", 1)};
+  }
+  if (reader.has("per_residents")) {
+    return OnSquare{reader.number<std::uint32_t>("per_residents", 1)};
+  }
+  return Nowhere{};
+}
+
+// An occupation (ADR 0081).
 Occupation read_occupation(Reader& reader, const std::string& name,
                            const Context& context) {
   Occupation occupation;
   occupation.name = name;
-  if (reader.has("workplace")) {
-    occupation.workplace =
-        id_of(context, "structure_kinds",
-              reader.reference("workplace", "structure_kinds"));
-  }
-  occupation.per_workplace =
-      reader.number<std::uint32_t>("per_workplace", 0, 0U);
-  occupation.per_residents =
-      reader.number<std::uint32_t>("per_residents", 0, 0U);
+  occupation.openings = read_openings(reader, context);
   occupation.schedule = read_bands(reader, "schedule");
   occupation.wares = reader.references("wares", "wares");
   return occupation;
 }
 
+// The rules of life, the one entry of kind `life`.
 void read_life(Reader& reader, Built& built, const Context& context) {
   Life& life = built.data.life;
   life.newborn_health = reader.number<std::uint64_t>("newborn_health", 1);
@@ -847,7 +862,6 @@ MapSource read_map(Reader& reader, const RegionData& data,
   return source;
 }
 
-// Reads the entry the context names, of kind `kind`, into `built`.
 // Adds `ware` to the trade's wares, giving `life` a trade if it has none.
 void add_ware(Life& life, Ware ware) {
   if (!life.trade) {
@@ -864,6 +878,7 @@ void add_occupation(Life& life, Occupation occupation) {
   life.occupations->list.push_back(std::move(occupation));
 }
 
+// Reads the entry the context names, of kind `kind`, into `built`.
 void read_entry(const std::string& kind, Reader& reader, Built& built,
                 const Context& context) {
   RegionData& data = built.data;

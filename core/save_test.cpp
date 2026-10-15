@@ -1016,11 +1016,8 @@ World traders(std::uint64_t bought) {
   Life life;
   life.disciplines = {{"medicine", {0, 0}, {1, 0}}};
   life.trade = Trade{{Ware{"herb", PRICE, 1, 0}}, PURSE, 1, 0, 0};
-  life.occupations =
-      Occupations{{Occupation{"herbalist", std::nullopt, 0, 1, at_home(), {0}}},
-                  0,
-                  0,
-                  at_home()};
+  life.occupations = Occupations{
+      {Occupation{"herbalist", OnSquare{1}, at_home(), {0}}}, 0, 0, at_home()};
   World world{
       Seed{1},
       Map{{"....", "...."}},
@@ -1073,8 +1070,8 @@ TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
   // takes the fallback, `spare`, the second and last occupation.
   Life life;
   life.occupations =
-      Occupations{{Occupation{"first", std::nullopt, 0, 0, at_home(), {}},
-                   Occupation{"spare", std::nullopt, 0, 0, at_home(), {}}},
+      Occupations{{Occupation{"first", Nowhere{}, at_home(), {}},
+                   Occupation{"spare", Nowhere{}, at_home(), {}}},
                   0,
                   1,
                   at_home()};
@@ -1125,16 +1122,15 @@ TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
   EXPECT_EQ(first.world.occupation_of(0), std::optional<std::size_t>{0});
   EXPECT_NE(first.world.hash(), world.hash());
 
-  // Drop `spare` from the data: its name, no workplace, two counts, one band
-  // and no wares; then its count of occupations falls to one and the
-  // fallback, after the working age, becomes `first`. The person still
-  // holds the second occupation, which the data no longer lists.
+  // Drop `spare` from the data: its name, its openings' one tag byte for
+  // nowhere, one band and no wares; then its count of occupations falls to
+  // one and the fallback, after the working age, becomes `first`. The person
+  // still holds the second occupation, which the data no longer lists.
   constexpr std::size_t BAND_BYTES = sizeof(std::uint32_t) + 1;
   const std::size_t spare = encoded_at(payload, "spare");
   const std::size_t spare_bytes =
       sizeof(std::uint64_t) + std::string{"spare"}.size() + 1 +
-      (2 * sizeof(std::uint32_t)) + sizeof(std::uint64_t) + BAND_BYTES +
-      sizeof(std::uint64_t);
+      sizeof(std::uint64_t) + BAND_BYTES + sizeof(std::uint64_t);
   const std::size_t count =
       encoded_at(payload, "first") - sizeof(std::uint64_t);
   ASSERT_EQ(payload.at(count), 2);

@@ -206,11 +206,11 @@ The simulation core: what exists of it now, and the decisions it rests on.
   - every person no driver steers buys the wares it lacks once a day, and consumes one when its health or qi runs low
 
 - People take occupations by one rule, `Occupations` in `Life` (ADR 0081, where an occupation is called a trade):
-  - an occupation is data: its name, the structure kind it works at or none for the square, its openings, a schedule of hour bands naming home, work or the square, and the wares it sells; the occupations also give the working age, the fallback for an adult left without a place, and the schedule of anyone with none. No rule reads a schedule yet
+  - an occupation is data: its name, where its places open, one of three: at a structure kind, so many at each, on the square, one for every so many residents, or nowhere; a schedule of hour bands naming home, work or the square; and the wares it sells. Content refuses an entry that names places both ways; the occupations also give the working age, the fallback for an adult left without a place, and the schedule of anyone with none. No rule reads a schedule yet
   - each village structure carries its kind, given by generation and by the plan growth lays it from
   - each standing structure of an occupation's kind opens its places, and an occupation on the square opens one for every so many people whose home the village is, rounded up, so any village with a resident of working age has its merchant in the base pack
   - once a day, and as the world is created, each village fills its openings from the living people whose home it is: a person of working age keeps the occupation it holds while a place is left, the rest are filled in the occupations' order then by index, and every adult left takes the fallback. A living person with no home holds none, and the dead keep theirs
-  - `occupation_of` reads a person's occupation and `occupations` the data. A person's occupation, each structure's kind and the occupations are saved; the hash folds them all, a person's none included, whatever the packs hold
+  - `occupation_of` reads a person's occupation and `occupations` the data. A person's occupation, each structure's kind and the occupations are saved; the hash folds them all, a person's none included, whatever the packs hold. A load refuses a person's occupation the data does not list, and a village whose kinds are neither none nor one for each of its structures
   - the base pack's occupations are the merchant and the beggar on the square, the physician at the apothecary, the smith at the smithy, the innkeeper at the hall and the farmer at a field; the monk works at no kind and opens no place, and the beggar is the fallback
 
 ### Content packs

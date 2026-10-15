@@ -30,9 +30,9 @@ std::vector<Band> day() { return {{0, Where::HOME}, {WORK_FROM, Where::WORK}}; }
 // people, rounded up; and the beggar, the fallback, which opens no place.
 Occupations occupations() {
   return Occupations{
-      {Occupation{"smith", "smithy", PER_SMITHY, 0, day(), {}},
-       Occupation{"merchant", std::nullopt, 0, PER_MERCHANT, day(), {0}},
-       Occupation{"beggar", std::nullopt, 0, 0, day(), {}}},
+      {Occupation{"smith", AtWorkplace{"smithy", PER_SMITHY}, day(), {}},
+       Occupation{"merchant", OnSquare{PER_MERCHANT}, day(), {0}},
+       Occupation{"beggar", Nowhere{}, day(), {}}},
       WORKING_AGE,
       BEGGAR,
       day()};
@@ -118,6 +118,15 @@ TEST(Occupation, OccupationsOutsideTheirLimitsAreRefused) {
   none.list.clear();
   none.fallback = 0;
   EXPECT_THROW(check_occupations(none, 1), std::invalid_argument);
+  Occupations idle_smiths = occupations();
+  idle_smiths.list.at(SMITH).openings = AtWorkplace{"smithy", 0};
+  EXPECT_THROW(check_occupations(idle_smiths, 1), std::invalid_argument);
+  Occupations unnamed = occupations();
+  unnamed.list.at(SMITH).openings = AtWorkplace{"", PER_SMITHY};
+  EXPECT_THROW(check_occupations(unnamed, 1), std::invalid_argument);
+  Occupations no_square = occupations();
+  no_square.list.at(MERCHANT).openings = OnSquare{0};
+  EXPECT_THROW(check_occupations(no_square, 1), std::invalid_argument);
   Occupations late = occupations();
   late.idle = {{1, Where::HOME}};
   EXPECT_THROW(check_occupations(late, 1), std::invalid_argument);

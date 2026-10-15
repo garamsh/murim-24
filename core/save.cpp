@@ -42,6 +42,8 @@ constexpr std::uint8_t ROLES = 3;
 constexpr std::uint8_t AREA_TIERS = 3;
 // Where a schedule's band may send a person, Where's members.
 constexpr std::uint8_t WHERES = 3;
+// Where an occupation's places may open, Openings' alternatives.
+constexpr std::uint8_t OPENINGS = 3;
 
 // "MURIMSAV": the bytes every save begins with.
 constexpr std::array<std::uint8_t, 8> MAGIC{0x4D, 0x55, 0x52, 0x49,
@@ -250,6 +252,29 @@ void put_bands(Writer& out, const std::vector<Band>& schedule) {
     out.u32(band.from);
     out.u8(static_cast<std::uint8_t>(band.where));
   });
+}
+
+void put_openings(Writer& out, const Openings& openings) {
+  out.u8(static_cast<std::uint8_t>(openings.index()));
+  if (const auto* workplace = std::get_if<AtWorkplace>(&openings)) {
+    out.text(workplace->kind);
+    out.u32(workplace->per);
+  } else if (const auto* square = std::get_if<OnSquare>(&openings)) {
+    out.u32(square->per_residents);
+  }
+}
+
+Openings get_openings(Reader& input) {
+  switch (input.tag(OPENINGS)) {
+    case 0: {
+      std::string kind = input.text();
+      return AtWorkplace{std::move(kind), input.u32()};
+    }
+    case 1:
+      return OnSquare{input.u32()};
+    default:
+      return Nowhere{};
+  }
 }
 
 std::vector<Band> get_bands(Reader& input) {
@@ -538,10 +563,7 @@ void put_life(Writer& out, const Life& life) {
   put_maybe(out, life.occupations, [&out](const Occupations& occupations) {
     put_all(out, occupations.list, [&out](const Occupation& occupation) {
       out.text(occupation.name);
-      put_maybe(out, occupation.workplace,
-                [&out](const std::string& kind) { out.text(kind); });
-      out.u32(occupation.per_workplace);
-      out.u32(occupation.per_residents);
+      put_openings(out, occupation.openings);
       put_bands(out, occupation.schedule);
       put_sizes(out, occupation.wares);
     });
@@ -670,10 +692,7 @@ Life get_life(Reader& input) {
     occupations.list = get_all<Occupation>(input, [&input] {
       Occupation occupation;
       occupation.name = input.text();
-      occupation.workplace =
-          get_maybe<std::string>(input, [&input] { return input.text(); });
-      occupation.per_workplace = input.u32();
-      occupation.per_residents = input.u32();
+      occupation.openings = get_openings(input);
       occupation.schedule = get_bands(input);
       occupation.wares = get_sizes(input);
       return occupation;

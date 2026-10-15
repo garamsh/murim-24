@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace murim {
@@ -19,16 +20,30 @@ struct Band {
   Where where = Where::HOME;
 };
 
-/// One occupation, as data (ADR 0081's trade): its `name`; the structure kind
-/// it works at, or none for the village's square; the openings each standing
-/// structure of that kind gives, or, working on the square, one opening for
-/// every `per_residents` people whose home the village is, rounded up; its
-/// schedule by hour; and the wares, by index, it sells.
+/// An occupation that works at structures of `kind`: each standing one opens
+/// `per` places.
+struct AtWorkplace {
+  std::string kind;
+  std::uint32_t per = 0;
+};
+
+/// An occupation that works on its village's square: one place for every
+/// `per_residents` people whose home the village is, rounded up.
+struct OnSquare {
+  std::uint32_t per_residents = 0;
+};
+
+/// An occupation that opens no place, held only as the fallback.
+struct Nowhere {};
+
+/// Where an occupation's places open, one of the three.
+using Openings = std::variant<AtWorkplace, OnSquare, Nowhere>;
+
+/// One occupation, as data (ADR 0081's trade): its `name`, where its places
+/// open, its schedule by hour, and the wares, by index, it sells.
 struct Occupation {
   std::string name;
-  std::optional<std::string> workplace;
-  std::uint32_t per_workplace = 0;
-  std::uint32_t per_residents = 0;
+  Openings openings;
   std::vector<Band> schedule;
   std::vector<std::size_t> wares;
 };
@@ -64,8 +79,9 @@ struct Candidate {
     const std::vector<std::string>& standing);
 
 /// Throws std::invalid_argument when `occupations` lists no occupation, its
-/// fallback is none of them, an occupation sells a ware outside `wares`, or
-/// a schedule is empty, does not begin at hour 0, or its hours are not
+/// fallback is none of them, an occupation opens places at no kind or none
+/// for each workplace or for no residents, sells a ware outside `wares`, or a
+/// schedule is empty, does not begin at hour 0, or its hours are not
 /// ascending below 24.
 void check_occupations(const Occupations& occupations, std::size_t wares);
 

@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace murim {
@@ -21,13 +22,15 @@ std::vector<std::size_t> openings(const Occupations& occupations,
   std::vector<std::size_t> open;
   open.reserve(occupations.list.size());
   for (const Occupation& occupation : occupations.list) {
-    if (occupation.workplace) {
+    if (const auto* workplace =
+            std::get_if<AtWorkplace>(&occupation.openings)) {
       const auto workplaces = static_cast<std::size_t>(
-          std::count(standing.begin(), standing.end(), *occupation.workplace));
-      open.push_back(workplaces * occupation.per_workplace);
-    } else if (occupation.per_residents > 0) {
-      open.push_back((people + occupation.per_residents - 1) /
-                     occupation.per_residents);
+          std::count(standing.begin(), standing.end(), workplace->kind));
+      open.push_back(workplaces * workplace->per);
+    } else if (const auto* square =
+                   std::get_if<OnSquare>(&occupation.openings)) {
+      open.push_back((people + square->per_residents - 1) /
+                     square->per_residents);
     } else {
       open.push_back(0);
     }
@@ -88,6 +91,15 @@ void check_occupations(const Occupations& occupations, std::size_t wares) {
         return std::any_of(occupation.wares.begin(), occupation.wares.end(),
                            [wares](std::size_t ware) { return ware >= wares; });
       });
+  const bool opens_nothing = std::any_of(
+      occupations.list.begin(), occupations.list.end(),
+      [](const Occupation& occupation) {
+        const auto* workplace = std::get_if<AtWorkplace>(&occupation.openings);
+        const auto* square = std::get_if<OnSquare>(&occupation.openings);
+        return (workplace != nullptr &&
+                (workplace->kind.empty() || workplace->per == 0)) ||
+               (square != nullptr && square->per_residents == 0);
+      });
   const bool schedules_ordered =
       well_ordered(occupations.idle) &&
       std::all_of(occupations.list.begin(), occupations.list.end(),
@@ -95,11 +107,12 @@ void check_occupations(const Occupations& occupations, std::size_t wares) {
                     return well_ordered(occupation.schedule);
                   });
   if (occupations.list.empty() ||
-      occupations.fallback >= occupations.list.size() || sells_unknown ||
-      !schedules_ordered) {
+      occupations.fallback >= occupations.list.size() || opens_nothing ||
+      sells_unknown || !schedules_ordered) {
     throw std::invalid_argument(
         "occupations must list at least one occupation, a fallback among "
-        "them, only wares there are, and schedules that begin at hour 0 with "
+        "them, places at a named kind or on the square that open at least "
+        "one, only wares there are, and schedules that begin at hour 0 with "
         "hours ascending below 24");
   }
 }

@@ -885,12 +885,18 @@ void fold_occupations(const Fold& fold,
   if (!occupations) {
     return;
   }
+  fold(occupations->list.size());
   for (const Occupation& occupation : occupations->list) {
     fold_text(fold, occupation.name);
-    fold(occupation.workplace.has_value());
-    fold_text(fold, occupation.workplace.value_or(std::string{}));
-    fold(occupation.per_workplace);
-    fold(occupation.per_residents);
+    fold(occupation.openings.index());
+    if (const auto* workplace =
+            std::get_if<AtWorkplace>(&occupation.openings)) {
+      fold_text(fold, workplace->kind);
+      fold(workplace->per);
+    } else if (const auto* square =
+                   std::get_if<OnSquare>(&occupation.openings)) {
+      fold(square->per_residents);
+    }
     fold_bands(fold, occupation.schedule);
     fold(occupation.wares.size());
     for (const std::size_t ware : occupation.wares) {
