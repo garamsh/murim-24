@@ -1,0 +1,126 @@
+{ "frames": [
+   {
+    "filename": "caravan 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 500
+   },
+   {
+    "filename": "caravan 1.aseprite",
+    "frame": { "x": 32, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 2.aseprite",
+    "frame": { "x": 64, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 3.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 4.aseprite",
+    "frame": { "x": 128, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 5.aseprite",
+    "frame": { "x": 160, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 500
+   },
+   {
+    "filename": "caravan 6.aseprite",
+    "frame": { "x": 192, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 7.aseprite",
+    "frame": { "x": 224, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 8.aseprite",
+    "frame": { "x": 256, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 9.aseprite",
+    "frame": { "x": 288, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 10.aseprite",
+    "frame": { "x": 320, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "caravan 11.aseprite",
+    "frame": { "x": 352, "y": 0, "w": 32, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 32, "h": 24 },
+    "sourceSize": { "w": 32, "h": 24 },
+    "duration": 150
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.18.6-arm64",
+  "image": "caravan.png",
+  "format": "RGBA8888",
+  "size": { "w": 384, "h": 24 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "mule_idle", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
+   { "name": "mule_walk", "from": 1, "to": 4, "direction": "forward", "color": "#000000ff" },
+   { "name": "pack_idle", "from": 5, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "pack_walk", "from": 6, "to": 9, "direction": "forward", "color": "#000000ff" },
+   { "name": "cart", "from": 10, "to": 11, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}
