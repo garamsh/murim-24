@@ -4,7 +4,7 @@
 # death naming the person. Control: a person far from the first tells other news, and a dead
 # person, who offers nothing, leaves farewell alone on the menu. A seller's menu holds its wares, which
 # list every ware and choose among them, show what came of a purchase and go back to the menu, and
-# its card names the discipline it sells by; control: one who sells nothing has no wares on its menu
+# its card names its occupation; control: one who sells nothing has no wares on its menu
 # and its sect under its card. Every word and name it draws fits the room it gives it, in each locale,
 # every rumour whole on its line.
 extends RefCounted
@@ -114,7 +114,7 @@ func _menu_pass(world: WorldAdapter, panel: Control, living: int) -> bool:
 
 # A seller's menu offers its wares after its news; shown to the player, they list every ware, the
 # first chosen, down choosing the next and no further; a refusal shows its word, refused, and a
-# purchase the ware bought; Escape goes back to the menu. Its card names the discipline it sells by.
+# purchase the ware bought; Escape goes back to the menu. Its card names its occupation.
 # Control: the nearest person who sells nothing has no wares on its menu and its sect, or none, under
 # its card.
 func _trade_pass(world: WorldAdapter, panel: Control) -> bool:
@@ -150,7 +150,7 @@ func _trade_pass(world: WorldAdapter, panel: Control) -> bool:
 	var sect := world.person_sect(plain)
 	var expected_card := tr("DIALOGUE_NO_SECT") if sect < 0 \
 			else tr("SECT_" + world.sect_name(sect).to_upper().replace(" ", "_"))
-	var seller_word := tr("DIALOGUE_SELLER") % tr("DISCIPLINE_MEDICINE")
+	var seller_word := Dialogue.occupation_name(world, world.person_occupation(seller))
 	var passed: bool = rows == seller_rows and seller_card == seller_word and listed and refused and bought \
 			and went_back and plain_rows == [WorldAdapter.OFFER_NEWS, Dialogue.FAREWELL] and plain_card == expected_card
 	print("dialogue_test: seller %d's menu %s, card %s; wares listed and chosen %s, refusal shown %s, purchase shown %s, back %s; person %d's menu %s, card %s: %s" % [
@@ -220,8 +220,8 @@ func _fit_pass(world: WorldAdapter, panel: Control, person: int) -> bool:
 
 
 # The wares' words within their rooms in the current locale: the greeting beside the silver, each
-# ware's name, effect, count and price on its row, the line for each purchase and refusal, and the
-# seller's word under the card for each discipline a ware is sold by.
+# ware's name, effect, count and price on its row, the line for each purchase and refusal, and each
+# occupation's word, which a seller's card shows.
 func _fit_wares(world: WorldAdapter, fit: WordFit, line: float) -> void:
 	var silver := fit.say("SILVER") % 99999
 	fit.check("DIALOGUE_TRADE_GREETING", fit.width(fit.say("DIALOGUE_TRADE_GREETING")), line - 80)
@@ -237,10 +237,9 @@ func _fit_wares(world: WorldAdapter, fit: WordFit, line: float) -> void:
 		fit.check("DIALOGUE_BOUGHT", fit.width(fit.say("DIALOGUE_BOUGHT") % named), line)
 	for key: String in Dialogue.BUY_KEYS.values():
 		fit.check(key, fit.width(fit.say(key)), line)
-	for ware: Dictionary in world.wares():
-		var discipline: String = world.discipline_names()[int(ware.discipline)]
-		var word := fit.say("DIALOGUE_SELLER") % tr("DISCIPLINE_" + discipline.to_upper().replace(" ", "_"))
-		fit.check(word, fit.width(word), 84)
+	for occupation in world.occupation_names().size():
+		var key := "OCCUPATION_" + world.occupation_names()[occupation].to_upper()
+		fit.check(key, fit.width(fit.say(key)), 84)
 
 
 # Person 0, struck dead on the first tick by person 1, of a faction hostile to its own.

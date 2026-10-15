@@ -323,7 +323,13 @@ DIALOGUE_KEYS_MENU,방향키 고르기 · Enter 말하기 · Esc 닫기,Arrows c
 DIALOGUE_KEYS_NEWS,방향키 넘기기 · Esc 돌아가기,Arrows scroll · Esc back
 DIALOGUE_TRADE,물건 좀 봅시다.,Show me your wares.
 DIALOGUE_TRADE_GREETING,“무엇이 필요하오?”,“What do you need?”
-DIALOGUE_SELLER,%s · 약장수,%s · seller
+OCCUPATION_MERCHANT,상인,Merchant
+OCCUPATION_PHYSICIAN,의원,Physician
+OCCUPATION_SMITH,대장장이,Smith
+OCCUPATION_INNKEEPER,주막 주인,Innkeeper
+OCCUPATION_FARMER,농부,Farmer
+OCCUPATION_MONK,승려,Monk
+OCCUPATION_BEGGAR,거지,Beggar
 DIALOGUE_KEYS_TRADE,방향키 고르기 · Enter 사기 · Esc 돌아가기,Arrows choose · Enter buy · Esc back
 DIALOGUE_BOUGHT,샀다 · %s,Bought · %s
 BUY_DEAD,쓰러진 이와는 거래할 수 없다,No trade with the fallen

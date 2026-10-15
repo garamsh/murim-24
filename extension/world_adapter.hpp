@@ -354,6 +354,14 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the sect person `person` belongs to, or -1 for none.
   [[nodiscard]] std::int64_t person_sect(std::int64_t person) const;
 
+  /// Returns the occupation person `person` holds, an index into
+  /// occupation_names(), or -1 for none (ADR 0081's trade).
+  [[nodiscard]] std::int64_t person_occupation(std::int64_t person) const;
+
+  /// Returns the names of the occupations, by index; empty for a world given
+  /// none.
+  [[nodiscard]] godot::PackedStringArray occupation_names() const;
+
   /// Returns the qi person `person` holds.
   [[nodiscard]] std::int64_t person_qi(std::int64_t person) const;
 
@@ -500,9 +508,8 @@ class WorldAdapter : public godot::RefCounted {
   [[nodiscard]] godot::PackedInt64Array offers(std::int64_t person) const;
 
   /// Returns the trade's wares, in order, each a Dictionary of its `name`,
-  /// `price` in silver, the `health` and `qi` it restores, and the
-  /// `discipline` whose people sell it, by its index in discipline_names();
-  /// empty without a trade.
+  /// `price` in silver, and the `health` and `qi` it restores; empty without
+  /// a trade.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> wares() const;
 
   /// Returns the silver person `person` holds.
