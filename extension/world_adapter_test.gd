@@ -826,6 +826,7 @@ static func _works_world() -> WorldAdapter:
 	return WorldAdapter.create(1, rows, armies, structures,
 			{"separation": 256, "hostile": [[false]], "stage_floors": [75, 25, 1]})
 
+
 # The cells from a village's centre within which the base pack's last tier builds, read from its
 # rules of life.
 func _largest_vicinity() -> int:
