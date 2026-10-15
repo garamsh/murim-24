@@ -73,6 +73,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - a key route whose shortest walk is shorter than its designed length or more than a fifth longer, ADR 0047's tolerance, which ADR 0070 keeps.
 - A walk's length is this step's choice, since neither ADR defines it. It goes 8-connected through passable cells, and steps only between levels at most one apart, so it walks and never leaps (ADR 0058). A diagonal step costs 7 to a straight step's 5 and is taken only where both cells beside it could be stepped through. The length is the cost divided by 5, rounded down, as `FlowField` counts a path.
 - ADR 0047's other checks wait for the layers and the coarse graph they read: every place reaching every other, regions joined only through their gates, rivers and the frame.
+- A compiled map of 8,192 cells holds 64 MiB of cells and 256 KiB of lands. Loading the base pack with the test map, which compiles, hashes and validates it, took about 145 ms in the Release build on the development Mac, at a load average of 30, measured by `MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash`, which loads two such maps in 283 to 295 ms over three runs. The delta layer, ADR 0070's 128 MiB budget with it full, and its 2 seconds' load wait for the steps that build the delta layer and the first map's content.
 
 ## Rationale
 
