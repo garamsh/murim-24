@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <variant>
 #include <vector>
 
 #include "map.hpp"
@@ -29,23 +30,43 @@ struct Route {
   std::int32_t length;
 };
 
+/// A village an authored place settles: laid out from village template
+/// `settlement` and owned by faction `owner`, by their indices.
+struct VillagePlace {
+  std::size_t owner;
+  std::size_t settlement;
+};
+
+/// The seat of sect `sect`, by its index, that an authored place settles.
+struct SeatPlace {
+  std::size_t sect;
+};
+
+/// A place authored on a map: its cell, and what it settles there.
+struct Place {
+  Cell cell;
+  std::variant<VillagePlace, SeatPlace> settles;
+};
+
 /// A hand-made map as its pack paints it (ADR 0070): `side` cells square,
-/// painted per `block` cells, with each block's footing, level and land row
-/// by row, and the places authored on it.
+/// painted per `block` cells, with each block's terrain kind, by its index,
+/// footing, level and land row by row, and the places authored on it.
 struct MapSource {
   std::int32_t side = 0;
   std::int32_t block = 0;
+  std::vector<std::uint8_t> terrains;
   std::vector<Footing> footings;
   std::vector<std::uint8_t> levels;
   std::vector<std::uint8_t> lands;
-  std::vector<Cell> places;
+  std::vector<Place> places;
 };
 
 /// Digest of a compiled map; equal maps give equal hashes.
 enum class MapHash : std::uint64_t {};
 
 /// A hand-made map compiled from its source: every cell's footing and level,
-/// a byte a cell, each block's land, and the places authored on it.
+/// a byte a cell, each block's terrain kind and land, and the places
+/// authored on it.
 class CompiledMap {
  public:
   /// Compiles `source`, whose side and block hold the core's bounds and whose
@@ -54,30 +75,33 @@ class CompiledMap {
 
   [[nodiscard]] std::int32_t side() const;
   [[nodiscard]] std::int32_t block() const;
-  [[nodiscard]] const std::vector<Cell>& places() const;
+  [[nodiscard]] const std::vector<Place>& places() const;
 
   /// Returns whether `cell` lies on the map.
   [[nodiscard]] bool contains(Cell cell) const;
 
-  /// Returns the footing, level and land of `cell`, which must lie on the
-  /// map.
+  /// Returns the footing, level, terrain kind and land of `cell`, which must
+  /// lie on the map.
   [[nodiscard]] Footing footing(Cell cell) const;
   [[nodiscard]] std::uint8_t level(Cell cell) const;
+  [[nodiscard]] std::uint8_t terrain(Cell cell) const;
   [[nodiscard]] std::uint8_t land(Cell cell) const;
 
-  /// Returns the digest of every cell, land and place.
+  /// Returns the digest of every cell, terrain kind, land and place.
   [[nodiscard]] MapHash hash() const;
 
  private:
   [[nodiscard]] std::uint8_t byte(Cell cell) const;
+  [[nodiscard]] std::size_t block_of(Cell cell) const;
 
   std::int32_t side_;
   std::int32_t block_;
   // A byte a cell, eight to a word, row by row: its footing in the low
   // nibble and its level in the high one.
   std::vector<std::uint64_t> words_;
+  std::vector<std::uint8_t> terrains_;
   std::vector<std::uint8_t> lands_;
-  std::vector<Cell> places_;
+  std::vector<Place> places_;
 };
 
 /// Why a compiled map is refused.

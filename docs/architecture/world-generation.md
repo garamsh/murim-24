@@ -54,19 +54,20 @@ How the core generates a region from a seed: what exists of it now, and the deci
 
 ### The hand-made map's format
 
-- ADR 0070's and ADR 0077's first step exists: the format, its compiler and its validator. No world is created on a map yet, and the base pack paints none, so the region is still the only world.
+- ADR 0070's and ADR 0077's first step exists: the format, its compiler and its validator. The base pack paints no map, so the region is still the game's only world; a world on a map is described below.
 - A pack authors a map in its `map/` documents, read through `PackSource` like its `data/` ones and merged the same way:
   - `map/map` is the one entry of the map: its side, the block it is painted per, and three layers;
-  - `map/lands` lists the lands, `map/places` the authored places by cell, and `map/routes` the key routes, each two places and a designed length in cells.
+  - `map/lands` lists the lands, `map/places` the authored places by cell, and `map/routes` the key routes, each two places and a designed length in cells;
+  - a place settles a village, of a faction (`owner`) and a village template (`settlement`), or a sect's seat (`sect`), one or the other.
 - Each layer is one string a row of blocks, a character a block:
-  - the ground, whose marks a legend gives terrain kinds, so a block takes its kind's footing;
+  - the ground, whose marks a legend gives terrain kinds, so a block takes its kind and the kind's footing; a pack painting a map holds at most 256 terrain kinds, a byte a block;
   - the levels, a digit from `0` to `f` a block;
   - the lands, whose marks a legend gives lands, at most 256.
 - The core's bounds, each refused naming its field:
   - the side a power of two from 32 cells, one area, to 8,192, which keeps the 65,536 areas and 1,024 regions of ADR 0070 within theirs;
   - the block 8 or 16 cells;
   - rows of another shape than the side and block give, and marks no legend names.
-- Compiling gives every cell its block's footing and level, a byte a cell, and keeps each block's land. The fill of detail between blocks, with relief, cliffs and slopes, rivers, roads and patches, comes with the first map's content (ADR 0077, step 6). The compiled map's hash covers every cell, land and place.
+- Compiling gives every cell its block's footing and level, a byte a cell, and keeps each block's terrain kind and land. The fill of detail between blocks, with relief, cliffs and slopes, rivers, roads and patches, comes with the first map's content (ADR 0077, step 6). The compiled map's hash covers every cell, terrain kind, land and place, and what each place settles.
 - The validator refuses, at the entry each fault lies in:
   - a place on a blocked cell;
   - a place nearer than the growth's `apart` to an earlier one, by the test founding keeps villages apart by;
@@ -74,6 +75,18 @@ How the core generates a region from a seed: what exists of it now, and the deci
 - A walk's length is this step's choice, since neither ADR defines it. It goes 8-connected through passable cells, and steps only between levels at most one apart, so it walks and never leaps (ADR 0058). A diagonal step costs 7 to a straight step's 5 and is taken only where both cells beside it could be stepped through. The length is the cost divided by 5, rounded down, as `FlowField` counts a path.
 - ADR 0047's other checks wait for the layers and the coarse graph they read: every place reaching every other, regions joined only through their gates, rivers and the frame.
 - A compiled map of 8,192 cells holds 64 MiB of cells and 256 KiB of lands. Loading the base pack with the test map, which compiles, hashes and validates it, took about 145 ms in the Release build on the development Mac, at a load average of 30, measured by `MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash`, which loads two such maps in 283 to 295 ms over three runs. The delta layer, ADR 0070's 128 MiB budget with it full, and its 2 seconds' load wait for the steps that build the delta layer and the first map's content.
+
+### A world on the map
+
+- `settle_map` gives, from a compiled map and the tables, the inputs a `World` is created from, as `generate_region` gives them, so a world on the map is created and runs by the same code as one on the region (ADR 0077, step 2):
+  - the map rows are the compiled footing, and each cell's terrain kind the compiled one;
+  - no cell is any faction's territory: territory on the map is the claims of villages (ADR 0047);
+  - each village place is laid out from its template, its centre the place's cell, its square and start list placed by role round it by the code the region's villages are laid by, over every cell the footing lets it build on, in the places' order;
+  - each seat place is laid from the seat template, its area's middle on the place, its area kept from the villages and laid after them, so each faction's first village's first resident leads it, as on the region;
+  - the seed draws only the people, since the map places every village.
+- A place whose buildings or seat find no room, or a sect with no seat place or more than one, is refused.
+- A world on the map takes the map's footing only. Its levels stay in `CompiledMap`, and no rule reads them until ADR 0058's leaps and cliffs are built (#244). Until then a world's people walk across a drop of two levels or more, which the validator's walk treats as a cliff.
+- A world on the 8,192-cell map waits for ADR 0077's steps 3 and 4. Each army holds a flow field over the whole map, at 12 bytes a cell about 800 MB at that side, and the world keeps a chart for each person and scans every cell in growth and in its hash; areas, tiers and the coarse graph bound those. A world on the map is tested on a compiled map of 256 cells until then.
 
 ## Rationale
 

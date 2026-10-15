@@ -8,6 +8,7 @@
 #include <optional>
 #include <queue>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "layout.hpp"
@@ -160,6 +161,7 @@ CompiledMap::CompiledMap(const MapSource& source)
       words_(
           (static_cast<std::size_t>(side_) * static_cast<std::size_t>(side_)) /
           CELLS_A_WORD),
+      terrains_(source.terrains),
       lands_(source.lands),
       places_(source.places) {
   // A block spans whole words, so each row of blocks paints one row of words,
@@ -187,7 +189,7 @@ std::int32_t CompiledMap::side() const { return side_; }
 
 std::int32_t CompiledMap::block() const { return block_; }
 
-const std::vector<Cell>& CompiledMap::places() const { return places_; }
+const std::vector<Place>& CompiledMap::places() const { return places_; }
 
 bool CompiledMap::contains(Cell cell) const {
   return cell.x >= 0 && cell.y >= 0 && cell.x < side_ && cell.y < side_;
@@ -201,10 +203,12 @@ std::uint8_t CompiledMap::level(Cell cell) const {
   return static_cast<std::uint8_t>(byte(cell) >> LEVEL_SHIFT);
 }
 
+std::uint8_t CompiledMap::terrain(Cell cell) const {
+  return terrains_.at(block_of(cell));
+}
+
 std::uint8_t CompiledMap::land(Cell cell) const {
-  const auto blocks = static_cast<std::size_t>(side_ / block_);
-  return lands_.at((static_cast<std::size_t>(cell.y / block_) * blocks) +
-                   static_cast<std::size_t>(cell.x / block_));
+  return lands_.at(block_of(cell));
 }
 
 MapHash CompiledMap::hash() const {
@@ -216,14 +220,30 @@ MapHash CompiledMap::hash() const {
   for (const std::uint64_t word : words_) {
     fold(word);
   }
+  for (const std::uint8_t terrain : terrains_) {
+    fold(terrain);
+  }
   for (const std::uint8_t land : lands_) {
     fold(land);
   }
-  for (const Cell place : places_) {
-    fold(static_cast<std::uint64_t>(place.x));
-    fold(static_cast<std::uint64_t>(place.y));
+  for (const Place& place : places_) {
+    fold(static_cast<std::uint64_t>(place.cell.x));
+    fold(static_cast<std::uint64_t>(place.cell.y));
+    fold(place.settles.index());
+    if (const auto* village = std::get_if<VillagePlace>(&place.settles)) {
+      fold(village->owner);
+      fold(village->settlement);
+    } else if (const auto* seat = std::get_if<SeatPlace>(&place.settles)) {
+      fold(seat->sect);
+    }
   }
   return MapHash{digest};
+}
+
+std::size_t CompiledMap::block_of(Cell cell) const {
+  const auto blocks = static_cast<std::size_t>(side_ / block_);
+  return (static_cast<std::size_t>(cell.y / block_) * blocks) +
+         static_cast<std::size_t>(cell.x / block_);
 }
 
 std::uint8_t CompiledMap::byte(Cell cell) const {
@@ -242,7 +262,7 @@ std::vector<MapFinding> validate_map(const CompiledMap& map,
   std::vector<MapFinding> found;
   std::vector<Cell> earlier;
   for (std::size_t place = 0; place < map.places().size(); ++place) {
-    const Cell cell = map.places().at(place);
+    const Cell cell = map.places().at(place).cell;
     if (map.footing(cell) == Footing::BLOCKED) {
       found.push_back(MapFinding{MapFault::BLOCKED_PLACE, place});
     }
@@ -256,8 +276,9 @@ std::vector<MapFinding> validate_map(const CompiledMap& map,
     const std::int64_t length = key.length;
     const auto limit =
         static_cast<std::int32_t>(length * SLACK_OVER / SLACK_UNDER);
-    const std::optional<std::int32_t> walked = walk_length(
-        map, map.places().at(key.from), map.places().at(key.to), limit);
+    const std::optional<std::int32_t> walked =
+        walk_length(map, map.places().at(key.from).cell,
+                    map.places().at(key.to).cell, limit);
     if (!walked) {
       found.push_back(MapFinding{MapFault::LONG_ROUTE, route});
     } else if (*walked < key.length) {
