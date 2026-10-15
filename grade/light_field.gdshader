@@ -21,14 +21,15 @@ uniform int light_count = 0;
 uniform vec4 light_rects[32];
 uniform float light_reach[32];
 // How thick the fog is, 0 for none; how dark the clouds' shadows are, 0 for none; the world's pixel
-// of this field's first pixel; the seconds the wind has blown; and the relief's cells, one texel a
-// cell, its level plus one in green, `map_size` of them.
+// of this field's first pixel; the seconds the wind has blown; and the relief's cells in view, one
+// texel a cell, its level plus one in green, `cells_size` of them from cell `cells_origin`.
 uniform float fog = 0.0;
 uniform float clouds = 0.0;
 uniform vec2 view_origin = vec2(0.0);
 uniform float drift = 0.0;
 uniform sampler2D cells : filter_nearest;
-uniform ivec2 map_size = ivec2(0);
+uniform ivec2 cells_origin = ivec2(0);
+uniform ivec2 cells_size = ivec2(0);
 
 // The pixels the fog's noise varies over, its wind in pixels a second, and the level from which
 // ground stands clear of it; a cell's size and a level's height in pixels, and the highest level,
@@ -51,8 +52,8 @@ const float CLOUD_CORE = 0.68;
 // enough for a mist.
 float level_at(vec2 world) {
 	for (int level = TOP; level > 0; level--) {
-		ivec2 cell = ivec2(floor((world + vec2(0.0, float(level) * LEVEL_PX)) / CELL));
-		if (cell.x >= 0 && cell.y >= 0 && cell.x < map_size.x && cell.y < map_size.y
+		ivec2 cell = ivec2(floor((world + vec2(0.0, float(level) * LEVEL_PX)) / CELL)) - cells_origin;
+		if (cell.x >= 0 && cell.y >= 0 && cell.x < cells_size.x && cell.y < cells_size.y
 				&& texelFetch(cells, cell, 0).g * 255.0 - 1.0 >= float(level) - 0.5) {
 			return float(level);
 		}

@@ -142,11 +142,30 @@ func _fog_pass() -> bool:
 		keyed.append(Vector2(key.get("fog", -1.0), key.get("clouds", -1.0)))
 	var key_pass: bool = keyed[0].is_equal_approx(Vector2(0.35, 0.0)) and keyed[1].is_equal_approx(Vector2(0.7, 0.7)) \
 			and keyed[2].is_equal_approx(Vector2(0.2, 1.0))
-	var relief := Relief.new(Vector2i(4, 3))
-	relief.lay(Vector2i(2, 1), "rock", 2, "rock_face", false)
+	# A view from the world's pixel (100, 50) reads the cells from a cell before its corner's, (5, 3),
+	# to a cell past its bottom right's plus the highest level's lift, (47, 41).
+	var relief := Relief.new(Vector2i(60, 50))
+	relief.lay(Vector2i(10, 6), "rock", 2, "rock_face", false)
 	grade.show_relief(relief)
 	grade.show_time(0.5, SUMMER)
 	grade.show_lights(PackedFloat32Array(), Rect2(100, 50, 640, 360))
+	var first_cells: Texture2D = grade.params().cells
+	grade.show_lights(PackedFloat32Array(), Rect2(101, 50, 640, 360))
+	var kept: bool = grade.params().cells == first_cells
+	grade.show_lights(PackedFloat32Array(), Rect2(116, 50, 640, 360))
+	var moved := grade.params()
+	grade.show_lights(PackedFloat32Array(), Rect2(-2000, -2000, 640, 360))
+	var beside := grade.params()
+	grade.show_lights(PackedFloat32Array(), Rect2(100, 50, 640, 360))
+	# A relief shown after the view is read in that view at once.
+	var relaid := Relief.new(Vector2i(60, 50))
+	relaid.lay(Vector2i(11, 6), "rock", 1, "rock_face", false)
+	grade.show_relief(relaid)
+	var relaid_cells: Texture2D = grade.params().cells
+	var relaid_level := int(round(relaid_cells.get_image().get_pixel(6, 3).g * 255.0)) if relaid_cells != null else -1
+	grade.show_relief(relief)
+	var window_pass: bool = relaid_level == 2 and kept and moved.cells != first_cells and moved.cells_origin == Vector2i(6, 3) \
+			and moved.cells_size == Vector2i(43, 39) and beside.cells_size == Vector2i.ZERO
 	var shown := {}
 	for quality: int in [Grade.Quality.STANDARD, Grade.Quality.HIGH, Grade.Quality.LOW]:
 		grade.quality = quality
@@ -162,9 +181,10 @@ func _fog_pass() -> bool:
 			and is_equal_approx(shown[Grade.Quality.HIGH].fog, 0.2) and is_equal_approx(shown[Grade.Quality.HIGH].clouds, 1.0) \
 			and is_equal_approx(low.fog, 0.0) and is_equal_approx(low.clouds, 0.0)
 	var cells: Image = (standard.cells as ImageTexture).get_image() if standard.cells != null else null
-	var raised := int(round(cells.get_pixel(2, 1).g * 255.0)) if cells != null else -1
-	var flat := int(round(cells.get_pixel(1, 1).g * 255.0)) if cells != null else -1
-	var relief_pass: bool = standard.map_size == Vector2i(4, 3) and raised == 3 and flat == 1 \
+	var raised := int(round(cells.get_pixel(5, 3).g * 255.0)) if cells != null else -1
+	var flat := int(round(cells.get_pixel(4, 3).g * 255.0)) if cells != null else -1
+	var relief_pass: bool = standard.cells_origin == Vector2i(5, 3) and standard.cells_size == Vector2i(43, 39) \
+			and cells != null and cells.get_size() == Vector2i(43, 39) and raised == 3 and flat == 1 and window_pass \
 			and Vector2(standard.view_origin).is_equal_approx(Vector2(100, 50)) \
 			and standard.drift > 0.0 and standard.clouds_read_field \
 			and standard.field_drawn and not low.field_drawn
@@ -173,8 +193,11 @@ func _fog_pass() -> bool:
 	other.free()
 	grade.free()
 	var passed := key_pass and quality_pass and relief_pass and separate
+	print("grade_test: the fog's cells from %s, %s of them, kept for a pixel's move %s, from %s, %s of them, a cell on, %s beside the map; a relief shown after the view raised there to level plus one %d: %s" % [
+		standard.cells_origin, standard.cells_size, kept, moved.cells_origin, moved.cells_size, beside.cells_size, relaid_level,
+		"pass" if window_pass else "FAIL"])
 	print("grade_test: fog and clouds at midnight, morning and noon %s; standard fog %.2f clouds %.2f, low fog %.2f clouds %.2f; relief %s with levels plus one %d raised and %d flat, from %s, drift %.2f; the clouds read from the light field %s, drawn for the fog and the clouds at standard %s and at low %s; clouds a material of each grade's own %s: %s" % [
-		keyed, standard.fog, standard.clouds, low.fog, low.clouds, standard.map_size, raised, flat,
+		keyed, standard.fog, standard.clouds, low.fog, low.clouds, standard.cells_size, raised, flat,
 		standard.view_origin, standard.drift, standard.clouds_read_field, standard.field_drawn, low.field_drawn, separate, "pass" if passed else "FAIL"])
 	return passed
 

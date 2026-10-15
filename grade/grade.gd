@@ -56,8 +56,12 @@ var _light_reach := PackedFloat32Array()
 var _hearths := 0
 var _view_origin := Vector2.ZERO
 var _grid_offset := Vector2.ZERO
+# The relief the fog reads, the view last shown, and the cells of the relief in it and the rect of
+# them, the texture built anew only when that rect moves (#336).
+var _relief: Relief
+var _view := Rect2()
 var _cells: ImageTexture
-var _map_size := Vector2i.ZERO
+var _cells_window := Rect2i()
 var _drift := 0.0
 
 
@@ -76,8 +80,9 @@ func show_time(of_day: float, season: int) -> void:
 
 ## Shows the fog over `relief`, the world's, so its high ground rises above it.
 func show_relief(relief: Relief) -> void:
-	_cells = ImageTexture.create_from_image(relief.cell_image())
-	_map_size = relief.size
+	_relief = relief
+	_cells = null
+	_show_cells(_view)
 	_apply()
 
 
@@ -85,7 +90,8 @@ func show_relief(relief: Relief) -> void:
 ## its pixels: each one's rect and reach in screen pixels, at most MAX_LIGHTS of them; and how many
 ## `hearths` are among them, which the bloom waits for. The fog drifts over the world from `view`'s
 ## corner, which may lie between world pixels as the camera moves a screen pixel at a time: the art
-## pixels the pass steps in begin where the world's whole pixels fall on the screen.
+## pixels the pass steps in begin where the world's whole pixels fall on the screen. The fog reads
+## the relief's cells in view, and as far below as raised ground lifts.
 func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
 	_hearths = hearths
 	_view_origin = view.position.floor()
@@ -107,7 +113,22 @@ func show_lights(lights: PackedFloat32Array, view: Rect2, hearths := 0) -> void:
 		var corner := (Vector2(lights[at], lights[at + 1]) - view.position) * art_pixel
 		_light_rects.append(Vector4(corner.x, corner.y, lights[at + 2] * art_pixel, lights[at + 3] * art_pixel))
 		_light_reach.append(lights[at + 4] * art_pixel)
+	_view = view
+	if _relief != null:
+		_show_cells(view)
 	_apply()
+
+
+# Gives the fog the relief's cells within `view` and a cell round it, and as many rows below as the
+# highest level lifts ground into view, built anew only when that rect of cells moves.
+func _show_cells(view: Rect2) -> void:
+	var first := Vector2i((view.position / Relief.CELL).floor()) - Vector2i.ONE
+	var last := Vector2i(((view.end + Vector2(0, Relief.TOP * Relief.LEVEL_PX)) / Relief.CELL).floor()) + Vector2i.ONE
+	var window := Rect2i(first, last - first + Vector2i.ONE).intersection(Rect2i(Vector2i.ZERO, _relief.size))
+	if window == _cells_window and _cells != null:
+		return
+	_cells_window = window
+	_cells = ImageTexture.create_from_image(_relief.cell_image_of(window)) if window.has_area() else null
 
 
 ## The grade of `of_day` in `season`: `gain`, `lift`, `shadow` and `light` as Vector3s, and
@@ -141,15 +162,16 @@ func grade_at(of_day: float, season: int) -> Dictionary:
 ## `saturation` dimmed while it rains, `hue_shift`, `vignette`, `art_pixel`, `grid_offset`, where
 ## the world's art pixels begin on the screen, `bloom`, `light_count`,
 ## `rain`, 1 while it rains, its `drift`, and `fog`; what the light field draws with, the lights
-## shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`, `cells`
-## and `map_size`, and whether it draws, `field_drawn`; and `clouds`, how dark the clouds' material
-## draws their shadows, and `clouds_read_field`, whether it reads them from the light field.
+## shown, `light_rects` and `light_reach`, the fog's and the clouds' `view_origin`, `drift`, the
+## relief's `cells` in view, `cells_size` of them from cell `cells_origin`, and whether it draws,
+## `field_drawn`; and `clouds`, how dark the clouds' material draws their shadows, and
+## `clouds_read_field`, whether it reads them from the light field.
 func params() -> Dictionary:
 	var shown := {}
 	for name: String in ["gain", "lift", "shadow", "light", "saturation", "contrast", "lamp", "hue_shift",
 			"vignette", "art_pixel", "grid_offset", "bloom", "light_count", "rain", "fog"]:
 		shown[name] = ($Pass.material as ShaderMaterial).get_shader_parameter(name)
-	for name: String in ["light_rects", "light_reach", "view_origin", "drift", "cells", "map_size"]:
+	for name: String in ["light_rects", "light_reach", "view_origin", "drift", "cells", "cells_origin", "cells_size"]:
 		shown[name] = ($LightField/Field.material as ShaderMaterial).get_shader_parameter(name)
 	shown.field_drawn = $LightField.render_target_update_mode == SubViewport.UPDATE_ALWAYS
 	shown.clouds = clouds.get_shader_parameter("clouds")
@@ -197,7 +219,8 @@ func _apply() -> void:
 	field.set_shader_parameter("grid_offset", _grid_offset)
 	field.set_shader_parameter("drift", _drift)
 	field.set_shader_parameter("cells", _cells)
-	field.set_shader_parameter("map_size", _map_size)
+	field.set_shader_parameter("cells_origin", _cells_window.position)
+	field.set_shader_parameter("cells_size", _cells_window.size if _cells != null else Vector2i.ZERO)
 	var drawn: bool = (_light_rects.size() > 0 and _grade.lamp > 0.0) or fog > 0.0 or shade > 0.0
 	$LightField.render_target_update_mode = SubViewport.UPDATE_ALWAYS if drawn else SubViewport.UPDATE_DISABLED
 	if is_inside_tree():

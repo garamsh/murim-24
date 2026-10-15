@@ -191,16 +191,26 @@ func highest() -> int:
 ## green, its face material in blue, plus 128 where something is built on it and the ground round
 ## it is flat, and alpha half where it rises as a slope.
 func cell_image() -> Image:
+	return cell_image_of(Rect2i(Vector2i.ZERO, size))
+
+
+## The cells within `window`, a rect of cells inside the relief, as cell_image() gives them, its
+## top-left cell first.
+func cell_image_of(window: Rect2i) -> Image:
 	if _flat.is_empty():
 		_find_flat()
 	var data := PackedByteArray()
-	data.resize(size.x * size.y * 4)
-	for i in size.x * size.y:
-		data[i * 4] = _kind[i]
-		data[i * 4 + 1] = _level[i] + 1
-		data[i * 4 + 2] = _face[i] + (128 if _straight(i) else 0)
-		data[i * 4 + 3] = 128 if _slope[i] == 1 else 255
-	return Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, data)
+	data.resize(window.size.x * window.size.y * 4)
+	var at := 0
+	for y in range(window.position.y, window.end.y):
+		for x in range(window.position.x, window.end.x):
+			var i := y * size.x + x
+			data[at] = _kind[i]
+			data[at + 1] = _level[i] + 1
+			data[at + 2] = _face[i] + (128 if _straight(i) else 0)
+			data[at + 3] = 128 if _slope[i] == 1 else 255
+			at += 4
+	return Image.create_from_data(window.size.x, window.size.y, false, Image.FORMAT_RGBA8, data)
 
 
 ## The cells as lift_at() reads them, for a reader of its own: their `size`, each cell's `level`,
