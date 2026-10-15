@@ -18,6 +18,9 @@ constexpr Calendar CALENDAR{30, 4};
 constexpr std::uint64_t DAYS_PER_YEAR =
     CALENDAR.days_per_season * CALENDAR.seasons_per_year;
 
+/// Ticks the simulation runs per second.
+constexpr int TICKS_PER_SECOND = 30;
+
 /// A minute of play to a day.
 constexpr std::uint64_t TICKS_PER_DAY = 1'800;
 

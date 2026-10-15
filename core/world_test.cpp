@@ -30,7 +30,6 @@
 #include "leadership.hpp"
 #include "life.hpp"
 #include "limits.hpp"
-#include "m1_scenario.hpp"
 #include "map.hpp"
 #include "person.hpp"
 #include "progress.hpp"

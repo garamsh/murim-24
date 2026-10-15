@@ -9,9 +9,6 @@
 
 namespace murim {
 
-/// Ticks the simulation runs per second.
-constexpr int TICKS_PER_SECOND = 30;
-
 /// The capacity the M1 scenario's rules set: MAX_PEOPLE with a quarter more
 /// for headroom, so the bench can tell a world that fills it from one that
 /// fits.

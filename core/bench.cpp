@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "calendar.hpp"
 #include "limits.hpp"
 #include "live_scenario.hpp"
 #include "m1_scenario.hpp"

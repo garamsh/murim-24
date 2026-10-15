@@ -26,7 +26,6 @@
 #include "kinship.hpp"
 #include "layout.hpp"
 #include "limits.hpp"
-#include "m1_scenario.hpp"
 #include "map.hpp"
 #include "names.hpp"
 #include "person.hpp"
