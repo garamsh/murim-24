@@ -73,7 +73,19 @@ It ran three scenarios. Each lived one day to settle, then was measured over the
 
 ### Cost
 
-Pending: the tick cost at 500 and at 5,000 waits for a quiet window on the development Mac. The shares above do not depend on timing. The decision names the budget the measurement must meet.
+The prototype was timed on the development Mac in the PM's quiet window on 2026-10-15, from 20:07:48 to 20:08:22. The 1-minute load was 3.0 to 4.0, under `/private/tmp/murim-quiet`. The schedule ran off, then on, in turn, three rounds. Each run warmed 540 ticks and timed 600, hours 07 to 15, so the morning walk to work is timed. M1 used its bench's 60 and 600.
+
+| Scenario | Tick p50, off | Tick p50, on | Tick p99, off | Tick p99, on | Path fields |
+|---|---|---|---|---|---|
+| 500 in two villages | 0.114–0.118 ms | 0.258–0.269 ms | 0.128–0.136 ms | 0.276–0.438 ms | 90, 216,090 cells, 2.59 MB |
+| live scenario, 4,894 living | 3.328–3.340 ms | 3.835–4.171 ms | 4.416, 5.395, 8.165 ms | 4.422, 4.495, 7.890 ms | 360, 826,924 cells, 9.92 MB |
+| M1, 499 living | 0.610–0.618 ms | 0.612–0.615 ms | 0.650–0.872 ms | 0.665–0.700 ms | none |
+
+- **M1 is unchanged.** It has no village residents, so no one follows a schedule.
+- **The schedule's cost misses 0.2 ms.** It adds 0.14 to 0.15 ms at the median at 500 and 0.50 to 0.83 ms at 5,000, where 2,000 of the people are villagers. That is about 0.3 µs a resident a tick in both, so it grows with the residents, not the fields.
+- **The live p99 is not a result.** Off and on, each build had one run high, 8.2 and 7.9 ms, while its median moved little or not at all, so the p99s are read as stalls and the medians are compared.
+- **Where the prototype spends.** Each resident, each tick, looks up its village's places, its door and its place's field in three ordered maps keyed by number, and draws its spot. Those lookups are what scales with residents; the fields are built once and kept. The decision below asks for a form that does this work only when a person's place changes.
+- **Memory.** The prototype keeps each field as 12 bytes a cell, a step of two 32-bit integers and a 32-bit cost, over 49 x 49 cells round each place: 2.59 MB at 500 and 9.92 MB in the live scenario.
 
 ## Decision
 
@@ -139,7 +151,9 @@ Awake, a person wanders within a cell of its spot, to a new one every 90 ticks, 
 - the M1 scenario's 4 ms p99, which has no village residents and so must be unchanged;
 - the live scenario's target of 4 ms p99 at 5,000, issue #216's, as ADR 0053 makes it binding.
 
-Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of the budget, measured in the bench as the live scenario with its villages laid out.
+Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of the budget, measured in the bench as the live scenario with its villages laid out. The prototype added 0.50 to 0.83 ms. So step 2 builds the cheaper form, and lands only once it meets 0.2 ms:
+- each person keeps its place, its spot and its next step, refreshed only when its band of hours changes, it reaches its spot, a wander period ends, or its village's layout changes, so a tick reads stored values rather than searching for them;
+- each path field stores a step in one byte and a cost in two, a quarter of the prototype's 12, over its village's window rather than 49 x 49 cells round each place.
 
 **Steps.**
 1. Trades as pack data, the daily assignment, `trade_of`, saving and the hash.
@@ -151,7 +165,7 @@ Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of
 - **People live on their own.** A village's people walk to work in the morning and to the square in the evening. In the prototype at 500, 28% are moving at 08, against none today.
 - **A rule change.** Every pinned hash changes once in step 1, when the trade is folded, and again in step 2 for a world with trades data, when people start to move by it; and `make sweep` must keep ci.md's 200-seed bar. The sweep lives the region at 5 ticks a day, so a band of hours spans a tick or less there. Its movement is a few steps a tick, not a day's walk.
 - **`sells` reads the trade.** That closes `simulation.md`'s open question on who sells once people have trades.
-- **Memory.** One byte a person for its trade, saved. The path fields are kept per place; their size and the window's are pending with the cost.
+- **Memory.** One byte a person for its trade, saved, and its place, spot and next step, derived and not saved. The path fields, at 3 bytes a cell, would take about 0.65 MB at 500 and 2.5 MB in the live scenario over the prototype's windows, and less over a village's window.
 - **Monks wait for content.** The base pack opens no place for a monk until a pack adds a temple kind or a monastery sect, which #364 tracks with the inn. Until then the looks exist, but no monk appears in the base pack's villages, and the innkeeper works at the hall.
 - **The tiers.** ADR 0042, proposed, runs the daily rules in every tier. The schedule moves people only where they are simulated in full. When a person's area becomes live, ADR 0077's handover places it first; it then walks to its spot for the hour, as from anywhere else, so this decision adds nothing to the handover.
 
@@ -160,5 +174,5 @@ Within those, its own cost at 5,000 must stay within 0.2 ms at the median, 5% of
 - Doors jam: a household cannot reach its house through a crowd. Spots then need spreading along the house's whole side, not one door.
 - Trades churn: people change trade more than a few times a year in a village that is not growing or shrinking.
 - The sweep falls below ci.md's bar because people at work on the fields are caught by raids that a crowd at the centre would have fought.
-- The tick cost at 5,000 exceeds 0.2 ms at the median: the path fields or the per-tick lookup then need a cheaper form, such as the next step stored per person and refreshed only when its place changes.
+- Step 2's stored steps still cost more than 0.2 ms at the median at 5,000: what remains is then the movement itself, more people walking and stepping round each other. The schedule then needs fewer walkers at once, such as staggered bands of hours.
 - Players read the evening crowd on the square as a bug: an idle person who wanders too little looks frozen, and one who wanders too much looks lost.
