@@ -95,6 +95,9 @@ std::optional<ContentRefusal> convert(const Json& root, ContentTree& tree) {
 
 constexpr std::string_view MANIFEST_FILE = "pack.json";
 constexpr std::string_view DATA_DIRECTORY = "data";
+// A map's documents are its pack's `map/` files, named with the directory.
+constexpr std::string_view MAP_DIRECTORY = "map";
+constexpr std::string_view MAP_PREFIX = "map/";
 constexpr std::string_view EXTENSION = ".json";
 constexpr std::size_t READ_CHUNK = std::size_t{64} << 10U;
 
@@ -130,9 +133,12 @@ ContentRead parse_document(const std::string& bytes) {
 }
 
 std::string file_of(const std::string& document) {
-  return document == murim::MANIFEST ? std::string{MANIFEST_FILE}
-                                     : std::string{DATA_DIRECTORY} + "/" +
-                                           document + std::string{EXTENSION};
+  if (document == murim::MANIFEST) {
+    return std::string{MANIFEST_FILE};
+  }
+  const bool mapped = document.compare(0, MAP_PREFIX.size(), MAP_PREFIX) == 0;
+  return (mapped ? document : std::string{DATA_DIRECTORY} + "/" + document) +
+         std::string{EXTENSION};
 }
 
 DirectoryPacks::DirectoryPacks(std::filesystem::path root)
@@ -162,10 +168,15 @@ std::vector<std::string> DirectoryPacks::documents(
     const std::string& pack) const {
   std::vector<std::string> names;
   std::error_code error;
-  const std::filesystem::path data = root_ / pack / DATA_DIRECTORY;
-  for (const auto& entry : std::filesystem::directory_iterator(data, error)) {
-    if (entry.is_regular_file(error)) {
-      names.push_back(document_of(entry.path().filename().string()));
+  for (const auto& [directory, prefix] :
+       {std::pair{DATA_DIRECTORY, std::string_view{}},
+        std::pair{MAP_DIRECTORY, MAP_PREFIX}}) {
+    for (const auto& entry :
+         std::filesystem::directory_iterator(root_ / pack / directory, error)) {
+      if (entry.is_regular_file(error)) {
+        names.push_back(std::string{prefix} +
+                        document_of(entry.path().filename().string()));
+      }
     }
   }
   std::sort(names.begin(), names.end());
@@ -189,8 +200,13 @@ std::vector<std::string> BytePacks::documents(const std::string& pack) const {
   const std::string prefix = std::string{DATA_DIRECTORY} + "/";
   for (const auto& [key, bytes] : files_) {
     const auto& [owner, path] = key;
-    if (owner == pack && path.compare(0, prefix.size(), prefix) == 0) {
+    if (owner != pack) {
+      continue;
+    }
+    if (path.compare(0, prefix.size(), prefix) == 0) {
       names.push_back(document_of(path.substr(prefix.size())));
+    } else if (path.compare(0, MAP_PREFIX.size(), MAP_PREFIX) == 0) {
+      names.push_back(document_of(path));
     }
   }
   std::sort(names.begin(), names.end());

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "arts.hpp"
+#include "compiled_map.hpp"
 #include "diplomacy.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
@@ -43,11 +44,13 @@ constexpr std::array<std::string_view, 3> ORIENTATIONS{"orthodox", "unorthodox",
 constexpr std::array<std::string_view, 2> POLARITIES{"yang", "yin"};
 
 // The kinds of content a pack may hold, in the order their tables are built,
-// so a kind is built after every kind it names.
-constexpr std::array<std::string_view, 15> KINDS{
-    "terrain",  "skills",       "factions",   "structure_kinds", "villages",
-    "seats",    "disciplines",  "arts",       "sects",           "realms",
-    "surnames", "female_names", "male_names", "wares",           "life"};
+// so a kind is built after every kind it names. A map's kinds are its
+// authored sources (ADR 0049), named for the pack's `map/` documents.
+constexpr std::array<std::string_view, 19> KINDS{
+    "terrain",   "skills",       "factions",   "structure_kinds", "villages",
+    "seats",     "disciplines",  "arts",       "sects",           "realms",
+    "surnames",  "female_names", "male_names", "wares",           "life",
+    "map/lands", "map/places",   "map/routes", "map/map"};
 
 // Whether `name` is lowercase ASCII letters, digits and underscores, and not
 // empty.
@@ -248,6 +251,29 @@ class Reader {
     }
   }
 
+  // The strings of the list field `key`.
+  [[nodiscard]] std::vector<std::string> words(const std::string& key) {
+    std::vector<std::string> found;
+    const std::optional<std::size_t> field = list(key);
+    for (std::size_t place = 0; field && place < at(*field).children.size();
+         ++place) {
+      const ContentNode& value = at(at(*field).children.at(place));
+      if (value.kind != Kind::STRING) {
+        fail(item(key, place), ContentRefusal::WRONG_TYPE, value);
+        continue;
+      }
+      found.push_back(value.text);
+    }
+    return found;
+  }
+
+  // Records field `key`, if present, as refused for `reason`.
+  void refuse(const std::string& key, ContentRefusal reason) const {
+    if (const std::optional<std::size_t> field = member(*tree_, node_, key)) {
+      fail(key, reason, at(*field));
+    }
+  }
+
   // Marks field `key` read, without reading it.
   void skip(const std::string& key) { read_.insert(key); }
 
@@ -400,6 +426,15 @@ struct Built {
   std::vector<Skill> skills;
   std::vector<std::vector<std::size_t>> manuals;
   std::size_t lives = 0;
+  // The map as painted, if a pack paints one, and how many packs' entries
+  // of kind `map/map` there are; its places and key routes, and the entry
+  // and pack each came from.
+  std::optional<MapSource> map;
+  std::size_t maps = 0;
+  std::vector<Cell> places;
+  std::vector<Route> routes;
+  std::vector<std::pair<std::string, std::string>> place_origins;
+  std::vector<std::pair<std::string, std::string>> route_origins;
 };
 
 // The id of entry `index` of kind `kind`, when building; none otherwise.
@@ -675,6 +710,104 @@ DisciplineDraw read_discipline(Reader& reader) {
   return draw;
 }
 
+// Each block's value in a layer painted as `blocks` rows of `blocks` marks,
+// row by row, a mark's value its index among `marks`; an error at the rows
+// when they are not of that shape or hold a mark `marks` lacks. Checks the
+// shape only when building, once the side and block are known.
+std::vector<std::uint8_t> read_rows(Reader& reader, const std::string& key,
+                                    const std::vector<char>& marks,
+                                    std::optional<std::size_t> blocks) {
+  const std::vector<std::string> rows = reader.words(key);
+  std::vector<std::uint8_t> painted;
+  if (!blocks) {
+    return painted;
+  }
+  bool shaped = rows.size() == *blocks;
+  for (const std::string& row : rows) {
+    shaped = shaped && row.size() == *blocks;
+    for (const char mark : row) {
+      const auto found = std::find(marks.begin(), marks.end(), mark);
+      shaped = shaped && found != marks.end();
+      painted.push_back(static_cast<std::uint8_t>(found - marks.begin()));
+    }
+  }
+  if (!shaped) {
+    reader.refuse(key, ContentRefusal::OUT_OF_RANGE);
+    painted.clear();
+  }
+  return painted;
+}
+
+// A painted layer whose marks a legend names, each mark one character
+// standing for an entry of kind `kind` under `field`: each block's entry
+// index, row by row.
+std::vector<std::size_t> read_legend_layer(Reader& reader,
+                                           const std::string& field,
+                                           const std::string& kind,
+                                           std::optional<std::size_t> blocks) {
+  std::vector<char> marks;
+  std::vector<std::size_t> values;
+  reader.each("legend", false, [&](Reader& item) {
+    const std::string mark = item.text("mark");
+    const char first = mark.empty() ? '\0' : mark.front();
+    if (mark.size() != 1 ||
+        std::find(marks.begin(), marks.end(), first) != marks.end()) {
+      item.refuse("mark", ContentRefusal::OUT_OF_RANGE);
+    }
+    marks.push_back(first);
+    values.push_back(item.reference(field, kind));
+  });
+  std::vector<std::size_t> painted;
+  for (const std::uint8_t mark : read_rows(reader, "rows", marks, blocks)) {
+    painted.push_back(values.at(mark));
+  }
+  return painted;
+}
+
+// The digits a level is painted with, 0 to 15.
+constexpr std::string_view LEVEL_DIGITS = "0123456789abcdef";
+
+// The map an entry of kind `map/map` paints: its side and block within the
+// core's bounds, its ground by terrain kind, its levels by digit and its
+// lands by legend.
+MapSource read_map(Reader& reader, const RegionData& data,
+                   const Context& context) {
+  MapSource source;
+  source.side = reader.number<std::int32_t>("side", MIN_MAP_SIDE);
+  source.block = reader.number<std::int32_t>("block", 1);
+  const bool sized =
+      map_side_holds(source.side) && map_block_holds(source.block);
+  if (!map_side_holds(source.side)) {
+    reader.refuse("side", ContentRefusal::OUT_OF_RANGE);
+  }
+  if (!map_block_holds(source.block)) {
+    reader.refuse("block", ContentRefusal::OUT_OF_RANGE);
+  }
+  const std::optional<std::size_t> blocks =
+      context.building && sized
+          ? std::optional<std::size_t>{static_cast<std::size_t>(source.side /
+                                                                source.block)}
+          : std::nullopt;
+  reader.object("ground", false, [&](Reader& ground) {
+    for (const std::size_t terrain :
+         read_legend_layer(ground, "terrain", "terrain", blocks)) {
+      source.footings.push_back(terrain < data.terrain.size()
+                                    ? data.terrain.at(terrain).footing
+                                    : Footing::BLOCKED);
+    }
+  });
+  source.levels = read_rows(
+      reader, "levels",
+      std::vector<char>(LEVEL_DIGITS.begin(), LEVEL_DIGITS.end()), blocks);
+  reader.object("lands", false, [&](Reader& lands) {
+    for (const std::size_t land :
+         read_legend_layer(lands, "land", "map/lands", blocks)) {
+      source.lands.push_back(static_cast<std::uint8_t>(land));
+    }
+  });
+  return source;
+}
+
 // Reads the entry the context names, of kind `kind`, into `built`.
 void read_entry(const std::string& kind, Reader& reader, Built& built,
                 const Context& context) {
@@ -720,6 +853,18 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
   } else if (kind == "life") {
     ++built.lives;
     read_life(reader, built, context);
+  } else if (kind == "map/places") {
+    built.places.push_back(read_cell(reader));
+    built.place_origins.emplace_back(context.pack, name);
+  } else if (kind == "map/routes") {
+    const std::size_t from = reader.reference("from", "map/places");
+    const std::size_t toward = reader.reference("to", "map/places");
+    built.routes.push_back(
+        Route{from, toward, reader.number<std::int32_t>("length", 1)});
+    built.route_origins.emplace_back(context.pack, name);
+  } else if (kind == "map/map") {
+    ++built.maps;
+    built.map = read_map(reader, data, context);
   }
 }
 
@@ -976,9 +1121,9 @@ std::map<std::string, Merged> merge_packs(
 }
 
 // Builds the tables from `merged`, recording each error.
-RegionData build_tables(const std::map<std::string, Merged>& merged,
-                        const std::vector<std::string>& order,
-                        std::vector<ContentError>& errors) {
+Built build_tables(const std::map<std::string, Merged>& merged,
+                   const std::vector<std::string>& order,
+                   std::vector<ContentError>& errors) {
   std::map<std::string, std::vector<std::string>> ids;
   for (const std::string_view kind : KINDS) {
     std::vector<std::string>& kind_ids = ids[std::string{kind}];
@@ -1015,7 +1160,55 @@ RegionData build_tables(const std::map<std::string, Merged>& merged,
     errors.push_back(ContentError{order.back(), seats > 1 ? "seats" : "life",
                                   "", "", ContentRefusal::INCONSISTENT});
   }
-  return built.data;
+  const bool authored = !built.places.empty() || !built.routes.empty();
+  if (built.maps > 1 || (built.maps == 0 && authored)) {
+    errors.push_back(ContentError{order.back(), "map/map", "", "",
+                                  ContentRefusal::INCONSISTENT});
+  }
+  // A land is a byte of its block.
+  constexpr std::size_t MOST_LANDS = 256;
+  if (ids.at("map/lands").size() > MOST_LANDS) {
+    errors.push_back(ContentError{order.back(), "map/lands", "", "",
+                                  ContentRefusal::OUT_OF_RANGE});
+  }
+  return built;
+}
+
+// Compiles `source`, the map `built` paints, and validates it, recording
+// each error at the entry it lies in; nothing when it is refused. `built`'s
+// tables and map must have been built without error.
+std::optional<CompiledMap> compile_map(const Built& built, MapSource source,
+                                       std::vector<ContentError>& errors) {
+  const std::size_t before = errors.size();
+  for (std::size_t place = 0; place < built.places.size(); ++place) {
+    const Cell cell = built.places.at(place);
+    if (cell.x < 0 || cell.y < 0 || cell.x >= source.side ||
+        cell.y >= source.side) {
+      const auto& [pack, entry] = built.place_origins.at(place);
+      errors.push_back(ContentError{pack, "map/places", entry, "",
+                                    ContentRefusal::OUT_OF_RANGE});
+    }
+  }
+  if (errors.size() != before) {
+    return std::nullopt;
+  }
+  source.places = built.places;
+  CompiledMap map{source};
+  const std::int32_t apart =
+      built.data.life.growth ? built.data.life.growth->apart : 0;
+  for (const MapFinding& finding : validate_map(map, built.routes, apart)) {
+    const bool place = finding.fault == MapFault::BLOCKED_PLACE ||
+                       finding.fault == MapFault::CROWDED_PLACE;
+    const auto& [pack, entry] = place ? built.place_origins.at(finding.index)
+                                      : built.route_origins.at(finding.index);
+    errors.push_back(ContentError{pack, place ? "map/places" : "map/routes",
+                                  entry, place ? "" : "length",
+                                  ContentRefusal::INCONSISTENT});
+  }
+  if (errors.size() != before) {
+    return std::nullopt;
+  }
+  return map;
 }
 
 // Orders the packs of `wanted` not yet refused so that each follows the
@@ -1157,14 +1350,17 @@ LoadedContent load_content(const PackSource& source, const std::string& base,
     return loaded;
   }
   const std::size_t before = loaded.errors.size();
-  RegionData data = build_tables(merge_packs(loaded.order, read), loaded.order,
-                                 loaded.errors);
-  if (loaded.errors.size() == before && !consistent(data)) {
+  Built built = build_tables(merge_packs(loaded.order, read), loaded.order,
+                             loaded.errors);
+  if (loaded.errors.size() == before && !consistent(built.data)) {
     loaded.errors.push_back(ContentError{loaded.order.back(), "", "", "",
                                          ContentRefusal::INCONSISTENT});
   }
+  if (loaded.errors.size() == before && built.map) {
+    loaded.map = compile_map(built, *built.map, loaded.errors);
+  }
   if (loaded.errors.size() == before) {
-    loaded.data = std::move(data);
+    loaded.data = std::move(built.data);
   }
   return loaded;
 }

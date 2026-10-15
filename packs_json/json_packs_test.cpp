@@ -72,6 +72,31 @@ TEST(JsonPacks, BytePacksServeEachDataFileAsTheDocumentItNames) {
   EXPECT_EQ(packs.read("one", "terrain").refusal, ContentRefusal::UNREADABLE);
 }
 
+TEST(JsonPacks, EachSourceServesAMapFileAsTheMapDocumentItNames) {
+  BytePacks bytes;
+  bytes.add("one", "data/terrain.json", "[]");
+  bytes.add("one", "map/places.json", "[]");
+  // Control: a file under neither directory is no document.
+  bytes.add("one", "view/places.json", "[]");
+  const std::filesystem::path root =
+      std::filesystem::path{testing::TempDir()} / "json_packs_map";
+  std::filesystem::remove_all(root);
+  for (const char* directory : {"data", "map", "view"}) {
+    std::filesystem::create_directories(root / "one" / directory);
+  }
+  std::ofstream(root / "one" / "data" / "terrain.json") << "[]";
+  std::ofstream(root / "one" / "map" / "places.json") << "[]";
+  std::ofstream(root / "one" / "view" / "places.json") << "[]";
+  const DirectoryPacks directories{root};
+  const std::vector<std::string> served{"map/places", "terrain"};
+  EXPECT_EQ(bytes.documents("one"), served);
+  EXPECT_EQ(directories.documents("one"), served);
+  EXPECT_EQ(file_of("map/places"), "map/places.json");
+  EXPECT_TRUE(bytes.read("one", "map/places").tree.has_value());
+  EXPECT_TRUE(directories.read("one", "map/places").tree.has_value());
+  std::filesystem::remove_all(root);
+}
+
 TEST(JsonPacks, ADirectoryFilePastTheLimitIsRefusedAsTooLarge) {
   const std::filesystem::path root =
       std::filesystem::path{testing::TempDir()} / "json_packs_limit";

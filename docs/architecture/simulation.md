@@ -195,6 +195,7 @@ The simulation core: what exists of it now, and the decisions it rests on.
 - The world's tables come from content packs (ADR 0049, its first step) through a port, `PackSource`, that serves a pack's manifest and its content documents, one per kind of content, each a list of entries with an id, as the core's value tree, `ContentTree`.
 - `load_content` takes the base pack and the mods, orders them by what each requires and names to load after, checks every document against its kind, refuses a pack with any error whole, with every pack requiring it, merges the rest by id field by field, the later winning, and builds the tables, refusing a merged set that fails the checks `generate_region` makes.
 - Every error is collected with its pack, document, entry, field path and a `ContentRefusal`.
+- A pack may author a map in its `map/` documents. `load_content` compiles a merged set that paints one into a `CompiledMap` and refuses it unless the map's validator passes it (`world-generation.md`).
 - The base pack, `packs/wuxia/`, holds exactly the tables the core defined before. `packs_json/` is the JSON adapter of the port, reading pack directories for the sweep and the tests, and documents handed in as bytes for the adapter.
 - Loading the base pack takes about 1 ms on the development Mac in the Release build, within ADR 0049's start-up budget of a second.
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "compiled_map.hpp"
 #include "region.hpp"
 
 namespace murim {
@@ -124,11 +125,13 @@ class PackSource {
 };
 
 /// The content a set of packs gives: the tables a region is generated from,
-/// unless the base pack or the merged set is refused; every error found, in
-/// the order found; the packs refused, each with every pack requiring it;
-/// and the packs loaded, in the order merged, the base first.
+/// and the map compiled from the sources a pack's `map/` documents author,
+/// if one does, unless the base pack or the merged set is refused; every
+/// error found, in the order found; the packs refused, each with every pack
+/// requiring it; and the packs loaded, in the order merged, the base first.
 struct LoadedContent {
   std::optional<RegionData> data;
+  std::optional<CompiledMap> map;
   std::vector<ContentError> errors;
   std::vector<std::string> refused;
   std::vector<std::string> order;
@@ -139,7 +142,9 @@ struct LoadedContent {
 /// the packs it names to load after, checks every document against its
 /// kind, refuses a pack with any error with every pack requiring it, merges
 /// the rest field by field, the later winning, and builds the tables from the
-/// merge. Ids become indices in the order they first appear.
+/// merge. Ids become indices in the order they first appear. A merge that
+/// paints a map is compiled, and refused unless validate_map passes it with
+/// the growth's `apart`.
 [[nodiscard]] LoadedContent load_content(const PackSource& source,
                                          const std::string& base,
                                          const std::vector<std::string>& mods);

@@ -52,6 +52,29 @@ How the core generates a region from a seed: what exists of it now, and the deci
 - A seat takes a corner drawn among every corner where its area lies on free buildable cells of its faction's territory, its centre `apart` from the seats before it.
 - `born_in` makes an army of one person born into a village, of its faction and with its residents' skills and health, making the village its home from creation as a rebirth does. The player's body is born this way.
 
+### The hand-made map's format
+
+- ADR 0070's and ADR 0077's first step exists: the format, its compiler and its validator. No world is created on a map yet, and the base pack paints none, so the region is still the only world.
+- A pack authors a map in its `map/` documents, read through `PackSource` like its `data/` ones and merged the same way:
+  - `map/map` is the one entry of the map: its side, the block it is painted per, and three layers;
+  - `map/lands` lists the lands, `map/places` the authored places by cell, and `map/routes` the key routes, each two places and a designed length in cells.
+- Each layer is one string a row of blocks, a character a block:
+  - the ground, whose marks a legend gives terrain kinds, so a block takes its kind's footing;
+  - the levels, a digit from `0` to `f` a block;
+  - the lands, whose marks a legend gives lands, at most 256.
+- The core's bounds, each refused naming its field:
+  - the side a power of two from 32 cells, one area, to 8,192, which keeps the 65,536 areas and 1,024 regions of ADR 0070 within theirs;
+  - the block 8 or 16 cells;
+  - rows of another shape than the side and block give, and marks no legend names.
+- Compiling gives every cell its block's footing and level, a byte a cell, and keeps each block's land. The fill of detail between blocks, with relief, cliffs and slopes, rivers, roads and patches, comes with the first map's content (ADR 0077, step 6). The compiled map's hash covers every cell, land and place.
+- The validator refuses, at the entry each fault lies in:
+  - a place on a blocked cell;
+  - a place nearer than the growth's `apart` to an earlier one, by the test founding keeps villages apart by;
+  - a key route whose shortest walk is shorter than its designed length or more than a fifth longer, ADR 0047's tolerance, which ADR 0070 keeps.
+- A walk's length is this step's choice, since neither ADR defines it. It goes 8-connected through passable cells, and steps only between levels at most one apart, so it walks and never leaps (ADR 0058). A diagonal step costs 7 to a straight step's 5 and is taken only where both cells beside it could be stepped through. The length is the cost divided by 5, rounded down, as `FlowField` counts a path.
+- ADR 0047's other checks wait for the layers and the coarse graph they read: every place reaching every other, regions joined only through their gates, rivers and the frame.
+- A compiled map of 8,192 cells holds 64 MiB of cells and 256 KiB of lands. Loading the base pack with the test map, which compiles, hashes and validates it, took about 145 ms in the Release build on the development Mac, at a load average of 30, measured by `MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash`, which loads two such maps in 283 to 295 ms over three runs. The delta layer, ADR 0070's 128 MiB budget with it full, and its 2 seconds' load wait for the steps that build the delta layer and the first map's content.
+
 ## Rationale
 
 - Footprints that block movement and the region at 128 cells: ADR 0013 (`adr/0013-give-structures-footprints-that-block-movement-in-every-stage.md`).
@@ -75,7 +98,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
 - **Seeds with no room.** Of seeds 0 to 999, 998 generate at `apart` 20: seed 480 leaves a seat no room and 394 a village. `main` at `8b4bb8d7`, before villages were kept apart, refused 5 of them.
 - **Whether territory should follow terrain.** Territory ignores terrain, so a border can cross a mountain range, and a faction's territory can be mostly impassable. No seed tested lacks room for a village, but nothing guarantees it. ADR 0047, proposed, ends the question with the hand-made map: no faction territory is partitioned when a world is created, and territory is the claims of villages, as ADR 0023 gives it.
 - **How large a region the game needs.** The region is 128 cells square, the smallest size tested at which every one of 200 seeds held room for its villages with four factions; it is not measured against play. The owner decided on 2026-10-09 on one hand-made world of 4,096 cells square (`docs/concept.md` §World and scale).
-- **How the hand-made world is made.** ADR 0047 (`adr/0047-author-one-continuous-map-of-4096-cells-by-hand-at-a-li-a-cell.md`), proposed; nothing above changes until the pull requests that build it land. It supersedes ADR 0041's generated 512-cell world, which was never built.
+- **How the hand-made world is made.** ADR 0047 (`adr/0047-author-one-continuous-map-of-4096-cells-by-hand-at-a-li-a-cell.md`), proposed. Its format exists at ADR 0070's size, as described above; nothing else above changes until the pull requests that build the rest land. It supersedes ADR 0041's generated 512-cell world, which was never built.
   - **The map.** One map of 4,096 x 4,096 cells, the same in every game; no seed shapes its terrain, and the seed draws only the simulation's randomness. A cell is a li of 500 metres between places in the heartland, and the outer lands are compressed inside an impassable frame at least 128 cells deep.
   - **Authoring.** Elevation tiers, biomes and regions are painted at one value per 8 x 8 cells. Rivers, lakes, coast, roads, passes, fords, bridges, ferries and named places are data, and cities, seats and passes are patched cell by cell. A deterministic build-time tool compiles them into four bytes a cell by 32-cell area, with the minimap images and the bare map's coarse graph, reproducible bit-for-bit with its hash pinned by a test.
   - **Validation.** The tool and a test refuse a map whose named places do not all reach one another, whose regions join other than through their gates, or whose key routes fall outside their designed lengths.
