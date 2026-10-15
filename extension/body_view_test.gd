@@ -7,7 +7,9 @@
 # world pixels. Each kind of use draws its user in its own motion (#184): a sweep a swing, a use at
 # one person a lunge, a dart a throw, an area a cast, a mend and a torch theirs, and the person a use
 # struck in its recoil; with no use the user stands idle. A loss rises in its art's colour, the
-# player's own in crimson, and one of no art in paper.
+# player's own in crimson, and one of no art in paper. In a crowd (#355), a use's shape is drawn only
+# for the player's own use and one that struck the player or the player's target; another's shows its
+# effects alone, and with no one steered no use is shaped.
 extends RefCounted
 
 const CELL_SIZE := WorldAdapter.CELL_SIZE
@@ -20,7 +22,7 @@ const ELSEWHERE := Rect2(Vector2(100000, 100000), Vector2(256, 128))
 
 func run() -> bool:
 	return _hit_pass() and _fill_pass() and _begin_pass() and _pixel_scale_pass() and _motion_pass() \
-			and _number_colour_pass()
+			and _number_colour_pass() and _crowd_pass()
 
 
 # After the tick the second lost LEFT of HEALTH to the first's use from its left, it flashes fully,
@@ -287,3 +289,60 @@ static func _tags_of(shown: Dictionary) -> Array:
 			found.append([band[at + 3], tag])
 	found.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 	return found.map(func(entry: Array) -> String: return entry[1])
+
+
+# In a crowd of five, each in an army of its own, on one tick: the steered first sweeps the second,
+# making it its target; the third strikes the second; the fourth strikes the first; the fifth strikes
+# the fourth. Every use is shown, and the first three are shaped, their shapes drawn, the fifth's not.
+# Control: the same tick with no one steered shapes none.
+func _crowd_pass() -> bool:
+	var shaped := []
+	for steered: int in [0, -1]:
+		var view := BodyView.new()
+		view.set_atlas(Vector2(64, 24), PackedInt64Array([0, 1, 1, 2, 0, 1, 0, 1]), PackedInt64Array([2, 3, 3, 3, 2, 3, 2, 3]),
+				Vector2i(48, 48), PackedInt64Array([0, 0, 0, 0, 0]), PackedColorArray([Color.WHITE]))
+		view.begin(_crowd(HEALTH, []))
+		view.show_at(VIEW, NOW, Vector2.ZERO)
+		view.note_tick(_crowd(LEFT, [[0, 1], [2, 1], [3, 0], [4, 3]]), PackedInt64Array(), steered, NOW)
+		var shown: Array = view.shown_strikes(NOW)
+		shaped.append([shown.size(), shown.map(func(strike: Dictionary) -> bool: return strike.shaped)])
+	var passed: bool = shaped[0] == [4, [true, true, true, false]] and shaped[1] == [4, [false, false, false, false]]
+	print("body_view_test: in a crowd the uses shown and shaped, the first steered %s, no one steered %s: %s" % [
+		shaped[0], shaped[1], "pass" if passed else "FAIL"])
+	return passed
+
+
+# Five people a cell apart in a row, each its army's only body and faction, the struck of `uses`, each
+# [user, struck] a sweep of the user's, left at `health`.
+func _crowd(health: int, uses: Array) -> Dictionary:
+	var positions := PackedVector2Array()
+	var healths := PackedInt64Array()
+	for person in 5:
+		positions.append(Vector2(CELL_SIZE / 2 + person * CELL_SIZE, CELL_SIZE / 2))
+		healths.append(health if uses.any(func(use: Array) -> bool: return use[1] == person) else HEALTH)
+	var snapshot := {
+		"first": PackedInt64Array([0, 1, 2, 3, 4, 5]), "person": PackedInt64Array([0, 1, 2, 3, 4]),
+		"position": positions, "health": healths, "ready": PackedInt64Array([0, 0, 0, 0, 0]),
+		"faction": PackedInt64Array([0, 1, 2, 3, 4]), "stage": PackedInt64Array(),
+	}
+	var fields := {"strike_person": PackedInt64Array(), "strike_shape": PackedInt64Array(),
+		"strike_range": PackedInt64Array(), "strike_radius": PackedInt64Array(),
+		"strike_body_damage": PackedInt64Array(), "strike_origin": PackedVector2Array(),
+		"strike_toward": PackedVector2Array(), "strike_end": PackedVector2Array(),
+		"strike_first": PackedInt64Array([0]), "struck": PackedInt64Array(), "strike_art": PackedInt64Array(),
+		"strike_structure_damage": PackedInt64Array()}
+	for use: Array in uses:
+		fields.strike_person.append(use[0])
+		fields.strike_shape.append(WorldAdapter.SHAPE_ARC)
+		fields.strike_range.append(2 * CELL_SIZE)
+		fields.strike_radius.append(0)
+		fields.strike_body_damage.append(HEALTH - LEFT)
+		fields.strike_origin.append(positions[use[0]])
+		fields.strike_toward.append(positions[use[1]])
+		fields.strike_end.append(positions[use[1]])
+		fields.struck.append(use[1])
+		fields.strike_first.append(fields.struck.size())
+		fields.strike_art.append(-1)
+		fields.strike_structure_damage.append(0)
+	snapshot.merge(fields)
+	return snapshot

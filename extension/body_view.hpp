@@ -159,8 +159,11 @@ class BodyView : public godot::RefCounted {
 
   /// Returns the last tick's hit stops, each `person` and `frames`.
   [[nodiscard]] godot::TypedArray<godot::Dictionary> hit_stops() const;
-  /// Returns each use kept, as WorldAdapter.strikes() gives it, with `ms`
-  /// and `steered`; those shown at `now`; each death kept, its `person`,
+  /// Returns each use kept, as WorldAdapter.strikes() gives it, with `ms`,
+  /// `steered` and `shaped`, whether its shape is drawn under its effects:
+  /// only for the steered person's own use and one that struck the steered
+  /// person or its target, so a crowd's shapes cover no one's motion (#355);
+  /// those shown at `now`; each death kept, its `person`,
   /// `army`, `at`, `ground` and `ms`; those shown at `now`, each its
   /// `army`, `at`, `ground`, `fallen`, `alpha` and `flash`; each number
   /// kept, its `ms`, `text`, `at`, `own`, `mine` and `width`; and those
@@ -373,6 +376,7 @@ class BodyView : public godot::RefCounted {
   void draw_use_effects(const godot::RID& canvas_item, const Strike& strike,
                         std::int64_t age) const;
   [[nodiscard]] bool shows(const Strike& strike, std::int64_t now) const;
+  [[nodiscard]] bool shaped(const Strike& strike) const;
 
   // The atlas: until it is set, every frame is its first.
   static constexpr std::size_t TAGS = 14;
