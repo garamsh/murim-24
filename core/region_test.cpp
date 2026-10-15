@@ -17,10 +17,12 @@
 
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "compiled_map.hpp"
 #include "flow_field.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "kinship.hpp"
+#include "layout.hpp"
 #include "limits.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
@@ -2155,6 +2157,158 @@ TEST(Region, SectsAdmitChangeMastersAndElectOverACentury) {
   const Century shut = century(closed(), NEIGHBOURLY);
   ASSERT_TRUE(shut.leader_died);
   EXPECT_EQ(sect_deeds(shut), (std::array<std::size_t, 3>{0, 0, 0}));
+}
+
+// The settled test map: 256 cells painted per 16, all plain but for a block
+// of mountain, with a village place for each faction and a seat place for
+// each sect, ADR 0076's `apart` or more from one another.
+constexpr std::int32_t MAP_SIDE = 256;
+constexpr std::int32_t MAP_BLOCK = 16;
+constexpr std::size_t MAP_BLOCKS = std::size_t{16} * 16;
+// The base pack's terrain kinds: plain first, mountain fifth.
+constexpr std::uint8_t PLAIN = 0;
+constexpr std::uint8_t MOUNTAIN = 4;
+constexpr Cell MOUNTAIN_BLOCK{3, 3};
+
+struct PlacedVillage {
+  Cell cell;
+  std::size_t owner;
+  std::size_t settlement;
+};
+
+constexpr std::array<PlacedVillage, 4> VILLAGE_PLACES{{{Cell{40, 120}, 0, 1},
+                                                       {Cell{120, 40}, 1, 1},
+                                                       {Cell{200, 120}, 2, 0},
+                                                       {Cell{120, 200}, 0, 0}}};
+constexpr std::array<Cell, 3> SEAT_PLACES{
+    {Cell{200, 40}, Cell{40, 200}, Cell{200, 200}}};
+
+MapSource map_source() {
+  MapSource source;
+  source.side = MAP_SIDE;
+  source.block = MAP_BLOCK;
+  source.terrains.assign(MAP_BLOCKS, PLAIN);
+  source.footings.assign(MAP_BLOCKS, Footing::BUILDABLE);
+  const std::size_t mountain =
+      (static_cast<std::size_t>(MOUNTAIN_BLOCK.y) *
+       static_cast<std::size_t>(MAP_SIDE / MAP_BLOCK)) +
+      static_cast<std::size_t>(MOUNTAIN_BLOCK.x);
+  source.terrains.at(mountain) = MOUNTAIN;
+  source.footings.at(mountain) = Footing::BLOCKED;
+  source.levels.assign(MAP_BLOCKS, 0);
+  source.lands.assign(MAP_BLOCKS, 0);
+  for (const PlacedVillage& place : VILLAGE_PLACES) {
+    source.places.push_back(
+        Place{place.cell, VillagePlace{place.owner, place.settlement}});
+  }
+  for (std::size_t sect = 0; sect < SEAT_PLACES.size(); ++sect) {
+    source.places.push_back(Place{SEAT_PLACES.at(sect), SeatPlace{sect}});
+  }
+  return source;
+}
+
+TEST(SettledMap, AWorldOnTheMapHashesTheSameTwiceAndAnotherOnAnotherMap) {
+  const CompiledMap map{map_source()};
+  const Region settled = settle_map(SEED, base_data(), map);
+  ASSERT_TRUE(builds_a_world(settled));
+  EXPECT_EQ(hash_after_ticks(settled),
+            hash_after_ticks(settle_map(SEED, base_data(), map)));
+  // Control: the same map with its first village a block east.
+  MapSource moved = map_source();
+  moved.places.front().cell.x += MAP_BLOCK;
+  const Region elsewhere = settle_map(SEED, base_data(), CompiledMap{moved});
+  ASSERT_TRUE(builds_a_world(elsewhere));
+  EXPECT_NE(hash_after_ticks(elsewhere), hash_after_ticks(settled));
+}
+
+// Whether village `place` of `region` is laid round its place, of its
+// owner and template, its square's corner round the place.
+bool laid_at_its_place(const Region& region, std::size_t place) {
+  const PlacedVillage& placed = VILLAGE_PLACES.at(place);
+  const Village& village = region.villages.at(place);
+  const Footprint square =
+      region.life.growth.value_or(Growth{}).tiers.front().square;
+  return same(region.armies.at(village.army).objective, placed.cell) &&
+         same(village.corner, square_corner(placed.cell, square)) &&
+         village.faction == placed.owner &&
+         village.kind == base_data().villages.at(placed.settlement).name;
+}
+
+// Whether seat `sect` of `region` has its area's middle on its place and is
+// owned by its sect's faction.
+bool seated_at_its_place(const Region& region, std::size_t sect) {
+  const Village& seat = region.villages.at(VILLAGE_PLACES.size() + sect);
+  const Cell middle{seat.corner.x + (seat.area.width / 2),
+                    seat.corner.y + (seat.area.height / 2)};
+  return same(middle, SEAT_PLACES.at(sect)) &&
+         seat.faction == base_data().sects.at(sect).faction;
+}
+
+TEST(SettledMap, EachVillageIsLaidOutByRoleWhereTheMapPlacesIt) {
+  const Region region =
+      settle_map(SEED, base_data(), CompiledMap{map_source()});
+  ASSERT_EQ(region.villages.size(), VILLAGE_PLACES.size() + SEAT_PLACES.size());
+  for (std::size_t place = 0; place < VILLAGE_PLACES.size(); ++place) {
+    EXPECT_TRUE(laid_at_its_place(region, place)) << place;
+  }
+  for (std::size_t sect = 0; sect < SEAT_PLACES.size(); ++sect) {
+    EXPECT_TRUE(seated_at_its_place(region, sect)) << sect;
+  }
+  // Their buildings stand by role on buildable cells within the vicinity,
+  // and their residents on open cells, as on the region.
+  EXPECT_TRUE(villages_on_buildable_cells(region));
+}
+
+TEST(SettledMap, TheWorldsRowsAndTerrainAreTheCompiledMaps) {
+  const Region region =
+      settle_map(SEED, base_data(), CompiledMap{map_source()});
+  const Cell inside{(MOUNTAIN_BLOCK.x * MAP_BLOCK) + 1,
+                    (MOUNTAIN_BLOCK.y * MAP_BLOCK) + 1};
+  const Cell outside{0, 0};
+  const auto row = [&region](Cell cell) {
+    return region.map_rows.at(static_cast<std::size_t>(cell.y))
+        .at(static_cast<std::size_t>(cell.x));
+  };
+  const auto terrain = [&region](Cell cell) {
+    return region.terrain.at((static_cast<std::size_t>(cell.y) *
+                              static_cast<std::size_t>(MAP_SIDE)) +
+                             static_cast<std::size_t>(cell.x));
+  };
+  EXPECT_EQ(row(inside), tile_of(Footing::BLOCKED));
+  EXPECT_EQ(terrain(inside), MOUNTAIN);
+  EXPECT_EQ(row(outside), tile_of(Footing::BUILDABLE));
+  EXPECT_EQ(terrain(outside), PLAIN);
+}
+
+TEST(SettledMap, AVillagePlaceWithNoRoomIsRefused) {
+  // A village placed in the middle of the mountain block has no square.
+  MapSource walled = map_source();
+  walled.places.front().cell =
+      Cell{(MOUNTAIN_BLOCK.x * MAP_BLOCK) + (MAP_BLOCK / 2),
+           (MOUNTAIN_BLOCK.y * MAP_BLOCK) + (MAP_BLOCK / 2)};
+  EXPECT_THROW(
+      static_cast<void>(settle_map(SEED, base_data(), CompiledMap{walled})),
+      std::runtime_error);
+  // Control: the map as given settles.
+  EXPECT_NO_THROW(static_cast<void>(
+      settle_map(SEED, base_data(), CompiledMap{map_source()})));
+}
+
+TEST(SettledMap, ASectWithoutASeatPlaceIsRefused) {
+  MapSource unseated = map_source();
+  unseated.places.pop_back();
+  EXPECT_THROW(
+      static_cast<void>(settle_map(SEED, base_data(), CompiledMap{unseated})),
+      std::runtime_error);
+  // Two seat places for one sect are refused too.
+  MapSource twice = map_source();
+  std::get<SeatPlace>(twice.places.back().settles).sect = 0;
+  EXPECT_THROW(
+      static_cast<void>(settle_map(SEED, base_data(), CompiledMap{twice})),
+      std::runtime_error);
+  // Control: a seat place for each sect settles.
+  EXPECT_NO_THROW(static_cast<void>(
+      settle_map(SEED, base_data(), CompiledMap{map_source()})));
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "compiled_map.hpp"
 #include "map.hpp"
 #include "world.hpp"
 
@@ -179,6 +180,21 @@ struct Region {
 /// faction that does not exist; throws std::runtime_error when a village or a
 /// seat finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
+
+/// Settles the hand-made map `map` with `data` (ADR 0077): the inputs a World
+/// is created from, as generate_region gives them, its map rows the compiled
+/// footing, each cell's terrain kind the compiled one, and no cell any
+/// faction's territory. Each village place is laid out from its template, its
+/// centre the place's cell and its buildings placed by their roles round its
+/// square, in the places' order; each seat place is laid from the seat
+/// template, its area's middle on the place, after the villages. `seed` draws
+/// only the people. The same seed, data and map give the same region. Throws
+/// std::invalid_argument when `data` fails generate_region's checks or a
+/// place names a faction, template or sect it lacks; throws
+/// std::runtime_error when a place's buildings or seat find no room, or a
+/// sect has no seat place or more than one.
+[[nodiscard]] Region settle_map(Seed seed, const RegionData& data,
+                                const CompiledMap& map);
 
 /// Returns the villages of `region` as a World is created with them: each
 /// village's structures, resident army, what its structures hold and the land

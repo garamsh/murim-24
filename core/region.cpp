@@ -9,10 +9,12 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "attack.hpp"
 #include "calendar.hpp"
+#include "compiled_map.hpp"
 #include "growth.hpp"
 #include "layout.hpp"
 #include "life.hpp"
@@ -344,19 +346,36 @@ Lot owned_by(const Lot& land, const Region& region, std::size_t owner) {
   return owned;
 }
 
-// Lays village `name` of template `kind`, owned by `owner`, round `centre`
-// on `land`, its first tier's square kept clear and each building placed by
-// its role (ADR 0076), and marks what it built on `land`. Returns whether
+// The index on `lot` of `cell`, which lies on it.
+std::size_t index_on(const Lot& lot, Cell cell) {
+  return (static_cast<std::size_t>(cell.y) *
+          static_cast<std::size_t>(lot.size.width)) +
+         static_cast<std::size_t>(cell.x);
+}
+
+// A village to lay: its template, its owner, the centre it is laid round and
+// its name.
+struct Laying {
+  const VillageTemplate* kind;
+  std::size_t owner;
+  Cell centre;
+  std::string name;
+};
+
+// Lays village `laying` on `land`, its first tier's square kept clear and
+// each building placed by its role (ADR 0076) on `owned`, `land` as its
+// owner may build on it, and marks what it built on `land`. Returns whether
 // every building found a place; when one does not, nothing is laid.
 bool lay_village(Region& region, const RegionData& data, const Growth& growth,
-                 Lot& land, const VillageTemplate& kind, std::size_t owner,
-                 Cell centre, std::string name) {
+                 Lot& land, Lot owned, Laying laying) {
+  const VillageTemplate& kind = *laying.kind;
+  const std::size_t owner = laying.owner;
+  const Cell centre = laying.centre;
   // Its start list is placed nearest first within the largest tier's
   // vicinity, so a list larger than the first tier's still lays.
   const Tier& first = growth.tiers.front();
   const Townsite site{centre, first.square, growth.tiers.back().vicinity};
   const Cell corner = square_corner(centre, first.square);
-  Lot owned = owned_by(land, region, owner);
   build_on(owned, corner, first.square, false);
   std::vector<std::pair<Building, Cell>> placed;
   std::vector<Structure> homes;
@@ -379,8 +398,8 @@ bool lay_village(Region& region, const RegionData& data, const Growth& growth,
     placed.emplace_back(building, *corner_at);
   }
   Village village{
-      std::move(name),      kind.name, owner, corner, first.square, {},
-      region.armies.size(), 0,         {}};
+      std::move(laying.name), kind.name, owner, corner, first.square, {},
+      region.armies.size(),   0,         {}};
   build_on(land, corner, first.square, false);
   const auto inside_square = [corner, &first](Cell cell) {
     return cell.x >= corner.x && cell.y >= corner.y &&
@@ -396,12 +415,12 @@ bool lay_village(Region& region, const RegionData& data, const Growth& growth,
   // its square's, nearest the centre, and take them from later villages.
   std::vector<Cell> open;
   for (Cell cell{0, std::max(centre.y - site.vicinity, 0)};
-       cell.y <= std::min(centre.y + site.vicinity, REGION_SIDE - 1);
+       cell.y <= std::min(centre.y + site.vicinity, land.size.height - 1);
        ++cell.y) {
     for (cell.x = std::max(centre.x - site.vicinity, 0);
-         cell.x <= std::min(centre.x + site.vicinity, REGION_SIDE - 1);
+         cell.x <= std::min(centre.x + site.vicinity, land.size.width - 1);
          ++cell.x) {
-      const Plot plot = land.plots.at(index_of(cell));
+      const Plot plot = land.plots.at(index_on(land, cell));
       if (plot == Plot::FREE || plot == Plot::ROUGH || inside_square(cell)) {
         open.push_back(cell);
       }
@@ -409,7 +428,7 @@ bool lay_village(Region& region, const RegionData& data, const Growth& growth,
   }
   settle(region, data, std::move(village), std::move(open), centre);
   for (const Recruit& resident : region.armies.back().members) {
-    Plot& plot = land.plots.at(index_of(resident.cell));
+    Plot& plot = land.plots.at(index_on(land, resident.cell));
     plot = plot == Plot::BUILT ? plot : Plot::TAKEN;
   }
   return true;
@@ -574,10 +593,13 @@ void validate(const RegionData& data) {
 // The land as generation builds on `map`: free where buildable, rough
 // where bodies only pass, blocked elsewhere.
 Lot land_of(const Map& map) {
-  Lot land{REGION, {}, {}};
-  land.plots.reserve(CELLS);
-  land.passable.reserve(CELLS);
-  for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
+  const Footprint size{map.width(), map.height()};
+  Lot land{size, {}, {}};
+  const std::size_t cells = static_cast<std::size_t>(size.width) *
+                            static_cast<std::size_t>(size.height);
+  land.plots.reserve(cells);
+  land.passable.reserve(cells);
+  for (const Cell cell : cells_of(Cell{0, 0}, size)) {
     Plot plot = Plot::BLOCKED;
     if (map.buildable(cell)) {
       plot = Plot::FREE;
@@ -671,8 +693,10 @@ void site_village(Region& region, Siting& siting, Random& random,
   const std::size_t drawn = farthest_drawn(sites, random, centres);
   bool laid = false;
   for (std::size_t tried = 0; tried < sites.size() && !laid; ++tried) {
-    laid = lay_village(region, data, siting.growth, siting.land, kind, owner,
-                       sites.at((drawn + tried) % sites.size()), name);
+    laid = lay_village(
+        region, data, siting.growth, siting.land,
+        owned_by(siting.land, region, owner),
+        Laying{&kind, owner, sites.at((drawn + tried) % sites.size()), name});
   }
   if (!laid) {
     throw std::runtime_error(
@@ -684,6 +708,90 @@ void site_village(Region& region, Siting& siting, Random& random,
       siting.room.at(cell) = siting.nobody;
     }
   }
+}
+
+// The rules a world on `data` keeps, on a region or a map.
+Rules rules_of(const RegionData& data) {
+  Rules rules{SEPARATION,
+              hostility(data.factions),
+              {DURABILITY, DURABILITY / 2, 1},
+              TICKS_PER_DAY,
+              RUMOUR_REACH,
+              TALK_REACH,
+              SIGHT};
+  rules.map_sight = MAP_SIGHT;
+  rules.tokens = default_tokens();
+  return rules;
+}
+
+// Gives each faction of `region` its succession, admission and election,
+// and its first village's first resident as its leader.
+void lead(Region& region, const RegionData& data) {
+  // A faction is led by the first resident of its first village; people are
+  // numbered in army order, so that resident's index counts every member of
+  // the armies before it.
+  region.leadership.resize(data.factions.size());
+  for (std::size_t faction = 0; faction < data.factions.size(); ++faction) {
+    region.leadership.at(faction).succession =
+        data.factions.at(faction).succession;
+    region.leadership.at(faction).admission =
+        data.factions.at(faction).admission;
+    region.leadership.at(faction).election = data.factions.at(faction).election;
+  }
+  std::size_t counted = 0;
+  for (std::size_t army = 0; army < region.armies.size(); ++army) {
+    const auto housed = [army](const Village& village) {
+      return village.army == army;
+    };
+    const auto home =
+        std::find_if(region.villages.begin(), region.villages.end(), housed);
+    std::optional<std::size_t>& leader =
+        region.leadership.at(region.armies.at(army).faction).leader;
+    if (home != region.villages.end() && !leader &&
+        !region.armies.at(army).members.empty()) {
+      leader = counted;
+    }
+    counted += region.armies.at(army).members.size();
+  }
+}
+
+// Each sect's seat corner on `map`, where its seat place puts the seat
+// template's middle, its area then taken from `land` before the villages are
+// laid, as the region's seats are sited first; none for a sect no place
+// seats. Throws std::invalid_argument when a place seats a sect `data`
+// lacks, and std::runtime_error when a seat's area is not free buildable
+// land or a sect has two seat places.
+std::vector<std::optional<Cell>> seat_corners_on(const CompiledMap& map,
+                                                 const RegionData& data,
+                                                 Lot& land) {
+  const Footprint size = land.size;
+  const Cell middle = middle_of(data.seat.area);
+  std::vector<std::optional<Cell>> seat_corners(data.sects.size());
+  for (const Place& place : map.places()) {
+    const auto* seat = std::get_if<SeatPlace>(&place.settles);
+    if (seat == nullptr) {
+      continue;
+    }
+    if (seat->sect >= data.sects.size()) {
+      throw std::invalid_argument("a place seats a sect the data lacks");
+    }
+    const Cell corner{place.cell.x - middle.x, place.cell.y - middle.y};
+    const std::vector<Cell> area = cells_of(corner, data.seat.area);
+    const bool fits = std::all_of(area.begin(), area.end(), [&](Cell cell) {
+      return cell.x >= 0 && cell.y >= 0 && cell.x < size.width &&
+             cell.y < size.height &&
+             land.plots.at(index_on(land, cell)) == Plot::FREE;
+    });
+    if (!fits || seat_corners.at(seat->sect)) {
+      throw std::runtime_error(fits ? "a sect has more than one seat place"
+                                    : "no room for a seat at its place");
+    }
+    for (const Cell cell : area) {
+      land.plots.at(index_on(land, cell)) = Plot::TAKEN;
+    }
+    seat_corners.at(seat->sect) = corner;
+  }
+  return seat_corners;
 }
 
 }  // namespace
@@ -707,13 +815,7 @@ Region generate_region(Seed seed, const RegionData& data) {
                 {},
                 {},
                 {},
-                Rules{SEPARATION,
-                      hostility(data.factions),
-                      {DURABILITY, DURABILITY / 2, 1},
-                      TICKS_PER_DAY,
-                      RUMOUR_REACH,
-                      TALK_REACH,
-                      SIGHT},
+                rules_of(data),
                 generate_terrain(random, data.terrain),
                 generate_territory(random, data.factions.size()),
                 {},
@@ -721,8 +823,6 @@ Region generate_region(Seed seed, const RegionData& data) {
                 life_of(data),
                 {},
                 {}};
-  region.rules.map_sight = MAP_SIGHT;
-  region.rules.tokens = default_tokens();
   for (const Cell cell : cells_of(Cell{0, 0}, REGION)) {
     region.map_rows.at(static_cast<std::size_t>(cell.y))
         .at(static_cast<std::size_t>(cell.x)) =
@@ -770,32 +870,67 @@ Region generate_region(Seed seed, const RegionData& data) {
              seat_corners.at(sect),
              data.seat.name + " of " + data.sects.at(sect).name);
   }
-  // A faction is led by the first resident of its first village; people are
-  // numbered in army order, so that resident's index counts every member of
-  // the armies before it.
-  region.leadership.resize(data.factions.size());
-  for (std::size_t faction = 0; faction < data.factions.size(); ++faction) {
-    region.leadership.at(faction).succession =
-        data.factions.at(faction).succession;
-    region.leadership.at(faction).admission =
-        data.factions.at(faction).admission;
-    region.leadership.at(faction).election = data.factions.at(faction).election;
+  lead(region, data);
+  region.sects = sects_of(region, data, seats);
+  return region;
+}
+
+Region settle_map(Seed seed, const RegionData& data, const CompiledMap& map) {
+  validate(data);
+  const auto side = static_cast<std::size_t>(map.side());
+  Region region{seed,
+                std::vector<std::string>(side, std::string(side, '.')),
+                {},
+                {},
+                {},
+                rules_of(data),
+                std::vector<std::size_t>(side * side),
+                std::vector<std::size_t>(side * side, data.factions.size()),
+                {},
+                {},
+                life_of(data),
+                {},
+                {}};
+  const Footprint size{map.side(), map.side()};
+  for (const Cell cell : cells_of(Cell{0, 0}, size)) {
+    const std::size_t slot = (static_cast<std::size_t>(cell.y) * side) +
+                             static_cast<std::size_t>(cell.x);
+    region.terrain.at(slot) = map.terrain(cell);
+    region.map_rows.at(static_cast<std::size_t>(cell.y))
+        .at(static_cast<std::size_t>(cell.x)) = tile_of(map.footing(cell));
   }
-  std::size_t counted = 0;
-  for (std::size_t army = 0; army < region.armies.size(); ++army) {
-    const auto housed = [army](const Village& village) {
-      return village.army == army;
-    };
-    const auto home =
-        std::find_if(region.villages.begin(), region.villages.end(), housed);
-    std::optional<std::size_t>& leader =
-        region.leadership.at(region.armies.at(army).faction).leader;
-    if (home != region.villages.end() && !leader &&
-        !region.armies.at(army).members.empty()) {
-      leader = counted;
+  Lot land = land_of(Map{region.map_rows});
+  const Growth growth = data.life.growth.value_or(Growth{});
+  const std::vector<std::optional<Cell>> seat_corners =
+      seat_corners_on(map, data, land);
+  for (const Place& place : map.places()) {
+    const auto* village = std::get_if<VillagePlace>(&place.settles);
+    if (village == nullptr) {
+      continue;
     }
-    counted += region.armies.at(army).members.size();
+    if (village->owner >= data.factions.size() ||
+        village->settlement >= data.villages.size()) {
+      throw std::invalid_argument(
+          "a place names a faction or template the data lacks");
+    }
+    const VillageTemplate& kind = data.villages.at(village->settlement);
+    if (!lay_village(region, data, growth, land, land,
+                     Laying{&kind, village->owner, place.cell,
+                            village_name(kind.name, region.villages.size())})) {
+      throw std::runtime_error("no room for a village at its place");
+    }
   }
+  std::vector<std::size_t> seats;
+  for (std::size_t sect = 0; sect < data.sects.size(); ++sect) {
+    if (!seat_corners.at(sect)) {
+      throw std::runtime_error("a sect has no seat place");
+    }
+    seats.push_back(region.villages.size());
+    lay_seat(region, data, data.seat, data.sects.at(sect).faction,
+             seat_corners.at(sect).value_or(Cell{0, 0}),
+             data.seat.name + " of " + data.sects.at(sect).name);
+  }
+  lead(region, data);
   region.sects = sects_of(region, data, seats);
   return region;
 }
