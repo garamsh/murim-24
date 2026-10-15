@@ -2189,14 +2189,16 @@ constexpr Seed SONLESS{9};
 
 // base_data() with no sects, whose seats would change the region SONLESS
 // was chosen on, no cultivation, whose draws at birth would change its
-// people, and no diplomacy, whose draws and wars would change its history;
-// ADR 0027's rule depends on none of them.
+// people, no diplomacy, whose draws and wars would change its history, and
+// no occupations, whose sellers' healing would change who lives; ADR 0027's
+// rule depends on none of them.
 RegionData sectless() {
   RegionData data = base_data();
   data.sects.clear();
   data.life.manuals.reset();
   data.life.cultivation.reset();
   data.life.diplomacy.reset();
+  data.life.occupations.reset();
   return data;
 }
 
