@@ -8,7 +8,6 @@
 #include <optional>
 #include <stdexcept>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -303,28 +302,21 @@ Attacks::Group Attacks::free_stale(std::vector<Engaging>& engaging,
   return within;
 }
 
-// The people engaging one foe on a tick by how they stand to its tokens:
-// holders, the one that took its token last first; waiters in the order they
-// began to wait; newcomers by distance; and holders giving theirs up.
-struct Attacks::Lines {
-  std::vector<Group> holders;
-  std::vector<Group> queued;
-  std::vector<Group> newcomers;
-  std::vector<Group> lapsed;
-};
-
 void Attacks::grant(Group first, Group last, const Tokens& tokens,
                     std::uint32_t now) {
   const std::uint32_t granted = std::min(first->tokens, MAX_TOKENS);
-  Lines lines = line_up(first, last, now);
-  lapse(lines, granted, tokens, now);
-  const std::vector<Group> order = claims(lines, granted);
-  hand_out(first, last, lines, order, now);
+  line_up(first, last, now, lines_);
+  lapse(lines_, granted, tokens, now);
+  claims(lines_, granted, order_);
+  hand_out(first, last, lines_, order_, now);
 }
 
-Attacks::Lines Attacks::line_up(Group first, Group last,
-                                std::uint32_t now) const {
-  Lines lines;
+void Attacks::line_up(Group first, Group last, std::uint32_t now,
+                      Lines& lines) const {
+  lines.holders.clear();
+  lines.queued.clear();
+  lines.newcomers.clear();
+  lines.lapsed.clear();
   for (auto each = first; each != last; ++each) {
     const std::optional<Engagement> held = engagement(each->person);
     if (each->claim == Claim::EXEMPT) {
@@ -337,24 +329,21 @@ Attacks::Lines Attacks::line_up(Group first, Group last,
       lines.newcomers.push_back(each);
     }
   }
-  // The ticks since `tick`, how long a token was held or a waiter waited.
-  const auto since = [&](Group each, std::uint32_t Engagement::* tick) {
-    return now - engagement(each->person).value_or(Engagement{}).*tick;
+  // The ticks since `ticks` notes for a person, how long it held its token
+  // or waited; each here is engaged, so reads its own.
+  const auto since = [&](Group each, const std::vector<std::uint32_t>& ticks) {
+    return now - ticks.at(each->person);
   };
-  std::sort(
-      lines.holders.begin(), lines.holders.end(), [&](Group left, Group right) {
-        return std::tuple{since(left, &Engagement::token_since),
-                          right->person} <
-               std::tuple{since(right, &Engagement::token_since), left->person};
+  std::sort(lines.holders.begin(), lines.holders.end(),
+            [&](Group left, Group right) {
+              return std::tuple{since(left, token_since_), right->person} <
+                     std::tuple{since(right, token_since_), left->person};
+            });
+  std::stable_sort(
+      lines.queued.begin(), lines.queued.end(), [&](Group left, Group right) {
+        return std::tuple{since(right, waiting_since_), left->person} <
+               std::tuple{since(left, waiting_since_), right->person};
       });
-  std::stable_sort(lines.queued.begin(), lines.queued.end(),
-                   [&](Group left, Group right) {
-                     return std::tuple{since(right, &Engagement::waiting_since),
-                                       left->person} <
-                            std::tuple{since(left, &Engagement::waiting_since),
-                                       right->person};
-                   });
-  return lines;
 }
 
 void Attacks::lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
@@ -381,14 +370,14 @@ void Attacks::lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
   }
 }
 
-std::vector<Attacks::Group> Attacks::claims(Lines& lines,
-                                            std::uint32_t granted) {
+void Attacks::claims(Lines& lines, std::uint32_t granted,
+                     std::vector<Group>& order) {
   // Claim::FIRST ahead of the queue, displacing the holder that took its
   // token last when none is free; then the queue, newcomers, and those who
   // gave theirs up.
   const std::array<const std::vector<Group>*, 3> waiting{
       &lines.queued, &lines.newcomers, &lines.lapsed};
-  std::vector<Group> order;
+  order.clear();
   for (const std::vector<Group>* line : waiting) {
     std::copy_if(line->begin(), line->end(), std::back_inserter(order),
                  [](Group each) { return each->claim == Claim::FIRST; });
@@ -405,7 +394,6 @@ std::vector<Attacks::Group> Attacks::claims(Lines& lines,
     std::copy_if(line->begin(), line->end(), std::back_inserter(order),
                  [](Group each) { return each->claim != Claim::FIRST; });
   }
-  return order;
 }
 
 void Attacks::hand_out(Group first, Group last, const Lines& lines,
@@ -440,26 +428,25 @@ void Attacks::hand_out(Group first, Group last, const Lines& lines,
     }
   }
   // Strikers by ring, distance, then person; then waiters in queue order.
-  using Key = std::tuple<int, int, std::int64_t, std::size_t>;
-  std::vector<std::pair<Key, Engaging>> sorted;
+  ranked_.clear();
   std::int64_t position = 0;
   for (const auto each : order) {
     if (!each->strikes) {
-      sorted.emplace_back(Key{1, 0, position++, 0}, *each);
+      ranked_.emplace_back(Rank{1, 0, position++, 0}, *each);
     }
   }
   for (auto each = first; each != last; ++each) {
     if (each->strikes) {
       const Ring ring = ring_for(each->reach).value_or(Ring::NEAR);
-      sorted.emplace_back(
-          Key{0, static_cast<int>(ring), each->distance, each->person}, *each);
+      ranked_.emplace_back(
+          Rank{0, static_cast<int>(ring), each->distance, each->person}, *each);
     }
   }
-  std::sort(sorted.begin(), sorted.end(),
+  std::sort(ranked_.begin(), ranked_.end(),
             [](const auto& left, const auto& right) {
               return left.first < right.first;
             });
-  std::transform(sorted.begin(), sorted.end(), first,
+  std::transform(ranked_.begin(), ranked_.end(), first,
                  [](const auto& entry) { return entry.second; });
 }
 

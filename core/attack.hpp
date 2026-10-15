@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -286,15 +288,31 @@ class Attacks {
   void seat_waiting(Group first, Group last, std::int32_t separation,
                     const Tokens& tokens, std::uint32_t now, const Map& map,
                     const Crowded& crowded);
-  struct Lines;
+  // The people engaging one foe on a tick by how they stand to its tokens:
+  // holders, the one that took its token last first; waiters in the order
+  // they began to wait; newcomers by distance; and holders giving theirs up.
+  struct Lines {
+    std::vector<Group> holders;
+    std::vector<Group> queued;
+    std::vector<Group> newcomers;
+    std::vector<Group> lapsed;
+  };
+  // The order hand_out() leaves the people of one foe in: strikers by ring,
+  // distance then person, then waiters in queue order.
+  using Rank = std::tuple<int, int, std::int64_t, std::size_t>;
+  // The grant's working lists, kept from foe to foe so a tick reuses them;
+  // neither saved nor hashed.
+  Lines lines_;
+  std::vector<Group> order_;
+  std::vector<std::pair<Rank, Engaging>> ranked_;
   // The steps of grant(): who holds, waits or arrives; holders giving their
   // tokens up; the order free tokens go in; and handing them out, ordering
   // the people of `first` to `last` as grant() does.
-  [[nodiscard]] Lines line_up(Group first, Group last, std::uint32_t now) const;
+  void line_up(Group first, Group last, std::uint32_t now, Lines& lines) const;
   void lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
              std::uint32_t now) const;
-  [[nodiscard]] static std::vector<Group> claims(Lines& lines,
-                                                 std::uint32_t granted);
+  static void claims(Lines& lines, std::uint32_t granted,
+                     std::vector<Group>& order);
   void hand_out(Group first, Group last, const Lines& lines,
                 const std::vector<Group>& order, std::uint32_t now);
   // Frees the slot of each of `first` to `last` that lies past `count` or

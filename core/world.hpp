@@ -725,8 +725,10 @@ class World {
     std::optional<std::size_t> foe;
     Approach approach = OnFoe{};
   };
+  [[nodiscard]] std::vector<bool> granting(const Crowd& crowd) const;
   [[nodiscard]] std::optional<std::size_t> engaged_foe(
-      std::size_t index, const Army& army, const Crowd& crowd) const;
+      std::size_t index, const Army& army, const Crowd& crowd,
+      const std::vector<bool>& granting) const;
   [[nodiscard]] std::vector<Closing> close_in(const Crowd& crowd);
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
                                             const Crowd& crowd,

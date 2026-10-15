@@ -2867,12 +2867,12 @@ bool World::held(std::size_t index, Step pull,
 // crowd's order among equals, inside its home village's claim unless its army
 // marches on an objective beyond it or it has no home; while the rules set
 // tokens, the nearest such foe with a token free or granted to it, if any,
-// is engaged first (ADR 0068). None when a driver
-// steers its army and it holds no intent, it reaches no farther than itself,
-// or no foe is in sight.
-std::optional<std::size_t> World::engaged_foe(std::size_t index,
-                                              const Army& army,
-                                              const Crowd& crowd) const {
+// is engaged first (ADR 0068), `granting` holding those with one free. None
+// when a driver steers its army and it holds no intent, it reaches no farther
+// than itself, or no foe is in sight.
+std::optional<std::size_t> World::engaged_foe(
+    std::size_t index, const Army& army, const Crowd& crowd,
+    const std::vector<bool>& granting) const {
   const std::size_t member = crowd.people.at(index);
   if (army.order.target) {
     const std::size_t aimed = crowd.slot.at(*army.order.target);
@@ -2899,18 +2899,48 @@ std::optional<std::size_t> World::engaged_foe(std::size_t index,
   if (!rules_.tokens) {
     return nearest(engageable);
   }
-  // With tokens, a foe with one free or granted to it first (ADR 0068).
+  // With tokens, a foe with one free or granted to it first (ADR 0068), and
+  // else the nearest foe of all. Until the search accepts a foe it asks of
+  // every foe in sight, so when it accepts none, the nearest engageable foe
+  // it was asked of, the lowest index among equals, is the nearest of all,
+  // and one search finds both.
   const std::optional<Engagement> held = attacks_.engagement(member);
-  const std::vector<std::uint32_t>& by_rank = rules_.tokens->by_rank;
+  const Position from = crowd.hash.position(index);
+  std::optional<std::size_t> any;
+  std::int64_t any_distance = 0;
   const std::optional<std::size_t> open = nearest([&](std::size_t other) {
-    const std::size_t person = crowd.people.at(other);
-    const std::uint32_t granted = by_rank.at(std::min<std::size_t>(
-        rank_of(people_.at(person), life_), by_rank.size() - 1));
-    const bool granting = (held && held->foe == person && held->token) ||
-                          attacks_.tokens_held(person) < granted;
-    return granting && engageable(other);
+    if (granting.at(other) ||
+        (held && held->token && held->foe == crowd.people.at(other))) {
+      return engageable(other);
+    }
+    const std::int64_t distance =
+        distance_squared(from, crowd.hash.position(other));
+    if ((!any || distance < any_distance ||
+         (distance == any_distance && other < *any)) &&
+        engageable(other)) {
+      any = other;
+      any_distance = distance;
+    }
+    return false;
   });
-  return open ? open : nearest(engageable);
+  return open ? open : any;
+}
+
+// By index in `crowd`, whether the person there holds fewer of its tokens
+// than it grants by the rules' token table.
+std::vector<bool> World::granting(const Crowd& crowd) const {
+  std::vector<bool> granting(crowd.people.size(), false);
+  if (rules_.tokens) {
+    const std::vector<std::uint32_t>& by_rank = rules_.tokens->by_rank;
+    for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+      const std::size_t person = crowd.people.at(index);
+      granting.at(index) =
+          attacks_.tokens_held(person) <
+          by_rank.at(std::min<std::size_t>(rank_of(people_.at(person), life_),
+                                           by_rank.size() - 1));
+    }
+  }
+  return granting;
 }
 
 // Each living person's foe and how it closes on it, by its index in `crowd`.
@@ -2924,10 +2954,12 @@ std::optional<std::size_t> World::engaged_foe(std::size_t index,
 std::vector<World::Closing> World::close_in(const Crowd& crowd) {
   std::vector<Closing> closings(crowd.people.size());
   engaging_.clear();
+  const std::vector<bool> free = granting(crowd);
   for (const Army& army : armies_) {
     for (const std::size_t member : army.roster) {
       const std::size_t index = crowd.slot.at(member);
-      const std::optional<std::size_t> foe = engaged_foe(index, army, crowd);
+      const std::optional<std::size_t> foe =
+          engaged_foe(index, army, crowd, free);
       closings.at(index).foe = foe;
       if (rules_.tokens && foe) {
         const std::size_t target = crowd.people.at(*foe);
