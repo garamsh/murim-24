@@ -49,6 +49,40 @@ class SpatialHash {
     }
   }
 
+  /// Returns whether a position of any of `kinds` lies within `radius`
+  /// sub-cell units of `centre`, Euclidean distance inclusive, that `accept`
+  /// accepts. It passes over the blocks and cells holding none of `kinds`,
+  /// stops at the first cell holding an accepted position, and allocates
+  /// nothing.
+  template <typename Accept>
+  [[nodiscard]] bool any_within(std::uint64_t kinds, Position centre,
+                                std::int32_t radius, Accept accept) const {
+    const std::pair<Cell, Cell> span = walk(centre, radius);
+    if (!holds(span, kinds)) {
+      return false;
+    }
+    const auto [low, high] = span;
+    const std::int64_t radius_squared = std::int64_t{radius} * radius;
+    for (Cell cell{low.x, low.y}; cell.y <= high.y; ++cell.y) {
+      for (cell.x = low.x; cell.x <= high.x; ++cell.x) {
+        if ((slot_kinds_.at(slot_of(cell)) & kinds) == 0) {
+          continue;
+        }
+        bool found = false;
+        visit_cell(cell, [&](std::size_t other, Position position) {
+          found =
+              found || ((placed_.at(other).kinds & kinds) != 0 &&
+                        distance_squared(centre, position) <= radius_squared &&
+                        accept(other));
+        });
+        if (found) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Returns the index of the position of any of `kinds` nearest `centre`
   /// within `radius` sub-cell units, Euclidean distance inclusive, among
   /// those `accept` accepts, the lowest index among equals. It walks

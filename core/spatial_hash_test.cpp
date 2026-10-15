@@ -150,6 +150,47 @@ TEST(SpatialHash, NearestTakesTheLowerIndexAmongEquals) {
             std::optional<std::size_t>{2});
 }
 
+TEST(SpatialHash, AnyWithinMatchesABruteForceScan) {
+  const std::vector<Position> positions = random_population(13);
+  // Each position is of one of four kinds and the search asks for two of
+  // them; of those, it accepts the indices not divisible by three.
+  constexpr std::uint64_t SOUGHT = 0b0110U;
+  constexpr std::int32_t REACH = 2 * CELL_SIZE;
+  std::vector<SpatialHash::Placed> placed;
+  placed.reserve(positions.size());
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    placed.push_back(SpatialHash::Placed{positions.at(index),
+                                         std::uint64_t{1} << (index % 4)});
+  }
+  const SpatialHash hash{placed};
+
+  std::size_t held = 0;
+  std::size_t alone = 0;
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    const auto accepted = [index](std::size_t other) {
+      return other != index && other % 3 != 0;
+    };
+    bool expected = false;
+    for (std::size_t other = 0; other < positions.size(); ++other) {
+      const std::int64_t offset_x =
+          std::int64_t{positions.at(other).x} - positions.at(index).x;
+      const std::int64_t offset_y =
+          std::int64_t{positions.at(other).y} - positions.at(index).y;
+      expected = expected ||
+                 ((placed.at(other).kinds & SOUGHT) != 0 && accepted(other) &&
+                  (offset_x * offset_x) + (offset_y * offset_y) <=
+                      std::int64_t{REACH} * REACH);
+    }
+    EXPECT_EQ(hash.any_within(SOUGHT, positions.at(index), REACH, accepted),
+              expected)
+        << "agent " << index;
+    ++(expected ? held : alone);
+  }
+  // Both answers must occur, or one of them went untested.
+  EXPECT_GT(held, 0U);
+  EXPECT_GT(alone, 0U);
+}
+
 TEST(SpatialHash, NearestPassesOverPositionsOfOtherKinds) {
   const Position centre = centre_of(Cell{10, 10});
   constexpr std::uint64_t NEAR_KIND = 0b01U;
