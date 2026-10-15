@@ -39,17 +39,34 @@ bool open(const Map& map, Cell cell, Step direction) {
 
 }  // namespace
 
-FlowField::FlowField(const Map& map, Cell objective)
-    : width_(map.width()),
-      height_(map.height()),
-      steps_(
-          static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_),
-          Step{0, 0}),
-      costs_(steps_.size(), UNREACHABLE) {
+FlowField::FlowField(const Map& map, Cell objective) {
+  rebuild(map, Cell{0, 0}, Footprint{map.width(), map.height()},
+          {FieldSeed{objective, 0}}, objective);
+}
+
+FlowField::FlowField(const Map& map, Cell corner, Footprint size,
+                     const std::vector<FieldSeed>& seeds, Cell aim) {
+  rebuild(map, corner, size, seeds, aim);
+}
+
+void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
+                        const std::vector<FieldSeed>& seeds, Cell aim) {
+  corner_ = corner;
+  width_ = size.width;
+  height_ = size.height;
+  const std::size_t cells =
+      static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
+  steps_.assign(cells, Step{0, 0});
+  costs_.assign(cells, UNREACHABLE);
   using Entry = std::pair<std::uint32_t, std::size_t>;
   std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
-  costs_.at(index(objective)) = 0;
-  frontier.emplace(0, index(objective));
+  for (const FieldSeed& seed : seeds) {
+    if (inside(seed.cell) && map.passable(seed.cell) &&
+        seed.cost < costs_.at(index(seed.cell))) {
+      costs_.at(index(seed.cell)) = seed.cost;
+      frontier.emplace(seed.cost, index(seed.cell));
+    }
+  }
   while (!frontier.empty()) {
     const auto [cost, slot] = frontier.top();
     frontier.pop();
@@ -60,7 +77,7 @@ FlowField::FlowField(const Map& map, Cell objective)
     for (const Step direction : DIRECTIONS) {
       const Cell next{cell.x + direction.x, cell.y + direction.y};
       // Every step is open both ways, so a path from `next` may take it back.
-      if (!open(map, cell, direction)) {
+      if (!inside(next) || !open(map, cell, direction)) {
         continue;
       }
       const std::uint32_t through = cost + cost_of(direction);
@@ -70,19 +87,25 @@ FlowField::FlowField(const Map& map, Cell objective)
       }
     }
   }
+  std::vector<bool> seeded(cells, false);
+  for (const FieldSeed& seed : seeds) {
+    if (inside(seed.cell)) {
+      seeded.at(index(seed.cell)) = costs_.at(index(seed.cell)) == seed.cost;
+    }
+  }
   for (std::size_t slot = 0; slot < steps_.size(); ++slot) {
-    if (costs_.at(slot) != UNREACHABLE && costs_.at(slot) != 0) {
-      steps_.at(slot) = straightest(map, cell_at(slot), objective);
+    if (costs_.at(slot) != UNREACHABLE && !seeded.at(slot)) {
+      steps_.at(slot) = straightest(map, cell_at(slot), aim);
     }
   }
 }
 
-Step FlowField::step(Cell cell) const { return steps_.at(index(cell)); }
+Step FlowField::step(Cell cell) const {
+  return inside(cell) ? steps_.at(index(cell)) : Step{0, 0};
+}
 
 std::uint32_t FlowField::distance(Cell cell) const {
-  const bool inside =
-      cell.x >= 0 && cell.y >= 0 && cell.x < width_ && cell.y < height_;
-  if (!inside || costs_.at(index(cell)) == UNREACHABLE) {
+  if (!inside(cell) || costs_.at(index(cell)) == UNREACHABLE) {
     return UNREACHABLE;
   }
   return costs_.at(index(cell)) / STRAIGHT_COST;
@@ -97,10 +120,11 @@ Step FlowField::straightest(const Map& map, Cell cell, Cell objective) const {
   Step best{0, 0};
   std::int64_t nearest = -1;
   for (const Step direction : DIRECTIONS) {
-    if (!open(map, cell, direction)) {
+    const Cell next{cell.x + direction.x, cell.y + direction.y};
+    if (!inside(next) || !open(map, cell, direction) ||
+        costs_.at(index(next)) == UNREACHABLE) {
       continue;
     }
-    const Cell next{cell.x + direction.x, cell.y + direction.y};
     if (costs_.at(index(next)) + cost_of(direction) != costs_.at(index(cell))) {
       continue;
     }
@@ -114,15 +138,21 @@ Step FlowField::straightest(const Map& map, Cell cell, Cell objective) const {
   return best;
 }
 
+bool FlowField::inside(Cell cell) const {
+  return cell.x >= corner_.x && cell.y >= corner_.y &&
+         cell.x < corner_.x + width_ && cell.y < corner_.y + height_;
+}
+
 std::size_t FlowField::index(Cell cell) const {
-  return (static_cast<std::size_t>(cell.y) * static_cast<std::size_t>(width_)) +
-         static_cast<std::size_t>(cell.x);
+  return (static_cast<std::size_t>(cell.y - corner_.y) *
+          static_cast<std::size_t>(width_)) +
+         static_cast<std::size_t>(cell.x - corner_.x);
 }
 
 Cell FlowField::cell_at(std::size_t slot) const {
   const auto width = static_cast<std::size_t>(width_);
-  return Cell{static_cast<std::int32_t>(slot % width),
-              static_cast<std::int32_t>(slot / width)};
+  return Cell{corner_.x + static_cast<std::int32_t>(slot % width),
+              corner_.y + static_cast<std::int32_t>(slot / width)};
 }
 
 }  // namespace murim
