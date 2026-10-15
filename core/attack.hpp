@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <tuple>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include "map.hpp"
@@ -33,9 +36,10 @@ struct Tokens {
   std::uint64_t lease = 0;
 };
 
-/// ADR 0068's default table: 2 tokens for no realm and the lowest rank, 3
-/// for the next two, 4 for the next two and 6 above, a waiter circling every
-/// second and a holder leasing its token for three while others wait.
+/// ADR 0068's default table as its third step retuned it: 4 tokens for no
+/// realm and the three lowest ranks, 5 for the next two and 6 above, a
+/// waiter circling every second and a holder leasing its token for three
+/// while others wait.
 [[nodiscard]] Tokens default_tokens();
 
 /// Whether `tokens` gives a row for no realm, no row above MAX_TOKENS, and a
@@ -45,21 +49,24 @@ struct Tokens {
 /// Whether `tokens` is none, for no limit, or valid as above.
 [[nodiscard]] bool valid(const std::optional<Tokens>& tokens);
 
-/// The ring around a foe a slot lies on: arm's length, long reach, or the
-/// waiting ring outside both.
-enum class Ring : std::uint8_t { NEAR, LONG, WAITING };
+/// Where a person engaging a foe stands to it: on the ring at arm's length or
+/// at long reach, on the waiting ring outside both, or, for a reach beyond
+/// LONG_REACH, where it stands, on no ring.
+enum class Ring : std::uint8_t { NEAR, LONG, WAITING, FAR };
 
-/// The rings a slot may lie on, for a tag read from a save.
-constexpr std::uint8_t RING_KINDS = 3;
+/// The kinds of Ring, for a tag read from a save.
+constexpr std::uint8_t RING_KINDS = 4;
 
-/// What one person holds against the foe it engages: its slot on a ring,
-/// whether it holds one of the foe's tokens, and the ticks it began to wait
-/// and took the token, each kept modulo 2^32, since only the ticks between
-/// them and now are read.
+/// What one person holds against the foe it engages: its ring, its slot on
+/// it, none while the ring offers it none or on Ring::FAR, whether it holds
+/// one of the foe's tokens, and the ticks it began to wait and took the
+/// token, each kept modulo 2^32, since only the ticks between them and now
+/// are read. One on Ring::WAITING holds no token; one on another ring
+/// without one fights a duel, which needs none.
 struct Engagement {
   std::size_t foe = 0;
   Ring ring = Ring::NEAR;
-  std::uint8_t slot = 0;
+  std::optional<std::uint8_t> slot = std::nullopt;
   bool token = false;
   std::uint32_t waiting_since = 0;
   std::uint32_t token_since = 0;
@@ -84,9 +91,14 @@ constexpr std::int32_t RING_INSET = 32;
 /// How near its slot a striker counts as on it.
 constexpr std::int32_t ON_SLOT = CELL_SIZE / 4;
 
-/// The ring a striker of reach `reach` takes a slot on, or nothing for no
-/// reach or one beyond LONG_REACH.
+/// The ring a striker of reach `reach` stands on: Ring::NEAR, Ring::LONG, or
+/// Ring::FAR beyond LONG_REACH; nothing for no reach.
 [[nodiscard]] std::optional<Ring> ring_for(std::int32_t reach);
+
+/// How far from its foe a person of reach `reach` counts as engaging it,
+/// the waiting ring's radius for that reach: beyond it, it holds nothing.
+[[nodiscard]] std::int64_t waiting_reach(std::int32_t reach,
+                                         std::int32_t separation);
 
 /// A ring of attack slots round a foe: how far out it lies and how many
 /// slots it holds.
@@ -107,16 +119,44 @@ struct SlotRing {
 /// stands within the separation of a point, so a slot there is not offered.
 using Crowded = std::function<bool(Position point, std::size_t foe)>;
 
+/// How a person engaging takes one of its foe's tokens: in the queue, ahead
+/// of it, as the steered person does, or not at all, needing none, as a
+/// duellist toward the other.
+enum class Claim : std::uint8_t { QUEUED, FIRST, EXEMPT };
+
+/// Closes on the foe itself and stands once it is within reach.
+struct OnFoe {};
+
+/// Closes on point `at`, an attack slot or one on its way round the ring to
+/// it, and stands there once the foe is within reach.
+struct ToSlot {
+  Position at{0, 0};
+};
+
+/// Closes on waiting slot `at` and stands there.
+struct ToWait {
+  Position at{0, 0};
+};
+
+/// Stands where it is.
+struct Hold {};
+
+/// Where a person engaging goes this tick.
+using Approach = std::variant<OnFoe, ToSlot, ToWait, Hold>;
+
 /// A person engaging a foe on this tick, with where both stood as it began,
-/// and the point it closes on, which Attacks::assign gives: its slot, or a
-/// slot on its way round the ring to its own.
+/// the tokens the foe grants and how it claims one; and what Attacks::assign
+/// gives it: whether it may strike the foe, and where it goes.
 struct Engaging {
   std::size_t person = 0;
   std::size_t foe = 0;
   std::int32_t reach = 0;
   Position from{0, 0};
   Position foe_at{0, 0};
-  std::optional<Position> aim = std::nullopt;
+  std::uint32_t tokens = 0;
+  Claim claim = Claim::QUEUED;
+  bool strikes = false;
+  Approach approach = OnFoe{};
   std::int64_t distance = 0;
 };
 
@@ -147,8 +187,9 @@ class Attacks {
 
   /// `engaged`, as a save gives it, among `people` people; nothing when a
   /// person or foe lies at or past `people`, a person engages itself or is
-  /// given twice, a slot lies at or past MAX_SLOTS, a waiter holds a token,
-  /// or two people take one slot.
+  /// given twice, a slot lies at or past MAX_SLOTS, one on Ring::FAR holds
+  /// a slot, a waiter holds a token, two people take one slot, or a foe has
+  /// granted more than MAX_TOKENS.
   [[nodiscard]] static std::optional<Attacks> of(
       std::size_t people, const std::vector<Engaged>& engaged);
 
@@ -156,25 +197,39 @@ class Attacks {
   void grow_to(std::size_t people);
 
   /// Gives `person` `engagement`, replacing what it held. `person` and the
-  /// foe lie below the people there is room for, and the slot below
-  /// MAX_SLOTS.
+  /// foe lie below the people there is room for, the slot below MAX_SLOTS,
+  /// and none on Ring::FAR.
   void engage(std::size_t person, const Engagement& engagement);
 
   /// Frees what `person` holds.
   void release(std::size_t person);
 
-  /// Gives each of `engaging` a slot around its foe, on the ring for its
-  /// reach on `map`, keeping one it holds there; frees what anyone else holds.
-  /// A ring's radius is the shortest reach on it less RING_INSET, and its
-  /// slots are those slot_ring() spaces `separation` apart, each offered
-  /// while on a passable cell and not `crowded` (ADR 0080); a held slot no
-  /// longer offered is freed. Those without a slot take, in order of distance
-  /// squared from their foe then person, the free slot nearest them, the
-  /// lower slot among equals. Each gets as its aim the point it closes on,
-  /// round the ring toward its slot as waypoint() gives, or none without a
-  /// slot. `engaging` is reordered.
+  /// Gives each of `engaging`, on tick `now`, what it holds against its foe
+  /// under `tokens` (ADR 0068, as ADR 0080 amends it), and frees what anyone
+  /// else holds, and anyone beyond waiting_reach() of its foe holds:
+  /// - Tokens: a holder keeps its token, unless someone waits and it has
+  ///   held it `tokens.lease` ticks, or a Claim::FIRST takes it, the holder
+  ///   that took its token last giving it up; both join the back of the
+  ///   queue. Free tokens go to Claim::FIRST, then to the queue in order of
+  ///   the tick each began to wait, then person, then to newcomers in order
+  ///   of distance squared, then person. Claim::EXEMPT needs and takes none.
+  /// - Strikers, holders and the exempt, stand on the ring for their reach:
+  ///   its radius the shortest reach on it less RING_INSET, its slots those
+  ///   slot_ring() spaces `separation` apart, each offered while on a
+  ///   passable cell of `map` and not `crowded`. A held slot is kept while
+  ///   offered; else the striker takes, in order of distance squared then
+  ///   person, the free slot nearest it, the lower among equals, and closes
+  ///   on it round the ring as waypoint() gives, or on the foe with none.
+  /// - Waiters stand on the waiting ring: its radius the longest reach among
+  ///   them, plus `separation`, plus RING_INSET, its slots offered as above.
+  ///   In queue order, a waiter keeps its slot; every `tokens.circling`
+  ///   ticks of waiting it moves on to the next free slot offered, onward
+  ///   for an even person and back for an odd one; one without a slot takes
+  ///   the nearest free. One with none, or a reach beyond LONG_REACH, holds.
+  /// `engaging` is reordered.
   void assign(std::vector<Engaging>& engaging, const Map& map,
-              std::int32_t separation, const Crowded& crowded = {});
+              std::int32_t separation, const Tokens& tokens, std::uint32_t now,
+              const Crowded& crowded = {});
 
   /// What `person` holds, or nothing while it engages no one.
   [[nodiscard]] std::optional<Engagement> engagement(std::size_t person) const;
@@ -196,9 +251,11 @@ class Attacks {
 
  private:
   static constexpr std::uint32_t NONE = UINT32_MAX;
-  // A person's flags: the token held in the lowest bit, the ring above it.
+  // A person's flags: the token held in the lowest bit, whether it has a
+  // slot above it, and the ring above both.
   static constexpr std::uint8_t TOKEN = 1U;
-  static constexpr unsigned RING_SHIFT = 1U;
+  static constexpr std::uint8_t SEATED = 2U;
+  static constexpr unsigned RING_SHIFT = 2U;
 
   std::vector<std::uint32_t> foe_;
   std::vector<std::uint8_t> slot_;
@@ -213,11 +270,57 @@ class Attacks {
   // Whether each person engages on the tick being assigned.
   std::vector<bool> engaging_;
 
-  // Seats the people of `first` to `last`, all engaging one foe on `ring`, on
-  // its `slots`, as assign() does.
-  void seat(std::vector<Engaging>::iterator first,
-            std::vector<Engaging>::iterator last, Ring ring,
-            const SlotRing& slots, const Map& map, const Crowded& crowded);
+  using Group = std::vector<Engaging>::iterator;
+  // Frees what anyone not engaging, engaging another foe, on another ring or
+  // beyond waiting_reach() holds; moves those beyond to the back.
+  [[nodiscard]] Group free_stale(std::vector<Engaging>& engaging,
+                                 std::int32_t separation);
+  // Grants the tokens of the foe that `first` to `last` all engage, as
+  // assign() does, and orders them: strikers by ring, distance then person,
+  // then waiters in queue order.
+  void grant(Group first, Group last, const Tokens& tokens, std::uint32_t now);
+  // Seats the strikers of `first` to `last`, all on `ring` of one foe, on its
+  // `slots`, as assign() does.
+  void seat(Group first, Group last, Ring ring, const SlotRing& slots,
+            const Map& map, const Crowded& crowded);
+  // Seats the waiters of `first` to `last`, of one foe, in queue order on
+  // its waiting ring, as assign() does.
+  void seat_waiting(Group first, Group last, std::int32_t separation,
+                    const Tokens& tokens, std::uint32_t now, const Map& map,
+                    const Crowded& crowded);
+  // The people engaging one foe on a tick by how they stand to its tokens:
+  // holders, the one that took its token last first; waiters in the order
+  // they began to wait; newcomers by distance; and holders giving theirs up.
+  struct Lines {
+    std::vector<Group> holders;
+    std::vector<Group> queued;
+    std::vector<Group> newcomers;
+    std::vector<Group> lapsed;
+  };
+  // The order hand_out() leaves the people of one foe in: strikers by ring,
+  // distance then person, then waiters in queue order.
+  using Rank = std::tuple<int, int, std::int64_t, std::size_t>;
+  // The grant's working lists, kept from foe to foe so a tick reuses them;
+  // neither saved nor hashed.
+  Lines lines_;
+  std::vector<Group> order_;
+  std::vector<std::pair<Rank, Engaging>> ranked_;
+  // The steps of grant(): who holds, waits or arrives; holders giving their
+  // tokens up; the order free tokens go in; and handing them out, ordering
+  // the people of `first` to `last` as grant() does.
+  void line_up(Group first, Group last, std::uint32_t now, Lines& lines) const;
+  void lapse(Lines& lines, std::uint32_t granted, const Tokens& tokens,
+             std::uint32_t now) const;
+  static void claims(Lines& lines, std::uint32_t granted,
+                     std::vector<Group>& order);
+  void hand_out(Group first, Group last, const Lines& lines,
+                const std::vector<Group>& order, std::uint32_t now);
+  // Frees the slot of each of `first` to `last` that lies past `count` or
+  // outside `offered`, or whose reach is beyond LONG_REACH.
+  void unseat(Group first, Group last, std::size_t count,
+              std::uint16_t offered);
+  // Takes or leaves `person`'s slot, keeping the rest it holds.
+  void sit(std::size_t person, std::optional<std::uint8_t> slot);
   [[nodiscard]] std::uint16_t& taken_mask(std::size_t foe, Ring ring);
   [[nodiscard]] std::uint16_t taken_mask(std::size_t foe, Ring ring) const;
 };

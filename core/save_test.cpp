@@ -355,14 +355,27 @@ TEST(Save, AVersion13SaveFromBeforeVillagesWereLaidOutByRoleIsRefused) {
   // Version 13 saves hold no village tier or centre, no plan or structure
   // role, no seed and none of growth's apart, terrace and tiers.
   constexpr std::uint32_t BEFORE_ROLES = 13;
-  ASSERT_EQ(SAVE_VERSION, BEFORE_ROLES + 1);
+  ASSERT_LT(BEFORE_ROLES, SAVE_VERSION);
   MemorySaves store;
   ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
-  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_ROLES);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
-  // Control: the same bytes at version 14 load.
-  store.bytes(SLOT) = intact;
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused) {
+  // Version 14 saves hold every engagement's slot as a bare index, so they
+  // cannot hold a token holder offered no slot or a waiter yet to take one.
+  constexpr std::uint32_t BEFORE_NO_SLOT = 14;
+  ASSERT_LT(BEFORE_NO_SLOT, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_NO_SLOT);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
 }
 

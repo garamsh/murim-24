@@ -976,12 +976,20 @@ bool within(std::uint64_t ticks, std::uint64_t least, std::uint64_t most) {
   return ticks >= least && ticks <= most;
 }
 
+// Whether a test region keeps the attack tokens it sets, or drops them.
+enum class TokenGate : std::uint8_t { TOKENS, NONE };
+
 // The ticks from a person born into the first Demonic village of the region
 // `data` generates from `seed` challenging its leader, as the player does,
-// until the duel is settled, or `limit` if it is not by then.
+// until the duel is settled, or `limit` if it is not by then; without the
+// region's attack tokens under TokenGate::NONE.
 std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
-                         bool beside = false) {
+                         bool beside = false,
+                         TokenGate gate = TokenGate::TOKENS) {
   Region region = generate_region(seed, data);
+  if (gate == TokenGate::NONE) {
+    region.rules.tokens.reset();
+  }
   const std::size_t home = first_of(region, DEMONIC);
   ArmySpec born = born_in(region, home);
   if (!beside) {
@@ -1050,12 +1058,16 @@ std::optional<Cell> open_field(const Region& region) {
 // The ticks two lines of SKIRMISHERS, Orthodox and Demonic, newborn and with
 // their factions' skills, two cells apart on an open field of the region
 // `data` generates from `seed` and bound for each other, fight until one has
-// no one left, or `limit` if neither falls by then.
+// no one left, or `limit` if neither falls by then; without the region's
+// attack tokens unless `tokens`.
 std::uint64_t skirmish_ticks(const RegionData& data, Seed seed,
-                             std::uint64_t limit) {
+                             std::uint64_t limit, bool tokens = true) {
   constexpr std::int32_t LINE = 4;
   constexpr std::int32_t APART = 6;
   Region region = generate_region(seed, data);
+  if (!tokens) {
+    region.rules.tokens.reset();
+  }
   const std::optional<Cell> field = open_field(region);
   EXPECT_TRUE(field.has_value());
   const Cell corner = field.value_or(Cell{0, 0});
@@ -1230,6 +1242,19 @@ TEST(Region, ADuelEndsWithinItsTargetTime) {
             DUEL_LEAST);
 }
 
+TEST(Region, ADuelIsFoughtAtThePaceItIsWithoutTokens) {
+  for (const Seed seed : PACED) {
+    EXPECT_EQ(
+        duel_ticks(base_data(), seed, DUEL_MOST + 1),
+        duel_ticks(base_data(), seed, DUEL_MOST + 1, false, TokenGate::NONE))
+        << "seed " << static_cast<std::uint64_t>(seed);
+  }
+  // Control: a skirmish, whose strikes tokens do limit, is fought at another
+  // pace with them than without.
+  EXPECT_NE(skirmish_ticks(base_data(), SEED, SKIRMISH_MOST + 1),
+            skirmish_ticks(base_data(), SEED, SKIRMISH_MOST + 1, false));
+}
+
 TEST(Region, ASkirmishOfTwentyASideEndsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
     EXPECT_TRUE(within(skirmish_ticks(base_data(), seed, SKIRMISH_MOST + 1),
@@ -1250,6 +1275,9 @@ std::uint64_t struck_from(std::int32_t apart) {
   const RegionData& data = base_data();
   Region region = generate_region(SEED, data);
   region.rules.sight = 0;
+  // Tokens decide who strikes, not how far; with no sight nobody engages, so
+  // nobody would hold one.
+  region.rules.tokens.reset();
   const Cell corner = open_field(region).value_or(Cell{0, 0});
   const Cell west{corner.x + 1, corner.y + 2};
   const Cell east{west.x + apart, west.y};

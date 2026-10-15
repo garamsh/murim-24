@@ -719,14 +719,16 @@ class World {
   [[nodiscard]] std::int32_t reach(const Person& person,
                                    const Army& army) const;
   [[nodiscard]] bool claims(std::size_t village, Cell cell) const;
-  // The foe a person engages, as its index in the crowd, and the point it
-  // closes on: its attack slot around the foe, or the foe itself without one.
+  // The foe a person engages, as its index in the crowd, and how it closes
+  // on it.
   struct Closing {
     std::optional<std::size_t> foe;
-    std::optional<Position> aim;
+    Approach approach = OnFoe{};
   };
+  [[nodiscard]] std::vector<bool> granting(const Crowd& crowd) const;
   [[nodiscard]] std::optional<std::size_t> engaged_foe(
-      std::size_t index, const Army& army, const Crowd& crowd) const;
+      std::size_t index, const Army& army, const Crowd& crowd,
+      const std::vector<bool>& granting) const;
   [[nodiscard]] std::vector<Closing> close_in(const Crowd& crowd);
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
                                             const Crowd& crowd,
@@ -738,6 +740,8 @@ class World {
   [[nodiscard]] bool held(std::size_t index, Step pull,
                           const std::vector<bool>& standing,
                           const Crowd& crowd) const;
+  [[nodiscard]] bool may_aim(std::size_t self, const Army& own,
+                             std::size_t target) const;
   [[nodiscard]] Position landing(const Person& caster, const Skill& skill,
                                  const Target& target) const;
   [[nodiscard]] CastRefusal assess_cast(std::size_t person,
