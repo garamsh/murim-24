@@ -72,7 +72,7 @@ end
 -- Garment pieces, drawn over the raw body: m is the faction's letter map.
 local garments = {}
 
--- The merchant: a coin pouch hung at the sash.
+-- The merchant: a coin pouch hung at the sash; its pole and baskets are its prop.
 function garments.merchant(cv, m)
   cv:set(9, 13, c("gold", 4)); cv:set(9, 14, c("gold", 3)); cv:set(8, 13, c("gold", 3))
 end
@@ -131,13 +131,26 @@ end
 -- and 2 for the two frames of work.
 local props = {}
 
--- An abacus under the arm; at work, a steelyard: its beam from the hand, a pan hanging from its
--- end with goods in it, the beam tipping as the weight slides.
+-- A woven basket of goods, 3 wide and 4 tall from its top-left (x0, y0): its rim lit, the weave a
+-- step lighter across it, goods heaped in it.
+local function basket(cv, x0, y0)
+  cv:rect(x0, y0 + 1, 3, 3, c("wood", 4)); cv:hline(x0, y0 + 2, 3, c("wood", 5)); cv:vline(x0 + 2, y0 + 1, 3, c("wood", 3))
+  cv:hline(x0, y0 + 1, 3, c("wood", 6)); cv:set(x0 + 1, y0, c("cloth", 5)); cv:set(x0, y0, c("earth", 5))
+end
+
+-- A shoulder pole across the shoulders past both sides of the body, a basket of goods hung on a
+-- cord from each end, so the merchant's outline changes as the other trades' do; at work, the
+-- baskets set down on the ground behind it and a steelyard in hand, its beam tipping as the
+-- weight slides over the goods in its pan.
 function props.merchant(cv, x, y, f)
+  local ox = x - HAND[1]
   if f == 0 then
-    cv:rect(x - 1, y - 1, 5, 3, c("wood", 3)); cv:hline(x, y, 3, c("gold", 5)); cv:hline(x, y - 1, 3, c("wood", 5))
+    cv:hline(1 + ox, 10, 14, c("wood", 5)); cv:hline(2 + ox, 10, 2, c("wood", 6))
+    cv:vline(2 + ox, 11, 2, c("wood", 3)); cv:vline(13 + ox, 11, 2, c("wood", 3))
+    basket(cv, 1 + ox, 13); basket(cv, 12 + ox, 13)
     return
   end
+  basket(cv, 0, FEET - 3); basket(cv, 2, FEET - 4)
   local tip = f == 1 and -1 or 1
   cv:line(x, y - 1, x + 4, y - 1 + tip, c("wood", 3))
   cv:set(x + 4, y + tip, c("stone", 4))
@@ -396,7 +409,7 @@ local function fighter(faction, weapon, x, fy, flip)
 end
 -- Back to front.
 local cast = {
-  { 26, function(fy) trade_at("merchant", "orthodox", "work", 1, 22, fy) end },
+  { 26, function(fy) trade_at("merchant", "orthodox", "walk", 1, 22, fy) end },
   { 28, function(fy) trade_at("monk", "unorthodox", "work", 2, 118, fy, true) end },
   { 36, function(fy) trade_at("physician", "demonic", "work", 1, 64, fy) end },
   { 44, function(fy) fighter("orthodox", "sword", 96, fy, true) end },
