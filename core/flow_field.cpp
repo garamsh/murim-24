@@ -61,8 +61,9 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
   using Entry = std::pair<std::uint32_t, std::size_t>;
   std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
   for (const FieldSeed& seed : seeds) {
-    if (inside(seed.cell) && map.passable(seed.cell) &&
-        seed.cost < costs_.at(index(seed.cell))) {
+    // A seed may be blocked, as an objective on a structure is: the walk
+    // ends beside it.
+    if (inside(seed.cell) && seed.cost < costs_.at(index(seed.cell))) {
       costs_.at(index(seed.cell)) = seed.cost;
       frontier.emplace(seed.cost, index(seed.cell));
     }

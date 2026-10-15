@@ -35,16 +35,6 @@ using Key = std::pair<std::size_t, std::size_t>;
 
 Key key_of(NodeRef ref) { return Key{ref.area, ref.node}; }
 
-// The least a walk between two cells can cost: a diagonal step for each cell
-// both axes differ by, a straight one for the rest.
-CoarseCost octile(Cell from, Cell to) {
-  const auto across = static_cast<CoarseCost>(std::abs(to.x - from.x));
-  const auto down = static_cast<CoarseCost>(std::abs(to.y - from.y));
-  const CoarseCost diagonal = std::min(across, down);
-  return (diagonal * DIAGONAL) +
-         ((std::max(across, down) - diagonal) * STRAIGHT);
-}
-
 // Whether a walker within the box from `corner` of `size` may step from
 // `cell` along (`column`, `row`) onto a passable cell, a diagonal step only
 // where both cells beside it are passable too.
@@ -62,6 +52,14 @@ bool opens(const Map& map, Cell corner, Footprint size, Cell cell,
 }
 
 }  // namespace
+
+CoarseCost octile(Cell from, Cell to) {
+  const auto across = static_cast<CoarseCost>(std::abs(to.x - from.x));
+  const auto down = static_cast<CoarseCost>(std::abs(to.y - from.y));
+  const CoarseCost diagonal = std::min(across, down);
+  return (diagonal * DIAGONAL) +
+         ((std::max(across, down) - diagonal) * STRAIGHT);
+}
 
 CoarseGraph::CoarseGraph(const Map& map)
     : width_(map.width()),
@@ -87,34 +85,34 @@ CoarseGraph::CoarseGraph(const Map& map)
 }
 
 void CoarseGraph::rebuild(const Map& map, const std::vector<Cell>& cells) {
-  // The areas changed and their neighbours, whose entrances toward them
-  // change; then every area whose exits name one of those areas' nodes.
-  std::set<std::size_t> changed;
-  for (const Cell cell : cells) {
-    const std::size_t area = area_of(cell);
+  // The areas holding a changed cell are rebuilt, and their neighbours too,
+  // whose entrances toward them change; every neighbour of a rebuilt area is
+  // relinked, since a rebuilt area's nodes are numbered afresh.
+  const auto around = [this](std::size_t area, std::set<std::size_t>& into) {
     const auto column =
         static_cast<std::int32_t>(area % static_cast<std::size_t>(columns_));
     const auto row =
         static_cast<std::int32_t>(area / static_cast<std::size_t>(columns_));
-    for (std::int32_t dy = -1; dy <= 1; ++dy) {
-      for (std::int32_t dx = -1; dx <= 1; ++dx) {
-        const bool beside = (dx == 0) != (dy == 0) || (dx == 0 && dy == 0);
-        const std::int32_t x = column + dx;
-        const std::int32_t y = row + dy;
-        if (beside && x >= 0 && y >= 0 && x < columns_ && y < rows_) {
-          changed.insert((static_cast<std::size_t>(y) *
-                          static_cast<std::size_t>(columns_)) +
-                         static_cast<std::size_t>(x));
-        }
+    const std::array<std::array<std::int32_t, 2>, 5> beside{
+        {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
+    for (const auto& [dx, dy] : beside) {
+      const std::int32_t x = column + dx;
+      const std::int32_t y = row + dy;
+      if (x >= 0 && y >= 0 && x < columns_ && y < rows_) {
+        into.insert(
+            (static_cast<std::size_t>(y) * static_cast<std::size_t>(columns_)) +
+            static_cast<std::size_t>(x));
       }
     }
+  };
+  std::set<std::size_t> changed;
+  for (const Cell cell : cells) {
+    around(area_of(cell), changed);
   }
-  std::set<std::size_t> relinked = changed;
+  std::set<std::size_t> relinked;
   for (const std::size_t area : changed) {
     build_area(map, area);
-    for (const CoarseExit& exit : areas_.at(area).exits) {
-      relinked.insert(exit.area);
-    }
+    around(area, relinked);
   }
   std::set<std::size_t> regions;
   for (const std::size_t area : relinked) {
@@ -272,6 +270,10 @@ void CoarseGraph::build_area(const Map& map, std::size_t area) {
   }
   made.within.resize(made.nodes.size());
   // node_costs reads the area's nodes, so the new ones are put in place first.
+  // An area of one component needs no labels: every passable cell is in it.
+  if (made.components > 1) {
+    made.labels = label;
+  }
   areas_.at(area) = std::move(made);
   AreaGraph& built = areas_.at(area);
   for (std::size_t from = 0; from < built.nodes.size(); ++from) {
@@ -426,33 +428,46 @@ void CoarseGraph::join_components() {
 }
 
 std::uint16_t CoarseGraph::component_of(const Map& map, Cell cell) const {
+  static_cast<void>(map);
   const std::size_t area = area_of(cell);
-  const Cell corner = area_corner(area);
-  const Footprint size = area_size(area);
-  return static_cast<std::uint16_t>(
-      labels(map, area).at((static_cast<std::size_t>(cell.y - corner.y) *
-                            static_cast<std::size_t>(size.width)) +
-                           static_cast<std::size_t>(cell.x - corner.x)));
+  const std::vector<std::int16_t>& held = areas_.at(area).labels;
+  return held.empty()
+             ? 0
+             : static_cast<std::uint16_t>(held.at(slot_in(area, cell)));
+}
+
+std::vector<std::size_t> CoarseGraph::sets_of(const Map& map, Cell cell) const {
+  // A blocked cell reaches the cells it could step onto, as a field seeded
+  // on it does.
+  std::vector<Cell> ends;
+  if (map.passable(cell)) {
+    ends.push_back(cell);
+  } else {
+    const Footprint whole{width_, height_};
+    for (const auto& [column, row] : DIRECTIONS) {
+      if (opens(map, Cell{0, 0}, whole, cell, column, row)) {
+        ends.push_back(Cell{cell.x + column, cell.y + row});
+      }
+    }
+  }
+  std::vector<std::size_t> sets;
+  for (const Cell end : ends) {
+    sets.push_back(
+        joined_.at(first_component_.at(area_of(end)) + component_of(map, end)));
+  }
+  return sets;
 }
 
 bool CoarseGraph::joined(const Map& map, Cell from, Cell to) const {
-  const std::size_t one =
-      first_component_.at(area_of(from)) + component_of(map, from);
-  const std::size_t other =
-      first_component_.at(area_of(to)) + component_of(map, to);
-  return joined_.at(one) == joined_.at(other);
+  const std::vector<std::size_t> one = sets_of(map, from);
+  const std::vector<std::size_t> other = sets_of(map, to);
+  return std::any_of(one.begin(), one.end(), [&other](std::size_t set) {
+    return std::find(other.begin(), other.end(), set) != other.end();
+  });
 }
 
-std::vector<CoarseExit> CoarseGraph::exits(std::size_t area,
-                                           std::uint16_t component) const {
-  std::vector<CoarseExit> found;
-  const AreaGraph& held = areas_.at(area);
-  for (const CoarseExit& exit : held.exits) {
-    if (held.nodes.at(exit.node).component == component) {
-      found.push_back(exit);
-    }
-  }
-  return found;
+const std::vector<CoarseExit>& CoarseGraph::exits(std::size_t area) const {
+  return areas_.at(area).exits;
 }
 
 std::vector<std::pair<NodeRef, CoarseCost>> CoarseGraph::inserted(
@@ -659,6 +674,53 @@ std::optional<CoarseCost> CoarseGraph::over_regions(
     }
   }
   return best;
+}
+
+GoalSearch CoarseGraph::toward(const Map& map, Cell objective) const {
+  GoalSearch search;
+  for (const auto& [ref, held] : inserted(map, objective)) {
+    search.cost[key_of(ref)] = held;
+    search.frontier.emplace(held, key_of(ref));
+  }
+  return search;
+}
+
+std::optional<CoarseCost> CoarseGraph::cost_from(GoalSearch& search,
+                                                 NodeRef from) const {
+  // Dijkstra outward from the objective, paused once `from` is settled; walks
+  // are as costly either way, so it settles each node at its cost to the
+  // objective. Ties go to the nodes' order.
+  const Key wanted = key_of(from);
+  while (search.settled.count(wanted) == 0 && !search.frontier.empty()) {
+    const CoarseCost held = search.frontier.top().first;
+    const Key at = search.frontier.top().second;
+    search.frontier.pop();
+    if (search.settled.count(at) != 0 || held != search.cost.at(at)) {
+      continue;
+    }
+    search.settled.insert(at);
+    const AreaGraph& area = areas_.at(at.first);
+    const auto relax = [&search, held](NodeRef next, CoarseCost step) {
+      const CoarseCost through = held + step;
+      const auto [place, fresh] = search.cost.emplace(key_of(next), through);
+      if (fresh || through < place->second) {
+        place->second = through;
+        search.frontier.emplace(through, key_of(next));
+      }
+    };
+    for (const Edge& edge : area.within.at(at.second)) {
+      relax(NodeRef{at.first, edge.to}, edge.cost);
+    }
+    for (const CoarseExit& exit : area.exits) {
+      if (exit.node == at.second) {
+        relax(NodeRef{exit.area, exit.far_node}, STRAIGHT);
+      }
+    }
+  }
+  if (search.settled.count(wanted) == 0) {
+    return std::nullopt;
+  }
+  return search.cost.at(wanted);
 }
 
 std::optional<CoarseCost> CoarseGraph::between(

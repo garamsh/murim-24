@@ -2,7 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <optional>
+#include <queue>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -45,6 +49,22 @@ struct NodeRef {
 /// diagonal 7 as FlowField counts it.
 using CoarseCost = std::uint32_t;
 
+/// Returns the least a walk between two cells can cost: a diagonal step for
+/// each cell both axes differ by, a straight one for the rest.
+[[nodiscard]] CoarseCost octile(Cell from, Cell to);
+
+/// A search outward from an objective over the coarse graph's level of areas,
+/// kept between queries: what it has settled, and what it would settle next.
+struct GoalSearch {
+  std::map<std::pair<std::size_t, std::size_t>, CoarseCost> cost;
+  std::set<std::pair<std::size_t, std::size_t>> settled;
+  std::priority_queue<
+      std::pair<CoarseCost, std::pair<std::size_t, std::size_t>>,
+      std::vector<std::pair<CoarseCost, std::pair<std::size_t, std::size_t>>>,
+      std::greater<>>
+      frontier;
+};
+
 /// The coarse graph of a map (ADR 0043, ADR 0070): each area's passable cells
 /// labelled into components, a node on either side of each entrance along
 /// the areas' shared borders, edges joining the nodes of one component at
@@ -68,7 +88,8 @@ class CoarseGraph {
   /// lies in.
   [[nodiscard]] std::uint16_t component_of(const Map& map, Cell cell) const;
 
-  /// Returns whether a walk joins the passable cells `from` and `to`.
+  /// Returns whether a walk joins the cells `from` and `to`; a blocked cell
+  /// is joined to whatever the cells it could step onto are.
   [[nodiscard]] bool joined(const Map& map, Cell from, Cell to) const;
 
   /// Returns the cost of the shortest walk the graph finds from node `from`
@@ -76,6 +97,17 @@ class CoarseGraph {
   /// they cross; nothing when no walk joins them.
   [[nodiscard]] std::optional<CoarseCost> cost_to(const Map& map, NodeRef from,
                                                   Cell to) const;
+
+  /// Starts a search outward from `objective`, from its area's nodes at
+  /// their cost to it.
+  [[nodiscard]] GoalSearch toward(const Map& map, Cell objective) const;
+
+  /// Returns the cost of the shortest walk over the areas from node `from` to
+  /// the objective `search` was started toward, settling only as far as it
+  /// must; nothing when none joins them. The answer depends on the graph and
+  /// the objective alone, however far `search` had gone.
+  [[nodiscard]] std::optional<CoarseCost> cost_from(GoalSearch& search,
+                                                    NodeRef from) const;
 
   /// Returns the cost of the shortest walk the graph finds from the passable
   /// cell `from` to the passable cell `to`, over the regions when
@@ -85,10 +117,8 @@ class CoarseGraph {
                                                     Cell to,
                                                     bool by_regions) const;
 
-  /// Returns the ways out of component `component` of area `area`, in node
-  /// order.
-  [[nodiscard]] std::vector<CoarseExit> exits(std::size_t area,
-                                              std::uint16_t component) const;
+  /// Returns the ways out of area `area`, in node order.
+  [[nodiscard]] const std::vector<CoarseExit>& exits(std::size_t area) const;
 
   [[nodiscard]] std::int32_t columns() const;
   [[nodiscard]] std::size_t area_of(Cell cell) const;
@@ -100,10 +130,12 @@ class CoarseGraph {
     std::size_t to;
     CoarseCost cost;
   };
-  // An area's components, nodes, the edges among its nodes, its exits, and
-  // each node's index among its region's border nodes, if it is one.
+  // An area's components, each cell's component when it has more than one,
+  // nodes, the edges among its nodes, its exits, and each node's index among
+  // its region's border nodes, if it is one.
   struct AreaGraph {
     std::uint16_t components = 0;
+    std::vector<std::int16_t> labels;
     std::vector<CoarseNode> nodes;
     std::vector<std::vector<Edge>> within;
     std::vector<CoarseExit> exits;
@@ -120,6 +152,8 @@ class CoarseGraph {
   void build_region(std::size_t region);
   void join_components();
   [[nodiscard]] std::size_t region_of_area(std::size_t area) const;
+  [[nodiscard]] std::vector<std::size_t> sets_of(const Map& map,
+                                                 Cell cell) const;
   [[nodiscard]] std::vector<std::int16_t> labels(const Map& map,
                                                  std::size_t area) const;
   [[nodiscard]] std::vector<CoarseCost> area_costs(const Map& map,
