@@ -26,7 +26,8 @@ constexpr std::size_t DOCUMENT_LIMIT = std::size_t{4} << 20U;
 [[nodiscard]] murim::ContentRead parse_document(const std::string& bytes);
 
 /// The file within a pack of document `document`: `pack.json` for the
-/// manifest, and `data/<kind>.json` for a kind's content.
+/// manifest, `map/<kind>.json` for a map's kind `map/<kind>`, and
+/// `data/<kind>.json` for any other kind's content.
 [[nodiscard]] std::string file_of(const std::string& document);
 
 /// A pack source reading pack directories under a root, each document from
