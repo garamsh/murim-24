@@ -196,3 +196,14 @@ The flow field, separation, shapes and duels keep their rules.
 - Waiters circling block movers passing by, because the waiting ring cuts across a road or a gate.
 - The free-token preference makes people walk past a near foe to a far one, and lines stretch thin instead of meeting.
 - Slots jitter: people step back and forth between a slot and its neighbour often enough to show.
+
+## Errata
+
+- **2026-10-15, measuring #282's third step (#358) on macOS arm64, Apple M1, with Apple Clang 21.0.0 (`clang-2100.1.1.101`) at `-O3`, C++17.** The cost section's "under 0.1 ms" and the Consequences' "well under a tenth of a millisecond of work at 5,000" were estimates. They counted slot tests and sort steps, not the engage search. In the live scenario's 5,000, step 3's tokens, waiting ring and lease cost about 0.23 ms a tick at the median over `main`. That figure is by instructions retired over 660 ticks, three runs each (31.0–31.3 G against 29.2–29.3 G, at about 12 M instructions a millisecond), after #358 cut the first build's +0.45 ms with behaviour unchanged. The breakdown, in millions of instructions a tick over `main`:
+  - the free-token preference in the engage search, +1.71. When no foe in sight has a free token, the search visits every foe in sight, where the plain search stops at the nearest, so it is not "one check" per rejected candidate;
+  - freeing and the waiting reach, +0.45;
+  - the waiting ring and circling, +0.30;
+  - the crowding reads round attack and waiting slots, +0.57;
+  - the grant itself, about +0.15.
+
+  Movement costs a little less, since waiters stand apart. The tick bench confirms the figure by wall time. Gated at a load under 4, three interleaved rounds against `main` at `8dac19de`, the live tick's median was 2.94 ms against 2.66 ms, +0.28 ms. #358's PR comment 6190526660 records the profile and the cuts tried. The decision stands, the free-token preference with it. The binding budget is the live tick's 4 ms at p99 (#216), not this estimate.
