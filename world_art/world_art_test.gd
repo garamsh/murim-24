@@ -206,11 +206,12 @@ func run() -> bool:
 			and _techniques_pass() and passed
 
 
-# The lights of the region SEED makes, over the whole map: the steered person's torch at its feet
-# by lights.json, then every window that file names for each structure's kind at its stage, at the
-# sprite's frame, and nothing else. Setup: the map holds lit windows and the steered person lives.
-# Controls: a view beside the map lists none, and with no one steered the same view lists every
-# window and no torch, so the count above is the culling's and the torch's.
+# The lights of the region SEED makes: over the whole map, every window lights.json names for each
+# structure's kind at its stage, at the sprite's frame, and nothing else, and the steered person's
+# torch at its feet beside them. Over a view round one lit structure, the windows reaching into it,
+# from only the structures near it (#336). Setup: the map holds lit windows and the steered person
+# lives. Controls: a view beside the map lists none and visits none, with no one steered there is no
+# torch, and the version holds for a list unchanged and moves on for one changed.
 func _lights_pass() -> bool:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/lights.json"))
 	var region := WorldAdapter.create_region(SEED)
@@ -220,41 +221,74 @@ func _lights_pass() -> bool:
 	var rows := region.map_rows()
 	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
 	art.refresh(whole)
-	var shown: PackedFloat32Array = art.lights(whole)
-	var expected := PackedFloat32Array()
+	var shown := _entries(art.lights(whole))
+	var whole_version: int = art.lights_version
+	var whole_visited: int = art.lights_visited
+	var again := _entries(art.lights(whole))
+	var steady: bool = art.lights_version == whole_version and again == shown
+	var expected := _windows(art, region, data, whole)
+	var drawn := 0
+	var lit_at := Vector2.INF
+	for sprite: Sprite2D in art.structure_sprites:
+		if sprite != null:
+			drawn += 1
+			if lit_at == Vector2.INF and not sprite.get_meta("lights").get("intact", []).is_empty():
+				lit_at = sprite.position + sprite.offset
+	var near := Rect2(lit_at - VIEW / 2.0, VIEW)
+	var near_shown := _entries(art.lights(near))
+	var near_expected := _windows(art, region, data, near)
+	var near_visited: int = art.lights_visited
+	var moved: bool = art.lights_version == whole_version + 1
 	var feet: Vector2 = art.body_at(steered, 0, 1.0)
 	var torch: Array = data.torch
-	expected.append_array([feet.x + torch[0], feet.y + torch[1], torch[2], torch[3], torch[4]])
+	var torch_pass: bool = art.torch(whole) == PackedFloat32Array([feet.x + torch[0], feet.y + torch[1], torch[2], torch[3], torch[4]])
+	var beside_view := Rect2(Vector2(-10000, 0), VIEW)
+	var beside: PackedFloat32Array = art.lights(beside_view)
+	var beside_visited: int = art.lights_visited
+	var beside_torch: PackedFloat32Array = art.torch(beside_view)
+	art.free()
+	var unsteered: Node2D = load(SCENE).instantiate()
+	unsteered.show_world(region, -1)
+	unsteered.refresh(whole)
+	var untorched: PackedFloat32Array = unsteered.torch(whole)
+	unsteered.free()
+	var passed := expected.size() > 0 and shown == expected and whole_visited == drawn and steady \
+			and near_shown.size() > 0 and near_shown == near_expected and near_visited < drawn and moved and torch_pass \
+			and beside.is_empty() and beside_visited == 0 and beside_torch.is_empty() and untorched.is_empty()
+	print("world_art_test: %d windows listed over the region against %d expected, visiting %d of %d structures, the version held when unchanged %s; %d round a lit structure against %d, visiting %d, the version moved on %s; the torch at %s %s; %d beside the map visiting %d, no torch there %s or with no one steered %s: %s" % [
+		shown.size(), expected.size(), whole_visited, drawn, steady, near_shown.size(), near_expected.size(), near_visited,
+		moved, feet, torch_pass, beside.size() / WorldArt.LIGHT_FLOATS, beside_visited, beside_torch.is_empty(),
+		untorched.is_empty(), "pass" if passed else "FAIL"])
+	return passed
+
+
+# Each window lit at night of every structure `art` draws of `region`, by `data`, whose light reaches
+# into `view`, as _entries() gives them: every structure looked at.
+func _windows(art: Node2D, region: WorldAdapter, data: Dictionary, view: Rect2) -> Array:
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
+	var listed := PackedFloat32Array()
 	for structure in region.structure_count():
 		var sprite: Sprite2D = art.structure_sprites[structure]
 		if sprite == null:
 			continue
 		var of_kind: Dictionary = data.structures.get(region.structure_kind(structure), {})
 		for light: Array in of_kind.get(stages[region.structure_stage(structure)], []):
-			var corner := sprite.position + sprite.offset + Vector2(light[0], light[1])
-			expected.append_array([corner.x, corner.y, light[2], light[3], light[4]])
-	var windows := expected.size() / WorldArt.LIGHT_FLOATS - 1
-	var beside: PackedFloat32Array = art.lights(Rect2(Vector2(-10000, 0), Vector2(480, 270)))
-	art.free()
-	var unsteered: Node2D = load(SCENE).instantiate()
-	unsteered.show_world(region, -1)
-	unsteered.refresh(whole)
-	var untorched: PackedFloat32Array = unsteered.lights(whole)
-	unsteered.free()
-	var passed := windows > 0 and shown == expected and beside.is_empty() \
-			and untorched == expected.slice(WorldArt.LIGHT_FLOATS)
-	print("world_art_test: %d lights listed over the region against %d expected, the torch at %s and %d windows; %d beside the map, %d with no one steered: %s" % [
-		shown.size() / WorldArt.LIGHT_FLOATS, expected.size() / WorldArt.LIGHT_FLOATS, feet, windows,
-		beside.size() / WorldArt.LIGHT_FLOATS, untorched.size() / WorldArt.LIGHT_FLOATS, "pass" if passed else "FAIL"])
-	return passed
+			var rect := Rect2(sprite.position + sprite.offset + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
+			if rect.grow(light[4]).intersects(view):
+				listed.append_array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
+	return _entries(listed)
 
 
-# Every kind of structure is drawn as the buildings check above draws a region's: the region, on
-# short days, grown until it has built a smithy and an apothecary, the kinds only growth lays, has
-# every structure but a field placed so, of every kind world_art.gd draws; the lights over the map
-# count a hearth for each smithy intact or damaged, and beside the map none. Setup: the region began
-# with neither workshop, and growth built both within WORKSHOP_DAYS.
+# Each light of `lights`, as lights() gives them, as an array of its floats, sorted, as lights() lists
+# them by area rather than by structure.
+func _entries(lights: PackedFloat32Array) -> Array:
+	var entries := []
+	for at in range(0, lights.size(), WorldArt.LIGHT_FLOATS):
+		entries.append(Array(lights.slice(at, at + WorldArt.LIGHT_FLOATS)))
+	entries.sort()
+	return entries
+
+
 func _every_kind_pass() -> bool:
 	var region := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
 	var art: Node2D = load(SCENE).instantiate()

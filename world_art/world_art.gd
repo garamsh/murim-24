@@ -59,6 +59,10 @@ const BANNERS := {"banner": "decorations/banner", "sect_banner": "decorations/se
 const LIGHTS := "res://world_art/lights.json"
 ## Floats per light in what lights() gives: its rect, x, y, width and height, and its reach.
 const LIGHT_FLOATS := 5
+# Pixels across and down an area of LIGHTS' index, which lights() reads only round the view (#336).
+const LIGHT_AREA := 256.0
+# What a structure's stage with no lights lists, one array shared rather than one made per visit.
+const NO_LIGHTS: Array = []
 const FOOTPRINT_INSET := 8
 const CHEVRON_FRAME_MS := 400
 # Frame positions in the body atlas built at startup, in pixels.
@@ -160,6 +164,20 @@ var _lights := {}
 ## How many hearths the last lights() listed: a structure's light with no window, its fire drawn in
 ## the emitters' colours.
 var hearths := 0
+## How many times what lights() lists has changed, so a reader can skip a list it has read; and how
+## many structures the last call visited, which only those near the view are (#336).
+var lights_version := 0
+var lights_visited := 0
+# What lights() lists and the list it builds next, swapped when the two differ, so a steady view
+# allocates no array; the structures by area of LIGHT_AREA from their frame's corner, for as many
+# structures as it was built for; and how far round its frame's corner a structure's light can reach.
+var _shown_lights := PackedFloat32Array()
+var _next_lights := PackedFloat32Array()
+# What torch() gives, refilled rather than made anew.
+var _torch_light := PackedFloat32Array()
+var _light_areas := {}
+var _light_areas_for := -1
+var _light_margin := 0.0
 # Where the steered person's feet were drawn in the last refresh, while it lives.
 var _lead_at := Vector2.ZERO
 var _lead_alive := false
@@ -354,33 +372,97 @@ func refresh(view: Rect2, between := 1.0) -> void:
 	$Sprays.show_at(now)
 
 
-## The lights whose light reaches into `view`, in pixels, as of the last refresh, LIGHT_FLOATS
-## floats each: the steered person's torch while it lives, then each window lit at night of every
-## structure at its stage, by LIGHTS. It counts the hearths among them in `hearths`.
+## The windows lit at night whose light reaches into `view`, in pixels, as of the last refresh,
+## LIGHT_FLOATS floats each, of every structure at its stage, by LIGHTS. It visits only the structures
+## whose area of LIGHT_AREA lies within their lights' reach of the view, counting them in
+## `lights_visited`, and the hearths it lists in `hearths`; `lights_version` moves on when the list
+## differs from the last. The array is kept and refilled: read it before the next call.
 func lights(view: Rect2) -> PackedFloat32Array:
-	var shown := PackedFloat32Array()
+	if _light_areas_for != structure_sprites.size():
+		_index_lights()
 	hearths = 0
-	if _lead_alive:
-		_add_light(shown, _lights.torch, _lead_at, view)
+	lights_visited = 0
+	var count := 0
+	var reach := view.grow(_light_margin)
+	var first := Vector2i((reach.position / LIGHT_AREA).floor())
+	var last := Vector2i((reach.end / LIGHT_AREA).floor())
+	for y in range(first.y, last.y + 1):
+		for x in range(first.x, last.x + 1):
+			for structure: int in _light_areas.get(Vector2i(x, y), PackedInt64Array()):
+				var sprite := structure_sprites[structure]
+				if sprite == null:
+					continue
+				lights_visited += 1
+				var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
+				for light: Array in sprite.get_meta("lights").get(STAGES[stage], NO_LIGHTS):
+					if _add_light(count, light, sprite.position + sprite.offset, view):
+						count += 1
+						if light[2] == 0 and light[3] == 0:
+							hearths += 1
+	_next_lights.resize(count * LIGHT_FLOATS)
+	if _next_lights != _shown_lights:
+		var listed := _next_lights
+		_next_lights = _shown_lights
+		_shown_lights = listed
+		lights_version += 1
+	return _shown_lights
+
+
+## The steered person's torch while it lives and its light reaches into `view`, as one entry of
+## lights() gives a window, LIGHT_FLOATS floats; empty otherwise. The array is kept and refilled:
+## read it before the next call.
+func torch(view: Rect2) -> PackedFloat32Array:
+	var light: Array = _lights.torch
+	var rect := Rect2(_lead_at + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
+	if not _lead_alive or not rect.grow(light[4]).intersects(view):
+		_torch_light.resize(0)
+		return _torch_light
+	_torch_light.resize(LIGHT_FLOATS)
+	_torch_light[0] = rect.position.x
+	_torch_light[1] = rect.position.y
+	_torch_light[2] = rect.size.x
+	_torch_light[3] = rect.size.y
+	_torch_light[4] = light[4]
+	return _torch_light
+
+
+# Writes `light`, a rect and a reach from `origin`, as entry `at` of the list lights() builds, when its
+# light reaches into `view`, and returns whether it did.
+func _add_light(at: int, light: Array, origin: Vector2, view: Rect2) -> bool:
+	var rect := Rect2(origin + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
+	if not rect.grow(light[4]).intersects(view):
+		return false
+	if _next_lights.size() < (at + 1) * LIGHT_FLOATS:
+		_next_lights.resize((at + 1) * LIGHT_FLOATS)
+	var base := at * LIGHT_FLOATS
+	_next_lights[base] = rect.position.x
+	_next_lights[base + 1] = rect.position.y
+	_next_lights[base + 2] = rect.size.x
+	_next_lights[base + 3] = rect.size.y
+	_next_lights[base + 4] = light[4]
+	return true
+
+
+# Files every structure under the area of LIGHT_AREA its frame's corner lies in, and finds how far
+# round that corner any light of LIGHTS can reach.
+func _index_lights() -> void:
+	_light_areas.clear()
+	_light_margin = 0.0
+	for kind: String in _lights.structures:
+		for stage: String in _lights.structures[kind]:
+			for light: Array in _lights.structures[kind][stage]:
+				_light_margin = maxf(_light_margin, maxf(absf(light[0]) + light[2], absf(light[1]) + light[3]) + light[4])
 	for structure in structure_sprites.size():
 		var sprite := structure_sprites[structure]
 		if sprite == null:
 			continue
-		var stage := _stages[structure] if structure < _stages.size() else world.structure_stage(structure)
-		for light: Array in sprite.get_meta("lights").get(STAGES[stage], []):
-			if _add_light(shown, light, sprite.position + sprite.offset, view) and light[2] == 0 and light[3] == 0:
-				hearths += 1
-	return shown
-
-
-# Adds `light`, a rect and a reach from `origin`, to `shown` when its light reaches into `view`, and
-# returns whether it did.
-func _add_light(shown: PackedFloat32Array, light: Array, origin: Vector2, view: Rect2) -> bool:
-	var rect := Rect2(origin + Vector2(light[0], light[1]), Vector2(light[2], light[3]))
-	if not rect.grow(light[4]).intersects(view):
-		return false
-	shown.append_array([rect.position.x, rect.position.y, rect.size.x, rect.size.y, light[4]])
-	return true
+		var area := Vector2i(((sprite.position + sprite.offset) / LIGHT_AREA).floor())
+		if not _light_areas.has(area):
+			_light_areas[area] = PackedInt64Array()
+		var filed: PackedInt64Array = _light_areas[area]
+		filed.append(structure)
+		_light_areas[area] = filed
+	_light_areas_for = structure_sprites.size()
 
 
 # Each cell's terrain kind name: the region's, or for a world without one, plain where the map

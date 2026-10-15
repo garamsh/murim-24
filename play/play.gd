@@ -512,7 +512,7 @@ func show_view(view: Rect2) -> void:
 	var date := world.date()
 	_grade.art_pixel = _camera.zoom.x
 	_grade.show_time(float(date.tick) / date.ticks_per_day, date.season)
-	_grade.show_lights(_art.lights(view), view, _art.hearths)
+	_grade.show_lights(_art.lights(view), view, _art.hearths, _art.lights_version, _art.torch(view))
 	_view_origin = view.position
 
 
