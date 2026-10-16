@@ -64,6 +64,8 @@ The production set. Each `.aseprite` file is drawn by the `.lua` script beside i
 | `art/structures/town_courtyard_house` | 96 x 106 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/smithy` | 64 x 58 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/structures/apothecary` | 80 x 52 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/temple` | 96 x 116 | `intact`, `damaged`, `destroyed`, `rubble` |
+| `art/structures/inn` | 96 x 112 | `intact`, `damaged`, `destroyed`, `rubble` |
 | `art/decorations/fields` | 16 x 12 | `sown`, `growing`, `ripe`, `fallow`, `burnt` and each with `_winter`, two variants each |
 | `art/decorations/ground` | 16 x 12 | `paving` and `road` (four each), `millet` and `rice` (two each) |
 | `art/decorations/banner` | 16 x 24 | `orthodox`, `demonic`, `unorthodox` |
@@ -303,6 +305,15 @@ As a village grows, its people build workshops among its houses (`docs/concept.m
 | Apothecary (약방) | Structure | 4 x 2 | A plastered shop on a stone plinth under a slate roof over its left three cells: a counter window on a cabinet of small drawers with gold pulls, jars and a mortar on the sill, herbs hung under the eave, a door under a split cloth curtain and a name board; in the yard at its right a herb rack of two posts and two bars hung with bundles, a drying tray of woven bamboo on trestles and a round tray on the ground, herbs spread on both; damaged holes the roof, scorches the wall, pulls drawers out and snaps the rack's lower bar onto the ground, destroyed drops the roof in and burns the walls to stumps, the rack to two posts and the tray where it fell, rubble is a heap on the plinth and ash in the yard |
 
 - The anvil outlasts the smithy: it stands on its stump intact and damaged and lies on its side, destroyed and rubble.
+
+A village starts with a temple, where its monks work, and an inn, where its innkeeper works (#364). Both face its square. Neither borrows jade or a faction accent, and the inn's lanterns are paper lit by the fire ramp, not red, which reads as crimson:
+
+| Prop | Kind | Footprint | Look |
+|---|---|---|---|
+| Temple (사찰) | Structure | 5 x 4 | A main hall of 4 x 3 at the back of a stone platform with steps, its walls lacquered rather than plastered, two latticed windows and open doors on a seated bronze figure, under a hip-and-gable roof with upswept eaves, eave boards painted in leaf and paper over a row of brackets, and a jewel finial at the ridge; on the court before it a bronze incense burner on three legs with embers and smoke, a bell hung in a lacquered frame at its left and a stone lantern at its right; its damage stages are the village buildings' |
+| Inn (객잔) | Structure | 5 x 3 | Two storeys over the back two rows: the lower with two latticed windows and a door under a signboard bearing the inn's mark in ink, a skirt roof with a paper lantern at each corner, the upper with three windows behind a railed gallery under its own roof; on a terrace along the front row two tables with benches, and at its right a cloth banner bearing the mark on a pole; its damage stages are the village buildings' |
+
+- At night the temple's windows, doors and stone lantern and the inn's windows light, and the temple's incense burner and the inn's two lanterns are hearths, which bloom (`world_art/lights.json`).
 
 A walled town (#200) encloses a real town, at least about 40 x 30 cells inside its wall, with streets, wards, a market square, a hall, temples and courtyard houses; a village stays unwalled. The game does not lay one yet: the town's template and its growth are #169's. Its pieces, each in the four stages:
 

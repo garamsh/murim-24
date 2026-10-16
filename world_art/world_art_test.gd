@@ -311,20 +311,25 @@ func _every_kind_pass() -> bool:
 	art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
 	var drawn := _placed(region, art)
 	var every: bool = WorldArt.BUILDINGS.keys().all(func(kind: String) -> bool: return drawn.kinds.has(kind))
-	# Each smithy with a hearth at its stage is counted as one, over the whole map and beside it none.
+	# Each hearth lights.json names for a structure's kind at its stage, a light with no width or height,
+	# is counted as one, over the whole map and beside it none.
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/lights.json"))
+	var stages := ["intact", "damaged", "destroyed", "rubble"]
 	var rows := region.map_rows()
 	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
 	var hearths := 0
 	for structure in region.structure_count():
-		if region.structure_kind(structure) == "smithy" and region.structure_stage(structure) <= 1:
-			hearths += 1
+		var of_kind: Dictionary = data.structures.get(region.structure_kind(structure), {})
+		for light: Array in of_kind.get(stages[region.structure_stage(structure)], []):
+			if light[2] == 0 and light[3] == 0:
+				hearths += 1
 	art.lights(whole)
 	var counted: int = art.hearths
 	art.lights(Rect2(Vector2(-10000, 0), Vector2(480, 270)))
 	var hearth_pass: bool = hearths > 0 and counted == hearths and art.hearths == 0
 	var passed: bool = at_start.is_empty() and held.call().size() == workshops.size() \
 			and drawn.placed + drawn.fields == region.structure_count() and every and drawn.batched and hearth_pass
-	print("world_art_test: after %d days, the workshops at the start %s and now %s; %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s); %d hearths counted of %d smithies with one, none beside the map %s: %s" % [
+	print("world_art_test: after %d days, the workshops at the start %s and now %s; %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s); %d hearths counted of %d lights.json names, none beside the map %s: %s" % [
 		ticks / SHORT_DAY, at_start, held.call(), drawn.placed + drawn.fields, region.structure_count(), every,
 		drawn.kinds.keys(), counted, hearths, art.hearths == 0, "pass" if passed else "FAIL"])
 	art.free()
