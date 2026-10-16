@@ -383,6 +383,20 @@ TEST(Save, AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
 }
 
+TEST(Save, AVersion17SaveFromBeforeTiersNamedSquareKindsIsRefused) {
+  // Version 17 saves hold no growth tier's square kinds.
+  constexpr std::uint32_t BEFORE_SQUARE_KINDS = 17;
+  ASSERT_LT(BEFORE_SQUARE_KINDS, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) =
+      static_cast<std::uint8_t>(BEFORE_SQUARE_KINDS);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
 TEST(Save, AVersion15SaveFromBeforeTiersIsRefused) {
   // Version 15 saves hold no area's tier and no army's far anchor.
   constexpr std::uint32_t BEFORE_TIERS = 15;
