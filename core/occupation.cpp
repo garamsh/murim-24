@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -11,8 +10,6 @@
 
 namespace murim {
 namespace {
-
-constexpr std::uint32_t HOURS_PER_DAY = 24;
 
 // The places each occupation opens in a village of `people` whose standing
 // structures are of the kinds `standing`.
@@ -106,14 +103,17 @@ void check_occupations(const Occupations& occupations, std::size_t wares) {
                   [](const Occupation& occupation) {
                     return well_ordered(occupation.schedule);
                   });
+  const Waking& waking = occupations.waking;
+  const bool wakes = waking.from < waking.to && waking.to <= HOURS_PER_DAY;
   if (occupations.list.empty() ||
       occupations.fallback >= occupations.list.size() || opens_nothing ||
-      sells_unknown || !schedules_ordered) {
+      sells_unknown || !schedules_ordered || !wakes) {
     throw std::invalid_argument(
         "occupations must list at least one occupation, a fallback among "
         "them, places at a named kind or on the square that open at least "
-        "one, only wares there are, and schedules that begin at hour 0 with "
-        "hours ascending below 24");
+        "one, only wares there are, schedules that begin at hour 0 with "
+        "hours ascending below 24, and waking hours ending after they begin, "
+        "by 24");
   }
 }
 

@@ -1,6 +1,6 @@
 # ADR 0081: Give people trades from their village's buildings, and move them between home, work and the square by the hour
 
-> Status: proposed
+> Status: proposed; three points it leaves open read by the PM's rulings on #376, in step 2: the waking hours are pack data, saved and folded with the occupations, 6 to 22 in the base pack; a household is a living married couple with their unmarried or widowed children, anyone else a household of one; and a structure that blocks nothing, such as a field, gives a spot anywhere on its cells rather than by a door
 > Date: 2026-10-15
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

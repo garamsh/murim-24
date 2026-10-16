@@ -29,6 +29,7 @@
 #include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
+#include "schedule.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "spatial_hash.hpp"
@@ -36,6 +37,7 @@
 #include "talk.hpp"
 #include "trade.hpp"
 #include "village.hpp"
+#include "village_fields.hpp"
 
 namespace murim {
 
@@ -674,6 +676,29 @@ class World {
   [[nodiscard]] std::optional<std::size_t> occupation_of(
       std::size_t person) const;
 
+  /// Returns what person `person` is doing by its schedule (ADR 0081): one
+  /// of a village's residents follows its occupation's schedule, or the idle
+  /// one without an occupation, while its army is not steered and is bound
+  /// for the village's centre with no attack intent, going in each band of
+  /// hours to its household's house, its workplace or the village's square.
+  /// It is walking while more than a cell from its spot there, and otherwise
+  /// working at its workplace in a work band, at home at its house in a home
+  /// band, or idle; anyone following no schedule is idle. Throws
+  /// std::out_of_range when there is no such person.
+  [[nodiscard]] Activity activity(std::size_t person) const;
+
+  /// The path fields the villages' schedules hold (ADR 0081), the bytes
+  /// their cells take, and how many fields have been built since the world
+  /// was created or loaded.
+  struct FieldUse {
+    std::size_t fields = 0;
+    std::size_t bytes = 0;
+    std::uint64_t builds = 0;
+  };
+
+  /// Returns the path fields the villages' schedules hold.
+  [[nodiscard]] FieldUse schedule_fields() const;
+
   /// Returns why person `buyer` may not buy one of ware `ware` from person
   /// `seller`, or BuyRefusal::NONE when it may. Throws std::invalid_argument
   /// when there is no such person or ware.
@@ -881,6 +906,94 @@ class World {
   [[nodiscard]] Service served() const;
   void tend();
   void assign_occupations();
+  // A village's grounds as its schedule reads them (ADR 0081): its square's
+  // free cells, each of its structures' doors, by index in the village, and
+  // the path fields of all its places over its window, built when the
+  // grounds are found; derived and kept until a structure is laid on its
+  // window, which its layout epoch marks, it is given a structure, or it
+  // reaches a tier, neither saved nor hashed.
+  struct Grounds {
+    std::uint64_t version = 0;
+    std::size_t tier = 0;
+    std::size_t places = 0;
+    std::uint64_t layout = 0;
+    std::vector<Cell> square;
+    std::vector<std::optional<Cell>> doors;
+    VillageFields fields;
+  };
+  // The places, as numbered for a village's fields, where each of its
+  // residents lives and works, by roster rank: 0 its square, 1 + i its i-th
+  // structure, none where it has no house or workplace. Derived and kept
+  // until a roster writer, the day's rules or a structure's fall changes
+  // them, neither saved nor hashed.
+  struct Lodging {
+    std::uint64_t version = 0;
+    std::size_t army = 0;
+    std::uint64_t army_epoch = 0;
+    std::uint64_t village_epoch = 0;
+    std::vector<std::optional<std::size_t>> homes;
+    std::vector<std::optional<std::size_t>> works;
+  };
+  // Where a person following its village's schedule goes, found for the
+  // village's grounds and lodging, the band of hours and the wander period,
+  // which make its key: the place, as numbered for the fields, the band's
+  // kind of place and the spot it stands on. `followed` is the tick it last
+  // followed its schedule on.
+  struct Errand {
+    std::optional<std::size_t> village;
+    std::uint64_t lodging = 0;
+    std::uint64_t grounds = 0;
+    std::size_t band = 0;
+    std::uint64_t period = 0;
+    Where where = Where::HOME;
+    std::size_t place = 0;
+    Cell spot{};
+    std::uint64_t followed = 0;
+  };
+  // One of a village's residents as its schedule reads it: the village, its
+  // rank in the residents' roster, and the person.
+  struct Follower {
+    std::size_t village = 0;
+    std::size_t rank = 0;
+    std::size_t person = 0;
+  };
+  // A person's pull toward where it goes, and whether it counts as standing.
+  struct Pull {
+    Step step{0, 0};
+    bool standing = true;
+  };
+  [[nodiscard]] bool follows(std::size_t village) const;
+  [[nodiscard]] std::uint64_t army_epoch(std::size_t army) const;
+  void bump_army(std::size_t army);
+  void bump_village(std::size_t village);
+  void bump_villages();
+  [[nodiscard]] std::uint64_t layout_epoch(std::size_t village) const;
+  void bump_layout(std::size_t village);
+  [[nodiscard]] bool current(const Grounds& grounds, std::size_t village) const;
+  [[nodiscard]] bool current(const Lodging& lodging, std::size_t village) const;
+  [[nodiscard]] Grounds grounds_of(std::size_t village) const;
+  [[nodiscard]] Lodging lodging_of(std::size_t village) const;
+  [[nodiscard]] std::vector<std::optional<std::size_t>> homes_of(
+      std::size_t village, const std::vector<bool>& standing) const;
+  [[nodiscard]] std::vector<std::optional<std::size_t>> works_of(
+      std::size_t village, const std::vector<bool>& standing) const;
+  [[nodiscard]] Errand errand_of(const Follower& follower,
+                                 const Grounds& grounds,
+                                 const Lodging& lodging) const;
+  [[nodiscard]] Errand key_of(const Follower& follower, const Grounds& grounds,
+                              const Lodging& lodging) const;
+  [[nodiscard]] static bool same_key(const Errand& one, const Errand& other);
+  [[nodiscard]] std::vector<Cell> seeds_of(std::size_t village,
+                                           const Grounds& grounds,
+                                           std::size_t place) const;
+  void find_grounds(std::size_t village);
+  void prepare_grounds();
+  void follow_schedules();
+  void build_field(std::size_t village, Grounds& grounds,
+                   std::size_t place) const;
+  [[nodiscard]] Step errand_pull(const Errand& errand, Cell cell) const;
+  [[nodiscard]] Pull pull_of(const FlowField& field, const Army& army,
+                             std::size_t rank, Cell cell) const;
   [[nodiscard]] std::vector<std::size_t> homes() const;
   void migrate_or_starve(std::size_t person,
                          std::vector<std::size_t>& population,
@@ -1018,6 +1131,23 @@ class World {
   // The sellers of the ware being shopped for, by row, column and index,
   // kept so a day allocates none; neither saved nor hashed.
   std::vector<Seller> sellers_;
+  // Each village's grounds and lodging, and each person's errand, as last
+  // found (ADR 0081); none is saved or hashed, and each is found again
+  // whenever what it is derived from has changed.
+  std::vector<Grounds> grounds_;
+  std::vector<Lodging> lodgings_;
+  std::vector<Errand> errands_;
+  // Bumped by the writers that change a roster, by army; by the day's rules
+  // and a structure of the village standing or falling, by village; and by a
+  // structure laid on a village's window, by village. Neither saved nor
+  // hashed.
+  std::vector<std::uint64_t> army_epochs_;
+  std::vector<std::uint64_t> village_epochs_;
+  std::vector<std::uint64_t> layout_epochs_;
+  // The last version given to a village's grounds or lodging, and the fields
+  // built since the world was created or loaded.
+  std::uint64_t versions_ = 0;
+  std::uint64_t field_builds_ = 0;
 };
 
 }  // namespace murim
