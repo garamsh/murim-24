@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -388,6 +389,37 @@ TEST(CoarseGraph, ARevertedRebuildLeavesTheGraphAsItWas) {
   EXPECT_EQ(CoarseGraph{housed}.node_count(), original.node_count());
   EXPECT_FALSE(
       CoarseGraph{walled}.joined(walled, Walk{Cell{0, 0}, Cell{WIDE - 1, 0}}));
+}
+
+TEST(CoarseGraph, OpenAreasCostedInClosedFormMatchTheirSearch) {
+  // Open ground east of the middle column, scattered blocks west of it, and
+  // in one open area a wall with a gap, which lengthens walks across it.
+  std::vector<std::string> rows = random_rows(Scatter{REBUILT_SEED, DENSE / 2});
+  for (std::string& row : rows) {
+    std::fill(row.begin() + SMALL_SIDE / 2, row.end(), '.');
+  }
+  constexpr std::int32_t WALLED = 80;
+  for (std::int32_t row = 64; row < 92; ++row) {
+    rows.at(static_cast<std::size_t>(row)).at(WALLED) = '#';
+  }
+  const Map map{rows};
+  const CoarseGraph closed{map};
+  const CoarseGraph searched{map, AreaCosts::SEARCHED};
+  EXPECT_TRUE(closed == searched);
+  // Control: across the wall a walk costs more than the octile cost, which
+  // the closed form would have given that area.
+  const Cell west{WALLED - 4, 70};
+  const Cell east{WALLED + 4, 70};
+  const std::optional<CoarseCost> across =
+      closed.path_cost(map, Walk{west, east}, false);
+  ASSERT_TRUE(across.has_value());
+  EXPECT_GT(across.value_or(0), octile(west, east));
+  // Setup: the graph does cost open areas, east of the middle column, and
+  // walks within one cost the octile cost.
+  const Cell open_from{70, 5};
+  const Cell open_to{90, 25};
+  EXPECT_EQ(closed.path_cost(map, Walk{open_from, open_to}, false),
+            octile(open_from, open_to));
 }
 
 }  // namespace

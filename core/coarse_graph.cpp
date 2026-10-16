@@ -61,8 +61,9 @@ CoarseCost octile(Cell from, Cell goal) {
          ((std::max(across, down) - diagonal) * STRAIGHT);
 }
 
-CoarseGraph::CoarseGraph(const Map& map)
-    : width_(map.width()),
+CoarseGraph::CoarseGraph(const Map& map, AreaCosts costs)
+    : costs_(costs),
+      width_(map.width()),
       height_(map.height()),
       columns_((width_ + AREA_SIDE - 1) / AREA_SIDE),
       rows_((height_ + AREA_SIDE - 1) / AREA_SIDE),
@@ -351,11 +352,33 @@ std::vector<std::int16_t> CoarseGraph::labels(const Map& map,
   return label;
 }
 
+bool CoarseGraph::open_area(const Map& map, std::size_t area) const {
+  const Cell corner = area_corner(area);
+  const Footprint size = area_size(area);
+  for (Cell cell{0, corner.y}; cell.y < corner.y + size.height; ++cell.y) {
+    for (cell.x = corner.x; cell.x < corner.x + size.width; ++cell.x) {
+      if (!map.passable(cell)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 void CoarseGraph::build_area(const Map& map, std::size_t area) {
   AreaGraph made;
   const Cell corner = area_corner(area);
   const Footprint size = area_size(area);
-  const std::vector<std::int16_t> label = labels(map, area);
+  // An area with no blocked cell is one component, and the shortest walk
+  // between two of its cells is the octile cost: every step within it opens.
+  made.open =
+      costs_ == AreaCosts::CLOSED_FORM_WHEN_OPEN && open_area(map, area);
+  const std::vector<std::int16_t> label =
+      made.open
+          ? std::vector<std::int16_t>(static_cast<std::size_t>(size.width) *
+                                          static_cast<std::size_t>(size.height),
+                                      0)
+          : labels(map, area);
   const auto slot = [&](Cell cell) {
     return (static_cast<std::size_t>(cell.y - corner.y) *
             static_cast<std::size_t>(size.width)) +
@@ -502,8 +525,14 @@ std::size_t CoarseGraph::slot_in(std::size_t area, Cell cell) const {
 
 std::vector<std::optional<CoarseCost>> CoarseGraph::node_costs(
     const Map& map, std::size_t area, Cell from) const {
-  const std::vector<CoarseCost> cost = area_costs(map, area, from);
   std::vector<std::optional<CoarseCost>> found;
+  if (areas_.at(area).open) {
+    for (const CoarseNode& node : areas_.at(area).nodes) {
+      found.emplace_back(octile(from, node.cell));
+    }
+    return found;
+  }
+  const std::vector<CoarseCost> cost = area_costs(map, area, from);
   for (const CoarseNode& node : areas_.at(area).nodes) {
     const CoarseCost reached = cost.at(slot_in(area, node.cell));
     found.push_back(reached == UNREACHED ? std::nullopt
@@ -532,10 +561,7 @@ std::vector<std::size_t> CoarseGraph::region_areas(std::size_t region) const {
 
 void CoarseGraph::build_region(std::size_t region) {
   RegionGraph made;
-  for (std::size_t area = 0; area < areas_.size(); ++area) {
-    if (region_of_area(area) != region) {
-      continue;
-    }
+  for (const std::size_t area : region_areas(region)) {
     AreaGraph& held = areas_.at(area);
     held.border.assign(held.nodes.size(), -1);
     for (const CoarseExit& exit : held.exits) {
