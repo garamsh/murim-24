@@ -4,10 +4,10 @@
 -- rubble as the core's structure stages, and holds its footprint's bottom-left corner at
 -- (8, height - 8), with what rises above the footprint in the rows above: house (3 x 3 cells),
 -- hall (5 x 3), storehouse (3 x 2), manual_hall (4 x 3), granary (2 x 2), well (2 x 2), seat_gate
--- (3 x 1), barrels (1 x 1), fence (5 x 1) and training_ground (6 x 4), which is laid with the
--- ground; and the walled town's pieces: its wall along the south and north (1 x 2) and the west and
--- east (2 x 1), corner tower (3 x 3), gate tower (5 x 2), steps (1 x 2), temple (4 x 3), market
--- stall (2 x 1) and courtyard house (5 x 5), each named town_<piece>. The smithy and the
+-- (3 x 1), barrels (1 x 1), fence (5 x 1), temple (5 x 4), inn (5 x 3) and training_ground (6 x 4),
+-- which is laid with the ground; and the walled town's pieces: its wall along the south and north
+-- (1 x 2) and the west and east (2 x 1), corner tower (3 x 3), gate tower (5 x 2), steps (1 x 2),
+-- temple (4 x 3), market stall (2 x 1) and courtyard house (5 x 5), each named town_<piece>. The smithy and the
 -- apothecary are workshops.lua's. The cast shadow is not in the frame.
 -- Run: aseprite --batch --script art/structures/structures.lua
 
@@ -269,6 +269,157 @@ do
   local cv, x, base = frame(5, 3, 46)
   building(cv, x, base, 5, 3, 16, 15, { 6, 18, 55, 67 }, { hip = 14 })
   save("hall", cv, 5, 3)
+end
+
+-- Painted eave boards under a roof's front eave, from x0 to x1: leaf and paper in alternating
+-- panels, lacquer at their joins.
+local function eave_boards(cv, x0, x1, y)
+  for x = x0, x1 do
+    local panel = ((x - x0) // 4) % 2
+    cv:set(x, y, panel == 0 and c("leaf", 5) or c("paper", 6))
+    cv:set(x, y + 1, panel == 0 and c("leaf", 4) or c("paper", 5))
+    if (x - x0) % 4 == 0 then cv:set(x, y + 1, c("lacquer", 4)) end
+  end
+end
+
+-- Smoke rising from (x, y): grey puffs lit from the upper left, thinning and drifting with height.
+local function smoke(cv, x, y)
+  for k = 0, 9 do
+    local px_ = x + (k // 3) % 2 - k // 5
+    local py = y - k
+    if px.bayer(px_, py) < 0.85 - k * 0.07 then cv:set(px_, py, k < 4 and c("stone", 6) or c("stone", 5)) end
+  end
+end
+
+-- The village temple, 5 x 4 cells (#364): a main hall of 4 x 3 under a hip-and-gable roof with
+-- upswept eaves and painted eave boards, its walls lacquered, on a platform with steps, its doors
+-- open on a seated bronze figure; before it on the court a smoking incense burner, a bell frame at
+-- its left and a stone lantern at its right.
+do
+  local cv, x, base = frame(5, 4, 52)
+  local W, D = 80, 48
+  -- The platform over the whole footprint, the court on its front row, steps at its middle.
+  block(cv, x, base, W, D, 4, "stone", 3)
+  for k = 0, 2 do cv:hline(x + 32 - k, base - 1 - k, 16 + 2 * k, c("stone", 5 - (k % 2))) end
+  -- The main hall, 4 x 3, at the back of the platform.
+  local hx, hfoot = x + 8, base - 4 - 12
+  block(cv, hx, hfoot, 64, 36, 3, "stone", 4)
+  local foot = hfoot - 3
+  front(cv, hx + 3, foot, 58, 15, {}, false)
+  local top = foot - 15
+  -- Its walls lacquered, as a temple's woodwork is, not plastered as the hall's and the houses'.
+  for yy = top, foot - 1 do
+    for xx = hx + 3, hx + 60 do
+      local i = cv:get(xx, yy)
+      if i == c("paper", 4) then cv:set(xx, yy, c("lacquer", 4)) elseif i == c("paper", 3) then cv:set(xx, yy, c("lacquer", 3)) end
+    end
+  end
+  window(cv, hx + 7, top + 4, 7, 7)
+  window(cv, hx + 44, top + 4, 7, 7)
+  -- Its doors open on the dim inside and a bronze figure seated in it.
+  local dx = hx + 25
+  cv:rect(dx, top + 3, 12, 12, c("ink", 1))
+  cv:vline(dx - 1, top + 3, 12, c("wood", 3)); cv:vline(dx + 12, top + 3, 12, c("wood", 3))
+  cv:rect(dx + 4, top + 8, 4, 5, c("earth", 4)); cv:rect(dx + 5, top + 6, 2, 2, c("earth", 5)); cv:set(dx + 5, top + 6, c("earth", 6))
+  cv:hline(dx + 3, top + 13, 6, c("earth", 3))
+  local eave = foot - 15 + 2
+  local back = foot - 36 - 15 + 3
+  local ridge = foot - 18 - 15 - 12
+  roof(cv, hx + 1, hx + 62, eave, ridge, back, 9)
+  for xx = hx + 3, hx + 60 do cv:shade_at(xx, eave + 1, -1) end
+  eave_boards(cv, hx + 1, hx + 62, eave + 1)
+  -- A row of brackets under the boards, and a jewel finial at the ridge's middle.
+  for xx = hx + 4, hx + 59, 4 do cv:set(xx, eave + 3, c("leaf", 5)); cv:set(xx + 1, eave + 3, c("lacquer", 5)) end
+  local mid = hx + 32
+  cv:rect(mid - 1, ridge - 4, 3, 3, c("earth", 4)); cv:set(mid, ridge - 5, c("earth", 5)); cv:set(mid, ridge - 6, c("earth", 6))
+  cv:set(mid - 1, ridge - 4, c("earth", 5))
+  -- Eaves swept up further at the corners.
+  for _, s in ipairs({ { hx - 3, -1 }, { hx + 64, 1 } }) do
+    cv:set(s[1] + s[2] * 2, eave - 3, c("stone", 2)); cv:set(s[1] + s[2] * 3, eave - 4, c("stone", 2))
+    cv:set(s[1] + s[2] * 3, eave - 5, c("stone", 5))
+  end
+  -- The bell frame at the court's left: lacquered posts, a capped beam, an iron bell.
+  local bx, by = x + 3, base - 4
+  cv:vline(bx, by - 16, 16, c("lacquer", 4)); cv:vline(bx + 9, by - 16, 16, c("lacquer", 3))
+  cv:hline(bx - 1, by - 17, 12, c("wood", 3)); cv:hline(bx - 2, by - 18, 14, c("stone", 3)); cv:hline(bx - 1, by - 19, 12, c("stone", 4))
+  cv:rect(bx + 3, by - 14, 4, 6, c("stone", 3)); cv:hline(bx + 2, by - 9, 6, c("stone", 2)); cv:vline(bx + 3, by - 14, 5, c("stone", 4))
+  cv:set(bx + 4, by - 15, c("stone", 2))
+  -- The incense burner before the steps: a bronze pot on three legs under a lid, embers in it.
+  local ix, iy = x + 37, base - 6
+  cv:rect(ix, iy - 5, 6, 4, c("earth", 3)); cv:hline(ix, iy - 5, 6, c("earth", 4)); cv:hline(ix - 1, iy - 6, 8, c("earth", 4))
+  cv:set(ix, iy - 1, c("earth", 2)); cv:set(ix + 5, iy - 1, c("earth", 2)); cv:set(ix + 2, iy - 1, c("earth", 2))
+  cv:hline(ix + 1, iy - 7, 4, c("earth", 5)); cv:set(ix + 2, iy - 7, c("fire", 3)); cv:set(ix + 3, iy - 7, c("fire", 4))
+  smoke(cv, ix + 3, iy - 8)
+  -- The stone lantern at the court's right, its opening lit at night.
+  local lx, ly = x + 68, base - 4
+  cv:rect(lx + 2, ly - 6, 3, 6, c("stone", 4)); cv:vline(lx + 4, ly - 6, 6, c("stone", 3))
+  cv:rect(lx + 1, ly - 10, 5, 4, c("stone", 4)); cv:rect(lx + 2, ly - 9, 3, 2, c("wood", 1))
+  cv:hline(lx, ly - 11, 7, c("stone", 5)); cv:hline(lx + 1, ly - 12, 5, c("stone", 4)); cv:set(lx + 3, ly - 13, c("stone", 5))
+  save("temple", cv, 5, 4)
+end
+
+-- A paper lantern hung at (x, y): a wood cap, a paper body round a flame, a tassel.
+local function lantern(cv, x, y)
+  cv:hline(x, y, 3, c("wood", 2)); cv:set(x + 1, y - 1, c("wood", 3))
+  cv:rect(x - 1, y + 1, 5, 4, c("paper", 6)); cv:vline(x + 3, y + 1, 4, c("paper", 5)); cv:hline(x - 1, y + 4, 5, c("paper", 5))
+  cv:set(x + 1, y + 2, c("fire", 4)); cv:set(x + 1, y + 3, c("fire", 3))
+  cv:hline(x, y + 5, 3, c("wood", 2)); cv:set(x + 1, y + 6, c("wood", 3))
+end
+
+-- A table with a bench either side, its top at (x, y).
+local function table_(cv, x, y)
+  cv:hline(x - 3, y + 3, 3, c("wood", 4)); cv:hline(x + 9, y + 3, 3, c("wood", 4))
+  cv:set(x - 3, y + 4, c("wood", 2)); cv:set(x - 1, y + 4, c("wood", 2)); cv:set(x + 9, y + 4, c("wood", 2)); cv:set(x + 11, y + 4, c("wood", 2))
+  cv:rect(x, y, 8, 3, c("wood", 5)); cv:hline(x, y, 8, c("wood", 6)); cv:hline(x, y + 2, 8, c("wood", 4))
+  cv:vline(x + 1, y + 3, 3, c("wood", 3)); cv:vline(x + 6, y + 3, 3, c("wood", 3))
+  cv:set(x + 2, y - 1, c("stone", 6)); cv:set(x + 5, y - 1, c("earth", 5))
+end
+
+-- The village inn, 5 x 3 cells (#364): two storeys, the upper with a railed gallery, a signboard
+-- over the door, a cloth banner on a pole, two paper lanterns at the lower eave, and two tables with
+-- benches on a terrace along its front row.
+do
+  local cv, x, base = frame(5, 3, 60)
+  local W = 80
+  -- The building over the back two rows, the terrace with its tables on the front row.
+  local bfoot = base - 12
+  block(cv, x, base, W, 12, 2, "earth", 4)
+  block(cv, x, bfoot, W, 24, 3, "stone", 3)
+  local foot = bfoot - 3
+  front(cv, x + 3, foot, W - 6, 14, {}, true)
+  local top = foot - 14
+  window(cv, x + 7, top + 4, 9, 6)
+  window(cv, x + 60, top + 4, 9, 6)
+  -- The lower roof, a skirt round the upper storey: its front slope only.
+  local eave = foot - 14 + 2
+  roof(cv, x + 1, x + W - 2, eave, eave - 8, eave - 8, 3)
+  -- The upper storey, its gallery railed.
+  local foot2 = eave - 7
+  front(cv, x + 9, foot2, W - 18, 12, {}, false)
+  local top2 = foot2 - 12
+  for _, wx in ipairs({ 5, 27, 49 }) do window(cv, x + 9 + wx, top2 + 3, 8, 5) end
+  cv:hline(x + 8, foot2 - 4, W - 16, c("wood", 4)); cv:hline(x + 8, foot2, W - 16, c("wood", 3))
+  for xx = x + 8, x + W - 9, 3 do cv:vline(xx, foot2 - 3, 3, c("wood", 3)) end
+  local eave2 = foot2 - 12 + 2
+  roof(cv, x + 5, x + W - 6, eave2, eave2 - 13, eave2 - 19, 8)
+  -- The signboard over the door: a dark board, its paper face bearing the inn's mark in ink.
+  local sx, sy = x + 33, top - 1
+  cv:rect(sx, sy, 14, 6, c("wood", 2)); cv:rect(sx + 1, sy + 1, 12, 4, c("paper", 6))
+  cv:hline(sx + 3, sy + 2, 3, c("ink", 2)); cv:vline(sx + 4, sy + 2, 3, c("ink", 2)); cv:hline(sx + 8, sy + 2, 3, c("ink", 2))
+  cv:set(sx + 9, sy + 3, c("ink", 2)); cv:hline(sx + 8, sy + 4, 3, c("ink", 2))
+  -- The lanterns at the lower eave's corners.
+  lantern(cv, x + 4, eave + 1)
+  lantern(cv, x + W - 7, eave + 1)
+  -- The banner on its pole at the terrace's right: a long cloth with the mark, its foot ragged.
+  local px0, pb = x + W - 3, base - 2
+  cv:vline(px0, pb - 40, 40, c("wood", 4)); cv:hline(px0 - 7, pb - 38, 8, c("wood", 3))
+  cv:rect(px0 - 7, pb - 37, 6, 16, c("cloth", 6)); cv:vline(px0 - 2, pb - 37, 16, c("cloth", 5))
+  for k = 0, 5, 2 do cv:set(px0 - 7 + k, pb - 21, c("cloth", 6)) end
+  cv:hline(px0 - 6, pb - 34, 3, c("ink", 2)); cv:vline(px0 - 5, pb - 33, 4, c("ink", 2)); cv:hline(px0 - 6, pb - 28, 3, c("ink", 2))
+  -- Two tables with benches on the terrace.
+  table_(cv, x + 12, base - 9)
+  table_(cv, x + 48, base - 9)
+  save("inn", cv, 5, 3)
 end
 
 -- The storehouse, 3 x 2 cells: no windows, studded double doors, a lower roof, a crate.

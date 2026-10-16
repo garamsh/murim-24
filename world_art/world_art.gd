@@ -38,7 +38,7 @@ const BUILDINGS := {
 	"barrels": "structures/barrels", "fence": "structures/fence",
 	"granary": "structures/granary", "storehouse": "structures/storehouse",
 	"training_ground": "structures/training_ground", "manual_hall": "structures/manual_hall",
-	"seat_gate": "structures/seat_gate",
+	"seat_gate": "structures/seat_gate", "temple": "structures/temple", "inn": "structures/inn",
 	"smithy": "structures/smithy", "apothecary": "structures/apothecary",
 }
 # The kinds laid with the ground, over the terrain and under everything standing.

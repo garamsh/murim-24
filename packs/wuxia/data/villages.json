@@ -99,6 +99,20 @@
         "households": 0
       },
       {
+        "width": 5,
+        "height": 4,
+        "durability": 10000,
+        "kind": "temple",
+        "households": 0
+      },
+      {
+        "width": 5,
+        "height": 3,
+        "durability": 10000,
+        "kind": "inn",
+        "households": 0
+      },
+      {
         "width": 1,
         "height": 1,
         "durability": 10000,

@@ -74,7 +74,7 @@
   },
   {
     "id": "innkeeper",
-    "workplace": "hall",
+    "workplace": "inn",
     "per_workplace": 1,
     "schedule": [
       {
@@ -87,6 +87,26 @@
       },
       {
         "from": 22,
+        "where": "home"
+      }
+    ],
+    "wares": []
+  },
+  {
+    "id": "monk",
+    "workplace": "temple",
+    "per_workplace": 2,
+    "schedule": [
+      {
+        "from": 0,
+        "where": "home"
+      },
+      {
+        "from": 5,
+        "where": "work"
+      },
+      {
+        "from": 21,
         "where": "home"
       }
     ],
@@ -108,24 +128,6 @@
       {
         "from": 18,
         "where": "square"
-      },
-      {
-        "from": 21,
-        "where": "home"
-      }
-    ],
-    "wares": []
-  },
-  {
-    "id": "monk",
-    "schedule": [
-      {
-        "from": 0,
-        "where": "home"
-      },
-      {
-        "from": 5,
-        "where": "work"
       },
       {
         "from": 21,

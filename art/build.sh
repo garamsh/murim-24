@@ -23,7 +23,7 @@ cd "$(dirname "$0")"
 
 for name in terrain/trees terrain/ramps terrain/detail bodies/orthodox bodies/demonic \
 	bodies/unorthodox effects/attack structures/house structures/hall structures/well structures/barrels structures/fence \
-	structures/granary structures/storehouse structures/training_ground structures/manual_hall \
+	structures/granary structures/storehouse structures/training_ground structures/manual_hall structures/temple structures/inn \
 	structures/seat_gate structures/smithy structures/apothecary structures/town_wall_south structures/town_wall_north \
 	structures/town_wall_west structures/town_wall_east structures/town_corner_tower structures/town_gate_tower \
 	structures/town_steps structures/town_temple structures/town_market_stall structures/town_courtyard_house \

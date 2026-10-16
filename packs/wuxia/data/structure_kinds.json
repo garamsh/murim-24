@@ -119,5 +119,23 @@
     "tends": 40,
     "healing": 12,
     "role": "square"
+  },
+  {
+    "id": "temple",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "role": "square"
+  },
+  {
+    "id": "inn",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "role": "square"
   }
 ]
