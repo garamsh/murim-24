@@ -90,12 +90,52 @@ struct GoalSearch {
 /// search breaks ties by that order, so the same map gives the same graph and
 /// the same paths on every host.
 class CoarseGraph {
+ private:
+  struct Edge {
+    std::size_t to;
+    CoarseCost cost;
+  };
+  // An area's components, each cell's component when it has more than one,
+  // nodes, the edges among its nodes, its exits, and each node's index among
+  // its region's border nodes, if it is one.
+  struct AreaGraph {
+    std::uint16_t components = 0;
+    std::vector<std::int16_t> labels;
+    std::vector<CoarseNode> nodes;
+    std::vector<std::vector<Edge>> within;
+    std::vector<CoarseExit> exits;
+    std::vector<std::int32_t> border;
+  };
+  // A region's border nodes and the shortest walks among them within it.
+  struct RegionGraph {
+    std::vector<NodeRef> border;
+    std::vector<std::vector<Edge>> within;
+  };
+
  public:
+  /// What a rebuild replaced, which revert() puts back.
+  class Undo {
+    friend class CoarseGraph;
+    std::vector<std::pair<std::size_t, AreaGraph>> areas_;
+    std::vector<std::pair<std::size_t, RegionGraph>> regions_;
+    std::optional<std::pair<std::vector<std::size_t>, std::vector<std::size_t>>>
+        components_;
+  };
+
   explicit CoarseGraph(const Map& map);
 
   /// Rebuilds the areas holding `cells`, and their neighbours' entrances
-  /// toward them, after the map changed there, and the regions holding them.
-  void rebuild(const Map& map, const std::vector<Cell>& cells);
+  /// toward them, after the map changed there, and the regions holding them,
+  /// and returns what it replaced. Where every rebuilt area keeps its nodes,
+  /// their components and its exits, which areas' components are joined is
+  /// unchanged, so it is not computed again.
+  Undo rebuild(const Map& map, const std::vector<Cell>& cells);
+
+  /// Puts back what the rebuild that returned `undo` replaced, the last made.
+  void revert(Undo undo);
+
+  /// Whether two graphs hold the same areas, regions and joined components.
+  [[nodiscard]] bool operator==(const CoarseGraph& other) const;
 
   /// Returns the component of `cell`'s area that the passable cell `cell`
   /// lies in.
@@ -137,27 +177,6 @@ class CoarseGraph {
   [[nodiscard]] const CoarseNode& node(NodeRef ref) const;
 
  private:
-  struct Edge {
-    std::size_t to;
-    CoarseCost cost;
-  };
-  // An area's components, each cell's component when it has more than one,
-  // nodes, the edges among its nodes, its exits, and each node's index among
-  // its region's border nodes, if it is one.
-  struct AreaGraph {
-    std::uint16_t components = 0;
-    std::vector<std::int16_t> labels;
-    std::vector<CoarseNode> nodes;
-    std::vector<std::vector<Edge>> within;
-    std::vector<CoarseExit> exits;
-    std::vector<std::int32_t> border;
-  };
-  // A region's border nodes and the shortest walks among them within it.
-  struct RegionGraph {
-    std::vector<NodeRef> border;
-    std::vector<std::vector<Edge>> within;
-  };
-
   void build_area(const Map& map, std::size_t area);
   void link_exits(std::size_t area);
   void build_region(std::size_t region);
