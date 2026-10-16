@@ -2314,6 +2314,7 @@ void World::tick() {
   note_falls(std::move(bereft));
   end_intents(crowd);
   const std::vector<Closing> closings = close_in(crowd);
+  bear_on_villages(crowd, closings);
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
   std::vector<std::size_t> seeking(crowd.people.size(), ABSENT);
@@ -2848,6 +2849,165 @@ void World::come_back(Army& army, FarAnchor far) {
 
 bool World::far_off(const Army& army) {
   return std::holds_alternative<FarAnchor>(army.course);
+}
+
+// How far army `army`'s order's skills that damage structures reach from a
+// striker, range and radius; 0 when none does.
+std::int32_t World::structure_reach(const Army& army) {
+  std::int32_t farthest = 0;
+  for (const std::size_t skill : army.order.skills) {
+    const Skill& used = army.skills.at(skill);
+    if (used.structure_damage > 0) {
+      farthest = std::max(farthest, used.range + used.radius);
+    }
+  }
+  return farthest;
+}
+
+// The village army `army` bears on: one whose claim holds its order's
+// objective, owned by a faction it is hostile to and not in ruins, when no
+// driver steers it, it is not far and one of its order's skills damages
+// structures; none otherwise. Of several, the one it is a raiding party
+// against, if it is, and otherwise the first.
+std::optional<std::size_t> World::bearing_on(std::size_t army) const {
+  const Army& bearing = armies_.at(army);
+  if (bearing.steered || far_off(bearing) || structure_reach(bearing) == 0) {
+    return std::nullopt;
+  }
+  const auto borne = [&](std::size_t village) {
+    return claims(village, bearing.order.objective) &&
+           hostile(bearing.faction, owner(village)) &&
+           !villages_.all_in(village, Stage::RUBBLE, stages());
+  };
+  std::optional<std::size_t> first;
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    const VillageRecord& record = villages_.at(village);
+    if (record.party == army && record.raiding && borne(*record.raiding)) {
+      return record.raiding;
+    }
+    if (!first && borne(village)) {
+      first = village;
+    }
+  }
+  return first;
+}
+
+// Whether a structure of village `village` short of rubble lies within
+// `reach` of `from`.
+bool World::standing_within(std::size_t village, Position from,
+                            std::int32_t reach) const {
+  const std::vector<std::size_t>& own = villages_.at(village).spec.structures;
+  return std::any_of(own.begin(), own.end(), [&](std::size_t index) {
+    return stage(index) != Stage::RUBBLE &&
+           reaches(structures_.at(index), from, reach);
+  });
+}
+
+// Each army bearing on a village, with no member engaging a foe, none within
+// reach of a structure of it still standing, and its objective out of reach of
+// all of them, is ordered on to the open cell nearest the standing structure
+// nearest its lead, so a band ruins what stands beyond its centre.
+void World::bear_on_villages(const Crowd& crowd,
+                             const std::vector<Closing>& closings) {
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    const Army& bearing = armies_.at(army);
+    const std::optional<std::size_t> village = bearing_on(army);
+    if (!village || bearing.roster.empty()) {
+      continue;
+    }
+    const std::int32_t reach = structure_reach(bearing);
+    const auto busy = [&](std::size_t member) {
+      const std::size_t index =
+          member < crowd.slot.size() ? crowd.slot.at(member) : ABSENT;
+      return (index != ABSENT && closings.at(index).foe) ||
+             standing_within(*village, people_.at(member).position, reach);
+    };
+    if (std::any_of(bearing.roster.begin(), bearing.roster.end(), busy) ||
+        standing_within(*village, centre_of(bearing.order.objective), reach)) {
+      continue;
+    }
+    if (const std::optional<Cell> cell = next_objective(bearing, *village)) {
+      order(army, Order{*cell, bearing.order.skills, bearing.order.target});
+    }
+  }
+}
+
+// The open cell inside village `village`'s claim that army `army`'s course
+// reaches nearest the structure of the village short of rubble nearest its
+// lead: of the nearest ring of cells round that structure's footprint holding
+// one, the one nearest the lead. Inside the claim, so the army still bears on
+// the village there. None when nothing stands or no such cell lies on the map.
+std::optional<Cell> World::next_objective(const Army& army,
+                                          std::size_t village) const {
+  const Position lead = people_.at(army.roster.front()).position;
+  const std::optional<std::size_t> standing = nearest_standing(village, lead);
+  const auto* field = std::get_if<FlowField>(&army.course);
+  if (!standing || field == nullptr) {
+    return std::nullopt;
+  }
+  const std::int32_t side = std::max(map_.width(), map_.height());
+  for (std::int32_t ring = 0; ring <= side; ++ring) {
+    if (const std::optional<Cell> cell = nearest_in_ring(
+            structures_.at(*standing), ring, lead, *field, village)) {
+      return cell;
+    }
+  }
+  return std::nullopt;
+}
+
+// The structure of village `village` short of rubble nearest `from`, ties by
+// structure index; none when nothing stands.
+std::optional<std::size_t> World::nearest_standing(std::size_t village,
+                                                   Position from) const {
+  std::optional<std::size_t> nearest;
+  std::int64_t least = 0;
+  for (const std::size_t index : villages_.at(village).spec.structures) {
+    if (stage(index) == Stage::RUBBLE) {
+      continue;
+    }
+    const std::int64_t apart =
+        distance_squared(from, nearest_point(structures_.at(index), from));
+    if (!nearest || apart < least || (apart == least && index < *nearest)) {
+      nearest = index;
+      least = apart;
+    }
+  }
+  return nearest;
+}
+
+// Of the cells `ring` cells round `structure`'s footprint, the footprint
+// itself at 0, the passable one inside village `village`'s claim that
+// `field` reaches nearest `from`, ties by row and then column; none when
+// there is no such cell.
+std::optional<Cell> World::nearest_in_ring(const Structure& structure,
+                                           std::int32_t ring, Position from,
+                                           const FlowField& field,
+                                           std::size_t village) const {
+  const std::int32_t left = structure.cell.x - ring;
+  const std::int32_t top = structure.cell.y - ring;
+  const std::int32_t right =
+      structure.cell.x + structure.footprint.width - 1 + ring;
+  const std::int32_t bottom =
+      structure.cell.y + structure.footprint.height - 1 + ring;
+  std::optional<Cell> best;
+  std::int64_t closest = 0;
+  for (std::int32_t row = top; row <= bottom; ++row) {
+    // The ring's top and bottom rows whole, its sides' two cells, and the
+    // footprint itself whole.
+    const bool whole = ring == 0 || row == top || row == bottom;
+    const std::int32_t step = whole ? 1 : right - left;
+    for (std::int32_t column = left; column <= right; column += step) {
+      const Cell cell{column, row};
+      const std::int64_t apart = distance_squared(from, centre_of(cell));
+      if (map_.passable(cell) && claims(village, cell) &&
+          field.distance(cell) != FlowField::UNREACHABLE &&
+          (!best || apart < closest)) {
+        best = cell;
+        closest = apart;
+      }
+    }
+  }
+  return best;
 }
 
 // Has each living leader no driver steers declare toward each other faction
