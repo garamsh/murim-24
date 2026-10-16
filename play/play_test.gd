@@ -111,8 +111,8 @@ func run() -> bool:
 	var scene := _scene(0)
 	var world: WorldAdapter = scene.world
 	var home_cell := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	var target := _cell_near(scene.world.map_rows(), home_cell, ".")
-	var wall := _cell_near(scene.world.map_rows(), home_cell, "#")
+	var target := _cell_near(scene.world, home_cell, ".")
+	var wall := _cell_near(scene.world, home_cell, "#")
 	# Setup: both cells were found, so a refusal below is the wall's, not a missing cell.
 	var aimed := target != home_cell and wall != home_cell
 	var target_click := _click(target, scene)
@@ -177,9 +177,8 @@ func _camera_pass() -> bool:
 func _camera_walk_pass() -> bool:
 	var Play := preload("res://play/play.gd")
 	var scene := _scene(0)
-	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	var far := _cell_near(rows, home + Vector2i(12, 0), ".")
+	var far := _cell_near(scene.world, home + Vector2i(12, 0), ".")
 	scene.command(_click(far, scene))
 	var screen := Vector2(640, 360)
 	var zoom := 3.0
@@ -550,10 +549,9 @@ func _slide(index: int, at: Vector2) -> InputEventScreenDrag:
 func _move_pass() -> bool:
 	var scene := _scene(0)
 	var control := _scene(0)
-	var rows: PackedStringArray = scene.world.map_rows()
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	var first := _cell_near(rows, home, ".")
-	var second := _cell_near(rows, first, ".")
+	var first := _cell_near(scene.world, home, ".")
+	var second := _cell_near(scene.world, first, ".")
 	var control_from: Vector2 = control.lead()
 	var pressed: bool = scene.command(_click(first, scene))
 	var first_from := _distance(scene.lead(), first)
@@ -1724,12 +1722,18 @@ func _title() -> Node2D:
 	return scene
 
 
-# The nearest cell to `home` within SEARCH cells, at least two away, whose tile is `tile`.
-func _cell_near(rows: PackedStringArray, home: Vector2i, tile: String) -> Vector2i:
+# The nearest cell to `home` within SEARCH cells, at least two away, whose tile in `world` is
+# `tile` and that no structure covers, since an order onto a structure's cell is refused.
+func _cell_near(world: WorldAdapter, home: Vector2i, tile: String) -> Vector2i:
+	var rows := world.map_rows()
+	var covers: Array[Rect2i] = []
+	for structure in world.structure_count():
+		covers.append(Rect2i(world.structure_cell(structure), world.structure_footprint(structure)))
 	for reach in range(2, SEARCH + 1):
 		for y in range(home.y - reach, home.y + reach + 1):
 			for x in range(home.x - reach, home.x + reach + 1):
-				if y >= 0 and y < rows.size() and x >= 0 and x < rows[y].length() and rows[y][x] == tile:
+				if y >= 0 and y < rows.size() and x >= 0 and x < rows[y].length() and rows[y][x] == tile \
+						and not covers.any(func(cover: Rect2i) -> bool: return cover.has_point(Vector2i(x, y))):
 					return Vector2i(x, y)
 	return home
 

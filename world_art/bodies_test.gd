@@ -28,7 +28,10 @@ const SWEEP := {"range": 384, "radius": 0, "body_damage": 10, "structure_damage"
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const VIEW := Rect2(0, 0, 480, 270)
 const REGION_SEED := 2026
-const WALK_TICKS := 600
+# Ticks the steered person has to walk to the house it is sent beside: at about 16 ticks a cell,
+# past half the region's width, since every house of its own village can have the temple, the inn or
+# rock before it.
+const WALK_TICKS := 3000
 # Ticks of the M1 battle searched for a body outlined while it flashes.
 const BATTLE_TICKS := 400
 # Rows before a house that nothing else stands on, so whatever stands south of it rises over no one
@@ -218,12 +221,17 @@ func _flash_pass() -> bool:
 	return passed
 
 
-# Whether no other structure but a field stands in the FRONT_CLEAR rows before `structure`, two
-# cells either side of it.
+# Whether the FRONT_CLEAR rows before `structure`, two cells either side of it, are open ground of
+# the map and no other structure but a field stands in them.
 static func _clear_before(world: WorldAdapter, structure: int) -> bool:
 	var corner := world.structure_cell(structure)
 	var size := world.structure_footprint(structure)
 	var before := Rect2i(corner.x - 2, corner.y + size.y, size.x + 4, FRONT_CLEAR)
+	var rows := world.map_rows()
+	for y in range(before.position.y, before.end.y):
+		for x in range(before.position.x, before.end.x):
+			if y < 0 or y >= rows.size() or x < 0 or x >= rows[y].length() or rows[y][x] != ".":
+				return false
 	for other in world.structure_count():
 		if other != structure and world.structure_field_state(other) < 0 \
 				and before.intersects(Rect2i(world.structure_cell(other), world.structure_footprint(other))):
