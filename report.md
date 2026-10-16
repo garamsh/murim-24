@@ -1,6 +1,6 @@
 # #364 temple and inn
 
-Evidence for the content PR from `content/temple-inn`. The head is `e42cb66f`, on main `d60c33d2`. Everything ran on the development Mac (Apple M1, macOS, Godot 4.7.2) on 2026-10-16.
+Evidence for the content PR from `feat/temple-inn`. The head is `e42cb66f`, on main `d60c33d2`. Everything ran on the development Mac (Apple M1, macOS, Godot 4.7.2) on 2026-10-16.
 
 - `images/day-ko.png` and `images/night-ko.png`: captures with the Korean HUD at 1920x1080, by `harness/capture.gd`.
   - The scene is the production play scene of seed 2026, with the player born in village 7 (index 6), a village-template village with a temple and an inn.
