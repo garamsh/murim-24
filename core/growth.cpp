@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "limits.hpp"
+#include "village.hpp"
 
 namespace murim {
 

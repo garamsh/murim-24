@@ -1060,8 +1060,10 @@ World temple_world(bool named) {
            named ? std::vector<std::size_t>{0} : std::vector<std::size_t>{}}};
   growth.stances = {{}};
   life.growth = growth;
+  constexpr std::int32_t PEOPLE = 4;
   std::vector<Recruit> residents;
-  for (std::int32_t person = 0; person < 4; ++person) {
+  residents.reserve(PEOPLE);
+  for (std::int32_t person = 0; person < PEOPLE; ++person) {
     residents.push_back(Recruit{{person, 0}, 1});
   }
   const std::vector<std::string> rows(8, std::string(8, '.'));

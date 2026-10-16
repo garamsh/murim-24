@@ -203,13 +203,13 @@ constexpr std::int64_t TINY_VERSION = 2;
 constexpr std::int64_t JAB_DAMAGE = 4;
 // The hamlet's area: room for its house and the army its household raises.
 
-// A complete set of rules of life, `name`, in pack `pack`, its one tier
-// naming `square_kind`, when given, as a square kind of one cell.
+// A complete set of rules of life, `name`, in pack `pack`. Returns its one
+// growth tier.
 // A terrace raised at the labour of a field on buildable cells.
 constexpr std::int64_t PER_MILLE_TERRACE = 1'000;
 
-void add_life(MemoryPacks& packs, const std::string& pack,
-              const std::string& name, const std::string& square_kind = "") {
+Node add_life(MemoryPacks& packs, const std::string& pack,
+              const std::string& name) {
   Node life = packs.entry(pack, "life", name).set("newborn_health", 4);
   Node growth = life.map("growth")
                     .set("interval", 1)
@@ -229,13 +229,6 @@ void add_life(MemoryPacks& packs, const std::string& pack,
                   .set("width", 1)
                   .set("height", 1)
                   .set("vicinity", 4);
-  if (!square_kind.empty()) {
-    tier.list("square_kinds")
-        .item()
-        .text("kind", square_kind)
-        .set("width", 1)
-        .set("height", 1);
-  }
   growth.list("builds");
   life.map("learning")
       .set("comprehension", 0)
@@ -246,6 +239,7 @@ void add_life(MemoryPacks& packs, const std::string& pack,
       .set("polarity_ease", 0)
       .set("orientation_potency", 0)
       .set("polarity_potency", 0);
+  return tier;
 }
 
 void add_tiny_base(MemoryPacks& packs, const std::string& square_kind = "") {
@@ -281,7 +275,14 @@ void add_tiny_base(MemoryPacks& packs, const std::string& square_kind = "") {
       .set("durability", 4)
       .text("kind", "house")
       .set("households", 1);
-  add_life(packs, TINY, "life", square_kind);
+  Node tier = add_life(packs, TINY, "life");
+  if (!square_kind.empty()) {
+    tier.list("square_kinds")
+        .item()
+        .text("kind", square_kind)
+        .set("width", 1)
+        .set("height", 1);
+  }
 }
 
 // The manifest of a mod pack `name` at version 1, for its further fields.

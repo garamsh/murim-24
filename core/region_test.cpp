@@ -781,6 +781,7 @@ TEST(Region, TheBasePacksVillageTierNamesATempleThenAnInn) {
   std::vector<std::vector<std::string>> named;
   for (const Tier& tier : growth.tiers) {
     std::vector<std::string> kinds;
+    kinds.reserve(tier.square_kinds.size());
     for (const std::size_t plan : tier.square_kinds) {
       kinds.push_back(growth.plans.at(plan).kind);
     }
