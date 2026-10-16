@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -17,6 +18,7 @@
 #include <vector>
 
 #include "area_fields.hpp"
+#include "areas.hpp"
 #include "calendar.hpp"
 #include "coarse_graph.hpp"
 #include "limits.hpp"
@@ -213,6 +215,34 @@ bool run_m1() {
 // timed, or they no longer bound two battles in play.
 constexpr std::uint64_t LEAST_BATTLE_STRIKES_PER_TICK = 16;
 
+// The nodes a search toward an objective has costed: its objective's
+// region's, the border nodes it settled, and each costed region's.
+std::size_t costed(const GoalSearch& search) {
+  std::size_t count = search.near.size();
+  count += static_cast<std::size_t>(
+      std::count(search.settled.begin(), search.settled.end(), true));
+  for (const auto& [region, costs] : search.regions) {
+    count += costs.size();
+  }
+  return count;
+}
+
+// About the memory a search holds: each node it costed in a tree, a tree
+// node of three pointers and a colour beside its value, and a cost and a
+// flag for every border node, with its frontier.
+std::size_t search_bytes(const GoalSearch& search) {
+  constexpr std::size_t TREE_NODE = 4 * sizeof(void*);
+  using Node = std::pair<std::size_t, std::size_t>;
+  std::size_t in_trees = search.near.size();
+  for (const auto& [region, costs] : search.regions) {
+    in_trees += costs.size() + 1;
+  }
+  return (in_trees * (TREE_NODE + sizeof(std::pair<const Node, CoarseCost>))) +
+         (search.border.size() * sizeof(CoarseCost)) +
+         (search.settled.size() / CHAR_BIT) +
+         (search.frontier.size() * sizeof(std::pair<CoarseCost, std::size_t>));
+}
+
 // Times the live scenario against the tick budget as a target, printing
 // whether it meets it; it returns whether it did, which the exit status does
 // not read (exit_status()).
@@ -255,10 +285,10 @@ bool run_live() {
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
     most_built = std::max(most_built, world.fields().built_in_all() - built_at);
-    const std::vector<std::size_t> searched = world.fields().searched();
-    most_objectives = std::max(most_objectives, searched.size());
-    for (const std::size_t costed : searched) {
-      most_costed = std::max(most_costed, costed);
+    const std::vector<const GoalSearch*> searches = world.fields().searches();
+    most_objectives = std::max(most_objectives, searches.size());
+    for (const GoalSearch* search : searches) {
+      most_costed = std::max(most_costed, costed(*search));
     }
     peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
@@ -380,8 +410,8 @@ void run_paths() {
   });
   require(by_regions.has_value() && by_areas.has_value(),
           "the path measure's corners must be joined");
-  // Growth's lay copies the graph, then rebuilds the copy where a structure
-  // blocks: here a 3 by 3 footprint in the first area.
+  // Growth's lay rebuilds the graph where a structure blocks: here a 3 by 3
+  // footprint in the first area.
   Map built = map;
   std::vector<Cell> blocked;
   for (std::int32_t row = 0; row < FOOTPRINT; ++row) {
@@ -390,28 +420,46 @@ void run_paths() {
       built.block(blocked.back());
     }
   }
-  std::vector<CoarseGraph> copies;
-  copies.reserve(PATH_RUNS);
-  const double copy_ms = median_ms(PATH_RUNS, [&] { copies.push_back(graph); });
-  std::size_t rebuilding = 0;
-  const double rebuild_ms = median_ms(
-      PATH_RUNS, [&] { copies.at(rebuilding++).rebuild(built, blocked); });
+  // Each attempt rebuilds the graph in place and, when refused, reverts it.
+  CoarseGraph laid = graph;
+  const double lay_ms =
+      median_ms(PATH_RUNS, [&] { laid.revert(laid.rebuild(built, blocked)); });
+  require(laid == graph, "a reverted rebuild must leave the graph as it was");
   // The first field toward a fresh objective: the reverse search from it
-  // costs the exits of the walker's area, and the field is built over them.
+  // costs the exits of the walker's area, and the field is built over them;
+  // the search over the areas alone, for one exit, is its control.
   AreaFields fields;
   const auto asked_at = std::chrono::steady_clock::now();
   static_cast<void>(fields.field_for(map, graph, from, corner));
   const double first_field_ms =
       milliseconds(std::chrono::steady_clock::now() - asked_at);
-  const std::size_t costed = fields.searched().at(0);
-  // Each costed node is held in the search's map of costs and at most once
-  // in its set of settled nodes, each a tree node of three pointers and a
-  // colour beside its value.
-  constexpr std::size_t TREE_NODE = 4 * sizeof(void*);
-  using Node = std::pair<std::size_t, std::size_t>;
-  const std::size_t search_bytes =
-      costed * ((2 * TREE_NODE) + sizeof(Node) +
-                sizeof(std::pair<const Node, CoarseCost>));
+  const GoalSearch& search = *fields.searches().at(0);
+  const CoarseExit& exit = graph.exits(graph.area_of(from)).at(0);
+  const NodeRef far{exit.area, exit.far_node};
+  std::optional<CoarseCost> over_areas;
+  const auto control_at = std::chrono::steady_clock::now();
+  over_areas = graph.cost_over_areas(map, corner, far);
+  const double over_areas_ms =
+      milliseconds(std::chrono::steady_clock::now() - control_at);
+  GoalSearch again = graph.toward(map, corner);
+  require(over_areas.has_value() && graph.cost_from(again, far) == over_areas,
+          "the search by regions must cost an exit as the areas alone do");
+  // A map whose every area holds a blocked cell, so no area is costed in
+  // closed form: the build's bound.
+  const double obstructed_ms = [] {
+    std::vector<std::string> rows(static_cast<std::size_t>(MAP_SIDE),
+                                  std::string(MAP_SIDE, '.'));
+    for (std::int32_t row = AREA_SIDE / 2; row < MAP_SIDE; row += AREA_SIDE) {
+      for (std::int32_t col = AREA_SIDE / 2; col < MAP_SIDE; col += AREA_SIDE) {
+        rows.at(static_cast<std::size_t>(row))
+            .at(static_cast<std::size_t>(col)) = '#';
+      }
+    }
+    const Map obstructed{rows};
+    const auto start = std::chrono::steady_clock::now();
+    const CoarseGraph built_graph{obstructed};
+    return milliseconds(std::chrono::steady_clock::now() - start);
+  }();
   std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "
             << graph.node_count() << " nodes, built in " << build_ms << " ms\n"
             << "path by regions: median " << regions_ms << " ms of "
@@ -421,12 +469,16 @@ void run_paths() {
             << "control, by areas alone: median " << areas_ms << " ms, cost "
             << by_areas.value_or(0) << "; "
             << (areas_ms <= FRAME_MS ? "within" : "past") << " a frame\n"
-            << "lay's graph copy: median " << copy_ms
-            << " ms; its rebuild under a " << FOOTPRINT << " by " << FOOTPRINT
-            << " footprint: median " << rebuild_ms << " ms\n"
+            << "graph build with a blocked cell in every area: "
+            << obstructed_ms << " ms\n"
+            << "lay's attempt, rebuilding the graph in place under a "
+            << FOOTPRINT << " by " << FOOTPRINT
+            << " footprint and reverting it: median " << lay_ms << " ms\n"
             << "first field toward a fresh objective across the map: "
-            << first_field_ms << " ms, its search costing " << costed
-            << " nodes, about " << search_bytes / KIB << " KiB\n";
+            << first_field_ms << " ms, its search costing " << costed(search)
+            << " nodes, about " << search_bytes(search) / KIB << " KiB\n"
+            << "control, one exit's cost over the areas alone: "
+            << over_areas_ms << " ms\n";
 }
 
 // The bench's exit status: failure when a budget in force is missed. Only

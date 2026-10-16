@@ -49,10 +49,8 @@ class AreaFields {
   [[nodiscard]] std::size_t built() const;
   [[nodiscard]] std::size_t built_in_all() const;
 
-  /// How many nodes each held search toward an objective has costed, by
-  /// objective: those of its objective's region, the border nodes it settled
-  /// and those of each region it costed.
-  [[nodiscard]] std::vector<std::size_t> searched() const;
+  /// Returns the held searches toward objectives, by objective.
+  [[nodiscard]] std::vector<const GoalSearch*> searches() const;
 
  private:
   using Key = std::tuple<std::size_t, std::int32_t, std::int32_t>;
