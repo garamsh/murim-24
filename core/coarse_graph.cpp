@@ -761,42 +761,122 @@ std::optional<CoarseCost> CoarseGraph::between(const Terminals& ends,
 
 GoalSearch CoarseGraph::toward(const Map& map, Cell objective) const {
   GoalSearch search;
-  for (const auto& [ref, held] : inserted(map, objective)) {
-    search.cost[key_of(ref)] = held;
-    search.frontier.emplace(held, key_of(ref));
+  search.region = region_of_area(area_of(objective));
+  search.border.assign(first_border_.back(), UNREACHED);
+  search.settled.assign(first_border_.back(), false);
+  for (const auto& [ref, held] :
+       settle_region(inserted(map, objective), search.region)) {
+    search.near.emplace(key_of(ref), held);
+    if (areas_.at(ref.area).border.at(ref.node) >= 0) {
+      search.border.at(border_id(ref)) = held;
+      search.frontier.emplace(held, border_id(ref));
+    }
   }
   return search;
 }
 
-std::optional<CoarseCost> CoarseGraph::cost_from(GoalSearch& search,
-                                                 NodeRef from) const {
-  // Dijkstra outward from the objective, paused once `from` is settled; walks
-  // are as costly either way, so it settles each node at its cost to the
-  // objective. Ties go to the nodes' order.
-  const Key wanted = key_of(from);
-  while (search.settled.count(wanted) == 0 && !search.frontier.empty()) {
+void CoarseGraph::settle_borders(GoalSearch& search, std::size_t region) const {
+  // Dijkstra outward over the regions' border nodes, paused once every
+  // border node of `region` is settled. Ties go to the nodes' order.
+  const std::size_t first = first_border_.at(region);
+  const std::size_t last = first_border_.at(region + 1);
+  std::size_t pending = 0;
+  for (std::size_t at = first; at < last; ++at) {
+    pending += search.settled.at(at) ? 0 : 1;
+  }
+  while (pending > 0 && !search.frontier.empty()) {
     const CoarseCost held = search.frontier.top().first;
-    const NodeRef ref{search.frontier.top().second.first,
-                      search.frontier.top().second.second};
+    const std::size_t at = search.frontier.top().second;
     search.frontier.pop();
-    if (search.settled.count(key_of(ref)) != 0 ||
-        held != search.cost.at(key_of(ref))) {
+    if (search.settled.at(at) || held != search.border.at(at)) {
       continue;
     }
-    search.settled.insert(key_of(ref));
-    expand_areas(ref, [&search, held](NodeRef next, CoarseCost step) {
+    search.settled.at(at) = true;
+    if (at >= first && at < last) {
+      --pending;
+    }
+    expand_regions(at, [&search, held](std::size_t next, CoarseCost step) {
       const CoarseCost through = held + step;
-      const auto [place, fresh] = search.cost.emplace(key_of(next), through);
-      if (fresh || through < place->second) {
-        place->second = through;
-        search.frontier.emplace(through, key_of(next));
+      if (through < search.border.at(next)) {
+        search.border.at(next) = through;
+        search.frontier.emplace(through, next);
       }
     });
   }
-  if (search.settled.count(wanted) == 0) {
+}
+
+std::optional<CoarseCost> CoarseGraph::cost_from(GoalSearch& search,
+                                                 NodeRef from) const {
+  // A walk from `from` to the objective either keeps to the objective's
+  // region, whose nodes `near` costs, or leaves `from`'s region through one
+  // of its border nodes, at that node's cost over the regions; so the region
+  // settled outward from its border nodes at those costs, with `near` in the
+  // objective's region, costs each of its nodes as the areas alone would.
+  const std::size_t region = region_of_area(from.area);
+  auto table = search.regions.find(region);
+  if (table == search.regions.end()) {
+    settle_borders(search, region);
+    Costs starts;
+    const RegionGraph& graph = regions_.at(region);
+    for (std::size_t index = 0; index < graph.border.size(); ++index) {
+      const CoarseCost held =
+          search.border.at(first_border_.at(region) + index);
+      if (held != UNREACHED) {
+        starts.emplace_back(graph.border.at(index), held);
+      }
+    }
+    std::map<Key, CoarseCost> costs;
+    for (const auto& [ref, held] : settle_region(starts, region)) {
+      costs.emplace(key_of(ref), held);
+    }
+    if (region == search.region) {
+      for (const auto& [key, held] : search.near) {
+        const auto [place, fresh] = costs.emplace(key, held);
+        if (!fresh) {
+          place->second = std::min(place->second, held);
+        }
+      }
+    }
+    table = search.regions.emplace(region, std::move(costs)).first;
+  }
+  const auto found = table->second.find(key_of(from));
+  if (found == table->second.end()) {
     return std::nullopt;
   }
-  return search.cost.at(wanted);
+  return found->second;
+}
+
+std::optional<CoarseCost> CoarseGraph::cost_over_areas(const Map& map,
+                                                       Cell objective,
+                                                       NodeRef from) const {
+  std::vector<CoarseCost> cost(first_node_.back(), UNREACHED);
+  using Entry = std::pair<CoarseCost, std::size_t>;
+  std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
+  for (const auto& [ref, held] : inserted(map, objective)) {
+    cost.at(id_of(ref)) = held;
+    frontier.emplace(held, id_of(ref));
+  }
+  const std::size_t wanted = id_of(from);
+  while (!frontier.empty()) {
+    const CoarseCost held = frontier.top().first;
+    const std::size_t at = frontier.top().second;
+    frontier.pop();
+    if (held != cost.at(at)) {
+      continue;
+    }
+    if (at == wanted) {
+      return held;
+    }
+    expand_areas(ref_of(at),
+                 [this, &cost, &frontier, held](NodeRef next, CoarseCost step) {
+                   const CoarseCost through = held + step;
+                   if (through < cost.at(id_of(next))) {
+                     cost.at(id_of(next)) = through;
+                     frontier.emplace(through, id_of(next));
+                   }
+                 });
+  }
+  return std::nullopt;
 }
 
 std::optional<CoarseCost> CoarseGraph::path_cost(const Map& map, Walk walk,
