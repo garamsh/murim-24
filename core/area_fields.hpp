@@ -36,7 +36,8 @@ class AreaFields {
   [[nodiscard]] const FlowField& field(std::size_t index) const;
 
   /// Ends a tick: every field no one asked for in it returns to the pool, and
-  /// the searches toward objectives no build read are dropped.
+  /// the search toward an objective is dropped once no field toward it is
+  /// held and no build read it in the tick.
   void end_tick();
 
   /// Drops every field and cost, as after the map or the graph changes.
