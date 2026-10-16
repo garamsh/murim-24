@@ -9,6 +9,7 @@
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "limits.hpp"
+#include "occupation.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
 #include "trade.hpp"
@@ -107,7 +108,11 @@ void check_life(const Life& life) {
         "diplomacy's chances must lie within a thousand per mille");
   }
   if (life.trade) {
-    check_trade(*life.trade, life.disciplines.size());
+    check_trade(*life.trade);
+  }
+  if (life.occupations) {
+    check_occupations(*life.occupations,
+                      life.trade ? life.trade->wares.size() : 0);
   }
 }
 

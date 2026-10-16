@@ -19,6 +19,7 @@
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "map.hpp"
+#include "occupation.hpp"
 #include "region.hpp"
 #include "skill.hpp"
 #include "world.hpp"
@@ -325,6 +326,51 @@ TEST(Content, AnUnknownFieldRefusesItsPack) {
   ASSERT_TRUE(named.data.has_value());
   EXPECT_EQ(named.data.value_or(RegionData{}).factions.front().name,
             "Northmen");
+}
+
+// An occupation, `keeper`, in a mod `trades` over the tiny base, at home all
+// day and selling nothing.
+Node keeper(MemoryPacks& packs) {
+  add_tiny_base(packs);
+  add_mod(packs, "trades");
+  Node made = packs.entry("trades", "occupations", "keeper");
+  made.list("schedule").item().set("from", 0).text("where", "home");
+  made.words("wares", {});
+  return made;
+}
+
+TEST(Content, AnOccupationOpeningPlacesTwoWaysIsRefused) {
+  // Places on the square beside a workplace.
+  MemoryPacks both;
+  keeper(both)
+      .text("workplace", "house")
+      .set("per_workplace", 2)
+      .set("per_residents", 3);
+  const LoadedContent twice = load_content(both, TINY, {"trades"});
+  EXPECT_TRUE(refused_for(twice, "trades", "per_residents",
+                          ContentRefusal::OUT_OF_RANGE));
+  EXPECT_EQ(twice.refused, std::vector<std::string>{"trades"});
+  // Places per workplace with no workplace.
+  MemoryPacks stray;
+  keeper(stray).set("per_workplace", 2);
+  const LoadedContent unplaced = load_content(stray, TINY, {"trades"});
+  EXPECT_TRUE(refused_for(unplaced, "trades", "per_workplace",
+                          ContentRefusal::OUT_OF_RANGE));
+
+  // Control: places at the workplace alone load, as that one kind of
+  // opening.
+  MemoryPacks control;
+  keeper(control).text("workplace", "house").set("per_workplace", 2);
+  const LoadedContent loaded = load_content(control, TINY, {"trades"});
+  EXPECT_TRUE(loaded.errors.empty());
+  const RegionData data = loaded.data.value_or(RegionData{});
+  const std::vector<Occupation> list =
+      data.life.occupations.value_or(Occupations{}).list;
+  ASSERT_EQ(list.size(), 1U);
+  const auto* workplace = std::get_if<AtWorkplace>(&list.front().openings);
+  ASSERT_NE(workplace, nullptr);
+  EXPECT_EQ(workplace->kind, "house");
+  EXPECT_EQ(workplace->per, 2U);
 }
 
 TEST(Content, AFractionIsRefused) {

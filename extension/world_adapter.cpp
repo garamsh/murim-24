@@ -46,6 +46,7 @@
 #include "m1_scenario.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "region.hpp"
@@ -1456,7 +1457,6 @@ godot::TypedArray<godot::Dictionary> WorldAdapter::wares() const {
     fields.set("price", static_cast<std::int64_t>(ware.price));
     fields.set("health", static_cast<std::int64_t>(ware.health));
     fields.set("qi", static_cast<std::int64_t>(ware.qi));
-    fields.set("discipline", static_cast<std::int64_t>(ware.discipline));
     wares.push_back(fields);
   }
   return wares;
@@ -1576,6 +1576,20 @@ godot::PackedStringArray WorldAdapter::discipline_names() const {
   godot::PackedStringArray names;
   for (const std::string& name : disciplines_) {
     names.append(name.c_str());
+  }
+  return names;
+}
+
+std::int64_t WorldAdapter::person_occupation(std::int64_t person) const {
+  const std::optional<std::size_t> occupation =
+      world().occupation_of(person_index(person));
+  return occupation ? static_cast<std::int64_t>(*occupation) : -1;
+}
+
+godot::PackedStringArray WorldAdapter::occupation_names() const {
+  godot::PackedStringArray names;
+  for (const murim::Occupation& occupation : world().occupations()) {
+    names.append(occupation.name.c_str());
   }
   return names;
 }
@@ -1928,6 +1942,10 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::discipline_names);
   godot::ClassDB::bind_method(godot::D_METHOD("person_sect", "person"),
                               &WorldAdapter::person_sect);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_occupation", "person"),
+                              &WorldAdapter::person_occupation);
+  godot::ClassDB::bind_method(godot::D_METHOD("occupation_names"),
+                              &WorldAdapter::occupation_names);
   godot::ClassDB::bind_method(godot::D_METHOD("person_qi", "person"),
                               &WorldAdapter::person_qi);
   godot::ClassDB::bind_method(godot::D_METHOD("person_qi_capacity", "person"),

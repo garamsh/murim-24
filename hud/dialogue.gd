@@ -207,6 +207,11 @@ func _sold() -> Dictionary:
 	return {}
 
 
+## Returns occupation `occupation` of `world` named in the current locale.
+static func occupation_name(world: WorldAdapter, occupation: int) -> String:
+	return TranslationServer.translate("OCCUPATION_" + world.occupation_names()[occupation].to_upper())
+
+
 ## Returns the room, in pixels, the window gives a line of news or a menu row.
 func line_room() -> float:
 	return RECT.end.x - 12 - SAY_X
@@ -218,7 +223,7 @@ func card_room() -> float:
 
 
 ## Returns the person's particulars under its card: its faction's name, its sect's or none, or for
-## a seller the discipline it sells by, and its age, in the current locale.
+## a seller its occupation, and its age, in the current locale.
 func particulars() -> Array[String]:
 	var faction := _world.person_faction(person)
 	var sect := _world.person_sect(person)
@@ -226,8 +231,7 @@ func particulars() -> Array[String]:
 	var sect_name: String = Affiliation.sect_name(_world, sect) if sect >= 0 else tr("DIALOGUE_NO_SECT")
 	var sold := _sold()
 	if not sold.is_empty():
-		var discipline: String = _world.discipline_names()[int(sold.discipline)]
-		sect_name = tr("DIALOGUE_SELLER") % tr("DISCIPLINE_" + discipline.to_upper().replace(" ", "_"))
+		sect_name = occupation_name(_world, _world.person_occupation(person))
 	return [faction_name, sect_name, tr("DIALOGUE_AGE") % _world.person_age(person)]
 
 

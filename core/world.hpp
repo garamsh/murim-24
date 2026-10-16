@@ -26,6 +26,7 @@
 #include "limits.hpp"
 #include "map.hpp"
 #include "names.hpp"
+#include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
 #include "sect.hpp"
@@ -651,11 +652,23 @@ class World {
   /// Returns the trade's wares, in order, or none without a trade.
   [[nodiscard]] const std::vector<Ware>& wares() const;
 
+  /// Returns the occupations, in order, or none without them.
+  [[nodiscard]] const std::vector<Occupation>& occupations() const;
+
   /// Returns whether person `person` sells ware `ware`: while it lives and
-  /// its best discipline, its highest talent limit, is the ware's. This is
-  /// the one rule of who sells what. Throws std::out_of_range when there is
-  /// no such person or ware.
+  /// its occupation sells the ware (ADR 0081). This is the one rule of who
+  /// sells what. Throws std::out_of_range when there is no such person or
+  /// ware.
   [[nodiscard]] bool sells(std::size_t person, std::size_t ware) const;
+
+  /// Returns the occupation, by index among the occupations, person `person`
+  /// holds, if any (ADR 0081's trade). Once a day, and as the world is
+  /// created, each village fills its occupations' openings from the living
+  /// people whose home it is, by assign(); a living person with no home
+  /// holds none, and the dead keep what they held. Throws std::out_of_range
+  /// when there is no such person.
+  [[nodiscard]] std::optional<std::size_t> occupation_of(
+      std::size_t person) const;
 
   /// Returns why person `buyer` may not buy one of ware `ware` from person
   /// `seller`, or BuyRefusal::NONE when it may. Throws std::invalid_argument
@@ -845,6 +858,7 @@ class World {
   [[nodiscard]] Stages stages() const;
   [[nodiscard]] Service served() const;
   void tend();
+  void assign_occupations();
   [[nodiscard]] std::vector<std::size_t> homes() const;
   /// A person unfed too long, and the army it serves in.
   struct Unfed {
