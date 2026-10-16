@@ -1,4 +1,4 @@
-.PHONY: lint format test build ci bench sweep android export
+.PHONY: lint format test build ci bench sweep gcc android export
 
 BUILD_DIR := build
 EXTENSION_BUILD_DIR := $(BUILD_DIR)/extension
@@ -94,6 +94,19 @@ sweep: build
 	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
 	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_sweep
 	$(BENCH_DIR)/murim_core_sweep $(FIRST_SEED) $(LAST_SEED) $(YEARS)
+
+# Not part of ci: hosted ci builds with the runner's GCC, which warns, under core/CMakeLists.txt's -Werror, where
+# Apple Clang does not, as on a conversion to std::size_t from int. This builds the core and its tests with GCC
+# under those same flags, from the same CMakeLists.txt, and runs the tests. GCC names the compiler, Homebrew's
+# GCC 16 unless given another; when it is not on PATH the target says so and fails.
+GCC ?= g++-16
+GCC_BUILD_DIR := $(BUILD_DIR)/gcc
+gcc:
+	@command -v $(GCC) > /dev/null || { echo "make gcc needs $(GCC) on PATH (brew install gcc), or GCC=<compiler>"; exit 1; }
+	$(TOOLS)/cmake -S core -B $(GCC_BUILD_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_CXX_COMPILER=$$(command -v $(GCC))
+	$(TOOLS)/cmake --build $(GCC_BUILD_DIR)
+	$(TOOLS)/ctest --test-dir $(GCC_BUILD_DIR) --output-on-failure --no-tests=error
+	@echo "make gcc built every target in core/CMakeLists.txt with $$($(GCC) --version | head -1) into $(GCC_BUILD_DIR)/, and ctest ran the tests selected by: every GoogleTest case gtest_discover_tests registers there"
 
 # Not part of ci: CI installs no Android SDK. The NDK's toolchain file selects the target; extension/CMakeLists.txt is the same for every platform.
 # murim.apk opens the game on the title screen; murim_bench.apk runs frame_bench.gd at launch through the Android bench preset's
