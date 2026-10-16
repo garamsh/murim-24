@@ -149,7 +149,13 @@ class CoarseGraph {
   void link_exits(std::size_t area);
   void build_region(std::size_t region);
   void join_components();
+  void number();
+  [[nodiscard]] std::size_t id_of(NodeRef ref) const;
+  [[nodiscard]] NodeRef ref_of(std::size_t id) const;
+  [[nodiscard]] std::size_t border_id(NodeRef ref) const;
+  [[nodiscard]] NodeRef border_ref(std::size_t id) const;
   [[nodiscard]] std::size_t region_of_area(std::size_t area) const;
+  [[nodiscard]] std::vector<std::size_t> region_areas(std::size_t region) const;
   [[nodiscard]] std::vector<std::size_t> sets_of(const Map& map,
                                                  Cell cell) const;
   [[nodiscard]] std::vector<std::int16_t> labels(const Map& map,
@@ -167,14 +173,12 @@ class CoarseGraph {
     Costs starts;
     Costs goals;
   };
-  using Relax = std::function<void(NodeRef, CoarseCost)>;
-  using Expand = std::function<void(NodeRef, const Relax&)>;
 
   [[nodiscard]] Costs inserted(const Map& map, Cell cell) const;
-  void expand_areas(NodeRef ref, const Relax& relax) const;
-  void expand_regions(NodeRef ref, const Relax& relax) const;
-  [[nodiscard]] std::optional<CoarseCost> a_star(const Terminals& ends,
-                                                 const Expand& expand) const;
+  template <typename Relax>
+  void expand_areas(NodeRef ref, Relax relax) const;
+  template <typename Relax>
+  void expand_regions(std::size_t id, Relax relax) const;
   [[nodiscard]] Costs settle_region(const Costs& starts,
                                     std::size_t region) const;
   [[nodiscard]] Costs on_border(const Costs& settled) const;
@@ -193,6 +197,10 @@ class CoarseGraph {
   // component's set, joined through the entrances.
   std::vector<std::size_t> first_component_;
   std::vector<std::size_t> joined_;
+  // Each area's first node's number among every node, and each region's
+  // first border node's among every region's, in area and region order.
+  std::vector<std::size_t> first_node_;
+  std::vector<std::size_t> first_border_;
 };
 
 }  // namespace murim
