@@ -68,6 +68,7 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
   }
   held_.emplace(key, Held{slot, true});
   ++built_;
+  ++built_in_all_;
   return slot;
 }
 
@@ -147,5 +148,16 @@ void AreaFields::clear() {
 std::size_t AreaFields::held() const { return held_.size(); }
 
 std::size_t AreaFields::built() const { return built_; }
+
+std::size_t AreaFields::built_in_all() const { return built_in_all_; }
+
+std::vector<std::size_t> AreaFields::searched() const {
+  std::vector<std::size_t> sizes;
+  sizes.reserve(searches_.size());
+  for (const auto& [objective, held] : searches_) {
+    sizes.push_back(held.search.cost.size());
+  }
+  return sizes;
+}
 
 }  // namespace murim

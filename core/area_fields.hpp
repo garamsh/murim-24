@@ -42,10 +42,15 @@ class AreaFields {
   /// Drops every field and cost, as after the map or the graph changes.
   void clear();
 
-  /// How many fields are held, and how many were built since the last
-  /// end_tick().
+  /// How many fields are held, how many were built since the last
+  /// end_tick(), and how many were built in all.
   [[nodiscard]] std::size_t held() const;
   [[nodiscard]] std::size_t built() const;
+  [[nodiscard]] std::size_t built_in_all() const;
+
+  /// How many nodes each held search toward an objective has costed, by
+  /// objective.
+  [[nodiscard]] std::vector<std::size_t> searched() const;
 
  private:
   using Key = std::tuple<std::size_t, std::int32_t, std::int32_t>;
@@ -69,6 +74,7 @@ class AreaFields {
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
   std::size_t built_ = 0;
+  std::size_t built_in_all_ = 0;
 };
 
 }  // namespace murim

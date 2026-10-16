@@ -13,8 +13,10 @@
 #include <optional>
 #include <ratio>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "area_fields.hpp"
 #include "calendar.hpp"
 #include "coarse_graph.hpp"
 #include "limits.hpp"
@@ -240,11 +242,24 @@ bool run_live() {
 
   std::vector<std::chrono::steady_clock::duration> durations;
   Strikes timed{0, 0};
+  const std::size_t built_before = world.fields().built_in_all();
+  std::size_t most_built = 0;
+  // The searches toward objectives a build read in a tick, which end_tick()
+  // keeps, at their most over the timed ticks.
+  std::size_t most_objectives = 0;
+  std::size_t most_costed = 0;
   for (int tick = 0; tick < TIMED_TICKS; ++tick) {
     const auto before = cooldowns(world);
+    const std::size_t built_at = world.fields().built_in_all();
     const auto start = std::chrono::steady_clock::now();
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
+    most_built = std::max(most_built, world.fields().built_in_all() - built_at);
+    const std::vector<std::size_t> searched = world.fields().searched();
+    most_objectives = std::max(most_objectives, searched.size());
+    for (const std::size_t costed : searched) {
+      most_costed = std::max(most_costed, costed);
+    }
     peak = std::max(peak, living(world, world.army_count()));
     const Strikes strikes = strikes_between(before, cooldowns(world), fighting);
     timed.all += strikes.all;
@@ -252,6 +267,7 @@ bool run_live() {
   }
   const auto [p50, p99, max] = times_of(durations);
   const bool pass = p99 <= BUDGET_MS;
+  const std::size_t built_timed = world.fields().built_in_all() - built_before;
   require(living(world, armies) > people / 2,
           "most of the world must still live when timing ends");
   require_below_capacity(peak, scenario.rules.people_capacity);
@@ -278,6 +294,13 @@ bool run_live() {
             << static_cast<double>(timed.area) / TIMED_TICKS << "\n"
             << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max "
             << max << " ms\n"
+            << "fields: " << world.fields().held()
+            << " held when timing ended; built while timed "
+            << static_cast<double>(built_timed) / TIMED_TICKS
+            << " a tick, at most " << most_built << " in one tick\n"
+            << "objectives searched toward in a tick: at most "
+            << most_objectives << ", costing at most " << most_costed
+            << " nodes each\n"
             << "TARGET " << (pass ? "MET" : "MISSED") << ": p99 " << p99
             << " ms against a " << BUDGET_MS
             << " ms target, not yet in force (#216; ADR 0053 makes it "
@@ -300,6 +323,8 @@ constexpr std::int32_t RANGE_EVERY = 1'024;
 constexpr std::int32_t PASS_WIDTH = 16;
 constexpr std::int32_t PASS_STRIDE = 1'777;
 constexpr int PATH_RUNS = 5;
+constexpr std::int32_t FOOTPRINT = 3;
+constexpr std::size_t KIB = 1'024;
 // A frame at 60 frames a second, in milliseconds.
 constexpr double FRAME_MS = 16.7;
 
@@ -355,6 +380,38 @@ void run_paths() {
   });
   require(by_regions.has_value() && by_areas.has_value(),
           "the path measure's corners must be joined");
+  // Growth's lay copies the graph, then rebuilds the copy where a structure
+  // blocks: here a 3 by 3 footprint in the first area.
+  Map built = map;
+  std::vector<Cell> blocked;
+  for (std::int32_t row = 0; row < FOOTPRINT; ++row) {
+    for (std::int32_t col = 0; col < FOOTPRINT; ++col) {
+      blocked.push_back(Cell{from.x + col + 2, from.y + row + 2});
+      built.block(blocked.back());
+    }
+  }
+  std::vector<CoarseGraph> copies;
+  copies.reserve(PATH_RUNS);
+  const double copy_ms = median_ms(PATH_RUNS, [&] { copies.push_back(graph); });
+  std::size_t rebuilding = 0;
+  const double rebuild_ms = median_ms(
+      PATH_RUNS, [&] { copies.at(rebuilding++).rebuild(built, blocked); });
+  // The first field toward a fresh objective: the reverse search from it
+  // costs the exits of the walker's area, and the field is built over them.
+  AreaFields fields;
+  const auto asked_at = std::chrono::steady_clock::now();
+  static_cast<void>(fields.field_for(map, graph, from, corner));
+  const double first_field_ms =
+      milliseconds(std::chrono::steady_clock::now() - asked_at);
+  const std::size_t costed = fields.searched().at(0);
+  // Each costed node is held in the search's map of costs and at most once
+  // in its set of settled nodes, each a tree node of three pointers and a
+  // colour beside its value.
+  constexpr std::size_t TREE_NODE = 4 * sizeof(void*);
+  using Node = std::pair<std::size_t, std::size_t>;
+  const std::size_t search_bytes =
+      costed * ((2 * TREE_NODE) + sizeof(Node) +
+                sizeof(std::pair<const Node, CoarseCost>));
   std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "
             << graph.node_count() << " nodes, built in " << build_ms << " ms\n"
             << "path by regions: median " << regions_ms << " ms of "
@@ -363,7 +420,13 @@ void run_paths() {
             << FRAME_MS << " ms\n"
             << "control, by areas alone: median " << areas_ms << " ms, cost "
             << by_areas.value_or(0) << "; "
-            << (areas_ms <= FRAME_MS ? "within" : "past") << " a frame\n";
+            << (areas_ms <= FRAME_MS ? "within" : "past") << " a frame\n"
+            << "lay's graph copy: median " << copy_ms
+            << " ms; its rebuild under a " << FOOTPRINT << " by " << FOOTPRINT
+            << " footprint: median " << rebuild_ms << " ms\n"
+            << "first field toward a fresh objective across the map: "
+            << first_field_ms << " ms, its search costing " << costed
+            << " nodes, about " << search_bytes / KIB << " KiB\n";
 }
 
 // The bench's exit status: failure when a budget in force is missed. Only

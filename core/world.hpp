@@ -548,6 +548,9 @@ class World {
   /// Returns every area's tier.
   [[nodiscard]] const Areas& areas() const;
 
+  /// Returns the fields people step by, for a measure to read.
+  [[nodiscard]] const AreaFields& fields() const;
+
   /// Returns where army `army` stands while it is far; nothing while it is
   /// live or stepped. Throws std::out_of_range when there is no such army.
   [[nodiscard]] std::optional<FarAnchor> far(std::size_t army) const;
