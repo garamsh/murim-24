@@ -7,8 +7,23 @@
 
 #include "limits.hpp"
 #include "village.hpp"
+#include "village_fields.hpp"
 
 namespace murim {
+
+Kept kept_by(const Growth& growth) {
+  Kept kept;
+  for (const Tier& tier : growth.tiers) {
+    const std::int32_t width = tier.square.width;
+    const std::int32_t height = tier.square.height;
+    kept.west = std::max({kept.west, tier.vicinity, width / 2});
+    kept.north = std::max({kept.north, tier.vicinity, height / 2});
+    kept.east = std::max({kept.east, tier.vicinity, width - (width / 2) - 1});
+    kept.south =
+        std::max({kept.south, tier.vicinity, height - (height / 2) - 1});
+  }
+  return kept;
+}
 
 void check_growth(const Growth& growth) {
   const auto unknown = [&growth](std::size_t plan) {
@@ -34,13 +49,15 @@ void check_growth(const Growth& growth) {
   }
   if (growth.interval == 0 || growth.pressure > PER_MILLE || reaches_out ||
       misshapen || growth.terrace == 0 || !tiered ||
+      !VillageFields::holds(kept_by(growth)) ||
       std::any_of(growth.builds.begin(), growth.builds.end(), unknown) ||
       std::any_of(growth.core.begin(), growth.core.end(), unknown)) {
     throw std::invalid_argument(
         "growth must check at an interval, press within a thousand per "
         "mille, reach within MAX_REACH, raise terraces at some labour, start "
         "its tiers at no one and raise them in order with squares of 1 to "
-        "MAX_FOOTPRINT cells, and name only plans it has, of the square role "
+        "MAX_FOOTPRINT cells, keep no more than a village's window holds, "
+        "and name only plans it has, of the square role "
         "where a tier names its square kinds");
   }
 }

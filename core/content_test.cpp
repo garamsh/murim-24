@@ -382,6 +382,38 @@ TEST(Content, AnOccupationOpeningPlacesTwoWaysIsRefused) {
   EXPECT_EQ(workplace->per, 2U);
 }
 
+// The mod's life occupations: a working age, the keeper as the fallback and
+// an idle schedule at home.
+Node life_occupations(MemoryPacks& packs) {
+  constexpr std::int64_t WORKING_AGE = 16;
+  Node occupations = packs.entry("trades", "life", "life").map("occupations");
+  occupations.set("working_age", WORKING_AGE).text("fallback", "keeper");
+  occupations.list("idle").item().set("from", 0).text("where", "home");
+  return occupations;
+}
+
+TEST(Content, OccupationsNameTheirWakingHours) {
+  constexpr std::uint32_t WAKING = 6;
+  constexpr std::uint32_t SLEEPING = 22;
+  MemoryPacks sleepless;
+  keeper(sleepless).text("workplace", "house").set("per_workplace", 2);
+  life_occupations(sleepless);
+  const LoadedContent unnamed = load_content(sleepless, TINY, {"trades"});
+  EXPECT_TRUE(refused_for(unnamed, "trades", "occupations.waking",
+                          ContentRefusal::MISSING_FIELD));
+  EXPECT_FALSE(unnamed.data.has_value());
+  // Control: with waking hours named, they load as given.
+  MemoryPacks named;
+  keeper(named).text("workplace", "house").set("per_workplace", 2);
+  life_occupations(named).map("waking").set("from", WAKING).set("to", SLEEPING);
+  const LoadedContent loaded = load_content(named, TINY, {"trades"});
+  EXPECT_TRUE(loaded.errors.empty());
+  const Occupations occupations = loaded.data.value_or(RegionData{})
+                                      .life.occupations.value_or(Occupations{});
+  EXPECT_EQ(occupations.waking.from, WAKING);
+  EXPECT_EQ(occupations.waking.to, SLEEPING);
+}
+
 TEST(Content, AFractionIsRefused) {
   MemoryPacks packs;
   add_tiny_base(packs);

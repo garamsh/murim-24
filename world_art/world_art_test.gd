@@ -47,8 +47,10 @@ const VIEW := Vector2(480, 270)
 # 3,660 days.
 const SHORT_DAY := 5
 const FOUNDING_DAYS := 4500
-# Days of short days within which the region's growth builds a smithy and an apothecary.
-const WORKSHOP_DAYS := 9000
+# Days of short days within which the region's growth builds a smithy and an apothecary: the
+# apothecary came at day 10,980 once settlers walked into their villages by their army's field
+# (#387). A stopgap tied to this seed's growth until #396 sets every kind up directly.
+const WORKSHOP_DAYS := 12000
 # How far in from its left and bottom edges every structure's frame holds its footprint's
 # bottom-left corner, as docs/art-direction.md §Structures and damage stages gives it.
 const INSET := 8

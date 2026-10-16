@@ -78,7 +78,7 @@ struct Clearing {
 /// married to each other, each heading a family of their own.
 struct VillageSpec {
   std::vector<std::size_t> structures;
-  std::size_t residents;
+  std::size_t residents = 0;
   /// What each of `structures` holds, in their order; none holds nothing.
   std::vector<Holding> holdings;
   std::uint32_t households = 0;

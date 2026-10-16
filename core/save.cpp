@@ -571,6 +571,8 @@ void put_life(Writer& out, const Life& life) {
     out.u32(occupations.working_age);
     out.size(occupations.fallback);
     put_bands(out, occupations.idle);
+    out.u32(occupations.waking.from);
+    out.u32(occupations.waking.to);
   });
 }
 
@@ -701,6 +703,8 @@ Life get_life(Reader& input) {
     occupations.working_age = input.u32();
     occupations.fallback = input.size();
     occupations.idle = get_bands(input);
+    occupations.waking.from = input.u32();
+    occupations.waking.to = input.u32();
     return occupations;
   });
   return life;

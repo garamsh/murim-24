@@ -510,6 +510,19 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
   }
 }
 
+TEST(Region, ASeatKeepingMoreThanAVillagesWindowHoldsIsRefused) {
+  // A window holds 128 cells a side with 4 round what a village keeps: a seat
+  // 120 cells wide keeps 120 across its middle, wider than its growth keeps.
+  constexpr std::int32_t WIDEST = 120;
+  RegionData widest = base_data();
+  widest.seat.area.width = WIDEST;
+  // Control: the widest seat a window holds is accepted.
+  EXPECT_TRUE(consistent(widest));
+  RegionData wider = widest;
+  wider.seat.area.width = WIDEST + 1;
+  EXPECT_FALSE(consistent(wider));
+}
+
 TEST(Region, RejectsInconsistentData) {
   EXPECT_NO_THROW(static_cast<void>(generate_region(SEED, base_data())));
 
@@ -1139,8 +1152,9 @@ enum class TokenGate : std::uint8_t { TOKENS, NONE };
 
 // The ticks from a person born into the first Demonic village of the region
 // `data` generates from `seed` challenging its leader, as the player does,
-// until the duel is settled, or `limit` if it is not by then; without the
-// region's attack tokens under TokenGate::NONE.
+// until the duel is settled, or `limit` if it is not by then; with `beside`,
+// born where born_in() has it, beside the leader, with no occupations; without
+// the region's attack tokens under TokenGate::NONE.
 std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
                          bool beside = false,
                          TokenGate gate = TokenGate::TOKENS) {
@@ -1150,7 +1164,11 @@ std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
   }
   const std::size_t home = first_of(region, DEMONIC);
   ArmySpec born = born_in(region, home);
-  if (!beside) {
+  if (beside) {
+    // No occupations, so the leader stands where it was born, beside the
+    // challenger, rather than stepping to its spot at home.
+    region.life.occupations.reset();
+  } else {
     // The challenger stands DUEL_AWAY cells from the leader, the first
     // resident, on the first open cell that far, row by row: where the
     // village templates' corner once had it born.

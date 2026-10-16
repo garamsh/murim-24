@@ -1,6 +1,6 @@
 # ADR 0081: Give people trades from their village's buildings, and move them between home, work and the square by the hour
 
-> Status: proposed
+> Status: proposed; its fixed 90 ticks between a person's wanders superseded by ADR-0084, under which the period is one hour of the world's day
 > Date: 2026-10-15
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

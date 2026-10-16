@@ -177,10 +177,12 @@ struct Region {
 /// faction has no skills, a village template has no buildings, houses no
 /// household or has a building of no cell, the seat template has no
 /// buildings, houses no household, has one outside its area, two that
-/// overlap or one over the area's centre, a template names a kind the kinds
-/// do not, a faction is hostile to one that does not exist, a sect names a
-/// faction that does not exist, or the growth fails check_growth; throws
-/// std::runtime_error when a village or a seat finds no room.
+/// overlap or one over the area's centre, or keeps, with what the growth
+/// may lay round its centre, more than a village's window holds
+/// (VillageFields::holds), a template names a kind the kinds do not, a faction
+/// is hostile to one that does not exist, a sect names a faction that does not
+/// exist, or the growth fails check_growth; throws std::runtime_error when a
+/// village or a seat finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Settles the hand-made map `map` with `data` (ADR 0077): the inputs a World

@@ -35,6 +35,7 @@
 #include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
+#include "schedule.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "spatial_hash.hpp"
@@ -3656,6 +3657,28 @@ TEST(World, GrowthPastItsLimitsIsRefused) {
   EXPECT_FALSE(grows_by(too_many));
 }
 
+TEST(World, GrowthKeepingMoreThanAVillagesWindowHoldsIsRefused) {
+  // A window holds 128 cells a side with 4 round what a village keeps: a
+  // vicinity of 59 keeps 119 cells across its centre, and a square of 120
+  // keeps 120.
+  constexpr std::int32_t WIDEST_VICINITY = 59;
+  constexpr std::int32_t WIDEST_SQUARE = 120;
+  const Growth valid = growth_of(Growing{});
+  // Controls: the widest a window holds are accepted.
+  Growth widest_vicinity = valid;
+  widest_vicinity.tiers.back().vicinity = WIDEST_VICINITY;
+  EXPECT_TRUE(grows_by(widest_vicinity));
+  Growth widest_square = valid;
+  widest_square.tiers.back().square = {1, WIDEST_SQUARE};
+  EXPECT_TRUE(grows_by(widest_square));
+  Growth wider_vicinity = valid;
+  wider_vicinity.tiers.back().vicinity = WIDEST_VICINITY + 1;
+  EXPECT_FALSE(grows_by(wider_vicinity));
+  Growth wider_square = valid;
+  wider_square.tiers.back().square = {1, WIDEST_SQUARE + 1};
+  EXPECT_FALSE(grows_by(wider_square));
+}
+
 // A world of one village whose three residents start with `households`
 // households.
 World housed(std::uint32_t households) {
@@ -6824,7 +6847,8 @@ World market(const Stall& stall) {
                    Occupation{"salve_seller", Nowhere{}, day, {SALVE}}},
                   0,
                   1,
-                  day};
+                  day,
+                  Waking{}};
   Rules rules = stall.foe ? at_war(0) : peaceful(0);
   rules.talk_reach = 2;
   rules.ticks_per_day = 1;
@@ -6922,7 +6946,8 @@ World smithing(std::uint32_t durability) {
                    Occupation{"beggar", Nowhere{}, day, {}}},
                   1,
                   1,
-                  day};
+                  day,
+                  Waking{}};
   Rules rules = peaceful(0);
   rules.ticks_per_day = 1;
   return World{Seed{1},
@@ -7100,7 +7125,8 @@ World two_sellers(Cell first, Cell second) {
                    Occupation{"beggar", Nowhere{}, day, {}}},
                   0,
                   1,
-                  day};
+                  day,
+                  Waking{}};
   Rules rules = peaceful(0);
   rules.talk_reach = 2;
   rules.ticks_per_day = 1;
@@ -7194,6 +7220,844 @@ TEST(World, ATradeOutsideItsLimitsIsRefused) {
   Trade eager = sound;
   eager.wounded = PER_MILLE + 1;
   EXPECT_FALSE(trades(eager));
+}
+
+// The schedule tests' day, 2,400 ticks, so an hour is 100 ticks and a walk
+// across their village fits in a band of hours.
+constexpr std::uint64_t SCHEDULED_DAY = 2'400;
+constexpr std::uint64_t AN_HOUR = SCHEDULED_DAY / HOURS_PER_DAY;
+// The hours they read their village at: asleep at home; awake at home before
+// work; the smiths' work beginning; late morning; and the afternoon, when
+// all are at work.
+constexpr std::uint64_t ASLEEP = 5;
+constexpr std::uint64_t BEFORE_WORK = 7;
+constexpr std::uint64_t WORK_BEGINS = 8;
+constexpr std::uint64_t LATE_MORNING = 12;
+constexpr std::uint64_t AFTERNOON = 14;
+constexpr Cell SCHEDULED_CENTRE{20, 12};
+constexpr std::size_t SCHEDULED_WIDTH = 40;
+constexpr std::size_t SCHEDULED_HEIGHT = 24;
+// The schedule tests' village's structures: a house of two, a house of
+// three, a smithy and a field.
+constexpr std::array<Structure, 4> SCHEDULED_STRUCTURES{
+    {Structure{{10, 4}, 100, {2, 2}, true, Role::HOME},
+     Structure{{6, 10}, 100, {2, 2}, true, Role::HOME},
+     Structure{{28, 4}, 100, {3, 2}, true, Role::SQUARE},
+     Structure{{30, 16}, 100, {4, 4}, false, Role::EDGE}}};
+constexpr std::size_t FIRST_HOUSE = 0;
+constexpr std::size_t SECOND_HOUSE = 1;
+constexpr std::size_t THE_SMITHY = 2;
+constexpr std::size_t THE_FIELD = 3;
+// Its residents: a married couple, both smiths; a farmer; and a beggar; and
+// the person of another army, if any.
+constexpr std::size_t FIRST_SMITH = 0;
+constexpr std::size_t SECOND_SMITH = 1;
+constexpr std::size_t THE_FARMER = 2;
+constexpr std::size_t THE_BEGGAR = 3;
+constexpr std::size_t INTRUDER = 4;
+constexpr std::array<Cell, 4> RESIDENTS_AT{
+    {{19, 12}, {21, 12}, {20, 11}, {20, 13}}};
+// The occupations' days, and the village's rules: its claim, its square, the
+// vicinity it builds in, the sight people engage within, the waking hours,
+// and a growth interval no test reaches.
+constexpr std::array<Band, 4> SMITH_DAY{{{0, Where::HOME},
+                                         {8, Where::WORK},
+                                         {16, Where::SQUARE},
+                                         {20, Where::HOME}}};
+constexpr std::array<Band, 3> FARMER_DAY{
+    {{0, Where::HOME}, {6, Where::WORK}, {18, Where::HOME}}};
+constexpr std::array<Band, 3> BEGGAR_DAY{
+    {{0, Where::HOME}, {8, Where::SQUARE}, {20, Where::HOME}}};
+constexpr std::int32_t SCHEDULED_CLAIM = 20;
+constexpr Footprint SCHEDULED_SQUARE{5, 5};
+constexpr std::int32_t SCHEDULED_VICINITY = 12;
+constexpr std::int32_t SCHEDULED_SIGHT = 10;
+constexpr Waking SCHEDULED_WAKING{6, 22};
+constexpr std::uint32_t NEVER_GROWS = 1'000'000;
+constexpr std::uint32_t AMPLE_HARVEST = 1'000;
+// The corners away from the village where another army may stand: the
+// north-east, out of sight, and the south-east.
+constexpr Cell UNSEEN_CORNER{39, 0};
+constexpr Cell ALLY_CORNER{38, 22};
+
+std::vector<std::string> scheduled_rows() {
+  return {SCHEDULED_HEIGHT, std::string(SCHEDULED_WIDTH, '.')};
+}
+
+// How a schedule test's world differs from its village alone: its map; a
+// steered person of the hostile faction standing at `foe`, with `foe_skills`;
+// a person of the residents' faction standing at `ally`, in an army of its
+// own after the foe's; how old the residents are made, in days; and whether
+// the village lays a field, its scarcest holding, at each day's rules.
+struct Daily {
+  std::vector<std::string> rows = scheduled_rows();
+  std::optional<Cell> foe;
+  std::vector<Skill> foe_skills{IDLE};
+  std::optional<Cell> ally;
+  std::uint64_t founding_days = 2 * DAYS_PER_YEAR;
+  bool builds = false;
+  std::optional<Kinship> kinship;
+  std::uint64_t ticks_per_day = SCHEDULED_DAY;
+};
+
+template <std::size_t N>
+std::vector<Band> day_of(const std::array<Band, N>& bands) {
+  return {bands.begin(), bands.end()};
+}
+
+// The schedule tests' life: their occupations, waking hours and growth.
+Life daily_life(const Daily& daily) {
+  Life life;
+  life.newborn_health = WHOLE;
+  life.founding_age =
+      Spread{static_cast<std::uint32_t>(daily.founding_days), 0};
+  life.kinship = daily.kinship;
+  life.occupations = Occupations{
+      {Occupation{"smith", AtWorkplace{"smithy", 2}, day_of(SMITH_DAY), {}},
+       Occupation{"farmer", AtWorkplace{"field", 1}, day_of(FARMER_DAY), {}},
+       Occupation{"beggar", Nowhere{}, day_of(BEGGAR_DAY), {}}},
+      1,
+      2,
+      {{0, Where::HOME}},
+      SCHEDULED_WAKING};
+  Growth growth;
+  growth.interval = NEVER_GROWS;
+  growth.claim = SCHEDULED_CLAIM;
+  growth.tiers = {Tier{0, SCHEDULED_SQUARE, SCHEDULED_VICINITY, {}}};
+  if (daily.builds) {
+    Holding harvest;
+    harvest.harvest = AMPLE_HARVEST;
+    growth.interval = 1;
+    growth.pressure = 0;
+    growth.plans = {Plan{"field", {2, 2}, false, harvest, Role::EDGE}};
+    growth.builds = {0};
+    growth.stances = {{Expansion::BUILD}, {}};
+  }
+  life.growth = growth;
+  return life;
+}
+
+// A village round SCHEDULED_CENTRE of SCHEDULED_STRUCTURES and four
+// residents at its centre, the first two married. Smiths take the smithy's
+// two places and work 8 to 16, the farmer the field's one from 6 to 18, and
+// the beggar, the fallback, is on the square 8 to 20; each is home
+// otherwise, awake 6 to 22. Its claim reaches 20 cells and its square is 5
+// by 5. People overlap, and residents reach 2 cells with a harmless touch.
+// Residents take an occupation from a year old.
+World daily_village(const Daily& daily = {}) {
+  const Life life = daily_life(daily);
+  Rules rules = at_war(0);
+  rules.ticks_per_day = daily.ticks_per_day;
+  rules.sight = SCHEDULED_SIGHT;
+  const Skill touch{2 * CELL_SIZE, 0, 0, 0, NEVER_AGAIN};
+  std::vector<Recruit> residents;
+  residents.reserve(RESIDENTS_AT.size());
+  for (const Cell cell : RESIDENTS_AT) {
+    residents.push_back(Recruit{cell, WHOLE});
+  }
+  std::vector<ArmySpec> armies{
+      ArmySpec{SCHEDULED_CENTRE, residents, 0, {touch}}};
+  if (daily.foe) {
+    armies.push_back(ArmySpec{
+        *daily.foe, {Recruit{*daily.foe, WHOLE}}, 1, daily.foe_skills});
+  }
+  if (daily.ally) {
+    armies.push_back(
+        ArmySpec{*daily.ally, {Recruit{*daily.ally, WHOLE}}, 0, {IDLE}});
+  }
+  Holding house;
+  house.housing = 2;
+  Holding roomy;
+  roomy.housing = 3;
+  World world{Seed{1},
+              Map{daily.rows},
+              armies,
+              {SCHEDULED_STRUCTURES.begin(), SCHEDULED_STRUCTURES.end()},
+              rules,
+              {VillageSpec{{0, 1, 2, 3},
+                           RESIDENTS,
+                           {house, roomy, {}, {}},
+                           1,
+                           {},
+                           {"house", "house", "smithy", "field"}}},
+              {},
+              life};
+  if (daily.foe) {
+    world.steer(1, true);
+  }
+  return world;
+}
+
+// Runs `world` until hour `hour` of the day it is in, or of the next.
+void run_to(World& world, std::uint64_t hour) {
+  const std::uint64_t ticks = world.ticks_per_day();
+  const std::uint64_t day = world.tick_count() / ticks;
+  std::uint64_t until = (day * ticks) + (hour * ticks / HOURS_PER_DAY);
+  if (until < world.tick_count()) {
+    until += ticks;
+  }
+  run_ticks(world, until - world.tick_count());
+}
+
+Cell cell_at(const World& world, std::size_t person) {
+  return cell_of(world.person(person).position);
+}
+
+// Cells between two cells along the farther axis.
+std::int32_t cells_apart(Cell one, Cell other) {
+  return std::max(std::abs(one.x - other.x), std::abs(one.y - other.y));
+}
+
+// The door of the schedule tests' structure `structure`.
+Cell door_of(std::size_t structure) {
+  return door(Map{scheduled_rows()}, SCHEDULED_STRUCTURES.at(structure),
+              SCHEDULED_CENTRE)
+      .value_or(Cell{-1, -1});
+}
+
+// How many cells person `person` of `world` stands on over the `hours`
+// hours from now, one a tick.
+std::size_t cells_stood_on(std::size_t person, World& world,
+                           std::uint64_t hours) {
+  std::vector<std::pair<std::int32_t, std::int32_t>> stood;
+  for (std::uint64_t tick = 0; tick < hours * AN_HOUR; ++tick) {
+    world.tick();
+    stood.emplace_back(cell_at(world, person).x, cell_at(world, person).y);
+  }
+  std::sort(stood.begin(), stood.end());
+  return static_cast<std::size_t>(std::unique(stood.begin(), stood.end()) -
+                                  stood.begin());
+}
+
+// The lowest row person `person` of `world` reaches over the `hours` hours
+// from now.
+std::int32_t lowest_row(std::size_t person, World& world, std::uint64_t hours) {
+  std::int32_t lowest = 0;
+  for (std::uint64_t tick = 0; tick < hours * AN_HOUR; ++tick) {
+    world.tick();
+    lowest = std::max(lowest, cell_at(world, person).y);
+  }
+  return lowest;
+}
+
+// Runs `world` while person `person` is at home, for at most one wander
+// period.
+void run_while_at_home(World& world, std::size_t person) {
+  for (std::uint64_t tick = 0; tick < wander_ticks(world.ticks_per_day()) &&
+                               world.activity(person) == Activity::AT_HOME;
+       ++tick) {
+    run_ticks(world, 1);
+  }
+}
+
+TEST(World, AResidentWalksToItsWorkplaceInItsWorkBandAndWorksThere) {
+  World world = daily_village();
+  ASSERT_EQ(world.occupation_of(FIRST_SMITH), std::optional<std::size_t>{0});
+  ASSERT_EQ(world.occupation_of(THE_BEGGAR), std::optional<std::size_t>{2});
+  run_to(world, BEFORE_WORK);
+  // Before its work band, awake at home.
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::AT_HOME);
+  EXPECT_LE(cells_apart(cell_at(world, FIRST_SMITH), door_of(FIRST_HOUSE)), 2);
+  // It leaves at the start of its first period in the work band, within one
+  // period of the band's hour.
+  run_to(world, WORK_BEGINS);
+  run_while_at_home(world, FIRST_SMITH);
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::WALKING);
+  run_to(world, AFTERNOON);
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::WORKING);
+  EXPECT_LE(cells_apart(cell_at(world, FIRST_SMITH), door_of(THE_SMITHY)), 2);
+  // Control: the beggar, in its square band, is idle on the square.
+  EXPECT_EQ(world.activity(THE_BEGGAR), Activity::IDLE);
+  EXPECT_LE(cells_apart(cell_at(world, THE_BEGGAR), SCHEDULED_CENTRE), 3);
+}
+
+// Whether person `person` of `world` is at home within a cell of the door of
+// structure `house`.
+bool at_home_by(const World& world, std::size_t person, std::size_t house) {
+  return world.activity(person) == Activity::AT_HOME &&
+         cells_apart(cell_at(world, person), door_of(house)) <= 1;
+}
+
+TEST(World, AtNightEachHouseholdIsAtHomeInTheFirstHouseWithRoomForIt) {
+  World world = daily_village();
+  run_to(world, ASLEEP);
+  // The couple fill the first house; the farmer and the beggar, each alone,
+  // take the second.
+  EXPECT_TRUE(at_home_by(world, FIRST_SMITH, FIRST_HOUSE));
+  EXPECT_TRUE(at_home_by(world, SECOND_SMITH, FIRST_HOUSE));
+  EXPECT_TRUE(at_home_by(world, THE_FARMER, SECOND_HOUSE));
+  EXPECT_TRUE(at_home_by(world, THE_BEGGAR, SECOND_HOUSE));
+}
+
+TEST(World, AFarmerWorksOnItsFieldsOwnCells) {
+  // How far a smith at work stands from the field.
+  constexpr std::int32_t FAR_FROM_FIELD = 5;
+  World world = daily_village();
+  run_to(world, AFTERNOON);
+  const Structure& field = SCHEDULED_STRUCTURES.at(THE_FIELD);
+  const Cell farmer = cell_at(world, THE_FARMER);
+  EXPECT_EQ(world.activity(THE_FARMER), Activity::WORKING);
+  // On the field, or a cell off it as it wanders.
+  EXPECT_GE(farmer.x, field.cell.x - 1);
+  EXPECT_GE(farmer.y, field.cell.y - 1);
+  EXPECT_LE(farmer.x, field.cell.x + field.footprint.width);
+  EXPECT_LE(farmer.y, field.cell.y + field.footprint.height);
+  // Control: a smith working at the same hour stands by its smithy.
+  EXPECT_GT(cells_apart(cell_at(world, FIRST_SMITH), field.cell),
+            FAR_FROM_FIELD);
+}
+
+TEST(World, AnIdlePersonWandersEveryHourOnlyWhileAwake) {
+  // Home by 3, it sleeps until 6; on the square from 8, it is awake there
+  // from 10 to 19.
+  constexpr std::uint64_t HOME_BY = 3;
+  constexpr std::uint64_t SETTLED = 10;
+  constexpr std::uint64_t SETTLED_HOURS = 9;
+  World world = daily_village();
+  run_to(world, HOME_BY);
+  EXPECT_EQ(cells_stood_on(THE_BEGGAR, world, ASLEEP - HOME_BY), 1U);
+  run_to(world, SETTLED);
+  EXPECT_GT(cells_stood_on(THE_BEGGAR, world, SETTLED_HOURS), 1U);
+}
+
+TEST(World, NoneButAnUnsteeredVillagesResidentsBoundForItsCentreFollow) {
+  // A cell beyond the centre, south of it.
+  constexpr Cell SOUTH{20, 20};
+  // Control: the residents follow, the smith at its smithy by 14.
+  World following = daily_village();
+  run_to(following, AFTERNOON);
+  ASSERT_EQ(following.activity(FIRST_SMITH), Activity::WORKING);
+  // Steered, they follow no schedule.
+  World steered = daily_village();
+  steered.steer(RESIDENTS, true);
+  run_to(steered, AFTERNOON);
+  EXPECT_EQ(steered.activity(FIRST_SMITH), Activity::IDLE);
+  EXPECT_GT(cells_apart(cell_at(steered, FIRST_SMITH), door_of(THE_SMITHY)), 3);
+  // Bound beyond the centre, they follow their order.
+  World elsewhere = daily_village();
+  elsewhere.order(RESIDENTS, Order{SOUTH, {0}});
+  run_to(elsewhere, AFTERNOON);
+  EXPECT_EQ(elsewhere.activity(FIRST_SMITH), Activity::IDLE);
+  EXPECT_GT(cells_apart(cell_at(elsewhere, FIRST_SMITH), door_of(THE_SMITHY)),
+            3);
+}
+
+TEST(World, ResidentsChasingAnAttackIntentFollowNoSchedule) {
+  // A foe stands east of the centre, within the rules' sight.
+  constexpr Cell EAST{29, 12};
+  Daily daily;
+  daily.foe = EAST;
+  World chasing = daily_village(daily);
+  ASSERT_EQ(chasing.attack_refusal(RESIDENTS, INTRUDER), AttackRefusal::NONE);
+  chasing.order(RESIDENTS, Order{SCHEDULED_CENTRE, {0}, INTRUDER});
+  run_ticks(chasing, AN_HOUR);
+  EXPECT_EQ(chasing.activity(FIRST_SMITH), Activity::IDLE);
+  // A person of no village follows no schedule either.
+  EXPECT_EQ(chasing.activity(INTRUDER), Activity::IDLE);
+  // Control: with no intent, the same residents follow theirs, closing on
+  // the foe in their claim as the schedule's pull gives way, and so are not
+  // idle by it.
+  World resting = daily_village(daily);
+  run_ticks(resting, AN_HOUR);
+  EXPECT_NE(resting.activity(FIRST_SMITH), Activity::IDLE);
+}
+
+TEST(World, AWalkToWorkGoesRoundAWallByItsPlacesField) {
+  // A wall down column 24 from the top to row 10 stands between the first
+  // house and the smithy; the houses' rows end at 7.
+  constexpr std::size_t WALL_COLUMN = 24;
+  constexpr std::size_t WALL_FOOT = 10;
+  constexpr std::int32_t HOUSE_ROWS_END = 7;
+  constexpr std::uint64_t WALK_HOURS = AFTERNOON - WORK_BEGINS;
+  std::vector<std::string> walled = scheduled_rows();
+  for (std::size_t row = 0; row <= WALL_FOOT; ++row) {
+    walled.at(row).at(WALL_COLUMN) = '#';
+  }
+  Daily daily;
+  daily.rows = walled;
+  World world = daily_village(daily);
+  run_to(world, WORK_BEGINS);
+  EXPECT_GT(lowest_row(FIRST_SMITH, world, WALK_HOURS),
+            static_cast<std::int32_t>(WALL_FOOT));
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::WORKING);
+  // Control: on open ground the walk keeps to the houses' rows.
+  World open = daily_village();
+  run_to(open, WORK_BEGINS);
+  EXPECT_LE(lowest_row(FIRST_SMITH, open, WALK_HOURS), HOUSE_ROWS_END);
+}
+
+TEST(World, ClosingOnAFoeOverridesTheSchedule) {
+  // A foe stands four cells from the first house's door, inside the claim.
+  const Cell beside{door_of(FIRST_HOUSE).x + 4, door_of(FIRST_HOUSE).y};
+  Daily daily;
+  daily.foe = beside;
+  World engaging = daily_village(daily);
+  run_to(engaging, ASLEEP);
+  EXPECT_LE(cells_apart(cell_at(engaging, FIRST_SMITH), beside), 2);
+  // Control: with no foe, the smith sleeps at its door.
+  World asleep = daily_village();
+  run_to(asleep, ASLEEP);
+  EXPECT_LE(cells_apart(cell_at(asleep, FIRST_SMITH), door_of(FIRST_HOUSE)), 1);
+}
+
+TEST(World, EveryPlacesFieldIsBuiltAsTheWorldIsCreatedAtThreeBytesACell) {
+  // The square, the first house and the second, the smithy and the field:
+  // each field over the window from (2, 0) to (38, 24), 4 cells round
+  // columns 6 to 33 and rows 4 to 19, the map's edge cutting it at row 24.
+  constexpr std::size_t PLACES = 5;
+  constexpr std::size_t WINDOW_CELLS = std::size_t{36} * 24;
+  constexpr std::size_t BYTES_A_CELL = 3;
+  World world = daily_village();
+  const World::FieldUse made = world.schedule_fields();
+  EXPECT_EQ(made.fields, PLACES);
+  EXPECT_EQ(made.builds, PLACES);
+  EXPECT_EQ(made.bytes, PLACES * WINDOW_CELLS * BYTES_A_CELL);
+  // Control: a day of errands to every place builds no field again.
+  run_ticks(world, SCHEDULED_DAY);
+  EXPECT_EQ(world.schedule_fields().fields, PLACES);
+  EXPECT_EQ(world.schedule_fields().builds, PLACES);
+}
+
+TEST(World, ResidentsComingOfAgeAtTheDaysRulesGoToWorkThatDay) {
+  // A day short of the working age as the world is created, they hold no
+  // occupation and stay home by the idle schedule.
+  Daily daily;
+  daily.founding_days = DAYS_PER_YEAR - 1;
+  World world = daily_village(daily);
+  ASSERT_FALSE(world.occupation_of(FIRST_SMITH).has_value());
+  run_to(world, AFTERNOON);
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::AT_HOME);
+  // The next day's rules give them their occupations, and by 14 the smith
+  // works at the smithy.
+  run_ticks(world, SCHEDULED_DAY);
+  ASSERT_EQ(world.occupation_of(FIRST_SMITH), std::optional<std::size_t>{0});
+  EXPECT_EQ(world.activity(FIRST_SMITH), Activity::WORKING);
+  EXPECT_LE(cells_apart(cell_at(world, FIRST_SMITH), door_of(THE_SMITHY)), 2);
+}
+
+TEST(World, SmithsWhoseSmithyFallsMidDayGoToTheSquare) {
+  // A foe out of sight in the north-east corner, striking no one by itself,
+  // breaks the smithy with one cast of its second skill at 12.
+  constexpr std::int32_t WRECKING_REACH = 12;
+  constexpr std::int32_t WRECKING_DAMAGE = 1'000;
+  constexpr Cell IN_THE_SMITHY{29, 4};
+  const Skill wrecking{WRECKING_REACH * CELL_SIZE, 2 * CELL_SIZE, 0,
+                       WRECKING_DAMAGE, NEVER_AGAIN};
+  Daily daily;
+  daily.foe = UNSEEN_CORNER;
+  daily.foe_skills = {IDLE, wrecking};
+  World wrecked = daily_village(daily);
+  run_to(wrecked, LATE_MORNING);
+  ASSERT_EQ(wrecked.activity(FIRST_SMITH), Activity::WORKING);
+  ASSERT_EQ(wrecked.stage(THE_SMITHY), Stage::INTACT);
+  wrecked.cast(INTRUDER, 1, Point{centre_of(IN_THE_SMITHY)});
+  run_to(wrecked, AFTERNOON);
+  ASSERT_EQ(wrecked.stage(THE_SMITHY), Stage::RUBBLE);
+  EXPECT_EQ(wrecked.activity(FIRST_SMITH), Activity::IDLE);
+  EXPECT_LE(cells_apart(cell_at(wrecked, FIRST_SMITH), SCHEDULED_CENTRE), 3);
+  // Control: with no cast, the same smith works on at its smithy.
+  World standing = daily_village(daily);
+  run_to(standing, AFTERNOON);
+  EXPECT_EQ(standing.activity(FIRST_SMITH), Activity::WORKING);
+}
+
+TEST(World, AResidentConscriptedAwayLeavesItsHouseToBeFilledAgain) {
+  // An army of the residents' faction stands in the south-east corner.
+  constexpr std::size_t ALLY_ARMY = 1;
+  Daily daily;
+  daily.ally = ALLY_CORNER;
+  World conscripted = daily_village(daily);
+  run_ticks(conscripted, AN_HOUR);
+  conscripted.conscript(SECOND_SMITH, ALLY_ARMY);
+  run_to(conscripted, ASLEEP);
+  // With the wife gone, the husband lives alone, and the farmer joins him in
+  // the first house.
+  EXPECT_EQ(conscripted.activity(THE_FARMER), Activity::AT_HOME);
+  EXPECT_LE(cells_apart(cell_at(conscripted, THE_FARMER), door_of(FIRST_HOUSE)),
+            1);
+  // Control: with no one conscripted, the farmer sleeps in the second house.
+  World whole = daily_village(daily);
+  run_to(whole, ASLEEP);
+  EXPECT_LE(cells_apart(cell_at(whole, THE_FARMER), door_of(SECOND_HOUSE)), 1);
+}
+
+// The hours either side of midnight the schedule tests read lodging and
+// errands at, everyone asleep at home.
+constexpr std::uint64_t LATE = 23;
+constexpr std::uint64_t SMALL_HOURS = 2;
+
+TEST(World, AnUnchangedNightFindsNoLodgingOrErrandAgain) {
+  // Asleep from 22, everyone stays home through midnight and the day's rules,
+  // which change no occupation and marry no one.
+  World night = daily_village();
+  run_to(night, LATE);
+  const World::FieldUse before = night.schedule_fields();
+  run_to(night, SMALL_HOURS);
+  EXPECT_EQ(night.schedule_fields().lodgings, before.lodgings);
+  EXPECT_EQ(night.schedule_fields().errands, before.errands);
+  // Control: waking at 6, each finds its errand again.
+  run_to(night, BEFORE_WORK);
+  EXPECT_GT(night.schedule_fields().errands, before.errands);
+}
+
+// The most errands village `village` finds again in one tick of the wander
+// period from the start of hour `hour`, and all it finds in that period.
+std::pair<std::uint64_t, std::uint64_t> found_from(World& village,
+                                                   std::uint64_t hour) {
+  run_to(village, hour);
+  const std::uint64_t before = village.schedule_fields().errands;
+  std::uint64_t most = 0;
+  for (std::uint64_t tick = 0; tick < wander_ticks(village.ticks_per_day());
+       ++tick) {
+    const std::uint64_t was = village.schedule_fields().errands;
+    run_ticks(village, 1);
+    most = std::max(most, village.schedule_fields().errands - was);
+  }
+  return {most, village.schedule_fields().errands - before};
+}
+
+// An hour at which some of a village's residents change, and how many.
+struct Change {
+  std::uint64_t hour;
+  std::uint64_t residents;
+};
+
+// Expects the residents of `village` who change at `change` to find their
+// errands again over the wander period from its hour, fewer than all of
+// them in any one tick.
+void expect_spread(World& village, Change change) {
+  const auto [most, all] = found_from(village, change.hour);
+  EXPECT_LT(most, change.residents);
+  EXPECT_GE(all, change.residents);
+}
+
+// Expects the residents of `village` to change band, wake and fall asleep
+// each at its own phase, each within an hour of the band's: at 6 the farmer
+// goes to work and the other three wake at home; at 8 the smiths go to work
+// and the beggar to the square; at 22 all four fall asleep. Without the
+// phase, every one that changes would find its errand again in the same
+// tick; with a period other than an hour of the day, some would not within
+// the hour (the mutations in #387).
+void expect_own_phases(World& village) {
+  constexpr std::uint64_t RESIDENTS = 4;
+  constexpr std::uint64_t TO_WORK = 8;
+  expect_spread(village, Change{SCHEDULED_WAKING.from, RESIDENTS});
+  expect_spread(village, Change{TO_WORK, RESIDENTS - 1});
+  expect_spread(village, Change{SCHEDULED_WAKING.to, RESIDENTS});
+  // Control: asleep, none of them finds an errand again through the next
+  // period, as each awake did once a period.
+  const std::uint64_t asleep = village.schedule_fields().errands;
+  run_ticks(village, wander_ticks(village.ticks_per_day()));
+  EXPECT_EQ(village.schedule_fields().errands, asleep);
+}
+
+TEST(World, ResidentsChangeBandWakeAndFallAsleepAtTheirOwnPhase) {
+  World village = daily_village();
+  expect_own_phases(village);
+}
+
+TEST(World, ResidentsKeepTheirOwnPhaseWithinAnHourOfAShortDay) {
+  // A day of 240 ticks: a wander period of 10.
+  constexpr std::uint64_t SHORT_DAY = 240;
+  Daily daily;
+  daily.ticks_per_day = SHORT_DAY;
+  World village = daily_village(daily);
+  expect_own_phases(village);
+}
+
+// Two villages of the same faction 20 cells apart on the schedule tests'
+// map, each of one resident, a single of a family of its own, and a house;
+// anyone may marry, at the most chance there is.
+World two_singles() {
+  constexpr std::array<Cell, 2> CENTRES{{{10, 12}, {30, 12}}};
+  constexpr std::int32_t HOUSE_OFF = 2;
+  Daily daily;
+  daily.kinship =
+      Kinship{Range{0, NEVER_GROWS}, SCHEDULED_CLAIM, PER_MILLE, {}, 0, 0};
+  Rules rules = peaceful(0);
+  rules.ticks_per_day = SCHEDULED_DAY;
+  rules.sight = SCHEDULED_SIGHT;
+  Holding house;
+  house.housing = 2;
+  std::vector<ArmySpec> armies;
+  std::vector<Structure> structures;
+  std::vector<VillageSpec> villages;
+  for (const Cell centre : CENTRES) {
+    villages.push_back(VillageSpec{
+        {structures.size()}, armies.size(), {house}, 0, {}, {"house"}});
+    armies.push_back(ArmySpec{centre, {Recruit{centre, WHOLE}}, 0, {IDLE}});
+    structures.push_back(Structure{{centre.x + HOUSE_OFF, centre.y + HOUSE_OFF},
+                                   HOME_DURABILITY,
+                                   {2, 2},
+                                   true,
+                                   Role::HOME});
+  }
+  return World{
+      Seed{1}, Map{scheduled_rows()}, armies, structures, rules, villages,
+      {},      daily_life(daily)};
+}
+
+// Lets nights pass in `world`, at most 1,000, until person `person` marries,
+// expecting a night with no marriage to find no lodging and the night of the
+// marriage to find two, one for each spouse's army, as two_singles() makes
+// them; returns the nights with none.
+std::uint64_t nights_until_wed(World& world, std::size_t person) {
+  constexpr std::uint64_t MOST_NIGHTS = 1'000;
+  constexpr std::uint64_t BOTH = 2;
+  std::uint64_t quiet = 0;
+  for (std::uint64_t night = 0;
+       night < MOST_NIGHTS && world.person(person).spouses.empty(); ++night) {
+    run_to(world, LATE);
+    const std::uint64_t before = world.schedule_fields().lodgings;
+    run_to(world, SMALL_HOURS);
+    const bool wed = !world.person(person).spouses.empty();
+    EXPECT_EQ(world.schedule_fields().lodgings, before + (wed ? BOTH : 0));
+    quiet += wed ? 0 : 1;
+  }
+  return quiet;
+}
+
+TEST(World, AMarriageFindsItsCouplesLodgingsAgain) {
+  // Nights pass until the two singles marry. The night they do finds each
+  // village's lodging, one for each spouse's army.
+  constexpr std::size_t FIRST = 0;
+  constexpr std::size_t SECOND = 1;
+  World wed = two_singles();
+  ASSERT_NE(wed.person(FIRST).sex, wed.person(SECOND).sex);
+  const std::uint64_t quiet = nights_until_wed(wed, FIRST);
+  ASSERT_EQ(wed.person(FIRST).spouses, std::vector<std::size_t>{SECOND});
+  // Control: the nights before it, with no marriage, found none.
+  EXPECT_GT(quiet, 0U);
+}
+
+TEST(World, ADeathAwayFindsItsSpousesLodgingAgain) {
+  // The second smith serves in an ally's army in the south-east corner, where
+  // a foe beside it, out of the village's sight, strikes down whoever comes
+  // within 5 cells.
+  constexpr std::size_t ALLY_ARMY = 2;
+  constexpr Cell BESIDE_THE_ALLY{39, 23};
+  constexpr std::int32_t KILLING_REACH = 5;
+  const Skill killing{KILLING_REACH * CELL_SIZE, 0, WHOLE, 0, 0};
+  const auto away = [&](const Skill& foe_skill) {
+    Daily daily;
+    daily.foe = BESIDE_THE_ALLY;
+    daily.foe_skills = {foe_skill};
+    daily.ally = ALLY_CORNER;
+    World world = daily_village(daily);
+    world.conscript(SECOND_SMITH, ALLY_ARMY);
+    return world;
+  };
+  World widowed = away(killing);
+  std::uint64_t before = 0;
+  for (std::uint64_t tick = 0;
+       tick < SCHEDULED_DAY && widowed.person(SECOND_SMITH).health > 0;
+       ++tick) {
+    before = widowed.schedule_fields().lodgings;
+    widowed.tick();
+  }
+  ASSERT_EQ(widowed.person(SECOND_SMITH).health, 0U);
+  ASSERT_GT(widowed.person(FIRST_SMITH).health, 0U);
+  // Her husband, left unwed in the village, may join his parents'
+  // household, so its lodging is found again in the tick she dies.
+  EXPECT_EQ(widowed.schedule_fields().lodgings, before + 1);
+  // Control: with a foe that strikes no one, she lives, and the same ticks
+  // find no lodging after the first.
+  World spared = away(IDLE);
+  spared.tick();
+  const std::uint64_t first = spared.schedule_fields().lodgings;
+  run_ticks(spared, widowed.tick_count() - spared.tick_count());
+  ASSERT_GT(spared.person(SECOND_SMITH).health, 0U);
+  EXPECT_EQ(spared.schedule_fields().lodgings, first);
+}
+
+TEST(World, AFollowerOutsideItsVillagesWindowWalksInByItsArmysField) {
+  // On a map 80 cells wide, a wall down column 50 leaves a gap in its bottom
+  // two rows only. A person of the residents' faction east of it is
+  // conscripted to the residents, whose village and its window lie west of
+  // the wall.
+  constexpr std::size_t WIDE = 80;
+  constexpr std::size_t WALL = 50;
+  constexpr std::size_t GAP_FROM = 22;
+  constexpr Cell EAST_OF_THE_WALL{70, 12};
+  constexpr std::size_t THE_RESIDENTS = 0;
+  constexpr std::uint64_t HALF_A_DAY = SCHEDULED_DAY / 2;
+  Daily daily;
+  daily.rows =
+      std::vector<std::string>(SCHEDULED_HEIGHT, std::string(WIDE, '.'));
+  for (std::size_t row = 0; row < GAP_FROM; ++row) {
+    daily.rows.at(row).at(WALL) = '#';
+  }
+  daily.ally = EAST_OF_THE_WALL;
+  World joined = daily_village(daily);
+  joined.conscript(INTRUDER, THE_RESIDENTS);
+  run_ticks(joined, HALF_A_DAY);
+  // Its army's field takes it round the wall through the gap, where a straight
+  // walk toward its spot would stop at the wall.
+  EXPECT_LT(cell_at(joined, INTRUDER).x, static_cast<std::int32_t>(WALL));
+  // Control: not conscripted, it holds east of the wall with its own army.
+  World apart = daily_village(daily);
+  run_ticks(apart, HALF_A_DAY);
+  EXPECT_GT(cell_at(apart, INTRUDER).x, static_cast<std::int32_t>(WALL));
+}
+
+// Ticks `world` until it holds more structures than `before`, for at most
+// `most` ticks.
+void run_until_laid(World& world, std::size_t before, std::uint64_t most) {
+  for (std::uint64_t tick = 0; tick < most && world.structure_count() == before;
+       ++tick) {
+    world.tick();
+  }
+}
+
+TEST(World, AStructureGivenToAVillageRebuildsItsFieldsInTheTickItIsLaid) {
+  // Its places as created: the square and four structures; and with the
+  // field the day's rules lay.
+  constexpr std::size_t PLACES = 5;
+  constexpr std::size_t WITH_THE_FIELD = 6;
+  Daily daily;
+  daily.builds = true;
+  World built = daily_village(daily);
+  run_ticks(built, SCHEDULED_DAY - 1);
+  ASSERT_EQ(built.schedule_fields().builds, PLACES);
+  const std::size_t before = built.structure_count();
+  run_until_laid(built, before, AN_HOUR);
+  ASSERT_EQ(built.structure_count(), before + 1);
+  // Built in the tick that laid it, which a blocking lay already makes long,
+  // rather than in a tick of their own.
+  EXPECT_EQ(built.schedule_fields().fields, WITH_THE_FIELD);
+  EXPECT_EQ(built.schedule_fields().builds, PLACES + WITH_THE_FIELD);
+  // Control: a village that lays nothing builds none again.
+  World kept = daily_village();
+  run_ticks(kept, SCHEDULED_DAY - 1 + AN_HOUR);
+  ASSERT_EQ(kept.structure_count(), before);
+  EXPECT_EQ(kept.schedule_fields().builds, PLACES);
+}
+
+// The schedule tests' village, at peace, beside a second village of the
+// other faction round `builder_centre` on a map 80 cells wide: one resident
+// and a house of its own, 3 cells south-east of its centre. Only the second
+// village's faction builds, laying a field 6 cells west and 3 south of its
+// centre at each day's rules. Each village's square is `square`.
+World beside_a_builder(Cell builder_centre,
+                       Footprint square = SCHEDULED_SQUARE) {
+  constexpr std::size_t WIDE = 80;
+  constexpr std::int32_t HOUSE_OFF = 3;
+  Life life = daily_life(Daily{});
+  Growth growth = life.growth.value_or(Growth{});
+  Holding harvest;
+  harvest.harvest = AMPLE_HARVEST;
+  growth.interval = 1;
+  growth.pressure = 0;
+  growth.plans = {Plan{"field", {2, 2}, false, harvest, Role::EDGE}};
+  growth.builds = {0};
+  growth.stances = {{}, {Expansion::BUILD}};
+  growth.tiers.at(0).square = square;
+  life.growth = growth;
+  Rules rules = peaceful(0);
+  rules.hostile = {{false, false}, {false, false}};
+  rules.ticks_per_day = SCHEDULED_DAY;
+  rules.sight = SCHEDULED_SIGHT;
+  const Skill touch{2 * CELL_SIZE, 0, 0, 0, NEVER_AGAIN};
+  std::vector<Recruit> residents;
+  residents.reserve(RESIDENTS_AT.size());
+  for (const Cell cell : RESIDENTS_AT) {
+    residents.push_back(Recruit{cell, WHOLE});
+  }
+  const std::vector<ArmySpec> armies{
+      ArmySpec{SCHEDULED_CENTRE, residents, 0, {touch}},
+      ArmySpec{builder_centre, {Recruit{builder_centre, WHOLE}}, 1, {touch}}};
+  Holding house;
+  house.housing = 2;
+  Holding roomy;
+  roomy.housing = 3;
+  std::vector<Structure> structures{SCHEDULED_STRUCTURES.begin(),
+                                    SCHEDULED_STRUCTURES.end()};
+  structures.push_back(
+      Structure{{builder_centre.x + HOUSE_OFF, builder_centre.y + HOUSE_OFF},
+                HOME_DURABILITY,
+                {2, 2},
+                true,
+                Role::HOME});
+  return World{
+      Seed{1},
+      Map{std::vector<std::string>(SCHEDULED_HEIGHT, std::string(WIDE, '.'))},
+      armies,
+      structures,
+      rules,
+      {VillageSpec{{0, 1, 2, 3},
+                   0,
+                   {house, roomy, {}, {}},
+                   1,
+                   {},
+                   {"house", "house", "smithy", "field"}},
+       VillageSpec{{4}, 1, {house}, 0, {}, {"house"}}},
+      {},
+      life};
+}
+
+TEST(World, AStructureLaidOnAnotherVillagesWindowRebuildsItsFields) {
+  // The first village's window ends at column 37. A builder round (43, 12)
+  // lays its field at (37, 15), on that window; one round (44, 12) at
+  // (38, 15), just past it.
+  constexpr std::size_t LAID = 5;
+  constexpr std::int32_t ON_THE_WINDOW = 37;
+  constexpr std::uint64_t FIRST_PLACES = 5;
+  constexpr std::uint64_t BUILDER_PLACES = 2;
+  constexpr Cell NEAR_CENTRE{43, 12};
+  constexpr Cell FAR_CENTRE{44, 12};
+  World near = beside_a_builder(NEAR_CENTRE);
+  const std::uint64_t made = near.schedule_fields().builds;
+  ASSERT_EQ(made, FIRST_PLACES + BUILDER_PLACES);
+  run_ticks(near, SCHEDULED_DAY + 1);
+  ASSERT_EQ(near.structure(LAID).cell.x, ON_THE_WINDOW);
+  // Both build again: the builder for its new place, the first village for
+  // the field on its window.
+  EXPECT_EQ(near.schedule_fields().builds,
+            made + FIRST_PLACES + BUILDER_PLACES + 1);
+  // Control: laid just past the window, only the builder builds again.
+  World far = beside_a_builder(FAR_CENTRE);
+  run_ticks(far, SCHEDULED_DAY + 1);
+  ASSERT_EQ(far.structure(LAID).cell.x, ON_THE_WINDOW + 1);
+  EXPECT_EQ(far.schedule_fields().builds, made + BUILDER_PLACES + 1);
+}
+
+TEST(World, AStructureGivenToAVillageOutsideItsWindowRebuildsItsFields) {
+  // With squares of one cell, a builder round (60, 12) has a window from
+  // column 56, and lays its field 6 cells west, outside it and far from the
+  // first village's window: no layout changes, but its places do.
+  constexpr std::size_t LAID = 5;
+  constexpr std::int32_t WINDOW_FROM = 56;
+  constexpr std::uint64_t BUILDER_PLACES = 2;
+  constexpr Cell BUILDER_CENTRE{60, 12};
+  World builder = beside_a_builder(BUILDER_CENTRE, {1, 1});
+  const std::uint64_t made = builder.schedule_fields().builds;
+  run_ticks(builder, SCHEDULED_DAY - 1);
+  // Control: before the lay, nothing builds again.
+  ASSERT_EQ(builder.schedule_fields().builds, made);
+  run_ticks(builder, 2);
+  ASSERT_LE(builder.structure(LAID).cell.x + 2, WINDOW_FROM);
+  EXPECT_EQ(builder.schedule_fields().builds, made + BUILDER_PLACES + 1);
+}
+
+TEST(World, APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule) {
+  // A person of the residents' faction, in an army of its own, stands in the
+  // south-east corner; the walk home takes it until 9.
+  constexpr std::size_t ALLY_ARMY = 1;
+  constexpr std::size_t NEWCOMER = 4;
+  constexpr std::uint64_t HOME_BY = 9;
+  Daily daily;
+  daily.ally = ALLY_CORNER;
+  World world = daily_village(daily);
+  run_ticks(world, AN_HOUR);
+  EXPECT_EQ(world.activity(NEWCOMER), Activity::IDLE);
+  world.conscript(NEWCOMER, RESIDENTS);
+  ASSERT_NE(world.roster(ALLY_ARMY).size(), 1U);
+  run_to(world, HOME_BY);
+  // With no occupation until the day's rules, it keeps the idle schedule at
+  // home, as a household of its own in the second house, which has room for
+  // a third.
+  EXPECT_EQ(world.activity(NEWCOMER), Activity::AT_HOME);
+  EXPECT_LE(cells_apart(cell_at(world, NEWCOMER), door_of(SECOND_HOUSE)), 1);
 }
 
 }  // namespace

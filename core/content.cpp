@@ -736,6 +736,10 @@ void read_life(Reader& reader, Built& built, const Context& context) {
     occupations.working_age = inner.number<std::uint32_t>("working_age", 0, 0U);
     occupations.fallback = inner.reference("fallback", "occupations");
     occupations.idle = read_bands(inner, "idle");
+    inner.object("waking", false, [&occupations](Reader& hours) {
+      occupations.waking.from = hours.number<std::uint32_t>("from", 0);
+      occupations.waking.to = hours.number<std::uint32_t>("to", 0);
+    });
     life.occupations = occupations;
   });
   reader.object("trade", true, [&life](Reader& inner) {

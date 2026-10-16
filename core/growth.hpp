@@ -9,6 +9,7 @@
 #include "limits.hpp"
 #include "map.hpp"
 #include "village.hpp"
+#include "village_fields.hpp"
 
 namespace murim {
 
@@ -89,11 +90,17 @@ struct Growth {
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
 };
 
+/// Returns the cells a village keeps round its centre by `growth`'s tiers:
+/// each tier's square, and its vicinity, within which every structure it
+/// lays lies.
+[[nodiscard]] Kept kept_by(const Growth& growth);
+
 /// Throws std::invalid_argument when `growth` checks at no interval, presses
 /// above PER_MILLE, reaches outside [0, MAX_REACH], raises terraces at no
 /// labour, has no tiers, a first tier past no one, tiers out of order or a
-/// square of no cell, names a plan it does not have, or names among a tier's
-/// `square_kinds` a plan whose role is not the square.
+/// square of no cell, keeps by its tiers more than a village's window holds
+/// (VillageFields::holds), names a plan it does not have, or names among a
+/// tier's `square_kinds` a plan whose role is not the square.
 void check_growth(const Growth& growth);
 
 /// Returns the index of the last of `growth`'s tiers that `residents` reach.
