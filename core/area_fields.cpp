@@ -72,9 +72,10 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
   return slot;
 }
 
-std::vector<FieldSeed> AreaFields::seeds(const Map& map,
-                                         const CoarseGraph& graph,
-                                         std::size_t area, Cell objective) {
+const std::vector<FieldSeed>& AreaFields::seeds(const Map& map,
+                                                const CoarseGraph& graph,
+                                                std::size_t area,
+                                                Cell objective) {
   scratch_.clear();
   if (graph.area_of(objective) == area) {
     scratch_.push_back(FieldSeed{objective, 0});
