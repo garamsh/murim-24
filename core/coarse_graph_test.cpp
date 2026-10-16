@@ -240,5 +240,109 @@ TEST(CoarseGraph, AnExitLinksToTheFarNodeWhoseExitLeadsBack) {
   }
 }
 
+// A map of 2 by 2 regions, each cell blocked with DENSE / 4 chances in 100,
+// drawn from `seed`.
+constexpr std::int32_t REGIONS_SIDE = 512;
+constexpr std::uint64_t REGIONS_SEED = 11;
+constexpr int OBJECTIVES = 3;
+// The exits drawn for each objective.
+constexpr int EXITS = 40;
+
+std::vector<std::string> regions_rows(std::uint64_t seed) {
+  constexpr std::int32_t HUNDRED = 100;
+  Random random{seed};
+  std::vector<std::string> rows(static_cast<std::size_t>(REGIONS_SIDE),
+                                std::string(REGIONS_SIDE, '.'));
+  for (std::string& row : rows) {
+    for (char& cell : row) {
+      cell = random.below(HUNDRED) < DENSE / 4 ? '#' : '.';
+    }
+  }
+  return rows;
+}
+
+TEST(CoarseGraph, ASearchByRegionsCostsExitsAsTheAreasAloneDo) {
+  constexpr std::int32_t REGION_SIDE = REGION_AREAS * 32;
+  for (std::uint64_t seed = REGIONS_SEED; seed < REGIONS_SEED + 2; ++seed) {
+    const Map map{regions_rows(seed)};
+    const CoarseGraph graph{map};
+    Random draws{seed + PAIR_DRAWS};
+    for (int each = 0; each < OBJECTIVES; ++each) {
+      const Cell objective = passable_cell(map, draws);
+      GoalSearch search = graph.toward(map, objective);
+      std::size_t reached = 0;
+      std::size_t elsewhere = 0;
+      const auto areas =
+          static_cast<std::int32_t>((REGIONS_SIDE / 32) * (REGIONS_SIDE / 32));
+      for (int drawn = 0; drawn < EXITS; ++drawn) {
+        const auto area = static_cast<std::size_t>(draws.below(areas));
+        const std::vector<CoarseExit>& exits = graph.exits(area);
+        if (exits.empty()) {
+          continue;
+        }
+        const CoarseExit& exit = exits.at(static_cast<std::size_t>(
+            draws.below(static_cast<std::int32_t>(exits.size()))));
+        const NodeRef far{exit.area, exit.far_node};
+        const std::optional<CoarseCost> by_areas =
+            graph.cost_over_areas(map, objective, far);
+        EXPECT_EQ(graph.cost_from(search, far), by_areas)
+            << seed << " " << area << " " << exit.far_node;
+        const Cell cell = graph.node(far).cell;
+        reached += by_areas ? 1 : 0;
+        elsewhere +=
+            by_areas && (cell.x / REGION_SIDE != objective.x / REGION_SIDE ||
+                         cell.y / REGION_SIDE != objective.y / REGION_SIDE)
+                ? 1
+                : 0;
+      }
+      // Setup: exits in another region than the objective's reach it.
+      ASSERT_GT(reached, 0U);
+      ASSERT_GT(elsewhere, 0U);
+    }
+  }
+}
+
+TEST(CoarseGraph, ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay) {
+  // Two regions side by side; a wall across the western one parts its upper
+  // rows from its lower, so a node below the wall reaches an objective above
+  // it only through the eastern region, which is open.
+  constexpr std::int32_t WIDE = 512;
+  constexpr std::int32_t HIGH = 256;
+  constexpr std::int32_t REGION_SIDE = 256;
+  constexpr std::int32_t WALL = 40;
+  std::vector<std::string> rows(HIGH, std::string(WIDE, '.'));
+  for (std::int32_t col = 0; col < REGION_SIDE; ++col) {
+    rows.at(WALL).at(static_cast<std::size_t>(col)) = '#';
+  }
+  const Map map{rows};
+  const CoarseGraph graph{map};
+  const Cell objective{240, 10};
+  // A node below the wall in the western region: the far side of an exit
+  // from the area holding (240, 100) into its western neighbour.
+  const std::size_t area = graph.area_of(Cell{240, 100});
+  std::optional<NodeRef> below;
+  for (const CoarseExit& exit : graph.exits(area)) {
+    if (exit.area + 1 == area) {
+      below = NodeRef{exit.area, exit.far_node};
+    }
+  }
+  ASSERT_TRUE(below.has_value());
+  const NodeRef from = below.value_or(NodeRef{0, 0});
+  GoalSearch search = graph.toward(map, objective);
+  const std::optional<CoarseCost> by_areas =
+      graph.cost_over_areas(map, objective, from);
+  ASSERT_TRUE(by_areas.has_value());
+  EXPECT_EQ(graph.cost_from(search, from), by_areas);
+  // Control: within the western region alone, no walk joins them.
+  std::vector<std::string> western;
+  for (const std::string& row : rows) {
+    western.push_back(row.substr(0, REGION_SIDE));
+  }
+  const Map alone{western};
+  const CoarseGraph alone_graph{alone};
+  EXPECT_FALSE(
+      alone_graph.joined(alone, Walk{graph.node(from).cell, objective}));
+}
+
 }  // namespace
 }  // namespace murim

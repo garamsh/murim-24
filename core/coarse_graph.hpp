@@ -6,7 +6,6 @@
 #include <map>
 #include <optional>
 #include <queue>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -59,16 +58,24 @@ struct Walk {
   Cell to;
 };
 
-/// A search outward from an objective over the coarse graph's level of areas,
-/// kept between queries: what it has settled, and what it would settle next.
+/// A search outward from an objective over the coarse graph, kept between
+/// queries (ADR 0043): the objective's region's nodes at their cost within
+/// it; the regions' border nodes, settled outward from that region's border
+/// over the level of regions as far as a query needed, and what it would
+/// settle next; and, for each region a query was in, each node's cost to the
+/// objective. Nodes are keyed by their area and their index in it.
 struct GoalSearch {
-  std::map<std::pair<std::size_t, std::size_t>, CoarseCost> cost;
-  std::set<std::pair<std::size_t, std::size_t>> settled;
-  std::priority_queue<
-      std::pair<CoarseCost, std::pair<std::size_t, std::size_t>>,
-      std::vector<std::pair<CoarseCost, std::pair<std::size_t, std::size_t>>>,
-      std::greater<>>
+  std::size_t region = 0;
+  std::map<std::pair<std::size_t, std::size_t>, CoarseCost> near;
+  std::vector<CoarseCost> border;
+  std::vector<bool> settled;
+  std::priority_queue<std::pair<CoarseCost, std::size_t>,
+                      std::vector<std::pair<CoarseCost, std::size_t>>,
+                      std::greater<>>
       frontier;
+  std::map<std::size_t,
+           std::map<std::pair<std::size_t, std::size_t>, CoarseCost>>
+      regions;
 };
 
 /// The coarse graph of a map (ADR 0043, ADR 0070): each area's passable cells
@@ -102,12 +109,18 @@ class CoarseGraph {
   /// their cost to it.
   [[nodiscard]] GoalSearch toward(const Map& map, Cell objective) const;
 
-  /// Returns the cost of the shortest walk over the areas from node `from` to
+  /// Returns the cost of the shortest walk over the graph from node `from` to
   /// the objective `search` was started toward, settling only as far as it
   /// must; nothing when none joins them. The answer depends on the graph and
   /// the objective alone, however far `search` had gone.
   [[nodiscard]] std::optional<CoarseCost> cost_from(GoalSearch& search,
                                                     NodeRef from) const;
+  /// Returns the cost of the shortest walk over the areas alone from node
+  /// `from` to `objective`, by a search outward from it: the reference
+  /// cost_from() must equal, and its control in the bench.
+  [[nodiscard]] std::optional<CoarseCost> cost_over_areas(const Map& map,
+                                                          Cell objective,
+                                                          NodeRef from) const;
 
   /// Returns the cost of the shortest walk the graph finds between `walk`'s
   /// passable ends, over the regions when `by_regions` and over the areas
@@ -154,6 +167,7 @@ class CoarseGraph {
   [[nodiscard]] NodeRef ref_of(std::size_t id) const;
   [[nodiscard]] std::size_t border_id(NodeRef ref) const;
   [[nodiscard]] NodeRef border_ref(std::size_t id) const;
+  void settle_borders(GoalSearch& search, std::size_t region) const;
   [[nodiscard]] std::size_t region_of_area(std::size_t area) const;
   [[nodiscard]] std::vector<std::size_t> region_areas(std::size_t region) const;
   [[nodiscard]] std::vector<std::size_t> sets_of(const Map& map,

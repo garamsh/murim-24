@@ -166,7 +166,13 @@ std::vector<std::size_t> AreaFields::searched() const {
   std::vector<std::size_t> sizes;
   sizes.reserve(searches_.size());
   for (const auto& [objective, held] : searches_) {
-    sizes.push_back(held.search.cost.size());
+    std::size_t costed = held.search.near.size();
+    costed += static_cast<std::size_t>(std::count(
+        held.search.settled.begin(), held.search.settled.end(), true));
+    for (const auto& [region, costs] : held.search.regions) {
+      costed += costs.size();
+    }
+    sizes.push_back(costed);
   }
   return sizes;
 }

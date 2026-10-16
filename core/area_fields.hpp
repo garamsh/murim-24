@@ -50,7 +50,8 @@ class AreaFields {
   [[nodiscard]] std::size_t built_in_all() const;
 
   /// How many nodes each held search toward an objective has costed, by
-  /// objective.
+  /// objective: those of its objective's region, the border nodes it settled
+  /// and those of each region it costed.
   [[nodiscard]] std::vector<std::size_t> searched() const;
 
  private:
