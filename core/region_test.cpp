@@ -716,6 +716,84 @@ TEST(Region, EveryPeopledVillageHasAMerchantFromTheStart) {
   EXPECT_NE(std::find(sold.begin(), sold.end(), 0), sold.end());
 }
 
+// Of the villages laid from one template: how many there are, how many have
+// a temple and an inn, how many have an adult, and how many an innkeeper.
+struct Tally {
+  std::size_t villages = 0;
+  std::size_t temples = 0;
+  std::size_t inns = 0;
+  std::size_t adults = 0;
+  std::size_t innkeepers = 0;
+};
+
+// The tally of `region`'s villages of template `kind`, from their staffing
+// `staffed` for the innkeeper.
+Tally tally(const Region& region, const std::vector<Staffed>& staffed,
+            const std::string& kind) {
+  Tally counted;
+  for (std::size_t village = 0; village < region.villages.size(); ++village) {
+    const Village& laid = region.villages.at(village);
+    if (laid.kind != kind) {
+      continue;
+    }
+    const auto has = [&region, &laid](const std::string& structure_kind) {
+      return std::any_of(laid.structures.begin(), laid.structures.end(),
+                         [&](std::size_t structure) {
+                           return region.structure_kinds.at(structure) ==
+                                  structure_kind;
+                         });
+    };
+    ++counted.villages;
+    counted.temples += has("temple") ? 1U : 0U;
+    counted.inns += has("inn") ? 1U : 0U;
+    counted.adults += staffed.at(village).adult ? 1U : 0U;
+    counted.innkeepers += staffed.at(village).holding ? 1U : 0U;
+  }
+  return counted;
+}
+
+TEST(Region, OnlyTheVillageTemplateStartsWithATempleAndAnInnKeeper) {
+  const Region region = generate_region(SEED, base_data());
+  const World world = world_of(region);
+  const Occupations occupations =
+      region.life.occupations.value_or(Occupations{});
+  const std::size_t innkeeper = occupation_named(occupations, "innkeeper");
+  ASSERT_LT(innkeeper, occupations.list.size());
+  const std::vector<Staffed> staffed =
+      staffing(world, region, occupations, innkeeper);
+  const Tally villages = tally(region, staffed, "village");
+  const Tally hamlets = tally(region, staffed, "hamlet");
+  // Setup: both templates are laid, with adults in each.
+  ASSERT_GT(villages.adults, 0U);
+  ASSERT_GT(hamlets.adults, 0U);
+  EXPECT_EQ(villages.temples, villages.villages);
+  EXPECT_EQ(villages.inns, villages.villages);
+  EXPECT_EQ(villages.innkeepers, villages.adults);
+  // Control: a hamlet has neither, so its adults hold no innkeeper's place.
+  EXPECT_EQ(hamlets.temples, 0U);
+  EXPECT_EQ(hamlets.inns, 0U);
+  EXPECT_EQ(hamlets.innkeepers, 0U);
+}
+
+TEST(Region, TheBasePacksTempleTakesTwoMonksBeforeTheFields) {
+  const Occupations occupations =
+      base_data().life.occupations.value_or(Occupations{});
+  const std::vector<Candidate> adults(4, Candidate{true, std::nullopt});
+  const auto named = [&occupations](const std::string& name) {
+    return std::optional<std::size_t>{occupation_named(occupations, name)};
+  };
+  // A village of four with an inn, a temple and a field fills the temple
+  // before the field; without the temple, the field takes the two.
+  EXPECT_EQ(assign(occupations, adults, {"inn", "temple", "field"}),
+            (std::vector<std::optional<std::size_t>>{
+                named("merchant"), named("innkeeper"), named("monk"),
+                named("monk")}));
+  EXPECT_EQ(assign(occupations, adults, {"inn", "field"}),
+            (std::vector<std::optional<std::size_t>>{
+                named("merchant"), named("innkeeper"), named("farmer"),
+                named("farmer")}));
+}
+
 TEST(Region, AVillageIsNamedForItsKindAndNumber) {
   EXPECT_EQ(village_name("hamlet", 0), "hamlet 1");
   EXPECT_EQ(village_name("village", 11), "village 12");
