@@ -2759,6 +2759,8 @@ void World::set_profile(std::optional<Profile> profile) { profile_ = profile; }
 
 const Areas& World::areas() const { return areas_; }
 
+const AreaFields& World::fields() const { return fields_; }
+
 std::optional<FarAnchor> World::far(std::size_t army) const {
   const auto* anchor = std::get_if<FarAnchor>(&armies_.at(army).course);
   return anchor != nullptr ? std::optional<FarAnchor>{*anchor} : std::nullopt;
