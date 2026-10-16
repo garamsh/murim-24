@@ -78,6 +78,12 @@ struct GoalSearch {
       regions;
 };
 
+/// How a graph costs the walks between an area's nodes: in closed form, as
+/// the octile cost, where the area has no blocked cell, and by a search over
+/// its cells elsewhere; or by the search everywhere, the closed form's
+/// reference.
+enum class AreaCosts : std::uint8_t { CLOSED_FORM_WHEN_OPEN, SEARCHED };
+
 /// The coarse graph of a map (ADR 0043, ADR 0070): each area's passable cells
 /// labelled into components, a node on either side of each entrance along
 /// the areas' shared borders, edges joining the nodes of one component at
@@ -96,8 +102,9 @@ class CoarseGraph {
     CoarseCost cost;
   };
   // An area's components, each cell's component when it has more than one,
-  // nodes, the edges among its nodes, its exits, and each node's index among
-  // its region's border nodes, if it is one.
+  // nodes, the edges among its nodes, its exits, each node's index among its
+  // region's border nodes, if it is one, and whether it was costed in closed
+  // form for having no blocked cell.
   struct AreaGraph {
     std::uint16_t components = 0;
     std::vector<std::int16_t> labels;
@@ -105,6 +112,7 @@ class CoarseGraph {
     std::vector<std::vector<Edge>> within;
     std::vector<CoarseExit> exits;
     std::vector<std::int32_t> border;
+    bool open = false;
   };
   // A region's border nodes and the shortest walks among them within it.
   struct RegionGraph {
@@ -122,7 +130,8 @@ class CoarseGraph {
         components_;
   };
 
-  explicit CoarseGraph(const Map& map);
+  explicit CoarseGraph(const Map& map,
+                       AreaCosts costs = AreaCosts::CLOSED_FORM_WHEN_OPEN);
 
   /// Rebuilds the areas holding `cells`, and their neighbours' entrances
   /// toward them, after the map changed there, and the regions holding them,
@@ -134,7 +143,8 @@ class CoarseGraph {
   /// Puts back what the rebuild that returned `undo` replaced, the last made.
   void revert(Undo undo);
 
-  /// Whether two graphs hold the same areas, regions and joined components.
+  /// Whether two graphs hold the same areas, regions and joined components,
+  /// however their areas were costed.
   [[nodiscard]] bool operator==(const CoarseGraph& other) const;
 
   /// Returns the component of `cell`'s area that the passable cell `cell`
@@ -155,6 +165,7 @@ class CoarseGraph {
   /// the objective alone, however far `search` had gone.
   [[nodiscard]] std::optional<CoarseCost> cost_from(GoalSearch& search,
                                                     NodeRef from) const;
+
   /// Returns the cost of the shortest walk over the areas alone from node
   /// `from` to `objective`, by a search outward from it: the reference
   /// cost_from() must equal, and its control in the bench.
@@ -182,6 +193,7 @@ class CoarseGraph {
   void build_region(std::size_t region);
   void join_components();
   void number();
+  [[nodiscard]] bool open_area(const Map& map, std::size_t area) const;
   [[nodiscard]] std::size_t id_of(NodeRef ref) const;
   [[nodiscard]] NodeRef ref_of(std::size_t id) const;
   [[nodiscard]] std::size_t border_id(NodeRef ref) const;
@@ -220,6 +232,7 @@ class CoarseGraph {
   [[nodiscard]] Cell area_corner(std::size_t area) const;
   [[nodiscard]] Footprint area_size(std::size_t area) const;
 
+  AreaCosts costs_;
   std::int32_t width_;
   std::int32_t height_;
   std::int32_t columns_;
