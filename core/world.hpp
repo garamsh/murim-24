@@ -383,6 +383,10 @@ class World {
   /// Returns person `person`'s age in whole years of the calendar.
   [[nodiscard]] std::int64_t age_in_years(std::size_t person) const;
 
+  /// Returns the army whose roster holds person `person`, if one does; the
+  /// dead serve in none.
+  [[nodiscard]] std::optional<std::size_t> army_of(std::size_t person) const;
+
   /// Returns the faction of the army person `person` serves in, if it
   /// serves in one; the dead serve in none.
   [[nodiscard]] std::optional<std::size_t> faction_of(std::size_t person) const;
@@ -803,8 +807,13 @@ class World {
                                         std::optional<std::size_t> army,
                                         const Cast& cast,
                                         std::uint64_t due) const;
-  /// The army person `person` serves in, if it serves in one.
-  [[nodiscard]] std::optional<std::size_t> army_of(std::size_t person) const;
+  [[nodiscard]] std::size_t army_serving(std::size_t person) const;
+  // The only writers of the rosters, each keeping serving_ with them.
+  void enrol(std::size_t person, std::size_t army);
+  void strike_off(std::size_t person);
+  void strike_off_dead();
+  void refit(std::size_t army, Army refitted);
+  void index_rosters();
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] Challenging challenging(std::size_t army) const;
   void enlist(ArmySpec& army, std::size_t pairs, std::size_t& families);
@@ -814,11 +823,9 @@ class World {
   void keep_sects();
   void elect(std::size_t faction);
   void hold_elections(std::uint64_t day);
-  /// The living, in index order, and the army each living person serves in,
-  /// by person index.
+  /// The living, in index order.
   struct Living {
     std::vector<std::size_t> people;
-    std::vector<std::size_t> army_of;
   };
   [[nodiscard]] Living living_people() const;
   /// What admission reads of a sect, counted once for many applicants.
@@ -860,13 +867,9 @@ class World {
   void tend();
   void assign_occupations();
   [[nodiscard]] std::vector<std::size_t> homes() const;
-  /// A person unfed too long, and the army it serves in.
-  struct Unfed {
-    std::size_t person;
-    std::size_t army;
-  };
-  void migrate_or_starve(Unfed unfed, std::int32_t reach,
-                         std::vector<std::size_t>& population);
+  void migrate_or_starve(std::size_t person,
+                         std::vector<std::size_t>& population,
+                         std::int32_t reach);
   [[nodiscard]] bool may_bear(std::size_t mother, const Kinship& kinship) const;
   [[nodiscard]] std::optional<Sex> scarcer_sex(std::size_t village,
                                                const Kinship& kinship) const;
@@ -877,8 +880,7 @@ class World {
   [[nodiscard]] VillageMemory memory_of(std::size_t village) const;
   void marry(std::size_t person, const std::vector<std::size_t>& living,
              const Kinship& kinship);
-  void bear_child(std::size_t mother, std::vector<std::size_t>& army_of,
-                  const Kinship& kinship);
+  void bear_child(std::size_t mother, const Kinship& kinship);
   /// A person who died carrying a soul, and the army it served in.
   struct Passing {
     std::size_t dead;
@@ -990,6 +992,10 @@ class World {
     Cell cell{};
     std::size_t person = 0;
   };
+  // The army whose roster holds each person, by person index, or none: set
+  // by the rosters' writers and rebuilt from the rosters on restore; neither
+  // saved nor hashed.
+  std::vector<std::optional<std::size_t>> serving_;
   // The sellers of the ware being shopped for, by row, column and index,
   // kept so a day allocates none; neither saved nor hashed.
   std::vector<Seller> sellers_;
