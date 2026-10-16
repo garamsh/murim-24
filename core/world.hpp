@@ -955,7 +955,7 @@ class World {
   [[nodiscard]] Clearing square(std::size_t village) const;
   [[nodiscard]] std::vector<Structure> homes(std::size_t village) const;
   [[nodiscard]] std::vector<Passing> passings() const;
-  [[nodiscard]] std::vector<std::size_t> fields_of(const Crowd& crowd);
+  [[nodiscard]] const std::vector<std::size_t>& fields_of(const Crowd& crowd);
   void steer(const Crowd& crowd, const std::vector<std::size_t>& fields,
              const std::vector<Closing>& closings, std::vector<Step>& pulls,
              std::vector<bool>& standing,
@@ -978,6 +978,9 @@ class World {
   // derived from both; neither is saved.
   CoarseGraph graph_;
   AreaFields fields_;
+  // Each person's field in the tick's crowd, by crowd index: scratch, reused
+  // across ticks, not saved.
+  std::vector<std::size_t> crowd_fields_;
   Rules rules_;
   std::vector<Person> people_;
   std::vector<Army> armies_;

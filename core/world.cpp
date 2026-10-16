@@ -2316,7 +2316,7 @@ void World::tick() {
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
   std::vector<std::size_t> seeking(crowd.people.size(), ABSENT);
-  const std::vector<std::size_t> fields = fields_of(crowd);
+  const std::vector<std::size_t>& fields = fields_of(crowd);
   steer(crowd, fields, closings, pulls, standing, seeking);
   // A far army holds no field, so it does not march.
   for (std::size_t army = 0; army < armies_.size(); ++army) {
@@ -2357,9 +2357,11 @@ void World::tick() {
 }
 
 // The field each person of `crowd` steps by, by its index in the crowd: its
-// area's, toward its army's objective.
-std::vector<std::size_t> World::fields_of(const Crowd& crowd) {
-  std::vector<std::size_t> fields(crowd.people.size(), 0);
+// area's, toward its army's objective. The list is held between ticks so a
+// tick of no more people than the last allocates nothing for it.
+const std::vector<std::size_t>& World::fields_of(const Crowd& crowd) {
+  std::vector<std::size_t>& fields = crowd_fields_;
+  fields.assign(crowd.people.size(), 0);
   // People of one army stand mostly in one area, so the field the last
   // person was given is looked up again only when the area or objective
   // changes.
