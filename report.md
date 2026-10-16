@@ -15,3 +15,6 @@ Evidence for the content PR from `feat/temple-inn`. The head is `e42cb66f`, on m
 - `logs/sweep-main-d60c33d2.md` and `logs/sweep-head-e42cb66f.md`: `make sweep` over seeds 0 to 199 for 100 years.
   - Main ran the commands behind `make sweep` in its scratch worktree.
   - The head ran `make sweep FIRST_SEED=0 LAST_SEED=199 YEARS=100`.
+- `logs/sweep-main-fe0b2c96.md` and `logs/sweep-head-a7855632.md`: the same sweep, re-run on 2026-10-17 after the branch was rebased onto main `fe0b2c96` (#388, which changes how a raid band picks its target).
+  - Both binaries are `murim_core_sweep`, built as `make sweep` builds it: CMake Release with the macOS SDK. Main was built in a scratch worktree of `fe0b2c96` and the head in the branch's worktree at `a7855632`.
+  - Each ran `murim_core_sweep 0 199 100`. The two ran side by side; the seeds fix their results.
