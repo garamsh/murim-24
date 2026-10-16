@@ -53,7 +53,7 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
   // diagonal step included, lies within the window, so it is read once.
   passable_.assign(cells, false);
   for (std::size_t slot = 0; slot < cells; ++slot) {
-    passable_[slot] = map.passable(cell_at(slot));
+    passable_.at(slot) = map.passable(cell_at(slot));
   }
   // A heap ordered as std::priority_queue orders one with std::greater.
   frontier_.clear();
@@ -93,11 +93,11 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
   seeded_.assign(cells, false);
   for (const FieldSeed& seed : seeds) {
     if (inside(seed.cell)) {
-      seeded_[index(seed.cell)] = costs_.at(index(seed.cell)) == seed.cost;
+      seeded_.at(index(seed.cell)) = costs_.at(index(seed.cell)) == seed.cost;
     }
   }
   for (std::size_t slot = 0; slot < steps_.size(); ++slot) {
-    if (costs_.at(slot) != UNREACHABLE && !seeded_[slot]) {
+    if (costs_.at(slot) != UNREACHABLE && !seeded_.at(slot)) {
       steps_.at(slot) = straightest(cell_at(slot), aim);
     }
   }
@@ -108,9 +108,10 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
 // cells, and both must be passable.
 bool FlowField::opens(Cell cell, Step direction) const {
   const Cell next{cell.x + direction.x, cell.y + direction.y};
-  return passable_[index(next)] && (direction.x == 0 || direction.y == 0 ||
-                                    (passable_[index(Cell{next.x, cell.y})] &&
-                                     passable_[index(Cell{cell.x, next.y})]));
+  return passable_.at(index(next)) &&
+         (direction.x == 0 || direction.y == 0 ||
+          (passable_.at(index(Cell{next.x, cell.y})) &&
+           passable_.at(index(Cell{cell.x, next.y}))));
 }
 
 Step FlowField::step(Cell cell) const {

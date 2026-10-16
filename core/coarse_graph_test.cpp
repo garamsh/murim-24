@@ -199,6 +199,35 @@ TEST(CoarseGraph, ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers) {
   EXPECT_TRUE(graph.joined(map, Walk{west, Cell{SPLIT, ROW + 5}}));
 }
 
+// The nodes of area `area` lying at `cell`.
+std::vector<std::size_t> nodes_at(const CoarseGraph& graph, std::size_t area,
+                                  Cell cell) {
+  std::vector<std::size_t> found;
+  for (const CoarseExit& exit : graph.exits(area)) {
+    const Cell node = graph.node(NodeRef{area, exit.node}).cell;
+    if (node.x == cell.x && node.y == cell.y) {
+      found.push_back(exit.node);
+    }
+  }
+  return found;
+}
+
+// Whether every entrance of area `from` into area `into` names a node of
+// `into` whose exit leads back to `from`.
+bool links_back(const CoarseGraph& graph, std::size_t from, std::size_t into) {
+  const std::vector<CoarseExit>& back = graph.exits(into);
+  for (const CoarseExit& exit : graph.exits(from)) {
+    const bool leads_back =
+        std::any_of(back.begin(), back.end(), [&](const CoarseExit& other) {
+          return other.node == exit.far_node && other.area == from;
+        });
+    if (exit.area == into && !leads_back) {
+      return false;
+    }
+  }
+  return true;
+}
+
 TEST(CoarseGraph, AnExitLinksToTheFarNodeWhoseExitLeadsBack) {
   // A map of 2 by 2 areas. The south-eastern area's corner cell (32, 32) is
   // the only cell open across its top border and across its left one, so it
@@ -213,32 +242,14 @@ TEST(CoarseGraph, AnExitLinksToTheFarNodeWhoseExitLeadsBack) {
   const Map map{rows};
   const CoarseGraph graph{map};
   const std::size_t corner_area = graph.area_of(Cell{CORNER, CORNER});
-  const std::size_t west = graph.area_of(Cell{0, CORNER});
-  const std::size_t north = graph.area_of(Cell{CORNER, 0});
-  // Setup: the corner area holds two nodes at the corner cell, one leading
-  // north and one west.
-  std::vector<std::size_t> at_corner;
-  for (const CoarseExit& exit : graph.exits(corner_area)) {
-    const Cell cell = graph.node(NodeRef{corner_area, exit.node}).cell;
-    if (cell.x == CORNER && cell.y == CORNER) {
-      at_corner.push_back(exit.node);
-    }
-  }
+  // Setup: the corner area holds two nodes at the corner cell.
+  const std::vector<std::size_t> at_corner =
+      nodes_at(graph, corner_area, Cell{CORNER, CORNER});
   ASSERT_EQ(at_corner.size(), 2U);
   ASSERT_NE(at_corner.front(), at_corner.back());
   // Each neighbour's entrance names the node whose exit leads back to it.
-  for (const std::size_t neighbour : {west, north}) {
-    for (const CoarseExit& exit : graph.exits(neighbour)) {
-      if (exit.area != corner_area) {
-        continue;
-      }
-      bool back = false;
-      for (const CoarseExit& other : graph.exits(corner_area)) {
-        back = back || (other.node == exit.far_node && other.area == neighbour);
-      }
-      EXPECT_TRUE(back) << neighbour;
-    }
-  }
+  EXPECT_TRUE(links_back(graph, graph.area_of(Cell{0, CORNER}), corner_area));
+  EXPECT_TRUE(links_back(graph, graph.area_of(Cell{CORNER, 0}), corner_area));
 }
 
 // A map of 2 by 2 regions, each cell blocked with DENSE / 4 chances in 100,
@@ -262,43 +273,58 @@ std::vector<std::string> regions_rows(std::uint64_t seed) {
   return rows;
 }
 
-TEST(CoarseGraph, ASearchByRegionsCostsExitsAsTheAreasAloneDo) {
+// Over EXITS exits drawn from `draws`, how many reach `objective` over the
+// areas alone and how many of those lie in another region than its; each
+// drawn exit's cost by regions is checked against the areas' alone.
+struct Drawn {
+  std::size_t reached = 0;
+  std::size_t elsewhere = 0;
+};
+
+Drawn compare_exits(const Map& map, const CoarseGraph& graph, Cell objective,
+                    Random& draws) {
   constexpr std::int32_t REGION_SIDE = REGION_AREAS * 32;
+  const auto areas =
+      static_cast<std::int32_t>((REGIONS_SIDE / 32) * (REGIONS_SIDE / 32));
+  GoalSearch search = graph.toward(map, objective);
+  Drawn drawn;
+  for (int each = 0; each < EXITS; ++each) {
+    const auto area = static_cast<std::size_t>(draws.below(areas));
+    const std::vector<CoarseExit>& exits = graph.exits(area);
+    if (exits.empty()) {
+      continue;
+    }
+    const CoarseExit& exit = exits.at(static_cast<std::size_t>(
+        draws.below(static_cast<std::int32_t>(exits.size()))));
+    const NodeRef far{exit.area, exit.far_node};
+    const std::optional<CoarseCost> by_areas =
+        graph.cost_over_areas(map, objective, far);
+    EXPECT_EQ(graph.cost_from(search, far), by_areas)
+        << area << " " << exit.far_node;
+    if (!by_areas) {
+      continue;
+    }
+    const Cell cell = graph.node(far).cell;
+    ++drawn.reached;
+    drawn.elsewhere += cell.x / REGION_SIDE != objective.x / REGION_SIDE ||
+                               cell.y / REGION_SIDE != objective.y / REGION_SIDE
+                           ? 1
+                           : 0;
+  }
+  return drawn;
+}
+
+TEST(CoarseGraph, ASearchByRegionsCostsExitsAsTheAreasAloneDo) {
   for (std::uint64_t seed = REGIONS_SEED; seed < REGIONS_SEED + 2; ++seed) {
     const Map map{regions_rows(seed)};
     const CoarseGraph graph{map};
     Random draws{seed + PAIR_DRAWS};
     for (int each = 0; each < OBJECTIVES; ++each) {
-      const Cell objective = passable_cell(map, draws);
-      GoalSearch search = graph.toward(map, objective);
-      std::size_t reached = 0;
-      std::size_t elsewhere = 0;
-      const auto areas =
-          static_cast<std::int32_t>((REGIONS_SIDE / 32) * (REGIONS_SIDE / 32));
-      for (int drawn = 0; drawn < EXITS; ++drawn) {
-        const auto area = static_cast<std::size_t>(draws.below(areas));
-        const std::vector<CoarseExit>& exits = graph.exits(area);
-        if (exits.empty()) {
-          continue;
-        }
-        const CoarseExit& exit = exits.at(static_cast<std::size_t>(
-            draws.below(static_cast<std::int32_t>(exits.size()))));
-        const NodeRef far{exit.area, exit.far_node};
-        const std::optional<CoarseCost> by_areas =
-            graph.cost_over_areas(map, objective, far);
-        EXPECT_EQ(graph.cost_from(search, far), by_areas)
-            << seed << " " << area << " " << exit.far_node;
-        const Cell cell = graph.node(far).cell;
-        reached += by_areas ? 1 : 0;
-        elsewhere +=
-            by_areas && (cell.x / REGION_SIDE != objective.x / REGION_SIDE ||
-                         cell.y / REGION_SIDE != objective.y / REGION_SIDE)
-                ? 1
-                : 0;
-      }
+      const Drawn drawn =
+          compare_exits(map, graph, passable_cell(map, draws), draws);
       // Setup: exits in another region than the objective's reach it.
-      ASSERT_GT(reached, 0U);
-      ASSERT_GT(elsewhere, 0U);
+      ASSERT_GT(drawn.reached, 0U) << seed;
+      ASSERT_GT(drawn.elsewhere, 0U) << seed;
     }
   }
 }
@@ -336,6 +362,7 @@ TEST(CoarseGraph, ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay) {
   EXPECT_EQ(graph.cost_from(search, from), by_areas);
   // Control: within the western region alone, no walk joins them.
   std::vector<std::string> western;
+  western.reserve(rows.size());
   for (const std::string& row : rows) {
     western.push_back(row.substr(0, REGION_SIDE));
   }
@@ -345,48 +372,59 @@ TEST(CoarseGraph, ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay) {
       alone_graph.joined(alone, Walk{graph.node(from).cell, objective}));
 }
 
+// `map` with `cells` blocked.
+Map blocked_at(Map map, const std::vector<Cell>& cells) {
+  for (const Cell cell : cells) {
+    map.block(cell);
+  }
+  return map;
+}
+
+// Rebuilds a copy of `original`, the graph of `map`, where `cells` are
+// blocked, checks it then equals a fresh build, and that reverting the
+// rebuild gives `original` back.
+void expect_reverted(const Map& map, const CoarseGraph& original,
+                     const std::vector<Cell>& cells) {
+  const Map built = blocked_at(map, cells);
+  CoarseGraph graph = original;
+  CoarseGraph::Undo undo = graph.rebuild(built, cells);
+  // The rebuild changed the graph to what a fresh build gives.
+  ASSERT_FALSE(graph == original);
+  EXPECT_TRUE(graph == CoarseGraph{built});
+  graph.revert(std::move(undo));
+  EXPECT_TRUE(graph == original);
+}
+
 TEST(CoarseGraph, ARevertedRebuildLeavesTheGraphAsItWas) {
   // Open ground of two regions side by side.
   constexpr std::int32_t WIDE = 512;
   constexpr std::int32_t HIGH = 256;
-  const Map map{std::vector<std::string>(HIGH, std::string(WIDE, '.'))};
-  const CoarseGraph original{map};
   // A house in the middle of the western region's easternmost area, which
   // lies across the walks between its region's border nodes and parts
   // nothing, and a wall down the western region, which parts it.
+  constexpr Cell HOUSE{238, 110};
+  constexpr std::int32_t HOUSE_SIDE = 3;
+  const Map map{std::vector<std::string>(HIGH, std::string(WIDE, '.'))};
+  const CoarseGraph original{map};
   std::vector<Cell> house;
-  for (std::int32_t row = 110; row < 113; ++row) {
-    for (std::int32_t col = 238; col < 241; ++col) {
-      house.push_back(Cell{col, row});
+  house.reserve(static_cast<std::size_t>(HOUSE_SIDE) *
+                static_cast<std::size_t>(HOUSE_SIDE));
+  for (std::int32_t row = 0; row < HOUSE_SIDE; ++row) {
+    for (std::int32_t col = 0; col < HOUSE_SIDE; ++col) {
+      house.push_back(Cell{HOUSE.x + col, HOUSE.y + row});
     }
   }
   std::vector<Cell> wall;
+  wall.reserve(HIGH);
   for (std::int32_t row = 0; row < HIGH; ++row) {
     wall.push_back(Cell{WIDE / 4, row});
   }
-  for (const std::vector<Cell>& blocked : {house, wall}) {
-    Map built = map;
-    for (const Cell cell : blocked) {
-      built.block(cell);
-    }
-    CoarseGraph graph = original;
-    CoarseGraph::Undo undo = graph.rebuild(built, blocked);
-    // The rebuild changed the graph to what a fresh build gives.
-    ASSERT_FALSE(graph == original);
-    EXPECT_TRUE(graph == CoarseGraph{built});
-    graph.revert(std::move(undo));
-    EXPECT_TRUE(graph == original);
-  }
+  expect_reverted(map, original, house);
+  expect_reverted(map, original, wall);
   // Setup: the house kept every area's nodes, and the wall did not.
-  Map housed = map;
-  for (const Cell cell : house) {
-    housed.block(cell);
-  }
-  Map walled = map;
-  for (const Cell cell : wall) {
-    walled.block(cell);
-  }
-  EXPECT_EQ(CoarseGraph{housed}.node_count(), original.node_count());
+  EXPECT_EQ(CoarseGraph{blocked_at(map, house)}.node_count(),
+            original.node_count());
+  const Map walled = blocked_at(map, wall);
   EXPECT_FALSE(
       CoarseGraph{walled}.joined(walled, Walk{Cell{0, 0}, Cell{WIDE - 1, 0}}));
 }
@@ -399,7 +437,9 @@ TEST(CoarseGraph, OpenAreasCostedInClosedFormMatchTheirSearch) {
     std::fill(row.begin() + SMALL_SIDE / 2, row.end(), '.');
   }
   constexpr std::int32_t WALLED = 80;
-  for (std::int32_t row = 64; row < 92; ++row) {
+  constexpr std::int32_t WALL_TOP = 64;
+  constexpr std::int32_t WALL_BOTTOM = 92;
+  for (std::int32_t row = WALL_TOP; row < WALL_BOTTOM; ++row) {
     rows.at(static_cast<std::size_t>(row)).at(WALLED) = '#';
   }
   const Map map{rows};
