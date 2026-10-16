@@ -65,9 +65,10 @@ class AreaFields {
     bool read = false;
   };
 
-  [[nodiscard]] std::vector<FieldSeed> seeds(const Map& map,
-                                             const CoarseGraph& graph,
-                                             std::size_t area, Cell objective);
+  [[nodiscard]] const std::vector<FieldSeed>& seeds(const Map& map,
+                                                    const CoarseGraph& graph,
+                                                    std::size_t area,
+                                                    Cell objective);
 
   std::vector<FlowField> pool_;
   std::vector<std::size_t> free_;
