@@ -126,6 +126,16 @@ void AreaFields::end_tick() {
       each = held_.erase(each);
     }
   }
+  // A search is a function of the map, the graph and its objective alone, so
+  // keeping it while a field toward its objective is held, for the next build
+  // toward it, changes no cost.
+  for (const auto& [key, held] : held_) {
+    const auto search =
+        searches_.find(Objective{std::get<1>(key), std::get<2>(key)});
+    if (search != searches_.end()) {
+      search->second.read = true;
+    }
+  }
   for (auto each = searches_.begin(); each != searches_.end();) {
     if (each->second.read) {
       each->second.read = false;
