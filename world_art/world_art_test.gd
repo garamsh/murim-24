@@ -114,7 +114,7 @@ func run() -> bool:
 	var undrawn := _undrawn(region, region_art)
 	var unkinded := _undrawn(world, art)
 	var seat_kinds := ["training_ground", "manual_hall", "seat_gate"].all(func(kind: String) -> bool: return kinds.has(kind))
-	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 10 \
+	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 12 \
 			and seat_kinds and undrawn == 0 and unkinded == world.structure_count() and unkinded > 0
 	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame and shadow, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
 		placed, region.structure_count(), kinds.keys(), seat_kinds, fields, undrawn, unkinded,
