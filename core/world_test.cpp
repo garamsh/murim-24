@@ -2545,6 +2545,9 @@ struct Growing {
   // Residents reaching a second tier, with a square two cells wider; none
   // at 0.
   std::uint32_t second_tier = 0;
+  // Residents reaching a third tier, after the second, with a square two
+  // cells wider again and no square kinds of its own; none at 0.
+  std::uint32_t third_tier = 0;
   // Whether the second tier names the temple and then the inn as its square
   // kinds.
   bool named = false;
@@ -2575,6 +2578,10 @@ Growth growth_of(const Growing& growing) {
              VICINITY,
              growing.named ? std::vector<std::size_t>{TEMPLE_PLAN, INN_PLAN}
                            : std::vector<std::size_t>{}});
+  }
+  if (growing.third_tier > 0) {
+    growth.tiers.push_back(Tier{
+        growing.third_tier, {SQUARE_SIDE + 4, SQUARE_SIDE + 4}, VICINITY, {}});
   }
   growth.plans = {
       Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}, Role::HOME},
@@ -3016,6 +3023,33 @@ TEST(World, AVillageReachingATierLaysItsSquareKindsAheadOfItsBuilds) {
   ASSERT_EQ(unnamed.structure_count(), STRUCTURES_AT_START + 1);
   EXPECT_EQ(unnamed.laid_kind(STRUCTURES_AT_START),
             std::optional<std::string>{"house"});
+}
+
+TEST(World, ATownLaysTheSquareKindsOfTheVillageTierBelowIt) {
+  // Village A, of four, reaches a third tier naming no kinds of its own; the
+  // second, at three, names the temple and the inn. Village B, of two,
+  // reaches neither.
+  Growing town = square_kinds_of({});
+  town.second_tier = FOUNDERS - 1;
+  town.third_tier = FOUNDERS;
+  World world = growth_world(town);
+  ASSERT_EQ(world.tier(VILLAGE_A), 2U);
+  ASSERT_EQ(world.tier(VILLAGE_B), 0U);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  raise(world, STRUCTURES_AT_START);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 2);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START + 1),
+            std::optional<std::string>{"inn"});
+  // Control: with the lower tier naming none, the town lays nothing.
+  town.named = false;
+  World unnamed = growth_world(town);
+  ASSERT_EQ(unnamed.tier(VILLAGE_A), 2U);
+  run_ticks(unnamed, 1);
+  EXPECT_EQ(unnamed.structure_count(), STRUCTURES_AT_START);
 }
 
 TEST(World, AnUnpressedVillageWhoseStanceOnlyRaidsLaysItsSquareKinds) {

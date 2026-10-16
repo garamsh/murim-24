@@ -1,6 +1,6 @@
 # ADR 0082: Lay a tier's square buildings once a village reaches it, ahead of its holdings' plans
 
-> Status: accepted; built by #390, as `simulation.md` records; its no-site reading corrected in the Errata below
+> Status: proposed; built by #390, as `simulation.md` records; its no-site reading corrected in the Errata below
 > Date: 2026-10-17
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
