@@ -195,9 +195,9 @@ class CoarseGraph {
   void number();
   [[nodiscard]] bool open_area(const Map& map, std::size_t area) const;
   [[nodiscard]] std::size_t id_of(NodeRef ref) const;
-  [[nodiscard]] NodeRef ref_of(std::size_t id) const;
+  [[nodiscard]] NodeRef ref_of(std::size_t ordinal) const;
   [[nodiscard]] std::size_t border_id(NodeRef ref) const;
-  [[nodiscard]] NodeRef border_ref(std::size_t id) const;
+  [[nodiscard]] NodeRef border_ref(std::size_t ordinal) const;
   void settle_borders(GoalSearch& search, std::size_t region) const;
   [[nodiscard]] std::size_t region_of_area(std::size_t area) const;
   [[nodiscard]] std::vector<std::size_t> region_areas(std::size_t region) const;
@@ -223,7 +223,7 @@ class CoarseGraph {
   template <typename Relax>
   void expand_areas(NodeRef ref, Relax relax) const;
   template <typename Relax>
-  void expand_regions(std::size_t id, Relax relax) const;
+  void expand_regions(std::size_t ordinal, Relax relax) const;
   [[nodiscard]] Costs settle_region(const Costs& starts,
                                     std::size_t region) const;
   [[nodiscard]] Costs on_border(const Costs& settled) const;
