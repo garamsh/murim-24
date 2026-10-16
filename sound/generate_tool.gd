@@ -1,7 +1,7 @@
 ## Synthesises every sound under sound/ from the parameters below and writes each as a 16-bit mono
 ## WAV beside this script: the effects the sound scene plays on what the core reports, and the
 ## explore and battle music. A seeded generator draws every random value, so a run writes the same
-## files. Run: godot --headless --path . --script res://sound/generate.gd
+## files. Run: godot --headless --path . --script res://sound/generate_tool.gd
 extends SceneTree
 
 const RATE := 22050

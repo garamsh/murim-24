@@ -3,7 +3,7 @@
 ## ticking at the core's tick rate, vsync off so a frame takes as long as its work. Prints p50, p99
 ## and max over its timed frames. It reads the art only through show_world, note_tick, refresh and
 ## body_at, so the same script measures an older tree for comparison. Run by hand, on a machine with
-## a display: godot --path . --script res://world_view/village_bench.gd
+## a display: godot --path . --script res://world_view/village_bench_tool.gd
 extends SceneTree
 
 const ViewScale := preload("res://view_scale.gd")

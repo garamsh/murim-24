@@ -21,14 +21,14 @@ The sound scene, `sound/sound.tscn`, plays what the core reports and holds no ga
 
 ## Sources and licence
 
-Every file in the table is made here. `sound/generate.gd` synthesises each from the parameters it holds, drawing every random value from a seeded generator, so a run writes the same files. The WAVs are committed beside it, and so is the `.import` file Godot writes beside each; the music's set it to loop.
+Every file in the table is made here. `sound/generate_tool.gd` synthesises each from the parameters it holds, drawing every random value from a seeded generator, so a run writes the same files. The WAVs are committed beside it, and so is the `.import` file Godot writes beside each; the music's set it to loop.
 
-Run: `godot --headless --path . --script res://sound/generate.gd`
+Run: `godot --headless --path . --script res://sound/generate_tool.gd`
 
 | File | Source | Licence | Author |
 |---|---|---|---|
-| `sound/strike.wav`, `hit.wav`, `fall.wav`, `fire.wav`, `mend.wav`, `bell.wav`, `click.wav`, `open.wav` | `sound/generate.gd`, `EFFECTS` | The project's own | Murim24, made here |
-| `sound/explore.wav`, `battle.wav` | `sound/generate.gd`, `MUSIC` | The project's own | Murim24, made here |
+| `sound/strike.wav`, `hit.wav`, `fall.wav`, `fire.wav`, `mend.wav`, `bell.wav`, `click.wav`, `open.wav` | `sound/generate_tool.gd`, `EFFECTS` | The project's own | Murim24, made here |
+| `sound/explore.wav`, `battle.wav` | `sound/generate_tool.gd`, `MUSIC` | The project's own | Murim24, made here |
 
 - A file made here is the project's own, under no licence dedication. What licence the project's own work takes is undecided: the repository has no licence file.
 - A file from outside is added only under CC0, with its source URL, licence and author in this table.

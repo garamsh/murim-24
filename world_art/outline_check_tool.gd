@@ -1,8 +1,8 @@
 ## Checks the pixels world_art/outline.gdshader draws, which need a renderer, as
 ## world_art/bodies_test.gd checks only what the view gives it. It is a tool, not a test: no test
 ## runs it. Run it by hand on a machine with a display, as
-## `godot --path . --script res://world_art/outline_check.gd`, and report what it prints in the pull
-## request. It draws the whole M1 battle at 1x, a tick at a time. On a tick an outlined body
+## `godot --path . --script res://world_art/outline_check_tool.gd`, and report what it prints in
+## the pull request. It draws the whole M1 battle at 1x, a tick at a time. On a tick an outlined body
 ## flashes, struck, it draws the frame once with the outlines hidden, then once for each such body
 ## and for up to STILL_BODIES outlined bodies that do not flash, with that body's outline alone, so
 ## no other body's outline is counted as its own. For each it counts the pixels of its outline
