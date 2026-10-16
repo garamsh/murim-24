@@ -1,11 +1,11 @@
 #include "flow_field.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
-#include <queue>
 #include <utility>
 #include <vector>
 
@@ -26,15 +26,6 @@ constexpr std::uint32_t DIAGONAL_COST = 7;
 
 std::uint32_t cost_of(Step direction) {
   return direction.x != 0 && direction.y != 0 ? DIAGONAL_COST : STRAIGHT_COST;
-}
-
-// Whether a step from `cell` along `direction` stays on passable cells: a
-// diagonal step passes beside two cells, and both must be passable.
-bool open(const Map& map, Cell cell, Step direction) {
-  const Cell next{cell.x + direction.x, cell.y + direction.y};
-  return map.passable(next) && (direction.x == 0 || direction.y == 0 ||
-                                (map.passable(Cell{next.x, cell.y}) &&
-                                 map.passable(Cell{cell.x, next.y})));
 }
 
 }  // namespace
@@ -58,19 +49,30 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
       static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
   steps_.assign(cells, Step{0, 0});
   costs_.assign(cells, UNREACHABLE);
-  using Entry = std::pair<std::uint32_t, std::size_t>;
-  std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
+  // Every cell a step from within the window reads, the two beside a
+  // diagonal step included, lies within the window, so it is read once.
+  passable_.assign(cells, false);
+  for (std::size_t slot = 0; slot < cells; ++slot) {
+    passable_[slot] = map.passable(cell_at(slot));
+  }
+  // A heap ordered as std::priority_queue orders one with std::greater.
+  frontier_.clear();
+  const auto push = [this](std::uint32_t cost, std::size_t slot) {
+    frontier_.emplace_back(cost, slot);
+    std::push_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
+  };
   for (const FieldSeed& seed : seeds) {
     // A seed may be blocked, as an objective on a structure is: the walk
     // ends beside it.
     if (inside(seed.cell) && seed.cost < costs_.at(index(seed.cell))) {
       costs_.at(index(seed.cell)) = seed.cost;
-      frontier.emplace(seed.cost, index(seed.cell));
+      push(seed.cost, index(seed.cell));
     }
   }
-  while (!frontier.empty()) {
-    const auto [cost, slot] = frontier.top();
-    frontier.pop();
+  while (!frontier_.empty()) {
+    std::pop_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
+    const auto [cost, slot] = frontier_.back();
+    frontier_.pop_back();
     if (cost != costs_.at(slot)) {
       continue;
     }
@@ -78,27 +80,37 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
     for (const Step direction : DIRECTIONS) {
       const Cell next{cell.x + direction.x, cell.y + direction.y};
       // Every step is open both ways, so a path from `next` may take it back.
-      if (!inside(next) || !open(map, cell, direction)) {
+      if (!inside(next) || !opens(cell, direction)) {
         continue;
       }
       const std::uint32_t through = cost + cost_of(direction);
       if (through < costs_.at(index(next))) {
         costs_.at(index(next)) = through;
-        frontier.emplace(through, index(next));
+        push(through, index(next));
       }
     }
   }
-  std::vector<bool> seeded(cells, false);
+  seeded_.assign(cells, false);
   for (const FieldSeed& seed : seeds) {
     if (inside(seed.cell)) {
-      seeded.at(index(seed.cell)) = costs_.at(index(seed.cell)) == seed.cost;
+      seeded_[index(seed.cell)] = costs_.at(index(seed.cell)) == seed.cost;
     }
   }
   for (std::size_t slot = 0; slot < steps_.size(); ++slot) {
-    if (costs_.at(slot) != UNREACHABLE && !seeded.at(slot)) {
-      steps_.at(slot) = straightest(map, cell_at(slot), aim);
+    if (costs_.at(slot) != UNREACHABLE && !seeded_[slot]) {
+      steps_.at(slot) = straightest(cell_at(slot), aim);
     }
   }
+}
+
+// Whether a step from `cell`, within the window, along `direction` onto a
+// cell within it stays on passable cells: a diagonal step passes beside two
+// cells, and both must be passable.
+bool FlowField::opens(Cell cell, Step direction) const {
+  const Cell next{cell.x + direction.x, cell.y + direction.y};
+  return passable_[index(next)] && (direction.x == 0 || direction.y == 0 ||
+                                    (passable_[index(Cell{next.x, cell.y})] &&
+                                     passable_[index(Cell{cell.x, next.y})]));
 }
 
 Step FlowField::step(Cell cell) const {
@@ -115,14 +127,14 @@ std::uint32_t FlowField::distance(Cell cell) const {
 // Of the steps from `cell` that begin a shortest path, the one whose cell
 // lies nearest the line from `cell` to `objective`, the first in DIRECTIONS
 // among equals.
-Step FlowField::straightest(const Map& map, Cell cell, Cell objective) const {
+Step FlowField::straightest(Cell cell, Cell objective) const {
   const std::int64_t toward_x = std::int64_t{objective.x} - cell.x;
   const std::int64_t toward_y = std::int64_t{objective.y} - cell.y;
   Step best{0, 0};
   std::int64_t nearest = -1;
   for (const Step direction : DIRECTIONS) {
     const Cell next{cell.x + direction.x, cell.y + direction.y};
-    if (!inside(next) || !open(map, cell, direction) ||
+    if (!inside(next) || !opens(cell, direction) ||
         costs_.at(index(next)) == UNREACHABLE) {
       continue;
     }

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "map.hpp"
@@ -57,8 +58,8 @@ class FlowField {
   static constexpr std::uint32_t UNREACHABLE = UINT32_MAX;
 
  private:
-  [[nodiscard]] Step straightest(const Map& map, Cell cell,
-                                 Cell objective) const;
+  [[nodiscard]] Step straightest(Cell cell, Cell objective) const;
+  [[nodiscard]] bool opens(Cell cell, Step direction) const;
   [[nodiscard]] bool inside(Cell cell) const;
   [[nodiscard]] std::size_t index(Cell cell) const;
   [[nodiscard]] Cell cell_at(std::size_t slot) const;
@@ -69,6 +70,12 @@ class FlowField {
   std::vector<Step> steps_;
   // Path costs, a straight step 5 and a diagonal one 7.
   std::vector<std::uint32_t> costs_;
+  // Scratch a rebuild reuses, so a field rebuilt allocates nothing once its
+  // buffers have grown: whether each cell is passable, the frontier, and
+  // whether each cell is a seed that kept its cost.
+  std::vector<bool> passable_;
+  std::vector<std::pair<std::uint32_t, std::size_t>> frontier_;
+  std::vector<bool> seeded_;
 };
 
 }  // namespace murim
