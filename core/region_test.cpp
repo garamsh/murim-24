@@ -1798,8 +1798,9 @@ void tally(const World& world,
     seen.agreed = seen.agreed && world.army_of(person) == army &&
                   world.faction_of(person) == faction;
     if (person >= before.size()) {
-      seen.born += army ? 1 : 0;
-      seen.reborn += army && world.person(person).soul ? 1 : 0;
+      seen.born += army ? std::size_t{1} : std::size_t{0};
+      seen.reborn +=
+          army && world.person(person).soul ? std::size_t{1} : std::size_t{0};
     } else if (before.at(person) && !army) {
       ++seen.died;
     } else if (before.at(person) != army && army && *army >= armies) {
