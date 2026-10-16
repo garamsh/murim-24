@@ -1,6 +1,6 @@
 # ADR 0082: Lay a tier's square buildings once a village reaches it, ahead of its holdings' plans
 
-> Status: proposed
+> Status: accepted; built by #390, as `simulation.md` records; its no-site reading corrected in the Errata below
 > Date: 2026-10-17
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
@@ -89,3 +89,7 @@ This amends ADR 0076's growth, which lays only the plan that most raises the sca
 - Villages of the village tier at year 100 often lack a temple or an inn because their square's edge is full. Then square kinds need a placement that may grow the square, or a reserved place in the tier's square.
 - Building stalls behind rubble: villages pressing their cap fall behind `main` in housing at the sweep, because the square kinds' rubble holds the scarcity rule's turn. Then they should be laid only when no holding plan is due, or beside it.
 - Villages that never press their cap are raided down while raising a temple, so their losses rise against `main`. Then laying outside pressure needs a peace or a size bound.
+
+## Errata
+
+- **2026-10-17, implementing #390 at `main` `49903a04`.** The Decision's "No site" and the first of the Signs take a square plan to be placed only on a free corner touching the square's edge. Since #328 (`fbf08c8b`), `place` in `core/layout.cpp` places a square plan, when no corner touching the square is free, as near as any free corner within the vicinity, and smithies and apothecaries are placed so. The decision stands: a square kind is placed as any square plan is, by that one rule. So "no site" means no free corner for the kind in the whole vicinity, and a full square edge puts the kind at the nearest free corner rather than passing it over.

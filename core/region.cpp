@@ -243,7 +243,8 @@ Plan plan_of(const RegionData& data, const Building& building) {
 
 Growth growth_for(const RegionData& data, Growth rules,
                   const std::vector<Building>& builds,
-                  const VillageTemplate& settlement) {
+                  const VillageTemplate& settlement,
+                  const std::vector<std::vector<Building>>& square_kinds) {
   Growth growth = std::move(rules);
   growth.plans.clear();
   growth.builds.clear();
@@ -256,6 +257,14 @@ Growth growth_for(const RegionData& data, Growth rules,
   for (const Building& building : settlement.buildings) {
     growth.core.push_back(growth.plans.size());
     growth.plans.push_back(plan_of(data, building));
+  }
+  for (std::size_t tier = 0;
+       tier < std::min(square_kinds.size(), growth.tiers.size()); ++tier) {
+    growth.tiers.at(tier).square_kinds.clear();
+    for (const Building& building : square_kinds.at(tier)) {
+      growth.tiers.at(tier).square_kinds.push_back(growth.plans.size());
+      growth.plans.push_back(plan_of(data, building));
+    }
   }
   return growth;
 }
@@ -588,6 +597,7 @@ void validate(const RegionData& data) {
       (!data.sects.empty() && unknown_kind(data.seat))) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
+  check_growth(*data.life.growth);
 }
 
 // The land as generation builds on `map`: free where buildable, rough

@@ -4565,7 +4565,8 @@ std::vector<std::optional<std::size_t>> World::remembered_territory(
                    : std::nullopt);
 }
 
-// Every growth check: each village recalls a raid that is over, then, while
+// Every growth check: each village recalls a raid that is over, then, with
+// living residents, lays a square kind its tiers name that it lacks or, while
 // it presses against its cap, takes the first expansion of its owner's stance
 // it can, in order of village; a village founded in the check waits for the
 // next.
@@ -4577,9 +4578,14 @@ void World::grow(const Growth& growth) {
     const std::size_t owned_by = owner(village);
     const std::uint64_t people = population.at(village);
     villages_.reach(Reached{village, tier_for(growth, people)});
-    const bool pressed =
+    const bool peopled =
         people > 0 &&
-        !armies_.at(villages_.at(village).spec.residents).roster.empty() &&
+        !armies_.at(villages_.at(village).spec.residents).roster.empty();
+    if (peopled && lay_square_kind(village, growth)) {
+      continue;
+    }
+    const bool pressed =
+        peopled &&
         people * PER_MILLE >= std::uint64_t{cap(village)} * growth.pressure;
     if (!pressed || owned_by >= growth.stances.size()) {
       continue;
@@ -4700,17 +4706,41 @@ World::Ground World::ground() const {
   return marked;
 }
 
+// Lays the first square kind of village `village`'s tier and every tier
+// below it, in order, that none of its structures has at any stage and that
+// has a site, while every structure of its own is intact (ADR 0082). Returns
+// whether it laid one.
+bool World::lay_square_kind(std::size_t village, const Growth& growth) {
+  if (!intact(village)) {
+    return false;
+  }
+  const std::vector<std::string>& kinds = villages_.at(village).spec.kinds;
+  for (std::size_t tier = 0; tier <= villages_.at(village).tier; ++tier) {
+    for (const std::size_t plan : growth.tiers.at(tier).square_kinds) {
+      const bool held = std::find(kinds.begin(), kinds.end(),
+                                  growth.plans.at(plan).kind) != kinds.end();
+      if (!held && lay_plan(village, plan, growth)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Whether every structure of village `village`'s own is intact.
+bool World::intact(std::size_t village) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  return std::all_of(spec.structures.begin(), spec.structures.end(),
+                     [this](std::size_t structure) {
+                       return stage(structure) == Stage::INTACT;
+                     });
+}
+
 // Lays the plan of the growth's builds that most raises village `village`'s
-// scarcest holding, in people, while every structure of its own is intact:
-// as rubble, on the free cells within the vicinity of its centre nearest it,
-// a cell clear of any structure, village's clearing or unbuildable cell.
+// scarcest holding, in people, while every structure of its own is intact.
 // Returns whether it laid one.
 bool World::lay_building(std::size_t village, const Growth& growth) {
-  const VillageSpec& spec = villages_.at(village).spec;
-  const auto unfinished = [this](std::size_t structure) {
-    return stage(structure) != Stage::INTACT;
-  };
-  if (std::any_of(spec.structures.begin(), spec.structures.end(), unfinished)) {
+  if (!intact(village)) {
     return false;
   }
   const std::uint64_t yearly = std::max<std::uint64_t>(
@@ -4740,18 +4770,25 @@ bool World::lay_building(std::size_t village, const Growth& growth) {
       chosen = plan;
     }
   }
-  if (!chosen) {
-    return false;
-  }
-  const Plan& plan = growth.plans.at(*chosen);
-  const std::optional<Cell> best = place(
-      lot(), site(village, growth), plan.footprint, plan.role, homes(village),
-      placement_draw(seed_, village, spec.structures.size()));
+  return chosen && lay_plan(village, *chosen, growth);
+}
+
+// Lays plan `plan` for village `village` as rubble, placed by its role within
+// its tier's vicinity on a cell clear of any structure, village's clearing or
+// unbuildable cell. Returns whether it laid it.
+bool World::lay_plan(std::size_t village, std::size_t plan,
+                     const Growth& growth) {
+  const Plan& laying = growth.plans.at(plan);
+  const std::optional<Cell> best =
+      place(lot(), site(village, growth), laying.footprint, laying.role,
+            homes(village),
+            placement_draw(seed_, village,
+                           villages_.at(village).spec.structures.size()));
   if (!best) {
     return false;
   }
   const std::optional<std::vector<std::size_t>> laid =
-      lay({Laid{*chosen, *best}}, growth, {}, seat(village));
+      lay({Laid{plan, *best}}, growth, {}, seat(village));
   if (!laid) {
     return false;
   }

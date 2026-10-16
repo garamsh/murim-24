@@ -154,10 +154,12 @@ struct Region {
 
 /// Returns `rules` with the plans growth lays: a plan for each of `builds`,
 /// from what its kind holds in `data`, its builds, then one for each of
-/// `settlement`'s buildings, the core a new village of that template lays.
-[[nodiscard]] Growth growth_for(const RegionData& data, Growth rules,
-                                const std::vector<Building>& builds,
-                                const VillageTemplate& settlement);
+/// `settlement`'s buildings, the core a new village of that template lays,
+/// then one for each of `square_kinds`, by tier, that tier's square kinds.
+[[nodiscard]] Growth growth_for(
+    const RegionData& data, Growth rules, const std::vector<Building>& builds,
+    const VillageTemplate& settlement,
+    const std::vector<std::vector<Building>>& square_kinds);
 
 /// Returns whether `data` passes the checks generate_region makes of it.
 [[nodiscard]] bool consistent(const RegionData& data);
@@ -176,9 +178,9 @@ struct Region {
 /// household or has a building of no cell, the seat template has no
 /// buildings, houses no household, has one outside its area, two that
 /// overlap or one over the area's centre, a template names a kind the kinds
-/// do not, a faction is hostile to one that does not exist, or a sect names a
-/// faction that does not exist; throws std::runtime_error when a village or a
-/// seat finds no room.
+/// do not, a faction is hostile to one that does not exist, a sect names a
+/// faction that does not exist, or the growth fails check_growth; throws
+/// std::runtime_error when a village or a seat finds no room.
 [[nodiscard]] Region generate_region(Seed seed, const RegionData& data);
 
 /// Settles the hand-made map `map` with `data` (ADR 0077): the inputs a World
