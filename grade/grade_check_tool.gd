@@ -1,6 +1,6 @@
 ## Checks what grade.tscn draws, which needs a renderer, as its test leaves the drawn pixels to a
 ## tool. It is a tool, not a test: no test runs it. Run it by hand on a machine with a display, as
-## `godot --path . --script res://grade/grade_check.gd`, and report what it prints in the pull
+## `godot --path . --script res://grade/grade_check_tool.gd`, and report what it prints in the pull
 ## request with the captures. Over world_view.tscn's M1 battle, held still, it draws the frame with
 ## no grade pass, with the pass hidden, graded at noon in summer, at dusk and at night, and at
 ## standard against low. It checks that the hidden pass leaves the frame unchanged; that dusk and

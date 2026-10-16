@@ -81,8 +81,8 @@ bench: build
 	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
 	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_bench
 	@$(BENCH_DIR)/murim_core_bench; tick=$$?; \
-	$(GODOT) --path . --script res://world_view/frame_bench.gd; frame=$$?; \
-	$(GODOT) --path . --script res://world_view/pan_bench.gd; pan=$$?; \
+	$(GODOT) --path . --script res://world_view/frame_bench_tool.gd; frame=$$?; \
+	$(GODOT) --path . --script res://world_view/pan_bench_tool.gd; pan=$$?; \
 	echo "make bench ran the tick benchmark (exit $$tick), the frame benchmark (exit $$frame) and the pan benchmark (exit $$pan)"; \
 	test $$tick -eq 0 && test $$frame -eq 0 && test $$pan -eq 0
 
@@ -109,7 +109,7 @@ gcc:
 	@echo "make gcc built every target in core/CMakeLists.txt with $$($(GCC) --version | head -1) into $(GCC_BUILD_DIR)/, and ctest ran the tests selected by: every GoogleTest case gtest_discover_tests registers there"
 
 # Not part of ci: CI installs no Android SDK. The NDK's toolchain file selects the target; extension/CMakeLists.txt is the same for every platform.
-# murim.apk opens the game on the title screen; murim_bench.apk runs frame_bench.gd at launch through the Android bench preset's
+# murim.apk opens the game on the title screen; murim_bench.apk runs frame_bench_tool.gd at launch through the Android bench preset's
 # command_line/extra_args, and murim_core_bench is pushed to the device separately.
 android: build
 	$(TOOLS)/cmake -S extension -B $(ANDROID_BUILD_DIR) -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24

@@ -1,8 +1,9 @@
 ## Checks what world_art/ground.gd draws, which needs a renderer, as docs/convention/stack-godot.md
 ## §Ground leaves the drawn pixels to captures. It is a tool, not a test: no test runs it. Run it by
-## hand on a machine with a display, as `godot --path . --script res://world_art/ground_check.gd`,
-## and report what it prints in the pull request with the captures. It checks that the bake frees
-## its viewport once every area is drawn; that the same relief bakes to the same pixels, detail and
+## hand on a machine with a display, as
+## `godot --path . --script res://world_art/ground_check_tool.gd`, and report what it prints in the
+## pull request with the captures. It checks that the bake frees its viewport once every area is
+## drawn; that the same relief bakes to the same pixels, detail and
 ## trees; that an edge between plain and forest running straight along the cells' sides is drawn
 ## wandering over them, where the same relief drawn without warp keeps it within a few pixels of the
 ## cells' side; that across cells something is built on, the same edge runs straight down the cells'

@@ -4,8 +4,8 @@
 # body drawn has a shadow under it in its band; a person standing just north of a house, which
 # hides it, is outlined over the house, while one standing just south of it, in front, is not; and
 # an outlined body's outline carries the share of white its body flashes with as it is struck, for
-# outline.gdshader to tell the body's pixels from what hides it (world_art/outline_check.gd checks
-# the pixels it then draws, which need a renderer).
+# outline.gdshader to tell the body's pixels from what hides it (world_art/outline_check_tool.gd
+# checks the pixels it then draws, which need a renderer).
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"

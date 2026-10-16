@@ -1,6 +1,6 @@
 # Checks what world_art/ground.gd gives the shader and where it places what it scatters, as
 # docs/convention/stack-godot.md §Ground asks; the pixels the shader draws are shown by captures
-# and checked on a display by ground_check.gd. With no renderer, as under make test, the ground
+# and checked on a display by ground_check_tool.gd. With no renderer, as under make test, the ground
 # bakes nothing and says so. A stand-in drawing each cell flat in its kind takes the viewport's
 # place for the rest: every area is baked once and no more however the view moves; streaming shows
 # the areas round the view, one more a frame once the first are, frees those it left and shows an
