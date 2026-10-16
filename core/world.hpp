@@ -729,16 +729,18 @@ class World {
   // Whether `army` is far.
   [[nodiscard]] static bool far_off(const Army& army);
   [[nodiscard]] static std::int32_t structure_reach(const Army& army);
-  [[nodiscard]] std::optional<std::size_t> bearing_on(const Army& army) const;
+  [[nodiscard]] std::optional<std::size_t> bearing_on(std::size_t army) const;
   [[nodiscard]] bool standing_within(std::size_t village, Position from,
                                      std::int32_t reach) const;
   [[nodiscard]] std::optional<Cell> next_objective(const Army& army,
                                                    std::size_t village) const;
   [[nodiscard]] std::optional<std::size_t> nearest_standing(
       std::size_t village, Position from) const;
-  [[nodiscard]] std::optional<Cell> nearest_in_ring(
-      const Structure& structure, std::int32_t ring, Position from,
-      const FlowField& field) const;
+  [[nodiscard]] std::optional<Cell> nearest_in_ring(const Structure& structure,
+                                                    std::int32_t ring,
+                                                    Position from,
+                                                    const FlowField& field,
+                                                    std::size_t village) const;
 
   /// A crowd slot no person holds.
   static constexpr std::size_t ABSENT = std::numeric_limits<std::size_t>::max();

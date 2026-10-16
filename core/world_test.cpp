@@ -3140,6 +3140,64 @@ TEST(World, ABandFightsAFoeInSightThenGoesForTheNearestStandingStructure) {
   EXPECT_TRUE(within_four(frail.objective(BAND), OUTLYING));
 }
 
+// The edge village's claim, and its two structures: one on its claim's east
+// edge, whose cells beside it within the claim are blocked, and one 11 cells
+// north of its seat.
+constexpr std::int32_t EDGE_CLAIM = 10;
+constexpr Cell ON_EDGE{BESET_SEAT.x + EDGE_CLAIM, BESET_SEAT.y};
+constexpr Cell NORTH{BESET_SEAT.x, BESET_SEAT.y - EDGE_CLAIM - 1};
+
+// beset_far's village and band with a claim of 10 cells and frail residents,
+// its structures ON_EDGE and NORTH, every cell beside ON_EDGE within the claim
+// blocked, so the cells beside it the band can stand on lie outside it.
+World edge_beset() {
+  std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  for (const Cell cell :
+       {Cell{ON_EDGE.x - 1, ON_EDGE.y - 1}, Cell{ON_EDGE.x - 1, ON_EDGE.y},
+        Cell{ON_EDGE.x - 1, ON_EDGE.y + 1}, Cell{ON_EDGE.x, ON_EDGE.y - 1},
+        Cell{ON_EDGE.x, ON_EDGE.y + 1}}) {
+    rows.at(static_cast<std::size_t>(cell.y))
+        .at(static_cast<std::size_t>(cell.x)) = tile_of(Footing::BLOCKED);
+  }
+  Life life = one_discipline(0);
+  Growth growth = growth_of(Growing{});
+  growth.claim = EDGE_CLAIM;
+  life.growth = growth;
+  Rules rules = at_war(SEPARATION);
+  rules.ticks_per_day = 1;
+  rules.sight = BESET_SIGHT;
+  return World{Seed{3},
+               Map{rows},
+               {army(rows, BESET_SEAT, BESET_SEAT, FOUNDERS, 1, 1, {IDLE}),
+                army(rows, {BESET_SEAT.x + 2, BESET_SEAT.y}, BESET_SEAT, 3,
+                     INTACT, 0, {GUARD, TORCH})},
+               {Structure{ON_EDGE, INTACT, {1, 1}, true},
+                Structure{NORTH, INTACT, {1, 1}, true}},
+               rules,
+               {VillageSpec{{0, 1}, BESET_RESIDENTS, {{}, {}}, 0, {}, {}}},
+               {},
+               life};
+}
+
+TEST(World, ABandRuinsAVillageWhoseStructureStandsOnItsClaimsEdge) {
+  constexpr std::uint64_t TICKS = 600;
+  World world = edge_beset();
+  // Setup: the structure on the edge is the nearer the band, and the only
+  // open cells beside it lie outside the claim.
+  ASSERT_LT(std::abs(ON_EDGE.x - (BESET_SEAT.x + 2)),
+            std::abs(NORTH.y - BESET_SEAT.y));
+  std::uint64_t ticks = 0;
+  for (; ticks < TICKS && world.village_state(0) != VillageState::RUINS;
+       ++ticks) {
+    world.tick();
+  }
+  // The band burns the edge structure from inside the claim and goes on to
+  // the other, so the village falls.
+  EXPECT_EQ(world.stage(0), Stage::RUBBLE);
+  EXPECT_EQ(world.stage(1), Stage::RUBBLE);
+  EXPECT_EQ(world.village_state(0), VillageState::RUINS);
+}
+
 TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
   // The same village raids a hostile neighbour within its reach (above).
   ASSERT_EQ(grown_armies(Growing{{Expansion::RAID}}), 3U);
