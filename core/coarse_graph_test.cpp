@@ -344,5 +344,51 @@ TEST(CoarseGraph, ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay) {
       alone_graph.joined(alone, Walk{graph.node(from).cell, objective}));
 }
 
+TEST(CoarseGraph, ARevertedRebuildLeavesTheGraphAsItWas) {
+  // Open ground of two regions side by side.
+  constexpr std::int32_t WIDE = 512;
+  constexpr std::int32_t HIGH = 256;
+  const Map map{std::vector<std::string>(HIGH, std::string(WIDE, '.'))};
+  const CoarseGraph original{map};
+  // A house in the middle of the western region's easternmost area, which
+  // lies across the walks between its region's border nodes and parts
+  // nothing, and a wall down the western region, which parts it.
+  std::vector<Cell> house;
+  for (std::int32_t row = 110; row < 113; ++row) {
+    for (std::int32_t col = 238; col < 241; ++col) {
+      house.push_back(Cell{col, row});
+    }
+  }
+  std::vector<Cell> wall;
+  for (std::int32_t row = 0; row < HIGH; ++row) {
+    wall.push_back(Cell{WIDE / 4, row});
+  }
+  for (const std::vector<Cell>& blocked : {house, wall}) {
+    Map built = map;
+    for (const Cell cell : blocked) {
+      built.block(cell);
+    }
+    CoarseGraph graph = original;
+    CoarseGraph::Undo undo = graph.rebuild(built, blocked);
+    // The rebuild changed the graph to what a fresh build gives.
+    ASSERT_FALSE(graph == original);
+    EXPECT_TRUE(graph == CoarseGraph{built});
+    graph.revert(std::move(undo));
+    EXPECT_TRUE(graph == original);
+  }
+  // Setup: the house kept every area's nodes, and the wall did not.
+  Map housed = map;
+  for (const Cell cell : house) {
+    housed.block(cell);
+  }
+  Map walled = map;
+  for (const Cell cell : wall) {
+    walled.block(cell);
+  }
+  EXPECT_EQ(CoarseGraph{housed}.node_count(), original.node_count());
+  EXPECT_FALSE(
+      CoarseGraph{walled}.joined(walled, Walk{Cell{0, 0}, Cell{WIDE - 1, 0}}));
+}
+
 }  // namespace
 }  // namespace murim

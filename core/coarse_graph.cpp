@@ -91,7 +91,8 @@ bool same(Cell one, Cell other) { return one.x == other.x && one.y == other.y; }
 
 }  // namespace
 
-void CoarseGraph::rebuild(const Map& map, const std::vector<Cell>& cells) {
+CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
+                                       const std::vector<Cell>& cells) {
   // The areas holding a changed cell are rebuilt, and their neighbours too,
   // whose entrances toward them change; every neighbour of a rebuilt area is
   // relinked, since a rebuilt area's nodes are numbered afresh.
@@ -119,19 +120,118 @@ void CoarseGraph::rebuild(const Map& map, const std::vector<Cell>& cells) {
   }
   std::set<std::size_t> relinked;
   for (const std::size_t area : changed) {
-    build_area(map, area);
     around(area, relinked);
   }
-  std::set<std::size_t> regions;
+  Undo undo;
+  for (const std::size_t area : relinked) {
+    undo.areas_.emplace_back(area, areas_.at(area));
+  }
+  // An area that keeps its components, its nodes with theirs, and its exits
+  // joins the same components as before.
+  const auto kept = [](const AreaGraph& before, const AreaGraph& after) {
+    const auto node = [](const CoarseNode& one, const CoarseNode& other) {
+      return same(one.cell, other.cell) && one.component == other.component;
+    };
+    const auto exit = [](const CoarseExit& one, const CoarseExit& other) {
+      return one.node == other.node && one.area == other.area &&
+             same(one.first, other.first) && same(one.along, other.along) &&
+             one.length == other.length;
+    };
+    return before.components == after.components &&
+           std::equal(before.nodes.begin(), before.nodes.end(),
+                      after.nodes.begin(), after.nodes.end(), node) &&
+           std::equal(before.exits.begin(), before.exits.end(),
+                      after.exits.begin(), after.exits.end(), exit);
+  };
+  bool joins_kept = true;
+  for (const std::size_t area : changed) {
+    build_area(map, area);
+    const auto before =
+        std::find_if(undo.areas_.begin(), undo.areas_.end(),
+                     [area](const auto& saved) { return saved.first == area; });
+    joins_kept = joins_kept && kept(before->second, areas_.at(area));
+  }
   for (const std::size_t area : relinked) {
     link_exits(area);
+  }
+  // Where every area kept its nodes, an area merely relinked is as it was,
+  // so only the regions holding a rebuilt area change.
+  std::set<std::size_t> regions;
+  for (const std::size_t area : joins_kept ? changed : relinked) {
     regions.insert(region_of_area(area));
   }
   for (const std::size_t region : regions) {
+    undo.regions_.emplace_back(region, regions_.at(region));
     build_region(region);
   }
   number();
-  join_components();
+  if (!joins_kept) {
+    undo.components_.emplace(first_component_, joined_);
+    join_components();
+  }
+  return undo;
+}
+
+void CoarseGraph::revert(Undo undo) {
+  for (auto& [area, graph] : undo.areas_) {
+    areas_.at(area) = std::move(graph);
+  }
+  for (auto& [region, graph] : undo.regions_) {
+    regions_.at(region) = std::move(graph);
+  }
+  if (undo.components_) {
+    first_component_ = std::move(undo.components_->first);
+    joined_ = std::move(undo.components_->second);
+  }
+  number();
+}
+
+bool CoarseGraph::operator==(const CoarseGraph& other) const {
+  const auto edges = [](const std::vector<std::vector<Edge>>& one,
+                        const std::vector<std::vector<Edge>>& two) {
+    return std::equal(
+        one.begin(), one.end(), two.begin(), two.end(),
+        [](const std::vector<Edge>& left, const std::vector<Edge>& right) {
+          return std::equal(left.begin(), left.end(), right.begin(),
+                            right.end(), [](const Edge& a, const Edge& b) {
+                              return a.to == b.to && a.cost == b.cost;
+                            });
+        });
+  };
+  const auto area = [&edges](const AreaGraph& one, const AreaGraph& two) {
+    const auto node = [](const CoarseNode& left, const CoarseNode& right) {
+      return same(left.cell, right.cell) && left.component == right.component;
+    };
+    const auto exit = [](const CoarseExit& left, const CoarseExit& right) {
+      return left.node == right.node && left.area == right.area &&
+             left.far_node == right.far_node && same(left.first, right.first) &&
+             same(left.along, right.along) && left.length == right.length;
+    };
+    return one.components == two.components && one.labels == two.labels &&
+           std::equal(one.nodes.begin(), one.nodes.end(), two.nodes.begin(),
+                      two.nodes.end(), node) &&
+           edges(one.within, two.within) &&
+           std::equal(one.exits.begin(), one.exits.end(), two.exits.begin(),
+                      two.exits.end(), exit) &&
+           one.border == two.border;
+  };
+  const auto region = [&edges](const RegionGraph& one, const RegionGraph& two) {
+    return std::equal(one.border.begin(), one.border.end(), two.border.begin(),
+                      two.border.end(),
+                      [](const NodeRef& left, const NodeRef& right) {
+                        return left.area == right.area &&
+                               left.node == right.node;
+                      }) &&
+           edges(one.within, two.within);
+  };
+  return width_ == other.width_ && height_ == other.height_ &&
+         std::equal(areas_.begin(), areas_.end(), other.areas_.begin(),
+                    other.areas_.end(), area) &&
+         std::equal(regions_.begin(), regions_.end(), other.regions_.begin(),
+                    other.regions_.end(), region) &&
+         first_component_ == other.first_component_ &&
+         joined_ == other.joined_ && first_node_ == other.first_node_ &&
+         first_border_ == other.first_border_;
 }
 
 void CoarseGraph::number() {

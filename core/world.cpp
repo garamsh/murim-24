@@ -5156,28 +5156,28 @@ std::optional<std::vector<std::size_t>> World::lay(
       }
     }
   }
-  // The graph rebuilt where the structures block; every army not far must
-  // still reach its objective over it, and the movers their destination.
-  CoarseGraph rebuilt = graph_;
-  rebuilt.rebuild(built, blocked);
-  const auto reaches = [this, &built, &rebuilt](
-                           Cell objective,
-                           const std::vector<std::size_t>& members) {
+  // The graph is rebuilt in place, and put back when the structures would
+  // cut someone off.
+  CoarseGraph::Undo undo = graph_.rebuild(built, blocked);
+  const auto reaches = [this, &built](Cell objective,
+                                      const std::vector<std::size_t>& members) {
     return std::all_of(members.begin(), members.end(), [&](std::size_t member) {
-      return rebuilt.joined(
+      return graph_.joined(
           built, Walk{cell_of(people_.at(member).position), objective});
     });
   };
-  for (const Army& army : armies_) {
-    if (!far_off(army) && !reaches(army.order.objective, army.roster)) {
-      return std::nullopt;
-    }
-  }
-  if (!movers.empty() && !reaches(destination, movers)) {
+  const bool cut_off =
+      std::any_of(armies_.begin(), armies_.end(),
+                  [&reaches](const Army& army) {
+                    return !far_off(army) &&
+                           !reaches(army.order.objective, army.roster);
+                  }) ||
+      (!movers.empty() && !reaches(destination, movers));
+  if (cut_off) {
+    graph_.revert(std::move(undo));
     return std::nullopt;
   }
   map_ = std::move(built);
-  graph_ = std::move(rebuilt);
   fields_.clear();
   std::vector<std::size_t> made;
   for (const Laid& each : laid) {
