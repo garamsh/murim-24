@@ -1166,10 +1166,16 @@ struct Raid {
   std::size_t band;
 };
 
-// How a raid went: the ticks it ran, and the residents still living.
+// How a raid went: the ticks it ran, and the residents still living; whether
+// an outpost asked for was placed, how many times the band's objective
+// moved, and whether it moved while a foe a member saw as the tick began
+// still lived.
 struct Raided {
   std::uint64_t ticks;
   std::size_t residents;
+  bool outpost_placed = false;
+  std::size_t moves = 0;
+  bool moved_past_foe = false;
 };
 
 constexpr std::size_t VILLAGE_RAIDERS = 44;
@@ -1194,8 +1200,100 @@ std::size_t first_raided(const Region& region, const std::string& kind) {
 // otherwise for where it stands, until the village is in ruins, or for
 // `limit` ticks if it is not by then; people close on foes in sight if
 // `sighted`.
+// Adds to `village` of `region` a copy of its first structure on its
+// edge, a cell wide, on the first passable cell no structure or person stands
+// on from `apart` cells away from its centre outward, east, then west, south
+// and north of it. Returns whether there was such a structure and such a cell.
+bool add_outpost(Region& region, Village& village, std::int32_t apart) {
+  const auto edge =
+      std::find_if(village.structures.begin(), village.structures.end(),
+                   [&region](std::size_t index) {
+                     return region.structures.at(index).role == Role::EDGE;
+                   });
+  if (edge == village.structures.end()) {
+    return false;
+  }
+  const Map map{region.map_rows};
+  const Cell centre = region.armies.at(village.army).objective;
+  const auto stood_on = [&region](Cell cell) {
+    return std::any_of(region.armies.begin(), region.armies.end(),
+                       [cell](const ArmySpec& army) {
+                         return std::any_of(army.members.begin(),
+                                            army.members.end(),
+                                            [cell](const Recruit& recruit) {
+                                              return recruit.cell.x == cell.x &&
+                                                     recruit.cell.y == cell.y;
+                                            });
+                       });
+  };
+  const auto free = [&](Cell cell) {
+    return map.passable(cell) && !stood_on(cell) &&
+           std::none_of(region.structures.begin(), region.structures.end(),
+                        [cell](const Structure& structure) {
+                          const std::vector<Cell> covered =
+                              cells_of(structure.cell, structure.footprint);
+                          return std::any_of(covered.begin(), covered.end(),
+                                             [cell](Cell spot) {
+                                               return spot.x == cell.x &&
+                                                      spot.y == cell.y;
+                                             });
+                        });
+  };
+  for (const Cell way : {Cell{1, 0}, Cell{-1, 0}, Cell{0, 1}, Cell{0, -1}}) {
+    for (Cell cell{centre.x + (way.x * apart), centre.y + (way.y * apart)};
+         cell.x >= 0 && cell.y >= 0 && cell.x < map.width() &&
+         cell.y < map.height();
+         cell = Cell{cell.x + way.x, cell.y + way.y}) {
+      if (!free(cell)) {
+        continue;
+      }
+      Structure outpost = region.structures.at(*edge);
+      outpost.cell = cell;
+      outpost.footprint = Footprint{1, 1};
+      village.structures.push_back(region.structures.size());
+      region.holdings.push_back(region.holdings.at(*edge));
+      region.structure_kinds.push_back(region.structure_kinds.at(*edge));
+      region.structures.push_back(outpost);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Ticks `world` until village `target` lies in ruins, for at most `limit`
+// ticks, noting in `result` the ticks run, each move of the objective of the
+// band, the world's last army, and whether it moved while a foe a member saw
+// as the tick began still lived.
+void watch_raid(World& world, std::size_t target, Raided& result,
+                std::uint64_t limit) {
+  const std::size_t band = world.army_count() - 1;
+  for (; result.ticks < limit &&
+         world.village_state(target) != VillageState::RUINS;
+       ++result.ticks) {
+    std::vector<std::size_t> seen;
+    for (const std::size_t member : world.roster(band)) {
+      const std::vector<std::size_t> foes = world.foes_in_sight(member);
+      seen.insert(seen.end(), foes.begin(), foes.end());
+    }
+    const Cell before = world.objective(band);
+    world.tick();
+    const Cell after = world.objective(band);
+    if (after.x != before.x || after.y != before.y) {
+      ++result.moves;
+      result.moved_past_foe =
+          result.moved_past_foe ||
+          std::any_of(seen.begin(), seen.end(), [&world](std::size_t foe) {
+            return world.person(foe).health > 0;
+          });
+    }
+  }
+}
+
+// With `outpost` above 0, the village raided holds one more structure on its
+// edge, at least `outpost` cells from its centre.
 Raided raided(const RegionData& data, Seed seed, const Raid& raid,
-              std::uint64_t limit, bool bound = true, bool sighted = true) {
+              std::uint64_t limit, bool bound = true, bool sighted = true,
+              std::int32_t outpost = 0) {
   Region region = generate_region(seed, data);
   if (!sighted) {
     region.rules.sight = 0;
@@ -1252,6 +1350,9 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
   }
   raiders.objective = bound ? centre : raiders.members.front().cell;
   region.armies.push_back(raiders);
+  // After the band, which stands round the village as it was laid.
+  const bool placed =
+      outpost > 0 && add_outpost(region, region.villages.at(target), outpost);
   World world = world_of(region);
   // Setup: the whole band against a village that stands.
   EXPECT_EQ(world.roster(region.armies.size() - 1).size(), raid.band);
@@ -1259,12 +1360,10 @@ Raided raided(const RegionData& data, Seed seed, const Raid& raid,
                           [&world](std::size_t index) {
                             return world.stage(index) == Stage::INTACT;
                           }));
-  std::uint64_t ticks = 0;
-  for (; ticks < limit && world.village_state(target) != VillageState::RUINS;
-       ++ticks) {
-    world.tick();
-  }
-  return Raided{ticks, world.roster(residents).size()};
+  Raided result{0, 0, placed};
+  watch_raid(world, target, result, limit);
+  result.residents = world.roster(residents).size();
+  return result;
 }
 
 // base_data() with every village starting as full as a grown one, as the
@@ -1379,6 +1478,28 @@ TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   constexpr std::int32_t SLOWER = 10;
   torch.structure_damage /= SLOWER;
   EXPECT_GT(raided(slow, SEED, HAMLET_RAID, RAID_MOST + 1).ticks, RAID_MOST);
+}
+
+// How far from a raided village's centre an outpost stands: past any blow
+// struck from round the centre, and within the village's claim.
+constexpr std::int32_t OUTPOST = 15;
+
+TEST(Region, ARaidBandGoesForWhatStandsBeyondItsCentresReach) {
+  const Raided far =
+      raided(grown(), SEED, HAMLET_RAID, RAID_MOST + 1, true, true, OUTPOST);
+  // Setup: the outpost stands, past the torch's reach from round the centre.
+  ASSERT_TRUE(far.outpost_placed);
+  // The band, its residents gone, is ordered on to the outpost once, and
+  // ruins the hamlet within the raid's target time, never moving while a foe
+  // it saw lives.
+  EXPECT_LE(far.ticks, RAID_MOST);
+  EXPECT_EQ(far.moves, 1U);
+  EXPECT_FALSE(far.moved_past_foe);
+  // Control: without the outpost the band ruins the hamlet from round its
+  // centre, its objective never moving.
+  const Raided near = raided(grown(), SEED, HAMLET_RAID, RAID_MOST + 1);
+  EXPECT_LE(near.ticks, RAID_MOST);
+  EXPECT_EQ(near.moves, 0U);
 }
 
 TEST(Region, ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime) {

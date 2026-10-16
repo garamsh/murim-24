@@ -3070,6 +3070,76 @@ TEST(World, EveryPersonServesInTheArmyWhoseRosterHoldsItAsTheHungryMove) {
   EXPECT_TRUE(agreed);
 }
 
+// Where the beset village's seat and its two structures stand, and how far
+// its claim reaches. The second, NEARER, lies nearer the band than the first.
+constexpr Cell BESET_SEAT{6, 16};
+constexpr Cell OUTLYING{26, 16};
+constexpr Cell NEARER{8, 26};
+constexpr std::size_t NEARER_INDEX = 1;
+constexpr std::int32_t BESET_CLAIM = 20;
+constexpr std::int32_t BESET_SIGHT = 6;
+constexpr std::size_t BESET_RESIDENTS = 0;
+constexpr std::size_t BAND = 1;
+// A torch that burns structures within two cells of its user.
+constexpr Skill TORCH{0, 2 * CELL_SIZE, 0, 10, 1, 0, Shape::SELF};
+
+// Faction 1's village, its structures 20 cells east and 10 cells south of its
+// seat, where its four residents of `health` stand, idle; faction 0's band of
+// three beside them, ordered on the seat with a strike and a torch, and at war
+// with it. The village's claim reaches 20 cells, people see 6, and growth
+// expands nothing.
+World beset_far(std::uint64_t health) {
+  const std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  Life life = one_discipline(0);
+  Growth growth = growth_of(Growing{});
+  growth.claim = BESET_CLAIM;
+  life.growth = growth;
+  Rules rules = at_war(SEPARATION);
+  rules.ticks_per_day = 1;
+  rules.sight = BESET_SIGHT;
+  return World{
+      Seed{3},
+      Map{rows},
+      {army(rows, BESET_SEAT, BESET_SEAT, FOUNDERS, health, 1, {IDLE}),
+       army(rows, {BESET_SEAT.x + 2, BESET_SEAT.y}, BESET_SEAT, 3, INTACT, 0,
+            {GUARD, TORCH})},
+      {Structure{OUTLYING, INTACT, {1, 1}, true},
+       Structure{NEARER, INTACT, {1, 1}, true}},
+      rules,
+      {VillageSpec{{0, NEARER_INDEX}, BESET_RESIDENTS, {{}, {}}, 0, {}, {}}},
+      {},
+      life};
+}
+
+TEST(World, ABandFightsAFoeInSightThenGoesForTheNearestStandingStructure) {
+  constexpr std::uint64_t TICKS = 300;
+  constexpr std::uint64_t STURDY = 1'000'000;
+  World sturdy = beset_far(STURDY);
+  run_ticks(sturdy, TICKS);
+  // Setup: the residents still stand in the band's sight, and both
+  // structures stand beyond its torch.
+  ASSERT_EQ(sturdy.roster(BESET_RESIDENTS).size(), FOUNDERS);
+  ASSERT_FALSE(sturdy.foes_in_sight(sturdy.roster(BAND).front()).empty());
+  ASSERT_EQ(sturdy.stage(0), Stage::INTACT);
+  ASSERT_EQ(sturdy.stage(NEARER_INDEX), Stage::INTACT);
+  // The band fights on, its objective still the seat.
+  EXPECT_TRUE(in(BESET_SEAT, centre_of(sturdy.objective(BAND))));
+  // Control: residents who fall leave the band no foe in sight, and it goes
+  // first for the standing structure nearest it, though another comes first
+  // by index; once that falls, it goes on to the other.
+  World frail = beset_far(1);
+  std::uint64_t ticks = 0;
+  for (; ticks < TICKS && in(BESET_SEAT, centre_of(frail.objective(BAND)));
+       ++ticks) {
+    frail.tick();
+  }
+  ASSERT_TRUE(frail.roster(BESET_RESIDENTS).empty());
+  EXPECT_TRUE(within_four(frail.objective(BAND), NEARER));
+  run_ticks(frail, TICKS);
+  ASSERT_EQ(frail.stage(NEARER_INDEX), Stage::RUBBLE);
+  EXPECT_TRUE(within_four(frail.objective(BAND), OUTLYING));
+}
+
 TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
   // The same village raids a hostile neighbour within its reach (above).
   ASSERT_EQ(grown_armies(Growing{{Expansion::RAID}}), 3U);
