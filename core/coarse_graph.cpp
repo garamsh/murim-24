@@ -84,6 +84,12 @@ CoarseGraph::CoarseGraph(const Map& map)
   join_components();
 }
 
+namespace {
+
+bool same(Cell one, Cell other) { return one.x == other.x && one.y == other.y; }
+
+}  // namespace
+
 void CoarseGraph::rebuild(const Map& map, const std::vector<Cell>& cells) {
   // The areas holding a changed cell are rebuilt, and their neighbours too,
   // whose entrances toward them change; every neighbour of a rebuilt area is
@@ -293,12 +299,16 @@ void CoarseGraph::link_exits(std::size_t area) {
   for (CoarseExit& exit : areas_.at(area).exits) {
     const Cell middle{exit.first.x + (exit.along.x * ((exit.length - 1) / 2)),
                       exit.first.y + (exit.along.y * ((exit.length - 1) / 2))};
-    const std::vector<CoarseNode>& far = areas_.at(exit.area).nodes;
+    // A corner cell may be the middle of an entrance on two of the far area's
+    // sides, so the far node is the one at that cell whose exit leads back.
+    const AreaGraph& far = areas_.at(exit.area);
     const auto found =
-        std::find_if(far.begin(), far.end(), [middle](const CoarseNode& each) {
-          return each.cell.x == middle.x && each.cell.y == middle.y;
-        });
-    exit.far_node = static_cast<std::size_t>(found - far.begin());
+        std::find_if(far.exits.begin(), far.exits.end(),
+                     [&far, area, middle](const CoarseExit& back) {
+                       return back.area == area &&
+                              same(far.nodes.at(back.node).cell, middle);
+                     });
+    exit.far_node = found->node;
   }
 }
 
