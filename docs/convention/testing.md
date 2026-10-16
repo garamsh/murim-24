@@ -13,7 +13,7 @@ Test layers, mocking, and placement — what each layer proves, what to mock, an
 
 ## Three layers — different goals, different scopes
 
-The concrete in-process client per stack is owned by the project's stack convention file; the Test client column states only the shape each layer requires.
+This section states what each layer exercises and the shape it requires, not the concrete client, build or wiring.
 
 | Layer | Scope | Mocks | Test client | External systems |
 |---|---|---|---|---|
@@ -27,7 +27,11 @@ What separates the layers is the subject: integration exercises real modules in 
 
 The exception is a dependency no in-process substitute can stand in for, because the code exists to interact with it: a controller's API server, not a database. Run that as a fixture and the test is still integration, because the subject is still in-process modules.
 
+**A test constructs what it puts under test** — the unit and whatever stands in for its dependencies, or the server its client is pointed at. What it does not construct is the shipped graph, the real implementations wired together as the application ships them: where that graph is the subject, the test calls the place that assembles it for the application. A copy assembled inside the test goes on passing after the shipped wiring breaks.
+
 ## Behavior over implementation
+
+The lists below state only the kinds of target that qualify.
 
 Assert on outputs and side-effects only:
 - return values
@@ -36,8 +40,6 @@ Assert on outputs and side-effects only:
 - DB rows (from a testcontainer, at the e2e layer)
 
 Do not assert on: call order, unexported helper shape, private type structure, internal refactors. **If an internal refactor forces test updates, the tests were testing implementation.**
-
-The concrete targets for a given stack are owned by the project's stack convention file; the lists above state only the kinds that qualify.
 
 ## Waiting
 
@@ -59,6 +61,8 @@ A test that cannot fail is not evidence. It passes on the day the behaviour is d
 
 ## Mocking strategy
 
+This section states what each layer mocks and what kind of substitute stands in for state, not the tool or mechanism that does it.
+
 - **Unit**: mock any module boundary you control.
 - **Integration**: external systems mocked or substituted; SUT itself is real.
 - **E2E**: nothing mocked. Real binary, real infrastructure.
@@ -69,14 +73,16 @@ Time → inject a clock. Network → substitute. Filesystem → tmpdir. Random �
 
 ## Coverage and naming
 
+Naming here covers what a test name conveys, not its concrete form.
+
 - Target meaningful branches, not 100%.
-- Names read like a spec. Concrete test-name forms follow the project's stack convention file.
+- Names read like a spec.
 - A failing test name should tell you what broke without opening the file.
 
 ## Placement
 
+The list below states the kind of location each layer takes, not its directory or file names.
+
 - Unit: co-located with the source it tests.
 - Integration: co-located with the boundary it exercises, or in a dedicated integration directory.
 - E2E: a dedicated top-level directory, outside the application source tree.
-
-Concrete directory and file names follow the project's stack convention file — the stack file owns placement specifics.
