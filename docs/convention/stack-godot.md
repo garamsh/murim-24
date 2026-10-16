@@ -42,7 +42,7 @@ GDScript, after the Godot 4.7 GDScript style guide (`tutorials/scripting/gdscrip
 - Framework: none beyond Godot. `run_tests.gd` at the root runs each test it is given and exits non-zero unless every test loaded and passed; a test that fails to parse counts as failed.
 - A test is `<unit>_test.gd` next to the code it tests, extends `RefCounted`, and has `func run() -> bool`, returning `true` on pass and printing what it compared.
 - A script a test runs in a Godot process of its own is `<name>_probe.gd` next to the test that runs it.
-- A script someone runs by hand, such as a bench or a check of the drawn ground, is `<name>_tool.gd` next to the code it exercises. Like tests and probes, every export preset leaves it out of the pack by `exclude_filter` (owner, 2026-10-16, #234).
+- A script someone runs by hand, such as a bench or a check of the drawn ground, is `<name>_tool.gd` next to the code it exercises. Like tests and probes, every release preset leaves it out of the pack by `exclude_filter` (owner, 2026-10-16, #234); a bench preset that runs a tool at launch ships that tool.
 - Assertions read what GDScript reads: the return values of the registered classes' methods.
 
 ## Comments
