@@ -198,5 +198,47 @@ TEST(CoarseGraph, ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers) {
   EXPECT_TRUE(graph.joined(map, Walk{west, Cell{SPLIT, ROW + 5}}));
 }
 
+TEST(CoarseGraph, AnExitLinksToTheFarNodeWhoseExitLeadsBack) {
+  // A map of 2 by 2 areas. The south-eastern area's corner cell (32, 32) is
+  // the only cell open across its top border and across its left one, so it
+  // is the middle of an entrance on each side: two nodes at one cell.
+  constexpr std::int32_t SIDE = 64;
+  constexpr std::int32_t CORNER = 32;
+  std::vector<std::string> rows(SIDE, std::string(SIDE, '.'));
+  for (std::int32_t along = CORNER + 1; along < SIDE; ++along) {
+    rows.at(CORNER - 1).at(static_cast<std::size_t>(along)) = '#';
+    rows.at(static_cast<std::size_t>(along)).at(CORNER - 1) = '#';
+  }
+  const Map map{rows};
+  const CoarseGraph graph{map};
+  const std::size_t corner_area = graph.area_of(Cell{CORNER, CORNER});
+  const std::size_t west = graph.area_of(Cell{0, CORNER});
+  const std::size_t north = graph.area_of(Cell{CORNER, 0});
+  // Setup: the corner area holds two nodes at the corner cell, one leading
+  // north and one west.
+  std::vector<std::size_t> at_corner;
+  for (const CoarseExit& exit : graph.exits(corner_area)) {
+    const Cell cell = graph.node(NodeRef{corner_area, exit.node}).cell;
+    if (cell.x == CORNER && cell.y == CORNER) {
+      at_corner.push_back(exit.node);
+    }
+  }
+  ASSERT_EQ(at_corner.size(), 2U);
+  ASSERT_NE(at_corner.front(), at_corner.back());
+  // Each neighbour's entrance names the node whose exit leads back to it.
+  for (const std::size_t neighbour : {west, north}) {
+    for (const CoarseExit& exit : graph.exits(neighbour)) {
+      if (exit.area != corner_area) {
+        continue;
+      }
+      bool back = false;
+      for (const CoarseExit& other : graph.exits(corner_area)) {
+        back = back || (other.node == exit.far_node && other.area == neighbour);
+      }
+      EXPECT_TRUE(back) << neighbour;
+    }
+  }
+}
+
 }  // namespace
 }  // namespace murim
