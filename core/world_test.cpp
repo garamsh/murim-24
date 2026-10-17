@@ -3438,6 +3438,74 @@ TEST(World, ABandRuinsAVillageWhoseStructureStandsOnItsClaimsEdge) {
   EXPECT_EQ(world.village_state(0), VillageState::RUINS);
 }
 
+// The straggled village's last structure, five cells east of its seat, and
+// what it takes to bring down: as much as one torch burns in 2,000 ticks.
+constexpr Cell LAST{BESET_SEAT.x + 5, BESET_SEAT.y};
+constexpr std::uint32_t LAST_DURABILITY = 20'000;
+constexpr std::size_t STRAGGLING_BAND = 6;
+// A torch that burns structures within four cells of its user, so the band
+// standing round the seat reaches LAST only from its east side.
+constexpr std::int32_t WIDE_TORCH_RADIUS = 4 * CELL_SIZE;
+constexpr Skill WIDE_TORCH{0, WIDE_TORCH_RADIUS, 0, 10, 1, 0, Shape::SELF};
+
+// beset_far's village of frail residents with LAST alone standing, and a band
+// of six round its seat, ordered on it with a strike and a wide torch.
+World straggling() {
+  const std::vector<std::string> rows = open_map(GROWTH_SIDE);
+  Life life = one_discipline(0);
+  Growth growth = growth_of(Growing{});
+  growth.claim = BESET_CLAIM;
+  life.growth = growth;
+  Rules rules = at_war(SEPARATION);
+  rules.ticks_per_day = 1;
+  rules.sight = BESET_SIGHT;
+  return World{Seed{3},
+               Map{rows},
+               {army(rows, BESET_SEAT, BESET_SEAT, FOUNDERS, 1, 1, {IDLE}),
+                army(rows, BESET_SEAT, BESET_SEAT, STRAGGLING_BAND, INTACT, 0,
+                     {GUARD, WIDE_TORCH})},
+               {Structure{LAST, LAST_DURABILITY, {1, 1}, true}},
+               rules,
+               {VillageSpec{{0}, BESET_RESIDENTS, {{}}, 0, {}, {}}},
+               {},
+               life};
+}
+
+// Whether the wide torch from `from` reaches LAST.
+bool torch_reaches_last(Position from) {
+  const auto clamp = [](std::int32_t along, std::int32_t first) {
+    return std::clamp(along, first * CELL_SIZE, ((first + 1) * CELL_SIZE) - 1);
+  };
+  const Position near{clamp(from.x, LAST.x), clamp(from.y, LAST.y)};
+  return distance_squared(from, near) <=
+         std::int64_t{WIDE_TORCH_RADIUS} * WIDE_TORCH_RADIUS;
+}
+
+TEST(World, ABandMovesOnThoughOneMemberReachesTheLastStructure) {
+  // One torch alone takes 2,000 ticks; the band brought up takes far fewer.
+  constexpr std::uint64_t LIMIT = 1'000;
+  World world = straggling();
+  bool straggled = false;
+  std::uint64_t ticks = 0;
+  for (; ticks < LIMIT && world.stage(0) != Stage::RUBBLE; ++ticks) {
+    world.tick();
+    // The state the band once held in: its foes gone, its objective the seat
+    // and out of reach of LAST, and a member of it in reach.
+    if (world.roster(BESET_RESIDENTS).empty() &&
+        in(BESET_SEAT, centre_of(world.objective(BAND))) &&
+        !torch_reaches_last(centre_of(world.objective(BAND)))) {
+      const std::vector<Position> standing = positions(world, BAND);
+      straggled = straggled || std::any_of(standing.begin(), standing.end(),
+                                           torch_reaches_last);
+    }
+  }
+  // Setup: a lone member reached LAST while the band's objective did not.
+  ASSERT_TRUE(straggled);
+  // The band is moved on, and LAST falls within the limit.
+  EXPECT_EQ(world.stage(0), Stage::RUBBLE);
+  EXPECT_LT(ticks, LIMIT);
+}
+
 TEST(World, NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach) {
   // The same village raids a hostile neighbour within its reach (above).
   ASSERT_EQ(grown_armies(Growing{{Expansion::RAID}}), 3U);
