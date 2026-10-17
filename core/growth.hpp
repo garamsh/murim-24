@@ -28,15 +28,21 @@ struct Plan {
 
 /// A size of village (ADR 0076): reached once `residents` people make it home,
 /// it keeps a `square` clear round its centre and builds within `vicinity`
-/// cells of it.
+/// cells of it. A village holds a structure of each of the `square_kinds`
+/// plans, in order, of its tier and every tier below it (ADR 0082).
 struct Tier {
   std::uint32_t residents = 0;
   Footprint square{1, 1};
   std::int32_t vicinity = 0;
+  std::vector<std::size_t> square_kinds;
 };
 
 /// How villages grow, as data, checked every `interval` days. A village with
-/// living residents presses against its cap once the people whose home it is
+/// living residents and every structure of its own intact first lays, as
+/// rubble, the first plan of its tiers' `square_kinds` whose kind none of its
+/// structures has, at any stage, and that has a site on its tier's square;
+/// laying one, it takes no expansion that check. A village with living
+/// residents presses against its cap once the people whose home it is
 /// reach `pressure` per mille of it; it then takes the first expansion of its
 /// owner's stance, `stances` by faction, that it can:
 /// - build: while every structure of its own is intact, it lays the plan of
@@ -86,7 +92,8 @@ struct Growth {
 /// Throws std::invalid_argument when `growth` checks at no interval, presses
 /// above PER_MILLE, reaches outside [0, MAX_REACH], raises terraces at no
 /// labour, has no tiers, a first tier past no one, tiers out of order or a
-/// square of no cell, or names a plan it does not have.
+/// square of no cell, names a plan it does not have, or names among a tier's
+/// `square_kinds` a plan whose role is not the square.
 void check_growth(const Growth& growth);
 
 /// Returns the index of the last of `growth`'s tiers that `residents` reach.

@@ -907,7 +907,11 @@ class World {
   void settle();
   [[nodiscard]] bool expand(std::size_t village, Expansion expansion,
                             const Growth& growth);
+  [[nodiscard]] bool lay_square_kind(std::size_t village, const Growth& growth);
   [[nodiscard]] bool lay_building(std::size_t village, const Growth& growth);
+  [[nodiscard]] bool intact(std::size_t village) const;
+  [[nodiscard]] bool lay_plan(std::size_t village, std::size_t plan,
+                              const Growth& growth);
   [[nodiscard]] bool found_village(std::size_t village, const Growth& growth);
   [[nodiscard]] bool send_raid(std::size_t village, const Growth& growth);
   [[nodiscard]] bool settling(std::size_t village) const;

@@ -2520,6 +2520,10 @@ constexpr std::size_t STRUCTURES_AT_START = 6;
 constexpr std::int32_t SQUARE_SIDE = 3;
 constexpr std::int32_t VICINITY = 6;
 
+// The growth tests' temple and inn plans.
+constexpr std::size_t TEMPLE_PLAN = 5;
+constexpr std::size_t INN_PLAN = 6;
+
 // What the growth tests vary: A's stance, the pressure, the reach, the plans
 // A builds, whether B's faction is hostile to A's, and B's residents'
 // health.
@@ -2531,6 +2535,8 @@ struct Growing {
   bool hostile = true;
   std::uint64_t neighbour_health = 1;
   std::size_t founders = FOUNDERS;
+  // Village B's residents.
+  std::size_t neighbours = FOUNDERS;
   std::uint32_t self_reliance = std::numeric_limits<std::uint32_t>::max();
   // Whether village A's first resident, person 0, leads faction 0.
   bool led = false;
@@ -2539,10 +2545,21 @@ struct Growing {
   // Residents reaching a second tier, with a square two cells wider; none
   // at 0.
   std::uint32_t second_tier = 0;
+  // Residents reaching a third tier, after the second, with a square two
+  // cells wider again and no square kinds of its own; none at 0.
+  std::uint32_t third_tier = 0;
+  // Whether the second tier names the temple and then the inn as its square
+  // kinds.
+  bool named = false;
+  // Whether village A's first structure, its house, is of the temple's kind,
+  // and its durability.
+  bool temple_first = false;
+  std::uint32_t first_durability = INTACT;
 };
 
-// Growth of five plans, a granary and a house for four, homes, a field, an
-// edge, and a smithy and an apothecary each serving four, of the square; one
+// Growth of seven plans, a granary and a house for four, homes, a field, an
+// edge, a smithy and an apothecary each serving four, and a temple and an
+// inn holding nothing, of the square; one
 // tier with a 3 x 3 square, building within six cells; a core of one of the
 // first three each; two settlers and two raiders.
 Growth growth_of(const Growing& growing) {
@@ -2553,10 +2570,18 @@ Growth growth_of(const Growing& growing) {
   growth.spacing = 1;
   growth.claim = 4;
   growth.apart = growing.apart;
-  growth.tiers = {Tier{0, {SQUARE_SIDE, SQUARE_SIDE}, VICINITY}};
+  growth.tiers = {Tier{0, {SQUARE_SIDE, SQUARE_SIDE}, VICINITY, {}}};
   if (growing.second_tier > 0) {
+    growth.tiers.push_back(
+        Tier{growing.second_tier,
+             {SQUARE_SIDE + 2, SQUARE_SIDE + 2},
+             VICINITY,
+             growing.named ? std::vector<std::size_t>{TEMPLE_PLAN, INN_PLAN}
+                           : std::vector<std::size_t>{}});
+  }
+  if (growing.third_tier > 0) {
     growth.tiers.push_back(Tier{
-        growing.second_tier, {SQUARE_SIDE + 2, SQUARE_SIDE + 2}, VICINITY});
+        growing.third_tier, {SQUARE_SIDE + 4, SQUARE_SIDE + 4}, VICINITY, {}});
   }
   growth.plans = {
       Plan{"granary", {1, 1}, true, Holding{0, TEN_YEARS_FOOD, 0}, Role::HOME},
@@ -2571,6 +2596,8 @@ Growth growth_of(const Growing& growing) {
   growth.plans.push_back(Plan{"smithy", {1, 1}, true, smithy, Role::SQUARE});
   growth.plans.push_back(
       Plan{"apothecary", {1, 1}, true, apothecary, Role::SQUARE});
+  growth.plans.push_back(Plan{"temple", {1, 1}, true, {}, Role::SQUARE});
+  growth.plans.push_back(Plan{"inn", {1, 1}, true, {}, Role::SQUARE});
   growth.self_reliance = growing.self_reliance;
   growth.builds = growing.builds;
   growth.settlement_kind = "hamlet";
@@ -2595,6 +2622,7 @@ World growth_world(const Growing& growing, const std::vector<Cell>& rough = {},
   };
   constexpr Cell NEIGHBOUR_ROW{20, 20};
   std::vector<Structure> structures = row({1, 1});
+  structures.front().durability = growing.first_durability;
   for (const Structure& structure : row(NEIGHBOUR_ROW)) {
     structures.push_back(structure);
   }
@@ -2619,11 +2647,18 @@ World growth_world(const Growing& growing, const std::vector<Cell>& rough = {},
       Map{rows},
       {army(rows, GROWING_SEAT, GROWING_SEAT, growing.founders, 1, 0,
             {MEND, GUARD}),
-       army(rows, NEIGHBOUR_SEAT, NEIGHBOUR_SEAT, FOUNDERS,
+       army(rows, NEIGHBOUR_SEAT, NEIGHBOUR_SEAT, growing.neighbours,
             growing.neighbour_health, 1, {IDLE})},
       structures,
       daily,
-      {VillageSpec{{0, 1, 2}, 0, holdings, 0, clearings, {}},
+      {VillageSpec{{0, 1, 2},
+                   0,
+                   holdings,
+                   0,
+                   clearings,
+                   growing.temple_first
+                       ? std::vector<std::string>{"temple", "", ""}
+                       : std::vector<std::string>{}},
        VillageSpec{{3, 4, STRUCTURES_AT_START - 1}, 1, holdings, 0, {}, {}}},
       growing.led ? std::vector<Leadership>{Leadership{
                         0, std::nullopt, std::nullopt, std::nullopt}}
@@ -2933,6 +2968,211 @@ TEST(World, AVillageKeepsTheTierItReachedAsItsPeopleLeave) {
   // Control: the founded village, as many as A now, has not reached it.
   ASSERT_EQ(world.residents_of(FOUNDED), FOUNDERS - 2);
   EXPECT_EQ(world.tier(FOUNDED), 0U);
+}
+
+// A world whose village A has reached a second tier naming the temple and
+// the inn as its square kinds, the stance `stance`, and village B, of two,
+// has not.
+Growing square_kinds_of(std::vector<Expansion> stance) {
+  Growing growing{std::move(stance)};
+  growing.neighbours = FOUNDERS - 2;
+  growing.second_tier = FOUNDERS;
+  growing.named = true;
+  return growing;
+}
+
+// Ticks `world` until structure `structure` stands intact, for at most 200
+// ticks.
+void raise(World& world, std::size_t structure) {
+  constexpr std::uint64_t RAISING_LIMIT = 200;
+  for (std::uint64_t tick = 0;
+       tick < RAISING_LIMIT && world.stage(structure) != Stage::INTACT;
+       ++tick) {
+    world.tick();
+  }
+}
+
+TEST(World, AVillageReachingATierLaysItsSquareKindsAheadOfItsBuilds) {
+  // Pressed, with housing scarcest, it lays the temple first, as rubble, and
+  // nothing else that check.
+  World world = growth_world(square_kinds_of({Expansion::BUILD}));
+  ASSERT_EQ(world.tier(VILLAGE_A), 1U);
+  ASSERT_EQ(world.tier(VILLAGE_B), 0U);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  EXPECT_EQ(world.stage(STRUCTURES_AT_START), Stage::RUBBLE);
+  // Raised by repair, it is followed by the inn, then by the house.
+  raise(world, STRUCTURES_AT_START);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 2);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START + 1),
+            std::optional<std::string>{"inn"});
+  raise(world, STRUCTURES_AT_START + 1);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 3);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START + 2),
+            std::optional<std::string>{"house"});
+  // Control: a tier naming no square kinds lays the house first.
+  Growing plain = square_kinds_of({Expansion::BUILD});
+  plain.named = false;
+  World unnamed = growth_world(plain);
+  ASSERT_EQ(unnamed.tier(VILLAGE_A), 1U);
+  run_ticks(unnamed, 1);
+  ASSERT_EQ(unnamed.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(unnamed.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"house"});
+}
+
+TEST(World, ATownLaysTheSquareKindsOfTheVillageTierBelowIt) {
+  // Village A, of four, reaches a third tier naming no kinds of its own; the
+  // second, at three, names the temple and the inn. Village B, of two,
+  // reaches neither.
+  Growing town = square_kinds_of({});
+  town.second_tier = FOUNDERS - 1;
+  town.third_tier = FOUNDERS;
+  World world = growth_world(town);
+  ASSERT_EQ(world.tier(VILLAGE_A), 2U);
+  ASSERT_EQ(world.tier(VILLAGE_B), 0U);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  raise(world, STRUCTURES_AT_START);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 2);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START + 1),
+            std::optional<std::string>{"inn"});
+  // Control: with the lower tier naming none, the town lays nothing.
+  town.named = false;
+  World unnamed = growth_world(town);
+  ASSERT_EQ(unnamed.tier(VILLAGE_A), 2U);
+  run_ticks(unnamed, 1);
+  EXPECT_EQ(unnamed.structure_count(), STRUCTURES_AT_START);
+}
+
+TEST(World, AnUnpressedVillageWhoseStanceOnlyRaidsLaysItsSquareKinds) {
+  // Three people under a cap of four, with no hostile neighbour to raid.
+  Growing raiding = square_kinds_of({Expansion::RAID});
+  raiding.hostile = false;
+  raiding.founders = FOUNDERS - 1;
+  raiding.second_tier = FOUNDERS - 1;
+  World world = growth_world(raiding);
+  ASSERT_EQ(world.tier(VILLAGE_A), 1U);
+  ASSERT_EQ(world.tier(VILLAGE_B), 0U);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  raise(world, STRUCTURES_AT_START);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 2);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START + 1),
+            std::optional<std::string>{"inn"});
+  // Both stand, and it lays nothing more.
+  raise(world, STRUCTURES_AT_START + 1);
+  run_ticks(world, 1);
+  EXPECT_EQ(world.structure_count(), STRUCTURES_AT_START + 2);
+  // Control: a tier naming no square kinds lays nothing.
+  raiding.named = false;
+  World unnamed = growth_world(raiding);
+  run_ticks(unnamed, 1);
+  EXPECT_EQ(unnamed.structure_count(), STRUCTURES_AT_START);
+}
+
+TEST(World, ATempleInRubbleIsRaisedByRepairAndNotLaidAgain) {
+  // Village A's first structure is a temple in rubble.
+  Growing ruined = square_kinds_of({});
+  ruined.temple_first = true;
+  ruined.first_durability = 0;
+  World world = growth_world(ruined);
+  ASSERT_EQ(world.stage(0), Stage::RUBBLE);
+  run_ticks(world, 1);
+  EXPECT_EQ(world.structure_count(), STRUCTURES_AT_START);
+  // Raised by repair, it is held, and the inn is laid.
+  raise(world, 0);
+  ASSERT_EQ(world.stage(0), Stage::INTACT);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"inn"});
+  // Control: the same structure of no kind leaves the temple to be laid.
+  ruined.temple_first = false;
+  World unheld = growth_world(ruined);
+  raise(unheld, 0);
+  ASSERT_EQ(unheld.stage(0), Stage::INTACT);
+  run_ticks(unheld, 1);
+  ASSERT_EQ(unheld.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(unheld.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+}
+
+// The column and row of `cell`.
+std::pair<std::int32_t, std::int32_t> xy(Cell cell) { return {cell.x, cell.y}; }
+
+// Clearings covering every cell of the growth tests' map but `free`.
+std::vector<Clearing> all_but(Cell free) {
+  constexpr std::int32_t SIDE = GROWTH_SIDE;
+  return {Clearing{{0, 0}, {free.x, SIDE}},
+          Clearing{{free.x + 1, 0}, {SIDE - free.x - 1, SIDE}},
+          Clearing{{free.x, 0}, {1, free.y}},
+          Clearing{{free.x, free.y + 1}, {1, SIDE - free.y - 1}}};
+}
+
+TEST(World, ASquareKindWithNoFreeCornerOnTheSquaresEdgeTakesTheNearest) {
+  // The second tier's 5 x 5 square spans x 4 to 8 round the centre, and the
+  // one free cell lies two cells off its edge, within the vicinity.
+  constexpr Cell FREE{GROWING_SEAT.x + 5, GROWING_SEAT.y};
+  World world = growth_world(square_kinds_of({}), {}, all_but(FREE));
+  run_ticks(world, 1);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  EXPECT_EQ(xy(world.structure(STRUCTURES_AT_START).cell), xy(FREE));
+  // Control: with the edge open, it touches the square.
+  World open = growth_world(square_kinds_of({}));
+  run_ticks(open, 1);
+  ASSERT_EQ(open.structure_count(), STRUCTURES_AT_START + 1);
+  const Cell laid = open.structure(STRUCTURES_AT_START).cell;
+  constexpr std::int32_t REACH = 3;
+  EXPECT_EQ(std::max(std::abs(laid.x - GROWING_SEAT.x),
+                     std::abs(laid.y - GROWING_SEAT.y)),
+            REACH);
+}
+
+// Ticks `world` until growth lays a structure, for at most 100 ticks.
+void tick_until_laid(World& world) {
+  constexpr std::uint64_t LAYING_LIMIT = 100;
+  const std::size_t before = world.structure_count();
+  for (std::uint64_t tick = 0;
+       tick < LAYING_LIMIT && world.structure_count() == before; ++tick) {
+    world.tick();
+  }
+}
+
+TEST(World, ASquareKindWithNoSiteIsTriedAgainOnceOneFrees) {
+  // The one free cell is the residents' objective, so no corner is free.
+  constexpr Cell FREE{GROWING_SEAT.x + 5, GROWING_SEAT.y};
+  World world = growth_world(square_kinds_of({}), {}, all_but(FREE));
+  const std::size_t residents_a = 0;
+  world.order(residents_a, Order{FREE, {0, 1}});
+  constexpr std::uint64_t WAITING_TICKS = 5;
+  run_ticks(world, WAITING_TICKS);
+  EXPECT_EQ(world.structure_count(), STRUCTURES_AT_START);
+  // Sent back to the centre, they free it, and the temple is laid there.
+  world.order(residents_a, Order{GROWING_SEAT, {0, 1}});
+  tick_until_laid(world);
+  ASSERT_EQ(world.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(world.laid_kind(STRUCTURES_AT_START),
+            std::optional<std::string>{"temple"});
+  EXPECT_EQ(xy(world.structure(STRUCTURES_AT_START).cell), xy(FREE));
+  // Control: with the cell free from the start, the temple is laid on the
+  // first check.
+  World free = growth_world(square_kinds_of({}), {}, all_but(FREE));
+  run_ticks(free, 1);
+  ASSERT_EQ(free.structure_count(), STRUCTURES_AT_START + 1);
+  EXPECT_EQ(xy(free.structure(STRUCTURES_AT_START).cell), xy(FREE));
 }
 
 // A world of one village whose residents mend every tick, holding a rubble
@@ -3308,7 +3548,7 @@ TEST(World, GrowthPastItsLimitsIsRefused) {
   late_first.tiers.front().residents = 1;
   EXPECT_FALSE(grows_by(late_first));
   Growth unordered = valid;
-  unordered.tiers.push_back(Tier{0, {1, 1}, 1});
+  unordered.tiers.push_back(Tier{0, {1, 1}, 1, {}});
   EXPECT_FALSE(grows_by(unordered));
   Growth squareless = valid;
   squareless.tiers.front().square = {0, 1};
@@ -3318,7 +3558,7 @@ TEST(World, GrowthPastItsLimitsIsRefused) {
   EXPECT_FALSE(grows_by(effortless));
   // Control: a second tier past the first is accepted.
   Growth two_tiers = valid;
-  two_tiers.tiers.push_back(Tier{2, {1, 1}, 1});
+  two_tiers.tiers.push_back(Tier{2, {1, 1}, 1, {}});
   EXPECT_TRUE(grows_by(two_tiers));
   Growth too_many = valid;
   too_many.stances = {{}, {}, {}};

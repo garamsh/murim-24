@@ -409,6 +409,7 @@ void put_growth(Writer& out, const Growth& growth) {
     out.u32(tier.residents);
     put_footprint(out, tier.square);
     out.i32(tier.vicinity);
+    put_sizes(out, tier.square_kinds);
   });
   put_all(out, growth.plans, [&out](const Plan& plan) {
     out.text(plan.kind);
@@ -445,6 +446,7 @@ Growth get_growth(Reader& input) {
     tier.residents = input.u32();
     tier.square = get_footprint(input);
     tier.vicinity = input.i32();
+    tier.square_kinds = get_sizes(input);
     return tier;
   });
   growth.plans = get_all<Plan>(input, [&input] {

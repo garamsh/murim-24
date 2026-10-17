@@ -568,8 +568,21 @@ Kinship read_kinship(Reader& reader) {
   return kinship;
 }
 
-// The rules of growth, its plans laid for the builds and the settlement
-// template the entry names, once the villages are known.
+// The buildings growth may lay that the list field `key`, required unless
+// `optional`, names, each a structure kind with a footprint.
+std::vector<Building> read_builds(Reader& reader, const std::string& key,
+                                  bool optional, const Context& context) {
+  std::vector<Building> builds;
+  reader.each(key, optional, [&builds, &context](Reader& build) {
+    const std::size_t kind = build.reference("kind", "structure_kinds");
+    builds.push_back(Building{Structure{Cell{0, 0}, 0, read_footprint(build)},
+                              id_of(context, "structure_kinds", kind), 0});
+  });
+  return builds;
+}
+
+// The rules of growth, its plans laid for the builds, the settlement template
+// the entry names and each tier's square kinds, once the villages are known.
 void read_growth(Reader& reader, Built& built, const Context& context) {
   Growth growth;
   growth.interval = reader.number<std::uint32_t>("interval", 1);
@@ -580,26 +593,25 @@ void read_growth(Reader& reader, Built& built, const Context& context) {
   growth.apart = reader.number<std::int32_t>("apart", 0);
   growth.terrace = reader.number<std::uint32_t>("terrace", 1);
   growth.tiers.clear();
-  reader.each("tiers", false, [&growth](Reader& tier) {
+  std::vector<std::vector<Building>> square_kinds;
+  reader.each("tiers", false, [&growth, &square_kinds, &context](Reader& tier) {
     const auto residents = tier.number<std::uint32_t>("residents", 0, 0U);
     const Footprint square = read_footprint(tier);
     growth.tiers.push_back(
-        Tier{residents, square, tier.number<std::int32_t>("vicinity", 0)});
+        Tier{residents, square, tier.number<std::int32_t>("vicinity", 0), {}});
+    square_kinds.push_back(read_builds(tier, "square_kinds", true, context));
   });
   growth.settlers = reader.number<std::uint32_t>("settlers", 0);
   growth.raiders = reader.number<std::uint32_t>("raiders", 0);
   growth.self_reliance = reader.number<std::uint32_t>("self_reliance", 0);
-  std::vector<Building> builds;
-  reader.each("builds", false, [&builds, &context](Reader& build) {
-    const std::size_t kind = build.reference("kind", "structure_kinds");
-    builds.push_back(Building{Structure{Cell{0, 0}, 0, read_footprint(build)},
-                              id_of(context, "structure_kinds", kind), 0});
-  });
+  const std::vector<Building> builds =
+      read_builds(reader, "builds", false, context);
   const std::size_t settlement = reader.reference("settlement", "villages");
   const RegionData& data = built.data;
   if (context.building && settlement < data.villages.size()) {
-    built.data.life.growth = growth_for(data, std::move(growth), builds,
-                                        data.villages.at(settlement));
+    built.data.life.growth =
+        growth_for(data, std::move(growth), builds,
+                   data.villages.at(settlement), square_kinds);
   }
 }
 

@@ -203,11 +203,12 @@ constexpr std::int64_t TINY_VERSION = 2;
 constexpr std::int64_t JAB_DAMAGE = 4;
 // The hamlet's area: room for its house and the army its household raises.
 
-// A complete set of rules of life, `name`, in pack `pack`.
+// A complete set of rules of life, `name`, in pack `pack`. Returns its one
+// growth tier.
 // A terrace raised at the labour of a field on buildable cells.
 constexpr std::int64_t PER_MILLE_TERRACE = 1'000;
 
-void add_life(MemoryPacks& packs, const std::string& pack,
+Node add_life(MemoryPacks& packs, const std::string& pack,
               const std::string& name) {
   Node life = packs.entry(pack, "life", name).set("newborn_health", 4);
   Node growth = life.map("growth")
@@ -222,12 +223,12 @@ void add_life(MemoryPacks& packs, const std::string& pack,
                     .set("raiders", 0)
                     .set("self_reliance", 0)
                     .text("settlement", "hamlet");
-  growth.list("tiers")
-      .item()
-      .set("residents", 0)
-      .set("width", 1)
-      .set("height", 1)
-      .set("vicinity", 4);
+  Node tier = growth.list("tiers")
+                  .item()
+                  .set("residents", 0)
+                  .set("width", 1)
+                  .set("height", 1)
+                  .set("vicinity", 4);
   growth.list("builds");
   life.map("learning")
       .set("comprehension", 0)
@@ -238,9 +239,10 @@ void add_life(MemoryPacks& packs, const std::string& pack,
       .set("polarity_ease", 0)
       .set("orientation_potency", 0)
       .set("polarity_potency", 0);
+  return tier;
 }
 
-void add_tiny_base(MemoryPacks& packs) {
+void add_tiny_base(MemoryPacks& packs, const std::string& square_kind = "") {
   packs.manifest(TINY, TINY_VERSION).flag("base", true);
   packs.entry(TINY, "terrain", "plain")
       .text("footing", "buildable")
@@ -273,7 +275,14 @@ void add_tiny_base(MemoryPacks& packs) {
       .set("durability", 4)
       .text("kind", "house")
       .set("households", 1);
-  add_life(packs, TINY, "life");
+  Node tier = add_life(packs, TINY, "life");
+  if (!square_kind.empty()) {
+    tier.list("square_kinds")
+        .item()
+        .text("kind", square_kind)
+        .set("width", 1)
+        .set("height", 1);
+  }
 }
 
 // The manifest of a mod pack `name` at version 1, for its further fields.
@@ -705,6 +714,80 @@ TEST(Content, AMergedSetFailingTheRegionsChecksIsRefused) {
       .text("kind", "house")
       .set("households", 1);
   EXPECT_TRUE(load_content(control, TINY, {"cramped"}).errors.empty());
+}
+
+// The tiny base pack with a shrine, a structure kind of the square role,
+// whose life's one tier names `square_kind` as a square kind.
+MemoryPacks tiny_naming(const std::string& square_kind) {
+  MemoryPacks packs;
+  add_tiny_base(packs, square_kind);
+  packs.entry(TINY, "structure_kinds", "shrine")
+      .set("housing", 0)
+      .set("storage", 0)
+      .set("yield", 0)
+      .flag("blocks", true)
+      .set("pupils", 0)
+      .text("role", "square");
+  return packs;
+}
+
+TEST(Content, ATierNamingAnUnknownOrOffSquareKindIsRefused) {
+  // A kind the packs do not have is unresolved.
+  const LoadedContent unknown = load_content(tiny_naming("temple"), TINY, {});
+  EXPECT_TRUE(refused_for(unknown, TINY, "growth.tiers.0.square_kinds.0.kind",
+                          ContentRefusal::UNRESOLVED_ID));
+  EXPECT_FALSE(unknown.data.has_value());
+  // A house, of the home role, is inconsistent.
+  const LoadedContent home = load_content(tiny_naming("house"), TINY, {});
+  EXPECT_TRUE(refused_for(home, TINY, "", ContentRefusal::INCONSISTENT));
+  EXPECT_FALSE(home.data.has_value());
+
+  // Control: the shrine, of the square role, loads as the tier's one square
+  // kind.
+  const LoadedContent shrine = load_content(tiny_naming("shrine"), TINY, {});
+  EXPECT_TRUE(shrine.errors.empty());
+  ASSERT_TRUE(shrine.data.has_value());
+  const Growth growth =
+      shrine.data.value_or(RegionData{}).life.growth.value_or(Growth{});
+  ASSERT_EQ(growth.tiers.front().square_kinds.size(), 1U);
+  EXPECT_EQ(growth.plans.at(growth.tiers.front().square_kinds.front()).kind,
+            "shrine");
+}
+
+// The tiny base pack with mod "towns", whose life's growth lists two tiers,
+// the second reached at `second` residents.
+MemoryPacks tiny_with_tiers(std::int64_t second) {
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "towns");
+  Node tiers = packs.entry("towns", "life", "life").map("growth").list("tiers");
+  for (const std::int64_t residents : {std::int64_t{0}, second}) {
+    tiers.item()
+        .set("residents", residents)
+        .set("width", 1)
+        .set("height", 1)
+        .set("vicinity", 4);
+  }
+  return packs;
+}
+
+TEST(Content, AGrowthWithTiersOutOfOrderIsRefusedAtLoad) {
+  // Two tiers both reached at no one are out of order.
+  const LoadedContent unordered =
+      load_content(tiny_with_tiers(0), TINY, {"towns"});
+  EXPECT_TRUE(
+      refused_for(unordered, "towns", "", ContentRefusal::INCONSISTENT));
+  EXPECT_FALSE(unordered.data.has_value());
+
+  // Control: the second reached at five residents loads.
+  const LoadedContent ordered =
+      load_content(tiny_with_tiers(5), TINY, {"towns"});
+  EXPECT_TRUE(ordered.errors.empty());
+  ASSERT_TRUE(ordered.data.has_value());
+  EXPECT_EQ(ordered.data.value_or(RegionData{})
+                .life.growth.value_or(Growth{})
+                .tiers.size(),
+            2U);
 }
 
 // The damage the test mod gives the guard strike.

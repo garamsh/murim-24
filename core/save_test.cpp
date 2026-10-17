@@ -383,6 +383,20 @@ TEST(Save, AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
 }
 
+TEST(Save, AVersion17SaveFromBeforeTiersNamedSquareKindsIsRefused) {
+  // Version 17 saves hold no growth tier's square kinds.
+  constexpr std::uint32_t BEFORE_SQUARE_KINDS = 17;
+  ASSERT_LT(BEFORE_SQUARE_KINDS, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) =
+      static_cast<std::uint8_t>(BEFORE_SQUARE_KINDS);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
 TEST(Save, AVersion15SaveFromBeforeTiersIsRefused) {
   // Version 15 saves hold no area's tier and no army's far anchor.
   constexpr std::uint32_t BEFORE_TIERS = 15;
@@ -1010,7 +1024,7 @@ World starving(std::size_t people) {
   Life life;
   life.husbandry = Husbandry{1, 1, 0};
   Growth growth;
-  growth.tiers = {Tier{0, {1, 1}, 1}, Tier{4, {3, 3}, 1}};
+  growth.tiers = {Tier{0, {1, 1}, 1, {}}, Tier{4, {3, 3}, 1, {}}};
   growth.stances = {{}};
   life.growth = growth;
   std::vector<Recruit> residents;
@@ -1043,6 +1057,53 @@ TEST(Save, AVillageThatShrankKeepsTheTierItReachedAfterLoading) {
   const World never = starving(3);
   ASSERT_EQ(never.residents_of(0), 0U);
   EXPECT_EQ(never.tier(0), 0U);
+}
+
+// A village of four on an open map with no structure, whose growth's one
+// tier names a temple of the square role as its square kind when `named`.
+World temple_world(bool named) {
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = 1;
+  Life life;
+  Growth growth;
+  growth.plans = {Plan{"temple", {1, 1}, true, {}, Role::SQUARE}};
+  growth.tiers = {
+      Tier{0,
+           {1, 1},
+           4,
+           named ? std::vector<std::size_t>{0} : std::vector<std::size_t>{}}};
+  growth.stances = {{}};
+  life.growth = growth;
+  constexpr std::int32_t PEOPLE = 4;
+  std::vector<Recruit> residents;
+  residents.reserve(PEOPLE);
+  for (std::int32_t person = 0; person < PEOPLE; ++person) {
+    residents.push_back(Recruit{{person, 0}, 1});
+  }
+  const std::vector<std::string> rows(8, std::string(8, '.'));
+  return World{Seed{1},
+               Map{rows},
+               {ArmySpec{{4, 4}, residents, 0, {Skill{0, 0, 0, 0, 1}}}},
+               {},
+               rules,
+               {VillageSpec{{}, 0, {}, 0, {}, {}}},
+               {},
+               life};
+}
+
+TEST(Save, ALoadedWorldKeepsItsTiersSquareKinds) {
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, temple_world(true)}, store, SLOT));
+  Saved restored = loaded(load(store, SLOT));
+  // The hash folds no growth data.
+  EXPECT_EQ(restored.world.hash(), temple_world(false).hash());
+  restored.world.tick();
+  ASSERT_EQ(restored.world.structure_count(), 1U);
+  EXPECT_EQ(restored.world.laid_kind(0), std::optional<std::string>{"temple"});
+  // Control: a tier naming none lays nothing.
+  World plain = temple_world(false);
+  plain.tick();
+  EXPECT_EQ(plain.structure_count(), 0U);
 }
 
 TEST(Save, ALoadedWorldKeepsItsAttackIntent) {

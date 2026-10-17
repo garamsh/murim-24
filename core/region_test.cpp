@@ -775,6 +775,23 @@ TEST(Region, OnlyTheVillageTemplateStartsWithATempleAndAnInnKeeper) {
   EXPECT_EQ(hamlets.innkeepers, 0U);
 }
 
+TEST(Region, TheBasePacksVillageTierNamesATempleThenAnInn) {
+  const Growth growth = base_data().life.growth.value_or(Growth{});
+  ASSERT_EQ(growth.tiers.size(), 3U);
+  std::vector<std::vector<std::string>> named;
+  for (const Tier& tier : growth.tiers) {
+    std::vector<std::string> kinds;
+    kinds.reserve(tier.square_kinds.size());
+    for (const std::size_t plan : tier.square_kinds) {
+      kinds.push_back(growth.plans.at(plan).kind);
+    }
+    named.push_back(kinds);
+  }
+  // The hamlet and the town name none; the town holds the village's.
+  EXPECT_EQ(named,
+            (std::vector<std::vector<std::string>>{{}, {"temple", "inn"}, {}}));
+}
+
 TEST(Region, TheBasePacksTempleTakesTwoMonksBeforeTheFields) {
   const Occupations occupations =
       base_data().life.occupations.value_or(Occupations{});
