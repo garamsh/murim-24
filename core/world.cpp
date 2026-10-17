@@ -2903,10 +2903,11 @@ bool World::standing_within(std::size_t village, Position from,
   });
 }
 
-// Each army bearing on a village, with no member engaging a foe, none within
-// reach of a structure of it still standing, and its objective out of reach of
-// all of them, is ordered on to the open cell nearest the standing structure
-// nearest its lead, so a band ruins what stands beyond its centre.
+// Each army bearing on a village, with no member engaging a foe and its
+// objective out of reach of every structure of it still standing, is ordered
+// on to the open cell nearest the standing structure nearest its lead, so a
+// band ruins what stands beyond its centre. A member in reach of one does not
+// hold the band, which holds where it gathers, at its objective.
 void World::bear_on_villages(const Crowd& crowd,
                              const std::vector<Closing>& closings) {
   for (std::size_t army = 0; army < armies_.size(); ++army) {
@@ -2916,13 +2917,12 @@ void World::bear_on_villages(const Crowd& crowd,
       continue;
     }
     const std::int32_t reach = structure_reach(bearing);
-    const auto busy = [&](std::size_t member) {
+    const auto engaging = [&](std::size_t member) {
       const std::size_t index =
           member < crowd.slot.size() ? crowd.slot.at(member) : ABSENT;
-      return (index != ABSENT && closings.at(index).foe) ||
-             standing_within(*village, people_.at(member).position, reach);
+      return index != ABSENT && closings.at(index).foe;
     };
-    if (std::any_of(bearing.roster.begin(), bearing.roster.end(), busy) ||
+    if (std::any_of(bearing.roster.begin(), bearing.roster.end(), engaging) ||
         standing_within(*village, centre_of(bearing.order.objective), reach)) {
       continue;
     }
