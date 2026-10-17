@@ -668,6 +668,10 @@ const std::vector<CoarseExit>& CoarseGraph::exits(std::size_t area) const {
   return areas_.at(area).exits;
 }
 
+bool CoarseGraph::costed_in_closed_form(std::size_t area) const {
+  return areas_.at(area).open;
+}
+
 std::vector<CoarseCost> CoarseGraph::walks_within(const Map& map,
                                                   std::size_t area,
                                                   Cell from) const {

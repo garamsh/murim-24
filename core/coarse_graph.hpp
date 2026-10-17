@@ -198,6 +198,10 @@ class CoarseGraph {
   /// Returns how many nodes area `area` holds.
   [[nodiscard]] std::size_t nodes_in(std::size_t area) const;
 
+  /// Returns whether area `area`'s walks are costed in closed form, as an
+  /// area with no blocked cell is unless AreaCosts::SEARCHED asks otherwise.
+  [[nodiscard]] bool costed_in_closed_form(std::size_t area) const;
+
   [[nodiscard]] std::int32_t columns() const;
   [[nodiscard]] std::size_t area_of(Cell cell) const;
   [[nodiscard]] std::size_t node_count() const;

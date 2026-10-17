@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "areas.hpp"
 #include "flow_field.hpp"
 #include "map.hpp"
 #include "random.hpp"
@@ -429,37 +430,49 @@ TEST(CoarseGraph, ARevertedRebuildLeavesTheGraphAsItWas) {
       CoarseGraph{walled}.joined(walled, Walk{Cell{0, 0}, Cell{WIDE - 1, 0}}));
 }
 
-TEST(CoarseGraph, OpenAreasCostedInClosedFormMatchTheirSearch) {
-  // Open ground east of the middle column, scattered blocks west of it, and
-  // in one open area a wall with a gap, which lengthens walks across it.
+// Open ground east of the middle column, scattered blocks west of it, and in
+// one open area a wall with a gap, which lengthens walks across it.
+constexpr std::int32_t WALLED = 80;
+
+Map walled_open_ground() {
   std::vector<std::string> rows = random_rows(Scatter{REBUILT_SEED, DENSE / 2});
   for (std::string& row : rows) {
     std::fill(row.begin() + SMALL_SIDE / 2, row.end(), '.');
   }
-  constexpr std::int32_t WALLED = 80;
   constexpr std::int32_t WALL_TOP = 64;
   constexpr std::int32_t WALL_BOTTOM = 92;
   for (std::int32_t row = WALL_TOP; row < WALL_BOTTOM; ++row) {
     rows.at(static_cast<std::size_t>(row)).at(WALLED) = '#';
   }
-  const Map map{rows};
+  return Map{rows};
+}
+
+TEST(CoarseGraph, OpenAreasCostedInClosedFormMatchTheirSearch) {
+  const Map map = walled_open_ground();
   const CoarseGraph closed{map};
   const CoarseGraph searched{map, AreaCosts::SEARCHED};
+  // Setup: the areas east of the middle column but the walled one are costed
+  // in closed form, and no area of the searched graph is.
+  const Cell open{70, 5};
+  const Cell walled{WALLED + 4, 70};
+  ASSERT_TRUE(closed.costed_in_closed_form(closed.area_of(open)));
+  ASSERT_FALSE(closed.costed_in_closed_form(closed.area_of(walled)));
+  ASSERT_FALSE(searched.costed_in_closed_form(searched.area_of(open)));
   EXPECT_TRUE(closed == searched);
+  // Every walk within an open area, from its corner, costs what the search
+  // gives it.
+  const std::size_t area = closed.area_of(open);
+  const Cell corner{(open.x / AREA_SIDE) * AREA_SIDE,
+                    (open.y / AREA_SIDE) * AREA_SIDE};
+  EXPECT_EQ(closed.walks_within(map, area, corner),
+            searched.walks_within(map, area, corner));
   // Control: across the wall a walk costs more than the octile cost, which
   // the closed form would have given that area.
   const Cell west{WALLED - 4, 70};
-  const Cell east{WALLED + 4, 70};
   const std::optional<CoarseCost> across =
-      closed.path_cost(map, Walk{west, east}, false);
+      closed.path_cost(map, Walk{west, walled}, false);
   ASSERT_TRUE(across.has_value());
-  EXPECT_GT(across.value_or(0), octile(west, east));
-  // Setup: the graph does cost open areas, east of the middle column, and
-  // walks within one cost the octile cost.
-  const Cell open_from{70, 5};
-  const Cell open_to{90, 25};
-  EXPECT_EQ(closed.path_cost(map, Walk{open_from, open_to}, false),
-            octile(open_from, open_to));
+  EXPECT_GT(across.value_or(0), octile(west, walled));
 }
 
 }  // namespace
