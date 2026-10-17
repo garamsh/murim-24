@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "random.hpp"
 
 namespace murim {
 namespace {
@@ -126,6 +127,86 @@ TEST(FlowField, NoStepPassesBesideOneBlockedCell) {
   // Control: with that cell open the step is the diagonal.
   const Step open = FlowField{Map{open_rows()}, CORNER_TO}.step(CORNER_FROM);
   EXPECT_TRUE(open.x == 1 && open.y == 1);
+}
+
+// Windows of maps with one cell in five blocked, each seeded on cells of its
+// edge at costs far apart and close, one seeded twice.
+constexpr std::int32_t RANDOM_SIDE = 40;
+constexpr Cell WINDOW_CORNER{3, 3};
+constexpr Footprint WINDOW{34, 34};
+constexpr std::uint64_t MAPS = 20;
+constexpr std::int32_t BLOCKED_IN = 5;
+constexpr std::int32_t SEED_COST_SPREAD = 2000;
+constexpr int SEEDS = 12;
+
+Map random_map(Random& random) {
+  std::vector<std::string> rows(RANDOM_SIDE, std::string(RANDOM_SIDE, '.'));
+  for (std::string& row : rows) {
+    for (char& cell : row) {
+      cell = random.below(BLOCKED_IN) == 0 ? '#' : '.';
+    }
+  }
+  return Map{rows};
+}
+
+std::vector<FieldSeed> random_seeds(Random& random) {
+  std::vector<FieldSeed> seeds;
+  for (int seed = 0; seed < SEEDS; ++seed) {
+    const Cell cell{WINDOW_CORNER.x + random.below(WINDOW.width),
+                    WINDOW_CORNER.y};
+    seeds.push_back(FieldSeed{
+        cell, static_cast<std::uint32_t>(random.below(SEED_COST_SPREAD))});
+  }
+  seeds.push_back(seeds.front());
+  return seeds;
+}
+
+// How many cells of the map the two fields give another step or distance.
+int differing(const FlowField& one, const FlowField& other) {
+  int cells = 0;
+  for (std::int32_t row = 0; row < RANDOM_SIDE; ++row) {
+    for (std::int32_t column = 0; column < RANDOM_SIDE; ++column) {
+      const Cell cell{column, row};
+      const bool same = one.step(cell).x == other.step(cell).x &&
+                        one.step(cell).y == other.step(cell).y &&
+                        one.distance(cell) == other.distance(cell);
+      cells += same ? 0 : 1;
+    }
+  }
+  return cells;
+}
+
+// How many cells of the map the field reaches.
+int reached(const FlowField& field) {
+  int cells = 0;
+  for (std::int32_t row = 0; row < RANDOM_SIDE; ++row) {
+    for (std::int32_t column = 0; column < RANDOM_SIDE; ++column) {
+      cells +=
+          field.distance(Cell{column, row}) != FlowField::UNREACHABLE ? 1 : 0;
+    }
+  }
+  return cells;
+}
+
+TEST(FlowField, TheBucketSearchStepsAndCostsEveryCellAsTheHeapDoes) {
+  int cells_differing = 0;
+  int cells_reached = 0;
+  for (std::uint64_t seed = 0; seed < MAPS; ++seed) {
+    Random random{seed};
+    const Map map = random_map(random);
+    const std::vector<FieldSeed> seeds = random_seeds(random);
+    const Cell aim{WINDOW_CORNER.x + (WINDOW.width / 2), 0};
+    const FlowField buckets{map,   WINDOW_CORNER, WINDOW,
+                            seeds, aim,           Frontier::BUCKETS};
+    const FlowField heap{map,   WINDOW_CORNER, WINDOW,
+                         seeds, aim,           Frontier::HEAP};
+    cells_differing += differing(buckets, heap);
+    cells_reached += reached(heap);
+  }
+  // The windows were reached well beyond their seeds, so the searches had
+  // cells to settle.
+  ASSERT_GT(cells_reached, static_cast<int>(MAPS) * SEEDS * 10);
+  EXPECT_EQ(cells_differing, 0);
 }
 
 }  // namespace

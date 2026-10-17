@@ -36,12 +36,14 @@ FlowField::FlowField(const Map& map, Cell objective) {
 }
 
 FlowField::FlowField(const Map& map, Cell corner, Footprint size,
-                     const std::vector<FieldSeed>& seeds, Cell aim) {
-  rebuild(map, corner, size, seeds, aim);
+                     const std::vector<FieldSeed>& seeds, Cell aim,
+                     Frontier frontier) {
+  rebuild(map, corner, size, seeds, aim, frontier);
 }
 
 void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
-                        const std::vector<FieldSeed>& seeds, Cell aim) {
+                        const std::vector<FieldSeed>& seeds, Cell aim,
+                        Frontier frontier) {
   corner_ = corner;
   width_ = size.width;
   height_ = size.height;
@@ -55,40 +57,17 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
   for (std::size_t slot = 0; slot < cells; ++slot) {
     passable_.at(slot) = map.passable(cell_at(slot));
   }
-  // A heap ordered as std::priority_queue orders one with std::greater.
-  frontier_.clear();
-  const auto push = [this](std::uint32_t cost, std::size_t slot) {
-    frontier_.emplace_back(cost, slot);
-    std::push_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
-  };
   for (const FieldSeed& seed : seeds) {
     // A seed may be blocked, as an objective on a structure is: the walk
     // ends beside it.
     if (inside(seed.cell) && seed.cost < costs_.at(index(seed.cell))) {
       costs_.at(index(seed.cell)) = seed.cost;
-      push(seed.cost, index(seed.cell));
     }
   }
-  while (!frontier_.empty()) {
-    std::pop_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
-    const auto [cost, slot] = frontier_.back();
-    frontier_.pop_back();
-    if (cost != costs_.at(slot)) {
-      continue;
-    }
-    const Cell cell = cell_at(slot);
-    for (const Step direction : DIRECTIONS) {
-      const Cell next{cell.x + direction.x, cell.y + direction.y};
-      // Every step is open both ways, so a path from `next` may take it back.
-      if (!inside(next) || !opens(cell, direction)) {
-        continue;
-      }
-      const std::uint32_t through = cost + cost_of(direction);
-      if (through < costs_.at(index(next))) {
-        costs_.at(index(next)) = through;
-        push(through, index(next));
-      }
-    }
+  if (frontier == Frontier::BUCKETS) {
+    settle_by_buckets(seeds);
+  } else {
+    settle_by_heap(seeds);
   }
   seeded_.assign(cells, false);
   for (const FieldSeed& seed : seeds) {
@@ -99,6 +78,92 @@ void FlowField::rebuild(const Map& map, Cell corner, Footprint size,
   for (std::size_t slot = 0; slot < steps_.size(); ++slot) {
     if (costs_.at(slot) != UNREACHABLE && !seeded_.at(slot)) {
       steps_.at(slot) = straightest(cell_at(slot), aim);
+    }
+  }
+}
+
+template <typename Reached>
+void FlowField::relax(std::size_t slot, Reached reached) {
+  const std::uint32_t cost = costs_.at(slot);
+  const Cell cell = cell_at(slot);
+  for (const Step direction : DIRECTIONS) {
+    const Cell next{cell.x + direction.x, cell.y + direction.y};
+    // Every step is open both ways, so a path from `next` may take it back.
+    if (!inside(next) || !opens(cell, direction)) {
+      continue;
+    }
+    const std::uint32_t through = cost + cost_of(direction);
+    if (through < costs_.at(index(next))) {
+      costs_.at(index(next)) = through;
+      reached(through, index(next));
+    }
+  }
+}
+
+// Cells are settled in order of cost. A step raises a cost by at most
+// DIAGONAL_COST, so every cell waiting has a cost within RING of the one
+// being settled, and each lies in the bucket of its cost modulo RING. A seed
+// joins the ring when its cost comes within reach, and the ring skips ahead
+// to the next seed when it is empty.
+void FlowField::settle_by_buckets(const std::vector<FieldSeed>& seeds) {
+  sorted_seeds_.clear();
+  for (const FieldSeed& seed : seeds) {
+    if (inside(seed.cell) && costs_.at(index(seed.cell)) == seed.cost) {
+      sorted_seeds_.emplace_back(seed.cost, index(seed.cell));
+    }
+  }
+  std::sort(sorted_seeds_.begin(), sorted_seeds_.end());
+  for (std::vector<std::size_t>& bucket : buckets_) {
+    bucket.clear();
+  }
+  std::size_t waiting = 0;
+  std::size_t next_seed = 0;
+  const auto file = [this, &waiting](std::uint32_t cost, std::size_t slot) {
+    buckets_.at(cost % RING).push_back(slot);
+    ++waiting;
+  };
+  std::uint32_t cost = 0;
+  while (waiting > 0 || next_seed < sorted_seeds_.size()) {
+    if (waiting == 0) {
+      cost = sorted_seeds_.at(next_seed).first;
+    }
+    while (next_seed < sorted_seeds_.size() &&
+           sorted_seeds_.at(next_seed).first == cost) {
+      file(cost, sorted_seeds_.at(next_seed).second);
+      ++next_seed;
+    }
+    // A step costs at least STRAIGHT_COST, so settling this bucket files
+    // nothing back into it.
+    std::vector<std::size_t>& bucket = buckets_.at(cost % RING);
+    waiting -= bucket.size();
+    for (const std::size_t slot : bucket) {
+      if (costs_.at(slot) == cost) {
+        relax(slot, file);
+      }
+    }
+    bucket.clear();
+    ++cost;
+  }
+}
+
+// A heap ordered as std::priority_queue orders one with std::greater.
+void FlowField::settle_by_heap(const std::vector<FieldSeed>& seeds) {
+  frontier_.clear();
+  const auto push = [this](std::uint32_t cost, std::size_t slot) {
+    frontier_.emplace_back(cost, slot);
+    std::push_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
+  };
+  for (const FieldSeed& seed : seeds) {
+    if (inside(seed.cell) && costs_.at(index(seed.cell)) == seed.cost) {
+      push(seed.cost, index(seed.cell));
+    }
+  }
+  while (!frontier_.empty()) {
+    std::pop_heap(frontier_.begin(), frontier_.end(), std::greater<>{});
+    const auto [cost, slot] = frontier_.back();
+    frontier_.pop_back();
+    if (cost == costs_.at(slot)) {
+      relax(slot, push);
     }
   }
 }
