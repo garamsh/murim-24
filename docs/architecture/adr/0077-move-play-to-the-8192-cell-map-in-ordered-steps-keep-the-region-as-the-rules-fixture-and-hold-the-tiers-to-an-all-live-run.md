@@ -1,6 +1,6 @@
 # ADR 0077: Move play to the 8,192-cell map in ordered steps, keep the region as the rules' fixture, and hold the tiers to an all-live run
 
-> Status: proposed; its step 3 built, as `simulation.md` records: until step 4 a far army's anchor is its lead's area and cell with no coarse node, and its progress stays 0 until step 5's far rules advance it
+> Status: proposed; its step 3 built, as `simulation.md` records: until step 4 a far army's anchor is its lead's area and cell with no coarse node, and its progress stays 0 until step 5's far rules advance it; its step 4's coarse graph, region level, paths, fields within areas and reachability built in #371's first part, the far anchor's node and the tiers bench to follow in its second
 > Date: 2026-10-12
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

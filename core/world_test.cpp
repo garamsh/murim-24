@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 
+#include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
 #include "calendar.hpp"
@@ -270,7 +271,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xF4972D72FF40287BULL);
+            0xAB0A003912E54CCCULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -296,9 +297,9 @@ struct Walk {
   std::int64_t strayed;
 };
 
-Walk walk_alone(Cell start, Cell objective) {
+Walk walk_alone(Cell start, Cell objective, std::size_t side = OPEN_SIDE) {
   World world{Seed{1},
-              Map{open_map(OPEN_SIDE)},
+              Map{open_map(side)},
               {army(start, objective, 1, 1, 0, {IDLE})},
               {},
               peaceful(SEPARATION)};
@@ -341,6 +342,28 @@ TEST(World, APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed) {
   // over the square root of two times as far.
   EXPECT_EQ(straight.ticks, 152);
   EXPECT_EQ(diagonal.ticks, 222);
+}
+
+// An open map of 4 by 4 areas.
+constexpr std::size_t AREAS_SIDE = 128;
+// The walk from (2, 10) to (100, 70) by one field over the whole map, on
+// main 5477540 before fields within areas: its ticks, and how far it strays
+// from the line, 7.4 cells, since each step is the one nearest the line from
+// its own cell (ADR 0037), not from the start's.
+constexpr int WHOLE_MAP_TICKS = 1'993;
+constexpr std::int64_t WHOLE_MAP_STRAY = 1'906;
+
+TEST(World, AWalkAcrossThreeAreasOnOpenGroundIsTheWholeMapFieldsWalk) {
+  // From area (0, 0) to area (3, 2), off every diagonal, by the fields of
+  // the areas it crosses (ADR 0043).
+  const Cell start{2, 10};
+  const Cell objective{100, 70};
+  const Walk across = walk_alone(start, objective, AREAS_SIDE);
+  // Setup: it arrived, across three areas or more.
+  ASSERT_LT(across.ticks, ARRIVAL_TICKS);
+  ASSERT_GE((objective.x / AREA_SIDE) - (start.x / AREA_SIDE), 3);
+  EXPECT_EQ(across.ticks, WHOLE_MAP_TICKS);
+  EXPECT_EQ(across.strayed, WHOLE_MAP_STRAY);
 }
 
 // Where an army of nine stands after ARRIVAL_TICKS at its objective, with
