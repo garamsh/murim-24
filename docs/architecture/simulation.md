@@ -4,6 +4,18 @@ The simulation core: what exists of it now, and the decisions it rests on.
 
 ## Current decisions
 
+### The principle
+
+The owner's design principle (#229, ADR 0063), confirmed as a review standard on 2026-10-18:
+- **Derived, not fixed.** A quantity the world could produce, such as a population limit, a price, a wage or an animal count, comes from the state that produces it: food that regrows, goods made and spent. A fixed cap, target or tuning constant standing in for one is a defect.
+- **The technical capacity is not a rule of play.** `MAX_PEOPLE` and the bench's live bound measure what the machine can hold, not a limit of the game (ADR 0063).
+- **A rule covers every case.** A change to a rule reaches every case it governs. A rule that stops fitting its cases is replaced as a whole, not given a special case beside it.
+
+Today's departures, each with its issue:
+- births are scaled by headroom under the village's cap and stop at it (ADR 0022), not governed by food (#296);
+- a ware's price and the daily wage are fixed data, with no household needs or markets behind them (#295);
+- animals are planned with their count capped by habitat (#171's text).
+
 ### The world
 
 - The simulation core is a C++ library in `core/`, with no engine dependency.
