@@ -215,6 +215,9 @@ bool run_m1() {
 // timed, or they no longer bound two battles in play.
 constexpr std::uint64_t LEAST_BATTLE_STRIKES_PER_TICK = 16;
 
+// A kibibyte, for the memory reports.
+constexpr std::size_t KIB = 1'024;
+
 // The nodes a search toward an objective has costed: its objective's
 // region's, the border nodes it settled, and each costed region's.
 std::size_t costed(const GoalSearch& search) {
@@ -278,6 +281,7 @@ bool run_live() {
   // keeps, at their most over the timed ticks.
   std::size_t most_objectives = 0;
   std::size_t most_costed = 0;
+  std::size_t most_walk_bytes = 0;
   for (int tick = 0; tick < TIMED_TICKS; ++tick) {
     const auto before = cooldowns(world);
     const std::size_t built_at = world.fields().built_in_all();
@@ -285,6 +289,7 @@ bool run_live() {
     world.tick();
     durations.push_back(std::chrono::steady_clock::now() - start);
     most_built = std::max(most_built, world.fields().built_in_all() - built_at);
+    most_walk_bytes = std::max(most_walk_bytes, world.fields().walk_bytes());
     const std::vector<const GoalSearch*> searches = world.fields().searches();
     most_objectives = std::max(most_objectives, searches.size());
     for (const GoalSearch* search : searches) {
@@ -331,6 +336,8 @@ bool run_live() {
             << "objectives searched toward in a tick: at most "
             << most_objectives << ", costing at most " << most_costed
             << " nodes each\n"
+            << "walks within areas seeding the fields: at most "
+            << most_walk_bytes / KIB << " KiB held in a tick\n"
             << "TARGET " << (pass ? "MET" : "MISSED") << ": p99 " << p99
             << " ms against a " << BUDGET_MS
             << " ms target, not yet in force (#216; ADR 0053 makes it "
@@ -354,7 +361,6 @@ constexpr std::int32_t PASS_WIDTH = 16;
 constexpr std::int32_t PASS_STRIDE = 1'777;
 constexpr int PATH_RUNS = 5;
 constexpr std::int32_t FOOTPRINT = 3;
-constexpr std::size_t KIB = 1'024;
 // A frame at 60 frames a second, in milliseconds.
 constexpr double FRAME_MS = 16.7;
 
@@ -476,7 +482,9 @@ void run_paths() {
             << " footprint and reverting it: median " << lay_ms << " ms\n"
             << "first field toward a fresh objective across the map: "
             << first_field_ms << " ms, its search costing " << costed(search)
-            << " nodes, about " << search_bytes(search) / KIB << " KiB\n"
+            << " nodes, about " << search_bytes(search) / KIB
+            << " KiB, and its walks within areas " << fields.walk_bytes() / KIB
+            << " KiB\n"
             << "control, one exit's cost over the areas alone: "
             << over_areas_ms << " ms\n";
 }
