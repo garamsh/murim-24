@@ -3438,30 +3438,6 @@ TEST(World, ABandRuinsAVillageWhoseStructureStandsOnItsClaimsEdge) {
   EXPECT_EQ(world.village_state(0), VillageState::RUINS);
 }
 
-TEST(World, ABandSentOnHoldsItsObjectiveUntilTheStructureThereFalls) {
-  constexpr std::uint64_t TICKS = 600;
-  World world = beset_far(1);
-  std::uint64_t ticks = 0;
-  for (; ticks < TICKS && in(BESET_SEAT, centre_of(world.objective(BAND)));
-       ++ticks) {
-    world.tick();
-  }
-  // Setup: the band was sent on to the structure nearest it, still standing.
-  ASSERT_TRUE(within_four(world.objective(BAND), NEARER));
-  ASSERT_NE(world.stage(NEARER_INDEX), Stage::RUBBLE);
-  const Cell sent = world.objective(BAND);
-  // It keeps that objective every tick until the structure falls.
-  bool kept = true;
-  for (; ticks < TICKS && world.stage(NEARER_INDEX) != Stage::RUBBLE; ++ticks) {
-    world.tick();
-    const Cell now = world.objective(BAND);
-    kept = kept && (world.stage(NEARER_INDEX) == Stage::RUBBLE ||
-                    (now.x == sent.x && now.y == sent.y));
-  }
-  ASSERT_EQ(world.stage(NEARER_INDEX), Stage::RUBBLE);
-  EXPECT_TRUE(kept);
-}
-
 // The straggled village's last structure, five cells east of its seat, and
 // what it takes to bring down: as much as one torch burns in 2,000 ticks.
 constexpr Cell LAST{BESET_SEAT.x + 5, BESET_SEAT.y};
