@@ -19,24 +19,51 @@
 namespace murim {
 namespace {
 
-// Whether the segment between the centres of `from` and `goal` crosses
-// only passable cells, read at two points a cell along it.
-bool clear_line(const Map& map, Cell from, Cell goal) {
-  const Position start = centre_of(from);
-  const Position end = centre_of(goal);
-  const std::int64_t points =
-      2 * std::max<std::int64_t>(std::abs(goal.x - from.x),
-                                 std::abs(goal.y - from.y));
-  const std::int64_t parts = std::max<std::int64_t>(points, 1);
-  for (std::int64_t point = 0; point <= points; ++point) {
-    const Position along{
-        static_cast<std::int32_t>(
-            start.x + ((std::int64_t{end.x} - start.x) * point / parts)),
-        static_cast<std::int32_t>(
-            start.y + ((std::int64_t{end.y} - start.y) * point / parts))};
-    if (!map.passable(cell_of(along))) {
+// -1, 0 or 1, as `value` is below, at or above 0.
+std::int32_t sign(std::int32_t value) {
+  if (value == 0) {
+    return 0;
+  }
+  return value > 0 ? 1 : -1;
+}
+
+// Whether a person can walk from `from` to `goal` at the octile cost by the
+// walker's own step rule: each step is one that keeps the walk at the octile
+// cost, the one whose cell lies nearest the line from `from` to `goal`, the
+// diagonal first among equals, and it opens only as a field's step does, a
+// diagonal one only where both cells beside it are passable. So the octile
+// cost it allows is the cost of a walk.
+bool walks_its_line(const Map& map, Cell from, Cell goal) {
+  const std::int64_t line_x = std::int64_t{goal.x} - from.x;
+  const std::int64_t line_y = std::int64_t{goal.y} - from.y;
+  const auto off_line = [&](Cell cell) {
+    return std::abs((line_x * (std::int64_t{cell.y} - from.y)) -
+                    (line_y * (std::int64_t{cell.x} - from.x)));
+  };
+  Cell cell = from;
+  while (cell.x != goal.x || cell.y != goal.y) {
+    const std::int32_t along_x = goal.x - cell.x;
+    const std::int32_t along_y = goal.y - cell.y;
+    const std::int32_t sign_x = sign(along_x);
+    const std::int32_t sign_y = sign(along_y);
+    Cell next{cell.x + sign_x, cell.y + sign_y};
+    // A straight step along the longer side keeps the octile cost too, where
+    // the sides differ.
+    if (std::abs(along_x) != std::abs(along_y)) {
+      const Cell straight = std::abs(along_x) > std::abs(along_y)
+                                ? Cell{cell.x + sign_x, cell.y}
+                                : Cell{cell.x, cell.y + sign_y};
+      if (sign_x == 0 || sign_y == 0 || off_line(straight) < off_line(next)) {
+        next = straight;
+      }
+    }
+    const bool diagonal = next.x != cell.x && next.y != cell.y;
+    if (!map.passable(next) ||
+        (diagonal && (!map.passable(Cell{next.x, cell.y}) ||
+                      !map.passable(Cell{cell.x, next.y})))) {
       return false;
     }
+    cell = next;
   }
   return true;
 }
@@ -133,10 +160,10 @@ void AreaFields::sow(const Map& map, const CoarseGraph& graph,
     if (best == CoarseGraph::NO_WALK) {
       continue;
     }
-    // Over open ground the cost to the objective is the octile cost, so a
-    // walk across areas keeps to its line (ADR 0043).
+    // Where a walk at the octile cost reaches the objective, that is its cost,
+    // so a walk across areas keeps to its line (ADR 0043).
     scratch_.push_back(
-        FieldSeed{seed, clear_line(map, seed, objective)
+        FieldSeed{seed, walks_its_line(map, seed, objective)
                             ? std::min(best, octile(seed, objective))
                             : best});
   }

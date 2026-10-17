@@ -105,6 +105,78 @@ TEST(AreaFields, AFieldIsKeptWhileAPersonBoundForItStepsBackAcrossItsSide) {
   EXPECT_EQ(fields.built(), 1U);
 }
 
+// A map of 2 by 2 areas crossed by a wall of cells touching only at their
+// corners, along x + y = DIAGONAL, from column `gap` on: a gap below it lets
+// a walk round, and a line along the wall passes through its corners.
+constexpr std::int32_t DIAGONAL_SIDE = 64;
+constexpr std::int32_t DIAGONAL = 63;
+constexpr std::int32_t DIAGONAL_GAP = 4;
+constexpr Cell BEYOND_THE_WALL{45, 33};
+constexpr int MOST_STEPS = 4000;
+
+Map diagonal_wall(std::int32_t gap) {
+  std::vector<std::string> rows(static_cast<std::size_t>(DIAGONAL_SIDE),
+                                std::string(DIAGONAL_SIDE, '.'));
+  for (std::int32_t column = gap; column < DIAGONAL_SIDE; ++column) {
+    rows.at(static_cast<std::size_t>(DIAGONAL - column))
+        .at(static_cast<std::size_t>(column)) = '#';
+  }
+  return Map{rows};
+}
+
+// Of the cells a field over the whole map reaches `objective` from, how many
+// a walk stepping by fields within areas, a tick a step, brings there.
+struct Arrivals {
+  int reached = 0;
+  int arrived = 0;
+};
+
+Arrivals arrivals(const Map& map, Cell objective) {
+  const CoarseGraph graph{map};
+  const FlowField whole{map, objective};
+  // A field is a function of the map, the graph and its key alone, so the
+  // walks share one cache.
+  AreaFields fields;
+  Arrivals found;
+  for (std::int32_t row = 0; row < map.height(); ++row) {
+    for (std::int32_t column = 0; column < map.width(); ++column) {
+      const Cell start{column, row};
+      if (!map.passable(start) ||
+          whole.distance(start) == FlowField::UNREACHABLE) {
+        continue;
+      }
+      ++found.reached;
+      Cell cell = start;
+      for (int each = 0; each < MOST_STEPS; ++each) {
+        if (cell.x == objective.x && cell.y == objective.y) {
+          ++found.arrived;
+          break;
+        }
+        const Step step =
+            fields.field(fields.field_for(map, graph, cell, objective))
+                .step(cell);
+        fields.end_tick();
+        cell = Cell{cell.x + step.x, cell.y + step.y};
+      }
+    }
+  }
+  return found;
+}
+
+TEST(AreaFields, EveryWalkRoundAWallOfTouchingCornersArrives) {
+  const Map map = diagonal_wall(DIAGONAL_GAP);
+  const Arrivals round = arrivals(map, BEYOND_THE_WALL);
+  // Cells on the near side of the wall reach the objective only through the
+  // gap.
+  ASSERT_GT(round.reached, DIAGONAL_SIDE * DIAGONAL_SIDE / 2);
+  EXPECT_EQ(round.arrived, round.reached);
+  // Control: with no gap the wall seals the near side, which the field over
+  // the whole map then reaches the objective from nowhere on.
+  const Arrivals sealed = arrivals(diagonal_wall(0), BEYOND_THE_WALL);
+  EXPECT_LT(sealed.reached, DIAGONAL_SIDE * DIAGONAL_SIDE / 2);
+  EXPECT_EQ(sealed.arrived, sealed.reached);
+}
+
 // Where a walk from `from` toward `objective` first crosses onto column
 // `border`, stepping by `step` from each cell: the row, or nothing when it
 // stops first.
