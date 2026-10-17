@@ -37,6 +37,7 @@
 #include "occupation.hpp"
 #include "person.hpp"
 #include "progress.hpp"
+#include "schedule.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "spatial_hash.hpp"
@@ -44,6 +45,7 @@
 #include "talk.hpp"
 #include "trade.hpp"
 #include "village.hpp"
+#include "village_fields.hpp"
 
 namespace murim {
 namespace {
@@ -59,6 +61,14 @@ constexpr unsigned MIX_SHIFT_3 = 31U;
 // Cells beyond its arrival ring a person may be jostled and still count as
 // standing still.
 constexpr std::uint32_t STANDING_SLACK = 2;
+// The streams a person's errand draws from (ADR 0081): its wander phase, its
+// spot at a place, and its spot within a cell of that in a wander period.
+constexpr std::uint64_t PHASE_STREAM = 1;
+constexpr std::uint64_t SPOT_STREAM = 2;
+constexpr std::uint64_t WANDER_STREAM = 3;
+// The margin round a village's square, structures and centre its path
+// fields cover.
+constexpr std::int32_t WINDOW_MARGIN = 4;
 
 constexpr std::uint64_t UINT64_LIMIT =
     std::numeric_limits<std::uint64_t>::max();
@@ -906,6 +916,8 @@ void fold_occupations(const Fold& fold,
   fold(occupations->working_age);
   fold(occupations->fallback);
   fold_bands(fold, occupations->idle);
+  fold(occupations->waking.from);
+  fold(occupations->waking.to);
 }
 
 // Folds the trade's data into `fold`, only when given, so a world without
@@ -1067,6 +1079,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   add_sects(std::move(sects));
   // The first day's assignment, so a world has its occupations from tick 0.
   assign_occupations();
+  prepare_grounds();
 }
 
 World::World(Map map, Rules rules, Life life)
@@ -1186,6 +1199,7 @@ void World::restore() {
                   structure.footprint.height * CELL_SIZE});
   }
   structure_index_ = SpatialHash{centres_of(structures_)};
+  prepare_grounds();
 }
 
 // Whether the events kept are as tick() keeps them: at most
@@ -1682,6 +1696,513 @@ void World::assign_occupations() {
       people_.at(homed.at(village).at(index)).occupation = held.at(index);
     }
   }
+}
+
+// Whether village `village`'s residents follow their schedules (ADR 0081):
+// with occupations, while their army is not steered, not far, and bound for
+// the village's centre with no attack intent.
+bool World::follows(std::size_t village) const {
+  const VillageRecord& record = villages_.at(village);
+  const Army& army = armies_.at(record.spec.residents);
+  return life_.occupations && !army.steered && !far_off(army) &&
+         !army.order.target && army.order.objective.x == record.centre.x &&
+         army.order.objective.y == record.centre.y;
+}
+
+std::uint64_t World::army_epoch(std::size_t army) const {
+  return army < army_epochs_.size() ? army_epochs_.at(army) : 0;
+}
+
+void World::bump_army(std::size_t army) {
+  if (army >= army_epochs_.size()) {
+    army_epochs_.resize(army + 1, 0);
+  }
+  ++army_epochs_.at(army);
+}
+
+void World::bump_village(std::size_t village) {
+  if (village >= village_epochs_.size()) {
+    village_epochs_.resize(village + 1, 0);
+  }
+  ++village_epochs_.at(village);
+}
+
+void World::bump_villages() {
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    bump_village(village);
+  }
+}
+
+std::uint64_t World::layout_epoch(std::size_t village) const {
+  return village < layout_epochs_.size() ? layout_epochs_.at(village) : 0;
+}
+
+void World::bump_layout(std::size_t village) {
+  if (village >= layout_epochs_.size()) {
+    layout_epochs_.resize(village + 1, 0);
+  }
+  ++layout_epochs_.at(village);
+}
+
+bool World::current(const Grounds& grounds, std::size_t village) const {
+  const VillageRecord& record = villages_.at(village);
+  return grounds.version != 0 && grounds.tier == record.tier &&
+         grounds.places == 1 + record.spec.structures.size() &&
+         grounds.layout == layout_epoch(village);
+}
+
+bool World::current(const Lodging& lodging, std::size_t village) const {
+  const std::size_t army = villages_.at(village).spec.residents;
+  const std::uint64_t epoch =
+      village < village_epochs_.size() ? village_epochs_.at(village) : 0;
+  return lodging.version != 0 && lodging.army == army &&
+         lodging.army_epoch == army_epoch(army) &&
+         lodging.village_epoch == epoch;
+}
+
+// Village `village`'s grounds: the cells of the square its tier keeps that
+// are passable and under no structure of it, each blocking structure's door,
+// and a window over its centre, square and structures with WINDOW_MARGIN
+// cells round them, holding no field yet.
+World::Grounds World::grounds_of(std::size_t village) const {
+  const VillageRecord& record = villages_.at(village);
+  const VillageSpec& spec = record.spec;
+  Grounds grounds;
+  grounds.tier = record.tier;
+  grounds.places = 1 + spec.structures.size();
+  grounds.layout = layout_epoch(village);
+  std::int32_t left = record.centre.x;
+  std::int32_t top = record.centre.y;
+  std::int32_t right = record.centre.x + 1;
+  std::int32_t bottom = record.centre.y + 1;
+  const auto cover = [&](Cell corner, Footprint size) {
+    left = std::min(left, corner.x);
+    top = std::min(top, corner.y);
+    right = std::max(right, corner.x + size.width);
+    bottom = std::max(bottom, corner.y + size.height);
+  };
+  const Clearing kept = square(village);
+  cover(kept.corner, kept.area);
+  const auto covered = [&](Cell cell) {
+    return std::any_of(
+        spec.structures.begin(), spec.structures.end(), [&](std::size_t index) {
+          const Structure& structure = structures_.at(index);
+          return cell.x >= structure.cell.x && cell.y >= structure.cell.y &&
+                 cell.x < structure.cell.x + structure.footprint.width &&
+                 cell.y < structure.cell.y + structure.footprint.height;
+        });
+  };
+  for (const Cell cell : cells_of(kept.corner, kept.area)) {
+    if (map_.passable(cell) && !covered(cell)) {
+      grounds.square.push_back(cell);
+    }
+  }
+  for (const std::size_t index : spec.structures) {
+    const Structure& structure = structures_.at(index);
+    cover(structure.cell, structure.footprint);
+    grounds.doors.push_back(
+        structure.blocks ? door(map_, structure, record.centre) : std::nullopt);
+  }
+  const Cell corner{std::max(0, left - WINDOW_MARGIN),
+                    std::max(0, top - WINDOW_MARGIN)};
+  const Footprint size{
+      std::min(std::min(map_.width(), right + WINDOW_MARGIN) - corner.x,
+               VillageFields::MAX_SIDE),
+      std::min(std::min(map_.height(), bottom + WINDOW_MARGIN) - corner.y,
+               VillageFields::MAX_SIDE)};
+  grounds.fields = VillageFields{map_, corner, size, grounds.places};
+  return grounds;
+}
+
+// Village `village`'s lodging: where each of its residents lives, by
+// homes_of(), and works, by works_of(), as its standing structures give.
+World::Lodging World::lodging_of(std::size_t village) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  Lodging lodging;
+  lodging.army = spec.residents;
+  lodging.army_epoch = army_epoch(spec.residents);
+  lodging.village_epoch =
+      village < village_epochs_.size() ? village_epochs_.at(village) : 0;
+  const Stages built = stages();
+  std::vector<bool> standing;
+  standing.reserve(spec.structures.size());
+  for (const std::size_t structure : spec.structures) {
+    standing.push_back(built.of(structure) <= Stage::DAMAGED);
+  }
+  lodging.homes = homes_of(village, standing);
+  lodging.works = works_of(village, standing);
+  return lodging;
+}
+
+// Where each of village `village`'s residents lives, by roster rank, of its
+// structures standing by `standing`: its households take those that house
+// people, in order, by house(); a resident whose household none holds has
+// none.
+std::vector<std::optional<std::size_t>> World::homes_of(
+    std::size_t village, const std::vector<bool>& standing) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  const std::vector<std::size_t>& roster = armies_.at(spec.residents).roster;
+  std::vector<std::size_t> houses;
+  std::vector<std::uint32_t> housing;
+  for (std::size_t index = 0; index < spec.holdings.size(); ++index) {
+    if (standing.at(index) && spec.holdings.at(index).housing > 0) {
+      houses.push_back(index);
+      housing.push_back(spec.holdings.at(index).housing);
+    }
+  }
+  std::vector<std::size_t> rank(people_.size(), ABSENT);
+  for (std::size_t each = 0; each < roster.size(); ++each) {
+    rank.at(roster.at(each)) = each;
+  }
+  const std::vector<std::vector<std::size_t>> found =
+      murim::households(roster, people_);
+  std::vector<std::size_t> sizes;
+  sizes.reserve(found.size());
+  for (const std::vector<std::size_t>& household : found) {
+    sizes.push_back(household.size());
+  }
+  const std::vector<std::optional<std::size_t>> taken = house(sizes, housing);
+  std::vector<std::optional<std::size_t>> homes(roster.size());
+  for (std::size_t household = 0; household < found.size(); ++household) {
+    if (const std::optional<std::size_t>& home = taken.at(household)) {
+      for (const std::size_t member : found.at(household)) {
+        homes.at(rank.at(member)) = 1 + houses.at(*home);
+      }
+    }
+  }
+  return homes;
+}
+
+// Where each of village `village`'s residents works, by roster rank, of its
+// structures standing by `standing`: holders of an occupation working at a
+// kind take its standing structures of that kind in order, each as many as
+// it opens places for, in roster order; holders of one working on the square
+// or opening no place work on the square; anyone else has none.
+std::vector<std::optional<std::size_t>> World::works_of(
+    std::size_t village, const std::vector<bool>& standing) const {
+  const VillageSpec& spec = villages_.at(village).spec;
+  const std::vector<std::size_t>& roster = armies_.at(spec.residents).roster;
+  if (!life_.occupations) {
+    throw std::logic_error("only a world with occupations has workplaces");
+  }
+  const std::vector<Occupation>& list = life_.occupations->list;
+  std::vector<std::optional<std::size_t>> works(roster.size());
+  std::vector<std::size_t> taken(list.size(), 0);
+  for (std::size_t each = 0; each < roster.size(); ++each) {
+    const std::optional<std::size_t> held =
+        people_.at(roster.at(each)).occupation;
+    if (!held) {
+      continue;
+    }
+    const auto* workplace = std::get_if<AtWorkplace>(&list.at(*held).openings);
+    if (workplace == nullptr) {
+      works.at(each) = 0;
+      continue;
+    }
+    // The holder's place among its occupation's, and the workplace it falls
+    // to, `per` holders to each.
+    std::size_t place = taken.at(*held)++ / workplace->per;
+    for (std::size_t index = 0; index < spec.kinds.size(); ++index) {
+      if (!standing.at(index) || spec.kinds.at(index) != workplace->kind) {
+        continue;
+      }
+      if (place == 0) {
+        works.at(each) = 1 + index;
+        break;
+      }
+      --place;
+    }
+  }
+  return works;
+}
+
+// The cells a walk to place `place` of village `village` ends on: the
+// square's free cells, a blocking structure's door, or the passable cells of
+// one that blocks nothing.
+std::vector<Cell> World::seeds_of(std::size_t village, const Grounds& grounds,
+                                  std::size_t place) const {
+  if (place == 0) {
+    return grounds.square;
+  }
+  const Structure& structure =
+      structures_.at(villages_.at(village).spec.structures.at(place - 1));
+  if (structure.blocks) {
+    const std::optional<Cell> entry = grounds.doors.at(place - 1);
+    return entry ? std::vector<Cell>{*entry} : std::vector<Cell>{};
+  }
+  std::vector<Cell> cells;
+  for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+    if (map_.passable(cell)) {
+      cells.push_back(cell);
+    }
+  }
+  return cells;
+}
+
+// Person `person`'s errand, its residents' roster rank `rank` in village
+// `village`: in the band of its occupation's schedule, or the idle one, in
+// force at this tick's hour, it goes home to its house, to work at its
+// workplace, or to the square, the square wherever it has no house or
+// workplace. Its spot there is drawn from SPOT_STREAM among the place's
+// seeds, or, at a door, the passable cells within a cell of it; awake, its
+// spot moves every WANDER_TICKS, from its own phase, to a passable cell
+// within a cell of that, drawn from WANDER_STREAM.
+World::Errand World::errand_of(const Follower& follower, const Grounds& grounds,
+                               const Lodging& lodging) const {
+  const std::size_t person = follower.person;
+  const std::size_t rank = follower.rank;
+  const std::size_t village = follower.village;
+  Errand errand = key_of(follower, grounds, lodging);
+  switch (errand.where) {
+    case Where::HOME:
+      errand.place = lodging.homes.at(rank).value_or(0);
+      break;
+    case Where::WORK:
+      errand.place = lodging.works.at(rank).value_or(0);
+      break;
+    case Where::SQUARE:
+      errand.place = 0;
+      break;
+  }
+  // The passable cells within a cell of `cell`, row by row.
+  const auto near = [this](Cell cell) {
+    std::vector<Cell> cells;
+    for (const Cell each : cells_of(Cell{cell.x - 1, cell.y - 1}, {3, 3})) {
+      if (map_.passable(each)) {
+        cells.push_back(each);
+      }
+    }
+    return cells;
+  };
+  std::vector<Cell> spots = seeds_of(village, grounds, errand.place);
+  const bool at_door =
+      errand.place != 0 && grounds.doors.at(errand.place - 1).has_value();
+  if (at_door) {
+    spots = near(spots.front());
+  }
+  const Cell base =
+      spots.empty()
+          ? villages_.at(village).centre
+          : spots.at(errand_draw(seed_, person, SPOT_STREAM, errand.place) %
+                     spots.size());
+  errand.spot = base;
+  if (errand.period != 0) {
+    const std::vector<Cell> wander = near(base);
+    if (!wander.empty()) {
+      errand.spot =
+          wander.at(errand_draw(seed_, person, WANDER_STREAM, errand.period) %
+                    wander.size());
+    }
+  }
+  return errand;
+}
+
+// Person `person`'s errand in village `village` with only its key and the
+// kind of place found: the band of its occupation's schedule, or the idle
+// one, in force at this tick's hour, and its wander period, none while it is
+// asleep at home outside the waking hours, each period beginning at its own
+// phase.
+World::Errand World::key_of(const Follower& follower, const Grounds& grounds,
+                            const Lodging& lodging) const {
+  const std::size_t person = follower.person;
+  if (!life_.occupations) {
+    throw std::logic_error("only a world with occupations has schedules");
+  }
+  const Occupations& occupations = *life_.occupations;
+  const std::optional<std::size_t> held = people_.at(person).occupation;
+  const std::vector<Band>& schedule =
+      held ? occupations.list.at(*held).schedule : occupations.idle;
+  const std::uint32_t hour = hour_of(tick_count_, rules_.ticks_per_day);
+  Errand errand;
+  errand.village = follower.village;
+  errand.lodging = lodging.version;
+  errand.grounds = grounds.version;
+  errand.band = band_at(schedule, hour);
+  errand.where = schedule.at(errand.band).where;
+  const bool asleep =
+      errand.where == Where::HOME && !awake(occupations.waking, hour);
+  const std::uint64_t phase =
+      errand_draw(seed_, person, PHASE_STREAM, 0) % WANDER_TICKS;
+  errand.period = asleep ? 0 : ((tick_count_ + phase) / WANDER_TICKS) + 1;
+  return errand;
+}
+
+// Whether two errands were found for the same grounds, lodging, band and
+// wander period of the same village.
+bool World::same_key(const Errand& one, const Errand& other) {
+  return one.village == other.village && one.lodging == other.lodging &&
+         one.grounds == other.grounds && one.band == other.band &&
+         one.period == other.period;
+}
+
+// Finds village `village`'s grounds again and builds the field of every
+// one of its places: they are pure, so a field built before it is needed
+// steps as one built when it is.
+void World::find_grounds(std::size_t village) {
+  Grounds& grounds = grounds_.at(village);
+  grounds = grounds_of(village);
+  grounds.version = ++versions_;
+  for (std::size_t place = 0; place < grounds.places; ++place) {
+    build_field(village, grounds, place);
+  }
+  field_builds_ += grounds.places;
+}
+
+// Finds the grounds of every village not yet found or no longer current:
+// as a world is created or loaded, and after each growth check, where every
+// structure is laid and every tier reached, so that no other tick builds
+// their fields.
+void World::prepare_grounds() {
+  if (!life_.occupations) {
+    return;
+  }
+  grounds_.resize(villages_.size());
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    if (!current(grounds_.at(village), village)) {
+      find_grounds(village);
+    }
+  }
+}
+
+// Finds again the grounds, lodging and errand of every village whose
+// residents follow their schedules, where what each is derived from has
+// changed.
+void World::follow_schedules() {
+  if (!life_.occupations) {
+    return;
+  }
+  grounds_.resize(villages_.size());
+  lodgings_.resize(villages_.size());
+  errands_.resize(people_.size());
+  for (std::size_t village = 0; village < villages_.size(); ++village) {
+    if (!follows(village)) {
+      continue;
+    }
+    if (!current(grounds_.at(village), village)) {
+      find_grounds(village);
+    }
+    const Grounds& grounds = grounds_.at(village);
+    Lodging& lodging = lodgings_.at(village);
+    if (!current(lodging, village)) {
+      lodging = lodging_of(village);
+      lodging.version = ++versions_;
+    }
+    const std::vector<std::size_t>& roster =
+        armies_.at(villages_.at(village).spec.residents).roster;
+    for (std::size_t rank = 0; rank < roster.size(); ++rank) {
+      const Follower follower{village, rank, roster.at(rank)};
+      Errand& errand = errands_.at(follower.person);
+      if (!same_key(key_of(follower, grounds, lodging), errand)) {
+        errand = errand_of(follower, grounds, lodging);
+      }
+      errand.followed = tick_count_;
+    }
+  }
+}
+
+// Builds the field of place `place` of village `village` into `grounds`,
+// toward the place's seeds, aimed at their middle.
+void World::build_field(std::size_t village, Grounds& grounds,
+                        std::size_t place) const {
+  const std::vector<Cell> seeds = seeds_of(village, grounds, place);
+  std::int64_t sum_x = 0;
+  std::int64_t sum_y = 0;
+  for (const Cell seed : seeds) {
+    sum_x += seed.x;
+    sum_y += seed.y;
+  }
+  const auto count =
+      std::max<std::int64_t>(static_cast<std::int64_t>(seeds.size()), 1);
+  grounds.fields.build(place, seeds,
+                       Cell{static_cast<std::int32_t>(sum_x / count),
+                            static_cast<std::int32_t>(sum_y / count)});
+}
+
+// The step a person following `errand` takes from `cell`: none on its spot;
+// straight toward it within STRAIGHT_REACH cells along each axis, where its
+// place's field does not reach or gives no step; and otherwise by the field.
+Step World::errand_pull(const Errand& errand, Cell cell) const {
+  const std::int64_t off_x = std::int64_t{errand.spot.x} - cell.x;
+  const std::int64_t off_y = std::int64_t{errand.spot.y} - cell.y;
+  if (off_x == 0 && off_y == 0) {
+    return Step{0, 0};
+  }
+  const Step straight{sign(off_x), sign(off_y)};
+  if (std::max(std::abs(off_x), std::abs(off_y)) <= STRAIGHT_REACH) {
+    return straight;
+  }
+  if (!errand.village) {
+    return straight;
+  }
+  const VillageFields& fields = grounds_.at(*errand.village).fields;
+  if (!fields.reaches(errand.place, cell)) {
+    return straight;
+  }
+  const Step step = fields.step(errand.place, cell);
+  return step.x == 0 && step.y == 0 ? straight : step;
+}
+
+Activity World::activity(std::size_t person) const {
+  const Person& each = people_.at(person);
+  const std::optional<std::size_t> army = army_of(person);
+  if (each.health == 0 || !army) {
+    return Activity::IDLE;
+  }
+  const std::vector<VillageRecord>& records = villages_.records();
+  const auto housed = std::find_if(records.begin(), records.end(),
+                                   [&army](const VillageRecord& record) {
+                                     return record.spec.residents == *army;
+                                   });
+  if (housed == records.end()) {
+    return Activity::IDLE;
+  }
+  const auto village = static_cast<std::size_t>(housed - records.begin());
+  if (!follows(village)) {
+    return Activity::IDLE;
+  }
+  const std::vector<std::size_t>& roster = armies_.at(*army).roster;
+  const auto rank = static_cast<std::size_t>(
+      std::find(roster.begin(), roster.end(), person) - roster.begin());
+  Grounds fresh_grounds;
+  const Grounds* grounds = nullptr;
+  if (village < grounds_.size() && current(grounds_.at(village), village)) {
+    grounds = &grounds_.at(village);
+  } else {
+    fresh_grounds = grounds_of(village);
+    grounds = &fresh_grounds;
+  }
+  Lodging fresh_lodging;
+  const Lodging* lodging = nullptr;
+  if (village < lodgings_.size() && current(lodgings_.at(village), village)) {
+    lodging = &lodgings_.at(village);
+  } else {
+    fresh_lodging = lodging_of(village);
+    lodging = &fresh_lodging;
+  }
+  const Errand errand =
+      errand_of(Follower{village, rank, person}, *grounds, *lodging);
+  const Cell cell = cell_of(each.position);
+  if (std::max(std::abs(errand.spot.x - cell.x),
+               std::abs(errand.spot.y - cell.y)) > 1) {
+    return Activity::WALKING;
+  }
+  if (errand.where == Where::WORK && lodging->works.at(rank) == errand.place) {
+    return Activity::WORKING;
+  }
+  if (errand.where == Where::HOME && lodging->homes.at(rank) == errand.place) {
+    return Activity::AT_HOME;
+  }
+  return Activity::IDLE;
+}
+
+World::FieldUse World::schedule_fields() const {
+  FieldUse use;
+  use.builds = field_builds_;
+  for (const Grounds& grounds : grounds_) {
+    use.fields += grounds.fields.built();
+    use.bytes += grounds.fields.bytes();
+  }
+  return use;
 }
 
 BuyRefusal World::buy_refusal(std::size_t buyer, std::size_t seller,
@@ -2318,6 +2839,7 @@ void World::tick() {
   std::vector<Step> pulls(crowd.people.size(), Step{0, 0});
   std::vector<bool> standing(crowd.people.size(), true);
   std::vector<std::size_t> seeking(crowd.people.size(), ABSENT);
+  follow_schedules();
   steer(crowd, crowd.slot, closings, pulls, standing, seeking);
   // A far army holds no field, so it does not march.
   for (std::size_t army = 0; army < armies_.size(); ++army) {
@@ -2331,6 +2853,9 @@ void World::tick() {
   if (life_.growth && tick_count_ % rules_.ticks_per_day == 0 &&
       day % life_.growth->interval == 0) {
     grow(*life_.growth);
+    // In the tick that laid them, so a lay's fields are not built in a tick
+    // of their own.
+    prepare_grounds();
   }
   if (life_.kinship && tick_count_ % rules_.ticks_per_day == 0) {
     kin(*life_.kinship);
@@ -2343,6 +2868,8 @@ void World::tick() {
   if (tick_count_ % rules_.ticks_per_day == 0) {
     tend();
     assign_occupations();
+    // Marriages and occupations change only on a day's rules, before here.
+    bump_villages();
     if (life_.trade) {
       pay(*life_.trade);
       shop(*life_.trade);
@@ -2403,13 +2930,12 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
     }
     const FlowField& field = *course;
     for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
-      const std::size_t index = slot.at(army.roster.at(rank));
-      const Cell cell = cell_of(crowd.hash.position(index));
-      const auto ring =
-          static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
-      const std::uint32_t distance = field.distance(cell);
-      pulls.at(index) = distance > ring ? field.step(cell) : Step{0, 0};
-      standing.at(index) = distance <= ring + STANDING_SLACK;
+      const std::size_t member = army.roster.at(rank);
+      const std::size_t index = slot.at(member);
+      const Pull pull =
+          pull_of(field, army, rank, cell_of(crowd.hash.position(index)));
+      pulls.at(index) = pull.step;
+      standing.at(index) = pull.standing;
       const Closing& close = closings.at(index);
       if (const std::optional<Step> engaged =
               closing(index, army, crowd, close)) {
@@ -2432,6 +2958,27 @@ void World::steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
       pulls.at(index) = Step{0, 0};
     }
   }
+}
+
+// The pull on `army`'s member of rank `rank`, standing on `cell`:
+// its schedule's, the weakest, while it follows one, standing within a cell of
+// its spot; and otherwise its army's `field`, none within its arrival ring, as
+// many cells from the objective as the square root of its rank, standing
+// within two cells of that ring.
+World::Pull World::pull_of(const FlowField& field, const Army& army,
+                           std::size_t rank, Cell cell) const {
+  const std::size_t member = army.roster.at(rank);
+  if (member < errands_.size() && errands_.at(member).followed == tick_count_) {
+    const Errand& errand = errands_.at(member);
+    return Pull{errand_pull(errand, cell),
+                std::max(std::abs(errand.spot.x - cell.x),
+                         std::abs(errand.spot.y - cell.y)) <= 1};
+  }
+  const auto ring =
+      static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
+  const std::uint32_t distance = field.distance(cell);
+  return Pull{distance > ring ? field.step(cell) : Step{0, 0},
+              distance <= ring + STANDING_SLACK};
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -3670,6 +4217,7 @@ std::optional<std::size_t> World::army_of(std::size_t person) const {
 // Appends person `person` to army `army`'s roster.
 void World::enrol(std::size_t person, std::size_t army) {
   armies_.at(army).roster.push_back(person);
+  bump_army(army);
   if (person >= serving_.size()) {
     serving_.resize(person + 1);
   }
@@ -3689,12 +4237,14 @@ std::size_t World::army_serving(std::size_t person) const {
 // Takes person `person` off the roster it stands on. Throws std::logic_error
 // when the roster serving_ names does not hold it.
 void World::strike_off(std::size_t person) {
-  std::vector<std::size_t>& roster = armies_.at(army_serving(person)).roster;
+  const std::size_t army = army_serving(person);
+  std::vector<std::size_t>& roster = armies_.at(army).roster;
   const auto held = std::find(roster.begin(), roster.end(), person);
   if (held == roster.end()) {
     throw std::logic_error("a person's army must hold it on its roster");
   }
   roster.erase(held);
+  bump_army(army);
   serving_.at(person).reset();
 }
 
@@ -3703,15 +4253,18 @@ void World::strike_off_dead() {
   const auto dead = [this](std::size_t member) {
     return people_.at(member).health == 0;
   };
-  for (Army& army : armies_) {
-    for (const std::size_t member : army.roster) {
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    std::vector<std::size_t>& roster = armies_.at(army).roster;
+    for (const std::size_t member : roster) {
       if (dead(member)) {
         serving_.at(member).reset();
       }
     }
-    army.roster.erase(
-        std::remove_if(army.roster.begin(), army.roster.end(), dead),
-        army.roster.end());
+    const auto alive = std::remove_if(roster.begin(), roster.end(), dead);
+    if (alive != roster.end()) {
+      roster.erase(alive, roster.end());
+      bump_army(army);
+    }
   }
 }
 
@@ -3762,12 +4315,18 @@ bool World::shift(std::size_t structure, Destroyer striker,
   }
   const std::int64_t before = shifted.durability;
   const bool stood = stage(structure) != Stage::RUBBLE;
+  const bool used = stage(structure) <= Stage::DAMAGED;
   const std::int64_t ceiling =
       std::max<std::int64_t>(before, rules_.stage_floors.front());
   shifted.durability = static_cast<std::uint32_t>(
       std::clamp(before - effect, std::int64_t{0}, ceiling));
   if (!home) {
     return effect != 0;
+  }
+  // A house or workplace that falls or is raised moves who lives or works
+  // there.
+  if (used != (stage(structure) <= Stage::DAMAGED)) {
+    bump_village(*home);
   }
   const VillageChange change = villages_.shifted(
       *home, stood, shifted.durability > before, held, striker, stages());
@@ -5161,6 +5720,18 @@ std::optional<std::vector<std::size_t>> World::lay(
     return std::nullopt;
   }
   map_ = std::move(built);
+  // A village whose window a structure is laid on finds its grounds again;
+  // the rest read no cell the structure covers.
+  for (std::size_t village = 0; village < grounds_.size(); ++village) {
+    const Grounds& grounds = grounds_.at(village);
+    if (grounds.version != 0 &&
+        std::any_of(laid.begin(), laid.end(), [&](const Laid& each) {
+          return grounds.fields.overlaps(each.cell,
+                                         growth.plans.at(each.plan).footprint);
+        })) {
+      bump_layout(village);
+    }
+  }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     std::optional<FlowField>& field = fields.at(army);
     if (field) {

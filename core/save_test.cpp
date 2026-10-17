@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -29,7 +30,9 @@
 #include "person.hpp"
 #include "progress.hpp"
 #include "region.hpp"
+#include "schedule.hpp"
 #include "skill.hpp"
+#include "talent.hpp"
 #include "talk.hpp"
 #include "trade.hpp"
 #include "village.hpp"
@@ -423,6 +426,22 @@ TEST(Save, AVersion16SaveFromBeforeOccupationsIsRefused) {
   // Control: the same bytes at the current version load.
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, AVersion17Or18SaveFromBeforeWakingHoursIsRefused) {
+  // Version 17 saves, and 18's, hold no waking hours among the occupations
+  // (ADR 0081).
+  for (const std::uint32_t before_waking : {17U, 18U}) {
+    ASSERT_LT(before_waking, SAVE_VERSION);
+    MemorySaves store;
+    ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+    store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(before_waking);
+    EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION)
+        << before_waking;
+    // Control: the same bytes at the current version load.
+    store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+    EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt) << before_waking;
+  }
 }
 
 // The side of the tier tests' map, 8 by 8 areas, how far from its edges
@@ -1143,8 +1162,12 @@ World traders(std::uint64_t bought) {
   Life life;
   life.disciplines = {{"medicine", {0, 0}, {1, 0}}};
   life.trade = Trade{{Ware{"herb", PRICE, 1, 0}}, PURSE, 1, 0, 0};
-  life.occupations = Occupations{
-      {Occupation{"herbalist", OnSquare{1}, at_home(), {0}}}, 0, 0, at_home()};
+  life.occupations =
+      Occupations{{Occupation{"herbalist", OnSquare{1}, at_home(), {0}}},
+                  0,
+                  0,
+                  at_home(),
+                  Waking{}};
   World world{
       Seed{1},
       Map{{"....", "...."}},
@@ -1240,7 +1263,8 @@ TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
                    Occupation{"spare", Nowhere{}, at_home(), {}}},
                   0,
                   1,
-                  at_home()};
+                  at_home(),
+                  Waking{}};
   const World world{
       Seed{1},
       Map{{"....", "...."}},
@@ -1472,6 +1496,277 @@ TEST(Save, AnEngagedPersonLoadsAndSavesAgainAsItWasWritten) {
   store.bytes(SLOT) = engaging(intact, encoded({0, 2, NEAR_RING}));
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
   store.bytes(SLOT) = engaging(intact, encoded({0, 1, NO_RING}));
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
+// The errand tests' map, 30 cells wide, the centre their residents start
+// round and are bound for, how durable their structures are, and their
+// houses' footprint.
+constexpr std::size_t ERRAND_WIDTH = 30;
+constexpr std::uint32_t BUILT = 100;
+constexpr Footprint HOUSE_FOOTPRINT{2, 2};
+
+std::vector<std::string> errand_rows(std::size_t height) {
+  return {height, std::string(ERRAND_WIDTH, '.')};
+}
+
+// Whether `people` of `one` and `other` stand where each other does.
+bool stand_alike(const World& one, const World& other,
+                 const std::vector<std::size_t>& people) {
+  return std::all_of(people.begin(), people.end(), [&](std::size_t person) {
+    const Position here = one.person(person).position;
+    const Position there = other.person(person).position;
+    return here.x == there.x && here.y == there.y;
+  });
+}
+
+// Runs each of `worlds` for `ticks` ticks.
+void run_all(const std::vector<World*>& worlds, std::uint64_t ticks) {
+  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+    for (World* world : worlds) {
+      world->tick();
+    }
+  }
+}
+
+// Two smiths at the centre of an open 30 by 10 map, with a house at its west
+// and a smithy at its east; smiths are home until hour 2, then at work. A
+// day is 240 ticks, so an hour is 10.
+constexpr std::uint64_t ERRAND_DAY = 240;
+constexpr std::size_t ERRAND_HEIGHT = 10;
+constexpr Cell ERRAND_CENTRE{15, 5};
+constexpr Cell BESIDE_CENTRE{15, 6};
+constexpr Cell WEST_HOUSE{4, 2};
+constexpr Cell EAST_SMITHY{24, 2};
+
+World errand_world() {
+  Life life;
+  life.founding_age = Spread{2 * DAYS_PER_YEAR, 0};
+  life.occupations =
+      Occupations{{Occupation{"smith",
+                              AtWorkplace{"smithy", 2},
+                              {{0, Where::HOME}, {2, Where::WORK}},
+                              {}}},
+                  0,
+                  0,
+                  at_home(),
+                  Waking{}};
+  Rules rules{0, {{false}}, STAGE_FLOORS};
+  rules.ticks_per_day = ERRAND_DAY;
+  Holding house;
+  house.housing = 2;
+  return World{
+      Seed{1},
+      Map{errand_rows(ERRAND_HEIGHT)},
+      {ArmySpec{ERRAND_CENTRE,
+                {Recruit{ERRAND_CENTRE, 1}, Recruit{BESIDE_CENTRE, 1}},
+                0,
+                {Skill{0, 0, 0, 0, 1}}}},
+      {Structure{WEST_HOUSE, BUILT, HOUSE_FOOTPRINT, true, Role::HOME},
+       Structure{EAST_SMITHY, BUILT, {3, 2}, true, Role::SQUARE}},
+      rules,
+      {VillageSpec{{0, 1}, 0, {house, {}}, 0, {}, {"house", "smithy"}}},
+      {},
+      life};
+}
+
+TEST(Save, AWorldLoadedMidErrandWalksOnAsTheOneThatRanOn) {
+  // Home by hour 2, then halfway to the smithy; and long enough after for
+  // the walk to end.
+  constexpr std::uint64_t MID_WALK = 100;
+  constexpr std::uint64_t WALKED_ON = 200;
+  World ran = errand_world();
+  run_all({&ran}, MID_WALK);
+  ASSERT_EQ(ran.activity(0), Activity::WALKING);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, ran}, store, SLOT));
+  World again = loaded(load(store, SLOT)).world;
+  World steered = loaded(load(store, SLOT)).world;
+  steered.steer(0, true);
+  run_all({&ran, &again, &steered}, WALKED_ON);
+  EXPECT_EQ(again.hash(), ran.hash());
+  EXPECT_TRUE(stand_alike(again, ran, {0, 1}));
+  EXPECT_EQ(again.activity(0), ran.activity(0));
+  EXPECT_EQ(again.activity(1), ran.activity(1));
+  // Control: a loaded world whose residents a driver steers walks no errand,
+  // so it does not go on as the one that ran on.
+  EXPECT_FALSE(stand_alike(steered, ran, {0}));
+}
+
+TEST(Save, AWorldLoadedBuildsEveryPlacesFieldBeforeItsFirstTick) {
+  // The square, the house and the smithy.
+  constexpr std::uint64_t PLACES = 3;
+  constexpr std::uint64_t MID_WALK = 100;
+  World ran = errand_world();
+  run_all({&ran}, MID_WALK);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, ran}, store, SLOT));
+  const World again = loaded(load(store, SLOT)).world;
+  EXPECT_EQ(again.schedule_fields().fields, PLACES);
+  EXPECT_EQ(again.schedule_fields().builds, PLACES);
+  EXPECT_EQ(again.schedule_fields().bytes, ran.schedule_fields().bytes);
+  // Control: the world that ran built them as it was created, and no tick
+  // since has built one again.
+  EXPECT_EQ(ran.schedule_fields().builds, PLACES);
+}
+
+// A village of a house of one and a house of two, a married couple and a
+// single smith, all three smiths, at the centre of an open 30 by 12 map: the
+// couple fill the second house and the single smith the first. A foe of the
+// hostile faction, steered, stands by the second house's door: its one blow
+// kills the first resident in its reach, and their one blow kills it. Smiths
+// are home all day, awake throughout; a day is 2,400 ticks, so no day's rules
+// fall in the test.
+constexpr std::size_t DOORSTEP_HEIGHT = 12;
+constexpr Cell DOORSTEP_CENTRE{15, 6};
+constexpr std::array<Cell, 3> DOORSTEP_RESIDENTS{{{15, 7}, {16, 7}, {18, 2}}};
+constexpr Cell SOUTH_HOUSE{4, 8};
+constexpr Cell BY_SOUTH_DOOR{9, 9};
+constexpr std::size_t THE_SINGLE = 2;
+constexpr std::size_t THE_FOE = 3;
+
+World doorstep_world() {
+  constexpr std::uint32_t NEVER = 1'000'000;
+  constexpr std::int32_t CLAIM = 15;
+  constexpr std::uint64_t LONG_DAY = 2'400;
+  constexpr std::int32_t SIGHT = 12;
+  Life life;
+  life.founding_age = Spread{2 * DAYS_PER_YEAR, 0};
+  life.occupations =
+      Occupations{{Occupation{"smith", Nowhere{}, at_home(), {}}},
+                  0,
+                  0,
+                  at_home(),
+                  Waking{}};
+  Growth growth;
+  growth.interval = NEVER;
+  growth.claim = CLAIM;
+  life.growth = growth;
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.ticks_per_day = LONG_DAY;
+  rules.sight = SIGHT;
+  const Skill blow{2 * CELL_SIZE, 0, 1, 0, NEVER};
+  Holding one;
+  one.housing = 1;
+  Holding two;
+  two.housing = 2;
+  std::vector<Recruit> residents;
+  residents.reserve(DOORSTEP_RESIDENTS.size());
+  for (const Cell cell : DOORSTEP_RESIDENTS) {
+    residents.push_back(Recruit{cell, 1});
+  }
+  World world{
+      Seed{1},
+      Map{errand_rows(DOORSTEP_HEIGHT)},
+      {ArmySpec{DOORSTEP_CENTRE, residents, 0, {blow}},
+       ArmySpec{BY_SOUTH_DOOR, {Recruit{BY_SOUTH_DOOR, 1}}, 1, {blow}}},
+      {Structure{WEST_HOUSE, BUILT, HOUSE_FOOTPRINT, true, Role::HOME},
+       Structure{SOUTH_HOUSE, BUILT, HOUSE_FOOTPRINT, true, Role::HOME}},
+      rules,
+      {VillageSpec{{0, 1}, 0, {one, two}, 1, {}, {"house", "house"}}},
+      {},
+      life};
+  world.steer(1, true);
+  return world;
+}
+
+// Whether the foe and one of the couple of doorstep_world() have fallen.
+bool fallen(const World& world) {
+  return world.person(THE_FOE).health == 0 &&
+         (world.person(0).health == 0 || world.person(1).health == 0);
+}
+
+// Cells along the farther axis between person `person` of `world`, a world
+// doorstep_world() made, and its first house's door.
+std::int32_t from_first_door(const World& world, std::size_t person) {
+  const Cell first_door =
+      door(Map{errand_rows(DOORSTEP_HEIGHT)},
+           Structure{WEST_HOUSE, BUILT, HOUSE_FOOTPRINT, true, Role::HOME},
+           DOORSTEP_CENTRE)
+          .value_or(Cell{-1, -1});
+  const Cell stands = cell_of(world.person(person).position);
+  return std::max(std::abs(stands.x - first_door.x),
+                  std::abs(stands.y - first_door.y));
+}
+
+// Runs `world`, a world doorstep_world() made, until the foe and one of the
+// couple have fallen, or for 400 ticks.
+void fight(World& world) {
+  constexpr std::uint64_t LONGEST = 400;
+  for (std::uint64_t tick = 0; tick < LONGEST && !fallen(world); ++tick) {
+    world.tick();
+  }
+}
+
+TEST(Save, AWorldLoadedAfterADeathHousesItsResidentsAsTheOneThatRanOn) {
+  // Ticks enough for the walks after the fight.
+  constexpr std::uint64_t WALKED_ON = 300;
+  World ran = doorstep_world();
+  fight(ran);
+  ASSERT_TRUE(fallen(ran));
+  ASSERT_GT(ran.person(THE_SINGLE).health, 0U);
+  const std::size_t widowed = ran.person(0).health > 0 ? 0 : 1;
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, ran}, store, SLOT));
+  World again = loaded(load(store, SLOT)).world;
+  run_all({&ran, &again}, WALKED_ON);
+  EXPECT_TRUE(stand_alike(again, ran, {widowed, THE_SINGLE}));
+  EXPECT_EQ(again.hash(), ran.hash());
+  // Widowed, it lives alone and comes first in the roster, so it takes the
+  // first house, and the single smith moves to the second.
+  EXPECT_LE(from_first_door(ran, widowed), 1);
+}
+
+TEST(Save, WakingHoursComeBackAsSavedAndTheHashFoldsThem) {
+  // Waking from 7 until 21; until 20 instead; and until 25, past the day.
+  constexpr Waking AWAKE{7, 21};
+  constexpr std::uint8_t EARLIER = 20;
+  constexpr std::uint8_t PAST_THE_DAY = 25;
+  Life life;
+  life.occupations = Occupations{
+      {Occupation{"first", Nowhere{}, at_home(), {}}}, 0, 0, at_home(), AWAKE};
+  const World world{
+      Seed{1},
+      Map{{"....", "...."}},
+      {ArmySpec{{0, 0}, {Recruit{{0, 0}, 1}}, 0, {Skill{0, 0, 0, 0, 1}}}},
+      {},
+      Rules{0, {{false}}, STAGE_FLOORS},
+      {VillageSpec{{}, 0, {}, 0, {}, {}}},
+      {},
+      life};
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::uint8_t> intact = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(intact.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      intact.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      intact.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // Control: resealing the same payload loads, so the reseal refuses nothing.
+  store.bytes(SLOT) = resealed(header, payload);
+  ASSERT_EQ(loaded(load(store, SLOT)).world.hash(), world.hash());
+
+  // The waking hours, each four bytes.
+  const std::vector<std::uint8_t> hours{
+      static_cast<std::uint8_t>(AWAKE.from), 0, 0, 0,
+      static_cast<std::uint8_t>(AWAKE.to),   0, 0, 0};
+  const auto found =
+      std::search(payload.begin(), payload.end(), hours.begin(), hours.end());
+  ASSERT_NE(found, payload.end());
+  ASSERT_EQ(
+      std::search(std::next(found), payload.end(), hours.begin(), hours.end()),
+      payload.end());
+  const std::size_t until =
+      static_cast<std::size_t>(found - payload.begin()) + sizeof(std::uint32_t);
+  // Waking until earlier, the world loads and hashes otherwise.
+  std::vector<std::uint8_t> earlier = payload;
+  earlier.at(until) = EARLIER;
+  store.bytes(SLOT) = resealed(header, earlier);
+  EXPECT_NE(loaded(load(store, SLOT)).world.hash(), world.hash());
+  // Waking past the day, the save is refused.
+  std::vector<std::uint8_t> past = payload;
+  past.at(until) = PAST_THE_DAY;
+  store.bytes(SLOT) = resealed(header, past);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 

@@ -22,7 +22,6 @@ constexpr std::uint32_t PER_MERCHANT = 30;
 
 constexpr std::uint32_t WORKING_AGE = 16;
 constexpr std::uint32_t WORK_FROM = 8;
-constexpr std::uint32_t HOURS_PER_DAY = 24;
 
 std::vector<Band> day() { return {{0, Where::HOME}, {WORK_FROM, Where::WORK}}; }
 
@@ -35,7 +34,8 @@ Occupations occupations() {
        Occupation{"beggar", Nowhere{}, day(), {}}},
       WORKING_AGE,
       BEGGAR,
-      day()};
+      day(),
+      Waking{}};
 }
 
 Candidate adult(std::optional<std::size_t> held = std::nullopt) {
@@ -138,6 +138,18 @@ TEST(Occupation, OccupationsOutsideTheirLimitsAreRefused) {
   overnight.list.at(0).schedule = {{0, Where::HOME},
                                    {HOURS_PER_DAY, Where::WORK}};
   EXPECT_THROW(check_occupations(overnight, 1), std::invalid_argument);
+  for (const Waking waking :
+       {Waking{22, 6}, Waking{6, 6}, Waking{6, HOURS_PER_DAY + 1}}) {
+    Occupations sleepless = occupations();
+    sleepless.waking = waking;
+    EXPECT_THROW(check_occupations(sleepless, 1), std::invalid_argument)
+        << waking.from << "-" << waking.to;
+  }
+  // Control: waking hours that end after they begin, by midnight, are taken.
+  constexpr std::uint32_t WAKING = 6;
+  Occupations awake = occupations();
+  awake.waking = Waking{WAKING, HOURS_PER_DAY};
+  EXPECT_NO_THROW(check_occupations(awake, 1));
 }
 
 }  // namespace

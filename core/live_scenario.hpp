@@ -4,7 +4,9 @@
 #include <string>
 #include <vector>
 
+#include "life.hpp"
 #include "map.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {
@@ -13,7 +15,9 @@ namespace murim {
 /// acting on every tick, as issue #216 asks the live tier to hold, spread
 /// over villages, the roads between them and two battles, on a map of four
 /// factions where only the two pairs facing each other in battle are
-/// hostile.
+/// hostile. Each village is laid out with houses, workshops, a hall and
+/// fields, and its residents follow their occupations' schedules (ADR 0081),
+/// so the bench measures them.
 struct LiveScenario {
   Seed seed;
   std::vector<std::string> map_rows;
@@ -22,6 +26,9 @@ struct LiveScenario {
   /// Armies 0 to battle_armies - 1 fight the two battles; the villages' and
   /// the roads' follow.
   std::size_t battle_armies;
+  std::vector<Structure> structures;
+  std::vector<VillageSpec> villages;
+  Life life;
 };
 
 /// The people the live scenario holds.
