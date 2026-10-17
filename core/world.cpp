@@ -124,6 +124,13 @@ bool block_footprints(Map& map, const std::vector<Structure>& structures) {
   return true;
 }
 
+// `map` with the footprints block_footprints blocks, so the coarse graph is
+// drawn once, over the map they leave.
+Map footprinted(Map map, const std::vector<Structure>& structures) {
+  static_cast<void>(block_footprints(map, structures));
+  return map;
+}
+
 // The sub-cell unit of the structure's footprint nearest `point`.
 Position nearest_point(const Structure& structure, Position point) {
   const auto clamp = [](std::int32_t along, std::int32_t first,
@@ -977,7 +984,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              std::vector<SectSpec> sects)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       seed_(static_cast<std::uint64_t>(seed)),
-      map_(std::move(map)),
+      map_(footprinted(map, structures)),
       graph_(map_),
       rules_(std::move(rules)),
       areas_(Footprint{map_.width(), map_.height()}),
@@ -1003,10 +1010,9 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
            std::any_of(army.members.begin(), army.members.end(),
                        invalid_recruit);
   };
-  // Footprints block their cells before any recruit is checked against them,
-  // and before the coarse graph is drawn over the map they leave.
-  const bool placed = block_footprints(map_, structures_);
-  graph_ = CoarseGraph{map_};
+  // Footprints blocked their cells before any recruit is checked against
+  // them, and before the coarse graph was drawn over the map they leave.
+  const bool placed = block_footprints(map, structures_);
   std::size_t recruits = 0;
   for (const ArmySpec& army : armies) {
     recruits += army.members.size();
