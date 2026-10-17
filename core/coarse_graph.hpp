@@ -182,6 +182,22 @@ class CoarseGraph {
   /// Returns the ways out of area `area`, in node order.
   [[nodiscard]] const std::vector<CoarseExit>& exits(std::size_t area) const;
 
+  /// The cost walks_within() gives a cell no walk reaches.
+  static constexpr CoarseCost NO_WALK = UINT32_MAX;
+
+  /// Returns the cost of the shortest walk within area `area` from `from`,
+  /// one of its cells, to each of its cells by slot_in(), NO_WALK where none
+  /// joins them: the octile cost in an area with no blocked cell.
+  [[nodiscard]] std::vector<CoarseCost> walks_within(const Map& map,
+                                                     std::size_t area,
+                                                     Cell from) const;
+
+  /// Returns cell `cell`'s place among area `area`'s cells, row by row.
+  [[nodiscard]] std::size_t slot_in(std::size_t area, Cell cell) const;
+
+  /// Returns how many nodes area `area` holds.
+  [[nodiscard]] std::size_t nodes_in(std::size_t area) const;
+
   [[nodiscard]] std::int32_t columns() const;
   [[nodiscard]] std::size_t area_of(Cell cell) const;
   [[nodiscard]] std::size_t node_count() const;
@@ -208,7 +224,6 @@ class CoarseGraph {
   [[nodiscard]] std::vector<CoarseCost> area_costs(const Map& map,
                                                    std::size_t area,
                                                    Cell from) const;
-  [[nodiscard]] std::size_t slot_in(std::size_t area, Cell cell) const;
   [[nodiscard]] std::vector<std::optional<CoarseCost>> node_costs(
       const Map& map, std::size_t area, Cell from) const;
   // Nodes at a cost: a search's starts or goals, or what it settled.

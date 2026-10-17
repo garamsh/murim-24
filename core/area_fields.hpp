@@ -52,6 +52,10 @@ class AreaFields {
   /// Returns the held searches toward objectives, by objective.
   [[nodiscard]] std::vector<const GoalSearch*> searches() const;
 
+  /// Returns how many bytes the walks within areas that seed the fields
+  /// hold.
+  [[nodiscard]] std::size_t walk_bytes() const;
+
  private:
   using Key = std::tuple<std::size_t, std::int32_t, std::int32_t>;
   using Objective = std::pair<std::int32_t, std::int32_t>;
@@ -62,18 +66,32 @@ class AreaFields {
   struct Search {
     GoalSearch search;
     bool read = false;
+    // The walks within the objective's area from the objective.
+    std::vector<CoarseCost> near;
   };
+  using Node = std::pair<std::size_t, std::size_t>;
 
+  [[nodiscard]] const std::vector<CoarseCost>& walks(const Map& map,
+                                                     const CoarseGraph& graph,
+                                                     Node node);
   [[nodiscard]] const std::vector<FieldSeed>& seeds(const Map& map,
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
                                                     Cell objective);
+  // Seeds the far side of one exit toward the objective into the scratch list.
+  void sow(const Map& map, const CoarseGraph& graph, const CoarseExit& exit,
+           Cell objective, Search& held);
 
   std::vector<FlowField> pool_;
   std::vector<std::size_t> free_;
   std::map<Key, Held> held_;
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
+  // The walks within an area from each node, by area and node, kept while a
+  // held field's area is the area or borders it, and the graph's columns of
+  // areas, to tell which do.
+  std::map<Node, std::vector<CoarseCost>> walks_;
+  std::size_t columns_ = 0;
   std::size_t built_ = 0;
   std::size_t built_in_all_ = 0;
 };
