@@ -21,10 +21,11 @@ namespace murim {
 /// only from its own exits, the objective in it, or margin cells joined to
 /// them, all of them walks, so the field needs no person's component. A field
 /// is a function of the map, the graph and its key alone, so what is cached
-/// changes no step. Fields are built when first asked for in a tick and kept
-/// while asked for every tick; a field asked for by no one in a tick returns
-/// its buffers to a pool, so a tick asking for the fields of the last allocates
-/// nothing.
+/// changes no step. A field is built when first asked for, and held while a
+/// person bound for its objective stands in its area or in one of the eight a
+/// step can cross into it from; one no such person stood near in a tick
+/// returns its buffers to a pool, so a tick asking for the fields of the last
+/// allocates nothing.
 class AreaFields {
  public:
   /// Returns the index of the field a person standing on `cell` steps by
@@ -35,9 +36,10 @@ class AreaFields {
   /// Returns the field at index `index`, which field_for gave this tick.
   [[nodiscard]] const FlowField& field(std::size_t index) const;
 
-  /// Ends a tick: every field no one asked for in it returns to the pool, and
-  /// the search toward an objective is dropped once no field toward it is
-  /// held and no build read it in the tick.
+  /// Ends a tick: every field no person bound for its objective stood in or
+  /// beside returns to the pool, and the search toward an objective is
+  /// dropped once no field toward it is held and no build read it in the
+  /// tick.
   void end_tick();
 
   /// Drops every field and cost, as after the map or the graph changes.
@@ -59,10 +61,6 @@ class AreaFields {
  private:
   using Key = std::tuple<std::size_t, std::int32_t, std::int32_t>;
   using Objective = std::pair<std::int32_t, std::int32_t>;
-  struct Held {
-    std::size_t slot;
-    bool asked;
-  };
   struct Search {
     GoalSearch search;
     bool read = false;
@@ -78,13 +76,19 @@ class AreaFields {
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
                                                     Cell objective);
+  // Whether a person bound for the key's objective stood this tick in its
+  // area or one of the eight around it.
+  [[nodiscard]] bool stood_near(const Key& key) const;
   // Seeds the far side of one exit toward the objective into the scratch list.
   void sow(const Map& map, const CoarseGraph& graph, const CoarseExit& exit,
            Cell objective, Search& held);
 
   std::vector<FlowField> pool_;
   std::vector<std::size_t> free_;
-  std::map<Key, Held> held_;
+  // The fields held, by key, and the keys asked for this tick, each the
+  // area a person bound for the objective stands in.
+  std::map<Key, std::size_t> held_;
+  std::vector<Key> standing_;
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
   // The walks within an area from each node, by area and node, kept while a
@@ -92,6 +96,7 @@ class AreaFields {
   // areas, to tell which do.
   std::map<Node, std::vector<CoarseCost>> walks_;
   std::size_t columns_ = 0;
+  std::size_t rows_ = 0;
   std::size_t built_ = 0;
   std::size_t built_in_all_ = 0;
 };

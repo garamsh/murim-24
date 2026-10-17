@@ -7,6 +7,7 @@
 #include <iterator>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -46,10 +47,12 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
                                   Cell cell, Cell objective) {
   const std::size_t area = graph.area_of(cell);
   const Key key{area, objective.x, objective.y};
+  standing_.push_back(key);
+  columns_ = static_cast<std::size_t>(graph.columns());
+  rows_ = static_cast<std::size_t>((map.height() + AREA_SIDE - 1) / AREA_SIDE);
   const auto found = held_.find(key);
   if (found != held_.end()) {
-    found->second.asked = true;
-    return found->second.slot;
+    return found->second;
   }
   // The area and a cell's margin round it, on the map.
   const Cell area_corner{(cell.x / AREA_SIDE) * AREA_SIDE,
@@ -69,7 +72,7 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
     free_.pop_back();
     pool_.at(slot).rebuild(map, corner, size, sown, objective);
   }
-  held_.emplace(key, Held{slot, true});
+  held_.emplace(key, slot);
   ++built_;
   ++built_in_all_;
   return slot;
@@ -92,7 +95,6 @@ const std::vector<FieldSeed>& AreaFields::seeds(const Map& map,
   }
   Search& held = found->second;
   held.read = true;
-  columns_ = static_cast<std::size_t>(graph.columns());
   for (const CoarseExit& exit : graph.exits(area)) {
     sow(map, graph, exit, objective, held);
   }
@@ -145,15 +147,22 @@ const FlowField& AreaFields::field(std::size_t index) const {
 }
 
 void AreaFields::end_tick() {
+  // A field is held while a person bound for its objective stands in its area
+  // or in one of the eight a step can cross into it from, so a walk stepping
+  // back and forth across an area's side or corner steps by fields already
+  // built.
+  std::sort(standing_.begin(), standing_.end());
+  standing_.erase(std::unique(standing_.begin(), standing_.end()),
+                  standing_.end());
   for (auto each = held_.begin(); each != held_.end();) {
-    if (each->second.asked) {
-      each->second.asked = false;
+    if (stood_near(each->first)) {
       ++each;
     } else {
-      free_.push_back(each->second.slot);
+      free_.push_back(each->second);
       each = held_.erase(each);
     }
   }
+  standing_.clear();
   // A search is a function of the map, the graph and its objective alone, so
   // keeping it while a field toward its objective is held, for the next build
   // toward it, changes no cost.
@@ -194,11 +203,30 @@ void AreaFields::end_tick() {
   built_ = 0;
 }
 
+bool AreaFields::stood_near(const Key& key) const {
+  const std::size_t area = std::get<0>(key);
+  const std::size_t column = area % columns_;
+  const std::size_t row = area / columns_;
+  for (std::size_t near_row = row == 0 ? 0 : row - 1;
+       near_row <= std::min(row + 1, rows_ - 1); ++near_row) {
+    for (std::size_t near_column = column == 0 ? 0 : column - 1;
+         near_column <= std::min(column + 1, columns_ - 1); ++near_column) {
+      if (std::binary_search(standing_.begin(), standing_.end(),
+                             Key{(near_row * columns_) + near_column,
+                                 std::get<1>(key), std::get<2>(key)})) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void AreaFields::clear() {
-  for (const auto& [key, held] : held_) {
-    free_.push_back(held.slot);
+  for (const auto& [key, slot] : held_) {
+    free_.push_back(slot);
   }
   held_.clear();
+  standing_.clear();
   searches_.clear();
   walks_.clear();
 }

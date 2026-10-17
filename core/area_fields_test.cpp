@@ -78,6 +78,33 @@ TEST(AreaFields, AFieldAskedForEveryTickIsBuiltOnce) {
   EXPECT_EQ(fields.built(), 1U);
 }
 
+// Cells either side of the side between the first two areas, and one two
+// areas east.
+constexpr Cell WEST_OF_SIDE{31, 16};
+constexpr Cell EAST_OF_SIDE{32, 16};
+constexpr Cell TWO_AREAS_EAST{70, 16};
+
+TEST(AreaFields, AFieldIsKeptWhileAPersonBoundForItStepsBackAcrossItsSide) {
+  const Map map = split_map();
+  const CoarseGraph graph{map};
+  ASSERT_NE(graph.area_of(WEST_OF_SIDE), graph.area_of(EAST_OF_SIDE));
+  ASSERT_EQ(graph.area_of(TWO_AREAS_EAST), graph.area_of(EAST_OF_SIDE) + 1);
+  AreaFields fields;
+  static_cast<void>(fields.field_for(map, graph, WEST_OF_SIDE, OBJECTIVE));
+  fields.end_tick();
+  static_cast<void>(fields.field_for(map, graph, EAST_OF_SIDE, OBJECTIVE));
+  fields.end_tick();
+  static_cast<void>(fields.field_for(map, graph, WEST_OF_SIDE, OBJECTIVE));
+  EXPECT_EQ(fields.built(), 0U);
+  fields.end_tick();
+  // Control: a tick the person stands two areas away, the west field is
+  // dropped, and built again on the way back.
+  static_cast<void>(fields.field_for(map, graph, TWO_AREAS_EAST, OBJECTIVE));
+  fields.end_tick();
+  static_cast<void>(fields.field_for(map, graph, WEST_OF_SIDE, OBJECTIVE));
+  EXPECT_EQ(fields.built(), 1U);
+}
+
 // Where a walk from `from` toward `objective` first crosses onto column
 // `border`, stepping by `step` from each cell: the row, or nothing when it
 // stops first.
