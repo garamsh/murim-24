@@ -149,7 +149,7 @@ class CoarseGraph {
 
   /// Returns the component of `cell`'s area that the passable cell `cell`
   /// lies in.
-  [[nodiscard]] std::uint16_t component_of(const Map& map, Cell cell) const;
+  [[nodiscard]] std::uint16_t component_of(Cell cell) const;
 
   /// Returns whether a walk joins `walk`'s ends; a blocked cell is joined to
   /// whatever the cells it could step onto are.

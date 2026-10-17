@@ -625,8 +625,7 @@ void CoarseGraph::join_components() {
   }
 }
 
-std::uint16_t CoarseGraph::component_of(const Map& map, Cell cell) const {
-  static_cast<void>(map);
+std::uint16_t CoarseGraph::component_of(Cell cell) const {
   const std::size_t area = area_of(cell);
   const std::vector<std::int16_t>& held = areas_.at(area).labels;
   return held.empty()
@@ -652,7 +651,7 @@ std::vector<std::size_t> CoarseGraph::sets_of(const Map& map, Cell cell) const {
   sets.reserve(ends.size());
   for (const Cell end : ends) {
     sets.push_back(
-        joined_.at(first_component_.at(area_of(end)) + component_of(map, end)));
+        joined_.at(first_component_.at(area_of(end)) + component_of(end)));
   }
   return sets;
 }
@@ -1049,7 +1048,7 @@ std::optional<CoarseCost> CoarseGraph::path_cost(const Map& map, Walk walk,
   }
   const std::size_t area = area_of(walk.from);
   if (area == area_of(walk.to) &&
-      component_of(map, walk.from) == component_of(map, walk.to)) {
+      component_of(walk.from) == component_of(walk.to)) {
     // Within one component of one area, the walk within it, as a field
     // restricted to the area finds it.
     return area_costs(map, area, walk.from).at(slot_in(area, walk.to));
