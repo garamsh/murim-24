@@ -669,6 +669,29 @@ const std::vector<CoarseExit>& CoarseGraph::exits(std::size_t area) const {
   return areas_.at(area).exits;
 }
 
+std::vector<CoarseCost> CoarseGraph::walks_within(const Map& map,
+                                                  std::size_t area,
+                                                  Cell from) const {
+  if (!areas_.at(area).open) {
+    return area_costs(map, area, from);
+  }
+  const Cell corner = area_corner(area);
+  const Footprint size = area_size(area);
+  std::vector<CoarseCost> walks;
+  walks.reserve(static_cast<std::size_t>(size.width) *
+                static_cast<std::size_t>(size.height));
+  for (Cell cell{0, corner.y}; cell.y < corner.y + size.height; ++cell.y) {
+    for (cell.x = corner.x; cell.x < corner.x + size.width; ++cell.x) {
+      walks.push_back(octile(from, cell));
+    }
+  }
+  return walks;
+}
+
+std::size_t CoarseGraph::nodes_in(std::size_t area) const {
+  return areas_.at(area).nodes.size();
+}
+
 CoarseGraph::Costs CoarseGraph::inserted(const Map& map, Cell cell) const {
   const std::size_t area = area_of(cell);
   const std::vector<std::optional<CoarseCost>> costs =
