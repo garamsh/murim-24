@@ -1,0 +1,30 @@
+== round 1 main ce580309 frame_bench_tool 02:55:49 load { 14.07 20.08 18.47 }
+frame time: p50 8.791 ms, p99 16.549 ms, max 17.919 ms
+PASS: p99 16.549 ms against a 16.7 ms budget
+== round 1 main ce580309 village_bench_tool 02:56:13 load { 16.92 20.25 18.57 }
+village frame time: p50 5.837 ms, p99 11.502 ms, max 12.898 ms
+== round 1 head 7d1d9d17 frame_bench_tool 02:56:31 load { 15.65 19.81 18.45 }
+frame time: p50 8.898 ms, p99 17.084 ms, max 18.032 ms
+FAIL: p99 17.084 ms against a 16.7 ms budget
+== round 1 head 7d1d9d17 village_bench_tool 02:56:53 load { 16.24 19.65 18.43 }
+village frame time: p50 6.048 ms, p99 10.609 ms, max 16.986 ms
+== round 2 main ce580309 frame_bench_tool 02:57:12 load { 18.51 19.99 18.58 }
+frame time: p50 8.268 ms, p99 16.816 ms, max 19.866 ms
+FAIL: p99 16.816 ms against a 16.7 ms budget
+== round 2 main ce580309 village_bench_tool 02:57:35 load { 16.21 19.39 18.40 }
+village frame time: p50 5.942 ms, p99 10.837 ms, max 11.754 ms
+== round 2 head 7d1d9d17 frame_bench_tool 02:57:52 load { 15.01 18.90 18.25 }
+frame time: p50 8.428 ms, p99 17.215 ms, max 20.368 ms
+FAIL: p99 17.215 ms against a 16.7 ms budget
+== round 2 head 7d1d9d17 village_bench_tool 02:58:15 load { 13.84 18.39 18.08 }
+village frame time: p50 5.471 ms, p99 11.114 ms, max 12.020 ms
+== round 3 main ce580309 frame_bench_tool 02:58:31 load { 11.88 17.73 17.85 }
+frame time: p50 10.811 ms, p99 13.841 ms, max 18.259 ms
+PASS: p99 13.841 ms against a 16.7 ms budget
+== round 3 main ce580309 village_bench_tool 02:58:53 load { 11.10 17.06 17.60 }
+village frame time: p50 5.826 ms, p99 10.771 ms, max 11.735 ms
+== round 3 head 7d1d9d17 frame_bench_tool 02:59:11 load { 11.23 16.81 17.50 }
+frame time: p50 7.648 ms, p99 16.414 ms, max 17.361 ms
+PASS: p99 16.414 ms against a 16.7 ms budget
+== round 3 head 7d1d9d17 village_bench_tool 02:59:30 load { 10.56 16.30 17.30 }
+village frame time: p50 5.139 ms, p99 10.885 ms, max 11.678 ms
