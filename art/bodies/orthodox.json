@@ -357,7 +357,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 250
    },
    {
     "filename": "orthodox 40.aseprite",
@@ -366,7 +366,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 250
    },
    {
     "filename": "orthodox 41.aseprite",
@@ -375,7 +375,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "orthodox 42.aseprite",
@@ -393,7 +393,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 44.aseprite",
@@ -402,7 +402,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 45.aseprite",
@@ -411,7 +411,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 46.aseprite",
@@ -420,7 +420,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 250
    },
    {
     "filename": "orthodox 47.aseprite",
@@ -429,7 +429,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 250
    },
    {
     "filename": "orthodox 48.aseprite",
@@ -438,7 +438,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "orthodox 49.aseprite",
@@ -465,7 +465,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 1000
+    "duration": 150
    },
    {
     "filename": "orthodox 52.aseprite",
@@ -483,7 +483,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 250
    },
    {
     "filename": "orthodox 54.aseprite",
@@ -492,7 +492,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 250
    },
    {
     "filename": "orthodox 55.aseprite",
@@ -501,7 +501,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 150
+    "duration": 1000
    },
    {
     "filename": "orthodox 56.aseprite",
@@ -510,7 +510,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 57.aseprite",
@@ -519,7 +519,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 58.aseprite",
@@ -528,7 +528,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 59.aseprite",
@@ -537,7 +537,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 60.aseprite",
@@ -546,7 +546,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 250
    },
    {
     "filename": "orthodox 61.aseprite",
@@ -555,7 +555,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 250
    },
    {
     "filename": "orthodox 62.aseprite",
@@ -564,7 +564,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 1000
    },
    {
     "filename": "orthodox 63.aseprite",
@@ -573,7 +573,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 64.aseprite",
@@ -582,7 +582,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 65.aseprite",
@@ -591,7 +591,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 66.aseprite",
@@ -600,7 +600,7 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
-    "duration": 80
+    "duration": 150
    },
    {
     "filename": "orthodox 67.aseprite",
@@ -609,7 +609,889 @@
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
     "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 68.aseprite",
+    "frame": { "x": 1088, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 69.aseprite",
+    "frame": { "x": 1104, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 70.aseprite",
+    "frame": { "x": 1120, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 71.aseprite",
+    "frame": { "x": 1136, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 72.aseprite",
+    "frame": { "x": 1152, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 73.aseprite",
+    "frame": { "x": 1168, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 74.aseprite",
+    "frame": { "x": 1184, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 75.aseprite",
+    "frame": { "x": 1200, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 76.aseprite",
+    "frame": { "x": 1216, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 77.aseprite",
+    "frame": { "x": 1232, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 78.aseprite",
+    "frame": { "x": 1248, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 79.aseprite",
+    "frame": { "x": 1264, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 80.aseprite",
+    "frame": { "x": 1280, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 81.aseprite",
+    "frame": { "x": 1296, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 82.aseprite",
+    "frame": { "x": 1312, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 83.aseprite",
+    "frame": { "x": 1328, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 84.aseprite",
+    "frame": { "x": 1344, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 85.aseprite",
+    "frame": { "x": 1360, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 86.aseprite",
+    "frame": { "x": 1376, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 87.aseprite",
+    "frame": { "x": 1392, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 88.aseprite",
+    "frame": { "x": 1408, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 89.aseprite",
+    "frame": { "x": 1424, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 90.aseprite",
+    "frame": { "x": 1440, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 91.aseprite",
+    "frame": { "x": 1456, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 92.aseprite",
+    "frame": { "x": 1472, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
     "duration": 80
+   },
+   {
+    "filename": "orthodox 93.aseprite",
+    "frame": { "x": 1488, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 94.aseprite",
+    "frame": { "x": 1504, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 95.aseprite",
+    "frame": { "x": 1520, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 96.aseprite",
+    "frame": { "x": 1536, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 97.aseprite",
+    "frame": { "x": 1552, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 98.aseprite",
+    "frame": { "x": 1568, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 99.aseprite",
+    "frame": { "x": 1584, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 100.aseprite",
+    "frame": { "x": 1600, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 101.aseprite",
+    "frame": { "x": 1616, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 102.aseprite",
+    "frame": { "x": 1632, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 103.aseprite",
+    "frame": { "x": 1648, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 104.aseprite",
+    "frame": { "x": 1664, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 105.aseprite",
+    "frame": { "x": 1680, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 106.aseprite",
+    "frame": { "x": 1696, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 107.aseprite",
+    "frame": { "x": 1712, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 108.aseprite",
+    "frame": { "x": 1728, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 109.aseprite",
+    "frame": { "x": 1744, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 110.aseprite",
+    "frame": { "x": 1760, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 111.aseprite",
+    "frame": { "x": 1776, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 112.aseprite",
+    "frame": { "x": 1792, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 113.aseprite",
+    "frame": { "x": 1808, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 114.aseprite",
+    "frame": { "x": 1824, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 115.aseprite",
+    "frame": { "x": 1840, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 116.aseprite",
+    "frame": { "x": 1856, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 80
+   },
+   {
+    "filename": "orthodox 117.aseprite",
+    "frame": { "x": 1872, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 118.aseprite",
+    "frame": { "x": 1888, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 119.aseprite",
+    "frame": { "x": 1904, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 120.aseprite",
+    "frame": { "x": 1920, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 121.aseprite",
+    "frame": { "x": 1936, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 122.aseprite",
+    "frame": { "x": 1952, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 123.aseprite",
+    "frame": { "x": 1968, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 124.aseprite",
+    "frame": { "x": 1984, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 125.aseprite",
+    "frame": { "x": 2000, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 126.aseprite",
+    "frame": { "x": 2016, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 127.aseprite",
+    "frame": { "x": 2032, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 128.aseprite",
+    "frame": { "x": 2048, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 129.aseprite",
+    "frame": { "x": 2064, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 130.aseprite",
+    "frame": { "x": 2080, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 131.aseprite",
+    "frame": { "x": 2096, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 132.aseprite",
+    "frame": { "x": 2112, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 133.aseprite",
+    "frame": { "x": 2128, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 134.aseprite",
+    "frame": { "x": 2144, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 135.aseprite",
+    "frame": { "x": 2160, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 136.aseprite",
+    "frame": { "x": 2176, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 137.aseprite",
+    "frame": { "x": 2192, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 138.aseprite",
+    "frame": { "x": 2208, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 139.aseprite",
+    "frame": { "x": 2224, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 140.aseprite",
+    "frame": { "x": 2240, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 141.aseprite",
+    "frame": { "x": 2256, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 142.aseprite",
+    "frame": { "x": 2272, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 143.aseprite",
+    "frame": { "x": 2288, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 144.aseprite",
+    "frame": { "x": 2304, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 145.aseprite",
+    "frame": { "x": 2320, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 146.aseprite",
+    "frame": { "x": 2336, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 147.aseprite",
+    "frame": { "x": 2352, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 148.aseprite",
+    "frame": { "x": 2368, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 149.aseprite",
+    "frame": { "x": 2384, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 150.aseprite",
+    "frame": { "x": 2400, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 151.aseprite",
+    "frame": { "x": 2416, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 152.aseprite",
+    "frame": { "x": 2432, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 153.aseprite",
+    "frame": { "x": 2448, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 154.aseprite",
+    "frame": { "x": 2464, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 155.aseprite",
+    "frame": { "x": 2480, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 156.aseprite",
+    "frame": { "x": 2496, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 157.aseprite",
+    "frame": { "x": 2512, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 158.aseprite",
+    "frame": { "x": 2528, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 159.aseprite",
+    "frame": { "x": 2544, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 1000
+   },
+   {
+    "filename": "orthodox 160.aseprite",
+    "frame": { "x": 2560, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 161.aseprite",
+    "frame": { "x": 2576, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 162.aseprite",
+    "frame": { "x": 2592, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 163.aseprite",
+    "frame": { "x": 2608, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 150
+   },
+   {
+    "filename": "orthodox 164.aseprite",
+    "frame": { "x": 2624, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
+   },
+   {
+    "filename": "orthodox 165.aseprite",
+    "frame": { "x": 2640, "y": 0, "w": 16, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 24 },
+    "sourceSize": { "w": 16, "h": 24 },
+    "duration": 250
    }
  ],
  "meta": {
@@ -617,7 +1499,7 @@
   "version": "1.3.18.6-arm64",
   "image": "orthodox.png",
   "format": "RGBA8888",
-  "size": { "w": 1088, "h": 24 },
+  "size": { "w": 2656, "h": 24 },
   "scale": "1",
   "frameTags": [
    { "name": "idle", "from": 0, "to": 0, "direction": "forward", "color": "#000000ff" },
@@ -634,20 +1516,62 @@
    { "name": "mend", "from": 28, "to": 29, "direction": "forward", "color": "#000000ff" },
    { "name": "torch", "from": 30, "to": 31, "direction": "forward", "color": "#000000ff" },
    { "name": "recoil", "from": 32, "to": 33, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_xray", "from": 34, "to": 34, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_xray", "from": 35, "to": 38, "direction": "forward", "color": "#000000ff" },
-   { "name": "back_xray", "from": 39, "to": 42, "direction": "forward", "color": "#000000ff" },
-   { "name": "swing_xray", "from": 43, "to": 45, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_hurt_xray", "from": 46, "to": 46, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_hurt_xray", "from": 47, "to": 50, "direction": "forward", "color": "#000000ff" },
-   { "name": "idle_maimed_xray", "from": 51, "to": 51, "direction": "forward", "color": "#000000ff" },
-   { "name": "walk_maimed_xray", "from": 52, "to": 55, "direction": "forward", "color": "#000000ff" },
-   { "name": "lunge_xray", "from": 56, "to": 57, "direction": "forward", "color": "#000000ff" },
-   { "name": "cast_xray", "from": 58, "to": 59, "direction": "forward", "color": "#000000ff" },
-   { "name": "throw_xray", "from": 60, "to": 61, "direction": "forward", "color": "#000000ff" },
-   { "name": "mend_xray", "from": 62, "to": 63, "direction": "forward", "color": "#000000ff" },
-   { "name": "torch_xray", "from": 64, "to": 65, "direction": "forward", "color": "#000000ff" },
-   { "name": "recoil_xray", "from": 66, "to": 67, "direction": "forward", "color": "#000000ff" }
+   { "name": "merchant_idle", "from": 34, "to": 34, "direction": "forward", "color": "#000000ff" },
+   { "name": "merchant_walk", "from": 35, "to": 38, "direction": "forward", "color": "#000000ff" },
+   { "name": "merchant_work", "from": 39, "to": 40, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_idle", "from": 41, "to": 41, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_walk", "from": 42, "to": 45, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_work", "from": 46, "to": 47, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_idle", "from": 48, "to": 48, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_walk", "from": 49, "to": 52, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_work", "from": 53, "to": 54, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_idle", "from": 55, "to": 55, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_walk", "from": 56, "to": 59, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_work", "from": 60, "to": 61, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_idle", "from": 62, "to": 62, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_walk", "from": 63, "to": 66, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_work", "from": 67, "to": 68, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_idle", "from": 69, "to": 69, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_walk", "from": 70, "to": 73, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_work", "from": 74, "to": 75, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_idle", "from": 76, "to": 76, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_walk", "from": 77, "to": 80, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_work", "from": 81, "to": 82, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_xray", "from": 83, "to": 83, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_xray", "from": 84, "to": 87, "direction": "forward", "color": "#000000ff" },
+   { "name": "back_xray", "from": 88, "to": 91, "direction": "forward", "color": "#000000ff" },
+   { "name": "swing_xray", "from": 92, "to": 94, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_hurt_xray", "from": 95, "to": 95, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_hurt_xray", "from": 96, "to": 99, "direction": "forward", "color": "#000000ff" },
+   { "name": "idle_maimed_xray", "from": 100, "to": 100, "direction": "forward", "color": "#000000ff" },
+   { "name": "walk_maimed_xray", "from": 101, "to": 104, "direction": "forward", "color": "#000000ff" },
+   { "name": "lunge_xray", "from": 105, "to": 106, "direction": "forward", "color": "#000000ff" },
+   { "name": "cast_xray", "from": 107, "to": 108, "direction": "forward", "color": "#000000ff" },
+   { "name": "throw_xray", "from": 109, "to": 110, "direction": "forward", "color": "#000000ff" },
+   { "name": "mend_xray", "from": 111, "to": 112, "direction": "forward", "color": "#000000ff" },
+   { "name": "torch_xray", "from": 113, "to": 114, "direction": "forward", "color": "#000000ff" },
+   { "name": "recoil_xray", "from": 115, "to": 116, "direction": "forward", "color": "#000000ff" },
+   { "name": "merchant_idle_xray", "from": 117, "to": 117, "direction": "forward", "color": "#000000ff" },
+   { "name": "merchant_walk_xray", "from": 118, "to": 121, "direction": "forward", "color": "#000000ff" },
+   { "name": "merchant_work_xray", "from": 122, "to": 123, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_idle_xray", "from": 124, "to": 124, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_walk_xray", "from": 125, "to": 128, "direction": "forward", "color": "#000000ff" },
+   { "name": "physician_work_xray", "from": 129, "to": 130, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_idle_xray", "from": 131, "to": 131, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_walk_xray", "from": 132, "to": 135, "direction": "forward", "color": "#000000ff" },
+   { "name": "smith_work_xray", "from": 136, "to": 137, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_idle_xray", "from": 138, "to": 138, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_walk_xray", "from": 139, "to": 142, "direction": "forward", "color": "#000000ff" },
+   { "name": "farmer_work_xray", "from": 143, "to": 144, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_idle_xray", "from": 145, "to": 145, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_walk_xray", "from": 146, "to": 149, "direction": "forward", "color": "#000000ff" },
+   { "name": "innkeeper_work_xray", "from": 150, "to": 151, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_idle_xray", "from": 152, "to": 152, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_walk_xray", "from": 153, "to": 156, "direction": "forward", "color": "#000000ff" },
+   { "name": "beggar_work_xray", "from": 157, "to": 158, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_idle_xray", "from": 159, "to": 159, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_walk_xray", "from": 160, "to": 163, "direction": "forward", "color": "#000000ff" },
+   { "name": "monk_work_xray", "from": 164, "to": 165, "direction": "forward", "color": "#000000ff" }
   ]
  }
 }

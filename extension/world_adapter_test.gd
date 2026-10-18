@@ -9,11 +9,14 @@
 # and that a region's sects and manuals are read back as the core holds them; and that the player
 # applies to a sect, hears rumours and shows attainment through the adapter as the core holds them;
 # and that a snapshot reads in one call what the per-army, per-structure and per-strike reads give;
-# and that the date reads the tick within the day and the day's length.
+# and that the date reads the tick within the day and the day's length; and that each person's
+# occupation and activity read as the core decides them.
 extends RefCounted
 
 const SEED := 42
 const OTHER_SEED := 43
+# The hour the activity pass reads at: smiths and physicians at work from 07, farmers from 06.
+const ACTIVITY_HOUR := 10
 const TICKS := 2000
 const REFERENCE := "res://build/extension/world_hash"
 const MAP_ROWS: Array[String] = [
@@ -153,11 +156,49 @@ func run() -> bool:
 	var lessons_pass := _lessons_pass(lived)
 	var event_people_pass := _event_people_pass()
 	var snapshot_pass := _snapshot_pass()
+	var activity_pass := _activity_pass()
 	# Last, as it ticks `lived` on.
 	var use_reads_pass := _use_reads_pass(lived)
-	return snapshot_pass and use_reads_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
+	return snapshot_pass and activity_pass and use_reads_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and homes_pass and time_pass and sects_pass \
 			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
+
+
+# In seed 2026's region at ACTIVITY_HOUR, when the base pack's trades are at work, the snapshot
+# gives every body's occupation and activity as person_occupation() and person_activity() read them,
+# and some resident with an occupation reads ACTIVITY_WORKING. Control: once its army is steered, it
+# follows no schedule, and the same person reads ACTIVITY_IDLE, as the core decides for a steered
+# army, with its occupation kept.
+func _activity_pass() -> bool:
+	var world := WorldAdapter.create_region(2026, 0)
+	var date := world.date()
+	while world.date().tick * 24 / date.ticks_per_day != ACTIVITY_HOUR:
+		world.tick()
+	var snapshot := world.snapshot()
+	var matched: bool = snapshot.occupation.size() == snapshot.person.size() \
+			and snapshot.activity.size() == snapshot.person.size()
+	var worker := -1
+	for i in snapshot.person.size():
+		var person: int = snapshot.person[i]
+		matched = matched and snapshot.occupation[i] == world.person_occupation(person) \
+				and snapshot.activity[i] == world.person_activity(person)
+		if worker < 0 and snapshot.activity[i] == WorldAdapter.ACTIVITY_WORKING and snapshot.occupation[i] >= 0:
+			worker = person
+	var army := -1
+	for each in world.army_count():
+		if worker >= 0 and world.roster(each).has(worker):
+			army = each
+	var occupation := world.person_occupation(worker) if worker >= 0 else -1
+	if army >= 0:
+		world.steer(army, true)
+	var steered_idle := worker >= 0 and world.person_activity(worker) == WorldAdapter.ACTIVITY_IDLE \
+			and world.person_occupation(worker) == occupation
+	var passed: bool = matched and worker >= 0 and steered_idle
+	print("world_adapter_test: at hour %d, %d bodies' occupation and activity in the snapshot as read one at a time %s; person %d, %s, working, reads idle once its army %d is steered %s: %s" % [
+		ACTIVITY_HOUR, snapshot.person.size(), matched, worker,
+		world.occupation_names()[occupation] if occupation >= 0 else "none", army, steered_idle,
+		"pass" if passed else "FAIL"])
+	return passed
 
 
 # On a tick of the M1 battle with uses of skills recorded and someone dead, a snapshot holds every

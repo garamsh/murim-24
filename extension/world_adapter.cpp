@@ -51,6 +51,7 @@
 #include "progress.hpp"
 #include "region.hpp"
 #include "save.hpp"
+#include "schedule.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
@@ -865,6 +866,8 @@ godot::Dictionary WorldAdapter::snapshot() const {
   godot::PackedVector2Array positions;
   godot::PackedInt64Array healths;
   godot::PackedInt64Array ready;
+  godot::PackedInt64Array occupations;
+  godot::PackedInt64Array activities;
   godot::PackedInt64Array factions;
   for (std::size_t army = 0; army < now.army_count(); ++army) {
     first.push_back(persons.size());
@@ -875,6 +878,10 @@ godot::Dictionary WorldAdapter::snapshot() const {
       positions.push_back(vector(person.position));
       healths.push_back(static_cast<std::int64_t>(person.health));
       ready.push_back(static_cast<std::int64_t>(person.ready_at));
+      const std::optional<std::size_t> occupation = now.occupation_of(member);
+      occupations.push_back(occupation ? static_cast<std::int64_t>(*occupation)
+                                       : -1);
+      activities.push_back(static_cast<std::int64_t>(now.activity(member)));
     }
   }
   first.push_back(persons.size());
@@ -933,6 +940,8 @@ godot::Dictionary WorldAdapter::snapshot() const {
   read.set("position", positions);
   read.set("health", healths);
   read.set("ready", ready);
+  read.set("occupation", occupations);
+  read.set("activity", activities);
   read.set("faction", factions);
   read.set("stage", stages);
   read.set("strike_person", strike_person);
@@ -1586,6 +1595,10 @@ std::int64_t WorldAdapter::person_occupation(std::int64_t person) const {
   return occupation ? static_cast<std::int64_t>(*occupation) : -1;
 }
 
+std::int64_t WorldAdapter::person_activity(std::int64_t person) const {
+  return static_cast<std::int64_t>(world().activity(person_index(person)));
+}
+
 godot::PackedStringArray WorldAdapter::occupation_names() const {
   godot::PackedStringArray names;
   for (const murim::Occupation& occupation : world().occupations()) {
@@ -1946,6 +1959,8 @@ void WorldAdapter::_bind_methods() {
                               &WorldAdapter::person_occupation);
   godot::ClassDB::bind_method(godot::D_METHOD("occupation_names"),
                               &WorldAdapter::occupation_names);
+  godot::ClassDB::bind_method(godot::D_METHOD("person_activity", "person"),
+                              &WorldAdapter::person_activity);
   godot::ClassDB::bind_method(godot::D_METHOD("person_qi", "person"),
                               &WorldAdapter::person_qi);
   godot::ClassDB::bind_method(godot::D_METHOD("person_qi_capacity", "person"),
@@ -2080,6 +2095,16 @@ void WorldAdapter::_bind_methods() {
       name, "", "STAGE_DESTROYED", static_cast<int>(murim::Stage::DESTROYED));
   godot::ClassDB::bind_integer_constant(name, "", "STAGE_RUBBLE",
                                         static_cast<int>(murim::Stage::RUBBLE));
+  const std::array<std::pair<const char*, murim::Activity>, 4> activities{{
+      {"ACTIVITY_WALKING", murim::Activity::WALKING},
+      {"ACTIVITY_WORKING", murim::Activity::WORKING},
+      {"ACTIVITY_AT_HOME", murim::Activity::AT_HOME},
+      {"ACTIVITY_IDLE", murim::Activity::IDLE},
+  }};
+  for (const auto& [constant, activity] : activities) {
+    godot::ClassDB::bind_integer_constant(name, "", constant,
+                                          static_cast<int>(activity));
+  }
   const std::array<std::pair<const char*, murim::FieldState>, 5> fields{{
       {"FIELD_SOWN", murim::FieldState::SOWN},
       {"FIELD_GROWING", murim::FieldState::GROWING},

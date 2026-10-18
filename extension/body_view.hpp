@@ -53,6 +53,15 @@ class BodyView : public godot::RefCounted {
                  const godot::PackedInt64Array& sprite_of_faction,
                  const godot::PackedColorArray& accents);
 
+  /// Sets each occupation's look (ADR 0081), by the occupation's index:
+  /// six frames each in `firsts`, the first frame of its idle, walk and work
+  /// motions in a faction's sheet and then of their outlines, all -1 for an
+  /// occupation the sheets draw no look for. A body of such an occupation,
+  /// not of the steered army and not wounded, stands, walks facing the viewer
+  /// and, at work, works in its occupation's look; any other is drawn as its
+  /// faction's body.
+  void set_looks(const godot::PackedInt64Array& firsts);
+
   /// Sets the colours the fighting is drawn in: paper, for others' losses
   /// and a use by an army of no accent; ink, for a number's shadow; jade,
   /// for the steered person's uses; and crimson, for its own losses and the
@@ -259,6 +268,8 @@ class BodyView : public godot::RefCounted {
   struct Look {
     std::int64_t tag = 0;
     Box frame;
+    // Frames from the body's frame to its outline's.
+    std::int64_t outline = 0;
     double white = 0.0;
     bool flip = false;
   };
@@ -282,6 +293,9 @@ class BodyView : public godot::RefCounted {
     std::vector<Point> before;
     bool same = true;
     std::int64_t faction = 0;
+    // Each body's occupation, -1 for none, and its activity, by roster.
+    std::vector<std::int64_t> occupation;
+    std::vector<std::int64_t> activity;
   };
   // A sprite to pack: its frame in the atlas, its centre, its flip, how far
   // toward white and how opaque it is drawn, how far it is turned about its
@@ -321,6 +335,8 @@ class BodyView : public godot::RefCounted {
     std::vector<Point> positions;
     std::vector<std::int64_t> healths;
     std::vector<std::int64_t> factions;
+    std::vector<std::int64_t> occupations;
+    std::vector<std::int64_t> activities;
   };
 
   static Read read(const godot::Dictionary& snapshot);
@@ -387,6 +403,9 @@ class BodyView : public godot::RefCounted {
   std::int64_t faction_width_ = 0;
   std::int64_t shadow_x_ = 0;
   std::vector<std::int64_t> sprite_of_faction_;
+  // Each occupation's look, LOOK_FIELDS frames each, as set_looks() takes
+  // them.
+  std::vector<std::int64_t> looks_;
   std::vector<Rgba> accents_;
   std::vector<Rgba> palette_;
   // The relief.

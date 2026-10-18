@@ -318,7 +318,9 @@ class WorldAdapter : public godot::RefCounted {
   /// each army's bodies start in them and, last, how many there are;
   /// each body's `person`, `position` in sub-cell units, `health` and
   /// `ready`, as roster(), body_positions(), body_strengths() and
-  /// body_ready() give them; each army's `faction`; each structure's
+  /// body_ready() give them, and its `occupation` and `activity`, as
+  /// person_occupation() and person_activity() give them; each army's
+  /// `faction`; each structure's
   /// `stage`; and the last tick's uses of skills as strikes() gives them,
   /// one entry each in `strike_person`, `strike_shape`, `strike_range`,
   /// `strike_radius`, `strike_body_damage`, `strike_origin`,
@@ -361,6 +363,11 @@ class WorldAdapter : public godot::RefCounted {
   /// Returns the names of the occupations, by index; empty for a world given
   /// none.
   [[nodiscard]] godot::PackedStringArray occupation_names() const;
+
+  /// Returns what person `person` is doing by its occupation's schedule, one
+  /// of the ACTIVITY_* constants, as the core's activity() decides it (ADR
+  /// 0081).
+  [[nodiscard]] std::int64_t person_activity(std::int64_t person) const;
 
   /// Returns the qi person `person` holds.
   [[nodiscard]] std::int64_t person_qi(std::int64_t person) const;

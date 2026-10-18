@@ -5,7 +5,8 @@
 # hides it, is outlined over the house, while one standing just south of it, in front, is not; and
 # an outlined body's outline carries the share of white its body flashes with as it is struck, for
 # outline.gdshader to tell the body's pixels from what hides it (world_art/outline_check_tool.gd
-# checks the pixels it then draws, which need a renderer).
+# checks the pixels it then draws, which need a renderer); every base-pack occupation has a look
+# drawn, and a resident at work is drawn working in it.
 extends RefCounted
 
 const SCENE := "res://world_art/world_art.tscn"
@@ -28,6 +29,8 @@ const SWEEP := {"range": 384, "radius": 0, "body_damage": 10, "structure_damage"
 const RULES := {"separation": 256, "hostile": [[false, true], [true, false]], "stage_floors": [75, 25, 1]}
 const VIEW := Rect2(0, 0, 480, 270)
 const REGION_SEED := 2026
+# An hour the base pack's trades are at work.
+const WORK_HOUR := 10
 # Ticks the steered person has to walk to the house it is sent beside: at about 16 ticks a cell,
 # past half the region's width, since every house of its own village can have the temple, the inn or
 # rock before it.
@@ -40,7 +43,96 @@ const FRONT_CLEAR := 6
 
 
 func run() -> bool:
-	return _facing_pass() and _strike_pass() and _outline_pass() and _flash_pass()
+	return _facing_pass() and _strike_pass() and _outline_pass() and _flash_pass() and _looks_pass() \
+			and _work_pass()
+
+
+# Every occupation of the base pack finds its look's `<id>_idle`, `<id>_walk` and `<id>_work`
+# tags, and their outlines, in every faction's body sheet, so a trade left undrawn fails here rather
+# than falling back unseen (ADR 0081). Control: an id no sheet tags falls back, six -1s. Setup: the
+# base pack names occupations.
+func _looks_pass() -> bool:
+	var names := WorldAdapter.create_region(REGION_SEED, 0).occupation_names()
+	var missing: Array[String] = []
+	for faction: String in FACTIONS:
+		var tags := {}
+		var sheet: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://art/bodies/%s.json" % faction))
+		for tag: Dictionary in sheet.meta.frameTags:
+			tags[tag.name] = [int(tag.from), int(tag.to)]
+		var looks := WorldArt.trade_looks(names, tags)
+		for occupation in names.size():
+			if looks.slice(occupation * 6, occupation * 6 + 6).has(-1):
+				missing.append("%s %s" % [faction, names[occupation]])
+		var none := WorldArt.trade_looks(PackedStringArray(["nonesuch"]), tags)
+		if none != PackedInt64Array([-1, -1, -1, -1, -1, -1]):
+			missing.append("%s nonesuch found %s" % [faction, none])
+	var passed := not names.is_empty() and missing.is_empty()
+	print("bodies_test: the base pack's occupations %s each find their look in every faction's sheet, and an id with none falls back; missing: %s: %s" % [
+		names, missing if not missing.is_empty() else "none", "pass" if passed else "FAIL"])
+	return passed
+
+
+# In seed 2026's region at WORK_HOUR, a resident the core reads as working at its workplace is drawn
+# in its occupation's work motion. Control: once its army is steered, it follows no schedule and the
+# same person, read not working, is drawn in its look but not working. Control: the player's body,
+# though it holds an occupation, is drawn as its faction's. Setup: someone with an occupation is
+# working, using no skill on either tick, whose motion would be drawn over its look, and the player
+# holds an occupation.
+func _work_pass() -> bool:
+	var world := WorldAdapter.create_region(REGION_SEED, 0)
+	var day: int = world.date().ticks_per_day
+	while world.date().tick * 24 / day != WORK_HOUR:
+		world.tick()
+	var art: Node2D = load(SCENE).instantiate()
+	art.show_world(world, world.player_army())
+	art.note_tick()
+	var found := _working(world)
+	if found.is_empty():
+		print("bodies_test: no one working at hour %d: FAIL" % WORK_HOUR)
+		art.free()
+		return false
+	var names := world.occupation_names()
+	var trade: String = names[world.person_occupation(found.person)]
+	var working := _drawn(art, found.army, found.body)
+	world.steer(found.army, true)
+	world.tick()
+	art.note_tick()
+	var steered := _drawn(art, found.army, found.body)
+	var still := not _striking(world, found.person)
+	var player := world.roster(world.player_army())[0]
+	var player_trade := world.person_occupation(player)
+	var player_drawn := _drawn(art, world.player_army(), 0)
+	var passed := still and player_trade >= 0 and working == trade + "_work" \
+			and steered in [trade + "_idle", trade + "_walk"] and player_drawn in ["idle", "walk", "back"]
+	print("bodies_test: at hour %d person %d, a %s working, drawn as %s; its army steered, read %d, as %s, using no skill %s; the player, a %s, drawn as %s: %s" % [
+		WORK_HOUR, found.person, trade, working, world.person_activity(found.person), steered, still,
+		names[player_trade] if player_trade >= 0 else "none", player_drawn, "pass" if passed else "FAIL"])
+	art.free()
+	return passed
+
+
+# The tag `art` draws body `body` of army `army` in, the view centred on it.
+func _drawn(art: Node2D, army: int, body: int) -> String:
+	var at: Vector2 = art.body_at(army, body, 1.0)
+	art.refresh(Rect2(at - VIEW.size / 2.0, VIEW.size), 1.0)
+	return _tag_at(art, at)
+
+
+# The first person of `world` with an occupation reading ACTIVITY_WORKING and using no skill on the
+# last tick: its `person`, `army` and `body` in the army's roster; or empty.
+func _working(world: WorldAdapter) -> Dictionary:
+	for army in world.army_count():
+		var roster := world.roster(army)
+		for body in roster.size():
+			if world.person_occupation(roster[body]) >= 0 and not _striking(world, roster[body]) \
+					and world.person_activity(roster[body]) == WorldAdapter.ACTIVITY_WORKING:
+				return {"person": roster[body], "army": army, "body": body}
+	return {}
+
+
+# Whether `person` used a skill on `world`'s last tick.
+func _striking(world: WorldAdapter, person: int) -> bool:
+	return world.strikes().any(func(strike: Dictionary) -> bool: return strike.person == person)
 
 
 # One person walks north and one east, from the same row: after two ticks the first shows a frame
