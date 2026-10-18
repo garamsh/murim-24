@@ -45,10 +45,14 @@ class AreaFields {
   /// Drops what blocking `cells` on the map, and the graph's rebuild for
   /// them, can change, `map` and `graph` being the new ones: every search,
   /// the walks within an area holding one of the cells, and each held field
-  /// whose area or margin holds one or whose seeds, sown again, differ from
-  /// those it was built from. A field is a function of its window's cells,
-  /// its seeds and its objective, so each field kept is the one a fresh build
-  /// gives.
+  /// whose area or margin holds one or whose seeds differ from those it was
+  /// built from. A seed whose line to the objective is walked keeps its cost
+  /// while no cell stops that line; any other keeps its walk over the graph
+  /// while that walk is cheaper than the octile cost through the window of
+  /// any area holding a cell, which every walk the rebuild changed passes; a
+  /// field with a seed neither keeps is sown again and compared. A field is a
+  /// function of its window's cells, its seeds and its objective, so each
+  /// field kept is the one a fresh build gives.
   void changed(const Map& map, const CoarseGraph& graph,
                const std::vector<Cell>& cells);
 
