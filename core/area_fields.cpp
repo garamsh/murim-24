@@ -71,7 +71,8 @@ bool walks_its_line(const Map& map, Cell from, Cell goal) {
 // Whether a blocked `cell` can be one walks_its_line() steps onto or past
 // from `from` to `goal`: every cell it steps onto lies within half a cell of
 // the line, by the larger side, and each cell beside a diagonal step within
-// one more.
+// one more, so within 1.5. The check takes 2, the whole number above 1.5,
+// which keeps it in integers.
 bool may_cross(Cell from, Cell goal, Cell cell) {
   const std::int64_t line_x = std::int64_t{goal.x} - from.x;
   const std::int64_t line_y = std::int64_t{goal.y} - from.y;
