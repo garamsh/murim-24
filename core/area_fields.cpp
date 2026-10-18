@@ -126,7 +126,9 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
     free_.pop_back();
     pool_.at(slot).rebuild(map, window.corner, window.size, sown, objective);
   }
-  sown_.at(slot) = Sown{sown, sowing_};
+  Sown& kept = sown_.at(slot);
+  kept.seeds.assign(sown.begin(), sown.end());
+  kept.sowing.assign(sowing_.begin(), sowing_.end());
   held_.emplace(key, slot);
   ++built_;
   ++built_in_all_;
