@@ -378,6 +378,12 @@ func fit(window: Vector2i, touch: bool) -> void:
 	_place()
 
 
+## Returns the top of the bars along the HUD's foot, the technique bar and the purse's belt beside
+## it, in the HUD's pixels; or the room's bottom while the touch controls hide them.
+func foot_top() -> float:
+	return _skill_bar.position.y if _skill_bar.visible else room.y
+
+
 ## Returns `event` with its position in the HUD's pixels, from the window's.
 func to_hud(event: InputEvent) -> InputEvent:
 	return event.xformed_by(transform.affine_inverse())

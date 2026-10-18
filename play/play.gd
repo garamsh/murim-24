@@ -273,6 +273,18 @@ static func camera_centre(at: Vector2, screen: Vector2, bounds: Rect2, zoom: flo
 	return (view_centre(at, screen, bounds) * zoom).round() / zoom
 
 
+## Returns the bounds the camera stops at to follow `at`, in the world's pixels, in a window `window`
+## pixels across and down: the drawn bounds, their bottom lowered past the lower of their own and `at`
+## by as far as the HUD's bars along the screen's foot reach up it, so those bars cover nothing above
+## either (#398).
+func camera_bounds(window: Vector2, at: Vector2) -> Rect2:
+	var foot: Vector2 = _hud.to_window(Vector2(0, _hud.foot_top()))
+	var covered := (window.y - foot.y) / _camera.zoom.y
+	var bounds := _bounds
+	bounds.end.y = maxf(bounds.end.y, at.y) + maxf(covered, 0.0)
+	return bounds
+
+
 ## Returns the part of a map `size` pixels across and down, on the unraised ground, that the view
 ## draws ground over: all of it, but where raised ground along its last row is drawn above the
 ## map's bottom edge, the bottom comes up to the highest of it, since nothing is drawn below.
@@ -307,7 +319,7 @@ func _play(made: WorldAdapter) -> void:
 	for keycode: Key in WARE_KEYS:
 		_hud.purse.keys.append(OS.get_keycode_string(keycode))
 	_body = world.roster(steered)[0]
-	# The camera stops at the region's edge rather than showing past it.
+	# The camera stops at the region's edge but for what the HUD's bars cover, as camera_bounds() says.
 	var rows := world.map_rows()
 	_bounds = drawn_bounds(Vector2(rows[0].length(), rows.size()) * _art.CELL, _art.relief)
 	_hud.title_screen.close()
@@ -481,14 +493,17 @@ func _process(delta: float) -> void:
 		_grade.visible = false
 	if world == null or _hud.screen() != null:
 		return
-	var screen := get_viewport_rect().size / _camera.zoom
-	_camera.position = camera_centre(drawn_lead(), screen, _bounds, _camera.zoom.x)
+	var window := get_viewport_rect().size
+	var screen := window / _camera.zoom
+	var lead := drawn_lead()
+	var bounds := camera_bounds(window, lead)
+	_camera.position = camera_centre(lead, screen, bounds, _camera.zoom.x)
 	var view := Rect2(_camera.position - screen / 2.0, screen)
 	show_view(view)
 	# A hit on or from the player shakes the screen by whole screen pixels, never past the bounds.
 	var shake := Vector2(_art.combat.shake(Time.get_ticks_msec())) / _camera.zoom
-	_camera.offset = shake.clamp((_bounds.position - view.position).min(Vector2.ZERO),
-			(_bounds.end - view.end).max(Vector2.ZERO))
+	_camera.offset = shake.clamp((bounds.position - view.position).min(Vector2.ZERO),
+			(bounds.end - view.end).max(Vector2.ZERO))
 	_sound.hearing = view
 	# The cursor stays on the screen while the camera moves, so it moves over the world.
 	_cursor = get_local_mouse_position()

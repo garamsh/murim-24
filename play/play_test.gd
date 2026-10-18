@@ -103,6 +103,9 @@ const WAYS := [Vector2i.UP, Vector2i.LEFT, Vector2i.DOWN, Vector2i.RIGHT]
 const STICK_TICKS := 150
 # Ticks the person is given to walk up to a person of an allied faction.
 const TALK_WALK_LIMIT := 6000
+# Ticks the player born on the map's bottom edge is watched over, and how often it is checked.
+const FOOT_TICKS := 2800
+const FOOT_STEP := 200
 # The four diagonal ways a person is walked along.
 const DIAGONALS := [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
 
@@ -137,7 +140,8 @@ func run() -> bool:
 			and _shortcuts_pass() and _numbers_pass() and _apply_pass() and _rebirth_pass() and _save_pass() \
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
-			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _camera_walk_pass() and _grade_pass()
+			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _camera_walk_pass() and _foot_pass() \
+			and _grade_pass()
 
 
 # The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom
@@ -220,6 +224,65 @@ func _camera_walk_pass() -> bool:
 	var passed: bool = walked > 20.0 and worst <= 1.0 + 0.001 and drift <= 0.001 and worst_rounded > 1.0
 	print("play_test: walked %.1f pixels in 120 frames; the camera at most %.2f screen pixels off the person's motion a frame, the person at most %.2f off its place on the screen; rounded to world pixels the camera %.2f off: %s" % [
 		walked, worst, drift, worst_rounded, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# Born on the map's bottom edge, in village 0, the camera at 1920×1080 and 1280×720 leaves the
+# player's body, a cell wide from its feet up to its head, and the talk prompt's slip inside the
+# HUD's room and clear of every panel the HUD shows and of the purse's belt, every FOOT_STEP ticks
+# up to FOOT_TICKS, over which the issue saw the prompt under the technique bar (#398). Control: on
+# the map's middle the camera centres on it. Setup: the player stands within two cells of the map's
+# drawn bottom at every check, and the prompt was shown at one at least.
+func _foot_pass() -> bool:
+	var Play := preload("res://play/play.gd")
+	var ViewScale := preload("res://view_scale.gd")
+	var scene := _scene(0)
+	var world: WorldAdapter = scene.world
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var art: Node2D = scene.get_node("WorldArt")
+	var rows := world.map_rows()
+	var bottom: float = Play.drawn_bounds(Vector2(rows[0].length(), rows.size()) * art.CELL, art.relief).end.y
+	var at_edge := true
+	var checks := 0
+	var prompted := 0
+	var covered := []
+	var centred := true
+	for tick in FOOT_TICKS + 1:
+		if tick % FOOT_STEP == 0:
+			var lead: Vector2 = scene.drawn_lead()
+			at_edge = at_edge and bottom - lead.y < 2 * art.CELL.y
+			for window: Vector2 in [Vector2(1920, 1080), Vector2(1280, 720)]:
+				var zoom := float(ViewScale.world_scale(Vector2i(window), false))
+				scene.get_node("Camera").zoom = Vector2(zoom, zoom)
+				art.pixel_scale = zoom
+				hud.fit(Vector2i(window), false)
+				var screen := window / zoom
+				var bounds: Rect2 = scene.camera_bounds(window, lead)
+				scene.show_view(Rect2(Play.camera_centre(lead, screen, bounds, zoom) - screen / 2.0, screen))
+				scene.show_talk()
+				var shown: Array[Rect2] = [Rect2(scene.to_hud_pixels(lead - Vector2(art.CELL.x / 2.0, art.HEAD)),
+						Vector2.ZERO).expand(scene.to_hud_pixels(lead + Vector2(art.CELL.x / 2.0, 0)))]
+				if hud.talk_prompt.visible:
+					shown.append(hud.talk_prompt.slip_rect())
+					prompted += 1
+				var covers: Array[Rect2] = []
+				if hud.purse.belt:
+					covers.append(hud.purse.belt_rect())
+				for child: Node in hud.get_children():
+					if child is Panel and (child as Control).visible:
+						covers.append((child as Control).get_rect())
+				var room := Rect2(Vector2.ZERO, hud.room)
+				for rect in shown:
+					if not room.encloses(rect) or covers.any(func(cover: Rect2) -> bool: return cover.intersects(rect)):
+						covered.append("tick %d at %s: %s" % [tick, window, rect])
+				var middle := bounds.get_center().round()
+				centred = centred and Play.camera_centre(middle, screen, bounds, zoom) == middle
+				checks += 1
+		scene.step()
+	var passed := at_edge and prompted > 0 and covered.is_empty() and centred
+	print("play_test: born in village 0, within two cells of the map's drawn bottom at every check %s; of %d checks, %d with the talk prompt; covered or off the room: %s; centred on the map's middle %s: %s" % [
+		at_edge, checks, prompted, covered if not covered.is_empty() else "none", centred, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 
