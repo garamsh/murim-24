@@ -240,6 +240,27 @@ TEST(AreaFields, AFieldSeededByAWalkALayLengthensIsBuiltAgain) {
   EXPECT_EQ(made.differ, 0U);
 }
 
+// Open ground of 4 areas in a row, the objective in the last; the lay
+// stands a bar across the third, on the lines from the second to it.
+constexpr std::int32_t OPEN_WIDTH = 128;
+constexpr std::int32_t STOP_AT = 80;
+constexpr std::int32_t STOP_FROM = 12;
+constexpr std::int32_t STOP_TO = 21;
+constexpr Cell IN_THE_LAST{120, 16};
+
+TEST(AreaFields, AFieldWhoseSeedsLineALayStopsIsBuiltAgain) {
+  const std::vector<std::string> rows(AREA_SIDE, std::string(OPEN_WIDTH, '.'));
+  std::vector<Cell> laid;
+  for (std::int32_t row = STOP_FROM; row < STOP_TO; ++row) {
+    laid.push_back(Cell{STOP_AT, row});
+  }
+  const Relaid made = relaid(Map{rows}, laid, IN_THE_LAST, FIRST_AREA);
+  // Setup: the lay changes, through its seeds' lines alone, the first area's
+  // field, whose window and whose neighbour hold none of its cells.
+  ASSERT_GT(made.probe_changed, 0U);
+  EXPECT_EQ(made.differ, 0U);
+}
+
 // A map of 2 by 2 areas crossed by a wall of cells touching only at their
 // corners, along x + y = DIAGONAL, from column `gap` on: a gap below it lets
 // a walk round, and a line along the wall passes through its corners.

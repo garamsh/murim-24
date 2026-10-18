@@ -68,22 +68,42 @@ bool walks_its_line(const Map& map, Cell from, Cell goal) {
   return true;
 }
 
-// The cells a field is built over: its area, whose corner is `area_corner`,
-// and a cell's margin round it, on the map.
-struct Window {
-  Cell corner;
-  Footprint size;
-};
+// Whether a blocked `cell` can be one walks_its_line() steps onto or past
+// from `from` to `goal`: every cell it steps onto lies within half a cell of
+// the line, by the larger side, and each cell beside a diagonal step within
+// one more.
+bool may_cross(Cell from, Cell goal, Cell cell) {
+  const std::int64_t line_x = std::int64_t{goal.x} - from.x;
+  const std::int64_t line_y = std::int64_t{goal.y} - from.y;
+  const std::int64_t off_line =
+      std::abs((line_x * (std::int64_t{cell.y} - from.y)) -
+               (line_y * (std::int64_t{cell.x} - from.x)));
+  return cell.x >= std::min(from.x, goal.x) &&
+         cell.x <= std::max(from.x, goal.x) &&
+         cell.y >= std::min(from.y, goal.y) &&
+         cell.y <= std::max(from.y, goal.y) &&
+         off_line <= 2 * std::max(std::abs(line_x), std::abs(line_y));
+}
 
-Window window_of(const Map& map, Cell area_corner) {
+// The cell of the rectangle from `corner` of `size` nearest `cell` along
+// each axis.
+Cell nearest_in(Cell corner, Footprint size, Cell cell) {
+  return Cell{std::clamp(cell.x, corner.x, corner.x + size.width - 1),
+              std::clamp(cell.y, corner.y, corner.y + size.height - 1)};
+}
+
+}  // namespace
+
+AreaFields::Window AreaFields::window_of(const Map& map, std::size_t columns,
+                                         std::size_t area) {
+  const Cell area_corner{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
+                         static_cast<std::int32_t>(area / columns) * AREA_SIDE};
   const Cell corner{std::max(0, area_corner.x - 1),
                     std::max(0, area_corner.y - 1)};
   const Cell far{std::min(map.width(), area_corner.x + AREA_SIDE + 1),
                  std::min(map.height(), area_corner.y + AREA_SIDE + 1)};
   return Window{corner, Footprint{far.x - corner.x, far.y - corner.y}};
 }
-
-}  // namespace
 
 std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
                                   Cell cell, Cell objective) {
@@ -96,8 +116,7 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
   if (found != held_.end()) {
     return found->second;
   }
-  const Window window = window_of(map, Cell{(cell.x / AREA_SIDE) * AREA_SIDE,
-                                            (cell.y / AREA_SIDE) * AREA_SIDE});
+  const Window window = window_of(map, columns_, area);
   const std::vector<FieldSeed>& sown = seeds(map, graph, area, objective);
   std::size_t slot = 0;
   if (free_.empty()) {
@@ -109,7 +128,7 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
     free_.pop_back();
     pool_.at(slot).rebuild(map, window.corner, window.size, sown, objective);
   }
-  sown_.at(slot) = sown;
+  sown_.at(slot) = Sown{sown, sowing_};
   held_.emplace(key, slot);
   ++built_;
   ++built_in_all_;
@@ -121,8 +140,10 @@ const std::vector<FieldSeed>& AreaFields::seeds(const Map& map,
                                                 std::size_t area,
                                                 Cell objective) {
   scratch_.clear();
+  sowing_.clear();
   if (graph.area_of(objective) == area) {
     scratch_.push_back(FieldSeed{objective, 0});
+    sowing_.push_back(Sowing{0, true});
   }
   const Objective aim{objective.x, objective.y};
   auto found = searches_.find(aim);
@@ -173,10 +194,10 @@ void AreaFields::sow(const Map& map, const CoarseGraph& graph,
     }
     // Where a walk at the octile cost reaches the objective, that is its cost,
     // so a walk across areas keeps to its line (ADR 0043).
+    const bool line = walks_its_line(map, seed, objective);
     scratch_.push_back(
-        FieldSeed{seed, walks_its_line(map, seed, objective)
-                            ? std::min(best, octile(seed, objective))
-                            : best});
+        FieldSeed{seed, line ? std::min(best, octile(seed, objective)) : best});
+    sowing_.push_back(Sowing{best, line});
   }
 }
 
@@ -271,34 +292,81 @@ void AreaFields::changed(const Map& map, const CoarseGraph& graph,
     each = holding.count(std::get<0>(each->first)) == 0 ? std::next(each)
                                                         : walks_.erase(each);
   }
+  // The graph changed only within the areas holding a cell and a cell round
+  // them, where a neighbour's entrance toward them lies: each such area's
+  // window.
   const auto columns = static_cast<std::size_t>(graph.columns());
+  std::vector<Window> rebuilt;
+  rebuilt.reserve(holding.size());
+  for (const std::size_t area : holding) {
+    rebuilt.push_back(window_of(map, columns, area));
+  }
+  const auto same = [](const FieldSeed& one, const FieldSeed& other) {
+    return one.cell.x == other.cell.x && one.cell.y == other.cell.y &&
+           one.cost == other.cost;
+  };
   for (auto each = held_.begin(); each != held_.end();) {
     const auto& [area, objective_x, objective_y] = each->first;
-    const Window window = window_of(
-        map, Cell{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
-                  static_cast<std::int32_t>(area / columns) * AREA_SIDE});
+    const Cell objective{objective_x, objective_y};
+    const Window window = window_of(map, columns, area);
     const bool covered =
         std::any_of(cells.begin(), cells.end(), [&window](Cell cell) {
-          return cell.x >= window.corner.x && cell.y >= window.corner.y &&
-                 cell.x < window.corner.x + window.size.width &&
-                 cell.y < window.corner.y + window.size.height;
+          return nearest_in(window.corner, window.size, cell).x == cell.x &&
+                 nearest_in(window.corner, window.size, cell).y == cell.y;
         });
-    const auto same = [](const FieldSeed& one, const FieldSeed& other) {
-      return one.cell.x == other.cell.x && one.cell.y == other.cell.y &&
-             one.cost == other.cost;
-    };
-    const std::vector<FieldSeed>& was = sown_.at(each->second);
-    if (!covered) {
-      const std::vector<FieldSeed>& now =
-          seeds(map, graph, area, Cell{objective_x, objective_y});
-      if (std::equal(now.begin(), now.end(), was.begin(), was.end(), same)) {
-        ++each;
-        continue;
+    Sown& was = sown_.at(each->second);
+    bool kept = !covered && unchanged(map, was, objective, cells, rebuilt);
+    if (!covered && !kept) {
+      const std::vector<FieldSeed>& now = seeds(map, graph, area, objective);
+      kept = std::equal(now.begin(), now.end(), was.seeds.begin(),
+                        was.seeds.end(), same);
+      if (kept) {
+        was.sowing = sowing_;
       }
     }
-    free_.push_back(each->second);
-    each = held_.erase(each);
+    if (kept) {
+      ++each;
+    } else {
+      free_.push_back(each->second);
+      each = held_.erase(each);
+    }
   }
+}
+
+bool AreaFields::unchanged(const Map& map, const Sown& sown, Cell objective,
+                           const std::vector<Cell>& cells,
+                           const std::vector<Window>& rebuilt) {
+  for (std::size_t index = 0; index < sown.seeds.size(); ++index) {
+    const Cell seed = sown.seeds.at(index).cell;
+    const Sowing& sowing = sown.sowing.at(index);
+    if (sowing.line) {
+      // A seed whose line is walked costs the octile cost, whatever its walk
+      // over the graph, while no blocked cell stops that line.
+      const bool stopped =
+          std::any_of(
+              cells.begin(), cells.end(),
+              [&](Cell cell) { return may_cross(seed, objective, cell); }) &&
+          !walks_its_line(map, seed, objective);
+      if (stopped) {
+        return false;
+      }
+      continue;
+    }
+    // A walk over the graph that changed passes a rebuilt window, so it
+    // costs at least the octile cost to the window and from it to the
+    // objective; a seed's walk cheaper than every such walk is unchanged.
+    const bool cheaper =
+        std::all_of(rebuilt.begin(), rebuilt.end(), [&](const Window& window) {
+          return sowing.through <
+                 octile(seed, nearest_in(window.corner, window.size, seed)) +
+                     octile(nearest_in(window.corner, window.size, objective),
+                            objective);
+        });
+    if (!cheaper) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const std::vector<CoarseCost>& AreaFields::walks(const Map& map,

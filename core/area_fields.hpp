@@ -74,6 +74,23 @@ class AreaFields {
     // The walks within the objective's area from the objective.
     std::vector<CoarseCost> near;
   };
+  // How a seed was sown: its walk over the graph to the objective, and
+  // whether its line to the objective is walked at the octile cost.
+  struct Sowing {
+    CoarseCost through;
+    bool line;
+  };
+  // The seeds a field was built from, and how each was sown.
+  struct Sown {
+    std::vector<FieldSeed> seeds;
+    std::vector<Sowing> sowing;
+  };
+  // The cells a field is built over: its area and a cell's margin round it,
+  // on the map.
+  struct Window {
+    Cell corner;
+    Footprint size;
+  };
   // An area and a cell in it, a walk within the area starts from.
   using Start = std::tuple<std::size_t, std::int32_t, std::int32_t>;
 
@@ -84,6 +101,15 @@ class AreaFields {
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
                                                     Cell objective);
+  [[nodiscard]] static Window window_of(const Map& map, std::size_t columns,
+                                        std::size_t area);
+  // Whether the field sown as `sown` toward `objective` is sown the same
+  // after `cells` were blocked, the graph having changed only within
+  // `rebuilt`, without sowing it again.
+  [[nodiscard]] static bool unchanged(const Map& map, const Sown& sown,
+                                      Cell objective,
+                                      const std::vector<Cell>& cells,
+                                      const std::vector<Window>& rebuilt);
   // Whether a person bound for the key's objective stood this tick in its
   // area or one of the eight around it.
   [[nodiscard]] bool stood_near(const Key& key) const;
@@ -92,8 +118,7 @@ class AreaFields {
            Cell objective, Search& held);
 
   std::vector<FlowField> pool_;
-  // The seeds each field in the pool was built from.
-  std::vector<std::vector<FieldSeed>> sown_;
+  std::vector<Sown> sown_;
   std::vector<std::size_t> free_;
   // The fields held, by key, and the keys asked for this tick, each the
   // area a person bound for the objective stands in.
@@ -101,6 +126,7 @@ class AreaFields {
   std::vector<Key> standing_;
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
+  std::vector<Sowing> sowing_;
   // The walks within an area from each node, by area and the node's cell,
   // kept while a held field's area is the area or borders it, and the
   // graph's columns of areas, to tell which do.
