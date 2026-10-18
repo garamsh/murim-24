@@ -127,20 +127,22 @@ std::size_t differing(const Map& map, const FlowField& one,
   return differ;
 }
 
-// A lay of `laid` on `before`, with a field held toward `objective` in every
-// area beforehand: the field of `probe`'s area from before it, the cells
-// that differ between that and a fresh build after it, those that differ
-// between every field held through it and a fresh build, and how many
-// fields were built again.
+// The lays `lays` on `before`, one after another, with a field held toward
+// `objective` in every area beforehand and again after each but the last:
+// whether the field of `probe`'s area was kept through each lay, the cells
+// that differ between that field before the first and a fresh build after
+// the last, those that differ between every field held through the last
+// and a fresh build, and how many fields the last built again.
 struct Relaid {
+  std::vector<bool> probe_kept;
   std::size_t probe_changed = 0;
   std::size_t differ = 0;
   std::size_t built = 0;
   std::size_t fields = 0;
 };
 
-Relaid relaid(const Map& before, const std::vector<Cell>& laid, Cell objective,
-              Cell probe) {
+Relaid relaid(const Map& before, const std::vector<std::vector<Cell>>& lays,
+              Cell objective, Cell probe) {
   CoarseGraph graph{before};
   std::vector<Cell> starts;
   for (std::int32_t row = AREA_SIDE / 2; row < before.height();
@@ -158,13 +160,24 @@ Relaid relaid(const Map& before, const std::vector<Cell>& laid, Cell objective,
   const FlowField probed =
       fields.field(fields.field_for(before, graph, probe, objective));
   Map after = before;
-  for (const Cell cell : laid) {
-    after.block(cell);
-  }
-  static_cast<void>(graph.rebuild(after, laid));
-  fields.changed(after, graph, laid);
-  AreaFields fresh;
   Relaid made;
+  for (std::size_t lay = 0; lay < lays.size(); ++lay) {
+    if (lay > 0) {
+      for (const Cell start : starts) {
+        static_cast<void>(fields.field_for(after, graph, start, objective));
+      }
+      fields.end_tick();
+    }
+    for (const Cell cell : lays.at(lay)) {
+      after.block(cell);
+    }
+    static_cast<void>(graph.rebuild(after, lays.at(lay)));
+    fields.changed(after, graph, lays.at(lay));
+    const std::size_t built = fields.built_in_all();
+    static_cast<void>(fields.field_for(after, graph, probe, objective));
+    made.probe_kept.push_back(fields.built_in_all() == built);
+  }
+  AreaFields fresh;
   made.probe_changed = differing(
       after, fresh.field(fresh.field_for(after, graph, probe, objective)),
       probed, probe);
@@ -203,7 +216,7 @@ TEST(AreaFields, EveryFieldKeptThroughALayIsTheOneAFreshBuildGives) {
   for (std::int32_t row = TOP_GAP; row < TOP_GAP + GAP; ++row) {
     laid.push_back(Cell{WALLED_AT, row});
   }
-  const Relaid made = relaid(Map{rows}, laid, EAST_OF_THE_WALL, FAR_WEST);
+  const Relaid made = relaid(Map{rows}, {laid}, EAST_OF_THE_WALL, FAR_WEST);
   // Setup: the lay changes, through the graph's costs, a field whose window
   // holds none of its cells; and some fields were kept.
   ASSERT_GT(made.probe_changed, 0U);
@@ -235,7 +248,7 @@ TEST(AreaFields, AFieldSeededByAWalkALayLengthensIsBuiltAgain) {
   for (std::int32_t column = BAR_FROM; column < BAR_TO; ++column) {
     laid.push_back(Cell{column, BAR_AT});
   }
-  const Relaid made = relaid(Map{rows}, laid, BEHIND_THE_SCREEN, FIRST_AREA);
+  const Relaid made = relaid(Map{rows}, {laid}, BEHIND_THE_SCREEN, FIRST_AREA);
   // Setup: the lay changes, through a walk within the next area alone, the
   // first area's field, whose window holds none of its cells.
   ASSERT_GT(made.probe_changed, 0U);
@@ -256,9 +269,48 @@ TEST(AreaFields, AFieldWhoseSeedsLineALayStopsIsBuiltAgain) {
   for (std::int32_t row = STOP_FROM; row < STOP_TO; ++row) {
     laid.push_back(Cell{STOP_AT, row});
   }
-  const Relaid made = relaid(Map{rows}, laid, IN_THE_LAST, FIRST_AREA);
+  const Relaid made = relaid(Map{rows}, {laid}, IN_THE_LAST, FIRST_AREA);
   // Setup: the lay changes, through its seeds' lines alone, the first area's
   // field, whose window and whose neighbour hold none of its cells.
+  ASSERT_GT(made.probe_changed, 0U);
+  EXPECT_EQ(made.differ, 0U);
+}
+
+// Open ground of 4 areas in a row, the first walled off from the second but
+// for a gap, so the seeds of its field toward the last area walk their
+// lines at no less than their walk over the graph costs. The first lay
+// stops those lines across the third area without lengthening any walk; the
+// second narrows the entrance into the last area, off every line, which
+// lengthens the walks.
+constexpr std::int32_t FENCE_AT = 31;
+constexpr std::int32_t FENCE_GAP_FROM = 12;
+constexpr std::int32_t FENCE_GAP_TO = 16;
+constexpr std::int32_t ACROSS_AT = 80;
+constexpr std::int32_t ACROSS_FROM = 17;
+constexpr std::int32_t ACROSS_TO = 19;
+constexpr std::int32_t NARROWED_AT = 95;
+constexpr std::int32_t NARROWED_FROM = 22;
+constexpr Cell LOW_IN_THE_LAST{112, 20};
+
+TEST(AreaFields,
+     AFieldKeptThroughALayThatStopsItsSeedsLinesIsBuiltAgainByTheNext) {
+  std::vector<std::string> rows(AREA_SIDE, std::string(OPEN_WIDTH, '.'));
+  for (std::int32_t row = 0; row < AREA_SIDE; ++row) {
+    if (row < FENCE_GAP_FROM || row >= FENCE_GAP_TO) {
+      rows.at(static_cast<std::size_t>(row)).at(FENCE_AT) = '#';
+    }
+  }
+  std::vector<std::vector<Cell>> lays(2);
+  for (std::int32_t row = ACROSS_FROM; row < ACROSS_TO; ++row) {
+    lays.at(0).push_back(Cell{ACROSS_AT, row});
+  }
+  for (std::int32_t row = NARROWED_FROM; row < AREA_SIDE; ++row) {
+    lays.at(1).push_back(Cell{NARROWED_AT, row});
+  }
+  const Relaid made = relaid(Map{rows}, lays, LOW_IN_THE_LAST, FIRST_AREA);
+  // Setup: the first lay keeps the first area's field, and the two change
+  // it.
+  ASSERT_TRUE(made.probe_kept.at(0));
   ASSERT_GT(made.probe_changed, 0U);
   EXPECT_EQ(made.differ, 0U);
 }
