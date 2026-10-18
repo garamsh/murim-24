@@ -9,6 +9,9 @@
 
 namespace murim {
 
+/// The hours of a day, by which a schedule's bands are given.
+constexpr std::uint32_t HOURS_PER_DAY = 24;
+
 /// Where an occupation's schedule sends a person in a band of hours
 /// (ADR 0081): its home, its workplace, or its village's square.
 enum class Where : std::uint8_t { HOME, WORK, SQUARE };
@@ -48,15 +51,22 @@ struct Occupation {
   std::vector<std::size_t> wares;
 };
 
+/// The hours a person is awake, from hour `from` until hour `to`, 0 to 24.
+struct Waking {
+  std::uint32_t from = 0;
+  std::uint32_t to = HOURS_PER_DAY;
+};
+
 /// The occupations people take, as data, one rule for every person: the
 /// occupations in the order openings are filled, the age in years from which
 /// a person takes one, the occupation, by index, of an adult left without an
-/// opening, and the schedule of anyone with none.
+/// opening, the schedule of anyone with none, and the hours people are awake.
 struct Occupations {
   std::vector<Occupation> list;
   std::uint32_t working_age = 0;
   std::size_t fallback = 0;
   std::vector<Band> idle;
+  Waking waking;
 };
 
 /// One person whose home is a village, as the day's assignment reads it:
@@ -80,9 +90,9 @@ struct Candidate {
 
 /// Throws std::invalid_argument when `occupations` lists no occupation, its
 /// fallback is none of them, an occupation opens places at no kind or none
-/// for each workplace or for no residents, sells a ware outside `wares`, or a
+/// for each workplace or for no residents, sells a ware outside `wares`, a
 /// schedule is empty, does not begin at hour 0, or its hours are not
-/// ascending below 24.
+/// ascending below 24, or its waking hours do not end after they begin, by 24.
 void check_occupations(const Occupations& occupations, std::size_t wares);
 
 }  // namespace murim

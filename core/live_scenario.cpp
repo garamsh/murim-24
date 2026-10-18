@@ -1,15 +1,23 @@
 #include "live_scenario.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "attack.hpp"
 #include "calendar.hpp"
+#include "growth.hpp"
+#include "life.hpp"
 #include "map.hpp"
+#include "occupation.hpp"
 #include "skill.hpp"
+#include "talent.hpp"
+#include "village.hpp"
 #include "world.hpp"
 
 namespace murim {
@@ -127,6 +135,148 @@ void homeland(std::vector<ArmySpec>& armies, std::size_t faction, Cell first) {
   }
 }
 
+// Each village's layout round its centre, as ADR 0081's prototype laid the
+// scenario out: four rows of eleven houses of 8, a smithy, an apothecary and
+// a hall on the square's edge, and two rows of six fields beyond the houses;
+// a structure off the map, or on a cell a person or structure takes, is not
+// laid.
+constexpr std::array<std::int32_t, 4> HOUSE_ROWS{-11, -8, 6, 9};
+constexpr std::int32_t HOUSE_FROM = -16;
+constexpr std::int32_t HOUSE_TO = 14;
+constexpr std::int32_t HOUSE_STEP = 3;
+constexpr std::uint32_t HOUSE_HOUSING = 8;
+constexpr std::uint32_t HALL_HOUSING = 12;
+constexpr std::uint32_t WORKSHOP_SERVES = 40;
+constexpr std::array<std::int32_t, 2> FIELD_ROWS{-17, 13};
+constexpr std::int32_t FIELD_STEP = 6;
+constexpr std::uint32_t FIELD_HARVEST = 600;
+// The workshops' and the hall's corners from the centre: the smithy and the
+// hall to the west, the apothecary to the east.
+constexpr std::int32_t WEST_SIDE = -17;
+constexpr std::int32_t EAST_SIDE = 15;
+constexpr std::int32_t WORKSHOP_ROW = -3;
+constexpr std::int32_t HALL_ROW = 1;
+constexpr Footprint HOUSE{2, 2};
+constexpr Footprint WORKSHOP{3, 2};
+constexpr Footprint HALL{3, 3};
+constexpr Footprint FIELD{4, 4};
+// The square each village keeps clear round its centre, and the growth's
+// interval, longer than any run of the bench, so no village grows.
+constexpr Footprint SQUARE{13, 9};
+constexpr std::int32_t VICINITY = 24;
+constexpr std::uint32_t NEVER = 1'000'000;
+constexpr std::uint64_t ADULT_YEARS = 20;
+
+// Lays the village of army `residents`, centred on `centre`, onto `scenario`,
+// clear of the cells in `taken`, which it takes.
+void lay(LiveScenario& scenario, std::size_t residents, Cell centre,
+         std::set<std::pair<std::int32_t, std::int32_t>>& taken) {
+  VillageSpec spec;
+  spec.residents = residents;
+  const auto place = [&](Cell corner, Footprint footprint, bool blocks,
+                         Role role, Holding holding, const std::string& kind) {
+    const std::vector<Cell> cells = cells_of(corner, footprint);
+    const bool clear = std::all_of(cells.begin(), cells.end(), [&](Cell cell) {
+      return cell.x >= 0 && cell.y >= 0 && cell.x < MAP_SIDE &&
+             cell.y < MAP_SIDE && taken.count({cell.x, cell.y}) == 0;
+    });
+    if (!clear) {
+      return;
+    }
+    for (const Cell cell : cells) {
+      taken.insert({cell.x, cell.y});
+    }
+    spec.structures.push_back(scenario.structures.size());
+    spec.holdings.push_back(holding);
+    spec.kinds.push_back(kind);
+    scenario.structures.push_back(
+        Structure{corner, DURABILITY, footprint, blocks, role});
+  };
+  Holding house;
+  house.housing = HOUSE_HOUSING;
+  for (const std::int32_t row : HOUSE_ROWS) {
+    for (std::int32_t column = HOUSE_FROM; column <= HOUSE_TO;
+         column += HOUSE_STEP) {
+      place({centre.x + column, centre.y + row}, HOUSE, true, Role::HOME, house,
+            "house");
+    }
+  }
+  Holding smithy;
+  smithy.arms = WORKSHOP_SERVES;
+  place({centre.x + WEST_SIDE, centre.y + WORKSHOP_ROW}, WORKSHOP, true,
+        Role::SQUARE, smithy, "smithy");
+  Holding apothecary;
+  apothecary.tends = WORKSHOP_SERVES;
+  place({centre.x + EAST_SIDE, centre.y + WORKSHOP_ROW}, WORKSHOP, true,
+        Role::SQUARE, apothecary, "apothecary");
+  Holding hall;
+  hall.housing = HALL_HOUSING;
+  place({centre.x + WEST_SIDE, centre.y + HALL_ROW}, HALL, true, Role::SQUARE,
+        hall, "hall");
+  Holding field;
+  field.harvest = FIELD_HARVEST;
+  for (const std::int32_t row : FIELD_ROWS) {
+    for (std::int32_t column = HOUSE_FROM; column <= HOUSE_TO;
+         column += FIELD_STEP) {
+      place({centre.x + column, centre.y + row}, FIELD, false, Role::EDGE,
+            field, "field");
+    }
+  }
+  scenario.villages.push_back(spec);
+}
+
+// The base pack's seven occupations as they stood before #379 gave monks a
+// temple and the innkeeper an inn, which the scenario's villages do not have
+// (packs/wuxia/data/occupations.json and life.json): their schedules, the
+// merchant's residents a place, which occupation is the fallback, and the
+// working age and waking hours.
+constexpr std::array<Band, 3> MERCHANT_DAY{
+    {{0, Where::HOME}, {7, Where::WORK}, {20, Where::HOME}}};
+constexpr std::array<Band, 4> WORKSHOP_DAY{{{0, Where::HOME},
+                                            {7, Where::WORK},
+                                            {19, Where::SQUARE},
+                                            {21, Where::HOME}}};
+constexpr std::array<Band, 3> INNKEEPER_DAY{
+    {{0, Where::HOME}, {8, Where::WORK}, {22, Where::HOME}}};
+constexpr std::array<Band, 4> FARMER_DAY{{{0, Where::HOME},
+                                          {6, Where::WORK},
+                                          {18, Where::SQUARE},
+                                          {21, Where::HOME}}};
+constexpr std::array<Band, 3> MONK_DAY{
+    {{0, Where::HOME}, {5, Where::WORK}, {21, Where::HOME}}};
+constexpr std::array<Band, 3> BEGGAR_DAY{
+    {{0, Where::HOME}, {7, Where::WORK}, {22, Where::HOME}}};
+constexpr std::array<Band, 3> IDLE_DAY{
+    {{0, Where::HOME}, {8, Where::SQUARE}, {18, Where::HOME}}};
+constexpr std::uint32_t RESIDENTS_A_MERCHANT = 30;
+constexpr std::size_t BEGGAR = 6;
+constexpr std::uint32_t WORKING_AGE = 16;
+constexpr Waking AWAKE{6, 22};
+
+template <std::size_t N>
+std::vector<Band> bands(const std::array<Band, N>& day) {
+  return {day.begin(), day.end()};
+}
+
+// Those seven occupations, selling nothing, as the scenario has no trade.
+Occupations occupations() {
+  return Occupations{
+      {Occupation{
+           "merchant", OnSquare{RESIDENTS_A_MERCHANT}, bands(MERCHANT_DAY), {}},
+       Occupation{
+           "physician", AtWorkplace{"apothecary", 2}, bands(WORKSHOP_DAY), {}},
+       Occupation{"smith", AtWorkplace{"smithy", 2}, bands(WORKSHOP_DAY), {}},
+       Occupation{
+           "innkeeper", AtWorkplace{"hall", 1}, bands(INNKEEPER_DAY), {}},
+       Occupation{"farmer", AtWorkplace{"field", 2}, bands(FARMER_DAY), {}},
+       Occupation{"monk", Nowhere{}, bands(MONK_DAY), {}},
+       Occupation{"beggar", Nowhere{}, bands(BEGGAR_DAY), {}}},
+      WORKING_AGE,
+      BEGGAR,
+      bands(IDLE_DAY),
+      AWAKE};
+}
+
 }  // namespace
 
 LiveScenario live_scenario() {
@@ -135,7 +285,10 @@ LiveScenario live_scenario() {
       std::vector<std::string>(MAP_SIDE, std::string(MAP_SIDE, '.')),
       {},
       rules(),
-      0};
+      0,
+      {},
+      {},
+      {}};
   constexpr std::int32_t MIDDLE = MAP_SIDE / 2;
   constexpr std::int32_t QUARTER = MAP_SIDE / 4;
   battle(scenario.armies, Cell{MIDDLE, QUARTER}, NORTH);
@@ -147,6 +300,25 @@ LiveScenario live_scenario() {
     homeland(scenario.armies, pair.at(1),
              Cell{MAP_SIDE - VILLAGE_INSET, north});
   }
+  std::set<std::pair<std::int32_t, std::int32_t>> taken;
+  for (const ArmySpec& army : scenario.armies) {
+    for (const Recruit& recruit : army.members) {
+      taken.insert({recruit.cell.x, recruit.cell.y});
+    }
+  }
+  // Each homeland lists its two villages, then its bands.
+  for (std::size_t army = scenario.battle_armies; army < scenario.armies.size();
+       army += static_cast<std::size_t>(2 + BANDS)) {
+    for (const std::size_t village : {army, army + 1}) {
+      lay(scenario, village, scenario.armies.at(village).objective, taken);
+    }
+  }
+  scenario.life.founding_age = Spread{ADULT_YEARS * DAYS_PER_YEAR, 0};
+  scenario.life.occupations = occupations();
+  Growth growth;
+  growth.interval = NEVER;
+  growth.tiers = {Tier{0, SQUARE, VICINITY, {}}};
+  scenario.life.growth = growth;
   return scenario;
 }
 

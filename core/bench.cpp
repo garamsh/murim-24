@@ -255,8 +255,11 @@ bool run_live() {
   World world{scenario.seed,
               Map{scenario.map_rows},
               scenario.armies,
+              scenario.structures,
+              scenario.rules,
+              scenario.villages,
               {},
-              scenario.rules};
+              scenario.life};
   const std::size_t people = living(world, armies);
   const std::vector<bool> fighting = serving(world, 0, scenario.battle_armies);
   std::size_t peak = living(world, world.army_count());
@@ -327,6 +330,11 @@ bool run_live() {
             << static_cast<double>(timed.all) / TIMED_TICKS
             << ", of which in battle "
             << static_cast<double>(timed.area) / TIMED_TICKS << "\n"
+            << "villages: " << scenario.villages.size() << ", "
+            << scenario.structures.size()
+            << " structures; schedule path fields: "
+            << world.schedule_fields().fields << ", "
+            << world.schedule_fields().bytes << " bytes\n"
             << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max "
             << max << " ms\n"
             << "fields: " << world.fields().held()

@@ -160,7 +160,11 @@
           "from": 18,
           "where": "home"
         }
-      ]
+      ],
+      "waking": {
+        "from": 6,
+        "to": 22
+      }
     }
   }
 ]

@@ -23,6 +23,7 @@
 #include "random.hpp"
 #include "sect.hpp"
 #include "village.hpp"
+#include "village_fields.hpp"
 #include "world.hpp"
 
 namespace murim {
@@ -574,6 +575,16 @@ void validate(const RegionData& data) {
                          return !spans(building.structure.footprint);
                        });
   };
+  // A seat keeps its area round its centre, the area's middle, and what its
+  // growth may lay there; together they must fit a village's window.
+  const auto unwindowed = [&data](const VillageTemplate& seat) {
+    const Cell middle = middle_of(seat.area);
+    const Kept grown = kept_by(*data.life.growth);
+    return !VillageFields::holds(
+        Kept{std::max(middle.x, grown.west), std::max(middle.y, grown.north),
+             std::max(seat.area.width - 1 - middle.x, grown.east),
+             std::max(seat.area.height - 1 - middle.y, grown.south)});
+  };
   const auto unknown_kind = [&data](const VillageTemplate& village) {
     return std::any_of(village.buildings.begin(), village.buildings.end(),
                        [&data](const Building& building) {
@@ -589,6 +600,7 @@ void validate(const RegionData& data) {
       !data.life.growth ||
       std::any_of(data.villages.begin(), data.villages.end(), unplaceable) ||
       (!data.sects.empty() && malformed(data.seat)) ||
+      (!data.sects.empty() && unwindowed(data.seat)) ||
       std::any_of(data.sects.begin(), data.sects.end(),
                   [&data](const SectData& sect) {
                     return sect.faction >= data.factions.size();
