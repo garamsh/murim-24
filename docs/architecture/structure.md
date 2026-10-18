@@ -13,6 +13,9 @@ The application is the simulation core: C++ with no engine dependency. Adapters 
 - **An adapter's only counterpart is its port.** One adapter calling another carries application work outside, where no port names it and no substitute stands in for it.
 - **A new port is earned** by a conversation whose technology can be replaced without the application changing, and which the application can name without naming that technology. A port carries two or more adapters — the real technology, and one for the test harness — so a port with a single adapter that nothing substitutes is indirection.
 - **GDScript holds no game rule.** It lives only in adapters; a rule written there exists outside the application.
+- **The application has one composition site.** It is the one place that constructs concrete implementations, and it decides which implementation each declared abstraction receives.
+- **Every other unit receives what it depends on and constructs none of it**, whatever the shape makes the unit — a domain, a layer, or an adapter.
+- **The composition site stays thin.** It constructs and passes; it decides nothing else.
 - **The inside is undivided.** The application has no concentric rings and no folder per subject area: the core's files sit flat in `core/`, whichever subject area they serve, as in Cockburn's statement of the pattern (*Hexagonal architecture*, 2005).
 
 ## Rationale
