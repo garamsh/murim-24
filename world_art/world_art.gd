@@ -75,6 +75,8 @@ const HEAD := BodyView.HEAD
 # the atlas slot after the factions' frames that holds the shadow, centred in it.
 const BODY_TAGS := ["idle", "walk", "back", "swing", "idle_hurt", "walk_hurt", "idle_maimed", "walk_maimed",
 	"lunge", "cast", "throw", "mend", "torch", "recoil"]
+# The motions a trade's look is drawn in, `<occupation>_<motion>` in a faction's body sheet (ADR 0081).
+const TRADE_MOTIONS := ["idle", "walk", "work"]
 # The effects drawn over a use (#184), a strip of frames tagged as BodyView reads them, in its order;
 # and the colour each discipline's damage numbers rise in.
 const EFFECTS := "effects/attack"
@@ -687,6 +689,27 @@ func _build_body_atlas() -> void:
 		outlines.append(_body_frames[tag + "_xray"])
 	combat.bodies.set_atlas(Vector2(_atlas.get_size()), frames, outlines, Vector2i(_faction_width, _shadow_x),
 			_sprite_of_faction, PackedColorArray(USE_ACCENTS))
+	combat.bodies.set_looks(trade_looks(world.occupation_names(), first.tags))
+
+
+## Returns each occupation's look in a faction's body sheet whose tags are `tags`, by the index of its
+## name in `names`, as BodyView.set_looks() takes it: the first frames of `<name>_idle`, `<name>_walk`
+## and `<name>_work` and of their outlines, `_xray` after each; or six -1s for an occupation missing
+## any of those tags, which is then drawn as its faction's body.
+static func trade_looks(names: PackedStringArray, tags: Dictionary) -> PackedInt64Array:
+	var looks := PackedInt64Array()
+	for name in names:
+		var wanted: Array[String] = []
+		for suffix in ["", "_xray"]:
+			for motion in TRADE_MOTIONS:
+				wanted.append(name + "_" + motion + suffix)
+		if wanted.all(func(tag: String) -> bool: return tags.has(tag)):
+			for tag in wanted:
+				looks.append(tags[tag][0])
+		else:
+			for tag in wanted:
+				looks.append(-1)
+	return looks
 
 
 # Gives the bodies the effects drawn over uses and, by art, the colour its damage numbers rise in: its

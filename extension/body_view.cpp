@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "map.hpp"
+#include "schedule.hpp"
 #include "skill.hpp"
 
 namespace murim_godot {
@@ -98,6 +99,14 @@ constexpr std::int64_t BODY_STRIKE_MS = 240;
 constexpr std::int64_t MOTION_FRAME_MS = 80;
 constexpr std::int64_t WALK_FRAME_MS = 150;
 constexpr std::int64_t WALK_FRAMES = 4;
+// A trade's work motion (ADR 0081), looped, and the frames set_looks() takes
+// for each occupation: idle, walk and work, then their outlines.
+constexpr std::int64_t WORK_FRAME_MS = 250;
+constexpr std::int64_t WORK_FRAMES = 2;
+constexpr std::size_t LOOK_FIELDS = 6;
+constexpr std::size_t LOOK_IDLE = 0;
+constexpr std::size_t LOOK_WALK = 1;
+constexpr std::size_t LOOK_WORK = 2;
 // Pixels the occluders are bucketed by, and the fields of one.
 constexpr double BUCKET = 32.0;
 constexpr std::size_t OCCLUDER_FIELDS = 5;
@@ -460,6 +469,10 @@ void BodyView::set_atlas(const godot::Vector2& size,
   accents_ = items_of<Rgba>(accents.to_byte_array());
 }
 
+void BodyView::set_looks(const godot::PackedInt64Array& firsts) {
+  looks_ = integers_of(firsts);
+}
+
 void BodyView::set_palette(const godot::PackedColorArray& colours) {
   palette_ = items_of<Rgba>(colours.to_byte_array());
 }
@@ -599,9 +612,13 @@ BodyView::Read BodyView::read(const godot::Dictionary& snapshot) {
     return integers_of(
         godot::PackedInt64Array(snapshot.get(key, godot::Variant())));
   };
-  return Read{field("first"), field("person"),
+  return Read{field("first"),
+              field("person"),
               points_of(snapshot.get("position", godot::Variant())),
-              field("health"), field("faction")};
+              field("health"),
+              field("faction"),
+              field("occupation"),
+              field("activity")};
 }
 
 void BodyView::begin(const godot::Dictionary& snapshot) {
@@ -619,6 +636,21 @@ void BodyView::read_armies(const Read& snapshot) {
                                      snapshot.persons.begin() + upto);
     std::vector<Point> now(snapshot.positions.begin() + from,
                            snapshot.positions.begin() + upto);
+    // A snapshot that carries no occupations draws every body as its
+    // faction's.
+    const bool read_trades =
+        snapshot.occupations.size() == snapshot.persons.size() &&
+        snapshot.activities.size() == snapshot.persons.size();
+    std::vector<std::int64_t> occupation =
+        read_trades
+            ? std::vector<std::int64_t>(snapshot.occupations.begin() + from,
+                                        snapshot.occupations.begin() + upto)
+            : std::vector<std::int64_t>(roster.size(), -1);
+    std::vector<std::int64_t> activity =
+        read_trades
+            ? std::vector<std::int64_t>(snapshot.activities.begin() + from,
+                                        snapshot.activities.begin() + upto)
+            : std::vector<std::int64_t>(roster.size(), -1);
     if (army < armies_.size()) {
       Army& known = armies_.at(army);
       known.before = std::move(known.now);
@@ -626,11 +658,14 @@ void BodyView::read_armies(const Read& snapshot) {
       known.same = roster == known.roster;
       known.roster = std::move(roster);
       known.faction = snapshot.factions.at(army);
+      known.occupation = std::move(occupation);
+      known.activity = std::move(activity);
     } else {
       std::vector<Point> before = now;
       armies_.push_back(Army{std::move(roster), std::move(now),
                              std::move(before), true,
-                             snapshot.factions.at(army)});
+                             snapshot.factions.at(army), std::move(occupation),
+                             std::move(activity)});
     }
   }
 }
@@ -1306,12 +1341,36 @@ BodyView::Look BodyView::look_of(const Frame& frame, const Army& army,
   if (look.tag == TAG_IDLE || look.tag == TAG_WALK) {
     look.tag = WOUND_TAGS.at(index_of(look.tag)).at(index_of(wound(person)));
   }
-  look.frame =
-      Box{{static_cast<float>(
-               (sprite * faction_width_) +
-               ((frames_.at(index_of(look.tag)) + index) * FRAME_WIDTH)),
-           0.0F},
-          {FRAME_W, FRAME_H}};
+  std::int64_t first = frames_.at(index_of(look.tag));
+  look.outline = outline_frames_.at(index_of(look.tag)) - first;
+  // Unwounded, standing or walking facing the viewer, a body of an
+  // occupation with a look wears it, and at work plays its work; the
+  // steered army's keep their faction's.
+  const std::int64_t occupation =
+      body < army.occupation.size() ? army.occupation.at(body) : -1;
+  const std::size_t fields = index_of(occupation) * LOOK_FIELDS;
+  const bool steered = steered_army_ >= 0 &&
+                       index_of(steered_army_) < armies_.size() &&
+                       &armies_.at(index_of(steered_army_)) == &army;
+  if (occupation >= 0 && fields + LOOK_FIELDS <= looks_.size() &&
+      looks_.at(fields) >= 0 && !steered &&
+      (look.tag == TAG_IDLE || look.tag == TAG_WALK)) {
+    const bool working =
+        look.tag == TAG_IDLE && body < army.activity.size() &&
+        army.activity.at(body) ==
+            static_cast<std::int64_t>(murim::Activity::WORKING);
+    std::size_t motion = look.tag == TAG_WALK ? LOOK_WALK : LOOK_IDLE;
+    if (working) {
+      motion = LOOK_WORK;
+      index = (now / WORK_FRAME_MS) % WORK_FRAMES;
+    }
+    first = looks_.at(fields + motion);
+    look.outline = looks_.at(fields + motion + (LOOK_FIELDS / 2)) - first;
+  }
+  look.frame = Box{{static_cast<float>((sprite * faction_width_) +
+                                       ((first + index) * FRAME_WIDTH)),
+                    0.0F},
+                   {FRAME_W, FRAME_H}};
   look.white = flash(person, now);
   look.flip = heading.x < 0.0F;
   return look;
@@ -1362,10 +1421,7 @@ void BodyView::pack_body(Frame& frame, const Army& army, std::size_t body) {
   const Box covers = grown(Box{centre - (size / TWICE_F), size}, -BODY_INSET);
   if (hidden(covers, static_cast<double>(origin.y))) {
     Box outline = look.frame;
-    outline.position.x +=
-        static_cast<float>((outline_frames_.at(index_of(look.tag)) -
-                            frames_.at(index_of(look.tag))) *
-                           FRAME_WIDTH);
+    outline.position.x += static_cast<float>(look.outline * FRAME_WIDTH);
     pack(frame.outlines, Sprite{outline, centre, look.flip, look.white, 1.0,
                                 0.0, look.frame.position});
     ++frame.outlined;
@@ -1912,6 +1968,7 @@ void BodyView::_bind_methods() {
   ClassDB::bind_method(D_METHOD("set_atlas", "size", "frames", "outlines",
                                 "slots", "sprite_of_faction", "accents"),
                        &BodyView::set_atlas);
+  ClassDB::bind_method(D_METHOD("set_looks", "firsts"), &BodyView::set_looks);
   ClassDB::bind_method(D_METHOD("set_palette", "colours"),
                        &BodyView::set_palette);
   ClassDB::bind_method(D_METHOD("set_relief", "cells"), &BodyView::set_relief);
