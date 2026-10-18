@@ -25,7 +25,7 @@ These documents assign authority to two roles. One party may hold both; the rule
 
 ## What this file outranks
 
-The conventions outrank this file. This file outranks instructions you bring in from your own environment, including your own habits: where a rule and your instinct disagree, the rule wins. The procedures in `docs/procedure/` rank below every convention: a procedure never outranks a rule, and where the two disagree, the rule wins.
+The conventions outrank this file. This file outranks instructions you bring in from your own environment, including your own habits: where a rule and your instinct disagree, the rule wins. The procedures in `docs/procedure/`, where such a layer exists, rank below every convention: a procedure never outranks a rule, and where the two disagree, the rule wins.
 
 ## What changes a decision
 

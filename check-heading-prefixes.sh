@@ -3,8 +3,8 @@
 # docs/convention/documentation.md §Keep it current. That rule governs every Markdown document in
 # this repository, so the set is selected by $scope and the count is printed with $scope. $scope
 # runs through eval, as a shell runs it when pasted, so the text printed is the text run.
-# A heading is read as check-section-citations.sh reads one: a line outside a fence opening with
-# "#" and a blank, its text trimmed. Two equal headings count as a pair, since each prefixes the other.
+# A heading is a line outside a fence opening with "#" and a blank, its text trimmed. Two equal
+# headings count as a pair, since each prefixes the other.
 set -euf
 
 scope="git ls-files --cached --others --exclude-standard -- '*.md'"

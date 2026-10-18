@@ -5,10 +5,16 @@
 # selected by $scope and the count is printed with $scope. $scope runs through eval, as a shell
 # runs it when pasted, so the text printed is the text run.
 # A § outside a fence and outside a code span, not followed by a digit, is a reference. It resolves
-# where a heading of the citing file, of a file named in a code span on its line, or of every file
-# in a folder so named, is a prefix of the text after the §. A name resolves to each selected path
-# equal to it or ending in "/" and it, so a bare basename such as `review.md` matches every file of
-# that basename; a folder name ends in "/" and matches the files directly inside it.
+# where a heading of the citing file, of a file named on its line, or of every file in a folder so
+# named, is a prefix of the text after the §. A line names a file or folder in a code span, or in
+# the destination of a Markdown link outside a code span, read without its title, its "#" fragment
+# and any leading "/", "./" or "../". A name resolves to each selected path equal to it or ending
+# in "/" and it, so a bare basename such as `review.md` matches every file of that basename; a
+# folder name ends in "/" and matches the files directly inside it.
+# A line also names an ADR as ADR-NNNN anywhere on it, four digits not inside a longer word: the
+# one selected file in docs/architecture/adr/ whose name begins with those digits and no further
+# digit. Where no file or more than one begins so, the ADR names nothing, and an unresolved
+# reference on its line says which.
 # A shorter heading that prefixes a longer one resolves citations of the longer, so the check finds
 # a citation matching nothing, not one matching the wrong heading. check-heading-prefixes.sh keeps
 # such a pair out, per docs/convention/documentation.md §Keep it current,
@@ -68,7 +74,7 @@ eval "$scope" | awk -v scope="$scope" '
 		}
 		return 0
 	}
-	function check(file,    line, r, fence, seg, segs, names, name, n, i, p, offset, rest, at, text) {
+	function check(file,    line, r, fence, seg, segs, names, name, n, i, j, p, offset, rest, at, text, note, prev, num, next_char, found) {
 		fence = 0
 		lineno = 0
 		while ((r = (getline line < file)) > 0) {
@@ -81,6 +87,37 @@ eval "$scope" | awk -v scope="$scope" '
 				name = seg[i]
 				sub(/^\.\//, "", name)
 				if (name ~ /\.md$/ || name ~ /\/$/) names[++n] = name
+			}
+			for (i = 1; i <= segs; i += 2) {
+				rest = seg[i]
+				while ((p = index(rest, "](")) > 0) {
+					rest = substr(rest, p + 2)
+					if ((p = index(rest, ")")) == 0) break
+					name = substr(rest, 1, p - 1)
+					rest = substr(rest, p + 1)
+					sub(/[ \t].*$/, "", name)
+					sub(/#.*$/, "", name)
+					sub(/^\//, "", name)
+					while (sub(/^\.\.?\//, "", name)) {}
+					if (name ~ /\.md$/ || name ~ /\/$/) names[++n] = name
+				}
+			}
+			note = ""
+			rest = line
+			while ((p = index(rest, "ADR-")) > 0) {
+				prev = p > 1 ? substr(rest, p - 1, 1) : ""
+				num = substr(rest, p + 4, 4)
+				next_char = substr(rest, p + 8, 1)
+				rest = substr(rest, p + 4)
+				if (prev ~ /[A-Za-z0-9_-]/ || num !~ /^[0-9][0-9][0-9][0-9]$/ || next_char ~ /[0-9]/) continue
+				found = 0
+				for (j = 1; j <= files; j++)
+					if (substr(path[j], 1, length(adr) + 4) == adr num && substr(path[j], length(adr) + 5, 1) !~ /[0-9]/) {
+						found++
+						name = path[j]
+					}
+				if (found == 1) names[++n] = name
+				else note = note "; ADR-" num " names " (found ? found " files" : "no file") " in " adr " beginning " num
 			}
 			offset = 0
 			for (i = 1; i <= segs; i++) {
@@ -95,7 +132,7 @@ eval "$scope" | awk -v scope="$scope" '
 						references++
 						if (resolves(file, text, names, n)) continue
 						unresolved = 1
-						print file ":" lineno ": \"" sect substr(text, 1, 50) "\" matches no heading in the citing file or in a file or folder named on its line"
+						print file ":" lineno ": \"" sect substr(text, 1, 50) "\" matches no heading in the citing file or in a file or folder named on its line" note
 					}
 				}
 				offset += length(seg[i]) + 1
@@ -104,7 +141,7 @@ eval "$scope" | awk -v scope="$scope" '
 		if (r < 0) { print file ": cannot be read" > "/dev/stderr"; exit 3 }
 		close(file)
 	}
-	BEGIN { sect = "§" }
+	BEGIN { sect = "§"; adr = "docs/architecture/adr/" }
 	NF { path[++files] = $0 }
 	END {
 		for (i = 1; i <= files; i++) read_headings(path[i])

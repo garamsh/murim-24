@@ -29,7 +29,7 @@ This section states which names exist and what each owes, not the commands behin
 ## Run the checks before pushing
 
 - Before code leaves the machine, run the cheap entry points: lint and format, and whatever the project folds into them. They catch the ordinary mistakes in seconds, so they are the first line of defence, and CI is not the only one.
-- Once the project has a pipeline, test and build are the pipeline's to run, over the whole set, and its run is the record §One entry point per task requires. Until then, they run locally before pushing too.
+- Where a pipeline run against the change being pushed will be the record §One entry point per task requires, test and build are the pipeline's to run, over the whole set. Where no pipeline run will be that change's record, they run locally before pushing too.
 - Running more locally, the whole set included, is always allowed. This rule sets the least that runs before pushing, not the most.
 - Automating the local run — a version-control hook, a watch task, an on-save editor command — is the contributor's choice. No tool is mandated, and running the checks by hand satisfies this section.
 
