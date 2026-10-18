@@ -335,12 +335,9 @@ func _touch_cast_pass() -> bool:
 	touch.clock = func() -> int: return now[0]
 	var person: int = world.roster(scene.steered)[0]
 	var here := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
-	var foes := _nearest_hostile(world, scene.steered)
-	world.order(foes, here, PackedInt64Array([0]))
-	var waited := 0
-	while world.aim(person, 0, Vector2.ZERO) < 0 and waited < APPROACH_LIMIT:
-		scene.step()
-		waited += 1
+	var marched := _march_hostile_within_range(scene, person, here)
+	var foes: int = marched[0]
+	var waited: int = marched[1]
 	var foe := world.aim(person, 0, Vector2.ZERO)
 	var in_range := foe >= 0 and _ready_to_cast(scene, person, 0, foe)
 	if not in_range:
@@ -488,6 +485,28 @@ func _clear_way(scene: Node2D, cells: int, ways := WAYS) -> Vector2i:
 		if clear:
 			return way
 	return Vector2i.ZERO
+
+
+# Marches the nearest hostile army on `here`, and the next nearest whenever the one marched falls,
+# until a living hostile person stands within the first skill's range of `person` while it may cast
+# that skill at it, for APPROACH_LIMIT ticks in all: a band worn down on its way may arrive only to
+# fall at once. Returns the army last marched and the ticks it took.
+func _march_hostile_within_range(scene: Node2D, person: int, here: Vector2i) -> Array:
+	var world: WorldAdapter = scene.world
+	var waited := 0
+	var foes := -1
+	var castable := func() -> bool:
+		var aimed := world.aim(person, 0, Vector2.ZERO)
+		return aimed >= 0 and world.cast_refusal(person, 0, aimed) == WorldAdapter.CAST_NONE
+	while not castable.call() and waited < APPROACH_LIMIT:
+		if foes < 0 or world.roster(foes).is_empty():
+			foes = _nearest_hostile(world, scene.steered)
+			if foes < 0:
+				break
+			world.order(foes, here, PackedInt64Array([0]))
+		scene.step()
+		waited += 1
+	return [foes, waited]
 
 
 # The army nearest army `army` whose faction its own is hostile to.

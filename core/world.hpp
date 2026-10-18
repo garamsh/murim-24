@@ -9,12 +9,14 @@
 #include <variant>
 #include <vector>
 
+#include "area_fields.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "chronicle.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -546,6 +548,9 @@ class World {
   /// Returns every area's tier.
   [[nodiscard]] const Areas& areas() const;
 
+  /// Returns the fields people step by, for a measure to read.
+  [[nodiscard]] const AreaFields& fields() const;
+
   /// Returns where army `army` stands while it is far; nothing while it is
   /// live or stepped. Throws std::out_of_range when there is no such army.
   [[nodiscard]] std::optional<FarAnchor> far(std::size_t army) const;
@@ -713,9 +718,11 @@ class World {
   void restore();
   [[nodiscard]] bool rostered() const;
 
-  // An army's course: its field toward its objective while it is live or
-  // stepped, or where it stands while it is far, never both.
-  using Course = std::variant<FlowField, FarAnchor>;
+  // An army's course: bound for its objective while it is live or stepped,
+  // each member stepping by its area's field (ADR 0043), or where it stands
+  // while it is far, never both.
+  struct Bound {};
+  using Course = std::variant<Bound, FarAnchor>;
 
   struct Army {
     std::size_t faction;
@@ -739,7 +746,7 @@ class World {
   [[nodiscard]] std::optional<Cell> nearest_in_ring(const Structure& structure,
                                                     std::int32_t ring,
                                                     Position from,
-                                                    const FlowField& field,
+                                                    Cell objective,
                                                     std::size_t village) const;
 
   /// A crowd slot no person holds.
@@ -948,15 +955,16 @@ class World {
   [[nodiscard]] Clearing square(std::size_t village) const;
   [[nodiscard]] std::vector<Structure> homes(std::size_t village) const;
   [[nodiscard]] std::vector<Passing> passings() const;
-  void steer(const Crowd& crowd, const std::vector<std::size_t>& slot,
+  [[nodiscard]] const std::vector<std::size_t>& fields_of(const Crowd& crowd);
+  void steer(const Crowd& crowd, const std::vector<std::size_t>& fields,
              const std::vector<Closing>& closings, std::vector<Step>& pulls,
              std::vector<bool>& standing,
              std::vector<std::size_t>& seeking) const;
   void march(std::size_t army, const Crowd& crowd,
-             const std::vector<std::size_t>& slot,
+             const std::vector<std::size_t>& fields,
              const std::vector<Step>& pulls, const std::vector<bool>& standing,
              const std::vector<std::size_t>& seeking);
-  void reachable_from(const FlowField& field,
+  void reachable_from(Cell objective,
                       const std::vector<std::size_t>& members) const;
   void go_far(Army& army);
   void come_back(Army& army, FarAnchor far);
@@ -966,6 +974,13 @@ class World {
   std::uint64_t seed_;
   std::uint64_t tick_count_ = 0;
   Map map_;
+  // The map's coarse graph, derived from it, and the fields people step by,
+  // derived from both; neither is saved.
+  CoarseGraph graph_;
+  AreaFields fields_;
+  // Each person's field in the tick's crowd, by crowd index: scratch, reused
+  // across ticks, not saved.
+  std::vector<std::size_t> crowd_fields_;
   Rules rules_;
   std::vector<Person> people_;
   std::vector<Army> armies_;

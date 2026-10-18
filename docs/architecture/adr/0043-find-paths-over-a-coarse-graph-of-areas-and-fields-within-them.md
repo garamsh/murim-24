@@ -1,6 +1,6 @@
 # ADR 0043: Find paths over a coarse graph of areas, and step by fields within them
 
-> Status: proposed; its graph built at the world's creation superseded by ADR-0047; its graph without climb edges superseded by ADR-0058, which adds leap edges and fields by climb class; its graph rebuilt only for structures superseded by ADR-0057, which also rebuilds it for terrain changes; its graph of areas alone superseded by ADR-0070, under which a level of regions of 8 x 8 areas stands above the areas
+> Status: proposed; its graph built at the world's creation superseded by ADR-0047; its graph without climb edges superseded by ADR-0058, which adds leap edges and fields by climb class; its graph rebuilt only for structures superseded by ADR-0057, which also rebuilds it for terrain changes; its graph of areas alone superseded by ADR-0070, under which a level of regions of 8 x 8 areas stands above the areas; its per-tick limit on field builds superseded by ADR-0083, under which every field a tick asks for is built that tick
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
@@ -69,3 +69,7 @@ The map is divided into 32-cell areas whose passable cells are labelled into com
 - People queue at an entrance's middle cell rather than spreading across the entrance, so crowds jam at borders that open ground does not show.
 - The per-tick limit on builds holds people still for long enough to be seen when many armies enter new areas at once, such as when a war begins.
 - Paths round ranges are noticeably longer than the shortest, enough that the player names a detour.
+
+## Errata
+
+- **2026-10-16, building ADR 0077's step 4 (#371).** The Consequences say "a walk crossing areas stays on the line between the cells' centres" and that "new ones walk a diagonal across three areas on open ground within a cell of the line". That holds for ADR 0037's short test walks and not for a long one. On a 128-cell open map, one person walking from cell (2, 10) to cell (100, 70) by a single field over the whole map, on `main` 5477540, arrives in 1,993 ticks and strays 1,906 sub-cell units, 7.4 cells, from the line. ADR 0037's step is the one nearest the line from the person's own cell, so a long walk goes diagonal first and then straight. The decision stands: fields within areas walk that same walk, in the same ticks and with the same stray, and the test asserts that equality instead.
