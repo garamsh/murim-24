@@ -307,6 +307,10 @@ class World {
   /// Returns the food village `village` holds.
   [[nodiscard]] std::uint64_t stock(std::size_t village) const;
 
+  /// Returns the food village `village`'s intact fields add to its stock at
+  /// each harvest, before its storage bounds the stock.
+  [[nodiscard]] std::uint64_t harvest(std::size_t village) const;
+
   /// Returns how many living people make village `village` their home.
   [[nodiscard]] std::size_t residents_of(std::size_t village) const;
 

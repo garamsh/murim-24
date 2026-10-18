@@ -5020,6 +5020,10 @@ std::uint64_t World::stock(std::size_t village) const {
   return villages_.at(village).stock;
 }
 
+std::uint64_t World::harvest(std::size_t village) const {
+  return villages_.held(village, Stage::INTACT, stages()).harvest;
+}
+
 std::size_t World::residents_of(std::size_t village) const {
   return homes().at(village);
 }

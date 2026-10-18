@@ -6,7 +6,10 @@
 // art at the end, how many people ever learned from a manual lying on a
 // cell, how many wars leaders declared and how many peaces they made, and
 // how many smithies and apothecaries growth raised; then how many seeds
-// raised at least one of each.
+// raised at least one of each. For the first seeds it prints each decade's
+// people, food, money and villages, and over every seed it measures ADR
+// 0063's bands. It exits 1 when a seed's living reach the capacity, given
+// as an optional fourth argument or else the region's.
 // `make sweep` builds it optimised and runs it; it is not a test.
 
 #include <algorithm>
@@ -16,6 +19,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <variant>
@@ -37,6 +41,26 @@ namespace {
 
 constexpr std::uint64_t TICKS_PER_SWEPT_DAY = 5;
 constexpr std::size_t GROWTH_FACTOR = 2;
+// The seeds, from the first, whose decades are printed (ADR 0063).
+constexpr std::uint64_t DECADE_SEEDS = 50;
+constexpr std::uint64_t DECADE = 10;
+constexpr std::uint64_t AUTUMN = 2;
+// ADR 0063's bands. Each "x of y" holds when x * y_of reaches y * x_of.
+constexpr std::size_t KEPT_OF = 48;
+constexpr std::size_t KEPT_SEEDS = 50;
+constexpr std::size_t LIVING_FACTOR = 3;
+constexpr std::size_t PEOPLED_FACTOR = 2;
+constexpr std::uint64_t SETTLED_YEARS = 20;
+constexpr std::size_t SETTLED_OF = 45;
+constexpr std::size_t SETTLED_LOW = 4;
+constexpr std::size_t SETTLED_HIGH = 5;
+constexpr std::uint64_t LEAST_FOOD = 120;
+constexpr std::uint64_t MOST_FOOD = 200;
+constexpr std::uint64_t STARVED_SHARE = 20;
+constexpr std::uint64_t MONEY_FROM = 10;
+constexpr std::uint64_t MONEY_FACTOR = 2;
+constexpr std::size_t PEAK_OF = 3;
+constexpr std::size_t PEAK_SHARE = 5;
 
 // The peopled villages, and how many each faction holds.
 std::pair<std::size_t, std::vector<std::size_t>> peopled(const World& world,
@@ -52,7 +76,26 @@ std::pair<std::size_t, std::vector<std::size_t>> peopled(const World& world,
   return held;
 }
 
+// One year of a seed: what the year counts, and the rest as at its end,
+// the food as at the end of its autumn.
+struct Year {
+  std::size_t born = 0;
+  std::size_t died = 0;
+  std::size_t starved = 0;
+  bool at_war = false;
+  std::uint64_t harvest = 0;
+  std::uint64_t stock = 0;
+  std::size_t fed = 0;
+  std::size_t living = 0;
+  std::uint64_t silver = 0;
+  std::size_t peopled = 0;
+  std::size_t villages = 0;
+};
+
 struct Lived {
+  std::size_t capacity;
+  std::vector<Year> years;
+  std::size_t villages_before;
   std::size_t living_before;
   std::size_t living_after;
   std::size_t peopled_before;
@@ -67,6 +110,69 @@ struct Lived {
   std::size_t smithies;
   std::size_t apothecaries;
 };
+
+// Returns whether a war stands between any two factions.
+bool at_war(const World& world, std::size_t factions) {
+  for (std::size_t one = 0; one < factions; ++one) {
+    for (std::size_t other = one + 1; other < factions; ++other) {
+      const std::optional<Declared> standing = world.declaration(one, other);
+      if (standing && standing->what == Declaration::WAR) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Counts in `year` the people who died since the last call, those dead of
+// hunger apart, and in `alive` who lives now. Starving leaves a person's
+// hunger at `hunger_days` or more, where migrating or eating resets it.
+void note_deaths(const World& world, std::uint32_t hunger_days,
+                 std::vector<bool>& alive, Year& year) {
+  alive.resize(world.population(), false);
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const Person& who = world.person(person);
+    if (alive.at(person) && who.health == 0) {
+      ++year.died;
+      year.starved += hunger_days > 0 && who.hunger >= hunger_days ? 1 : 0;
+    }
+    alive.at(person) = who.health > 0;
+  }
+}
+
+// Sets in `year` the villages' harvest and stock, and the living they feed.
+void note_food(const World& world, Year& year) {
+  year.harvest = 0;
+  year.stock = 0;
+  for (std::size_t village = 0; village < world.village_count(); ++village) {
+    year.harvest += world.harvest(village);
+    year.stock += world.stock(village);
+  }
+  year.fed = world.living();
+}
+
+// Counts in `year` the day's deaths and, in autumn, sets its food.
+void note_day(const World& world, std::uint32_t hunger_days,
+              std::vector<bool>& alive, Year& year) {
+  note_deaths(world, hunger_days, alive, year);
+  if (world.date().season == AUTUMN) {
+    note_food(world, year);
+  }
+}
+
+// Sets in `year`, at its end, the people born since the world held
+// `people`, and the living, their silver and the villages.
+void close_year(const World& world, std::size_t factions, Year& year,
+                std::size_t people) {
+  year.born = world.population() - people;
+  year.living = world.living();
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    year.silver +=
+        world.person(person).health > 0 ? world.person(person).silver : 0;
+  }
+  year.peopled = peopled(world, factions).first;
+  year.villages = world.village_count();
+}
 
 // Marks, among `raised`, every structure growth laid that now stands intact
 // and arms or tends people: a smithy or an apothecary.
@@ -129,14 +235,20 @@ void note_readers(const World& world, std::int64_t reach,
   }
 }
 
-Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
+Lived live(Seed seed, std::uint64_t years, std::optional<std::size_t> capacity,
+           const RegionData& data) {
   Region region = generate_region(seed, data);
   region.rules.ticks_per_day = TICKS_PER_SWEPT_DAY;
+  region.rules.people_capacity =
+      capacity.value_or(region.rules.people_capacity);
   World world{region.seed,       Map{region.map_rows}, region.armies,
               region.structures, region.rules,         village_specs(region),
               region.leadership, region.life,          region.sects};
   const std::size_t factions = data.factions.size();
-  Lived lived{world.living(),
+  Lived lived{region.rules.people_capacity,
+              {},
+              world.village_count(),
+              world.living(),
               0,
               peopled(world, factions).first,
               0,
@@ -154,14 +266,26 @@ Lived live(Seed seed, std::uint64_t years, const RegionData& data) {
   std::vector<std::size_t> known;
   std::vector<std::uint64_t> seen;
   std::vector<bool> read;
+  std::vector<bool> alive;
+  Year before;
+  note_deaths(world, 0, alive, before);
+  const std::uint32_t hunger_days =
+      data.life.husbandry ? data.life.husbandry->hunger_days : 0;
   for (std::uint64_t year = 0; year < years; ++year) {
+    Year& now = lived.years.emplace_back();
+    const std::size_t people = world.population();
     for (std::uint64_t tick = 0; tick < DAYS_PER_YEAR * TICKS_PER_SWEPT_DAY;
          ++tick) {
       world.tick();
       lived.peak = std::max(lived.peak, world.living());
       note_readers(world, data.life.learning.reading_reach, known, read);
       note_declarations(world, factions, seen, lived);
+      now.at_war = now.at_war || at_war(world, factions);
+      if ((tick + 1) % TICKS_PER_SWEPT_DAY == 0) {
+        note_day(world, hunger_days, alive, now);
+      }
     }
+    close_year(world, factions, now, people);
     note_workshops(world, growth, region.structures.size(), workshops);
     const std::vector<std::size_t> held = peopled(world, factions).second;
     lived.every_faction_peopled =
@@ -200,6 +324,159 @@ std::string listed(const std::vector<Count>& counts) {
   return joined;
 }
 
+// The rows of seed `seed`'s decades: the people born, dead and dead of
+// hunger over each; the living, silver a head and the peopled villages at
+// its end; its last autumn's harvest, wild food and stock a head; and the
+// villages founded over it. Wild food is 0 until ADR 0056's slots exist.
+std::string decades(std::uint64_t seed, const Lived& lived) {
+  std::ostringstream rows;
+  std::size_t born = 0;
+  std::size_t died = 0;
+  std::size_t starved = 0;
+  std::size_t villages = lived.villages_before;
+  for (std::size_t index = 0; index < lived.years.size(); ++index) {
+    const Year& year = lived.years.at(index);
+    born += year.born;
+    died += year.died;
+    starved += year.starved;
+    if ((index + 1) % DECADE != 0 && index + 1 != lived.years.size()) {
+      continue;
+    }
+    const std::uint64_t fed = std::max<std::size_t>(year.fed, 1);
+    rows << "| " << seed << " | " << index + 1 << " | " << year.living << " | "
+         << born << " | " << died << " | " << starved << " | "
+         << year.harvest / fed << " | 0 | " << year.stock / fed << " | "
+         << year.silver / std::max<std::size_t>(year.living, 1) << " | "
+         << year.peopled << " | " << year.villages - villages << " |\n";
+    born = 0;
+    died = 0;
+    starved = 0;
+    villages = year.villages;
+  }
+  return rows.str();
+}
+
+// "met" when `holds`, else "missed".
+const char* met(bool holds) { return holds ? "met" : "missed"; }
+
+// What ADR 0063's bands read, summed over the seeds swept.
+struct Totals {
+  std::size_t kept = 0;
+  std::size_t living_before = 0;
+  std::size_t living_after = 0;
+  std::size_t peopled_before = 0;
+  std::size_t peopled_after = 0;
+  std::size_t settled = 0;
+  std::uint64_t harvest = 0;
+  std::size_t fed = 0;
+  std::size_t peace_died = 0;
+  std::size_t peace_starved = 0;
+  std::vector<std::uint64_t> silver;
+  std::size_t peak = 0;
+  std::size_t capacity = 0;
+};
+
+// Returns whether a seed's living at the end lie within the settled share
+// of its living `SETTLED_YEARS` before; false with fewer years.
+bool stayed_settled(const Lived& lived) {
+  const std::size_t years = lived.years.size();
+  if (years < SETTLED_YEARS) {
+    return false;
+  }
+  const std::size_t then =
+      years > SETTLED_YEARS ? lived.years.at(years - SETTLED_YEARS - 1).living
+                            : lived.living_before;
+  return SETTLED_HIGH * lived.living_after >= SETTLED_LOW * then &&
+         SETTLED_LOW * lived.living_after <= SETTLED_HIGH * then;
+}
+
+// Sums what the bands read over every seed in `swept`, each lived `years`
+// years; the peak is the seed's nearest its capacity.
+Totals sum(const std::vector<Lived>& swept, std::uint64_t years) {
+  Totals totals;
+  totals.silver.assign(years, 0);
+  for (const Lived& lived : swept) {
+    totals.kept += lived.every_faction_peopled ? 1 : 0;
+    totals.living_before += lived.living_before;
+    totals.living_after += lived.living_after;
+    totals.peopled_before += lived.peopled_before;
+    totals.peopled_after += lived.peopled_after;
+    totals.settled += stayed_settled(lived) ? 1U : 0U;
+    totals.harvest += lived.years.back().harvest;
+    totals.fed += lived.years.back().fed;
+    for (std::size_t year = 0; year < years; ++year) {
+      const Year& each = lived.years.at(year);
+      totals.peace_died += each.at_war ? 0 : each.died;
+      totals.peace_starved += each.at_war ? 0 : each.starved;
+      totals.silver.at(year) += each.silver;
+    }
+    if (lived.peak * totals.capacity >= totals.peak * lived.capacity) {
+      totals.peak = lived.peak;
+      totals.capacity = lived.capacity;
+    }
+  }
+  return totals;
+}
+
+// Prints ADR 0063's bands over every seed in `swept`, each with what the
+// seeds measured and whether it is met.
+void print_bands(const std::vector<Lived>& swept, std::uint64_t years) {
+  const std::size_t seeds = swept.size();
+  const Totals totals = sum(swept, years);
+  const auto& [kept, living_before, living_after, peopled_before, peopled_after,
+               settled, harvest, fed, peace_died, peace_starved, silver, peak,
+               capacity] = totals;
+  const std::uint64_t food = harvest / std::max<std::size_t>(fed, 1);
+  std::cout << "\n| Band | Measured | Result |\n|---|---|---|\n"
+            << "| Every faction peopled at every year's end on at least "
+            << KEPT_OF << " of " << KEPT_SEEDS << " seeds | " << kept << " of "
+            << seeds << " | " << met(kept * KEPT_SEEDS >= seeds * KEPT_OF)
+            << " |\n| Living at the end at least " << LIVING_FACTOR
+            << " times the start | " << living_before << " -> " << living_after
+            << " | " << met(living_after >= LIVING_FACTOR * living_before)
+            << " |\n| Peopled villages at the end at least " << PEOPLED_FACTOR
+            << " times the start | " << peopled_before << " -> "
+            << peopled_after << " | "
+            << met(peopled_after >= PEOPLED_FACTOR * peopled_before)
+            << " |\n| Living at the end within " << SETTLED_LOW << "/"
+            << SETTLED_HIGH << " and " << SETTLED_HIGH << "/" << SETTLED_LOW
+            << " of " << SETTLED_YEARS << " years before, on at least "
+            << SETTLED_OF << " of " << KEPT_SEEDS << " seeds | ";
+  if (years >= SETTLED_YEARS) {
+    std::cout << settled << " of " << seeds << " | "
+              << met(settled * KEPT_SEEDS >= seeds * SETTLED_OF);
+  } else {
+    std::cout << "fewer years | not measurable";
+  }
+  std::cout << " |\n| Food a living person has in the last year, harvest and "
+               "wild, "
+            << LEAST_FOOD << " to " << MOST_FOOD << " | " << food << " | "
+            << met(food >= LEAST_FOOD && food <= MOST_FOOD)
+            << " |\n| Deaths by hunger in years without a war at most 1/"
+            << STARVED_SHARE << " of deaths | " << peace_starved << " of "
+            << peace_died << " | "
+            << met(peace_starved * STARVED_SHARE <= peace_died)
+            << " |\n| Hungry households in years without a war | no households "
+               "before ADR 0052 | not measurable |\n| Money supply from year "
+            << MONEY_FROM << " within half and double its level then | ";
+  if (years >= MONEY_FROM) {
+    const std::uint64_t base = silver.at(MONEY_FROM - 1);
+    const auto [low, high] =
+        std::minmax_element(silver.begin() + MONEY_FROM - 1, silver.end());
+    std::cout << *low << " to " << *high << " against " << base << " | "
+              << met(*low * MONEY_FACTOR >= base &&
+                     *high <= MONEY_FACTOR * base);
+  } else {
+    std::cout << "fewer years | not measurable";
+  }
+  std::cout << " |\n| Peak living at most " << PEAK_OF << "/" << PEAK_SHARE
+            << " of capacity | " << peak << " of " << capacity << " | "
+            << met(peak * PEAK_SHARE <= PEAK_OF * capacity)
+            << " |\n| Births refused at capacity, none | counted from ADR "
+               "0063's step 2; the living reaching it stand in below | not "
+               "measurable |\n";
+}
+
 // The households each faction starts with, comma-separated.
 std::string households(const Region& region, std::size_t factions) {
   std::vector<std::uint32_t> count(factions, 0);
@@ -209,7 +486,12 @@ std::string households(const Region& region, std::size_t factions) {
   return listed(count);
 }
 
-int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
+int run(std::uint64_t first, std::uint64_t last, std::uint64_t years,
+        std::optional<std::size_t> capacity) {
+  if (years == 0) {
+    std::cerr << "sweep: the years to live must be at least 1\n";
+    return 2;
+  }
   const RegionData data = murim_packs::load_base(MURIM_PACKS_DIR);
   std::cout
       << "| Seed | Households | Living | Peopled villages | Peak | "
@@ -229,8 +511,16 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
   std::size_t apothecaries = 0;
   std::size_t smithy_seeds = 0;
   std::size_t apothecary_seeds = 0;
+  std::vector<Lived> swept;
+  std::string decade_rows;
+  std::vector<std::uint64_t> reached;
   for (std::uint64_t seed = first; seed <= last; ++seed) {
-    const Lived lived = live(Seed{seed}, years, data);
+    const Lived& lived =
+        swept.emplace_back(live(Seed{seed}, years, capacity, data));
+    decade_rows += seed < DECADE_SEEDS ? decades(seed, lived) : "";
+    if (lived.peak >= lived.capacity) {
+      reached.push_back(seed);
+    }
     ++seeds;
     kept += lived.every_faction_peopled ? 1 : 0;
     grew += lived.living_after >= GROWTH_FACTOR * lived.living_before ? 1 : 0;
@@ -270,23 +560,45 @@ int run(std::uint64_t first, std::uint64_t last, std::uint64_t years) {
             << " (" << smithies
             << " in all); an apothecary: " << apothecary_seeds << " of "
             << seeds << " (" << apothecaries << " in all).\n";
-  return 0;
+  if (!decade_rows.empty()) {
+    std::cout << "\n| Seed | Year | Living | Born | Died | Died of hunger | "
+                 "Harvest a head | Wild food a head | Stock a head after "
+                 "autumn | Silver a head | Peopled villages | Villages "
+                 "founded |\n|---|---|---|---|---|---|---|---|---|---|---|---"
+                 "|\n"
+              << decade_rows;
+  }
+  print_bands(swept, years);
+  if (reached.empty()) {
+    std::cout << "\nNo seed's living reached its capacity.\n";
+    return 0;
+  }
+  std::cout << "\nSeeds whose living reached their capacity: "
+            << listed(reached) << ".\n";
+  return 1;
 }
 
 }  // namespace
 }  // namespace murim
 
-// Arguments: the first seed, the last seed and the years to live.
+// Arguments: the first seed, the last seed, the years to live and,
+// optionally, the capacity for the living.
 int main(int argc, char** argv) {
   constexpr int ARGUMENTS = 4;
-  if (argc != ARGUMENTS) {
-    std::cerr << "usage: murim_core_sweep <first seed> <last seed> <years>\n";
+  constexpr int WITH_CAPACITY = 5;
+  if (argc != ARGUMENTS && argc != WITH_CAPACITY) {
+    std::cerr << "usage: murim_core_sweep <first seed> <last seed> <years> "
+                 "[<capacity>]\n";
     return 2;
   }
   try {
     const std::vector<std::string> given(argv, std::next(argv, argc));
+    const std::optional<std::size_t> capacity =
+        argc == WITH_CAPACITY
+            ? std::optional<std::size_t>{std::stoull(given.at(ARGUMENTS))}
+            : std::nullopt;
     return murim::run(std::stoull(given.at(1)), std::stoull(given.at(2)),
-                      std::stoull(given.at(3)));
+                      std::stoull(given.at(3)), capacity);
   } catch (const std::exception& error) {
     std::cerr << "sweep: " << error.what() << "\n";
     return 2;
