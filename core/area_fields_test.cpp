@@ -113,14 +113,14 @@ std::size_t differing(const Map& map, const FlowField& one,
   const std::int32_t left = ((cell.x / AREA_SIDE) * AREA_SIDE) - 1;
   const std::int32_t top = ((cell.y / AREA_SIDE) * AREA_SIDE) - 1;
   std::size_t differ = 0;
-  for (std::int32_t y = std::max(0, top);
-       y < std::min(map.height(), top + AREA_SIDE + 2); ++y) {
-    for (std::int32_t x = std::max(0, left);
-         x < std::min(map.width(), left + AREA_SIDE + 2); ++x) {
-      const Cell at{x, y};
-      const bool same = one.distance(at) == other.distance(at) &&
-                        one.step(at).x == other.step(at).x &&
-                        one.step(at).y == other.step(at).y;
+  for (std::int32_t row = std::max(0, top);
+       row < std::min(map.height(), top + AREA_SIDE + 2); ++row) {
+    for (std::int32_t column = std::max(0, left);
+         column < std::min(map.width(), left + AREA_SIDE + 2); ++column) {
+      const Cell here{column, row};
+      const bool same = one.distance(here) == other.distance(here) &&
+                        one.step(here).x == other.step(here).x &&
+                        one.step(here).y == other.step(here).y;
       differ += same ? 0 : 1;
     }
   }
@@ -143,9 +143,11 @@ Relaid relaid(const Map& before, const std::vector<Cell>& laid, Cell objective,
               Cell probe) {
   CoarseGraph graph{before};
   std::vector<Cell> starts;
-  for (std::int32_t y = AREA_SIDE / 2; y < before.height(); y += AREA_SIDE) {
-    for (std::int32_t x = AREA_SIDE / 2; x < before.width(); x += AREA_SIDE) {
-      starts.push_back(Cell{x, y});
+  for (std::int32_t row = AREA_SIDE / 2; row < before.height();
+       row += AREA_SIDE) {
+    for (std::int32_t column = AREA_SIDE / 2; column < before.width();
+         column += AREA_SIDE) {
+      starts.push_back(Cell{column, row});
     }
   }
   AreaFields fields;

@@ -94,10 +94,7 @@ Cell nearest_in(Cell corner, Footprint size, Cell cell) {
 
 }  // namespace
 
-AreaFields::Window AreaFields::window_of(const Map& map, std::size_t columns,
-                                         std::size_t area) {
-  const Cell area_corner{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
-                         static_cast<std::int32_t>(area / columns) * AREA_SIDE};
+AreaFields::Window AreaFields::window_of(const Map& map, Cell area_corner) {
   const Cell corner{std::max(0, area_corner.x - 1),
                     std::max(0, area_corner.y - 1)};
   const Cell far{std::min(map.width(), area_corner.x + AREA_SIDE + 1),
@@ -116,7 +113,8 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
   if (found != held_.end()) {
     return found->second;
   }
-  const Window window = window_of(map, columns_, area);
+  const Window window = window_of(map, Cell{(cell.x / AREA_SIDE) * AREA_SIDE,
+                                            (cell.y / AREA_SIDE) * AREA_SIDE});
   const std::vector<FieldSeed>& sown = seeds(map, graph, area, objective);
   std::size_t slot = 0;
   if (free_.empty()) {
@@ -296,10 +294,15 @@ void AreaFields::changed(const Map& map, const CoarseGraph& graph,
   // them, where a neighbour's entrance toward them lies: each such area's
   // window.
   const auto columns = static_cast<std::size_t>(graph.columns());
+  const auto area_window = [&map, columns](std::size_t area) {
+    return window_of(
+        map, Cell{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
+                  static_cast<std::int32_t>(area / columns) * AREA_SIDE});
+  };
   std::vector<Window> rebuilt;
   rebuilt.reserve(holding.size());
   for (const std::size_t area : holding) {
-    rebuilt.push_back(window_of(map, columns, area));
+    rebuilt.push_back(area_window(area));
   }
   const auto same = [](const FieldSeed& one, const FieldSeed& other) {
     return one.cell.x == other.cell.x && one.cell.y == other.cell.y &&
@@ -308,7 +311,7 @@ void AreaFields::changed(const Map& map, const CoarseGraph& graph,
   for (auto each = held_.begin(); each != held_.end();) {
     const auto& [area, objective_x, objective_y] = each->first;
     const Cell objective{objective_x, objective_y};
-    const Window window = window_of(map, columns, area);
+    const Window window = area_window(area);
     const bool covered =
         std::any_of(cells.begin(), cells.end(), [&window](Cell cell) {
           return nearest_in(window.corner, window.size, cell).x == cell.x &&

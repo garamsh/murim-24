@@ -105,8 +105,8 @@ class AreaFields {
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
                                                     Cell objective);
-  [[nodiscard]] static Window window_of(const Map& map, std::size_t columns,
-                                        std::size_t area);
+  // Returns the window of the area whose top-left cell is `area_corner`.
+  [[nodiscard]] static Window window_of(const Map& map, Cell area_corner);
   // Whether the field sown as `sown` toward `objective` is sown the same
   // after `cells` were blocked, the graph having changed only within
   // `rebuilt`, without sowing it again.
