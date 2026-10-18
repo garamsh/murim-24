@@ -1,0 +1,33 @@
+diff --git a/extension/world_adapter.cpp b/extension/world_adapter.cpp
+index 89e09b8f..508e4761 100644
+--- a/extension/world_adapter.cpp
++++ b/extension/world_adapter.cpp
+@@ -866,8 +866,6 @@ godot::Dictionary WorldAdapter::snapshot() const {
+   godot::PackedVector2Array positions;
+   godot::PackedInt64Array healths;
+   godot::PackedInt64Array ready;
+-  godot::PackedInt64Array occupations;
+-  godot::PackedInt64Array activities;
+   godot::PackedInt64Array factions;
+   for (std::size_t army = 0; army < now.army_count(); ++army) {
+     first.push_back(persons.size());
+@@ -878,10 +876,6 @@ godot::Dictionary WorldAdapter::snapshot() const {
+       positions.push_back(vector(person.position));
+       healths.push_back(static_cast<std::int64_t>(person.health));
+       ready.push_back(static_cast<std::int64_t>(person.ready_at));
+-      const std::optional<std::size_t> occupation = now.occupation_of(member);
+-      occupations.push_back(occupation ? static_cast<std::int64_t>(*occupation)
+-                                       : -1);
+-      activities.push_back(static_cast<std::int64_t>(now.activity(member)));
+     }
+   }
+   first.push_back(persons.size());
+@@ -940,8 +934,6 @@ godot::Dictionary WorldAdapter::snapshot() const {
+   read.set("position", positions);
+   read.set("health", healths);
+   read.set("ready", ready);
+-  read.set("occupation", occupations);
+-  read.set("activity", activities);
+   read.set("faction", factions);
+   read.set("stage", stages);
+   read.set("strike_person", strike_person);

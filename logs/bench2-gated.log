@@ -1,0 +1,102 @@
+   gate: outside CPU 44.0%, load1 2.44, after 780s wait; busiest:
+      14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      11.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.5 claude
+       3.5 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       1.8 /Applications/Firefox.app/Contents/MacOS/firefox
+== round 1 main ce5803095d52c6b4269b2d41f1c26cf863fef236 frame_bench_tool 05:22:23 load { 2.44 4.14 7.12 }
+frame time: p50 5.280 ms, p99 10.976 ms, max 14.522 ms
+PASS: p99 10.976 ms against a 16.7 ms budget
+   gate: outside CPU 42.7%, load1 3.40, after 270s wait; busiest:
+      16.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       8.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.9 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       3.0 claude
+       2.0 claude
+== round 1 main ce5803095d52c6b4269b2d41f1c26cf863fef236 village_bench_tool 05:27:07 load { 3.40 3.38 5.91 }
+village frame time: p50 3.527 ms, p99 10.756 ms, max 11.543 ms
+   gate: outside CPU 57.6%, load1 2.77, after 30s wait; busiest:
+      16.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      14.0 claude
+       9.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.7 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       2.7 nvim
+== round 1 head e14d768b52dc45586e731b2f02a15b7ff394c82b frame_bench_tool 05:27:47 load { 2.77 3.23 5.74 }
+frame time: p50 5.345 ms, p99 11.050 ms, max 11.780 ms
+PASS: p99 11.050 ms against a 16.7 ms budget
+   gate: outside CPU 47.7%, load1 2.56, after 90s wait; busiest:
+      16.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      14.5 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.4 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       1.9 /Applications/BuhoCleaner.app/Contents/Library/LoginItems/BuhoCleanerMenu.app/Contents/MacOS/BuhoCleanerMenu
+       1.3 /Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container
+== round 1 head e14d768b52dc45586e731b2f02a15b7ff394c82b village_bench_tool 05:29:28 load { 2.56 3.05 5.38 }
+village frame time: p50 3.796 ms, p99 10.211 ms, max 11.440 ms
+   gate: outside CPU 85.9%, load1 2.54, after 0s wait; busiest:
+      18.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       9.6 /System/Library/PrivateFrameworks/CoreDuetContext.framework/Resources/ContextStoreAgent
+       8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       7.2 /usr/sbin/coreaudiod
+       3.0 /usr/libexec/audioanalyticsd
+== round 2 main ce5803095d52c6b4269b2d41f1c26cf863fef236 frame_bench_tool 05:29:37 load { 2.54 3.03 5.35 }
+frame time: p50 5.504 ms, p99 12.814 ms, max 14.798 ms
+PASS: p99 12.814 ms against a 16.7 ms budget
+   gate: outside CPU 76.3%, load1 3.06, after 45s wait; busiest:
+      15.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      13.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.1 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       2.5 nvim
+       2.0 /Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container
+== round 2 main ce5803095d52c6b4269b2d41f1c26cf863fef236 village_bench_tool 05:30:33 load { 3.06 3.11 5.23 }
+village frame time: p50 3.883 ms, p99 9.806 ms, max 11.310 ms
+   gate: outside CPU 43.9%, load1 2.41, after 75s wait; busiest:
+      14.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       8.8 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       4.7 claude
+       4.1 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       1.4 /Applications/Orca.app/Contents/Frameworks/Orca Helper.app/Contents/MacOS/Orca Helper
+== round 2 head e14d768b52dc45586e731b2f02a15b7ff394c82b frame_bench_tool 05:31:57 load { 2.41 2.89 4.94 }
+frame time: p50 5.565 ms, p99 13.471 ms, max 15.085 ms
+PASS: p99 13.471 ms against a 16.7 ms budget
+   gate: outside CPU 52.0%, load1 1.89, after 30s wait; busiest:
+      15.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      12.4 claude
+       7.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.4 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       2.5 claude
+== round 2 head e14d768b52dc45586e731b2f02a15b7ff394c82b village_bench_tool 05:32:39 load { 1.89 2.69 4.78 }
+village frame time: p50 3.623 ms, p99 9.730 ms, max 10.798 ms
+   gate: outside CPU 89.2%, load1 1.91, after 0s wait; busiest:
+      18.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      10.1 /System/Library/PrivateFrameworks/CoreDuetContext.framework/Resources/ContextStoreAgent
+       9.9 /usr/sbin/coreaudiod
+       5.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       4.2 /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted
+== round 3 main ce5803095d52c6b4269b2d41f1c26cf863fef236 frame_bench_tool 05:32:47 load { 1.91 2.67 4.75 }
+frame time: p50 5.634 ms, p99 11.254 ms, max 12.003 ms
+PASS: p99 11.254 ms against a 16.7 ms budget
+   gate: outside CPU 48.7%, load1 2.45, after 270s wait; busiest:
+      14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       8.4 claude
+       3.4 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       2.0 /Applications/Firefox.app/Contents/MacOS/firefox
+== round 3 main ce5803095d52c6b4269b2d41f1c26cf863fef236 village_bench_tool 05:37:29 load { 2.45 2.59 4.14 }
+village frame time: p50 3.691 ms, p99 10.224 ms, max 11.625 ms
+   gate: outside CPU 97.3%, load1 2.22, after 0s wait; busiest:
+      20.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       9.2 /System/Library/PrivateFrameworks/CoreDuetContext.framework/Resources/ContextStoreAgent
+       7.0 /usr/sbin/coreaudiod
+       6.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       4.9 claude
+== round 3 head e14d768b52dc45586e731b2f02a15b7ff394c82b frame_bench_tool 05:37:38 load { 2.22 2.54 4.10 }
+frame time: p50 5.452 ms, p99 13.325 ms, max 16.013 ms
+PASS: p99 13.325 ms against a 16.7 ms budget
+   gate: outside CPU 43.4%, load1 2.47, after 15s wait; busiest:
+      17.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       9.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.7 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       1.9 /Applications/BuhoCleaner.app/Contents/Library/LoginItems/BuhoCleanerMenu.app/Contents/MacOS/BuhoCleanerMenu
+       1.2 /System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine
+== round 3 head e14d768b52dc45586e731b2f02a15b7ff394c82b village_bench_tool 05:38:04 load { 2.47 2.59 4.07 }
+village frame time: p50 3.273 ms, p99 8.665 ms, max 10.766 ms
