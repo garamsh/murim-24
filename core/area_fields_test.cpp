@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "areas.hpp"
 #include "coarse_graph.hpp"
 #include "flow_field.hpp"
 #include "map.hpp"
@@ -103,6 +104,140 @@ TEST(AreaFields, AFieldIsKeptWhileAPersonBoundForItStepsBackAcrossItsSide) {
   fields.end_tick();
   static_cast<void>(fields.field_for(map, graph, WEST_OF_SIDE, OBJECTIVE));
   EXPECT_EQ(fields.built(), 1U);
+}
+
+// How many cells of `cell`'s area and its margin step or cost differently
+// in the two fields.
+std::size_t differing(const Map& map, const FlowField& one,
+                      const FlowField& other, Cell cell) {
+  const std::int32_t left = ((cell.x / AREA_SIDE) * AREA_SIDE) - 1;
+  const std::int32_t top = ((cell.y / AREA_SIDE) * AREA_SIDE) - 1;
+  std::size_t differ = 0;
+  for (std::int32_t y = std::max(0, top);
+       y < std::min(map.height(), top + AREA_SIDE + 2); ++y) {
+    for (std::int32_t x = std::max(0, left);
+         x < std::min(map.width(), left + AREA_SIDE + 2); ++x) {
+      const Cell at{x, y};
+      const bool same = one.distance(at) == other.distance(at) &&
+                        one.step(at).x == other.step(at).x &&
+                        one.step(at).y == other.step(at).y;
+      differ += same ? 0 : 1;
+    }
+  }
+  return differ;
+}
+
+// A lay of `laid` on `before`, with a field held toward `objective` in every
+// area beforehand: the field of `probe`'s area from before it, the cells
+// that differ between that and a fresh build after it, those that differ
+// between every field held through it and a fresh build, and how many
+// fields were built again.
+struct Relaid {
+  std::size_t probe_changed = 0;
+  std::size_t differ = 0;
+  std::size_t built = 0;
+  std::size_t fields = 0;
+};
+
+Relaid relaid(const Map& before, const std::vector<Cell>& laid, Cell objective,
+              Cell probe) {
+  CoarseGraph graph{before};
+  std::vector<Cell> starts;
+  for (std::int32_t y = AREA_SIDE / 2; y < before.height(); y += AREA_SIDE) {
+    for (std::int32_t x = AREA_SIDE / 2; x < before.width(); x += AREA_SIDE) {
+      starts.push_back(Cell{x, y});
+    }
+  }
+  AreaFields fields;
+  for (const Cell start : starts) {
+    static_cast<void>(fields.field_for(before, graph, start, objective));
+  }
+  fields.end_tick();
+  const FlowField probed =
+      fields.field(fields.field_for(before, graph, probe, objective));
+  Map after = before;
+  for (const Cell cell : laid) {
+    after.block(cell);
+  }
+  static_cast<void>(graph.rebuild(after, laid));
+  fields.changed(after, graph, laid);
+  AreaFields fresh;
+  Relaid made;
+  made.probe_changed = differing(
+      after, fresh.field(fresh.field_for(after, graph, probe, objective)),
+      probed, probe);
+  for (const Cell start : starts) {
+    made.differ += differing(
+        after, fields.field(fields.field_for(after, graph, start, objective)),
+        fresh.field(fresh.field_for(after, graph, start, objective)), start);
+  }
+  made.built = fields.built();
+  made.fields = starts.size();
+  return made;
+}
+
+// A map of 4 by 4 areas split by a wall down column WALLED_AT, with a gap
+// near the top and one near the bottom, and the objective east of the wall
+// nearer the top gap. The lay fills the top gap, so a walk from the west
+// goes round by the bottom one.
+constexpr std::int32_t LAID_SIDE = 128;
+constexpr std::int32_t WALLED_AT = 64;
+constexpr std::int32_t TOP_GAP = 10;
+constexpr std::int32_t BOTTOM_GAP = 110;
+constexpr std::int32_t GAP = 4;
+constexpr Cell EAST_OF_THE_WALL{100, 30};
+constexpr Cell FAR_WEST{16, 48};
+
+TEST(AreaFields, EveryFieldKeptThroughALayIsTheOneAFreshBuildGives) {
+  std::vector<std::string> rows(LAID_SIDE, std::string(LAID_SIDE, '.'));
+  for (std::int32_t row = 0; row < LAID_SIDE; ++row) {
+    const bool gap = (row >= TOP_GAP && row < TOP_GAP + GAP) ||
+                     (row >= BOTTOM_GAP && row < BOTTOM_GAP + GAP);
+    if (!gap) {
+      rows.at(static_cast<std::size_t>(row)).at(WALLED_AT) = '#';
+    }
+  }
+  std::vector<Cell> laid;
+  for (std::int32_t row = TOP_GAP; row < TOP_GAP + GAP; ++row) {
+    laid.push_back(Cell{WALLED_AT, row});
+  }
+  const Relaid made = relaid(Map{rows}, laid, EAST_OF_THE_WALL, FAR_WEST);
+  // Setup: the lay changes, through the graph's costs, a field whose window
+  // holds none of its cells; and some fields were kept.
+  ASSERT_GT(made.probe_changed, 0U);
+  ASSERT_GT(made.built, 0U);
+  ASSERT_LT(made.built, made.fields);
+  EXPECT_EQ(made.differ, 0U);
+}
+
+// A map of 3 areas in a row, the objective in the last behind a wall open
+// only at its foot, so no line from the middle area reaches it. The lay
+// draws a bar across the middle area below its entrances' middles, which
+// lengthens the walk from the east entrance down to the first area's
+// border without changing any node's cost.
+constexpr std::int32_t ROW_WIDTH = 96;
+constexpr std::int32_t SCREEN_AT = 72;
+constexpr std::int32_t SCREEN_FOOT = 28;
+constexpr std::int32_t BAR_AT = 24;
+constexpr std::int32_t BAR_FROM = 40;
+constexpr std::int32_t BAR_TO = 61;
+constexpr Cell BEHIND_THE_SCREEN{88, 4};
+constexpr Cell FIRST_AREA{16, 16};
+
+TEST(AreaFields, AFieldSeededByAWalkALayLengthensIsBuiltAgain) {
+  std::vector<std::string> rows(AREA_SIDE, std::string(ROW_WIDTH, '.'));
+  for (std::int32_t row = 0; row < SCREEN_FOOT; ++row) {
+    rows.at(static_cast<std::size_t>(row)).at(SCREEN_AT) = '#';
+  }
+  std::vector<Cell> laid;
+  for (std::int32_t column = BAR_FROM; column < BAR_TO; ++column) {
+    laid.push_back(Cell{column, BAR_AT});
+  }
+  const Relaid made = relaid(Map{rows}, laid, BEHIND_THE_SCREEN, FIRST_AREA);
+  // Setup: the lay changes, through a walk within the next area alone, the
+  // first area's field, whose window holds none of its cells.
+  ASSERT_GT(made.probe_changed, 0U);
+  EXPECT_EQ(made.differ, 0U);
 }
 
 // A map of 2 by 2 areas crossed by a wall of cells touching only at their

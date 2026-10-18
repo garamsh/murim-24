@@ -68,6 +68,21 @@ bool walks_its_line(const Map& map, Cell from, Cell goal) {
   return true;
 }
 
+// The cells a field is built over: its area, whose corner is `area_corner`,
+// and a cell's margin round it, on the map.
+struct Window {
+  Cell corner;
+  Footprint size;
+};
+
+Window window_of(const Map& map, Cell area_corner) {
+  const Cell corner{std::max(0, area_corner.x - 1),
+                    std::max(0, area_corner.y - 1)};
+  const Cell far{std::min(map.width(), area_corner.x + AREA_SIDE + 1),
+                 std::min(map.height(), area_corner.y + AREA_SIDE + 1)};
+  return Window{corner, Footprint{far.x - corner.x, far.y - corner.y}};
+}
+
 }  // namespace
 
 std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
@@ -81,24 +96,20 @@ std::size_t AreaFields::field_for(const Map& map, const CoarseGraph& graph,
   if (found != held_.end()) {
     return found->second;
   }
-  // The area and a cell's margin round it, on the map.
-  const Cell area_corner{(cell.x / AREA_SIDE) * AREA_SIDE,
-                         (cell.y / AREA_SIDE) * AREA_SIDE};
-  const Cell corner{std::max(0, area_corner.x - 1),
-                    std::max(0, area_corner.y - 1)};
-  const Cell far{std::min(map.width(), area_corner.x + AREA_SIDE + 1),
-                 std::min(map.height(), area_corner.y + AREA_SIDE + 1)};
-  const Footprint size{far.x - corner.x, far.y - corner.y};
+  const Window window = window_of(map, Cell{(cell.x / AREA_SIDE) * AREA_SIDE,
+                                            (cell.y / AREA_SIDE) * AREA_SIDE});
   const std::vector<FieldSeed>& sown = seeds(map, graph, area, objective);
   std::size_t slot = 0;
   if (free_.empty()) {
     slot = pool_.size();
-    pool_.emplace_back(map, corner, size, sown, objective);
+    pool_.emplace_back(map, window.corner, window.size, sown, objective);
+    sown_.emplace_back();
   } else {
     slot = free_.back();
     free_.pop_back();
-    pool_.at(slot).rebuild(map, corner, size, sown, objective);
+    pool_.at(slot).rebuild(map, window.corner, window.size, sown, objective);
   }
+  sown_.at(slot) = sown;
   held_.emplace(key, slot);
   ++built_;
   ++built_in_all_;
@@ -140,7 +151,7 @@ void AreaFields::sow(const Map& map, const CoarseGraph& graph,
   for (std::size_t node = 0; node < graph.nodes_in(exit.area); ++node) {
     if (const std::optional<CoarseCost> cost =
             graph.cost_from(held.search, NodeRef{exit.area, node})) {
-      onward.emplace_back(&walks(map, graph, Node{exit.area, node}), *cost);
+      onward.emplace_back(&walks(map, graph, NodeRef{exit.area, node}), *cost);
     }
   }
   const bool near = graph.area_of(objective) == exit.area;
@@ -224,8 +235,8 @@ void AreaFields::end_tick() {
     }
   }
   for (auto each = walks_.begin(); each != walks_.end();) {
-    each = beside.count(each->first.first) == 0 ? walks_.erase(each)
-                                                : std::next(each);
+    each = beside.count(std::get<0>(each->first)) == 0 ? walks_.erase(each)
+                                                       : std::next(each);
   }
   built_ = 0;
 }
@@ -248,27 +259,57 @@ bool AreaFields::stood_near(const Key& key) const {
   return false;
 }
 
-void AreaFields::clear() {
-  for (const auto& [key, slot] : held_) {
-    free_.push_back(slot);
-  }
-  held_.clear();
-  standing_.clear();
+void AreaFields::changed(const Map& map, const CoarseGraph& graph,
+                         const std::vector<Cell>& cells) {
+  // A search reads the whole graph, and a walk within an area its cells.
   searches_.clear();
-  walks_.clear();
+  std::set<std::size_t> holding;
+  for (const Cell cell : cells) {
+    holding.insert(graph.area_of(cell));
+  }
+  for (auto each = walks_.begin(); each != walks_.end();) {
+    each = holding.count(std::get<0>(each->first)) == 0 ? std::next(each)
+                                                        : walks_.erase(each);
+  }
+  const auto columns = static_cast<std::size_t>(graph.columns());
+  for (auto each = held_.begin(); each != held_.end();) {
+    const auto& [area, objective_x, objective_y] = each->first;
+    const Window window = window_of(
+        map, Cell{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
+                  static_cast<std::int32_t>(area / columns) * AREA_SIDE});
+    const bool covered =
+        std::any_of(cells.begin(), cells.end(), [&window](Cell cell) {
+          return cell.x >= window.corner.x && cell.y >= window.corner.y &&
+                 cell.x < window.corner.x + window.size.width &&
+                 cell.y < window.corner.y + window.size.height;
+        });
+    const auto same = [](const FieldSeed& one, const FieldSeed& other) {
+      return one.cell.x == other.cell.x && one.cell.y == other.cell.y &&
+             one.cost == other.cost;
+    };
+    const std::vector<FieldSeed>& was = sown_.at(each->second);
+    if (!covered) {
+      const std::vector<FieldSeed>& now =
+          seeds(map, graph, area, Cell{objective_x, objective_y});
+      if (std::equal(now.begin(), now.end(), was.begin(), was.end(), same)) {
+        ++each;
+        continue;
+      }
+    }
+    free_.push_back(each->second);
+    each = held_.erase(each);
+  }
 }
 
 const std::vector<CoarseCost>& AreaFields::walks(const Map& map,
                                                  const CoarseGraph& graph,
-                                                 Node node) {
-  auto found = walks_.find(node);
+                                                 NodeRef node) {
+  const Cell from = graph.node(node).cell;
+  const Start start{node.area, from.x, from.y};
+  auto found = walks_.find(start);
   if (found == walks_.end()) {
-    found = walks_
-                .emplace(node,
-                         graph.walks_within(
-                             map, node.first,
-                             graph.node(NodeRef{node.first, node.second}).cell))
-                .first;
+    found =
+        walks_.emplace(start, graph.walks_within(map, node.area, from)).first;
   }
   return found->second;
 }

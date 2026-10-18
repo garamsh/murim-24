@@ -42,8 +42,15 @@ class AreaFields {
   /// tick.
   void end_tick();
 
-  /// Drops every field and cost, as after the map or the graph changes.
-  void clear();
+  /// Drops what blocking `cells` on the map, and the graph's rebuild for
+  /// them, can change, `map` and `graph` being the new ones: every search,
+  /// the walks within an area holding one of the cells, and each held field
+  /// whose area or margin holds one or whose seeds, sown again, differ from
+  /// those it was built from. A field is a function of its window's cells,
+  /// its seeds and its objective, so each field kept is the one a fresh build
+  /// gives.
+  void changed(const Map& map, const CoarseGraph& graph,
+               const std::vector<Cell>& cells);
 
   /// How many fields are held, how many were built since the last
   /// end_tick(), and how many were built in all.
@@ -67,11 +74,12 @@ class AreaFields {
     // The walks within the objective's area from the objective.
     std::vector<CoarseCost> near;
   };
-  using Node = std::pair<std::size_t, std::size_t>;
+  // An area and a cell in it, a walk within the area starts from.
+  using Start = std::tuple<std::size_t, std::int32_t, std::int32_t>;
 
   [[nodiscard]] const std::vector<CoarseCost>& walks(const Map& map,
                                                      const CoarseGraph& graph,
-                                                     Node node);
+                                                     NodeRef node);
   [[nodiscard]] const std::vector<FieldSeed>& seeds(const Map& map,
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
@@ -84,6 +92,8 @@ class AreaFields {
            Cell objective, Search& held);
 
   std::vector<FlowField> pool_;
+  // The seeds each field in the pool was built from.
+  std::vector<std::vector<FieldSeed>> sown_;
   std::vector<std::size_t> free_;
   // The fields held, by key, and the keys asked for this tick, each the
   // area a person bound for the objective stands in.
@@ -91,10 +101,10 @@ class AreaFields {
   std::vector<Key> standing_;
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
-  // The walks within an area from each node, by area and node, kept while a
-  // held field's area is the area or borders it, and the graph's columns of
-  // areas, to tell which do.
-  std::map<Node, std::vector<CoarseCost>> walks_;
+  // The walks within an area from each node, by area and the node's cell,
+  // kept while a held field's area is the area or borders it, and the
+  // graph's columns of areas, to tell which do.
+  std::map<Start, std::vector<CoarseCost>> walks_;
   std::size_t columns_ = 0;
   std::size_t rows_ = 0;
   std::size_t built_ = 0;
