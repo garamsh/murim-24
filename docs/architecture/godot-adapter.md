@@ -9,7 +9,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - The adapter is a GDExtension library built from `extension/`, linking `core/` unchanged. `murim.gdextension` at the repository root loads it into the Godot project there.
 - `make build` builds the library for the host.
 - `make android` builds it for Android arm64 through the NDK's CMake toolchain file, with the same `extension/CMakeLists.txt`. It exports two debug APKs from that library: the `Android` preset's, which opens on the title screen, and the `Android bench` preset's, which runs `world_view/frame_bench_tool.gd`.
-- `make export` builds release libraries for macOS, arm64 and x86_64 in one universal library, for Windows x86_64, cross-built with a pinned llvm-mingw, and for Linux x86_64, cross-built with that toolchain's Clang against a pinned glibc 2.31 sysroot (ADR 0074). It exports a release build for each that opens on the title screen.
+- `make export` builds release libraries for macOS, arm64 and x86_64 in one universal library, for Windows x86_64, cross-built with a pinned llvm-mingw, and for Linux x86_64, cross-built with that toolchain's Clang against a pinned glibc 2.31 sysroot (ADR 0074). It first runs `murim_map` over the base pack, which ships the coarse graph of the map a pack paints (ADR 0047, `world-generation.md`) and writes nothing while the base pack paints none. It exports a release build for each that opens on the title screen.
 
 ### The port
 

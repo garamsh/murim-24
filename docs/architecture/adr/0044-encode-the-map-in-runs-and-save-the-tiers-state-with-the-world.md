@@ -1,6 +1,6 @@
 # ADR 0044: Encode the map in runs, and save the tiers' state with the world
 
-> Status: proposed; its map saved in runs superseded by ADR-0047; its tiers' state built, as `simulation.md` records: each area's tier and each far army's anchor and progress are saved, checked and hashed, at save version 16, the coarse node of an anchor waiting for ADR 0077's step 4
+> Status: proposed; its map saved in runs superseded by ADR-0047; its tiers' state built, as `simulation.md` records: each area's tier and each far army's anchor and progress are saved, checked and hashed, at save version 16; the coarse node of an anchor derived from the graph whenever it is read and never saved, in #371's second part
 > Date: 2026-10-09
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.
