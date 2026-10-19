@@ -1,3 +1,5 @@
+#include "region.hpp"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -30,7 +32,6 @@
 #include "names.hpp"
 #include "occupation.hpp"
 #include "person.hpp"
-#include "region.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
@@ -1288,8 +1289,43 @@ std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
   }
   region.armies.push_back(born);
   const std::size_t challenger = region.armies.size() - 1;
+  const std::size_t residents = region.villages.at(home).army;
   World world = world_of(region);
   const std::size_t leader = world.leader(DEMONIC).value_or(0);
+  // The challenger is the leader's fellow resident standing nearest the
+  // challenger's cell, so both duelists draw a villager's loadout; the one
+  // born there takes its place among the residents.
+  const std::size_t stand_in = world.roster(challenger).front();
+  const Position cell = world.person(stand_in).position;
+  std::optional<std::size_t> fellow;
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (const std::size_t resident : world.roster(residents)) {
+    const Position at = world.person(resident).position;
+    const std::int64_t across = std::int64_t{at.x} - cell.x;
+    const std::int64_t down = std::int64_t{at.y} - cell.y;
+    const std::int64_t apart = (across * across) + (down * down);
+    if (resident != leader && apart < nearest) {
+      nearest = apart;
+      fellow = resident;
+    }
+  }
+  EXPECT_TRUE(fellow.has_value());
+  const std::size_t duelist = fellow.value_or(leader);
+  // Setup: both duelists wear what the residents' loadout drew for them.
+  EXPECT_EQ(world.person(duelist).worn.at(1), world.person(leader).worn.at(1));
+  world.conscript(duelist, challenger);
+  world.conscript(stand_in, residents);
+  // It first takes the challenger's cell, so the duel's walk-in is the one
+  // the test places.
+  constexpr int LONGEST_WALK = 1'000;
+  const Cell start = cell_of(cell);
+  world.order(challenger, Order{start, {0, 1}});
+  for (int walked = 0; walked < LONGEST_WALK &&
+                       !same(cell_of(world.person(duelist).position), start);
+       ++walked) {
+    world.tick();
+  }
+  EXPECT_TRUE(same(cell_of(world.person(duelist).position), start));
   world.order(challenger, Order{cell_of(world.person(leader).position), {0, 1}},
               DEMONIC);
   // Setup: the challenge started a duel.
@@ -1616,11 +1652,10 @@ TEST(Region, ADuelEndsWithinItsTargetTime) {
   }
   // Control: the placeholder strike of 1 leaves the duel fought past it.
   EXPECT_GT(duel_ticks(striking(1), SEED, DUEL_MOST + 1), DUEL_MOST);
-  // Control: born beside the leader on its village's square, the challenger
-  // settles the duel on seed 2026 before the target's floor, so the walk-in
+  // Control: beside the leader on its village's square, the challenger
+  // settles the duel on seed 24 before the target's floor, so the walk-in
   // the test places is part of what it measures.
-  EXPECT_LT(duel_ticks(base_data(), Seed{2026}, DUEL_MOST + 1, true),
-            DUEL_LEAST);
+  EXPECT_LT(duel_ticks(base_data(), SEED, DUEL_MOST + 1, true), DUEL_LEAST);
 }
 
 TEST(Region, ADuelIsFoughtAtThePaceItIsWithoutTokens) {
