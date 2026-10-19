@@ -42,3 +42,12 @@ Head `10966d19` on `fix/built-crisp-on-slopes`; main `af3dbfc6`.
 - `harness/probe_lip.gd`: built cells just north of water, and below the face, at `10966d19` (`captures/review/pre_*`) and at head (`captures/review/fix_*`). By row:
   - the lip: only the built cells' last row changes, 64 px across, which no longer takes the lit lip;
   - below the face: only ground rows 432 to 435 change, which now carry one solid shadow row and nothing dithered below it.
+
+## Pan bench (S4)
+
+`harness/bench4.sh`, `pan_bench_tool`, 3 rounds interleaved in the PM's window: base `af3dbfc6` (this branch's base, whose C++ matches the build) against head `0e2b1022`. Each start waits until the CPU summed over every other process, except those under `/System/` and `/usr/libexec/`, is at most 50% and the 1-minute load is under 4, and logs what was running. Log: `logs/review/pan-bench.log`.
+
+| | p50 | p99 |
+|---|---|---|
+| base | 3.465 / 3.836 / 3.510 ms | 8.954 / 9.904 / 9.282 ms |
+| head | 3.634 / 3.888 / 3.672 ms | 9.638 / 9.702 / 9.847 ms |
