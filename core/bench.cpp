@@ -3,6 +3,7 @@
 // test.
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <climits>
 #include <cstddef>
@@ -15,16 +16,20 @@
 #include <ratio>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "area_fields.hpp"
 #include "areas.hpp"
 #include "calendar.hpp"
 #include "coarse_graph.hpp"
+#include "compiled_map.hpp"
 #include "limits.hpp"
 #include "live_scenario.hpp"
 #include "m1_scenario.hpp"
 #include "map.hpp"
+#include "save.hpp"
+#include "shipped_graph.hpp"
 #include "village.hpp"
 #include "world.hpp"
 
@@ -372,7 +377,7 @@ constexpr std::int32_t FOOTPRINT = 3;
 // A frame at 60 frames a second, in milliseconds.
 constexpr double FRAME_MS = 16.7;
 
-Map ranged_map() {
+std::vector<std::string> ranged_rows() {
   std::vector<std::string> rows(static_cast<std::size_t>(MAP_SIDE),
                                 std::string(MAP_SIDE, '.'));
   for (std::int32_t range = RANGE_EVERY; range < MAP_SIDE;
@@ -386,8 +391,10 @@ Map ranged_map() {
       }
     }
   }
-  return Map{rows};
+  return rows;
 }
+
+Map ranged_map() { return Map{ranged_rows()}; }
 
 // The median of `runs` timings of `measure`, in milliseconds.
 template <typename Measure>
@@ -400,6 +407,68 @@ double median_ms(int runs, Measure measure) {
   }
   std::sort(times.begin(), times.end());
   return times.at(times.size() / 2);
+}
+
+// A save store in memory, for the shipped graph's load.
+class HeldSaves : public SaveStore {
+ public:
+  bool put(Slot /*slot*/, const std::vector<std::uint8_t>& bytes) override {
+    bytes_ = bytes;
+    return true;
+  }
+
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get(
+      Slot /*slot*/) const override {
+    return bytes_;
+  }
+
+ private:
+  std::vector<std::uint8_t> bytes_;
+};
+
+// The lowest durability of a structure's intact, damaged and destroyed
+// stages, for the worlds the shipped graph is measured on, which hold none.
+constexpr std::array<std::uint32_t, 3> STAGE_FLOORS{75, 25, 1};
+
+// What shipping a map's graph costs: its size as murim_map writes it, the
+// time to read it back, and to create a world on the map from it and load a
+// save of that world with it.
+struct Shipping {
+  std::size_t bytes;
+  double read_ms;
+  double created_ms;
+  double loaded_ms;
+};
+
+// Measures shipping `graph`, the graph of `map`.
+Shipping shipping(const Map& map, const CoarseGraph& graph) {
+  const std::vector<std::uint8_t> shipped = ship_graph(graph, MapHash{0});
+  const auto read_at = std::chrono::steady_clock::now();
+  std::variant<CoarseGraph, GraphFault> read =
+      read_shipped_graph(shipped, MapHash{0});
+  const double read_ms =
+      milliseconds(std::chrono::steady_clock::now() - read_at);
+  require(std::holds_alternative<CoarseGraph>(read) &&
+              std::get<CoarseGraph>(read) == graph,
+          "a shipped graph must read back as the graph built");
+  const auto created_at = std::chrono::steady_clock::now();
+  const World world{
+      Seed{1}, map, {}, {}, Rules{0, {{false}}, STAGE_FLOORS},
+      {},      {},  {}, {}, std::get<CoarseGraph>(std::move(read))};
+  const double created_ms =
+      milliseconds(std::chrono::steady_clock::now() - created_at);
+  HeldSaves store;
+  require(save(Saved{std::nullopt, world}, store, Slot{0}),
+          "the world on the shipped graph must save");
+  const auto loaded_at = std::chrono::steady_clock::now();
+  const std::variant<Saved, LoadError> loaded =
+      load(store, Slot{0}, world.graph());
+  const double loaded_ms =
+      milliseconds(std::chrono::steady_clock::now() - loaded_at);
+  require(std::holds_alternative<Saved>(loaded) &&
+              std::get<Saved>(loaded).world.graph() == graph,
+          "a save loaded with the shipped graph must hold it");
+  return Shipping{shipped.size(), read_ms, created_ms, loaded_ms};
 }
 
 // Times a path corner to corner across the 8,192-cell map over the coarse
@@ -460,20 +529,21 @@ void run_paths() {
           "the search by regions must cost an exit as the areas alone do");
   // A map whose every area holds a blocked cell, so no area is costed in
   // closed form: the build's bound.
-  const double obstructed_ms = [] {
-    std::vector<std::string> rows(static_cast<std::size_t>(MAP_SIDE),
-                                  std::string(MAP_SIDE, '.'));
-    for (std::int32_t row = AREA_SIDE / 2; row < MAP_SIDE; row += AREA_SIDE) {
-      for (std::int32_t col = AREA_SIDE / 2; col < MAP_SIDE; col += AREA_SIDE) {
-        rows.at(static_cast<std::size_t>(row))
-            .at(static_cast<std::size_t>(col)) = '#';
-      }
+  std::vector<std::string> rows(static_cast<std::size_t>(MAP_SIDE),
+                                std::string(MAP_SIDE, '.'));
+  for (std::int32_t row = AREA_SIDE / 2; row < MAP_SIDE; row += AREA_SIDE) {
+    for (std::int32_t col = AREA_SIDE / 2; col < MAP_SIDE; col += AREA_SIDE) {
+      rows.at(static_cast<std::size_t>(row)).at(static_cast<std::size_t>(col)) =
+          '#';
     }
-    const Map obstructed{rows};
-    const auto start = std::chrono::steady_clock::now();
-    const CoarseGraph built_graph{obstructed};
-    return milliseconds(std::chrono::steady_clock::now() - start);
-  }();
+  }
+  const Map obstructed{rows};
+  const auto obstructed_at = std::chrono::steady_clock::now();
+  const CoarseGraph obstructed_graph{obstructed};
+  const double obstructed_ms =
+      milliseconds(std::chrono::steady_clock::now() - obstructed_at);
+  const Shipping on_ranged = shipping(map, graph);
+  const Shipping on_obstructed = shipping(obstructed, obstructed_graph);
   std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "
             << graph.node_count() << " nodes, built in " << build_ms << " ms\n"
             << "path by regions: median " << regions_ms << " ms of "
@@ -485,6 +555,17 @@ void run_paths() {
             << (areas_ms <= FRAME_MS ? "within" : "past") << " a frame\n"
             << "graph build with a blocked cell in every area: "
             << obstructed_ms << " ms\n"
+            << "shipped graph (ADR 0047), on the ranged map: "
+            << on_ranged.bytes << " bytes, read in " << on_ranged.read_ms
+            << " ms; a world created from it in " << on_ranged.created_ms
+            << " ms, and a save of it loaded with it in " << on_ranged.loaded_ms
+            << " ms\n"
+            << "shipped graph, with a blocked cell in every area: "
+            << on_obstructed.bytes << " bytes, read in "
+            << on_obstructed.read_ms << " ms; a world created from it in "
+            << on_obstructed.created_ms
+            << " ms, and a save of it loaded with it in "
+            << on_obstructed.loaded_ms << " ms\n"
             << "lay's attempt, rebuilding the graph in place under a "
             << FOOTPRINT << " by " << FOOTPRINT
             << " footprint and reverting it: median " << lay_ms << " ms\n"
@@ -495,6 +576,215 @@ void run_paths() {
             << " KiB\n"
             << "control, one exit's cost over the areas alone: "
             << over_areas_ms << " ms\n";
+}
+
+// Where the live scenario stands on the 8,192-cell map in the tiers measure:
+// between the first two ranges, on whole areas.
+constexpr Cell LIVE_AT{1'280, 1'280};
+// The armies far off: one every FAR_EVERY cells along both axes from half of
+// it in, on every other column, each of FAR_PEOPLE people bound FAR_MARCH
+// cells east, between ranges.
+constexpr std::int32_t FAR_EVERY = 1'024;
+constexpr std::size_t FAR_PEOPLE = 16;
+constexpr std::int32_t FAR_MARCH = 200;
+// The armies in the stepped areas: STEPPED_ARMIES of FAR_PEOPLE, three areas
+// east of the steered army's lead, past the live radius and within the
+// stepped one, STEPPED_APART cells apart down it, each holding its ground.
+constexpr std::int32_t STEPPED_ARMIES = 8;
+constexpr std::int32_t STEPPED_EAST = 3 * AREA_SIDE;
+constexpr std::int32_t STEPPED_APART = 8;
+constexpr int RETIER_RUNS = 5;
+
+Cell shifted(Cell cell) { return Cell{cell.x + LIVE_AT.x, cell.y + LIVE_AT.y}; }
+
+// The live scenario on the ranged map at LIVE_AT, with the stepped and far
+// armies beside it, all of its first army's faction and skills.
+struct Tiered {
+  LiveScenario live;
+  std::vector<std::string> rows;
+  std::size_t stepped;
+  std::size_t far;
+};
+
+Tiered tiered_scenario() {
+  Tiered made{live_scenario(), ranged_rows(), 0, 0};
+  LiveScenario& live = made.live;
+  for (std::size_t row = 0; row < live.map_rows.size(); ++row) {
+    made.rows.at(row + static_cast<std::size_t>(LIVE_AT.y))
+        .replace(static_cast<std::size_t>(LIVE_AT.x),
+                 live.map_rows.at(row).size(), live.map_rows.at(row));
+  }
+  for (ArmySpec& army : live.armies) {
+    army.objective = shifted(army.objective);
+    for (Recruit& member : army.members) {
+      member.cell = shifted(member.cell);
+    }
+  }
+  std::vector<std::vector<bool>> covered(
+      made.rows.size(), std::vector<bool>(made.rows.front().size(), false));
+  for (Structure& structure : live.structures) {
+    structure.cell = shifted(structure.cell);
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      covered.at(static_cast<std::size_t>(cell.y))
+          .at(static_cast<std::size_t>(cell.x)) = true;
+    }
+  }
+  // An army of FAR_PEOPLE on the open cells nearest `start`, row by row
+  // within each ring, bound for `objective`.
+  const ArmySpec& first = live.armies.front();
+  const auto band = [&](Cell start, Cell objective) {
+    ArmySpec army{objective, {}, first.faction, first.skills};
+    for (std::int32_t ring = 0; army.members.size() < FAR_PEOPLE; ++ring) {
+      const Cell corner{start.x - ring, start.y - ring};
+      for (const Cell cell :
+           cells_of(corner, Footprint{(2 * ring) + 1, (2 * ring) + 1})) {
+        const bool on_ring = std::max(std::abs(cell.x - start.x),
+                                      std::abs(cell.y - start.y)) == ring;
+        const auto row = static_cast<std::size_t>(cell.y);
+        const auto column = static_cast<std::size_t>(cell.x);
+        if (on_ring && made.rows.at(row).at(column) != '#' &&
+            !covered.at(row).at(column) && army.members.size() < FAR_PEOPLE) {
+          army.members.push_back(Recruit{cell, first.members.front().health});
+        }
+      }
+    }
+    return army;
+  };
+  const Cell lead = first.members.front().cell;
+  for (std::int32_t army = 0; army < STEPPED_ARMIES; ++army) {
+    const Cell start{lead.x + STEPPED_EAST,
+                     lead.y + ((army - (STEPPED_ARMIES / 2)) * STEPPED_APART)};
+    ArmySpec stepped = band(start, start);
+    stepped.objective = stepped.members.front().cell;
+    live.armies.push_back(std::move(stepped));
+    ++made.stepped;
+  }
+  const auto live_side = static_cast<std::int32_t>(live.map_rows.size());
+  for (std::int32_t row = FAR_EVERY / 2; row < MAP_SIDE; row += FAR_EVERY) {
+    for (std::int32_t column = FAR_EVERY / 2; column < MAP_SIDE;
+         column += 2 * FAR_EVERY) {
+      const bool near_live = std::abs(column - LIVE_AT.x) < FAR_EVERY &&
+                             std::abs(row - LIVE_AT.y) < FAR_EVERY + live_side;
+      if (!near_live) {
+        live.armies.push_back(
+            band(Cell{column, row}, Cell{column + FAR_MARCH, row}));
+        ++made.far;
+      }
+    }
+  }
+  return made;
+}
+
+// Times the world on the 8,192-cell map with its tiers running at the
+// standard profile (ADR 0077, step 4): the live scenario steered by its first
+// army, armies in the stepped areas beside it and far off across the map.
+// Reports only: no budget in force reads it.
+void run_tiers() {
+  const auto made_at = std::chrono::steady_clock::now();
+  const Tiered scenario = tiered_scenario();
+  const std::size_t armies = scenario.live.armies.size();
+  World world{scenario.live.seed,
+              Map{scenario.rows},
+              scenario.live.armies,
+              scenario.live.structures,
+              scenario.live.rules,
+              scenario.live.villages,
+              {},
+              scenario.live.life};
+  const double created_ms =
+      milliseconds(std::chrono::steady_clock::now() - made_at);
+  world.set_profile(STANDARD_PROFILE);
+  world.steer(0, true);
+  world.retier();
+  for (int tick = 0; tick < WARM_UP_TICKS; ++tick) {
+    world.tick();
+  }
+  std::vector<std::chrono::steady_clock::duration> durations;
+  const std::size_t built_before = world.fields().built_in_all();
+  std::size_t most_built = 0;
+  std::size_t most_held = 0;
+  for (int tick = 0; tick < TIMED_TICKS; ++tick) {
+    const std::size_t built_at = world.fields().built_in_all();
+    const auto start = std::chrono::steady_clock::now();
+    world.tick();
+    durations.push_back(std::chrono::steady_clock::now() - start);
+    most_built = std::max(most_built, world.fields().built_in_all() - built_at);
+    most_held = std::max(most_held, world.fields().held());
+  }
+  const auto [p50, p99, max] = times_of(durations);
+  const std::size_t built_timed = world.fields().built_in_all() - built_before;
+  std::array<std::size_t, 3> areas_by_tier{};
+  for (const AreaTier tier : world.areas().tiers()) {
+    ++areas_by_tier.at(static_cast<std::size_t>(tier));
+  }
+  std::vector<std::size_t> far_armies;
+  std::size_t far_people = 0;
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    if (world.far(army)) {
+      far_armies.push_back(army);
+      far_people += world.roster(army).size();
+    }
+  }
+  require(!far_armies.empty(), "armies must be far while the tiers run");
+  const double retier_ms = median_ms(RETIER_RUNS, [&world] { world.retier(); });
+  // Every far army's node, derived from the graph as it is read.
+  std::vector<std::chrono::steady_clock::duration> node_times;
+  std::size_t nodes_found = 0;
+  for (const std::size_t army : far_armies) {
+    const auto start = std::chrono::steady_clock::now();
+    nodes_found += static_cast<std::size_t>(world.far_node(army).has_value());
+    node_times.push_back(std::chrono::steady_clock::now() - start);
+  }
+  const TickTimes node_ms = times_of(node_times);
+  // With no profile every area is live, so every far army comes back; given
+  // the profile again, they go far. Each handover's cost is the retier's
+  // above a retier that hands none over.
+  world.set_profile(std::nullopt);
+  const auto back_at = std::chrono::steady_clock::now();
+  world.retier();
+  const double back_ms =
+      milliseconds(std::chrono::steady_clock::now() - back_at);
+  for (const std::size_t army : far_armies) {
+    require(!world.far(army), "with no profile no army may stay far");
+  }
+  world.set_profile(STANDARD_PROFILE);
+  const auto far_at = std::chrono::steady_clock::now();
+  world.retier();
+  const double far_ms = milliseconds(std::chrono::steady_clock::now() - far_at);
+  std::size_t gone_far = 0;
+  for (const std::size_t army : far_armies) {
+    gone_far += static_cast<std::size_t>(world.far(army).has_value());
+  }
+  require(gone_far > 0, "given the profile again, armies must go far");
+  const auto handovers = static_cast<double>(far_armies.size());
+  std::cout
+      << std::fixed << std::setprecision(3) << "scenario: tiers on the "
+      << MAP_SIDE
+      << "-cell ranged map at the standard profile, the live scenario at ("
+      << LIVE_AT.x << ", " << LIVE_AT.y << ") steered by its first army, "
+      << scenario.stepped << " armies of " << FAR_PEOPLE << " beside it and "
+      << scenario.far << " far off; " << armies << " armies, created in "
+      << created_ms << " ms\n"
+      << "areas: " << world.areas().count() << ", of which live "
+      << areas_by_tier.at(0) << ", stepped " << areas_by_tier.at(1) << ", far "
+      << areas_by_tier.at(2) << "; far when timing ended: " << far_armies.size()
+      << " armies, " << far_people << " people\n"
+      << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max " << max
+      << " ms, against the live " << BUDGET_MS << " ms target\n"
+      << "fields: at most " << most_held << " held; built while timed "
+      << static_cast<double>(built_timed) / TIMED_TICKS << " a tick, at most "
+      << most_built << " in one tick\n"
+      << "retier at " << world.areas().count() << " areas: median " << retier_ms
+      << " ms of " << RETIER_RUNS << "\n"
+      << "come_back of " << far_armies.size()
+      << " armies in one retier: " << back_ms << " ms, about "
+      << (back_ms - retier_ms) / handovers << " ms each above it\n"
+      << "go_far of " << gone_far << " armies in one retier: " << far_ms
+      << " ms, about " << (far_ms - retier_ms) / static_cast<double>(gone_far)
+      << " ms each above it\n"
+      << "far node derived for " << nodes_found << " of " << far_armies.size()
+      << " far armies: p50 " << node_ms.p50 << " ms, max " << node_ms.max
+      << " ms\n";
 }
 
 // The bench's exit status: failure when a budget in force is missed. Only
@@ -513,6 +803,7 @@ int run() {
   const bool m1_met = run_m1();
   const bool live_met = run_live();
   run_paths();
+  run_tiers();
   return exit_status(Met{m1_met, live_met});
 }
 
