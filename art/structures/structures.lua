@@ -7,8 +7,10 @@
 -- (3 x 1), barrels (1 x 1), fence (5 x 1), temple (5 x 4), inn (5 x 3) and training_ground (6 x 4),
 -- which is laid with the ground; and the walled town's pieces: its wall along the south and north
 -- (1 x 2) and the west and east (2 x 1), corner tower (3 x 3), gate tower (5 x 2), steps (1 x 2),
--- temple (4 x 3), market stall (2 x 1) and courtyard house (5 x 5), each named town_<piece>. The smithy and the
--- apothecary are workshops.lua's. The cast shadow is not in the frame.
+-- temple (4 x 3), market stall (2 x 1) and courtyard house (5 x 5), each named town_<piece>; and a
+-- sect seat's compound (#185): its main hall on a terrace (6 x 4) and its wall laid a piece a cell,
+-- compound_wall along the north and south, compound_wall_side along the west and east and
+-- compound_corner at each corner (1 x 1). The smithy and the apothecary are workshops.lua's. The cast shadow is not in the frame.
 -- Run: aseprite --batch --script art/structures/structures.lua
 
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") or "."
@@ -900,3 +902,95 @@ do
   roof(cv, x + 31, x + 48, base - 10, base - 15, base - 17, 3)
   save("town_courtyard_house", cv, 5, 5)
 end
+
+
+-- A sect seat's compound (#185): a whitewashed wall lower and thinner than a town's, on a stone
+-- plinth under a grey tiled coping, laid a piece a cell, with a pillar at each corner; and the main
+-- hall, two storeys on a stone terrace with steps, the tallest thing in the seat.
+local WALL = 14
+local COPING = 5
+
+-- The coping along a row: grey tiles from x for w, their ridge `top` and their eave `COPING` below.
+local function coping_along(cv, x, top, w)
+  for y = top, top + COPING - 1 do
+    for xx = x, x + w - 1 do
+      local tile = xx % 3 == 0 and c("stone", 2) or c("stone", 3)
+      cv:set(xx, y, y == top + COPING - 1 and c("stone", 2) or tile)
+    end
+  end
+  cv:hline(x, top, w, c("ink", 2))
+end
+
+-- A wall's whitewashed face over its plinth, from x for w with its foot on `base`.
+local function plaster(cv, x, base, w)
+  cv:rect(x, base - 3, w, 3, c("stone", 3))
+  cv:hline(x, base - 3, w, c("stone", 4))
+  for y = base - WALL, base - 4 do
+    for xx = x, x + w - 1 do
+      cv:set(xx, y, px.noise(xx, y, 2, 41) > 0.82 and c("paper", 4) or c("paper", 5))
+    end
+  end
+  cv:hline(x, base - WALL, w, c("paper", 3))
+end
+
+-- The wall along the north and south, 1 x 1 cell: its face at the cell's front, the coping on it.
+do
+  local cv, x, base = frame(1, 1, WALL + COPING)
+  plaster(cv, x, base, CW)
+  coping_along(cv, x, base - WALL - COPING, CW)
+  save("compound_wall", cv, 1, 1, trim_sides(1))
+end
+
+-- The wall along the west and east, 1 x 1 cell: its coping seen from above down the cell's middle,
+-- raised the wall's height, over a face that shows where the run ends.
+do
+  local cv, x, base = frame(1, 1, WALL + 2)
+  local left, width = x + 5, 6
+  local top = base - WALL
+  plaster(cv, left, base, width)
+  for y = top - CD, top - 1 do
+    for xx = left - 1, left + width do
+      local tile = (y - (top - CD)) % 3 == 0 and c("stone", 2) or c("stone", 3)
+      cv:set(xx, y, (xx == left - 1 or xx == left + width) and c("stone", 2) or tile)
+    end
+    cv:set(left + width // 2, y, c("ink", 2))
+  end
+  save("compound_wall_side", cv, 1, 1, trim_above(top - CD))
+end
+
+-- A corner pillar, 1 x 1 cell: square, a little taller than the wall, under a small hipped cap.
+do
+  local cv, x, base = frame(1, 1, WALL + 12)
+  local left, width = x + 2, CW - 4
+  block(cv, left, base, width, 8, WALL + 4, "stone", 3)
+  roof(cv, left - 1, left + width, base - WALL - 12, base - WALL - 16, base - WALL - 18, 3)
+  save("compound_corner", cv, 1, 1)
+end
+
+-- The main hall, 6 x 4 cells: a stone terrace over the whole footprint with steps at its middle,
+-- and on it a hall of two storeys, a skirt roof round the upper storey under a hip-and-gable roof
+-- with a gold finial, a gold-framed name board under its eave.
+do
+  local cv, x, base = frame(6, 4, 44)
+  local W, D = 6 * CW, 4 * CD
+  block(cv, x, base, W, D, 10, "stone", 3)
+  -- Steps down the terrace's face at its middle, each a lit tread over a shaded riser.
+  for k = 0, 3 do
+    cv:hline(x + 38 - k * 2, base - 9 + k * 2, 20 + k * 4, c("stone", 5))
+    cv:hline(x + 38 - k * 2, base - 8 + k * 2, 20 + k * 4, c("stone", 2))
+  end
+  -- The hall stands back on the terrace, a court of paving before it.
+  local foot = base - 10 - 14
+  front(cv, x + 6, foot, W - 12, 16, { 8, 70 })
+  local eave = foot - 16 + 2
+  roof(cv, x + 2, x + W - 3, eave, eave - 10, eave - 10, 4)
+  local foot2 = eave - 9
+  front(cv, x + 16, foot2, W - 32, 14, { 6, 46 }, false)
+  cv:rect(x + 38, foot2 - 12, 20, 7, c("gold", 4)); cv:rect(x + 39, foot2 - 11, 18, 5, c("lacquer", 4))
+  cv:hline(x + 42, foot2 - 9, 12, c("gold", 6))
+  local eave2 = foot2 - 14 + 2
+  roof(cv, x + 10, x + W - 11, eave2, eave2 - 20, eave2 - 28, 9)
+  cv:rect(x + W // 2 - 1, eave2 - 25, 2, 4, c("gold", 4)); cv:set(x + W // 2 - 1, eave2 - 26, c("gold", 6))
+  save("main_hall", cv, 6, 4)
+end
+

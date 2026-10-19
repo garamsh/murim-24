@@ -27,6 +27,7 @@ for name in terrain/trees terrain/ramps terrain/detail bodies/orthodox bodies/de
 	structures/seat_gate structures/smithy structures/apothecary structures/town_wall_south structures/town_wall_north \
 	structures/town_wall_west structures/town_wall_east structures/town_corner_tower structures/town_gate_tower \
 	structures/town_steps structures/town_temple structures/town_market_stall structures/town_courtyard_house \
+	structures/compound_wall structures/compound_wall_side structures/compound_corner structures/main_hall \
 	decorations/fields icons/economy_icons \
 	decorations/ground decorations/banner decorations/sect_banner icons/skill_icons icons/ware_icons markers/army_marker \
 	markers/player_marker markers/shadow title/backdrop icon/icon; do
