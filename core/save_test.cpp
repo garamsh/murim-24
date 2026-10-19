@@ -20,6 +20,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
@@ -266,6 +267,22 @@ TEST(Save, ALoadedRegionHashesAndTicksOnAsTheSavedOne) {
   const Saved other = lived_region(OTHER_SEED);
   EXPECT_NE(other.world.hash(), saved.world.hash());
   EXPECT_NE(ticked(other.world, MORE_TICKS).hash(),
+            ticked(saved.world, MORE_TICKS).hash());
+}
+
+TEST(Save, ALoadGivenItsMapsBareGraphRebuildsItUnderEveryStructureSaved) {
+  const Saved saved = lived_region(REGION_SEED);
+  const CoarseGraph bare{
+      Map{generate_region(REGION_SEED, base_data()).map_rows}};
+  // The region's structures, those growth laid among them, change the graph.
+  ASSERT_FALSE(bare == saved.world.graph());
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+
+  const Saved given = loaded(load(store, SLOT, bare));
+
+  EXPECT_TRUE(given.world.graph() == saved.world.graph());
+  EXPECT_EQ(ticked(given.world, MORE_TICKS).hash(),
             ticked(saved.world, MORE_TICKS).hash());
 }
 
@@ -595,6 +612,24 @@ TEST(Save, ASaveKeepsTheAreasTiersAndAFarArmysAnchor) {
   near.retier();
   ASSERT_FALSE(near.far(1).has_value());
   EXPECT_NE(near.hash(), world.hash());
+}
+
+TEST(Save, AFarArmyLoadedLeadsOutByTheNodeItDidWhenSaved) {
+  const World world = tiered();
+  const std::optional<NodeRef> held = world.far_node(1);
+  ASSERT_TRUE(held.has_value());
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+
+  const Saved restored = loaded(load(store, SLOT));
+
+  const std::optional<NodeRef> kept = restored.world.far_node(1);
+  ASSERT_TRUE(kept.has_value());
+  EXPECT_EQ(kept.value_or(NodeRef{}).area, held.value_or(NodeRef{}).area);
+  EXPECT_EQ(kept.value_or(NodeRef{}).node, held.value_or(NodeRef{}).node);
+  // Control: the steered army, not far, has no node either side of the save.
+  EXPECT_FALSE(world.far_node(0).has_value());
+  EXPECT_FALSE(restored.world.far_node(0).has_value());
 }
 
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {

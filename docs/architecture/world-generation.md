@@ -74,6 +74,11 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - a key route whose shortest walk is shorter than its designed length or more than a fifth longer, ADR 0047's tolerance, which ADR 0070 keeps.
 - A walk's length is this step's choice, since neither ADR defines it. It goes 8-connected through passable cells, and steps only between levels at most one apart, so it walks and never leaps (ADR 0058). A diagonal step costs 7 to a straight step's 5 and is taken only where both cells beside it could be stepped through. The length is the cost divided by 5, rounded down, as `FlowField` counts a path.
 - ADR 0047's other checks wait for the layers and the coarse graph they read: every place reaching every other, regions joined only through their gates, rivers and the frame.
+- The bare map's coarse graph ships with it (ADR 0047), so a world on the map does not build it:
+  - `murim_map`, the build tool in `packs_json/`, loads the packs, compiles their map, builds the graph of its footing and writes it to `map/graph.bin` of the last pack to author a map document, ignoring any graph the packs already ship; `make export` runs it over the base pack first, and it writes nothing while the packs paint no map;
+  - the file is the save's encoding (ADR 0030) under a magic, a format version, the compiled map's hash and a checksum, every index checked against the graph's own areas and regions on read;
+  - `load_content` reads that pack's graph, if it ships one, and refuses the merged set at its `map/graph` as `INCONSISTENT` when the graph was built for another map's hash, and as `UNREADABLE` when it cannot be read;
+  - a world created or loaded on the map takes the graph and rebuilds only the areas its blocking structures lie in (`simulation.md`).
 - A compiled map of 8,192 cells holds 64 MiB of cells and 256 KiB of lands. Loading the base pack with the test map, which compiles, hashes and validates it, took about 145 ms in the Release build on the development Mac, at a load average of 30, measured by `MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash`, which loads two such maps in 283 to 295 ms over three runs. The delta layer, ADR 0070's 128 MiB budget with it full, and its 2 seconds' load wait for the steps that build the delta layer and the first map's content.
 
 ### A world on the map
@@ -86,7 +91,7 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - the seed draws only the people, since the map places every village.
 - A place whose buildings or seat find no room, or a sect with no seat place or more than one, is refused.
 - A world on the map takes the map's footing only. Its levels stay in `CompiledMap`, and no rule reads them until ADR 0058's leaps and cliffs are built (#244). Until then a world's people walk across a drop of two levels or more, which the validator's walk treats as a cliff.
-- A world on the 8,192-cell map waits for ADR 0077's steps 3 and 4. Each army holds a flow field over the whole map, at 12 bytes a cell about 800 MB at that side, and the world keeps a chart for each person and scans every cell in growth and in its hash; areas, tiers and the coarse graph bound those. A world on the map is tested on a compiled map of 256 cells until then.
+- A world on the 8,192-cell map runs in the bench's tiers measure, on the ranged test map built in code (`simulation.md`); its hash and growth still scan every cell. The tests run a world on a compiled map of 256 cells.
 
 ## Rationale
 

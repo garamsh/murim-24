@@ -15,7 +15,9 @@
 #include "arts.hpp"
 #include "attack.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
+#include "encoding.hpp"
 #include "event.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
@@ -47,152 +49,14 @@ constexpr std::uint8_t OPENINGS = 3;
 // "MURIMSAV": the bytes every save begins with.
 constexpr std::array<std::uint8_t, 8> MAGIC{0x4D, 0x55, 0x52, 0x49,
                                             0x4D, 0x53, 0x41, 0x56};
-constexpr std::size_t BYTE_BITS = 8;
-constexpr std::uint64_t FNV_OFFSET = 0xCBF29CE484222325ULL;
-constexpr std::uint64_t FNV_PRIME = 0x100000001B3ULL;
 // The magic, the version and the payload's length.
 constexpr std::size_t HEADER_BYTES =
     MAGIC.size() + sizeof(std::uint32_t) + sizeof(std::uint64_t);
 constexpr std::size_t CHECKSUM_BYTES = sizeof(std::uint64_t);
 
-// FNV-1a over `bytes` from `first` up to `last`.
-std::uint64_t checksum(const std::vector<std::uint8_t>& bytes,
-                       std::size_t first, std::size_t last) {
-  std::uint64_t digest = FNV_OFFSET;
-  for (std::size_t index = first; index < last; ++index) {
-    digest = (digest ^ bytes.at(index)) * FNV_PRIME;
-  }
-  return digest;
-}
-
 // A save refused while it is read, and why.
 struct Refusal {
   LoadError error;
-};
-
-// Appends values to a save, little-endian and of fixed width.
-class Writer {
- public:
-  void u8(std::uint8_t value) { bytes_.push_back(value); }
-
-  void u32(std::uint32_t value) { little_endian(value); }
-
-  void u64(std::uint64_t value) { little_endian(value); }
-
-  void i32(std::int32_t value) { u32(static_cast<std::uint32_t>(value)); }
-
-  void i64(std::int64_t value) { u64(static_cast<std::uint64_t>(value)); }
-
-  void size(std::size_t value) { u64(value); }
-
-  void flag(bool value) { u8(value ? 1 : 0); }
-
-  void text(const std::string& value) {
-    size(value.size());
-    for (const char character : value) {
-      u8(static_cast<std::uint8_t>(character));
-    }
-  }
-
-  [[nodiscard]] std::vector<std::uint8_t>& bytes() { return bytes_; }
-
- private:
-  template <typename Unsigned>
-  void little_endian(Unsigned value) {
-    for (std::size_t byte = 0; byte < sizeof(Unsigned); ++byte) {
-      bytes_.push_back(static_cast<std::uint8_t>(value >> (byte * BYTE_BITS)));
-    }
-  }
-
-  std::vector<std::uint8_t> bytes_;
-};
-
-// Reads values back from a save's payload, refusing it as corrupted where it
-// runs short or holds a value no writer gives.
-class Reader {
- public:
-  Reader(const std::vector<std::uint8_t>& bytes, std::size_t first,
-         std::size_t last)
-      : bytes_(&bytes), next_(first), last_(last) {}
-
-  std::uint8_t u8() {
-    take(1);
-    return bytes_->at(next_ - 1);
-  }
-
-  std::uint32_t u32() { return little_endian<std::uint32_t>(); }
-
-  std::uint64_t u64() { return little_endian<std::uint64_t>(); }
-
-  std::int32_t i32() { return static_cast<std::int32_t>(u32()); }
-
-  std::int64_t i64() { return static_cast<std::int64_t>(u64()); }
-
-  std::size_t size() {
-    const std::uint64_t value = u64();
-    if (value > SIZE_MAX) {
-      throw Refusal{LoadError::CORRUPTED};
-    }
-    return static_cast<std::size_t>(value);
-  }
-
-  // A count of items each at least one byte long, so no count asks for more
-  // items than bytes remain.
-  std::size_t count() {
-    const std::size_t value = size();
-    if (value > last_ - next_) {
-      throw Refusal{LoadError::CORRUPTED};
-    }
-    return value;
-  }
-
-  // A tag below `bound`.
-  std::uint8_t tag(std::uint8_t bound) {
-    const std::uint8_t value = u8();
-    if (value >= bound) {
-      throw Refusal{LoadError::CORRUPTED};
-    }
-    return value;
-  }
-
-  bool flag() { return tag(2) == 1; }
-
-  std::string text() {
-    std::string value(count(), '\0');
-    for (char& character : value) {
-      character = static_cast<char>(u8());
-    }
-    return value;
-  }
-
-  [[nodiscard]] bool done() const { return next_ == last_; }
-
-  // The index of the next byte to be read.
-  [[nodiscard]] std::size_t next() const { return next_; }
-
- private:
-  void take(std::size_t count) {
-    if (count > last_ - next_) {
-      throw Refusal{LoadError::CORRUPTED};
-    }
-    next_ += count;
-  }
-
-  template <typename Unsigned>
-  Unsigned little_endian() {
-    take(sizeof(Unsigned));
-    Unsigned value = 0;
-    for (std::size_t byte = 0; byte < sizeof(Unsigned); ++byte) {
-      value |= static_cast<Unsigned>(
-          static_cast<Unsigned>(bytes_->at(next_ - sizeof(Unsigned) + byte))
-          << (byte * BYTE_BITS));
-    }
-    return value;
-  }
-
-  const std::vector<std::uint8_t>* bytes_;
-  std::size_t next_;
-  std::size_t last_;
 };
 
 template <typename Item, typename Write>
@@ -1280,14 +1144,16 @@ class SaveCodec {
   }
 
   // Reads a world from `input`, noting in `parts`, if given, where its parts
-  // end.
-  static World read(Reader& input, SaveParts* parts) {
+  // end, and taking its coarse graph from `bare`, if given.
+  static World read(Reader& input, SaveParts* parts, const CoarseGraph* bare) {
     const std::uint64_t rng_state = input.u64();
     const std::uint64_t seed = input.u64();
     const std::uint64_t tick_count = input.u64();
     Map map = get_map(input);
     Rules rules = get_rules(input);
-    World world{std::move(map), std::move(rules), get_life(input)};
+    World world{
+        std::move(map), std::move(rules), get_life(input),
+        bare != nullptr ? std::optional<CoarseGraph>{*bare} : std::nullopt};
     world.rng_state_ = rng_state;
     world.seed_ = seed;
     world.tick_count_ = tick_count;
@@ -1451,6 +1317,10 @@ class SaveCodec {
       throw Refusal{LoadError::CORRUPTED};
     }
     world.restore();
+    if (bare != nullptr) {
+      world.graph_ = World::graph_of(world.map_, std::move(world.graph_),
+                                     world.structures_);
+    }
     return world;
   }
 };
@@ -1476,9 +1346,11 @@ bool save(const Saved& saved, SaveStore& store, Slot slot) {
 
 namespace {
 
-// Reads the save `bytes`, noting in `parts`, if given, where its parts end.
+// Reads the save `bytes`, noting in `parts`, if given, where its parts end,
+// and taking the world's coarse graph from `bare`, if given.
 std::variant<Saved, LoadError> decode(const std::vector<std::uint8_t>& bytes,
-                                      SaveParts* parts) {
+                                      SaveParts* parts,
+                                      const CoarseGraph* bare) {
   // The one handler for a refused save: every refusal while it is read ends
   // here as its LoadError.
   try {
@@ -1511,13 +1383,15 @@ std::variant<Saved, LoadError> decode(const std::vector<std::uint8_t>& bytes,
       const Seed region{input.u64()};
       return Origin{region, input.size()};
     });
-    World world = SaveCodec::read(input, parts);
+    World world = SaveCodec::read(input, parts, bare);
     if (!input.done()) {
       return LoadError::CORRUPTED;
     }
     return Saved{origin, std::move(world)};
   } catch (const Refusal& refusal) {
     return refusal.error;
+  } catch (const Malformed&) {
+    return LoadError::CORRUPTED;
   } catch (const std::invalid_argument&) {
     return LoadError::CORRUPTED;
   }
@@ -1530,13 +1404,22 @@ std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
   if (!held) {
     return LoadError::MISSING;
   }
-  return decode(*held, nullptr);
+  return decode(*held, nullptr, nullptr);
+}
+
+std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot,
+                                    const CoarseGraph& bare) {
+  const std::optional<std::vector<std::uint8_t>> held = store.get(slot);
+  if (!held) {
+    return LoadError::MISSING;
+  }
+  return decode(*held, nullptr, &bare);
 }
 
 std::variant<SaveParts, LoadError> save_parts(
     const std::vector<std::uint8_t>& bytes) {
   SaveParts parts;
-  const std::variant<Saved, LoadError> decoded = decode(bytes, &parts);
+  const std::variant<Saved, LoadError> decoded = decode(bytes, &parts, nullptr);
   if (const auto* error = std::get_if<LoadError>(&decoded)) {
     return *error;
   }

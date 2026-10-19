@@ -990,11 +990,12 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
              std::vector<Structure> structures, Rules rules,
              std::vector<VillageSpec> villages,
              std::vector<Leadership> leadership, Life life,
-             std::vector<SectSpec> sects)
+             std::vector<SectSpec> sects, std::optional<CoarseGraph> bare)
     : rng_state_(static_cast<std::uint64_t>(seed)),
       seed_(static_cast<std::uint64_t>(seed)),
       map_(footprinted(map, structures)),
-      graph_(map_),
+      graph_(bare ? graph_of(map_, std::move(*bare), structures)
+                  : CoarseGraph{map_}),
       rules_(std::move(rules)),
       areas_(Footprint{map_.width(), map_.height()}),
       structures_(std::move(structures)),
@@ -1089,15 +1090,35 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   prepare_grounds();
 }
 
-World::World(Map map, Rules rules, Life life)
+World::World(Map map, Rules rules, Life life, std::optional<CoarseGraph> bare)
     : rng_state_(0),
       seed_(0),
       map_(std::move(map)),
-      graph_(map_),
+      graph_(bare ? std::move(*bare) : CoarseGraph{map_}),
       rules_(std::move(rules)),
       areas_(Footprint{map_.width(), map_.height()}),
       structure_index_(std::vector<Position>{}),
       life_(std::move(life)) {}
+
+CoarseGraph World::graph_of(const Map& map, CoarseGraph bare,
+                            const std::vector<Structure>& structures) {
+  std::vector<Cell> blocked;
+  for (const Structure& structure : structures) {
+    if (!structure.blocks || !spans(structure.footprint)) {
+      continue;
+    }
+    for (const Cell cell : cells_of(structure.cell, structure.footprint)) {
+      if (cell.x >= 0 && cell.y >= 0 && cell.x < map.width() &&
+          cell.y < map.height()) {
+        blocked.push_back(cell);
+      }
+    }
+  }
+  if (!blocked.empty()) {
+    static_cast<void>(bare.rebuild(map, blocked));
+  }
+  return bare;
+}
 
 // Whether village `village` holds a tier its growth lacks, or a centre off
 // the map.
@@ -3327,9 +3348,53 @@ const Areas& World::areas() const { return areas_; }
 
 const AreaFields& World::fields() const { return fields_; }
 
+const CoarseGraph& World::graph() const { return graph_; }
+
 std::optional<FarAnchor> World::far(std::size_t army) const {
   const auto* anchor = std::get_if<FarAnchor>(&armies_.at(army).course);
   return anchor != nullptr ? std::optional<FarAnchor>{*anchor} : std::nullopt;
+}
+
+std::optional<NodeRef> World::far_node(std::size_t army) const {
+  const Army& held = armies_.at(army);
+  const auto* anchor = std::get_if<FarAnchor>(&held.course);
+  if (anchor == nullptr || !map_.passable(anchor->cell)) {
+    return std::nullopt;
+  }
+  const std::size_t area = anchor->area;
+  const Cell objective = held.order.objective;
+  const std::uint16_t component = graph_.component_of(anchor->cell);
+  const auto in_component = [&](std::size_t node) {
+    return graph_.node(NodeRef{area, node}).component == component;
+  };
+  if (graph_.area_of(objective) == area && map_.passable(objective) &&
+      graph_.component_of(objective) == component) {
+    for (std::size_t node = 0; node < graph_.nodes_in(area); ++node) {
+      if (in_component(node)) {
+        return NodeRef{area, node};
+      }
+    }
+    return std::nullopt;
+  }
+  const std::vector<CoarseCost> walks =
+      graph_.walks_within(map_, area, anchor->cell);
+  GoalSearch search = graph_.toward(map_, objective);
+  std::optional<NodeRef> best;
+  CoarseCost least = CoarseGraph::NO_WALK;
+  for (std::size_t node = 0; node < graph_.nodes_in(area); ++node) {
+    const NodeRef ref{area, node};
+    const CoarseCost walk =
+        walks.at(graph_.slot_in(area, graph_.node(ref).cell));
+    if (!in_component(node) || walk == CoarseGraph::NO_WALK) {
+      continue;
+    }
+    const std::optional<CoarseCost> onward = graph_.cost_from(search, ref);
+    if (onward && walk + *onward < least) {
+      least = walk + *onward;
+      best = ref;
+    }
+  }
+  return best;
 }
 
 void World::retier() {

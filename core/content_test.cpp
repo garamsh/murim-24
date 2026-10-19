@@ -15,12 +15,14 @@
 #include <variant>
 #include <vector>
 
+#include "coarse_graph.hpp"
 #include "compiled_map.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "map.hpp"
 #include "occupation.hpp"
 #include "region.hpp"
+#include "shipped_graph.hpp"
 #include "skill.hpp"
 #include "world.hpp"
 
@@ -155,6 +157,19 @@ class MemoryPacks : public PackSource {
     return names;
   }
 
+  // Ships `bytes` in pack `pack` as the build tool ships a graph.
+  void ship(const std::string& pack, std::vector<std::uint8_t> bytes) {
+    graphs_[pack] = std::move(bytes);
+  }
+
+  [[nodiscard]] GraphRead read_graph(const std::string& pack) const override {
+    const auto found = graphs_.find(pack);
+    if (found == graphs_.end()) {
+      return NoGraph{};
+    }
+    return found->second;
+  }
+
  private:
   ContentTree& document(const std::string& pack, const std::string& name,
                         Kind root) {
@@ -169,6 +184,7 @@ class MemoryPacks : public PackSource {
 
   std::map<std::pair<std::string, std::string>, ContentTree> documents_;
   std::set<std::pair<std::string, std::string>> unreadable_;
+  std::map<std::string, std::vector<std::uint8_t>> graphs_;
 };
 
 // A pack source serving the base pack from the packs directory and every
@@ -188,6 +204,11 @@ class BaseAndMods : public PackSource {
       const std::string& pack) const override {
     return pack == murim_packs::BASE_PACK ? base_.documents(pack)
                                           : mods_->documents(pack);
+  }
+
+  [[nodiscard]] GraphRead read_graph(const std::string& pack) const override {
+    return pack == murim_packs::BASE_PACK ? base_.read_graph(pack)
+                                          : mods_->read_graph(pack);
   }
 
  private:
@@ -1049,6 +1070,97 @@ TEST(MapContent, ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash) {
     FAIL() << "the moved map is refused";
   }
   EXPECT_NE(moved.map->hash(), TEST_MAP_HASH);
+}
+
+// The graph of the map `loaded` compiled, shipped as the build tool ships it
+// for that map; no bytes when it compiled none.
+std::vector<std::uint8_t> its_graph(const LoadedContent& loaded) {
+  if (!loaded.map) {
+    return {};
+  }
+  return ship_graph(CoarseGraph{Map{footing_rows(*loaded.map)}},
+                    loaded.map->hash());
+}
+
+// Whether `loaded` holds the graph of the map it compiled.
+bool holds_its_graph(const LoadedContent& loaded) {
+  return loaded.map && loaded.graph &&
+         *loaded.graph == CoarseGraph{Map{footing_rows(*loaded.map)}};
+}
+
+// The content `painting`'s pack gives when it ships `graph`.
+LoadedContent shipping(const Painting& painting,
+                       std::vector<std::uint8_t> graph) {
+  MemoryPacks mods;
+  add_map(mods, painting);
+  mods.ship(PAINTER, std::move(graph));
+  return load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+}
+
+TEST(MapContent, TheGraphTheMapsPackShipsIsLoadedWithTheMap) {
+  const Painting painting = ranged_map(ROUTE_SIDE, PassShift{0});
+  const LoadedContent bare = load_painting(painting);
+  ASSERT_TRUE(bare.errors.empty());
+  ASSERT_TRUE(bare.map.has_value());
+  // Control: a pack shipping no graph loads with none.
+  EXPECT_FALSE(bare.graph.has_value());
+
+  const LoadedContent shipped = shipping(painting, its_graph(bare));
+
+  EXPECT_TRUE(shipped.errors.empty());
+  EXPECT_TRUE(shipped.data.has_value());
+  EXPECT_TRUE(holds_its_graph(shipped));
+}
+
+TEST(MapContent, AGraphShippedForAnotherMapRefusesTheContentAtTheGraph) {
+  const Painting painting = ranged_map(ROUTE_SIDE, PassShift{0});
+  const LoadedContent bare = load_painting(painting);
+  const LoadedContent moved =
+      load_painting(ranged_map(ROUTE_SIDE, PassShift{1}));
+  ASSERT_TRUE(bare.map && moved.map && bare.map->hash() != moved.map->hash());
+
+  const LoadedContent stale = shipping(painting, its_graph(moved));
+  const LoadedContent damaged = shipping(painting, {1, 2, 3});
+  // Control: the map's own graph loads.
+  const LoadedContent own = shipping(painting, its_graph(bare));
+
+  EXPECT_FALSE(stale.data.has_value());
+  EXPECT_FALSE(stale.graph.has_value());
+  ASSERT_EQ(stale.errors.size(), 1U);
+  EXPECT_EQ(stale.errors.front().pack, PAINTER);
+  EXPECT_EQ(stale.errors.front().document, SHIPPED_GRAPH);
+  EXPECT_EQ(stale.errors.front().reason, ContentRefusal::INCONSISTENT);
+  ASSERT_EQ(damaged.errors.size(), 1U);
+  EXPECT_EQ(damaged.errors.front().reason, ContentRefusal::UNREADABLE);
+  EXPECT_TRUE(own.errors.empty());
+  EXPECT_TRUE(own.data.has_value());
+}
+
+TEST(MapContent, TheGraphToShipIsItsMapsGraphForThePackPaintingIt) {
+  const Painting painting = ranged_map(ROUTE_SIDE, PassShift{0});
+  MemoryPacks mods;
+  add_map(mods, painting);
+  // A graph shipped for the map before it moved, which loading refuses, is
+  // ignored while its successor is built.
+  mods.ship(PAINTER,
+            its_graph(load_painting(ranged_map(ROUTE_SIDE, PassShift{1}))));
+  ASSERT_FALSE(
+      load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER})
+          .data.has_value());
+
+  const auto made =
+      graph_to_ship(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+
+  ASSERT_TRUE(std::holds_alternative<GraphToShip>(made));
+  EXPECT_EQ(std::get<GraphToShip>(made).pack, PAINTER);
+  const LoadedContent loaded =
+      shipping(painting, std::get<GraphToShip>(made).bytes);
+  EXPECT_TRUE(loaded.errors.empty());
+  EXPECT_TRUE(holds_its_graph(loaded));
+  // Control: the base pack alone paints no map, so there is nothing to ship.
+  EXPECT_TRUE(std::holds_alternative<NoMap>(
+      graph_to_ship(murim_packs::DirectoryPacks{MURIM_PACKS_DIR},
+                    murim_packs::BASE_PACK, {})));
 }
 
 TEST(MapContent, AKeyRouteWalkedWithinAFifthOverItsLengthIsKept) {

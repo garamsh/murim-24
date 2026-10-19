@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "coarse_graph.hpp"
 #include "world.hpp"
 
 namespace murim {
@@ -72,6 +73,14 @@ bool save(const Saved& saved, SaveStore& store, Slot slot);
 /// ticks on as the saved one did, or why it was refused.
 [[nodiscard]] std::variant<Saved, LoadError> load(const SaveStore& store,
                                                   Slot slot);
+
+/// Reads the save in `slot` of `store` as load() does, taking the world's
+/// coarse graph from `bare`, the graph of the map the world was created on
+/// before its structures blocked their cells, rebuilt where they block,
+/// rather than building it.
+[[nodiscard]] std::variant<Saved, LoadError> load(const SaveStore& store,
+                                                  Slot slot,
+                                                  const CoarseGraph& bare);
 
 /// Where parts of a save's payload end, each as the offset from the
 /// payload's first byte to just past its last: the plan each structure was

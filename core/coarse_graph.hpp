@@ -96,6 +96,9 @@ enum class AreaCosts : std::uint8_t { CLOSED_FORM_WHEN_OPEN, SEARCHED };
 /// search breaks ties by that order, so the same map gives the same graph and
 /// the same paths on every host.
 class CoarseGraph {
+  // Writes a graph as the build tool ships it and reads it back.
+  friend class GraphCodec;
+
  private:
   struct Edge {
     std::size_t to;
@@ -208,6 +211,9 @@ class CoarseGraph {
   [[nodiscard]] const CoarseNode& node(NodeRef ref) const;
 
  private:
+  // A graph of a map of `size` cells, its areas and regions sized and empty.
+  CoarseGraph(AreaCosts costs, Footprint size);
+
   void build_area(const Map& map, std::size_t area);
   void link_exits(std::size_t area);
   void build_region(std::size_t region);
