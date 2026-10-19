@@ -96,6 +96,62 @@ bool same(Cell one, Cell other) { return one.x == other.x && one.y == other.y; }
 
 }  // namespace
 
+std::set<std::size_t> CoarseGraph::touched_by(
+    const std::vector<Cell>& cells) const {
+  std::set<std::size_t> touched;
+  const auto columns = static_cast<std::size_t>(columns_);
+  for (const Cell cell : cells) {
+    const std::size_t area = area_of(cell);
+    const Cell corner = area_corner(area);
+    const Footprint size = area_size(area);
+    touched.insert(area);
+    if (cell.x == corner.x && cell.x > 0) {
+      touched.insert(area - 1);
+    }
+    if (cell.x == corner.x + size.width - 1 && cell.x + 1 < width_) {
+      touched.insert(area + 1);
+    }
+    if (cell.y == corner.y && cell.y > 0) {
+      touched.insert(area - columns);
+    }
+    if (cell.y == corner.y + size.height - 1 && cell.y + 1 < height_) {
+      touched.insert(area + columns);
+    }
+  }
+  return touched;
+}
+
+bool CoarseGraph::joins_as_before(const AreaGraph& before,
+                                  const AreaGraph& after) {
+  const auto node = [](const CoarseNode& one, const CoarseNode& other) {
+    return same(one.cell, other.cell) && one.component == other.component;
+  };
+  const auto exit = [](const CoarseExit& one, const CoarseExit& other) {
+    return one.node == other.node && one.area == other.area &&
+           same(one.first, other.first) && same(one.along, other.along) &&
+           one.length == other.length;
+  };
+  return before.components == after.components &&
+         std::equal(before.nodes.begin(), before.nodes.end(),
+                    after.nodes.begin(), after.nodes.end(), node) &&
+         std::equal(before.exits.begin(), before.exits.end(),
+                    after.exits.begin(), after.exits.end(), exit);
+}
+
+bool CoarseGraph::walks_as_before(const AreaGraph& before,
+                                  const AreaGraph& after) {
+  const auto edges = [](const std::vector<Edge>& one,
+                        const std::vector<Edge>& other) {
+    return std::equal(one.begin(), one.end(), other.begin(), other.end(),
+                      [](const Edge& left, const Edge& right) {
+                        return left.to == right.to && left.cost == right.cost;
+                      });
+  };
+  return joins_as_before(before, after) &&
+         std::equal(before.within.begin(), before.within.end(),
+                    after.within.begin(), after.within.end(), edges);
+}
+
 CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
                                        const std::vector<Cell>& cells) {
   // The areas holding a changed cell are rebuilt, each once, and a neighbour
@@ -120,26 +176,7 @@ CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
       }
     }
   };
-  std::set<std::size_t> changed;
-  const auto columns = static_cast<std::size_t>(columns_);
-  for (const Cell cell : cells) {
-    const std::size_t area = area_of(cell);
-    const Cell corner = area_corner(area);
-    const Footprint size = area_size(area);
-    changed.insert(area);
-    if (cell.x == corner.x && cell.x > 0) {
-      changed.insert(area - 1);
-    }
-    if (cell.x == corner.x + size.width - 1 && cell.x + 1 < width_) {
-      changed.insert(area + 1);
-    }
-    if (cell.y == corner.y && cell.y > 0) {
-      changed.insert(area - columns);
-    }
-    if (cell.y == corner.y + size.height - 1 && cell.y + 1 < height_) {
-      changed.insert(area + columns);
-    }
-  }
+  const std::set<std::size_t> changed = touched_by(cells);
   std::set<std::size_t> relinked;
   for (const std::size_t area : changed) {
     around(area, relinked);
@@ -148,38 +185,6 @@ CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
   for (const std::size_t area : relinked) {
     undo.areas_.emplace_back(area, areas_.at(area));
   }
-  // An area that keeps its components, its nodes with theirs, and its exits
-  // joins the same components as before.
-  const auto kept = [](const AreaGraph& before, const AreaGraph& after) {
-    const auto node = [](const CoarseNode& one, const CoarseNode& other) {
-      return same(one.cell, other.cell) && one.component == other.component;
-    };
-    const auto exit = [](const CoarseExit& one, const CoarseExit& other) {
-      return one.node == other.node && one.area == other.area &&
-             same(one.first, other.first) && same(one.along, other.along) &&
-             one.length == other.length;
-    };
-    return before.components == after.components &&
-           std::equal(before.nodes.begin(), before.nodes.end(),
-                      after.nodes.begin(), after.nodes.end(), node) &&
-           std::equal(before.exits.begin(), before.exits.end(),
-                      after.exits.begin(), after.exits.end(), exit);
-  };
-  // An area that also keeps every edge among its nodes is, to its region,
-  // as it was: the region's walks cross areas only by those edges and exits.
-  const auto unchanged = [&kept](const AreaGraph& before,
-                                 const AreaGraph& after) {
-    const auto edges = [](const std::vector<Edge>& one,
-                          const std::vector<Edge>& other) {
-      return std::equal(one.begin(), one.end(), other.begin(), other.end(),
-                        [](const Edge& left, const Edge& right) {
-                          return left.to == right.to && left.cost == right.cost;
-                        });
-    };
-    return kept(before, after) &&
-           std::equal(before.within.begin(), before.within.end(),
-                      after.within.begin(), after.within.end(), edges);
-  };
   bool joins_kept = true;
   std::set<std::size_t> altered;
   for (const std::size_t area : changed) {
@@ -188,8 +193,8 @@ CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
         std::find_if(undo.areas_.begin(), undo.areas_.end(),
                      [area](const auto& saved) { return saved.first == area; });
     AreaGraph& after = areas_.at(area);
-    joins_kept = joins_kept && kept(before->second, after);
-    if (unchanged(before->second, after)) {
+    joins_kept = joins_kept && joins_as_before(before->second, after);
+    if (walks_as_before(before->second, after)) {
       // Its region is not built again, so it keeps its place on the border.
       after.border = before->second.border;
     } else {

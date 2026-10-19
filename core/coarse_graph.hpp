@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <queue>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -217,6 +218,19 @@ class CoarseGraph {
   // A graph of a map of `size` cells, its areas and regions sized and empty.
   CoarseGraph(AreaCosts costs, Footprint size);
 
+  // The areas a rebuild under `cells` builds again: each holding one, and
+  // each beside it across an edge one lies on, whose entrances those cells
+  // make.
+  [[nodiscard]] std::set<std::size_t> touched_by(
+      const std::vector<Cell>& cells) const;
+  // Whether an area built again keeps its components, its nodes with theirs
+  // and its exits, so it joins the components it did.
+  [[nodiscard]] static bool joins_as_before(const AreaGraph& before,
+                                            const AreaGraph& after);
+  // Whether it also keeps every edge among its nodes, so its region, whose
+  // walks cross areas only by those edges and exits, sees it as it was.
+  [[nodiscard]] static bool walks_as_before(const AreaGraph& before,
+                                            const AreaGraph& after);
   void build_area(const Map& map, std::size_t area);
   void link_exits(std::size_t area);
   void build_region(std::size_t region);

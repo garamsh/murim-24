@@ -8103,14 +8103,28 @@ TEST(World, AWorldRefusesABareGraphOfAMapOfAnotherSize) {
   const ArmySpec walkers =
       army(rows, Cell{5, 5}, Cell{90, 90}, 1, 1, 0, {IDLE});
   const CoarseGraph smaller{Map{open_map(AREA_SIDE)}};
-  const auto created = [&](const CoarseGraph& bare) {
-    return World{Seed{1}, Map{rows}, {walkers}, {}, peaceful(0),
-                 {},      {},        {},        {}, bare};
+  // Whether the world refuses `bare`.
+  const auto refuses = [&](const CoarseGraph& bare) {
+    try {
+      static_cast<void>(World{Seed{1},
+                              Map{rows},
+                              {walkers},
+                              {},
+                              peaceful(0),
+                              {},
+                              {},
+                              {},
+                              {},
+                              bare});
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+    return false;
   };
 
-  EXPECT_THROW(static_cast<void>(created(smaller)), std::invalid_argument);
+  EXPECT_TRUE(refuses(smaller));
   // Control: the graph of the world's own map is taken.
-  EXPECT_NO_THROW(static_cast<void>(created(CoarseGraph{Map{rows}})));
+  EXPECT_FALSE(refuses(CoarseGraph{Map{rows}}));
 }
 
 // A map of two rows of ten areas, open but for `structures`, with army 0
