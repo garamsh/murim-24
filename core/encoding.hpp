@@ -33,6 +33,8 @@ class Writer {
  public:
   void u8(std::uint8_t value) { bytes_.push_back(value); }
 
+  void u16(std::uint16_t value) { little_endian(value); }
+
   void u32(std::uint32_t value) { little_endian(value); }
 
   void u64(std::uint64_t value) { little_endian(value); }
@@ -77,6 +79,8 @@ class Reader {
     take(1);
     return bytes_->at(next_ - 1);
   }
+
+  std::uint16_t u16() { return little_endian<std::uint16_t>(); }
 
   std::uint32_t u32() { return little_endian<std::uint32_t>(); }
 

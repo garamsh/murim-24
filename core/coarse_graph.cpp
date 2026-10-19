@@ -62,17 +62,7 @@ CoarseCost octile(Cell from, Cell goal) {
 }
 
 CoarseGraph::CoarseGraph(const Map& map, AreaCosts costs)
-    : costs_(costs),
-      width_(map.width()),
-      height_(map.height()),
-      columns_((width_ + AREA_SIDE - 1) / AREA_SIDE),
-      rows_((height_ + AREA_SIDE - 1) / AREA_SIDE),
-      areas_(static_cast<std::size_t>(columns_) *
-             static_cast<std::size_t>(rows_)),
-      regions_(
-          static_cast<std::size_t>((columns_ + REGION_AREAS - 1) /
-                                   REGION_AREAS) *
-          static_cast<std::size_t>((rows_ + REGION_AREAS - 1) / REGION_AREAS)) {
+    : CoarseGraph(costs, Footprint{map.width(), map.height()}) {
   for (std::size_t area = 0; area < areas_.size(); ++area) {
     build_area(map, area);
   }
@@ -84,6 +74,20 @@ CoarseGraph::CoarseGraph(const Map& map, AreaCosts costs)
   }
   number();
   join_components();
+}
+
+CoarseGraph::CoarseGraph(AreaCosts costs, Footprint size)
+    : costs_(costs),
+      width_(size.width),
+      height_(size.height),
+      columns_((width_ + AREA_SIDE - 1) / AREA_SIDE),
+      rows_((height_ + AREA_SIDE - 1) / AREA_SIDE),
+      areas_(static_cast<std::size_t>(columns_) *
+             static_cast<std::size_t>(rows_)),
+      regions_(
+          static_cast<std::size_t>((columns_ + REGION_AREAS - 1) /
+                                   REGION_AREAS) *
+          static_cast<std::size_t>((rows_ + REGION_AREAS - 1) / REGION_AREAS)) {
 }
 
 namespace {
