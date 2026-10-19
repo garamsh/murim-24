@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "limits.hpp"
 #include "person.hpp"
 
 namespace murim {
@@ -35,6 +36,10 @@ struct Appraisal {
 
 /// Ticks between a person's or an army's appraisals, each at its own phase.
 constexpr std::uint64_t APPRAISAL_TICKS = 15;
+
+/// The might, per mille, and the weight of a person in no realm.
+constexpr std::uint32_t UNRANKED_MIGHT = PER_MILLE;
+constexpr std::uint32_t UNRANKED_WEIGHT = 1;
 
 /// The ratio an appraisal reads when its own side has no strength and the
 /// threat has some, and the most any ratio reads.

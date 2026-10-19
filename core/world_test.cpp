@@ -8135,6 +8135,25 @@ TEST(World, AnArmysMergedSightCountsAFoeSeenByTwoMembersOnce) {
   EXPECT_EQ(apart.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
 }
 
+TEST(World, AnAppraisalWithNoFoeInSightReadsNothing) {
+  // Two members side by side, and the steered foe eleven cells from the
+  // nearer, beyond their sight.
+  const Standing out_of_sight{{{14, 8}}, {{2, 8}, {3, 8}}, {}};
+  World alone = appraisers(out_of_sight);
+  run_ticks(alone, 1);
+  const std::optional<Appraisal> band = alone.army_appraisal(BAND);
+  ASSERT_TRUE(band.has_value());
+  EXPECT_EQ(band.value_or(Appraisal{}).ratio, 0U);
+  EXPECT_EQ(band.value_or(Appraisal{}).tick, 1U);
+  EXPECT_EQ(alone.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio, 0U);
+  // Control: the foe within sight of both is weighed against the two.
+  const Standing in_sight{{{7, 8}}, out_of_sight.members, {}};
+  World seen = appraisers(in_sight);
+  run_ticks(seen, 1);
+  EXPECT_EQ(seen.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            PER_MILLE / 2);
+}
+
 TEST(World, AnAppraisalCountsNeitherAFactionAtPeaceNorAsOwn) {
   // The band's one member, a foe three cells east, and a person of faction 2
   // one cell east.
@@ -8440,15 +8459,19 @@ TEST(World, TemperamentsAreDrawnAtBirthByTheirShares) {
 }
 
 TEST(World, ASoulBornAgainDrawsItsOwnTemperament) {
-  Life bold;
-  bold.temperaments = shared({PER_MILLE, 0, 0});
-  World world = reborn_beyond_capacity(bold);
-  // Setup: the post was born bold, as everyone is under these shares.
+  // Even shares of bold and cautious, so the soul's new draw need not match
+  // the temperament its old record holds.
+  const Temperaments even = shared({500, 500, 0});
+  Life halves;
+  halves.temperaments = even;
+  World world = reborn_beyond_capacity(halves);
   const std::size_t post = world.roster(POST).front();
-  ASSERT_EQ(world.temperament(post), Temperament::BOLD);
+  const Temperament before = world.temperament(post);
   run_to_rebirth(world);
   ASSERT_EQ(world.population(), REBORN_CAPACITY + 1);
-  EXPECT_EQ(world.temperament(REBORN_CAPACITY), Temperament::BOLD);
+  // Under this seed the post's soul, born again, draws the other one.
+  EXPECT_NE(world.temperament(REBORN_CAPACITY), before);
+  EXPECT_EQ(world.temperament(post), before);
   // Control: with no temperaments, the soul born again is cautious.
   World plain = reborn_beyond_capacity();
   run_to_rebirth(plain);

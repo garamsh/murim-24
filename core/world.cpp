@@ -4247,19 +4247,31 @@ void World::appraise(const Crowd& crowd) {
 
 // The ratio of the strength that would strike person `lead`, of army `army`,
 // to its own side's, everyone of its faction who would not, among those in
-// sight of any of the people `seers`, each counted once.
+// sight of any of the people `seers`, each counted once; 0, its own side
+// uncounted, with no foe in their sight.
 template <typename Seers>
 std::uint32_t World::weigh(std::size_t lead, std::size_t army,
                            const Seers& seers, const Crowd& crowd) {
+  const std::uint64_t foe = foe_kinds(lead, armies_.at(army));
+  const std::int32_t sight = rules_.sight * CELL_SIZE;
+  const bool threatened =
+      std::any_of(seers.begin(), seers.end(), [&](std::size_t seer) {
+        return crowd.hash.any_within(
+            foe, people_.at(seer).position, sight, [&](std::size_t other) {
+              return foes(lead, army, crowd.people.at(other),
+                          crowd.armies.at(other));
+            });
+      });
+  if (!threatened) {
+    return 0;
+  }
   // A new serial for each appraisal, so no slot keeps a mark from one before.
   if (++serial_ == 0) {
     std::fill(stamps_.begin(), stamps_.end(), 0);
     serial_ = 1;
   }
   const std::size_t faction = armies_.at(army).faction;
-  const std::uint64_t kinds =
-      kind_of(faction) | foe_kinds(lead, armies_.at(army));
-  const std::int32_t sight = rules_.sight * CELL_SIZE;
+  const std::uint64_t kinds = kind_of(faction) | foe;
   std::uint64_t own = 0;
   std::uint64_t threat = 0;
   for (const std::size_t seer : seers) {
@@ -4282,11 +4294,12 @@ std::uint32_t World::weigh(std::size_t lead, std::size_t army,
 }
 
 // `person`'s strength in an appraisal: its health, times its realm's might
-// over a thousand and its realm's weight, a thousand and 1 with no realm.
+// over a thousand and its realm's weight, UNRANKED_MIGHT and UNRANKED_WEIGHT
+// with no realm.
 std::uint64_t World::strength_of(const Person& person) const {
   const std::uint32_t rank = rank_of(person, life_);
   if (rank == 0) {
-    return strength(person.health, PER_MILLE, 1);
+    return strength(person.health, UNRANKED_MIGHT, UNRANKED_WEIGHT);
   }
   const Realm& realm = life_.realms.at(rank - 1);
   return strength(person.health, realm.might, realm.weight);
