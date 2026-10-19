@@ -938,6 +938,7 @@ Loadout read_loadout(Reader& reader, std::size_t slots) {
         choice.kind = inner.reference("item", "items");
       }
       choice.weight = inner.number<std::uint32_t>("weight", 0, 1U);
+      choice.art = inner.boolean("art", false);
       choices.push_back(choice);
     });
     if (slot < loadout.slots.size()) {

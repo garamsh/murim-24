@@ -499,6 +499,7 @@ void put_gear(Writer& out, const Gear& gear) {
       put_all(out, choices, [&out](const Choice& choice) {
         put_index(out, choice.kind);
         out.u32(choice.weight);
+        out.flag(choice.art);
       });
     });
   });
@@ -538,6 +539,7 @@ Gear get_gear(Reader& input) {
         Choice choice;
         choice.kind = get_index(input);
         choice.weight = input.u32();
+        choice.art = input.flag();
         return choice;
       });
     });

@@ -921,6 +921,7 @@ class World {
   void bear(Person& person, const Soul& soul, const Calling& calling,
             std::optional<Sex> sex = std::nullopt);
   void dress(Person& person, const Calling& calling);
+  void arm_factions(const std::vector<std::size_t>& sects);
   [[nodiscard]] std::uint32_t draw(Range range);
   [[nodiscard]] std::int64_t age_in_days(const Person& person) const;
   void age();
@@ -1133,6 +1134,9 @@ class World {
   };
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
+  /// By faction, the weapon an art's-weapon choice dresses its people in,
+  /// derived from the sects, the manuals they start with and the gear.
+  std::vector<std::optional<std::size_t>> art_weapons_;
   /// The declaration standing between each two factions.
   Declarations declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.

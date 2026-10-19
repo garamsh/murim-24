@@ -36,11 +36,13 @@ struct ItemKind {
   std::uint32_t guard = 0;
 };
 
-/// One choice for a slot: item kind `kind`, or the slot left empty, drawn
+/// One choice for a slot: item kind `kind`, the `art`'s weapon of the
+/// wearer's faction (art_weapons()), or else the slot left empty, drawn
 /// with `weight` against the slot's other choices.
 struct Choice {
   std::optional<std::size_t> kind;
   std::uint32_t weight = 1;
+  bool art = false;
 };
 
 /// What the people a loadout fits wear as they are born: in each slot, by
@@ -102,10 +104,22 @@ using Worn = std::vector<std::optional<std::size_t>>;
                                          std::optional<std::size_t> sect,
                                          bool soldier);
 
+/// Returns, by faction, the weapon an art's-weapon choice gives its people:
+/// the first kind of the first family needed by the discipline of the first
+/// art its first sect holding a manual holds, of `held` by sect and of
+/// `disciplines` by art; nothing where its art needs no family or none of
+/// `gear`'s kinds is of it. `sects` gives each sect's faction.
+[[nodiscard]] std::vector<std::optional<std::size_t>> art_weapons(
+    const Gear& gear, std::size_t factions,
+    const std::vector<std::size_t>& sects,
+    const std::vector<std::vector<std::size_t>>& held,
+    const std::vector<std::size_t>& disciplines);
+
 /// Throws std::invalid_argument when `gear` names a slot, family or kind it
 /// lacks, a faction or sect past `factions` or `sects`, needs for more than
 /// `disciplines` disciplines, a striking weapon without a family or another
-/// slot's item with one, choices for a slot whose weights sum to 0, or a
+/// slot's item with one, an art's-weapon choice naming a kind or outside the
+/// striking slot, choices for a slot whose weights sum to 0, or a
 /// strike or damage outside MAX_BODY_DAMAGE or MAX_COOLDOWN.
 void check_gear(const Gear& gear, std::size_t disciplines, std::size_t factions,
                 std::size_t sects);

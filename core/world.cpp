@@ -997,6 +997,7 @@ void fold_gear(const Fold& fold, const std::optional<Gear>& gear) {
         fold(choice.kind.has_value());
         fold(choice.kind.value_or(0));
         fold(choice.weight);
+        fold(choice.art);
       }
     }
   }
@@ -1139,6 +1140,11 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       residents.at(spec.residents) = true;
     }
   }
+  std::vector<std::size_t> sect_factions;
+  for (const SectSpec& sect : sects) {
+    sect_factions.push_back(sect.faction);
+  }
+  arm_factions(sect_factions);
   // The sect each person founds, if any, by person.
   std::vector<std::optional<std::size_t>> founders;
   for (std::size_t sect = 0; sect < sects.size(); ++sect) {
@@ -1207,6 +1213,11 @@ void World::restore() {
   if (life_.gear) {
     check_gear(*life_.gear, life_.disciplines.size(), factions, sects_.size());
   }
+  std::vector<std::size_t> sect_factions;
+  for (const Sect& sect : sects_) {
+    sect_factions.push_back(sect.faction);
+  }
+  arm_factions(sect_factions);
   const std::size_t people = people_.size();
   const std::size_t villages = villages_.size();
   const std::size_t structures = structures_.size();
@@ -4564,6 +4575,25 @@ void World::bear(Person& person, const Soul& soul, const Calling& calling,
   dress(person, calling);
 }
 
+// Sets, by faction, the weapon an art's-weapon choice gives, from the
+// faction of each of the world's `sects`, the manuals they start with and the
+// gear: the weapon its sect's art needs.
+void World::arm_factions(const std::vector<std::size_t>& sects) {
+  art_weapons_.clear();
+  if (!life_.gear) {
+    return;
+  }
+  std::vector<std::size_t> disciplines;
+  for (const Art& art : life_.arts) {
+    disciplines.push_back(art.discipline);
+  }
+  art_weapons_ =
+      art_weapons(*life_.gear, rules_.hostile.size(), sects,
+                  life_.manuals ? life_.manuals->held
+                                : std::vector<std::vector<std::size_t>>{},
+                  disciplines);
+}
+
 // With gear, dresses `person`, the next the world holds, in the first
 // loadout that fits its `calling`, drawing one choice by weight for each slot
 // the loadout lists. Each draw is a counter-based hash of the seed, the
@@ -4589,7 +4619,10 @@ void World::dress(Person& person, const Calling& calling) {
     std::uint64_t drawn = mix(mix(mix(seed_) ^ people_.size()) ^ slot) % total;
     for (const Choice& choice : choices) {
       if (drawn < choice.weight) {
-        person.worn.at(slot) = choice.kind;
+        person.worn.at(slot) =
+            choice.art && calling.faction < art_weapons_.size()
+                ? art_weapons_.at(calling.faction)
+                : choice.kind;
         break;
       }
       drawn -= choice.weight;

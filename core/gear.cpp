@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -49,7 +50,9 @@ bool valid_loadout(const Gear& gear, const Loadout& loadout,
   // Each choice is of a kind worn in the slot it is listed for.
   for (std::size_t slot = 0; fits && slot < loadout.slots.size(); ++slot) {
     for (const Choice& choice : loadout.slots.at(slot)) {
-      fits = !choice.kind || gear.kinds.at(*choice.kind).slot == slot;
+      fits = choice.art
+                 ? !choice.kind && slot == gear.striking
+                 : !choice.kind || gear.kinds.at(*choice.kind).slot == slot;
       if (!fits) {
         break;
       }
@@ -106,6 +109,37 @@ const Loadout* loadout_for(const Gear& gear, std::size_t faction,
   const auto found =
       std::find_if(gear.loadouts.begin(), gear.loadouts.end(), fits);
   return found == gear.loadouts.end() ? nullptr : &*found;
+}
+
+std::vector<std::optional<std::size_t>> art_weapons(
+    const Gear& gear, std::size_t factions,
+    const std::vector<std::size_t>& sects,
+    const std::vector<std::vector<std::size_t>>& held,
+    const std::vector<std::size_t>& disciplines) {
+  std::vector<std::optional<std::size_t>> weapons(factions);
+  std::vector<bool> settled(factions, false);
+  for (std::size_t sect = 0; sect < sects.size() && sect < held.size();
+       ++sect) {
+    const std::size_t faction = sects.at(sect);
+    if (faction >= factions || settled.at(faction) || held.at(sect).empty() ||
+        held.at(sect).front() >= disciplines.size()) {
+      continue;
+    }
+    settled.at(faction) = true;
+    const std::size_t discipline = disciplines.at(held.at(sect).front());
+    if (discipline >= gear.needs.size() || gear.needs.at(discipline).empty()) {
+      continue;
+    }
+    const std::size_t family = gear.needs.at(discipline).front();
+    const auto kind = std::find_if(
+        gear.kinds.begin(), gear.kinds.end(),
+        [family](const ItemKind& each) { return each.family == family; });
+    if (kind != gear.kinds.end()) {
+      weapons.at(faction) =
+          static_cast<std::size_t>(std::distance(gear.kinds.begin(), kind));
+    }
+  }
+  return weapons;
 }
 
 void check_gear(const Gear& gear, std::size_t disciplines, std::size_t factions,

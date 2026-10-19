@@ -585,6 +585,82 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
   }
 }
 
+// By faction, how many people `data`'s world on SEED starts with, its sects'
+// founders aside, who carry a weapon, and how many of them carry one their
+// faction's sect's art needs.
+std::vector<std::pair<std::size_t, std::size_t>> armed_for_their_art(
+    const RegionData& data) {
+  const Gear gear = data.life.gear.value_or(Gear{});
+  const Manuals manuals = data.life.manuals.value_or(Manuals{});
+  std::vector<std::optional<std::size_t>> art(data.factions.size());
+  for (std::size_t sect = 0; sect < data.sects.size(); ++sect) {
+    std::optional<std::size_t>& first = art.at(data.sects.at(sect).faction);
+    if (!first && sect < manuals.held.size() &&
+        !manuals.held.at(sect).empty()) {
+      first = data.life.arts.at(manuals.held.at(sect).front()).discipline;
+    }
+  }
+  const Region region = generate_region(SEED, data);
+  std::vector<bool> founder;
+  for (const SectSpec& sect : region.sects) {
+    for (const Founder& each : sect.founders) {
+      founder.resize(std::max(founder.size(), each.person + 1), false);
+      founder.at(each.person) = true;
+    }
+  }
+  const World world = world_of(region);
+  std::vector<std::pair<std::size_t, std::size_t>> counts(data.factions.size());
+  for (std::size_t army = 0; army < world.army_count(); ++army) {
+    const std::size_t faction = world.faction(army);
+    for (const std::size_t member : world.roster(army)) {
+      const Worn& worn = world.person(member).worn;
+      const bool founded = member < founder.size() && founder.at(member);
+      if (founded || !worn.at(gear.striking) || !art.at(faction)) {
+        continue;
+      }
+      ++counts.at(faction).first;
+      counts.at(faction).second +=
+          armed_for(gear, worn, *art.at(faction)) ? 1 : 0;
+    }
+  }
+  return counts;
+}
+
+TEST(Region, EveryoneBornArmedCarriesTheWeaponTheirFactionsArtNeeds) {
+  constexpr std::size_t UNORTHODOX = 2;
+  const std::vector<std::pair<std::size_t, std::size_t>> counts =
+      armed_for_their_art(base_data());
+  for (std::size_t faction = 0; faction < counts.size(); ++faction) {
+    // Setup: each faction starts with people armed besides its founders.
+    EXPECT_GT(counts.at(faction).first, 0U) << "faction " << faction;
+    EXPECT_EQ(counts.at(faction).second, counts.at(faction).first)
+        << "faction " << faction;
+  }
+  // Control: with each loadout's art's weapon a sword in its place, the
+  // Unorthodox, whose art needs darts, carry none they may cast it with.
+  RegionData swords = base_data();
+  Gear& gear = swords.life.gear.value();
+  const auto sword = std::find_if(
+      gear.kinds.begin(), gear.kinds.end(),
+      [](const ItemKind& kind) { return kind.name == "iron_sword"; });
+  ASSERT_NE(sword, gear.kinds.end());
+  for (Loadout& loadout : gear.loadouts) {
+    for (std::vector<Choice>& choices : loadout.slots) {
+      for (Choice& choice : choices) {
+        if (choice.art) {
+          choice.art = false;
+          choice.kind = static_cast<std::size_t>(
+              std::distance(gear.kinds.begin(), sword));
+        }
+      }
+    }
+  }
+  const std::vector<std::pair<std::size_t, std::size_t>> unarted =
+      armed_for_their_art(swords);
+  ASSERT_GT(unarted.at(UNORTHODOX).first, 0U);
+  EXPECT_LT(unarted.at(UNORTHODOX).second, unarted.at(UNORTHODOX).first);
+}
+
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = base_data();
   data.factions.push_back(Faction{"Martial clans",

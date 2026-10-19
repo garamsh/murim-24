@@ -105,15 +105,14 @@
     ]
   },
   {
-    "id": "orthodox_soldiers",
-    "faction": "orthodox",
+    "id": "soldiers",
     "soldiers": true,
     "wear": [
       {
         "slot": "weapon",
         "choices": [
           {
-            "item": "iron_sword"
+            "art": true
           }
         ]
       },
@@ -136,165 +135,17 @@
     ]
   },
   {
-    "id": "demonic_soldiers",
-    "faction": "demonic",
-    "soldiers": true,
+    "id": "villagers",
     "wear": [
       {
         "slot": "weapon",
         "choices": [
           {
-            "item": "iron_saber"
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "lamellar"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "helmet"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "unorthodox_soldiers",
-    "faction": "unorthodox",
-    "soldiers": true,
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "iron_sword"
-          },
-          {
-            "item": "iron_saber"
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "lamellar"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "helmet"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "orthodox_villagers",
-    "faction": "orthodox",
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "iron_sword",
+            "art": true,
             "weight": 1
           },
           {
             "weight": 1
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "cloth"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "demonic_villagers",
-    "faction": "demonic",
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "iron_saber",
-            "weight": 1
-          },
-          {
-            "weight": 1
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "cloth"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "unorthodox_villagers",
-    "faction": "unorthodox",
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "iron_sword",
-            "weight": 1
-          },
-          {
-            "item": "iron_saber",
-            "weight": 1
-          },
-          {
-            "weight": 2
           }
         ]
       },

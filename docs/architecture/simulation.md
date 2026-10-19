@@ -173,6 +173,7 @@ Today's departures, each with its issue:
   - an art skill needs a weapon of a family its discipline names. A cast without one is refused `WRONG_WEAPON`, and the automatic strike draws only among the art skills the weapon allows. A weapon's edge, per mille, multiplies the body damage of the art skills used with it, `PER_MILLE` bare-handed;
   - the guards of everything worn add up, to at most `MAX_GUARD`, 600 per mille, and take that share from the body damage the wearer takes;
   - the one birth function dresses every person, at the world's creation and at each birth and rebirth alike. The first loadout that fits its calling gives each slot one choice drawn by weight. A calling is its faction, the sect it founds, if any, and whether it serves as a soldier, in an army other than its home's residents. The draw is a counter-based hash of the seed, the person and the slot, so it takes nothing from the world's stream;
+  - a choice may be the art's weapon: the first kind of the first family its faction's sect's art needs, the art of the first manual its first sect holding one starts with. So everyone born into a faction whose art needs a family draws that family, and its members may use the art (ADR 0050: "sect members carry their art's weapon"). It is derived on read, and a person who changes faction later keeps what it wears;
   - the gear and each person's worn slots are saved and hashed. A world without gear hashes as before.
 - The base pack's strikes, the step's reading of ADR 0050 and ADR 0066:
   - every family's strike is targeted, as ADR 0066 made the basic strike, at ADR 0050's ranges and cooldowns;
@@ -180,8 +181,9 @@ Today's departures, each with its issue:
   - steel deals a fifth more, with an edge of 1,200. The spear, staff and fan wait for a kind that carries them.
 - The base pack's loadouts, the step's reading of ADR 0050's:
   - a sect's founders carry its art's weapon, steel or darts, in leather;
-  - soldiers carry a sword or saber by faction, in lamellar and a helmet;
-  - villagers wear cloth and a headband or a hat, and their faction's weapon at even odds against none, so a village's later generations are not left bare-handed (#295).
+  - soldiers carry the art's weapon, in lamellar and a helmet;
+  - villagers wear cloth and a headband or a hat, and carry the art's weapon at even odds against none, so a village's later generations are not left bare-handed (#295);
+  - the art's weapon is the iron sword for the Orthodox, the iron saber for the Demonic Cult and darts for the Unorthodox, by Hwasan's, the Heavenly Demon's and Black Fang's arts.
 - Wear and breaking into scrap, spares and wares as stacks come with the steps after (#295).
 
 ### Qi and arts
