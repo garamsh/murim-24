@@ -1,0 +1,1537 @@
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_OSX_SYSROOT=macosx
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/_deps/json-src/include/
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build
+ninja: no work to do.
+SDKROOT=$(xcrun --show-sdk-path 2>/dev/null) /Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.9s)
+-- Generating done (0.5s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake --build build/extension
+[0/2] Re-checking globbed directories...
+[1/4] Building CXX object CMakeFiles/murim_extension.dir/extension.cpp.o
+[2/4] Building CXX object CMakeFiles/murim_extension.dir/world_adapter.cpp.o
+[3/4] Linking CXX shared library libmurim.macos.template_debug.arm64.dylib
+touch build/.gdignore
+mkdir -p .godot && git ls-files --cached --others --exclude-standard -- '*.gdextension' | sed 's|^|res://|' > .godot/extension_list.cfg
+godot --headless --path . --import > build/import.log 2>&1 || { cat build/import.log; exit 1; }
+imported 55 resources into .godot/, selected by: git ls-files --cached --others --exclude-standard -- '*.import'
+built every target in core/CMakeLists.txt into build/, and every default target in extension/CMakeLists.txt into build/extension/; registered 1 GDExtension, selected by: git ls-files --cached --others --exclude-standard -- '*.gdextension'
+./check-contents-list.sh
+checked 115 Markdown files, selected by: git ls-files --cached --others --exclude-standard -- '*.md'
+./check-convention-index.sh
+checked 11 convention files against 11 index rows in docs/convention/README.md, selected by: git ls-files --cached --others --exclude-standard -- 'docs/convention/*.md'
+./check-heading-prefixes.sh
+checked 670 headings in 115 Markdown files, selected by: git ls-files --cached --others --exclude-standard -- '*.md'
+./lint-sysroot.sh build/lint/sysroot
+kept the lint sysroot in build/lint/sysroot, unpacked from the same 4 packages
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S core -B build/lint/core -G Ninja -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core/_deps/json-src/include/
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/core
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/cmake -S extension -B build/lint/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -DPython3_EXECUTABLE=/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/python3 -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=/Users/sauce/orca/workspaces/murim-24/c-art/build/lint/sysroot -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
+-- Using the multi-header code from /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension/_deps/json-src/include/
+-- Auto-detected 8 CPU cores available for build parallelism.
+-- If not already cached, setting CMAKE_MSVC_RUNTIME_LIBRARY.
+	For more information please read godot-cpp/cmake/windows.cmake
+-- Using all cores. You can override this at configure time by using -j <n> or --parallel <n> in the build command.
+--   eg. cmake --build . -j 7  ...
+-- GODOTCPP_GDEXTENSION_API_FILE = 'gdextension/extension_api-4-7.json'
+-- GODOTCPP_GDEXTENSION_INTERFACE_FILE = 'gdextension/gdextension_interface.json'
+-- There are 2135 Files to generate
+-- Configuring done (0.9s)
+-- Generating done (0.5s)
+-- Build files have been written to: /Users/sauce/orca/workspaces/murim-24/c-art/build/lint/extension
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ninja -C build/lint/extension _deps/godot-cpp-build/generate_bindings
+ninja: Entering directory `build/lint/extension'
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+[1/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/area_fields.cpp.
+[2/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/area_fields_test.cpp.
+[3/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/areas.cpp.
+[4/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/areas_test.cpp.
+[5/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/attack.cpp.
+[6/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/attack_test.cpp.
+[7/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/bench.cpp.
+[8/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart.cpp.
+[9/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chart_test.cpp.
+[10/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/chronicle_test.cpp.
+[11/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/coarse_graph.cpp.
+[12/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/coarse_graph_test.cpp.
+[13/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/compiled_map.cpp.
+[14/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/compiled_map_test.cpp.
+[15/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content.cpp.
+[16/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/content_test.cpp.
+[17/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/cultivation.cpp.
+[18/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/cultivation_test.cpp.
+[19/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy.cpp.
+[20/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/diplomacy_test.cpp.
+[21/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/event.cpp.
+[22/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/event_test.cpp.
+[23/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field.cpp.
+[24/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/flow_field_test.cpp.
+[25/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/growth.cpp.
+[26/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/layout.cpp.
+[27/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/layout_test.cpp.
+[28/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/leadership.cpp.
+[29/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/leadership_test.cpp.
+[30/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/life.cpp.
+[31/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/limits.cpp.
+[32/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/live_scenario.cpp.
+[33/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/m1_scenario.cpp.
+[34/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/map.cpp.
+[35/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/occupation.cpp.
+[36/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/occupation_test.cpp.
+[37/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/progress.cpp.
+[38/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/progress_test.cpp.
+[39/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/random.cpp.
+[40/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region.cpp.
+[41/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/region_test.cpp.
+[42/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save.cpp.
+[43/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/save_test.cpp.
+[44/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/schedule.cpp.
+[45/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/schedule_test.cpp.
+[46/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/skill.cpp.
+[47/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash.cpp.
+[48/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/spatial_hash_test.cpp.
+[49/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/sweep.cpp.
+[50/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/talent.cpp.
+[51/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/trade.cpp.
+[52/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village.cpp.
+[53/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_fields.cpp.
+[54/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_fields_test.cpp.
+[55/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/village_test.cpp.
+[56/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world.cpp.
+[57/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/core/world_test.cpp.
+[58/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs.cpp.
+[59/59] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/packs_json/json_packs_test.cpp.
+clang-tidy checked 59 C++ sources and the core/ and packs_json/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'packs_json/*.cpp'
+[1/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/body_view.cpp.
+[2/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/extension.cpp.
+[3/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/file_saves.cpp.
+[4/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_adapter.cpp.
+[5/5] Processing file /Users/sauce/orca/workspaces/murim-24/c-art/extension/world_hash.cpp.
+clang-tidy checked 5 extension/ C++ sources and the extension/ headers they include, with core/.clang-tidy, selected by: git ls-files --cached --others --exclude-standard -- 'extension/*.cpp'
+clang-format checked 108 C++ files, selected by: git ls-files --cached --others --exclude-standard -- 'core/*.cpp' 'core/*.hpp' 'packs_json/*.cpp' 'packs_json/*.hpp' 'extension/*.cpp' 'extension/*.hpp'
+/Users/sauce/orca/workspaces/murim-24/c-art/.venv/bin/ctest --test-dir build --output-on-failure --no-tests=error
+Test project /Users/sauce/orca/workspaces/murim-24/c-art/build
+        Start   1: AreaFields.AComponentCutOffFromTheObjectiveGetsNoStep
+  1/511 Test   #1: AreaFields.AComponentCutOffFromTheObjectiveGetsNoStep .........................   Passed    0.07 sec
+        Start   2: AreaFields.AFieldAskedForEveryTickIsBuiltOnce
+  2/511 Test   #2: AreaFields.AFieldAskedForEveryTickIsBuiltOnce .................................   Passed    0.04 sec
+        Start   3: AreaFields.AFieldIsKeptWhileAPersonBoundForItStepsBackAcrossItsSide
+  3/511 Test   #3: AreaFields.AFieldIsKeptWhileAPersonBoundForItStepsBackAcrossItsSide ...........   Passed    0.04 sec
+        Start   4: AreaFields.EveryFieldKeptThroughALayIsTheOneAFreshBuildGives
+  4/511 Test   #4: AreaFields.EveryFieldKeptThroughALayIsTheOneAFreshBuildGives ..................   Passed    0.14 sec
+        Start   5: AreaFields.AFieldSeededByAWalkALayLengthensIsBuiltAgain
+  5/511 Test   #5: AreaFields.AFieldSeededByAWalkALayLengthensIsBuiltAgain .......................   Passed    0.06 sec
+        Start   6: AreaFields.AFieldWhoseSeedsLineALayStopsIsBuiltAgain
+  6/511 Test   #6: AreaFields.AFieldWhoseSeedsLineALayStopsIsBuiltAgain ..........................   Passed    0.05 sec
+        Start   7: AreaFields.AFieldKeptThroughALayThatStopsItsSeedsLinesIsBuiltAgainByTheNext
+  7/511 Test   #7: AreaFields.AFieldKeptThroughALayThatStopsItsSeedsLinesIsBuiltAgainByTheNext ...   Passed    0.06 sec
+        Start   8: AreaFields.EveryWalkRoundAWallOfTouchingCornersArrives
+  8/511 Test   #8: AreaFields.EveryWalkRoundAWallOfTouchingCornersArrives ........................   Passed    1.60 sec
+        Start   9: AreaFields.AWalkCrossesAnAreaBorderWhereTheWholeMapFieldsWalkDoes
+  9/511 Test   #9: AreaFields.AWalkCrossesAnAreaBorderWhereTheWholeMapFieldsWalkDoes .............   Passed    0.04 sec
+        Start  10: Areas.EveryAreaStartsLiveSoTheFirstTiersKeepOneAreaPastTheLiveRadius
+ 10/511 Test  #10: Areas.EveryAreaStartsLiveSoTheFirstTiersKeepOneAreaPastTheLiveRadius ..........   Passed    0.03 sec
+        Start  11: Areas.TiersReachTheirRadiiFromTheFocusAlongEachAxis
+ 11/511 Test  #11: Areas.TiersReachTheirRadiiFromTheFocusAlongEachAxis ...........................   Passed    0.03 sec
+        Start  12: Areas.AnAreaMovesFartherOnlyOnceItPassesItsRadiusByOneArea
+ 12/511 Test  #12: Areas.AnAreaMovesFartherOnlyOnceItPassesItsRadiusByOneArea ....................   Passed    0.03 sec
+        Start  13: Areas.TheLiveTierTakesOnlyTheRingsItsCapHolds
+ 13/511 Test  #13: Areas.TheLiveTierTakesOnlyTheRingsItsCapHolds .................................   Passed    0.03 sec
+        Start  14: Tokens.ATableIsValidWithARowForNoRealmAndHoldsWithinBounds
+ 14/511 Test  #14: Tokens.ATableIsValidWithARowForNoRealmAndHoldsWithinBounds ....................   Passed    0.03 sec
+        Start  15: Tokens.TheNearestTakeTheTokensAndTheRestWaitOnTheWaitingRing
+ 15/511 Test  #15: Tokens.TheNearestTakeTheTokensAndTheRestWaitOnTheWaitingRing ..................   Passed    0.03 sec
+        Start  16: Tokens.AFreedTokenGoesToTheLongestWaitingBeforeANearerNewcomer
+ 16/511 Test  #16: Tokens.AFreedTokenGoesToTheLongestWaitingBeforeANearerNewcomer ................   Passed    0.03 sec
+        Start  17: Tokens.AHolderGivesItsTokenUpAfterTheLeaseWhileSomeoneWaits
+ 17/511 Test  #17: Tokens.AHolderGivesItsTokenUpAfterTheLeaseWhileSomeoneWaits ...................   Passed    0.03 sec
+        Start  18: Tokens.TheSteeredTakesATokenAheadOfTheQueueFromTheLatestHolder
+ 18/511 Test  #18: Tokens.TheSteeredTakesATokenAheadOfTheQueueFromTheLatestHolder ................   Passed    0.03 sec
+        Start  19: Tokens.ADuellistStrikesWithoutATokenAndTakesNone
+ 19/511 Test  #19: Tokens.ADuellistStrikesWithoutATokenAndTakesNone ..............................   Passed    0.03 sec
+        Start  20: Tokens.AWaiterCirclesToTheNextFreeWaitingSlotEveryCirclingPeriod
+ 20/511 Test  #20: Tokens.AWaiterCirclesToTheNextFreeWaitingSlotEveryCirclingPeriod ..............   Passed    0.03 sec
+        Start  21: Tokens.AnEngagerBeyondItsWaitingReachHoldsNothing
+ 21/511 Test  #21: Tokens.AnEngagerBeyondItsWaitingReachHoldsNothing .............................   Passed    0.03 sec
+        Start  22: Tokens.AWaiterTakesNoCrowdedWaitingSlot
+ 22/511 Test  #22: Tokens.AWaiterTakesNoCrowdedWaitingSlot .......................................   Passed    0.03 sec
+        Start  23: Attacks.AnEngagedPersonHoldsItsSlotAndTokenUntilReleased
+ 23/511 Test  #23: Attacks.AnEngagedPersonHoldsItsSlotAndTokenUntilReleased ......................   Passed    0.02 sec
+        Start  24: Attacks.GrowingKeepsWhatEveryoneHolds
+ 24/511 Test  #24: Attacks.GrowingKeepsWhatEveryoneHolds .........................................   Passed    0.02 sec
+        Start  25: Attacks.EngagingAgainMovesAPersonOffItsOldSlot
+ 25/511 Test  #25: Attacks.EngagingAgainMovesAPersonOffItsOldSlot ................................   Passed    0.03 sec
+        Start  26: Attacks.ASavedEngagementIsRefusedWhenNoWorldCouldHoldIt
+ 26/511 Test  #26: Attacks.ASavedEngagementIsRefusedWhenNoWorldCouldHoldIt .......................   Passed    0.03 sec
+        Start  27: Slots.AReachTakesARingByItsClass
+ 27/511 Test  #27: Slots.AReachTakesARingByItsClass ..............................................   Passed    0.03 sec
+        Start  28: Slots.ARingHoldsTheMostSlotsASeparationApart
+ 28/511 Test  #28: Slots.ARingHoldsTheMostSlotsASeparationApart ..................................   Passed    0.03 sec
+        Start  29: Slots.SlotOffsetsArePinnedFromEastTowardSouth
+ 29/511 Test  #29: Slots.SlotOffsetsArePinnedFromEastTowardSouth .................................   Passed    0.03 sec
+        Start  30: Slots.ANewcomerTakesTheFreeSlotNearestItAndAHolderKeepsItsSlot
+ 30/511 Test  #30: Slots.ANewcomerTakesTheFreeSlotNearestItAndAHolderKeepsItsSlot ................   Passed    0.03 sec
+        Start  31: Slots.OfTwoFreeSlotsAsNearAsEachOtherTheLowerIsTaken
+ 31/511 Test  #31: Slots.OfTwoFreeSlotsAsNearAsEachOtherTheLowerIsTaken ..........................   Passed    0.03 sec
+        Start  32: Slots.ASlotFreesWhenItsHolderStopsEngagingOrTurnsToAnotherFoe
+ 32/511 Test  #32: Slots.ASlotFreesWhenItsHolderStopsEngagingOrTurnsToAnotherFoe .................   Passed    0.03 sec
+        Start  33: Slots.AReachBeyondTheLongRingStrikesFromWhereItStandsOnNoSlot
+ 33/511 Test  #33: Slots.AReachBeyondTheLongRingStrikesFromWhereItStandsOnNoSlot .................   Passed    0.02 sec
+        Start  34: Slots.NoSlotIsOfferedOnABlockedCell
+ 34/511 Test  #34: Slots.NoSlotIsOfferedOnABlockedCell ...........................................   Passed    0.03 sec
+        Start  35: Slots.ACrowdedSlotIsNotOffered
+ 35/511 Test  #35: Slots.ACrowdedSlotIsNotOffered ................................................   Passed    0.02 sec
+        Start  36: Slots.AHeldSlotThatBecomesCrowdedIsFreedAndAnotherTaken
+ 36/511 Test  #36: Slots.AHeldSlotThatBecomesCrowdedIsFreedAndAnotherTaken .......................   Passed    0.03 sec
+        Start  37: Slots.ASeekerReachesItsSlotRoundTheRing
+ 37/511 Test  #37: Slots.ASeekerReachesItsSlotRoundTheRing .......................................   Passed    0.03 sec
+        Start  38: Slots.ASeekerOnTheBandAimsAtTheNextSlotRoundTheRing
+ 38/511 Test  #38: Slots.ASeekerOnTheBandAimsAtTheNextSlotRoundTheRing ...........................   Passed    0.03 sec
+        Start  39: Chart.SeeMarksEveryCellWithinReachAndNoOther
+ 39/511 Test  #39: Chart.SeeMarksEveryCellWithinReachAndNoOther ..................................   Passed    0.03 sec
+        Start  40: Chart.SeeReportsOnlyCellsNotSeenBefore
+ 40/511 Test  #40: Chart.SeeReportsOnlyCellsNotSeenBefore ........................................   Passed    0.03 sec
+        Start  41: Chart.SeeStopsAtTheMapsEdge
+ 41/511 Test  #41: Chart.SeeStopsAtTheMapsEdge ...................................................   Passed    0.03 sec
+        Start  42: Chart.KeepsABlockOnlyForAreasWithASeenCell
+ 42/511 Test  #42: Chart.KeepsABlockOnlyForAreasWithASeenCell ....................................   Passed    0.03 sec
+        Start  43: Chart.RememberReportsOnlyAChangedMemory
+ 43/511 Test  #43: Chart.RememberReportsOnlyAChangedMemory .......................................   Passed    0.03 sec
+        Start  44: Chart.RestoresWhatItGave
+ 44/511 Test  #44: Chart.RestoresWhatItGave ......................................................   Passed    0.03 sec
+        Start  45: Chart.RefusesBlocksNoChartGives
+ 45/511 Test  #45: Chart.RefusesBlocksNoChartGives ...............................................   Passed    0.03 sec
+        Start  46: Chart.RefusesAVillageOwnedByNoFaction
+ 46/511 Test  #46: Chart.RefusesAVillageOwnedByNoFaction .........................................   Passed    0.03 sec
+        Start  47: Chart.AMovedClaimCentreChangesTheMemoryAndRevision
+ 47/511 Test  #47: Chart.AMovedClaimCentreChangesTheMemoryAndRevision ............................   Passed    0.03 sec
+        Start  48: Chart.RefusesAVillageClaimCentreOffTheMap
+ 48/511 Test  #48: Chart.RefusesAVillageClaimCentreOffTheMap .....................................   Passed    0.03 sec
+        Start  49: Chart.SeesAVillageWhenOneOfItsStructuresIsWithinReach
+ 49/511 Test  #49: Chart.SeesAVillageWhenOneOfItsStructuresIsWithinReach .........................   Passed    0.03 sec
+        Start  50: Chart.DerivesTerritoryFromWhatItSawAndRemembers
+ 50/511 Test  #50: Chart.DerivesTerritoryFromWhatItSawAndRemembers ...............................   Passed    0.03 sec
+        Start  51: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity
+ 51/511 Test  #51: Chronicle.KeepsTheNewestNumberedOnPastItsCapacity .............................   Passed    0.03 sec
+        Start  52: Chronicle.RefusesEntriesNotAsAddKeepsThem
+ 52/511 Test  #52: Chronicle.RefusesEntriesNotAsAddKeepsThem .....................................   Passed    0.03 sec
+        Start  53: CoarseGraph.TwoCellsAreJoinedExactlyWhereAFullFieldReachesOne
+ 53/511 Test  #53: CoarseGraph.TwoCellsAreJoinedExactlyWhereAFullFieldReachesOne .................   Passed    1.06 sec
+        Start  54: CoarseGraph.APathOverTheRegionsCostsWhatOneOverTheAreasDoes
+ 54/511 Test  #54: CoarseGraph.APathOverTheRegionsCostsWhatOneOverTheAreasDoes ...................   Passed    1.14 sec
+        Start  55: CoarseGraph.ARebuildAfterBlockingCellsMatchesAGraphBuiltAfresh
+ 55/511 Test  #55: CoarseGraph.ARebuildAfterBlockingCellsMatchesAGraphBuiltAfresh ................   Passed    0.48 sec
+        Start  56: CoarseGraph.ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers
+ 56/511 Test  #56: CoarseGraph.ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers .........   Passed    0.04 sec
+        Start  57: CoarseGraph.AnExitLinksToTheFarNodeWhoseExitLeadsBack
+ 57/511 Test  #57: CoarseGraph.AnExitLinksToTheFarNodeWhoseExitLeadsBack .........................   Passed    0.03 sec
+        Start  58: CoarseGraph.ASearchByRegionsCostsExitsAsTheAreasAloneDo
+ 58/511 Test  #58: CoarseGraph.ASearchByRegionsCostsExitsAsTheAreasAloneDo .......................   Passed   22.13 sec
+        Start  59: CoarseGraph.ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay
+ 59/511 Test  #59: CoarseGraph.ASearchByRegionsLeavesTheObjectivesRegionWhereThatIsTheWay ........   Passed    0.12 sec
+        Start  60: CoarseGraph.ARevertedRebuildLeavesTheGraphAsItWas
+ 60/511 Test  #60: CoarseGraph.ARevertedRebuildLeavesTheGraphAsItWas .............................   Passed    0.23 sec
+        Start  61: CoarseGraph.OpenAreasCostedInClosedFormMatchTheirSearch
+ 61/511 Test  #61: CoarseGraph.OpenAreasCostedInClosedFormMatchTheirSearch .......................   Passed    0.24 sec
+        Start  62: CompiledMap.AVillagePlaceAndASeatPlaceHashApartWhereTheirFieldsAgree
+ 62/511 Test  #62: CompiledMap.AVillagePlaceAndASeatPlaceHashApartWhereTheirFieldsAgree ..........   Passed    0.03 sec
+        Start  63: Content.ATinyBasePackLoadsWithNoError
+ 63/511 Test  #63: Content.ATinyBasePackLoadsWithNoError .........................................   Passed    0.03 sec
+        Start  64: Content.AnUnknownFieldRefusesItsPack
+ 64/511 Test  #64: Content.AnUnknownFieldRefusesItsPack ..........................................   Passed    0.03 sec
+        Start  65: Content.AnOccupationOpeningPlacesTwoWaysIsRefused
+ 65/511 Test  #65: Content.AnOccupationOpeningPlacesTwoWaysIsRefused .............................   Passed    0.03 sec
+        Start  66: Content.OccupationsNameTheirWakingHours
+ 66/511 Test  #66: Content.OccupationsNameTheirWakingHours .......................................   Passed    0.03 sec
+        Start  67: Content.AFractionIsRefused
+ 67/511 Test  #67: Content.AFractionIsRefused ....................................................   Passed    0.03 sec
+        Start  68: Content.AnUnresolvedIdRefusesTheMergedSet
+ 68/511 Test  #68: Content.AnUnresolvedIdRefusesTheMergedSet .....................................   Passed    0.03 sec
+        Start  69: Content.PacksLoadingAfterEachOtherInACycleAreRefused
+ 69/511 Test  #69: Content.PacksLoadingAfterEachOtherInACycleAreRefused ..........................   Passed    0.03 sec
+        Start  70: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt
+ 70/511 Test  #70: Content.AMissingRequirementRefusesThePackAndThoseRequiringIt ..................   Passed    0.03 sec
+        Start  71: Content.ARemovedEntryTakesNoIndex
+ 71/511 Test  #71: Content.ARemovedEntryTakesNoIndex .............................................   Passed    0.03 sec
+        Start  72: Content.ADocumentTheSourceCannotReadRefusesItsPack
+ 72/511 Test  #72: Content.ADocumentTheSourceCannotReadRefusesItsPack ............................   Passed    0.03 sec
+        Start  73: Content.AFieldOfTheWrongTypeIsRefused
+ 73/511 Test  #73: Content.AFieldOfTheWrongTypeIsRefused .........................................   Passed    0.03 sec
+        Start  74: Content.AnIdTwiceInOneDocumentIsRefused
+ 74/511 Test  #74: Content.AnIdTwiceInOneDocumentIsRefused .......................................   Passed    0.03 sec
+        Start  75: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused
+ 75/511 Test  #75: Content.AnIdNotInLowercaseLettersDigitsAndUnderscoresIsRefused ................   Passed    0.03 sec
+        Start  76: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet
+ 76/511 Test  #76: Content.ANewEntryMissingARequiredFieldRefusesTheMergedSet .....................   Passed    0.03 sec
+        Start  77: Content.AValueOutsideItsLimitsIsRefused
+ 77/511 Test  #77: Content.AValueOutsideItsLimitsIsRefused .......................................   Passed    0.03 sec
+        Start  78: Content.AModCallingItselfABaseIsRefused
+ 78/511 Test  #78: Content.AModCallingItselfABaseIsRefused .......................................   Passed    0.03 sec
+        Start  79: Content.AMergedSetFailingTheRegionsChecksIsRefused
+ 79/511 Test  #79: Content.AMergedSetFailingTheRegionsChecksIsRefused ............................   Passed    0.03 sec
+        Start  80: Content.ATierNamingAnUnknownOrOffSquareKindIsRefused
+ 80/511 Test  #80: Content.ATierNamingAnUnknownOrOffSquareKindIsRefused ..........................   Passed    0.03 sec
+        Start  81: Content.AGrowthWithTiersOutOfOrderIsRefusedAtLoad
+ 81/511 Test  #81: Content.AGrowthWithTiersOutOfOrderIsRefusedAtLoad .............................   Passed    0.03 sec
+        Start  82: Content.AModOverridingOneSkillsDamageChangesOnlyThatField
+ 82/511 Test  #82: Content.AModOverridingOneSkillsDamageChangesOnlyThatField .....................   Passed    0.33 sec
+        Start  83: MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash
+ 83/511 Test  #83: MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash .......   Passed    1.28 sec
+        Start  84: MapContent.AKeyRouteWalkedWithinAFifthOverItsLengthIsKept
+ 84/511 Test  #84: MapContent.AKeyRouteWalkedWithinAFifthOverItsLengthIsKept .....................   Passed    0.55 sec
+        Start  85: MapContent.AKeyRouteWalkedOutsideItsLengthRefusesTheMap
+ 85/511 Test  #85: MapContent.AKeyRouteWalkedOutsideItsLengthRefusesTheMap .......................   Passed    0.53 sec
+        Start  86: MapContent.AKeyRouteIsNotWalkedUpACliff
+ 86/511 Test  #86: MapContent.AKeyRouteIsNotWalkedUpACliff .......................................   Passed    0.41 sec
+        Start  87: MapContent.TwoPlacesCloserThanApartRefuseTheMap
+ 87/511 Test  #87: MapContent.TwoPlacesCloserThanApartRefuseTheMap ...............................   Passed    0.06 sec
+        Start  88: MapContent.APlaceOnABlockedCellRefusesTheMap
+ 88/511 Test  #88: MapContent.APlaceOnABlockedCellRefusesTheMap ..................................   Passed    0.05 sec
+        Start  89: MapContent.AMapPastTheCoresBoundsIsRefused
+ 89/511 Test  #89: MapContent.AMapPastTheCoresBoundsIsRefused ....................................   Passed    0.13 sec
+        Start  90: MapContent.RowsNotOfTheMapsShapeAreRefused
+ 90/511 Test  #90: MapContent.RowsNotOfTheMapsShapeAreRefused ....................................   Passed    0.04 sec
+        Start  91: MapContent.APlaceSettlesAFactionsVillageOrASectsSeat
+ 91/511 Test  #91: MapContent.APlaceSettlesAFactionsVillageOrASectsSeat ..........................   Passed    0.04 sec
+        Start  92: MapContent.APaintedMapWithMoreThan256TerrainKindsIsRefused
+ 92/511 Test  #92: MapContent.APaintedMapWithMoreThan256TerrainKindsIsRefused ....................   Passed    0.07 sec
+        Start  93: Cultivation.RanksAPersonByTheRealmsItsCapacityReaches
+ 93/511 Test  #93: Cultivation.RanksAPersonByTheRealmsItsCapacityReaches .........................   Passed    0.03 sec
+        Start  94: Cultivation.TakesAPersonsNatureFromTheArtItLearnedFirst
+ 94/511 Test  #94: Cultivation.TakesAPersonsNatureFromTheArtItLearnedFirst .......................   Passed    0.03 sec
+        Start  95: Cultivation.NamesTheArtLearnedFirstAsTheHeartMethod
+ 95/511 Test  #95: Cultivation.NamesTheArtLearnedFirstAsTheHeartMethod ...........................   Passed    0.03 sec
+        Start  96: Cultivation.HoldsASkillWithinARealmItsRankDoesNotPass
+ 96/511 Test  #96: Cultivation.HoldsASkillWithinARealmItsRankDoesNotPass .........................   Passed    0.03 sec
+        Start  97: Cultivation.EasesAnArtByHowFarItsNatureAgrees
+ 97/511 Test  #97: Cultivation.EasesAnArtByHowFarItsNatureAgrees .................................   Passed    0.03 sec
+        Start  98: Cultivation.OffersTheFirstSkillAPersonLacksWithinItsRank
+ 98/511 Test  #98: Cultivation.OffersTheFirstSkillAPersonLacksWithinItsRank ......................   Passed    0.03 sec
+        Start  99: Cultivation.GrowsQiCapacityToItsLimitAndRecoversQiWithinIt
+ 99/511 Test  #99: Cultivation.GrowsQiCapacityToItsLimitAndRecoversQiWithinIt ....................   Passed    0.03 sec
+        Start 100: Cultivation.PractisesEachArtOnceInTheOrderFirstLearned
+100/511 Test #100: Cultivation.PractisesEachArtOnceInTheOrderFirstLearned ........................   Passed    0.03 sec
+        Start 101: Cultivation.ScalesComprehensionByTalentAndAgreement
+101/511 Test #101: Cultivation.ScalesComprehensionByTalentAndAgreement ...........................   Passed    0.03 sec
+        Start 102: Cultivation.LetsAReaderWithTheRankAndQiReadAManual
+102/511 Test #102: Cultivation.LetsAReaderWithTheRankAndQiReadAManual ............................   Passed    0.03 sec
+        Start 103: Cultivation.ScalesTeachingByTheTeachersRankAndAgreement
+103/511 Test #103: Cultivation.ScalesTeachingByTheTeachersRankAndAgreement .......................   Passed    0.03 sec
+        Start 104: Declarations.HoldForBothFactionsWhicheverNamesThemFirst
+104/511 Test #104: Declarations.HoldForBothFactionsWhicheverNamesThemFirst .......................   Passed    0.03 sec
+        Start 105: Declarations.RefuseSlotsNotAsDeclareKeepsThem
+105/511 Test #105: Declarations.RefuseSlotsNotAsDeclareKeepsThem .................................   Passed    0.03 sec
+        Start 106: Declarations.MakeFactionsHostileByTheirDeclarationElseTheirStances
+106/511 Test #106: Declarations.MakeFactionsHostileByTheirDeclarationElseTheirStances ............   Passed    0.03 sec
+        Start 107: Declarations.TellHowOneFactionStandsTowardAnother
+107/511 Test #107: Declarations.TellHowOneFactionStandsTowardAnother .............................   Passed    0.03 sec
+        Start 108: Declarations.RefuseADeclarationForTheFirstReasonInOrder
+108/511 Test #108: Declarations.RefuseADeclarationForTheFirstReasonInOrder .......................   Passed    0.03 sec
+        Start 109: Declarations.SeekWarWhenStrongAndPeaceWhenWeak
+109/511 Test #109: Declarations.SeekWarWhenStrongAndPeaceWhenWeak ................................   Passed    0.03 sec
+        Start 110: Declarations.TurnAWinnersAlliesHostileToItAlone
+110/511 Test #110: Declarations.TurnAWinnersAlliesHostileToItAlone ...............................   Passed    0.03 sec
+        Start 111: Events.NameOnlyRecordsTheWorldHolds
+111/511 Test #111: Events.NameOnlyRecordsTheWorldHolds ...........................................   Passed    0.03 sec
+        Start 112: Events.CountAPersonsFamilySpousesParentsAndChildrenAsKin
+112/511 Test #112: Events.CountAPersonsFamilySpousesParentsAndChildrenAsKin ......................   Passed    0.03 sec
+        Start 113: Events.ReachAListenerNearbyOrWhenTheyConcernItsKinOrFaction
+113/511 Test #113: Events.ReachAListenerNearbyOrWhenTheyConcernItsKinOrFaction ...................   Passed    0.03 sec
+        Start 114: Events.GiveTheRumoursAListenerHearsNewestFirst
+114/511 Test #114: Events.GiveTheRumoursAListenerHearsNewestFirst ................................   Passed    0.03 sec
+        Start 115: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked
+115/511 Test #115: JsonPacks.AnIntegerIsReadExactlyAndAFractionIsMarked ..........................   Passed    0.03 sec
+        Start 116: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason
+116/511 Test #116: JsonPacks.ADocumentItCannotTakeIsRefusedWithItsReason .........................   Passed    0.03 sec
+        Start 117: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames
+117/511 Test #117: JsonPacks.BytePacksServeEachDataFileAsTheDocumentItNames ......................   Passed    0.03 sec
+        Start 118: JsonPacks.EachSourceServesAMapFileAsTheMapDocumentItNames
+118/511 Test #118: JsonPacks.EachSourceServesAMapFileAsTheMapDocumentItNames .....................   Passed    0.03 sec
+        Start 119: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge
+119/511 Test #119: JsonPacks.ADirectoryFilePastTheLimitIsRefusedAsTooLarge .......................   Passed    0.25 sec
+        Start 120: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError
+120/511 Test #120: JsonPacks.TheBasePackLoadsFromItsDirectoryWithNoError .........................   Passed    0.04 sec
+        Start 121: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal
+121/511 Test #121: FlowField.ADiagonalObjectiveIsWalkedAlongTheDiagonal ..........................   Passed    0.03 sec
+        Start 122: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine
+122/511 Test #122: FlowField.AnObjectiveOffEveryDiagonalIsWalkedNearItsLine ......................   Passed    0.03 sec
+        Start 123: FlowField.NoStepCutsACornerBetweenTwoBlockedCells
+123/511 Test #123: FlowField.NoStepCutsACornerBetweenTwoBlockedCells .............................   Passed    0.03 sec
+        Start 124: FlowField.NoStepPassesBesideOneBlockedCell
+124/511 Test #124: FlowField.NoStepPassesBesideOneBlockedCell ....................................   Passed    0.03 sec
+        Start 125: FlowField.TheBucketSearchStepsAndCostsEveryCellAsTheHeapDoes
+125/511 Test #125: FlowField.TheBucketSearchStepsAndCostsEveryCellAsTheHeapDoes ..................   Passed    0.08 sec
+        Start 126: Layout.FieldsLieBeyondTheHousesAndAmongThemWhenPlacedAsHomes
+126/511 Test #126: Layout.FieldsLieBeyondTheHousesAndAmongThemWhenPlacedAsHomes ..................   Passed    0.04 sec
+        Start 127: Layout.AnEdgePlanTerracesHillCellsWhenFlatLandIsFarther
+127/511 Test #127: Layout.AnEdgePlanTerracesHillCellsWhenFlatLandIsFarther .......................   Passed    0.04 sec
+        Start 128: Layout.HousesStringAlongABankNearerByPathThanAcrossTheWater
+128/511 Test #128: Layout.HousesStringAlongABankNearerByPathThanAcrossTheWater ...................   Passed    0.04 sec
+        Start 129: Layout.OneSiteAndDrawGiveOneLayoutAndAnotherDrawAnother
+129/511 Test #129: Layout.OneSiteAndDrawGiveOneLayoutAndAnotherDrawAnother .......................   Passed    0.05 sec
+        Start 130: Layout.ASiteNearerThanApartToAnotherCentreIsNotOpen
+130/511 Test #130: Layout.ASiteNearerThanApartToAnotherCentreIsNotOpen ...........................   Passed    0.03 sec
+        Start 131: Leaders.LeaveOutFactionsLedByNoOneAndRefuseStrangers
+131/511 Test #131: Leaders.LeaveOutFactionsLedByNoOneAndRefuseStrangers ..........................   Passed    0.03 sec
+        Start 132: Leaders.RefuseAChallengeForTheFirstReasonInOrder
+132/511 Test #132: Leaders.RefuseAChallengeForTheFirstReasonInOrder ..............................   Passed    0.03 sec
+        Start 133: Leaders.KnowWhoDuelsWhom
+133/511 Test #133: Leaders.KnowWhoDuelsWhom ......................................................   Passed    0.03 sec
+        Start 134: Leaders.EndADuelWhenADuellistYieldsAndCrownOnlyAStandingChallenger
+134/511 Test #134: Leaders.EndADuelWhenADuellistYieldsAndCrownOnlyAStandingChallenger ............   Passed    0.03 sec
+        Start 135: Leaders.ElectWhenTheLeaderIsGoneOrTheTermEnds
+135/511 Test #135: Leaders.ElectWhenTheLeaderIsGoneOrTheTermEnds .................................   Passed    0.03 sec
+        Start 136: Leaders.RefuseSavedLeadershipNamingWhatDoesNotExist
+136/511 Test #136: Leaders.RefuseSavedLeadershipNamingWhatDoesNotExist ...........................   Passed    0.03 sec
+        Start 137: Occupation.OpeningsFillInTheOccupationsOrderThenTheCandidates
+137/511 Test #137: Occupation.OpeningsFillInTheOccupationsOrderThenTheCandidates .................   Passed    0.03 sec
+        Start 138: Occupation.ACandidateUnderTheWorkingAgeHoldsNone
+138/511 Test #138: Occupation.ACandidateUnderTheWorkingAgeHoldsNone ..............................   Passed    0.03 sec
+        Start 139: Occupation.AHeldOccupationIsKeptAheadOfAnEarlierCandidate
+139/511 Test #139: Occupation.AHeldOccupationIsKeptAheadOfAnEarlierCandidate .....................   Passed    0.03 sec
+        Start 140: Occupation.AnOccupationIsLostWhenItsWorkplaceFalls
+140/511 Test #140: Occupation.AnOccupationIsLostWhenItsWorkplaceFalls ............................   Passed    0.03 sec
+        Start 141: Occupation.AFallbackHolderTakesAPlaceThatOpens
+141/511 Test #141: Occupation.AFallbackHolderTakesAPlaceThatOpens ................................   Passed    0.03 sec
+        Start 142: Occupation.SquarePlacesAreOneForEverySoManyPeopleRoundedUp
+142/511 Test #142: Occupation.SquarePlacesAreOneForEverySoManyPeopleRoundedUp ....................   Passed    0.03 sec
+        Start 143: Occupation.OccupationsOutsideTheirLimitsAreRefused
+143/511 Test #143: Occupation.OccupationsOutsideTheirLimitsAreRefused ............................   Passed    0.03 sec
+        Start 144: Progress.NamesOnlyPeopleArtsSkillsAndRealmsTheWorldHolds
+144/511 Test #144: Progress.NamesOnlyPeopleArtsSkillsAndRealmsTheWorldHolds ......................   Passed    0.03 sec
+        Start 145: Region.SameSeedGivesTheSameRegionAndWorld
+145/511 Test #145: Region.SameSeedGivesTheSameRegionAndWorld .....................................   Passed    1.41 sec
+        Start 146: Region.TheSeedsTheGodotTestsStartFromGenerate
+146/511 Test #146: Region.TheSeedsTheGodotTestsStartFromGenerate .................................   Passed    2.66 sec
+        Start 147: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages
+147/511 Test #147: Region.HasThreeFactionsWithTerritoryAndSixToEightVillages .....................   Passed   53.14 sec
+        Start 148: Region.VillagesStandOnBuildableCells
+148/511 Test #148: Region.VillagesStandOnBuildableCells ..........................................   Passed   97.07 sec
+        Start 149: Region.VillagesLieInTheirOwnersTerritory
+149/511 Test #149: Region.VillagesLieInTheirOwnersTerritory ......................................   Passed   64.44 sec
+        Start 150: Region.VillagesDoNotOverlap
+150/511 Test #150: Region.VillagesDoNotOverlap ...................................................   Passed   70.10 sec
+        Start 151: Region.NoTwoVillagesOrSeatsStandNearerThanApart
+151/511 Test #151: Region.NoTwoVillagesOrSeatsStandNearerThanApart ...............................   Passed   87.07 sec
+        Start 152: Region.TwoVillagesOfOneTemplateOnTwoSitesAreLaidOutApart
+152/511 Test #152: Region.TwoVillagesOfOneTemplateOnTwoSitesAreLaidOutApart ......................   Passed   67.50 sec
+        Start 153: Region.GeneratesAFourthFactionAddedAsData
+153/511 Test #153: Region.GeneratesAFourthFactionAddedAsData .....................................   Passed   58.86 sec
+        Start 154: Region.ASeatKeepingMoreThanAVillagesWindowHoldsIsRefused
+154/511 Test #154: Region.ASeatKeepingMoreThanAVillagesWindowHoldsIsRefused ......................   Passed    0.04 sec
+        Start 155: Region.RejectsInconsistentData
+155/511 Test #155: Region.RejectsInconsistentData ................................................   Passed    0.18 sec
+        Start 156: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds
+156/511 Test #156: Region.StructuresCarryTheirKindAndBuildingsHouseTheHouseholds .................   Passed    0.19 sec
+        Start 157: Region.EachSeatKeepsItsOpenCourtClearOfGrowth
+157/511 Test #157: Region.EachSeatKeepsItsOpenCourtClearOfGrowth .................................   Passed    0.19 sec
+        Start 158: Region.EveryPeopledVillageHasAMerchantFromTheStart
+158/511 Test #158: Region.EveryPeopledVillageHasAMerchantFromTheStart ............................   Passed    0.26 sec
+        Start 159: Region.OnlyTheVillageTemplateStartsWithATempleAndAnInnKeeper
+159/511 Test #159: Region.OnlyTheVillageTemplateStartsWithATempleAndAnInnKeeper ..................   Passed    0.25 sec
+        Start 160: Region.TheBasePacksVillageTierNamesATempleThenAnInn
+160/511 Test #160: Region.TheBasePacksVillageTierNamesATempleThenAnInn ...........................   Passed    0.04 sec
+        Start 161: Region.TheBasePacksTempleTakesTwoMonksBeforeTheFields
+161/511 Test #161: Region.TheBasePacksTempleTakesTwoMonksBeforeTheFields .........................   Passed    0.04 sec
+        Start 162: Region.AVillageIsNamedForItsKindAndNumber
+162/511 Test #162: Region.AVillageIsNamedForItsKindAndNumber .....................................   Passed    0.18 sec
+        Start 163: Region.EachSeatsGateIsTheSeatGateAmongItsStructures
+163/511 Test #163: Region.EachSeatsGateIsTheSeatGateAmongItsStructures ...........................   Passed    0.18 sec
+        Start 164: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt
+164/511 Test #164: Region.APersonBornIntoAVillageIsOfItsFactionInsideIt ..........................   Passed    0.26 sec
+        Start 165: Region.NoOneIsBornIntoAVillageWithNoFreeCell
+165/511 Test #165: Region.NoOneIsBornIntoAVillageWithNoFreeCell ..................................   Passed    0.18 sec
+        Start 166: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith
+166/511 Test #166: Region.APersonBornIntoAVillageMakesItHomeToMarryFromAndApplyWith ..............   Passed   10.77 sec
+        Start 167: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion
+167/511 Test #167: Region.AVillageRunsItsWholeLifeCycleInAGeneratedRegion ........................   Passed    3.67 sec
+        Start 168: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage
+168/511 Test #168: Region.EachFactionIsLedByTheFirstResidentOfItsFirstVillage ....................   Passed    0.26 sec
+        Start 169: Region.ADuelEndsWithinItsTargetTime
+169/511 Test #169: Region.ADuelEndsWithinItsTargetTime ...........................................   Passed    2.38 sec
+        Start 170: Region.ADuelIsFoughtAtThePaceItIsWithoutTokens
+170/511 Test #170: Region.ADuelIsFoughtAtThePaceItIsWithoutTokens ................................   Passed    4.07 sec
+        Start 171: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime
+171/511 Test #171: Region.ASkirmishOfTwentyASideEndsWithinItsTargetTime ..........................   Passed    4.50 sec
+        Start 172: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther
+172/511 Test #172: Region.AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther .....................   Passed    0.65 sec
+        Start 173: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime
+173/511 Test #173: Region.ARaidLeavesAHamletInRuinsWithinItsTargetTime ...........................   Passed   13.86 sec
+        Start 174: Region.ARaidBandGoesForWhatStandsBeyondItsCentresReach
+174/511 Test #174: Region.ARaidBandGoesForWhatStandsBeyondItsCentresReach ........................   Passed    5.69 sec
+        Start 175: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime
+175/511 Test #175: Region.ARaidLeavesTheWalledVillageInRuinsWithinItsTargetTime ..................   Passed   18.41 sec
+        Start 176: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike
+176/511 Test #176: Region.ABandTheWalledVillageOutnumbersStillClosesToStrike .....................   Passed    5.02 sec
+        Start 177: Region.FamiliesReachAThirdGenerationWithinThirtyYears
+177/511 Test #177: Region.FamiliesReachAThirdGenerationWithinThirtyYears .........................   Passed    3.92 sec
+        Start 178: Region.BirthsStopOnceMaxPeopleLive
+178/511 Test #178: Region.BirthsStopOnceMaxPeopleLive ............................................   Passed   19.48 sec
+        Start 179: Region.BirthsStopAtTheCapacityTheRulesSet
+179/511 Test #179: Region.BirthsStopAtTheCapacityTheRulesSet .....................................   Passed    2.57 sec
+        Start 180: Region.EveryChildBornHasRoomForAnAttackSlot
+180/511 Test #180: Region.EveryChildBornHasRoomForAnAttackSlot ...................................   Passed    0.34 sec
+        Start 181: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName
+181/511 Test #181: Region.EveryPersonBearsTheirFamilySurnameAndAGivenName ........................   Passed    3.44 sec
+        Start 182: Region.VillagesFillToTheirCapsAndNoFurther
+182/511 Test #182: Region.VillagesFillToTheirCapsAndNoFurther ....................................   Passed   27.02 sec
+        Start 183: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound
+183/511 Test #183: Region.VillagesBuildFoundAndRaidOverFiftyYearsWithinTheBound ..................   Passed   86.25 sec
+        Start 184: Region.EveryPersonServesInTheArmyWhoseRosterHoldsItThroughFiftyYears
+184/511 Test #184: Region.EveryPersonServesInTheArmyWhoseRosterHoldsItThroughFiftyYears ..........   Passed   20.97 sec
+        Start 185: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary
+185/511 Test #185: Region.VillagesPastTheirSelfRelianceRaiseASmithyAndAnApothecary ...............   Passed   28.61 sec
+        Start 186: Region.EachFactionStartsWithAtMostFourHouseholds
+186/511 Test #186: Region.EachFactionStartsWithAtMostFourHouseholds ..............................   Passed   56.32 sec
+        Start 187: Region.NoOutcomeReadsTheChart
+187/511 Test #187: Region.NoOutcomeReadsTheChart .................................................   Passed    1.45 sec
+        Start 188: Region.AFewHouseholdsGrowIntoACivilisationOverACentury
+188/511 Test #188: Region.AFewHouseholdsGrowIntoACivilisationOverACentury ........................   Passed  136.50 sec
+        Start 189: Region.ChildrenOfTheScarcerSexKeepEveryFactionPeopled
+189/511 Test #189: Region.ChildrenOfTheScarcerSexKeepEveryFactionPeopled .........................   Passed   33.05 sec
+        Start 190: Region.SectsAdmitChangeMastersAndElectOverACentury
+190/511 Test #190: Region.SectsAdmitChangeMastersAndElectOverACentury ............................   Passed  132.63 sec
+        Start 191: SettledMap.AWorldOnTheMapHashesTheSameTwiceAndAnotherOnAnotherMap
+191/511 Test #191: SettledMap.AWorldOnTheMapHashesTheSameTwiceAndAnotherOnAnotherMap .............   Passed    1.61 sec
+        Start 192: SettledMap.EachVillageIsLaidOutByRoleWhereTheMapPlacesIt
+192/511 Test #192: SettledMap.EachVillageIsLaidOutByRoleWhereTheMapPlacesIt ......................   Passed    0.29 sec
+        Start 193: SettledMap.TheWorldsRowsAndTerrainAreTheCompiledMaps
+193/511 Test #193: SettledMap.TheWorldsRowsAndTerrainAreTheCompiledMaps ..........................   Passed    0.26 sec
+        Start 194: SettledMap.AVillagePlaceWithNoRoomIsRefused
+194/511 Test #194: SettledMap.AVillagePlaceWithNoRoomIsRefused ...................................   Passed    0.27 sec
+        Start 195: SettledMap.ASectWithoutASeatPlaceIsRefused
+195/511 Test #195: SettledMap.ASectWithoutASeatPlaceIsRefused ....................................   Passed    0.50 sec
+        Start 196: Tiers.TiersFollowTheSteeredArmyAndAWorldWithoutOneRunsLive
+196/511 Test #196: Tiers.TiersFollowTheSteeredArmyAndAWorldWithoutOneRunsLive ....................   Passed    0.35 sec
+        Start 197: Tiers.AHandoverFarAndBackKeepsEveryPersonsRecord
+197/511 Test #197: Tiers.AHandoverFarAndBackKeepsEveryPersonsRecord ..............................   Passed   17.18 sec
+        Start 198: Tiers.ALiveFarAndLiveRunHashesTheSameTwice
+198/511 Test #198: Tiers.ALiveFarAndLiveRunHashesTheSameTwice ....................................   Passed    3.61 sec
+        Start 199: Tiers.AFarArmyNeitherStrikesNorMoves
+199/511 Test #199: Tiers.AFarArmyNeitherStrikesNorMoves ..........................................   Passed    0.05 sec
+        Start 200: Save.ALoadedRegionHashesAndTicksOnAsTheSavedOne
+200/511 Test #200: Save.ALoadedRegionHashesAndTicksOnAsTheSavedOne ...............................   Passed    7.85 sec
+        Start 201: Save.ALoadedRegionKeepsEveryonesQiAndArts
+201/511 Test #201: Save.ALoadedRegionKeepsEveryonesQiAndArts .....................................   Passed    2.99 sec
+        Start 202: Save.ARefusedSaveNamesWhyAndAnIntactOneLoads
+202/511 Test #202: Save.ARefusedSaveNamesWhyAndAnIntactOneLoads ..................................   Passed    0.03 sec
+        Start 203: Save.AVersion13SaveFromBeforeVillagesWereLaidOutByRoleIsRefused
+203/511 Test #203: Save.AVersion13SaveFromBeforeVillagesWereLaidOutByRoleIsRefused ...............   Passed    3.00 sec
+        Start 204: Save.AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused
+204/511 Test #204: Save.AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused .............   Passed    3.01 sec
+        Start 205: Save.AVersion17SaveFromBeforeTiersNamedSquareKindsIsRefused
+205/511 Test #205: Save.AVersion17SaveFromBeforeTiersNamedSquareKindsIsRefused ...................   Passed    3.08 sec
+        Start 206: Save.AVersion15SaveFromBeforeTiersIsRefused
+206/511 Test #206: Save.AVersion15SaveFromBeforeTiersIsRefused ...................................   Passed    3.00 sec
+        Start 207: Save.AVersion16SaveFromBeforeOccupationsIsRefused
+207/511 Test #207: Save.AVersion16SaveFromBeforeOccupationsIsRefused .............................   Passed    2.98 sec
+        Start 208: Save.AVersion17Or18SaveFromBeforeWakingHoursIsRefused
+208/511 Test #208: Save.AVersion17Or18SaveFromBeforeWakingHoursIsRefused .........................   Passed    5.95 sec
+        Start 209: Save.TheAreasTiersAreHashed
+209/511 Test #209: Save.TheAreasTiersAreHashed ...................................................   Passed    0.05 sec
+        Start 210: Save.AFarArmysAnchorIsHashed
+210/511 Test #210: Save.AFarArmysAnchorIsHashed ..................................................   Passed    0.05 sec
+        Start 211: Save.ASaveKeepsTheAreasTiersAndAFarArmysAnchor
+211/511 Test #211: Save.ASaveKeepsTheAreasTiersAndAFarArmysAnchor ................................   Passed    0.07 sec
+        Start 212: Save.ASealedSaveNamingARecordTheWorldLacksIsRefused
+212/511 Test #212: Save.ASealedSaveNamingARecordTheWorldLacksIsRefused ...........................   Passed    0.03 sec
+        Start 213: Save.ASaveWithAPersonOnTwoRostersIsRefused
+213/511 Test #213: Save.ASaveWithAPersonOnTwoRostersIsRefused ....................................   Passed    0.03 sec
+        Start 214: Save.AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused
+214/511 Test #214: Save.AChartComesBackAsSavedAndAStageNoChartHoldsIsRefused .....................   Passed    0.89 sec
+        Start 215: Save.ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap
+215/511 Test #215: Save.ARememberedClaimCentreIsSavedHashedAndRefusedOffTheMap ...................   Passed    0.80 sec
+        Start 216: Save.ASealedSaveNamingAPersonNoEventCanNameIsRefused
+216/511 Test #216: Save.ASealedSaveNamingAPersonNoEventCanNameIsRefused ..........................   Passed    0.03 sec
+        Start 217: Save.ASealedSaveNamingARealmNoProgressCanNameIsRefused
+217/511 Test #217: Save.ASealedSaveNamingARealmNoProgressCanNameIsRefused ........................   Passed    0.03 sec
+        Start 218: Save.ALoadedRegionKeepsItsLessonsAndRealmsNoted
+218/511 Test #218: Save.ALoadedRegionKeepsItsLessonsAndRealmsNoted ...............................   Passed    3.22 sec
+        Start 219: Save.APendingCastLoadsAndLandsAsTheSavedOne
+219/511 Test #219: Save.APendingCastLoadsAndLandsAsTheSavedOne ...................................   Passed    0.03 sec
+        Start 220: Save.ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations
+220/511 Test #220: Save.ALoadedWorldKeepsItsSteeredArmyAndItsDeclarations ........................   Passed    0.03 sec
+        Start 221: Save.ALoadedWorldKeepsItsPeopleCapacity
+221/511 Test #221: Save.ALoadedWorldKeepsItsPeopleCapacity .......................................   Passed    0.03 sec
+        Start 222: Save.AVillageThatShrankKeepsTheTierItReachedAfterLoading
+222/511 Test #222: Save.AVillageThatShrankKeepsTheTierItReachedAfterLoading ......................   Passed    0.03 sec
+        Start 223: Save.ALoadedWorldKeepsItsTiersSquareKinds
+223/511 Test #223: Save.ALoadedWorldKeepsItsTiersSquareKinds .....................................   Passed    0.03 sec
+        Start 224: Save.ALoadedWorldKeepsItsAttackIntent
+224/511 Test #224: Save.ALoadedWorldKeepsItsAttackIntent .........................................   Passed    0.03 sec
+        Start 225: Save.ALoadedWorldKeepsItsTalkReach
+225/511 Test #225: Save.ALoadedWorldKeepsItsTalkReach ............................................   Passed    0.03 sec
+        Start 226: Save.ALoadedWorldKeepsItsSilverWaresAndTrade
+226/511 Test #226: Save.ALoadedWorldKeepsItsSilverWaresAndTrade ..................................   Passed    0.03 sec
+        Start 227: Save.AVillageNamingMoreKindsThanStructuresIsRefused
+227/511 Test #227: Save.AVillageNamingMoreKindsThanStructuresIsRefused ...........................   Passed    0.03 sec
+        Start 228: Save.AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused
+228/511 Test #228: Save.AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused ..................   Passed    0.03 sec
+        Start 229: Save.ALoadedWorldKeepsItsSkillsShapesAndItsSight
+229/511 Test #229: Save.ALoadedWorldKeepsItsSkillsShapesAndItsSight ..............................   Passed    0.03 sec
+        Start 230: Save.ASealedSaveCastingAtAPersonTheWorldLacksIsRefused
+230/511 Test #230: Save.ASealedSaveCastingAtAPersonTheWorldLacksIsRefused ........................   Passed    0.03 sec
+        Start 231: Save.ALoadedWorldKeepsItsAttackTokens
+231/511 Test #231: Save.ALoadedWorldKeepsItsAttackTokens .........................................   Passed    0.03 sec
+        Start 232: Save.AnEngagedPersonLoadsAndSavesAgainAsItWasWritten
+232/511 Test #232: Save.AnEngagedPersonLoadsAndSavesAgainAsItWasWritten ..........................   Passed    0.03 sec
+        Start 233: Save.AWorldLoadedMidErrandWalksOnAsTheOneThatRanOn
+233/511 Test #233: Save.AWorldLoadedMidErrandWalksOnAsTheOneThatRanOn ............................   Passed    0.05 sec
+        Start 234: Save.AWorldLoadedBuildsEveryPlacesFieldBeforeItsFirstTick
+234/511 Test #234: Save.AWorldLoadedBuildsEveryPlacesFieldBeforeItsFirstTick .....................   Passed    0.03 sec
+        Start 235: Save.AWorldLoadedAfterADeathHousesItsResidentsAsTheOneThatRanOn
+235/511 Test #235: Save.AWorldLoadedAfterADeathHousesItsResidentsAsTheOneThatRanOn ...............   Passed    0.04 sec
+        Start 236: Save.WakingHoursComeBackAsSavedAndTheHashFoldsThem
+236/511 Test #236: Save.WakingHoursComeBackAsSavedAndTheHashFoldsThem ............................   Passed    0.03 sec
+        Start 237: Schedule.AnHourIsTheTickWithinItsDayScaledTo24
+237/511 Test #237: Schedule.AnHourIsTheTickWithinItsDayScaledTo24 ................................   Passed    0.03 sec
+        Start 238: Schedule.AWanderPeriodIsAnHourOfTheDayAndAtLeastATick
+238/511 Test #238: Schedule.AWanderPeriodIsAnHourOfTheDayAndAtLeastATick .........................   Passed    0.03 sec
+        Start 239: Schedule.TheBandInForceIsTheLastBeginningAtOrBeforeTheHour
+239/511 Test #239: Schedule.TheBandInForceIsTheLastBeginningAtOrBeforeTheHour ....................   Passed    0.03 sec
+        Start 240: Schedule.APersonIsAwakeFromItsWakingHourUntilItsSleepingOne
+240/511 Test #240: Schedule.APersonIsAwakeFromItsWakingHourUntilItsSleepingOne ...................   Passed    0.04 sec
+        Start 241: Schedule.AHouseholdIsACoupleWithTheirUnwedChildrenAndAnyoneElseAlone
+241/511 Test #241: Schedule.AHouseholdIsACoupleWithTheirUnwedChildrenAndAnyoneElseAlone ..........   Passed    0.03 sec
+        Start 242: Schedule.AHouseholdTakesTheFirstHouseWithRoomForAllOfIt
+242/511 Test #242: Schedule.AHouseholdTakesTheFirstHouseWithRoomForAllOfIt .......................   Passed    0.03 sec
+        Start 243: Schedule.ADoorIsThePassableCellBesideTheFootprintNearestTheCentre
+243/511 Test #243: Schedule.ADoorIsThePassableCellBesideTheFootprintNearestTheCentre .............   Passed    0.03 sec
+        Start 244: Schedule.AmongDoorsEquallyNearTheFirstRowByRowIsTaken
+244/511 Test #244: Schedule.AmongDoorsEquallyNearTheFirstRowByRowIsTaken .........................   Passed    0.03 sec
+        Start 245: Schedule.AnErrandDrawDependsOnItsKeyAlone
+245/511 Test #245: Schedule.AnErrandDrawDependsOnItsKeyAlone .....................................   Passed    0.03 sec
+        Start 246: SpatialHash.VisitWithinMatchesABruteForceScan
+246/511 Test #246: SpatialHash.VisitWithinMatchesABruteForceScan .................................   Passed    0.03 sec
+        Start 247: SpatialHash.NearestMatchesABruteForceScan
+247/511 Test #247: SpatialHash.NearestMatchesABruteForceScan .....................................   Passed    0.03 sec
+        Start 248: SpatialHash.NearestTakesTheLowerIndexAmongEquals
+248/511 Test #248: SpatialHash.NearestTakesTheLowerIndexAmongEquals ..............................   Passed    0.03 sec
+        Start 249: SpatialHash.AnyWithinMatchesABruteForceScan
+249/511 Test #249: SpatialHash.AnyWithinMatchesABruteForceScan ...................................   Passed    0.03 sec
+        Start 250: SpatialHash.NearestLooksOneRingFurtherWhileANearerPositionMayLieThere
+250/511 Test #250: SpatialHash.NearestLooksOneRingFurtherWhileANearerPositionMayLieThere .........   Passed    0.03 sec
+        Start 251: SpatialHash.NearestPassesOverPositionsOfOtherKinds
+251/511 Test #251: SpatialHash.NearestPassesOverPositionsOfOtherKinds ............................   Passed    0.03 sec
+        Start 252: SpatialHash.NearestFindsAPositionAtTheRadiusAndNoneOneUnitPast
+252/511 Test #252: SpatialHash.NearestFindsAPositionAtTheRadiusAndNoneOneUnitPast ................   Passed    0.03 sec
+        Start 253: SpatialHash.NearestWeighsAnEqualDistanceOnALaterRing
+253/511 Test #253: SpatialHash.NearestWeighsAnEqualDistanceOnALaterRing ..........................   Passed    0.03 sec
+        Start 254: VillageFields.AFieldLeadsRoundAWallToItsSeed
+254/511 Test #254: VillageFields.AFieldLeadsRoundAWallToItsSeed ..................................   Passed    0.03 sec
+        Start 255: VillageFields.ACellCutOffFromTheSeedsIsNotReached
+255/511 Test #255: VillageFields.ACellCutOffFromTheSeedsIsNotReached .............................   Passed    0.03 sec
+        Start 256: VillageFields.NoStepCutsBetweenTwoBlockedCorners
+256/511 Test #256: VillageFields.NoStepCutsBetweenTwoBlockedCorners ..............................   Passed    0.03 sec
+        Start 257: VillageFields.AFieldSeededOnManyCellsEndsAtTheNearest
+257/511 Test #257: VillageFields.AFieldSeededOnManyCellsEndsAtTheNearest .........................   Passed    0.03 sec
+        Start 258: VillageFields.AFieldStepsAlikeWhenEverItIsBuilt
+258/511 Test #258: VillageFields.AFieldStepsAlikeWhenEverItIsBuilt ...............................   Passed    0.03 sec
+        Start 259: VillageFields.EachCellOfAFieldTakesThreeBytes
+259/511 Test #259: VillageFields.EachCellOfAFieldTakesThreeBytes .................................   Passed    0.03 sec
+        Start 260: VillageFields.AFieldNotBuiltCannotBeRead
+260/511 Test #260: VillageFields.AFieldNotBuiltCannotBeRead ......................................   Passed    0.03 sec
+        Start 261: VillageFields.AWindowWiderThanTheLargestIsRefused
+261/511 Test #261: VillageFields.AWindowWiderThanTheLargestIsRefused .............................   Passed    0.04 sec
+        Start 262: VillageFields.AWindowOverlapsWhatSharesACellWithIt
+262/511 Test #262: VillageFields.AWindowOverlapsWhatSharesACellWithIt ............................   Passed    0.03 sec
+        Start 263: Stages.ReadEachStructureByTheFloorsItIsBelow
+263/511 Test #263: Stages.ReadEachStructureByTheFloorsItIsBelow ..................................   Passed    0.03 sec
+        Start 264: Villages.StartWithStorageFullAndClaimTheirStructures
+264/511 Test #264: Villages.StartWithStorageFullAndClaimTheirStructures ..........................   Passed    0.03 sec
+        Start 265: Villages.RefuseAVillageNamingWhatIsNotFreeToName
+265/511 Test #265: Villages.RefuseAVillageNamingWhatIsNotFreeToName ..............................   Passed    0.03 sec
+        Start 266: Villages.HoldWhatTheirStandingStructuresHoldAndIntactFieldsYield
+266/511 Test #266: Villages.HoldWhatTheirStandingStructuresHoldAndIntactFieldsYield ..............   Passed    0.03 sec
+        Start 267: Villages.CapAtTheLeastOfHousingHarvestAndStorage
+267/511 Test #267: Villages.CapAtTheLeastOfHousingHarvestAndStorage ..............................   Passed    0.03 sec
+        Start 268: Villages.FillAtHarvestUpToStorageAndFeedAllOrNone
+268/511 Test #268: Villages.FillAtHarvestUpToStorageAndFeedAllOrNone .............................   Passed    0.03 sec
+        Start 269: Villages.ServeOnlyWhileTheirWorkshopsCoverTheirPeople
+269/511 Test #269: Villages.ServeOnlyWhileTheirWorkshopsCoverTheirPeople .........................   Passed    0.03 sec
+        Start 270: Villages.ShelterOnlyWithRoomAndFood
+270/511 Test #270: Villages.ShelterOnlyWithRoomAndFood ...........................................   Passed    0.03 sec
+        Start 271: Villages.NoteTheirDestroyerOnceAndGiveOnlyAnEmptyVillageAway
+271/511 Test #271: Villages.NoteTheirDestroyerOnceAndGiveOnlyAnEmptyVillageAway ..................   Passed    0.03 sec
+        Start 272: Villages.ShowAFieldBySeasonUntilItIsBurnt
+272/511 Test #272: Villages.ShowAFieldBySeasonUntilItIsBurnt .....................................   Passed    0.03 sec
+        Start 273: Villages.TakeLaidStructuresAndFoundedVillages
+273/511 Test #273: Villages.TakeLaidStructuresAndFoundedVillages .................................   Passed    0.03 sec
+        Start 274: Villages.RecallTheirPartyOrLetItGo
+274/511 Test #274: Villages.RecallTheirPartyOrLetItGo ............................................   Passed    0.03 sec
+        Start 275: Villages.RefuseSavedVillagesNamingWhatDoesNotExist
+275/511 Test #275: Villages.RefuseSavedVillagesNamingWhatDoesNotExist ............................   Passed    0.03 sec
+        Start 276: Villages.ClaimEachCellForTheNearestCentreWithinTheClaim
+276/511 Test #276: Villages.ClaimEachCellForTheNearestCentreWithinTheClaim .......................   Passed    0.03 sec
+        Start 277: World.SameSeedGivesSameHashAfterTenThousandTicks
+277/511 Test #277: World.SameSeedGivesSameHashAfterTenThousandTicks ..............................   Passed    3.52 sec
+        Start 278: World.HashAfterTenThousandTicksIsTheSameOnEveryPlatform
+278/511 Test #278: World.HashAfterTenThousandTicksIsTheSameOnEveryPlatform .......................   Passed    0.88 sec
+        Start 279: World.PeopleReachTheirObjectiveAroundAWall
+279/511 Test #279: World.PeopleReachTheirObjectiveAroundAWall ....................................   Passed    0.13 sec
+        Start 280: World.APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed
+280/511 Test #280: World.APersonOrderedAlongADiagonalWalksItStraightAtItsSpeed ...................   Passed    0.03 sec
+        Start 281: World.AWalkAcrossThreeAreasOnOpenGroundIsTheWholeMapFieldsWalk
+281/511 Test #281: World.AWalkAcrossThreeAreasOnOpenGroundIsTheWholeMapFieldsWalk ................   Passed    0.07 sec
+        Start 282: World.PeopleAtTheirObjectiveStandTheSeparationApart
+282/511 Test #282: World.PeopleAtTheirObjectiveStandTheSeparationApart ...........................   Passed    0.23 sec
+        Start 283: World.MarchingPeopleKeepNearlyTheSeparationApart
+283/511 Test #283: World.MarchingPeopleKeepNearlyTheSeparationApart ..............................   Passed    0.07 sec
+        Start 284: World.APersonOrderedOutOfAStandingCrowdLeavesIt
+284/511 Test #284: World.APersonOrderedOutOfAStandingCrowdLeavesIt ...............................   Passed    0.09 sec
+        Start 285: World.FoesOnCrossingDiagonalsHoldWithinReachAndFight
+285/511 Test #285: World.FoesOnCrossingDiagonalsHoldWithinReachAndFight ..........................   Passed    0.17 sec
+        Start 286: World.OnlyHostilePeopleWithinRangeUseTheirSkills
+286/511 Test #286: World.OnlyHostilePeopleWithinRangeUseTheirSkills ..............................   Passed    0.03 sec
+        Start 287: World.AWarDeclaredBetweenTicksIsStruckOnTheNextTick
+287/511 Test #287: World.AWarDeclaredBetweenTicksIsStruckOnTheNextTick ...........................   Passed    0.03 sec
+        Start 288: World.EquallyNearTargetsGoToTheLowestIndex
+288/511 Test #288: World.EquallyNearTargetsGoToTheLowestIndex ....................................   Passed    0.03 sec
+        Start 289: World.StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap
+289/511 Test #289: World.StrikeOfTheLargestRadiusWalksNoMoreCellsThanTheMap ......................   Passed    0.03 sec
+        Start 290: World.AreaSkillHitsExactlyThePeopleInsideItsShape
+290/511 Test #290: World.AreaSkillHitsExactlyThePeopleInsideItsShape .............................   Passed    0.05 sec
+        Start 291: World.AStrikeHitsEachHostilePersonInItsDiscOnce
+291/511 Test #291: World.AStrikeHitsEachHostilePersonInItsDiscOnce ...............................   Passed    0.03 sec
+        Start 292: World.StrikeAtTheLargestAcceptedValuesKeepsHealthExact
+292/511 Test #292: World.StrikeAtTheLargestAcceptedValuesKeepsHealthExact ........................   Passed    0.03 sec
+        Start 293: World.InputJustPastALimitIsRefused
+293/511 Test #293: World.InputJustPastALimitIsRefused ............................................   Passed    0.03 sec
+        Start 294: World.AWorldHoldsNoMoreThanMaxPeople
+294/511 Test #294: World.AWorldHoldsNoMoreThanMaxPeople ..........................................   Passed    0.03 sec
+        Start 295: World.AWorldHoldsNoMoreThanTheCapacityItsRulesSet
+295/511 Test #295: World.AWorldHoldsNoMoreThanTheCapacityItsRulesSet .............................   Passed    0.03 sec
+        Start 296: World.ACapacityOtherThanMaxPeopleChangesTheHash
+296/511 Test #296: World.ACapacityOtherThanMaxPeopleChangesTheHash ...............................   Passed    0.03 sec
+        Start 297: World.AreaSkillWalksAStructureThroughEveryStage
+297/511 Test #297: World.AreaSkillWalksAStructureThroughEveryStage ...............................   Passed    0.03 sec
+        Start 298: World.AreaSkillBeatsSingleTargetSkill
+298/511 Test #298: World.AreaSkillBeatsSingleTargetSkill .........................................   Passed    0.07 sec
+        Start 299: World.QuickSkillBeatsSlowSkill
+299/511 Test #299: World.QuickSkillBeatsSlowSkill ................................................   Passed    0.10 sec
+        Start 300: World.APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding
+300/511 Test #300: World.APersonKeepsItsIdentityThroughConscriptionBattleAndDisbanding ...........   Passed    0.06 sec
+        Start 301: World.ConscriptingAndDisbandingKeepEveryPersonOnOneRoster
+301/511 Test #301: World.ConscriptingAndDisbandingKeepEveryPersonOnOneRoster .....................   Passed    0.03 sec
+        Start 302: World.OnlyALivingPersonCanBeConscripted
+302/511 Test #302: World.OnlyALivingPersonCanBeConscripted .......................................   Passed    0.08 sec
+        Start 303: World.OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData
+303/511 Test #303: World.OrderedBodyMatchesAnNpcFollowingTheSameOrderFromData ....................   Passed    0.15 sec
+        Start 304: World.OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse
+304/511 Test #304: World.OrderedBodyStrikesOnlyWithTheSkillsItIsOrderedToUse .....................   Passed    0.11 sec
+        Start 305: World.ReplayingARecordedOrderLogGivesTheSameHash
+305/511 Test #305: World.ReplayingARecordedOrderLogGivesTheSameHash ..............................   Passed    0.14 sec
+        Start 306: World.OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused
+306/511 Test #306: World.OrderNamingNoArmyBlockedCellOrSkillItLacksIsRefused .....................   Passed    0.03 sec
+        Start 307: World.AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint
+307/511 Test #307: World.AreaSkillHitsAStructureThroughTheEdgeOfItsFootprint .....................   Passed    0.14 sec
+        Start 308: World.BodiesWalkAroundAStructuresFootprint
+308/511 Test #308: World.BodiesWalkAroundAStructuresFootprint ....................................   Passed    0.10 sec
+        Start 309: World.FootprintsOverWallsArmiesOrEachOtherAreRefused
+309/511 Test #309: World.FootprintsOverWallsArmiesOrEachOtherAreRefused ..........................   Passed    0.03 sec
+        Start 310: World.ObjectiveTheArmyCannotReachIsRefused
+310/511 Test #310: World.ObjectiveTheArmyCannotReachIsRefused ....................................   Passed    0.03 sec
+        Start 311: World.VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder
+311/511 Test #311: World.VillageWalksFromProsperityThroughRuinsBackUnderItsRebuilder .............   Passed    0.08 sec
+        Start 312: World.RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther
+312/511 Test #312: World.RepairRestoresDurabilityUpToTheIntactFloorAndNoFurther ..................   Passed    0.06 sec
+        Start 313: World.RebuilderBecomesTheOwnerOnlyWhereNoResidentLives
+313/511 Test #313: World.RebuilderBecomesTheOwnerOnlyWhereNoResidentLives ........................   Passed    0.40 sec
+        Start 314: World.AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain
+314/511 Test #314: World.AVillageBurntOutOfSightIsRememberedAsItWasUntilSeenAgain ................   Passed    0.12 sec
+        Start 315: World.AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain
+315/511 Test #315: World.AVillageRebuiltOutOfSightKeepsItsRememberedOwnerUntilSeenAgain ..........   Passed    0.38 sec
+        Start 316: World.VillageNamingAMissingOrClaimedStructureOrArmyIsRefused
+316/511 Test #316: World.VillageNamingAMissingOrClaimedStructureOrArmyIsRefused ..................   Passed    0.03 sec
+        Start 317: World.VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction
+317/511 Test #317: World.VillageWithLivingResidentsTakesNoDamageFromItsOwnFaction ................   Passed    0.12 sec
+        Start 318: World.OnlyAMemberMayChallengeTheCultsLeader
+318/511 Test #318: World.OnlyAMemberMayChallengeTheCultsLeader ...................................   Passed    0.03 sec
+        Start 319: World.AChallengerWhoWinsLeadsAndTheLeadersAlliesTurnOnThem
+319/511 Test #319: World.AChallengerWhoWinsLeadsAndTheLeadersAlliesTurnOnThem ....................   Passed    0.12 sec
+        Start 320: World.ThePlayerAndAnNpcChallengeThroughTheSameOrder
+320/511 Test #320: World.ThePlayerAndAnNpcChallengeThroughTheSameOrder ...........................   Passed    0.18 sec
+        Start 321: World.AChallengeIsRefusedForEachReasonTheOrderRefusesIt
+321/511 Test #321: World.AChallengeIsRefusedForEachReasonTheOrderRefusesIt .......................   Passed    0.08 sec
+        Start 322: World.APersonsFactionIsItsArmysAndNoneOnceDead
+322/511 Test #322: World.APersonsFactionIsItsArmysAndNoneOnceDead ................................   Passed    0.08 sec
+        Start 323: World.ADuelIsReadWhileItIsFoughtAndGoneOnceSettled
+323/511 Test #323: World.ADuelIsReadWhileItIsFoughtAndGoneOnceSettled ............................   Passed    0.08 sec
+        Start 324: World.OnlyAFactionsLeaderDeclaresWarOrMakesPeace
+324/511 Test #324: World.OnlyAFactionsLeaderDeclaresWarOrMakesPeace ..............................   Passed    0.03 sec
+        Start 325: World.ADeclarationIsRefusedForEachReasonDeclareRefusesIt
+325/511 Test #325: World.ADeclarationIsRefusedForEachReasonDeclareRefusesIt ......................   Passed    0.14 sec
+        Start 326: World.ALeaderNoDriverSteersDeclaresByTheDiplomacy
+326/511 Test #326: World.ALeaderNoDriverSteersDeclaresByTheDiplomacy .............................   Passed    0.11 sec
+        Start 327: World.ALeaderOutnumberedInADeclaredWarMakesPeace
+327/511 Test #327: World.ALeaderOutnumberedInADeclaredWarMakesPeace ..............................   Passed    0.11 sec
+        Start 328: World.TheCalendarFollowsTheTicks
+328/511 Test #328: World.TheCalendarFollowsTheTicks ..............................................   Passed    2.34 sec
+        Start 329: World.HowManyTicksMakeADayIsTheWorldsData
+329/511 Test #329: World.HowManyTicksMakeADayIsTheWorldsData .....................................   Passed    0.03 sec
+        Start 330: World.TalentIsDrawnAtBirthFromItsDistribution
+330/511 Test #330: World.TalentIsDrawnAtBirthFromItsDistribution .................................   Passed    0.03 sec
+        Start 331: World.LifeDrawingPastItsLimitsIsRefused
+331/511 Test #331: World.LifeDrawingPastItsLimitsIsRefused .......................................   Passed    0.03 sec
+        Start 332: World.KinshipPastItsLimitsIsRefused
+332/511 Test #332: World.KinshipPastItsLimitsIsRefused ...........................................   Passed    0.03 sec
+        Start 333: World.ThePeopleAWorldStartsWithAreBornBeforeItByTheFoundingAge
+333/511 Test #333: World.ThePeopleAWorldStartsWithAreBornBeforeItByTheFoundingAge ................   Passed    0.03 sec
+        Start 334: World.APersonsAgeIsCountedInWholeYearsOfTheCalendar
+334/511 Test #334: World.APersonsAgeIsCountedInWholeYearsOfTheCalendar ...........................   Passed    0.03 sec
+        Start 335: World.PeopleAgeOutUnlessAttainmentExtendsTheirLives
+335/511 Test #335: World.PeopleAgeOutUnlessAttainmentExtendsTheirLives ...........................   Passed    0.06 sec
+        Start 336: World.PeopleTheWorldStartsWithBelongToTheFamilyOfTheirArmy
+336/511 Test #336: World.PeopleTheWorldStartsWithBelongToTheFamilyOfTheirArmy ....................   Passed    0.03 sec
+        Start 337: World.ASoulIsBornAgainIntoAFamilyOfTheSameWorld
+337/511 Test #337: World.ASoulIsBornAgainIntoAFamilyOfTheSameWorld ...............................   Passed    0.09 sec
+        Start 338: World.ASoulServesInTheArmyOfItsLatestBody
+338/511 Test #338: World.ASoulServesInTheArmyOfItsLatestBody .....................................   Passed    0.09 sec
+        Start 339: World.ARebirthContinuesTheWorldInsteadOfResettingIt
+339/511 Test #339: World.ARebirthContinuesTheWorldInsteadOfResettingIt ...........................   Passed    0.15 sec
+        Start 340: World.ASoulBornAgainHasRoomForAnAttackSlot
+340/511 Test #340: World.ASoulBornAgainHasRoomForAnAttackSlot ....................................   Passed    0.09 sec
+        Start 341: World.ASteeredSoulChartsTheCellsWithinItsMapSight
+341/511 Test #341: World.ASteeredSoulChartsTheCellsWithinItsMapSight .............................   Passed    0.03 sec
+        Start 342: World.ASoulKeepsItsChartWhenItIsBornAgain
+342/511 Test #342: World.ASoulKeepsItsChartWhenItIsBornAgain .....................................   Passed    0.09 sec
+        Start 343: World.PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife
+343/511 Test #343: World.PastLivesWidenTheTalentDrawByDisciplineLessWithEachLife .................   Passed    0.03 sec
+        Start 344: World.AVillagesCapIsTheLeastOfItsHousingFoodAndStorage
+344/511 Test #344: World.AVillagesCapIsTheLeastOfItsHousingFoodAndStorage ........................   Passed    0.03 sec
+        Start 345: World.AVillagesHarvestIsWhatItsIntactFieldsYieldPastItsStorage
+345/511 Test #345: World.AVillagesHarvestIsWhatItsIntactFieldsYieldPastItsStorage ................   Passed    0.03 sec
+        Start 346: World.AFieldBlocksNoOneAndATorchBurnsIt
+346/511 Test #346: World.AFieldBlocksNoOneAndATorchBurnsIt .......................................   Passed    0.03 sec
+        Start 347: World.AVillageWithoutAHarvestRunsOutOfFoodAndItsPeopleMove
+347/511 Test #347: World.AVillageWithoutAHarvestRunsOutOfFoodAndItsPeopleMove ....................   Passed    0.04 sec
+        Start 348: World.TheHungryWithNowhereToGoDie
+348/511 Test #348: World.TheHungryWithNowhereToGoDie .............................................   Passed    0.04 sec
+        Start 349: World.ResidentsStrikeHarderWhileASmithyArmingThemStands
+349/511 Test #349: World.ResidentsStrikeHarderWhileASmithyArmingThemStands .......................   Passed    0.03 sec
+        Start 350: World.TheWoundedHealWhileAnApothecaryTendingThemStands
+350/511 Test #350: World.TheWoundedHealWhileAnApothecaryTendingThemStands ........................   Passed    0.04 sec
+        Start 351: World.AStructureLaidByGrowthTakesItsPlansKind
+351/511 Test #351: World.AStructureLaidByGrowthTakesItsPlansKind .................................   Passed    0.03 sec
+        Start 352: World.APressedVillageBuildsWhatItLacksAndRaisesItByRepair
+352/511 Test #352: World.APressedVillageBuildsWhatItLacksAndRaisesItByRepair .....................   Passed    0.06 sec
+        Start 353: World.APressedVillageBuildsOnlyOnBuildableCells
+353/511 Test #353: World.APressedVillageBuildsOnlyOnBuildableCells ...............................   Passed    0.04 sec
+        Start 354: World.APressedVillageBuildsACellClearOfItsClearings
+354/511 Test #354: World.APressedVillageBuildsACellClearOfItsClearings ...........................   Passed    0.04 sec
+        Start 355: World.AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary
+355/511 Test #355: World.AVillagePastItsSelfRelianceBuildsASmithyThenAnApothecary ................   Passed    0.06 sec
+        Start 356: World.APressedVillageFoundsAVillageOnFreeLand
+356/511 Test #356: World.APressedVillageFoundsAVillageOnFreeLand .................................   Passed    0.05 sec
+        Start 357: World.AFoundedVillageNamesTheLandItWasLaidOutOn
+357/511 Test #357: World.AFoundedVillageNamesTheLandItWasLaidOutOn ...............................   Passed    0.04 sec
+        Start 358: World.SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem
+358/511 Test #358: World.SettlersMakeTheirVillageHomeAtAHarvestThatFindsItHoldingThem ............   Passed    0.07 sec
+        Start 359: World.NoVillageIsFoundedNearerThanApartToAnother
+359/511 Test #359: World.NoVillageIsFoundedNearerThanApartToAnother ..............................   Passed    0.06 sec
+        Start 360: World.AVillageKeepsTheTierItReachedAsItsPeopleLeave
+360/511 Test #360: World.AVillageKeepsTheTierItReachedAsItsPeopleLeave ...........................   Passed    0.07 sec
+        Start 361: World.AVillageReachingATierLaysItsSquareKindsAheadOfItsBuilds
+361/511 Test #361: World.AVillageReachingATierLaysItsSquareKindsAheadOfItsBuilds .................   Passed    0.06 sec
+        Start 362: World.ATownLaysTheSquareKindsOfTheVillageTierBelowIt
+362/511 Test #362: World.ATownLaysTheSquareKindsOfTheVillageTierBelowIt ..........................   Passed    0.05 sec
+        Start 363: World.AnUnpressedVillageWhoseStanceOnlyRaidsLaysItsSquareKinds
+363/511 Test #363: World.AnUnpressedVillageWhoseStanceOnlyRaidsLaysItsSquareKinds ................   Passed    0.05 sec
+        Start 364: World.ATempleInRubbleIsRaisedByRepairAndNotLaidAgain
+364/511 Test #364: World.ATempleInRubbleIsRaisedByRepairAndNotLaidAgain ..........................   Passed    0.05 sec
+        Start 365: World.ASquareKindWithNoFreeCornerOnTheSquaresEdgeTakesTheNearest
+365/511 Test #365: World.ASquareKindWithNoFreeCornerOnTheSquaresEdgeTakesTheNearest ..............   Passed    0.04 sec
+        Start 366: World.ASquareKindWithNoSiteIsTriedAgainOnceOneFrees
+366/511 Test #366: World.ASquareKindWithNoSiteIsTriedAgainOnceOneFrees ...........................   Passed    0.05 sec
+        Start 367: World.ATerracedFieldIsRaisedAtTheTerracesShareOfTheLabour
+367/511 Test #367: World.ATerracedFieldIsRaisedAtTheTerracesShareOfTheLabour .....................   Passed    0.03 sec
+        Start 368: World.APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome
+368/511 Test #368: World.APressedVillageRaidsAHostileNeighbourAndItsPartyComesHome ...............   Passed    0.05 sec
+        Start 369: World.EveryPersonServesInTheArmyWhoseRosterHoldsItAsAPartyGoesAndComesHome
+369/511 Test #369: World.EveryPersonServesInTheArmyWhoseRosterHoldsItAsAPartyGoesAndComesHome ....   Passed    0.05 sec
+        Start 370: World.EveryPersonServesInTheArmyWhoseRosterHoldsItAsTheHungryMove
+370/511 Test #370: World.EveryPersonServesInTheArmyWhoseRosterHoldsItAsTheHungryMove .............   Passed    0.04 sec
+        Start 371: World.ABandFightsAFoeInSightThenGoesForTheNearestStandingStructure
+371/511 Test #371: World.ABandFightsAFoeInSightThenGoesForTheNearestStandingStructure ............   Passed    0.07 sec
+        Start 372: World.ABandRuinsAVillageWhoseStructureStandsOnItsClaimsEdge
+372/511 Test #372: World.ABandRuinsAVillageWhoseStructureStandsOnItsClaimsEdge ...................   Passed    0.05 sec
+        Start 373: World.ABandMovesOnThoughOneMemberReachesTheLastStructure
+373/511 Test #373: World.ABandMovesOnThoughOneMemberReachesTheLastStructure ......................   Passed    0.06 sec
+        Start 374: World.NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach
+374/511 Test #374: World.NoVillageRaidsANeighbourAtPeaceOrBeyondItsReach .........................   Passed    0.05 sec
+        Start 375: World.ADeclaredPeaceStopsARaidAndADeclaredWarSendsOne
+375/511 Test #375: World.ADeclaredPeaceStopsARaidAndADeclaredWarSendsOne .........................   Passed    0.05 sec
+        Start 376: World.TheStanceOrdersTheChoicesAndTheCapAndNeighboursDecideThem
+376/511 Test #376: World.TheStanceOrdersTheChoicesAndTheCapAndNeighboursDecideThem ...............   Passed    0.07 sec
+        Start 377: World.GrowthPastItsLimitsIsRefused
+377/511 Test #377: World.GrowthPastItsLimitsIsRefused ............................................   Passed    0.03 sec
+        Start 378: World.GrowthKeepingMoreThanAVillagesWindowHoldsIsRefused
+378/511 Test #378: World.GrowthKeepingMoreThanAVillagesWindowHoldsIsRefused ......................   Passed    0.03 sec
+        Start 379: World.AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn
+379/511 Test #379: World.AVillagesHouseholdsStartAsMarriedCouplesOfFamiliesOfTheirOwn ............   Passed    0.03 sec
+        Start 380: World.RefusesMoreHouseholdsThanItsResidentsPairInto
+380/511 Test #380: World.RefusesMoreHouseholdsThanItsResidentsPairInto ...........................   Passed    0.03 sec
+        Start 381: World.ASectAdmitsItsFactionsPeopleWithinReachUpToItsCap
+381/511 Test #381: World.ASectAdmitsItsFactionsPeopleWithinReachUpToItsCap .......................   Passed    0.05 sec
+        Start 382: World.ASectAdmitsNoOneBelowItsThresholdsBeyondReachOrOfAnotherFaction
+382/511 Test #382: World.ASectAdmitsNoOneBelowItsThresholdsBeyondReachOrOfAnotherFaction .........   Passed    0.09 sec
+        Start 383: World.ALostSeatCapsItsSectAtNothingAndKeepsItsMembers
+383/511 Test #383: World.ALostSeatCapsItsSectAtNothingAndKeepsItsMembers .........................   Passed    0.04 sec
+        Start 384: World.AMemberServingAnotherFactionLeavesItsSect
+384/511 Test #384: World.AMemberServingAnotherFactionLeavesItsSect ...............................   Passed    0.03 sec
+        Start 385: World.EldersAreTheShareOfMembersOfHighestAttainment
+385/511 Test #385: World.EldersAreTheShareOfMembersOfHighestAttainment ...........................   Passed    0.03 sec
+        Start 386: World.AFallenSectScattersOrLosesItsManuals
+386/511 Test #386: World.AFallenSectScattersOrLosesItsManuals ....................................   Passed    0.04 sec
+        Start 387: World.AnElectionMakesTheMasterLeaderWhenNoOneLeads
+387/511 Test #387: World.AnElectionMakesTheMasterLeaderWhenNoOneLeads ............................   Passed    0.03 sec
+        Start 388: World.AFactionReadsAsElectingOnlyWithAnElection
+388/511 Test #388: World.AFactionReadsAsElectingOnlyWithAnElection ...............................   Passed    0.03 sec
+        Start 389: World.OnlyAFactionWithADuelPassesItsLeadByDuel
+389/511 Test #389: World.OnlyAFactionWithADuelPassesItsLeadByDuel ................................   Passed    0.03 sec
+        Start 390: World.AnApplicantJoinsAtOnceByTheAdmissionsThresholdsWithoutItsChance
+390/511 Test #390: World.AnApplicantJoinsAtOnceByTheAdmissionsThresholdsWithoutItsChance .........   Passed    0.04 sec
+        Start 391: World.AnApplicationIsRefusedForEachReasonApplyRefusesIt
+391/511 Test #391: World.AnApplicationIsRefusedForEachReasonApplyRefusesIt .......................   Passed    0.03 sec
+        Start 392: World.EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened
+392/511 Test #392: World.EveryDeathAndRebirthIsRecordedWhereAndWhenItHappened ....................   Passed    0.09 sec
+        Start 393: World.ASectsFallIsRecordedOnceWhenItsLastMemberLeaves
+393/511 Test #393: World.ASectsFallIsRecordedOnceWhenItsLastMemberLeaves .........................   Passed    0.04 sec
+        Start 394: World.ALeadChangingHandsIsRecordedAndARenewedOneIsNot
+394/511 Test #394: World.ALeadChangingHandsIsRecordedAndARenewedOneIsNot .........................   Passed    0.13 sec
+        Start 395: World.VillagesFoundedRaidedAndRuinedAreRecorded
+395/511 Test #395: World.VillagesFoundedRaidedAndRuinedAreRecorded ...............................   Passed    0.19 sec
+        Start 396: World.TheWorldKeepsItsLatestEventsUpToItsCapacity
+396/511 Test #396: World.TheWorldKeepsItsLatestEventsUpToItsCapacity .............................   Passed    0.03 sec
+        Start 397: World.ARumourReachOutsideItsLimitsIsRefused
+397/511 Test #397: World.ARumourReachOutsideItsLimitsIsRefused ...................................   Passed    0.03 sec
+        Start 398: World.ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse
+398/511 Test #398: World.ARumourReachesThoseNearItItsFactionAndItsKinAndNoOneElse ................   Passed    0.03 sec
+        Start 399: World.AnArmyMakesTheVillageItNamesItsMembersHome
+399/511 Test #399: World.AnArmyMakesTheVillageItNamesItsMembersHome ..............................   Passed    0.03 sec
+        Start 400: World.ACastAtAPersonLandsOnThatPersonInPlaceOfTheNearest
+400/511 Test #400: World.ACastAtAPersonLandsOnThatPersonInPlaceOfTheNearest ......................   Passed    0.03 sec
+        Start 401: World.ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt
+401/511 Test #401: World.ACastAtAPointBeyondRangeLandsAtTheRangeTowardIt .........................   Passed    0.03 sec
+        Start 402: World.TickCountIsTheTickACooldownIsCountedAgainst
+402/511 Test #402: World.TickCountIsTheTickACooldownIsCountedAgainst .............................   Passed    0.03 sec
+        Start 403: World.ACastAtItselfCentresItsDiscOnTheCaster
+403/511 Test #403: World.ACastAtItselfCentresItsDiscOnTheCaster ..................................   Passed    0.03 sec
+        Start 404: World.AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind
+404/511 Test #404: World.AnArcSweepsEveryFoeAheadWithinArmsLengthAndNoneBehind ...................   Passed    0.03 sec
+        Start 405: World.AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther
+405/511 Test #405: World.AnArcSweepsAsFarAsItsHalfWidthEitherSideAndNoFurther ....................   Passed    0.03 sec
+        Start 406: World.ALineHitsEveryFoeAlongItWithinItsLength
+406/511 Test #406: World.ALineHitsEveryFoeAlongItWithinItsLength .................................   Passed    0.03 sec
+        Start 407: World.AnArcAndALineReachTheStructuresTheyCover
+407/511 Test #407: World.AnArcAndALineReachTheStructuresTheyCover ................................   Passed    0.03 sec
+        Start 408: World.ASelfSkillLandsAroundItsUserWhereverItIsCast
+408/511 Test #408: World.ASelfSkillLandsAroundItsUserWhereverItIsCast ............................   Passed    0.03 sec
+        Start 409: World.ATargetedSkillHitsThePersonItLocksOnAlone
+409/511 Test #409: World.ATargetedSkillHitsThePersonItLocksOnAlone ...............................   Passed    0.03 sec
+        Start 410: World.NoShapeStrikesAnAlly
+410/511 Test #410: World.NoShapeStrikesAnAlly ....................................................   Passed    0.04 sec
+        Start 411: World.EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck
+411/511 Test #411: World.EachUseIsRecordedWithItsShapeReachOriginDirectionAndStruck ..............   Passed    0.03 sec
+        Start 412: World.ASkillsShapeChangesTheHash
+412/511 Test #412: World.ASkillsShapeChangesTheHash ..............................................   Passed    0.03 sec
+        Start 413: World.APersonClosesOnAFoeInSightAndStandsToFightIt
+413/511 Test #413: World.APersonClosesOnAFoeInSightAndStandsToFightIt ............................   Passed    0.03 sec
+        Start 414: World.AttackersStandOnDistinctSlotsAroundTheirFoe
+414/511 Test #414: World.AttackersStandOnDistinctSlotsAroundTheirFoe .............................   Passed    0.06 sec
+        Start 415: World.AttackersOnTheirSlotsStayOverlappedNoLongerThanHalfASecond
+415/511 Test #415: World.AttackersOnTheirSlotsStayOverlappedNoLongerThanHalfASecond ..............   Passed    0.10 sec
+        Start 416: World.PeopleSeekingSlotsRoundDifferentFoesKeepTheSeparation
+416/511 Test #416: World.PeopleSeekingSlotsRoundDifferentFoesKeepTheSeparation ...................   Passed    0.04 sec
+        Start 417: World.AttackersTakeTheSameSlotsWhicheverArmyIsListedFirst
+417/511 Test #417: World.AttackersTakeTheSameSlotsWhicheverArmyIsListedFirst .....................   Passed    0.07 sec
+        Start 418: World.APersonOfferedNoSlotClosesOnTheFoeAndFightsItInReach
+418/511 Test #418: World.APersonOfferedNoSlotClosesOnTheFoeAndFightsItInReach ....................   Passed    0.07 sec
+        Start 419: World.AtMostTheFoesTokensStrikeItOnAnyTick
+419/511 Test #419: World.AtMostTheFoesTokensStrikeItOnAnyTick ....................................   Passed    0.08 sec
+        Start 420: World.OneHoldingNoTokenStrikesNotThoughTheFoeIsInItsReach
+420/511 Test #420: World.OneHoldingNoTokenStrikesNotThoughTheFoeIsInItsReach .....................   Passed    0.06 sec
+        Start 421: World.ThePlayerAsAFoeIsCappedByItsOwnTokens
+421/511 Test #421: World.ThePlayerAsAFoeIsCappedByItsOwnTokens ...................................   Passed    0.08 sec
+        Start 422: World.TheSteeredTakesATokenTheNPCsHoldFromTheLastToTakeOne
+422/511 Test #422: World.TheSteeredTakesATokenTheNPCsHoldFromTheLastToTakeOne ....................   Passed    0.06 sec
+        Start 423: World.ARetargetOrAnEndedIntentFreesTheToken
+423/511 Test #423: World.ARetargetOrAnEndedIntentFreesTheToken ...................................   Passed    0.06 sec
+        Start 424: World.AnAreaUseStillHitsAWaiterInItsShape
+424/511 Test #424: World.AnAreaUseStillHitsAWaiterInItsShape .....................................   Passed    0.06 sec
+        Start 425: World.AHoldersDeathGivesTheHeadOfTheQueueItsTokenWithinATick
+425/511 Test #425: World.AHoldersDeathGivesTheHeadOfTheQueueItsTokenWithinATick ..................   Passed    0.03 sec
+        Start 426: World.ANewcomerTurnsToAFoeWithAFreeTokenBeforeANearerOneWithout
+426/511 Test #426: World.ANewcomerTurnsToAFoeWithAFreeTokenBeforeANearerOneWithout ...............   Passed    0.06 sec
+        Start 427: World.NoSlotLiesOnABlockedCell
+427/511 Test #427: World.NoSlotLiesOnABlockedCell ................................................   Passed    0.07 sec
+        Start 428: World.AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies
+428/511 Test #428: World.AnAttackIntentClosesOnItsTargetAndStrikesItUntilItDies ..................   Passed    0.05 sec
+        Start 429: World.AMoveOrderGivenDuringAnIntentReachesItsCell
+429/511 Test #429: World.AMoveOrderGivenDuringAnIntentReachesItsCell .............................   Passed    0.05 sec
+        Start 430: World.EndingAnIntentHoldsTheArmyWhereItsLeadStands
+430/511 Test #430: World.EndingAnIntentHoldsTheArmyWhereItsLeadStands ............................   Passed    0.05 sec
+        Start 431: World.AnAttackIntentStepsRoundACornerShuttingItsDiagonal
+431/511 Test #431: World.AnAttackIntentStepsRoundACornerShuttingItsDiagonal ......................   Passed    0.03 sec
+        Start 432: World.AnOrderWithoutATargetEndsTheAttackIntent
+432/511 Test #432: World.AnOrderWithoutATargetEndsTheAttackIntent ................................   Passed    0.03 sec
+        Start 433: World.AnAttackIntentEndsWhenItsTargetLeavesSight
+433/511 Test #433: World.AnAttackIntentEndsWhenItsTargetLeavesSight ..............................   Passed    0.04 sec
+        Start 434: World.AnArmyMayTargetOnlyALivingFoeInSight
+434/511 Test #434: World.AnArmyMayTargetOnlyALivingFoeInSight ....................................   Passed    0.03 sec
+        Start 435: World.FoesInSightAreListedNearestFirst
+435/511 Test #435: World.FoesInSightAreListedNearestFirst ........................................   Passed    0.03 sec
+        Start 436: World.RememberedBordersKeepTheLastSeenClaimCentreUntilSeenAgain
+436/511 Test #436: World.RememberedBordersKeepTheLastSeenClaimCentreUntilSeenAgain ...............   Passed    0.07 sec
+        Start 437: World.AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets
+437/511 Test #437: World.AtHomeAPersonDefendsItsClaimAndOnTheMarchFightsWhatItMeets ..............   Passed    0.04 sec
+        Start 438: World.ASteeredBodyDoesNotCloseOnAFoe
+438/511 Test #438: World.ASteeredBodyDoesNotCloseOnAFoe ..........................................   Passed    0.03 sec
+        Start 439: World.ACastIsRefusedWithItsReason
+439/511 Test #439: World.ACastIsRefusedWithItsReason .............................................   Passed    0.03 sec
+        Start 440: World.ACastByOrAtTheDeadIsRefused
+440/511 Test #440: World.ACastByOrAtTheDeadIsRefused .............................................   Passed    0.03 sec
+        Start 441: World.AnNpcCastsThroughTheSameFunction
+441/511 Test #441: World.AnNpcCastsThroughTheSameFunction ........................................   Passed    0.03 sec
+        Start 442: World.ALaterCastBeforeTheTickReplacesTheFirst
+442/511 Test #442: World.ALaterCastBeforeTheTickReplacesTheFirst .................................   Passed    0.03 sec
+        Start 443: World.ACastNoLongerAllowedOnItsTickLapses
+443/511 Test #443: World.ACastNoLongerAllowedOnItsTickLapses .....................................   Passed    0.03 sec
+        Start 444: World.CastsReplayToTheSameHash
+444/511 Test #444: World.CastsReplayToTheSameHash ................................................   Passed    0.04 sec
+        Start 445: World.APendingCastIsPartOfTheHash
+445/511 Test #445: World.APendingCastIsPartOfTheHash .............................................   Passed    0.03 sec
+        Start 446: World.AimTakesTheNearestFoeAheadOfTheFacing
+446/511 Test #446: World.AimTakesTheNearestFoeAheadOfTheFacing ...................................   Passed    0.03 sec
+        Start 447: World.QiCapacityGrowsADayUpToItsLimitAndQiRecovers
+447/511 Test #447: World.QiCapacityGrowsADayUpToItsLimitAndQiRecovers ............................   Passed    0.03 sec
+        Start 448: World.ThePeopleAWorldStartsWithCultivatedForTheirFoundingAge
+448/511 Test #448: World.ThePeopleAWorldStartsWithCultivatedForTheirFoundingAge ..................   Passed    0.03 sec
+        Start 449: World.ARealmIsHowManyRealmsTheQiCapacityReaches
+449/511 Test #449: World.ARealmIsHowManyRealmsTheQiCapacityReaches ...............................   Passed    0.04 sec
+        Start 450: World.QiDataPastItsLimitsIsRefused
+450/511 Test #450: World.QiDataPastItsLimitsIsRefused ............................................   Passed    0.03 sec
+        Start 451: World.AManualOnACellTeachesWhatItsReadersRealmAllowsAndStays
+451/511 Test #451: World.AManualOnACellTeachesWhatItsReadersRealmAllowsAndStays ..................   Passed    0.04 sec
+        Start 452: World.ReadingSpendsQiAndTeachesOnlyUpToTheReadersRealm
+452/511 Test #452: World.ReadingSpendsQiAndTeachesOnlyUpToTheReadersRealm ........................   Passed    0.04 sec
+        Start 453: World.AnArtOfAnotherNatureCostsMoreToRead
+453/511 Test #453: World.AnArtOfAnotherNatureCostsMoreToRead .....................................   Passed    0.04 sec
+        Start 454: World.AnArtsAgreementAndRealmAreReadAsTheReaderLearnsBy
+454/511 Test #454: World.AnArtsAgreementAndRealmAreReadAsTheReaderLearnsBy .......................   Passed    0.03 sec
+        Start 455: World.ARealmsMightAndAnArtsNatureScaleItsDamage
+455/511 Test #455: World.ARealmsMightAndAnArtsNatureScaleItsDamage ...............................   Passed    0.08 sec
+        Start 456: World.EachArtSkillKeepsItsOwnCooldown
+456/511 Test #456: World.EachArtSkillKeepsItsOwnCooldown .........................................   Passed    0.04 sec
+        Start 457: World.ACastIsRefusedForLackOfQi
+457/511 Test #457: World.ACastIsRefusedForLackOfQi ...............................................   Passed    0.04 sec
+        Start 458: World.AUseSpendsItsSkillsQi
+458/511 Test #458: World.AUseSpendsItsSkillsQi ...................................................   Passed    0.04 sec
+        Start 459: World.ThoseWhoKnowAnArtStrikeWithItUnbidden
+459/511 Test #459: World.ThoseWhoKnowAnArtStrikeWithItUnbidden ...................................   Passed    0.06 sec
+        Start 460: World.ARealmGainedComprehendsASkillOfAnArtItKnows
+460/511 Test #460: World.ARealmGainedComprehendsASkillOfAnArtItKnows .............................   Passed    0.07 sec
+        Start 461: World.ASectTeachesItsArtsWithinItsMembersAndEldersRealms
+461/511 Test #461: World.ASectTeachesItsArtsWithinItsMembersAndEldersRealms ......................   Passed    0.04 sec
+        Start 462: World.EveryRealmGainedAndSkillReadFromAManualIsRecorded
+462/511 Test #462: World.EveryRealmGainedAndSkillReadFromAManualIsRecorded .......................   Passed    0.04 sec
+        Start 463: World.ASkillComprehendedIsRecordedAsComprehended
+463/511 Test #463: World.ASkillComprehendedIsRecordedAsComprehended ..............................   Passed    0.06 sec
+        Start 464: World.ASkillTaughtIsRecordedAsTaught
+464/511 Test #464: World.ASkillTaughtIsRecordedAsTaught ..........................................   Passed    0.04 sec
+        Start 465: World.ProgressKeepsTheLatestStepsApartFromTheEvents
+465/511 Test #465: World.ProgressKeepsTheLatestStepsApartFromTheEvents ...........................   Passed    0.03 sec
+        Start 466: World.ProgressShortOfItsCapacityKeepsEveryStep
+466/511 Test #466: World.ProgressShortOfItsCapacityKeepsEveryStep ................................   Passed    0.03 sec
+        Start 467: World.KnownSkillsAndQiArePartOfTheHash
+467/511 Test #467: World.KnownSkillsAndQiArePartOfTheHash ........................................   Passed    0.04 sec
+        Start 468: World.APersonTalksToAnyoneWithinTheTalkReachWhoIsNotHostile
+468/511 Test #468: World.APersonTalksToAnyoneWithinTheTalkReachWhoIsNotHostile ...................   Passed    0.03 sec
+        Start 469: World.AHostileFactionsPersonRefusesToTalk
+469/511 Test #469: World.AHostileFactionsPersonRefusesToTalk .....................................   Passed    0.03 sec
+        Start 470: World.APersonOfAFactionAtWarRefusesToTalk
+470/511 Test #470: World.APersonOfAFactionAtWarRefusesToTalk .....................................   Passed    0.03 sec
+        Start 471: World.APersonTalksToTheNearestItMayTalkToOrMeetAsAFoe
+471/511 Test #471: World.APersonTalksToTheNearestItMayTalkToOrMeetAsAFoe .........................   Passed    0.03 sec
+        Start 472: World.TheDeadDoNotTalk
+472/511 Test #472: World.TheDeadDoNotTalk ........................................................   Passed    0.03 sec
+        Start 473: World.TheDeadOfferNoNews
+473/511 Test #473: World.TheDeadOfferNoNews ......................................................   Passed    0.03 sec
+        Start 474: World.NoOneIsTalkedToWhenNoneMayBe
+474/511 Test #474: World.NoOneIsTalkedToWhenNoneMayBe ............................................   Passed    0.03 sec
+        Start 475: World.ATalkReachOutsideItsLimitsIsRefused
+475/511 Test #475: World.ATalkReachOutsideItsLimitsIsRefused .....................................   Passed    0.03 sec
+        Start 476: World.APersonSellsTheWaresOfItsOccupation
+476/511 Test #476: World.APersonSellsTheWaresOfItsOccupation .....................................   Passed    0.03 sec
+        Start 477: World.AVillagesPeopleTakeOccupationsFromItsStandingBuildings
+477/511 Test #477: World.AVillagesPeopleTakeOccupationsFromItsStandingBuildings ..................   Passed    0.03 sec
+        Start 478: World.NoOneSellsWithoutATrade
+478/511 Test #478: World.NoOneSellsWithoutATrade .................................................   Passed    0.03 sec
+        Start 479: World.ABuyerPaysTheSellerForTheWareItHolds
+479/511 Test #479: World.ABuyerPaysTheSellerForTheWareItHolds ....................................   Passed    0.03 sec
+        Start 480: World.APurchaseIsRefusedForItsFirstReason
+480/511 Test #480: World.APurchaseIsRefusedForItsFirstReason .....................................   Passed    0.03 sec
+        Start 481: World.TheDeadNeitherSellNorBuy
+481/511 Test #481: World.TheDeadNeitherSellNorBuy ................................................   Passed    0.03 sec
+        Start 482: World.AHerbRestoresHealthUpToANewbornsAndNoFurther
+482/511 Test #482: World.AHerbRestoresHealthUpToANewbornsAndNoFurther ............................   Passed    0.03 sec
+        Start 483: World.AHerbIsRefusedAtFullHealth
+483/511 Test #483: World.AHerbIsRefusedAtFullHealth ..............................................   Passed    0.03 sec
+        Start 484: World.APillRestoresQiUpToTheStoreAndIsRefusedWhenFull
+484/511 Test #484: World.APillRestoresQiUpToTheStoreAndIsRefusedWhenFull .........................   Passed    0.03 sec
+        Start 485: World.ThoseNoDriverSteersBuyADayAndConsumeWhenWounded
+485/511 Test #485: World.ThoseNoDriverSteersBuyADayAndConsumeWhenWounded .........................   Passed    0.03 sec
+        Start 486: World.ThoseWithAHomeEarnAWageADay
+486/511 Test #486: World.ThoseWithAHomeEarnAWageADay .............................................   Passed    0.03 sec
+        Start 487: World.ABuyerBuysFromTheFirstSellerByIndexInReachNotTheNearest
+487/511 Test #487: World.ABuyerBuysFromTheFirstSellerByIndexInReachNotTheNearest .................   Passed    0.03 sec
+        Start 488: World.SilverAndWaresHeldArePartOfTheHash
+488/511 Test #488: World.SilverAndWaresHeldArePartOfTheHash ......................................   Passed    0.03 sec
+        Start 489: World.ATradeOutsideItsLimitsIsRefused
+489/511 Test #489: World.ATradeOutsideItsLimitsIsRefused .........................................   Passed    0.03 sec
+        Start 490: World.AResidentWalksToItsWorkplaceInItsWorkBandAndWorksThere
+490/511 Test #490: World.AResidentWalksToItsWorkplaceInItsWorkBandAndWorksThere ..................   Passed    0.06 sec
+        Start 491: World.AtNightEachHouseholdIsAtHomeInTheFirstHouseWithRoomForIt
+491/511 Test #491: World.AtNightEachHouseholdIsAtHomeInTheFirstHouseWithRoomForIt ................   Passed    0.04 sec
+        Start 492: World.AFarmerWorksOnItsFieldsOwnCells
+492/511 Test #492: World.AFarmerWorksOnItsFieldsOwnCells .........................................   Passed    0.06 sec
+        Start 493: World.AnIdlePersonWandersEveryHourOnlyWhileAwake
+493/511 Test #493: World.AnIdlePersonWandersEveryHourOnlyWhileAwake ..............................   Passed    0.08 sec
+        Start 494: World.NoneButAnUnsteeredVillagesResidentsBoundForItsCentreFollow
+494/511 Test #494: World.NoneButAnUnsteeredVillagesResidentsBoundForItsCentreFollow ..............   Passed    0.12 sec
+        Start 495: World.ResidentsChasingAnAttackIntentFollowNoSchedule
+495/511 Test #495: World.ResidentsChasingAnAttackIntentFollowNoSchedule ..........................   Passed    0.05 sec
+        Start 496: World.AWalkToWorkGoesRoundAWallByItsPlacesField
+496/511 Test #496: World.AWalkToWorkGoesRoundAWallByItsPlacesField ...............................   Passed    0.10 sec
+        Start 497: World.ClosingOnAFoeOverridesTheSchedule
+497/511 Test #497: World.ClosingOnAFoeOverridesTheSchedule .......................................   Passed    0.07 sec
+        Start 498: World.EveryPlacesFieldIsBuiltAsTheWorldIsCreatedAtThreeBytesACell
+498/511 Test #498: World.EveryPlacesFieldIsBuiltAsTheWorldIsCreatedAtThreeBytesACell .............   Passed    0.10 sec
+        Start 499: World.ResidentsComingOfAgeAtTheDaysRulesGoToWorkThatDay
+499/511 Test #499: World.ResidentsComingOfAgeAtTheDaysRulesGoToWorkThatDay .......................   Passed    0.15 sec
+        Start 500: World.SmithsWhoseSmithyFallsMidDayGoToTheSquare
+500/511 Test #500: World.SmithsWhoseSmithyFallsMidDayGoToTheSquare ...............................   Passed    0.14 sec
+        Start 501: World.AResidentConscriptedAwayLeavesItsHouseToBeFilledAgain
+501/511 Test #501: World.AResidentConscriptedAwayLeavesItsHouseToBeFilledAgain ...................   Passed    0.07 sec
+        Start 502: World.AnUnchangedNightFindsNoLodgingOrErrandAgain
+502/511 Test #502: World.AnUnchangedNightFindsNoLodgingOrErrandAgain .............................   Passed    0.10 sec
+        Start 503: World.ResidentsChangeBandWakeAndFallAsleepAtTheirOwnPhase
+503/511 Test #503: World.ResidentsChangeBandWakeAndFallAsleepAtTheirOwnPhase .....................   Passed    0.09 sec
+        Start 504: World.ResidentsKeepTheirOwnPhaseWithinAnHourOfAShortDay
+504/511 Test #504: World.ResidentsKeepTheirOwnPhaseWithinAnHourOfAShortDay .......................   Passed    0.04 sec
+        Start 505: World.AMarriageFindsItsCouplesLodgingsAgain
+505/511 Test #505: World.AMarriageFindsItsCouplesLodgingsAgain ...................................   Passed    0.13 sec
+        Start 506: World.ADeathAwayFindsItsSpousesLodgingAgain
+506/511 Test #506: World.ADeathAwayFindsItsSpousesLodgingAgain ...................................   Passed    0.07 sec
+        Start 507: World.AFollowerOutsideItsVillagesWindowWalksInByItsArmysField
+507/511 Test #507: World.AFollowerOutsideItsVillagesWindowWalksInByItsArmysField .................   Passed    0.11 sec
+        Start 508: World.AStructureGivenToAVillageRebuildsItsFieldsInTheTickItIsLaid
+508/511 Test #508: World.AStructureGivenToAVillageRebuildsItsFieldsInTheTickItIsLaid .............   Passed    0.15 sec
+        Start 509: World.AStructureLaidOnAnotherVillagesWindowRebuildsItsFields
+509/511 Test #509: World.AStructureLaidOnAnotherVillagesWindowRebuildsItsFields ..................   Passed    0.19 sec
+        Start 510: World.AStructureGivenToAVillageOutsideItsWindowRebuildsItsFields
+510/511 Test #510: World.AStructureGivenToAVillageOutsideItsWindowRebuildsItsFields ..............   Passed    0.11 sec
+        Start 511: World.APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule
+511/511 Test #511: World.APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule ............   Passed    0.06 sec
+
+100% tests passed out of 511
+
+Total Test time (real) = 1244.15 sec
+ctest ran the tests selected by: every GoogleTest case gtest_discover_tests registers in core/CMakeLists.txt
+godot --headless --path . --script res://run_tests.gd -- $(git ls-files --cached --others --exclude-standard -- '*_test.gd' | sed 's|^|res://|')
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+run_tests: the tests write to /var/folders/fd/dntqs4gj6vn043d8ldqskc4w0000gn/T/murim_tests-20261019164231382447
+selout_test: 28 sheets and 3 bodies, 34901 edge pixels, faults []; the house with its edge in ink: 829 of 932 edge pixels refused; the orthodox body with one edge pixel by the face in skin: 1 refused: pass
+export_presets_test: release presets ["Android", "macOS", "Windows", "Linux"], packed with no test, probe, tool or test helper, faults []; the Android bench pack holds world_view/frame_bench_tool.gd true (setup true): pass
+body_view_test: the struck at flash 1.00, knocked (2.0, 0.0), wound 1, numbers ["60"], at (1, 0); the striker at flash 0.00, knocked (0.0, 0.0), wound 0: pass
+body_view_test: in view 2 drawn as 4 sprites, named [1] at [2.0] cells; elsewhere 0 drawn as 0 sprites, named []: pass
+body_view_test: the hit showed flash and numbers [1.0, 1]; begun again [0.0, 0, 0, -1]: pass
+body_view_test: drawn a quarter of the way along half a pixel, at scale 1 the lead at (8.0, 6.0) and sprites at x [8.0, 8.0]; at scale 4 the lead at (8.25, 6.0) and sprites at x [8.25, 8.25]: pass
+body_view_test: drawn on the use's tick [["swing", "recoil"], ["lunge", "recoil"], ["throw", "recoil"], ["cast", "recoil"], ["mend", "idle"], ["torch", "idle"]]; with no use ["idle", "idle"]; faults []: pass
+body_view_test: a loss to an art's use rises in 9ac4cd, to a use of no art in efe5c9, the player's own in d6422e: pass
+body_view_test: in a crowd the uses shown and shaped, the first steered [4, [true, true, true, false]], no one steered [4, [false, false, false, false]]: pass
+cast_test: the bolt aims east at 1, west at 3; the idle skill east at -1: pass
+ERROR: WorldAdapter.cast: a target must be a Vector2 point, an int person or null
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/cast_test.gd:36)
+       [1] _init (res://run_tests.gd:22)
+cast_test: tick_count 0 before the cast's tick and 1 after, the caster ready at 31: pass
+ERROR: WorldAdapter.cast: a cast must come from a living person, ready on the next tick, of a skill its army has, at a living person within its range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/cast_test.gd:44)
+       [1] _init (res://run_tests.gd:22)
+cast_test: at a person true, the far foe at 990 and the near at 1000; out of range 6, on cooldown 3: pass
+cast_test: past the range the far foe at 990; at itself the one behind at 995, the caster at 1000: pass
+ERROR: WorldAdapter.order: a challenge must name a faction that passes its lead by duel and has a leader, from an army whose lead may challenge it, outside a duel
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/challenge_test.gd:33)
+       [1] _init (res://run_tests.gd:22)
+challenge_test: outsider refused true for 4; member may true; duel { "challenger": 1, "leader": 0 }; after 2000 ticks the Cult's leader is 1 (challenger 1), the old leader's health 0, its ally hostile true: pass
+challenge_test: a losing challenger leaves leader 0, its army 0 strong: pass
+ERROR: WorldAdapter.declare: a declaration must come from a living faction's leader, toward another faction, change how the two stand and come after the last has held
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/declaration_test.gd:22)
+       [1] _init (res://run_tests.gd:22)
+declaration_test: allied at first true; a member refused 2, declare() refusing true; the leader may true and declares true, read back { "what": 0, "by": 0, "tick": 0, "year": 1, "season": 0 }: pass
+declaration_test: the region's player army 10 steered true, no other true; steer() marks army 0 true: pass
+ERROR: WorldAdapter.load: the slot holds no save
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:52)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: the slot holds no save of this game
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:60)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.save: only a world made by create_region() is saved
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:64)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: the slot holds no save
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/file_saves_test.gd:64)
+       [1] _init (res://run_tests.gd:22)
+file_saves_test: player army 9 of 11 armies, grown past it true; saved true, loaded with the same hash, player, villages, terrain, date and seed true; the same after 1000 more ticks true; another region saved true and loaded as itself true; an empty slot refused as missing true; a saved slot read true and other bytes refused as not a save true; a world without a region refused true; the game's slot 0 untouched true: pass
+talk_test: person 0 within the reach 0, person 2 beyond it 3, the player itself 2; person 0 offers [0, 1]; the core names person 1 to talk to, none nearer true: pass
+trade_test: person 0 offers [0, 1]; the player paid 10 of 30 silver for a herb, holds [1, 0]; the pill 4, a herb at full health 3, a pill held by none 2; person 1, who sells no herb, 3: pass
+world_adapter_test: 2000 ticks, 2 armies, 2 structures; core hash 8179732412782460443, adapter hash 8179732412782460443 for seed 42, -7593464140826828369 for seed 43: pass
+world_adapter_test: 12 people through the adapter, 12 from the core, 12 for seed 43; positions and health equal: pass
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: separation, rumour and talk reach, sight, range and radius must lie in [0, MAX_REACH], hostility must be square, attack tokens must be valid, the world must hold at most its rules' capacity of people, itself at most PEOPLE_CEILING, each with health up to MAX_HEALTH on a passable cell, every army must have skills within MAX_BODY_DAMAGE and MAX_COOLDOWN and a known faction, and every structure must cover 1 to MAX_FOOTPRINT cells along each side, all passable and covered by no other structure
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is out of range
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: health is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: cooldown is missing or of the wrong type
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create: stage_floors must hold three ints
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] run (res://extension/world_adapter_test.gd:105)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: valid scenario accepted true; 7 of 7 invalid scenarios refused: pass
+ERROR: WorldAdapter.create_region: the day must last a positive number of ticks and the village be no negative index
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:117)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create_region: the day must last a positive number of ticks and the village be no negative index
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:117)
+       [1] _init (res://run_tests.gd:22)
+world_adapter_test: a region of five-tick days accepted true, on day 2 after five ticks from day 1; days of 0 and -1 ticks refused: pass
+ERROR: WorldAdapter.create_region: the region has no such village
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:124)
+       [1] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.create_region: the day must last a positive number of ticks and the village be no negative index
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] run (res://extension/world_adapter_test.gd:124)
+       [1] _init (res://run_tests.gd:22)
+world_adapter_test: villages 9 and -1 of 9 refused, village 8 accepted: pass
+world_adapter_test: five-tick days read 5 ticks a day, the tick [0, 3, 0] over five ticks; the default day reads 1800: pass
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _orders_pass (res://extension/world_adapter_test.gd:622)
+       [1] run (res://extension/world_adapter_test.gd:144)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: ordered person accepted true, moved true, camp left 0 of 10; unordered moved false, camp left 10; order for a missing skill refused true: pass
+ERROR: WorldAdapter.create: shape names no shape
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _create (res://extension/world_adapter_test.gd:658)
+       [1] _reads_pass (res://extension/world_adapter_test.gd:598)
+       [2] run (res://extension/world_adapter_test.gd:145)
+       [3] _init (res://run_tests.gd:22)
+world_adapter_test: factions 0, 1; strengths 1200, 1010, bodies 1200; no region from create true; region of 16384 cells: terrain ["plain", "forest", "hills", "water", "mountain"] agrees with blocked cells true, each village's centre in its owner's territory and some cell in none true, 9 villages, person's faction 0, first village's 0; created footprint (1, 1), region footprints [(5, 3), (2, 2), (5, 4), (3, 3), (1, 1), (3, 2), (5, 1), (4, 3), (6, 4), (3, 1)], 97 of 97 structures inside a village: pass
+world_adapter_test: structure kinds: created "", M1 barrels, region ["hall", "well", "temple", "inn", "house", "barrels", "granary", "storehouse", "fence", "field", "manual_hall", "training_ground", "seat_gate"], first village village; skills read back true: pass
+world_adapter_test: born into village 1 of faction 1, after 600 ticks 103 of 103 region structures intact; the torch beside a structure no village holds breaks it true: pass
+world_adapter_test: the player's body is 이 은비 (Lee Eunbi) of family 10, spouse -1, 0 parents, 0 children; names() holds 24 surnames and 24 given names, every one of 21 people's among them true; a created world names no one true, its names() empty true: pass
+world_adapter_test: 10 villages, first with 3 people under a cap of 50 and 6000 food, 5997 a day later: pass
+world_adapter_test: 3 sects, first Hwasan of faction 0 seated in village 7 with gate 88, members [14, 15], elders [14], master 14, cap 20; manuals [{ "art": 0, "place": "sect", "sect": 0 }, { "art": 1, "place": "sect", "sect": 1 }, { "art": 2, "place": "sect", "sect": 2 }]; player's sect -1; electing factions ["Orthodox"], dueling ["Demonic"]; a world from create has 0 sects and 0 of 2 factions electing or dueling: pass
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:737)
+       [1] run (res://extension/world_adapter_test.gd:154)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.apply: an applicant must meet its faction's admission and the sect have room
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _play_loop_pass (res://extension/world_adapter_test.gd:751)
+       [1] run (res://extension/world_adapter_test.gd:154)
+       [2] _init (res://run_tests.gd:22)
+world_adapter_test: the Cult player may apply to sect 1 true, joins true, is refused again true; the Unorthodox player refused by sect 2 as unproven true (setup true); 4 rumours after ten years, newest first, within the map and 4 of them naming the born or the dead rightly true, the first { "sequence": 15, "tick": 5010, "cell": (73, 96), "kind": "born", "person": 36 }; disciplines ["sword", "saber", "fist", "hidden weapons", "medicine"], master 14 attained [0, 0, 0, 0, 120] true; a world from create() names none true: pass
+world_adapter_test: 8 realms, the first { "korean": "삼류", "romanised": "Third-rate", "qi": 1000, "might": 1100 }; person 6 knows 3 skills, the last { "range": 384, "radius": 0, "body_damage": 20, "structure_damage": 0, "cooldown": 90, "qi_cost": 100, "shape": 1, "ready_at": 0, "art": 0, "skill": 0, "rank": 1, "korean": "매화일검", "romanised": "Plum Blossom Strike", "orientation": 0, "polarity": 0 }, qi 3640 of 3641, realm 2, nature { "orientation": 0, "polarity": 0 }; a world from create() reads none true: pass
+world_adapter_test: 3 arts, 10 art skills known named alike, 10 skills learned and 13 realms gained in its progress, none among its events; 8 with a heart art, 16 arts eased, 33 knowing none; a world from create() has no arts true: pass
+world_adapter_test: of a region's last 53 events, 48 births and 1 deaths name their person and 4 others none true: pass
+world_adapter_test: after 1011 ticks of the M1 battle, 15 uses and 499 of 500 people living, the snapshot reads as the per-army, per-structure and per-use reads true; a tick later it differs true: pass
+world_adapter_test: at hour 10, 21 bodies' occupation and activity in the snapshot as read one at a time true; person 0, merchant, working, reads idle once its army 0 is steered true: pass
+world_adapter_test: uses of a learned art read 10; the arts' disciplines ["sword", "saber", "hidden weapons"]; structure works read [5, -5]; faults []: pass
+grade_test: spring (1.0, 1.02, 0.98), winter (0.96, 0.99, 1.06), midnight (0.4692, 0.52, 0.6912) wrapped (0.4692, 0.52, 0.6912) before (0.4692, 0.52, 0.6912); high vignette 0.18: pass
+grade_test: noon in summer gain (1.02, 1.0, 0.96) saturation 1.06, dusk gain (1.071, 0.9, 0.768), between them (1.0455, 0.95, 0.864) against (1.0455, 0.95, 0.864); standard vignette 0.18 hue shift 1.00, low vignette 0.00 hue shift 1.00; hidden before a time true, shown after true: pass
+grade_test: torch at (300.0, 100.0, 2.0, 2.0) reaching 40 beside 1 window, counted as 2 lights, none after; of a version shown 1 lights kept, of a new one 0: pass
+grade_test: lamp at midnight, noon and dusk [1.0, 0.0, 0.5]; two lights shown as [(110.0, 60.0, 7.0, 3.0), (400.0, 200.0, 0.0, 0.0)] reaching [28.0, 48.0]; 32 of 40 lights kept, the farthest at x 730; bloom with a hearth standard 0.60 high 0.60 low 0.00 noon 0.00, without one 0.00, low keeping 32 lights; the light field drawn at midnight true, at noon false, with no lights false: pass
+grade_test: the fog's cells from (5, 3), (43, 39) of them, kept for a pixel's move true, from (6, 3), (43, 39) of them, a cell on, (0, 0) beside the map; a relief shown after the view raised there to level plus one 2: pass
+grade_test: fog and clouds at midnight, morning and noon [(0.35, 0.0), (0.7, 0.7), (0.2, 1.0)]; standard fog 0.20 clouds 1.00, low fog 0.00 clouds 0.00; relief (43, 39) with levels plus one 3 raised and 1 flat, from (100.0, 50.0), drift 19.86; the clouds read from the light field true, drawn for the fog and the clouds at standard true and at low false; clouds a material of each grade's own true: pass
+grade_test: dry rain 0.0 gain (1.02, 1.0, 0.96) clouds 1.00; raining rain 1.0 gain (0.816, 0.84, 0.8832) against (0.816, 0.84, 0.8832) saturation 0.827 clouds 0.00; raining at low rain 0.0 gain (1.02, 1.0, 0.96): pass
+grade_test: a view on whole pixels starts the art pixels at (0.0, 0.0) from (100.0, 50.0); one between them at (-1.000008, -2.000004) from (100.0, 50.0), the clouds at (-1.000008, -2.000004): pass
+arts_test: army 9, person 18 of realm 3, knows 2 skills of 흑아비도술 and 2 of its army; listed ["흑아비도술", "세력 기술"], 1 greyed, 1 past its realm: pass
+arts_test: chosen first { "art": 2, "skill": 0 }; up refused true; down through [{ "art": 2, "skill": 0 }, { "art": 2, "skill": 1 }, { "art": -1, "skill": 0 }, { "art": -1, "skill": 1 }], refused past the last true: pass
+arts_test: { "art": 2, "skill": 0 } on slot 2 put on T true, leaving its slot true; Delete took it off true, again false: pass
+arts_test: touch, none chosen on opening true; a tile it lacks refused true; a tile it has chose { "art": 2, "skill": 0 } true; 2 groups scroll nowhere true: pass
+arts_test: heart method 2 given art 0 of another nature, tags [["심법"], ["약화"], []]; read as agreeing fully, [["심법"], [], []] (setup true): pass
+arts_test: 32 keys measured in 293 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+dialogue_test: person 26 tells its 7 rumours newest first true, worded as rumour_text words them true, 7 births and deaths named true; scrolled to 2; back to the menu true; person 2, (17, 80) cells away, tells 3, 0 of them shared: pass
+dialogue_test: person 26 offers [0], the menu [0, -1]; down chooses farewell true; dead person 0 offers [], the menu [-1]: pass
+dialogue_test: seller 0's menu [0, 1, -1], card 상인; wares listed and chosen true, refusal shown true, purchase shown true, back true; person 1's menu [0, -1], card 문파 없음: pass
+dialogue_test: 41 keys measured in 10478 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+faction_test: a member of faction 0 sees 3 factions as relation() reads them true; offered no order true, asking gives -1: pass
+faction_test: the leader (person 0) of faction 0 offered war on its ally 2 true, asked again true, declared true; then war greyed with "이미 전쟁 중이다.", peace DECLARE_TOO_SOON, the basis "정파 수장이 봄 · 1년에 선포", asking gives -1: pass
+faction_test: on a touch screen a row tapped chooses it true, the middle asks nothing true, war tapped lit true, its question answered yes true, the close word closes true: pass
+faction_test: 49 keys measured in 149 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+genealogy_test: 19 keys and 576 names measured in 3588 checks across ["ko", "en"], names cut short { "en": 215 }; unmeasured []; 0 overruns, the first []: pass
+genealogy_test: after 70 days person 0 한태산, spouse 1, children [21]; cards { "centre": [0], "spouse": [1], "child": [21] }; details match; down and Enter centre on child 21 true, keypad Enter true; the founder 20 shows 0 parents; generations: founder 1대, child 2대; person 14 of faction 0 shows the sect "화산파" and sectless person 0 of it "없음" true (setup true): pass
+hud_test: keys HUD_HP, FACTION_ORTHODOX; Korean ["ko", "체력", "정파"]; in English ["en", "HP", "Orthodox"]; back to ko; HP 100%, qi 0 / 0, its bar 0; 2 skills on the slots ["Q", "W", "E", "R", "T"] with their icons, each key clear of its icon [true, true, true, true, true], the rest empty true: pass
+hud_test: date { "year": 1, "season": 0, "day": 1, "tick": 0, "ticks_per_day": 1800 } shown as "봄 · 1년"; year 3, season 1 as "여름 · 3년": pass
+hud_test: "남궁설화" is 40 px in Galmuri9; refused in a 39 px untrimmed label true, accepted in a 40 px one true (setup true): pass
+hud_test: Cult leader 2 named { "surname": "송", "given": "천명", "surname_en": "Song", "given_en": "Cheonmyeong" }, its given name 68 px wide; leader, duel leader and challenger shown ["송천명", "송천명", "당신"] in Korean, ["Cheonmyeong", "Cheonmyeong", "You"] in English (setup true), within their labels true, the leader's clear of its neighbours true; Orthodox leader 0 shown "한태산" for 한태산: pass
+hud_test: 38 keys measured on 56 label spans and 2304 names across ["ko", "en"] in both layouts; unmeasured []; overruns []: pass
+hud_test: person 0 of realm 2 shown "이류", in English "Second-rate", qi "3,218 / 3,218" with its bar at 100.0; the newborn player shown "—" and "0 / 0"; 18 values measured, overruns []: pass
+hud_test: army 9's person 18 learned within 706 ticks; waiting ["사문 전수: 흑아표"] against ["사문 전수: 흑아표"]; 1 lessons and realms of others announced none; 70 notices measured, overruns []: pass
+hud_test: 6 cast refusals ["CAST_DEAD", "CAST_NO_SKILL", "CAST_ON_COOLDOWN", "CAST_NO_QI", "CAST_NO_TARGET", "CAST_OUT_OF_RANGE"]; unworded []; a key hud.csv lacks reads "CAST_NOT_A_REASON" (setup true): pass
+hud_test: PC layouts at [(1280, 720), (1920, 1080), (2560, 1440)] in ["ko", "en"], 144 checks, the map moved by the room gained true; faults []; the touch layout kept at [(1920, 1080), (2400, 1080)] true: pass
+hud_test: the purse showed 30 silver at birth true, after a day true with the wares held; faults []; on touch the belt hidden and the strip clear of the buttons and the stick true: pass
+hud_test: full map stays open, player moved (87.0, 125.0) -> (88.0, 118.0) (order true, moved true), dot follows true: pass
+hud_test: partly seen villages keep 7 unseen cells in fog true and 11 seen cells coloured true: pass
+hud_test: the notice's slip against the talk prompt's in 34080 places; on its line with no prompt true; faults []: pass
+map_window_test: a 128x128 map at 1x in the native room and 3x in (960.0, 540.0), the frame inside both true true; N, Escape and 1 give ["close", "close", ""] (setup true): pass
+map_window_test: 10 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+nameplates_test: 6 of 6 within reach named [(0.8392, 0.2588, 0.1804, 1.0), (0.8392, 0.2588, 0.1804, 1.0), (0.8392, 0.2588, 0.1804, 1.0), (0.1686, 0.4471, 0.5294, 1.0), (0.1686, 0.4471, 0.5294, 1.0), (0.7373, 0.6039, 0.4902, 1.0)], none ringed; faults []; person 7 past the reach not named, nor the viewer, true (setup true): pass
+nameplates_test: own nearest and hostile further named in the order [6, 7, 8, 9, 10, 11, 0, 1], hostile first true; own alone [0, 1, 2, 3, 4, 5, 6, 7], the nearest 8 true: pass
+nameplates_test: over a nearer name [0], apart [0, 1]; over a clear place [], beside it [1]; at the edge []: pass
+nameplates_test: a name on the rail [P: (837.0, 70.0), S: (119.0, 118.0)] named 0; beside it at (717.0, 137.0) named 1 (setup true): pass
+nameplates_test: the widest names { "ko": "독고채원", "en": "Wolhyang Namgung" } named over a crowd at [(1280, 720), (1920, 1080), (2560, 1440)] in both locales, 54 checks; faults []: pass
+new_game_test: typed 4, 8, keypad 1, 7 and Backspace as 481, Enter start from seed 481; a full field kept 9999999991 with its last digit taken true; R drew 2282186585; an empty field drew 101393388; Escape back, closed true: pass
+new_game_test: 9 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+new_game_test: setup true; seeded with 156, R drew 3755607802 past 4170797617, an empty field 3755607802; seeded with 2026, R drew 4259094339: pass
+new_game_test: REGION_NONE shows the notice false; REGION_REFUSED shows it true; a digit clears it true; opening again clears it true: pass
+pause_test: opened on resume; down steps ["save", "settings", "title", "quit", "quit"]; Enter takes quit; Escape resume: pass
+pause_test: 26 keys and 12 controls measured in 72 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+rebirth_test: ended ["황보씨 가문", "27세", "화산파", "의술 120", "0명"] against ["황보씨 가문", "27세", "화산파", "의술 120", "0명"], begun ["이씨 가문", "정파", "17세"] against ["이씨 가문", "정파", "17세"] (setup true); swapped ["이씨 가문", "17세", "없음", "—", "0명"]; Enter, Escape and 1 give ["go_on", "go_on", ""]: pass
+rebirth_test: 23 keys measured in 90 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+sect_test: 40 keys, 3 sects and 576 names measured in 3554 checks across ["ko", "en"], cut short { "en": 147 }; unmeasured []; untranslated []; 0 overruns, the first []: pass
+sect_test: after 40 years army 1's lead 2 in sect 1; details match; cards [38, 23, 55, 57] against master 38 and elders [23, 55, 57]; column match; Tab through each faction true, duel tags { "Demonic": true, "Unorthodox": false, "Orthodox": false }, election tags { "Demonic": false, "Unorthodox": false, "Orthodox": true }; a world without sects opens on none true: pass
+sect_test: born in village 1, the player applies to sect 1: admitted true, again true, cleared on Tab true; born in village 2, refused as unproven true (setup true): pass
+settings_test: chosen { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, on disk { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 }, read back { "speed": 2, "window": 1, "resolution": 1, "language": 1, "master": 3, "effects": 2, "music": 0, "cast": 1, "touch": 0, "numbers": 2, "blood": 1, "hitstop": 1, "screen": 2, "rain": 1 } with speed 4x, casting on release, everyone's damage numbers and the blood and the hit stop off, the music muted and the master and effects at 0.75 and 0.5 unmuted true: true; a missing file reads the defaults true; a resolution out of range refused, the speed beside it read true: pass
+settings_test: the touch row's choices tapped, each [chosen, shown, tap-to-move]: { "auto": [true, false, false], "on": [true, true, false], "tap": [true, true, true], "off": [true, false, false] }, on a phone or tablet false; applied sent 4 times; a tap on the label chose nothing true; outside goes back: pass
+settings_test: 54 keys measured in 148 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+title_test: opened on new; continue between true true; with no save, down to settings, Enter takes settings; up to new, up again stays on new; with a save, down to continue, Enter takes continue: pass
+title_test: 13 keys measured in 24 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+touch_test: stick pressed { "do": "none" }, pushed 40 px right { "do": "steer", "way": (1.0, 0.0) }, let go { "do": "steer", "way": (0.0, 0.0) }; nudged within its dead zone { "do": "steer", "way": (0.0, 0.0) }: pass
+touch_test: tapped { "do": "cast", "slot": 0, "how": "tap" }; moved under the slop { "do": "cast", "slot": 0, "how": "tap" }; dragged past the pad { "do": "cast", "slot": 1, "how": "point", "aim": (0.0, -1.0) }; onto the cancel zone true, released { "do": "none" }: pass
+touch_test: held 500 ms { "do": "cast", "slot": 4, "how": "self" }; held 400 ms { "do": "cast", "slot": 4, "how": "tap" }: pass
+touch_test: buttons ["genealogy", "sect", "factions", "arts", "attack", "cycle", "pause"]; the ground { "do": "world", "at": (240.0, 60.0) }; the fifth button with two skills { "do": "world", "at": (330.0, 238.0) }: pass
+touch_test: an empty fourth slot pressed { "do": "none" }, released { "do": "none" }; the third, holding a skill, { "do": "cast", "slot": 2, "how": "tap" }: pass
+touch_test: placing, the arts button's finger lifted { "do": "none" }, the fourth button { "do": "place", "slot": 3 }, the pause button's place { "do": "button", "button": "close" }, the panel { "do": "panel", "at": (60.0, 60.0) }, moved up { "do": "scroll", "way": 1 }, down { "do": "scroll", "way": -1 }; not placing, the main button { "do": "cast", "slot": 0, "how": "tap" }: pass
+touch_test: 9 keys measured in 18 checks across ["ko", "en"]; unmeasured []; untranslated []; overruns []: pass
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] follow (res://play/play.gd:625)
+       [1] command (res://play/play.gd:580)
+       [2] run (res://play/play_test.gd:123)
+       [3] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] command (res://play/play.gd:611)
+       [1] run (res://play/play_test.gd:131)
+       [2] _init (res://run_tests.gd:22)
+play_test: cells found true; blocked cell refused true; cell (88, 123) accepted true, distance 572 to 166; key 1 accepted true, key 9 refused true: pass
+play_test: key C alone challenges no one true; F opens the faction window true, where C from an Orthodox village is refused true, the window saying CHALLENGE_NO_SUCCESSION; from a Cult village accepted, closing it, true, the duel shown true; again refused true, the window saying CHALLENGE_DUEL_IN_PROGRESS: pass
+play_test: in the faction window a member declares nothing true; its leader is asked war on ally 2 again true, Escape takes it back true, a digit gives no order true, Enter twice declares it true, F closes it true: pass
+play_test: G opens the genealogy on the steered person true, a digit gives no order while open true, G closes it true, then the digit orders true: pass
+play_test: M opens the sect panel on the steered person's faction true, a digit gives no order while open true, Tab shows the next faction true, M closes it true, then the digit orders true: pass
+play_test: a tick with no order keeps the territory and borders, and redraws the map only on a new chart revision true; army 4 ordered on village 6 true, the territory moved by the next tick true; borders follow the territory and the map the chart before true and after true, the borders before stale after true; kept over frames true: pass
+play_test: right button on (88, 123) from (87, 125) ordered true, 572 to 166 away in 60 ticks; held and moved to (88, 121) ordered true, 637 to 166 away; released true, then moved to (87, 125) ordered nothing true; control without input moved 0.00 cells: pass
+play_test: cast on press, Q with no target refused with its reason true; W accepted true and the ready tick moved 0 to 31, the control's staying true; W again refused as on cooldown with its reason true; E refused as no skill true (setup true): pass
+play_test: cast on release, Q's press aims true, the aim at the cursor with range 24 px true and at the ring past it true, nothing cast while held true; its release with no target casts nothing true true; W's release casts true and the ready tick moved true; W again cancels true, its release casts nothing true true; Escape pauses nothing true, cancels true, the release casts nothing true true: pass
+play_test: opens on the title with no world true; Enter opens the new game true; 4817 typed and Enter starts that world true, the same as the core makes from it and not seed 2026's true; Escape pauses it on that seed true, the guide showing ["CONTROLS_CLICK", "CONTROLS_LEFT_CLICK", "C", "Space", "Tab", "QWERT", "1-9", "0", "ZX", "G", "M", "F", "K", "N", "Esc"] true; no tick while paused true; resumed, 3.5 ticks' time runs 3 ticks, at 4x 16: pass
+ERROR: WorldAdapter.create_region: no room for a village: no open site
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] start (res://play/play.gd:227)
+       [1] _take (res://play/play.gd:433)
+       [2] navigate (res://play/play.gd:365)
+       [3] _refused_seed_pass (res://play/play_test.gd:832)
+       [4] run (res://play/play_test.gd:138)
+       [5] _init (res://run_tests.gd:22)
+play_test: 394 typed and Enter left the new game open with no world, refused true; the notice gone once 4817 is typed true, and Enter starts it true: pass
+ERROR: WorldAdapter.load: no room for a village: no open site
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _refused_save_pass (res://play/play_test.gd:868)
+       [1] run (res://play/play_test.gd:138)
+       [2] _init (res://run_tests.gd:22)
+ERROR: WorldAdapter.load: no room for a village: no open site
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] resume_saved (res://play/play.gd:237)
+       [1] _take (res://play/play.gd:436)
+       [2] navigate (res://play/play.gd:365)
+       [3] _refused_save_pass (res://play/play_test.gd:873)
+       [4] run (res://play/play_test.gd:138)
+       [5] _init (res://run_tests.gd:22)
+play_test: setup true; sealed again with seed 2026 it resumes true; with seed 394 load_refusal names LOAD_REGION_REFUSED and load gives nothing true, and the title shows its notice true; the game's slot 0 untouched true: pass
+play_test: each shortcut row clicked against its key, from the world and from the genealogy panel: faults []; the settings row opens them true, no tick while open true, Escape back to the world true, which runs true; from the pause panel true, back to it true; the cursor marks a row true, off it none true; control: clicks on the centre and beside the rail took [false, false], no order true, a row with the rail hidden taken false (setup true): pass
+play_test: damage numbers shown as the scene starts ["7"], for everyone ["7", "9"], off []: pass
+play_test: M opens the sect panel true; Enter applies true and joins true; from an Unorthodox village Enter is refused as unproven true (setup true): pass
+play_test: Cult body 20 ordered on (88, 123) true; after 2104 ticks the rebirth screen shows 20 dead and 21 born true, not open before true; no tick while open true; Enter goes on and ticks run true: pass
+ERROR: WorldAdapter.load: the slot holds no save of this game
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] resume_saved (res://play/play.gd:237)
+       [1] _take (res://play/play.gd:436)
+       [2] navigate (res://play/play.gd:365)
+       [3] _save_pass (res://play/play_test.gd:1129)
+       [4] run (res://play/play_test.gd:138)
+       [5] _init (res://run_tests.gd:22)
+play_test: with no save, Continue passed over true; saved from the pause panel true with its notice true, after ticks that changed the world true; on a fresh title Continue chosen true resumes the same hash, seed 2026 and person 20 true; a broken save refused on the title with its reason true; a world grown past the player's army 9 saved true, and Continue steers that army true; the game's slot 0 untouched true: pass
+play_test: autosaved as day 3 began, after 5400 ticks, every 3 days true; none earlier true; it loads as the world then was true; the game's slot 0 untouched true: pass
+play_test: touch shown true; the joystick pushed (1, 0) taken true, walked 9.38 cells its way, past the 3 one order reaches, and 0.00 across in 150 ticks; let go true, then moved 0.00 cells in 60; control with no touch moved 0.34 cells: pass
+play_test: touch shown true; the joystick pushed down the diagonal (-1, 1) taken true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+play_test: right button on (71, 72), down the diagonal (-1, 1) from (80, 63), ordered true, walked 6.45 and 6.45 cells along each axis its way in 150 ticks: pass
+ERROR: WorldAdapter.order: an order must name an army, a passable objective and at least one of the army's skills
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _steer (res://play/play.gd:804)
+       [1] touch (res://play/play.gd:840)
+       [2] _touch_cast_pass (res://play/play_test.gd:460)
+       [3] run (res://play/play_test.gd:138)
+       [4] _init (res://run_tests.gd:22)
+play_test: hostile army 8 marched 1817 ticks, foe 16 in range; a tap facing (0.707107, -0.707107) cast { "skill": 0, "target": 16 } at the aimed 16 true; dragged onto the cancel zone cast {  }, short of it { "skill": 0, "target": 16 } true; held 400 ms { "skill": 1, "target": (22274.0, 32040.0) }, 500 ms { "skill": 1, "target": <null> } true; a tap on cooldown refused 3, the notice CAST_ON_COOLDOWN shown true: pass
+play_test: new game tapped true; random tapped drew 4259094339, start tapped started it true; the pause button with the touch controls hidden ignored true, shown paused true, resume tapped true; the genealogy button opened the panel true, a tap closed it true: pass
+play_test: K opens the arts panel on the first skill true, a digit gives no order true and Escape pauses nothing true while open; down chooses the second true, Q puts it on the first slot, leaving its own true, Delete takes it off true; Escape closes it true, then the digit orders true: pass
+play_test: army 2's person 4 knows 1 skills past its army's 2; the art skill { "art": 2, "skill": 0 } on T shown true; T aims at 128 px true, Q at 24 px true; R's empty slot shows none true, casts none true; the fifth button dragged cast { "skill": 2, "target": (33538.0, 15798.0) } and tapped { "skill": 2, "target": (31490.0, 17846.0) } at range 2048 true; the fourth, empty, cast none true (setup true): pass
+play_test: the loadout [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }] saved true, restored by Continue [{ "art": -1, "skill": 0 }, {  }, {  }, {  }, { "art": -1, "skill": 1 }], T showing true; a new game starts from [{ "art": -1, "skill": 0 }, { "art": -1, "skill": 1 }, {  }, {  }, {  }]; the game's slot 0 untouched true: pass
+play_test: walked 1091 ticks up to person 4 of an allied faction, prompted true; C opened the window true, a digit taken true, Enter its 0 rumours true, Escape no pause true, back true, ended true; a left click on it opened it, selecting no one, true, and so did a tap with the touch controls shown true; a tick kept it open true; war declared true closed it true, the prompt refused true, C opened nothing true: pass
+play_test: walked 0 ticks up to seller 0; C opened its menu with wares true; Enter showed them true; bought a herb true, 20 silver left; the pill refused true; back true, ended true; Z at full health refused true, X with no pill true; a digit then ordered true: pass
+play_test: 2 people within reach, 1 named [0], all of them within true, neither the player nor person 1 the prompt names true; G's panel hides them true, closed shows them true (setup true): pass
+play_test: 2 foes in sight after 758 ticks; a click selected foe 19 with no intent true, the person kept its distance true; Space set the intent true, chased true and closed in true; a click on foe 18 moved it true; a move order replaced it true and the person reached its cell true in 11 ticks; Space again, a chase to (66, 13) and Escape ended it true, the person holding there true, a right click walking it back true; Tab selected the next true; Escape cleared true; Space on one of its own faction refused true; touch next and attack true; with no foe in sight Space did nothing true: pass
+play_test: bounds flat [P: (0.0, 0.0), S: (2048.0, 1536.0)], raised [P: (0.0, 0.0), S: (2048.0, 1472.0)]; the view at the corner [P: (0.0, 0.0), S: (640.0, 360.0)] and at the bottom [P: (680.0, 1112.0), S: (640.0, 360.0)]; centred on the middle at (1000.0, 700.0), on a small map at (160.0, 100.0): pass
+play_test: walked 43.3 pixels in 120 frames; the camera at most 0.97 screen pixels off the person's motion a frame, the person at most 0.00 off its place on the screen; rounded to world pixels the camera 2.23 off: pass
+play_test: born in village 0, within two cells of the map's drawn bottom at every check true; of 30 checks, 30 with the talk prompt; covered or off the room: none; centred on the map's middle true: pass
+play_test: at 2048×1536 with the touch controls, covered 87.0; the ground held to its pad ends at 1576.0 against the view's 1593.0
+play_test: born in village 0, the view ends at [1526.0, 1521.0, 1593.0, 1536.0], past the map's drawn bottom at 1504.0 at every layout true; the ground short of it: none; held to its pad, short at 2048×1536 true: pass
+play_test: grade hidden on title true, shown in play true; five-tick day at tick 3 gain (1.0, 1.02, 0.98) against (1.0, 1.02, 0.98), midnight (0.46, 0.5304, 0.7056); low vignette 0.00 standard 0.18 art pixel 3.0; raining with the row off false, on true: pass
+sound_test: at war over 600 ticks, heard [158, 55, 5, 3, 1, 0] and played [84, 29, 5, 3, 1, 0] by kind ["STRIKE", "HIT", "FALL", "FIRE", "MEND", "BELL"], each kind's stream sounded true; at peace heard [0, 0, 0, 0, 0, 0], silent true; an event outside the hearing unplayed true, inside played true: pass
+sound_test: the region recorded 1 raids after 16950 ticks, the bell heard 1 times, its stream sounded true; before it, 46 other events recorded and the bell heard early false: pass
+sound_test: the M1 battle over 300 ticks sounded at most 12 voices of 12, 1124 events dropped; freed after 2.6 s true, then 6 of 6 kinds heard started: pass
+sound_test: freed while 7 players sounded, the scene left 0 instances leaked and 0 resources in use at exit; 6 bare players left 12 and 6: pass
+view_scale_test: 4 PC and 2 touch windows; at least the least view [true, true, true, true, true, true]; wrong []; 14 windows swept with and without touch, scales not whole []: pass
+blood_test: on the hit tick 0, 1 spray(s) toward (1.0, 0.0) and 5 drop(s), 2 beyond the foe's feet and 2 pooled at them, given to draw as 8 and 15 pixels; out of reach, a use by tick -1, 0 spray(s) and 0 drop(s), 0 and 0 pixels: pass
+blood_test: with blood off, the hit on tick 0 drew 0 spray(s) and 0 drop(s), the foe flashing 1.00: pass
+blood_test: a burst striking 7 foes, by someone else, bled 4 of them; by the steered person, striking 7, bled 7: pass
+blood_test: foes left at 70, 40 and 20 of 100 drawn idle, idle_hurt and idle_maimed, faults []: pass
+blood_test: over 45 ticks a maimed foe dripped 1 drop(s), a hurt one 0: pass
+blood_test: held, the struck foe's white 1.00 then 1.00, 2 hit stop(s); hit stop off 1.00 then 0.42, 0; out of reach 0: pass
+blood_test: the hit of 60 shook the screen (3, 0), a step of the pattern 3 pixels far true, then (0, 0) after 150 ms; hit stop off (0, 0); out of reach (0, 0): pass
+blood_test: a hit stop on the striker true, after 6 frames off screen held false and drawn where it stands true; hit stop off false, false, true; back at once held true: pass
+blood_test: the foe killed true and stopped true, held after the next refresh false; the striker held true: pass
+blood_test: mid-battle { "drops": 15, "pixels": 8, "stops": 2, "held": 2 }, shown anew { "drops": 0, "pixels": 0, "stops": 0, "held": 0 }, a fresh art { "drops": 0, "pixels": 0, "stops": 0, "held": 0 }: pass
+blood_test: one past the rings' most { "drops": [200, 201, 200.0], "pixels": [320, 321, 320.0], "drawn": [600, 200.0] }, one under { "drops": [199, 199, 0.0], "pixels": [319, 319, 0.0], "drawn": [597, 0.0] }: pass
+bodies_test: walking north drawn as back, east as walk; 2 bodies drawn, 2 shadows: pass
+bodies_test: on the tick of a sweep, true, the striker drawn as swing and the foe as recoil flashing 0.97; with no strike, false, drawn as walk and walk flashing 0.00: pass
+bodies_test: north of house 62 at (76, 60) reached true, hidden by [62], outlined true; south of it at (76, 64) reached true, hidden by [], outlined false: pass
+bodies_test: over the M1 battle 60 outlines read, 0 without their body in a band, 0 carrying another share of white than their body's; 4 of a flashing body and 56 of one not: pass
+bodies_test: the base pack's occupations ["merchant", "physician", "smith", "innkeeper", "monk", "farmer", "beggar"] each find their look in every faction's sheet, and an id with none falls back; missing: none: pass
+bodies_test: at hour 10 person 1, a innkeeper working, drawn as innkeeper_work; its army steered, read 3, as innkeeper_walk, using no skill true; the player, a monk, drawn as idle: pass
+combat_test: beside, the sweep on tick 0 lost 60 of 100, shown as 1 arc(s) of the steered, the foe at flash 1.00 knocked (2.0, 0.0), the striker at 0.00, numbers ["60"], target 1 of 1, 1 body drawn white; out of reach no use by tick 90, health 100, 0 use(s) shown, flash 0.00, 0 number(s), target -1, 0 white: pass
+combat_test: the foe died true with nothing dying before true; at its death [{ "army": 1, "at": (56.0, 30.0), "ground": (56.0, 30.0), "fallen": 0.0, "alpha": 1.0, "flash": 1.0 }] with numbers ["60", "40"] against its last loss 40 and 1 body drawn white, halfway [{ "army": 1, "at": (56.0, 30.0), "ground": (56.0, 30.0), "fallen": 1.0, "alpha": 0.5, "flash": 0.0 }], after []; 1 living drawn and 3 sprites in the bands, a body and a shadow for each and the dying body: pass
+combat_test: a region with a tick's day ran 7401 ticks; 1 died struck and 26 of hunger or age, the struck alone falling, flashing and numbered true: pass
+combat_test: in "mine", the steered person's sweep and two bystanders' sweeps on tick 0, each losing 60 true, gave numbers [(50.0, 8.0)], the foe at x 56: pass
+ground_test: 8 areas, 8 distinct seeds, the same on a second ground true: pass
+ground_test: 2018 points from seed 7, the same drawn again true, other from seed 8 true, nearest two 4.21 apart against 4.2: pass
+ground_test: on the headless display the ground streamed false, baked false, holds 0 children and shows 0 areas: pass
+ground_test: the first stream drew 16 passes for 8 areas, 16 after moving across and back: pass
+ground_test: at the corner [(0, 0), (0, 1), (1, 0), (1, 1)] shown, the first area's 246 trees; at most 1 new a step; the first freed far away true, shown again with the same trees true: pass
+ground_test: 8 of 8 areas the same ground and trees twice; trees on the cleared cells 0, 29 with all open: pass
+ground_test: 4 ground sprites drawn with the ground's material true, 2 strips true, 1029 trees without it true: pass
+ground_test: rows drawn on the top edge (-8, 32), between the edges (32, 64), on the bottom edge (64, 100) reaching 1200 against the image's 1192; the bottom area shown true; past_bottom held drew 0 passes, past_bottom 400 drew 8 for 4 bottom areas, their image to 880, shown again true: pass
+relief_test: levels by kind and depth, faults []; rock and bank faces true; highest 5: pass
+relief_test: the cells' texture (16, 14), faults []; the same cells twice the same true, a cell changed another true: pass
+relief_test: cliffs between passable points 0, with hills unsloped 122: pass
+relief_test: under (130.5, 20.5) found (130.5, 20.5); the slope's (104.0, 78.0) raised 32.0 to (104.0, 46.0) found (104.0, 78.0); its unraised pixel shows (104.0, 97.0) (setup true): pass
+relief_test: built on the hills' edge [(4, 6), (8, 8), (6, 9)], marked [(4, 6), (8, 8), (6, 9)], cliffs between passable points 0; built on the plain at (13, 1) marked true: pass
+world_art_test: 8 of 8 blocked cells raised as rock, 136 of 136 others plain at level 0: pass
+world_art_test: after 2000 ticks 8 bodies, 8 drawn on screen, 0 off it: pass
+world_art_test: 89 of 103 region structures drawn as their kind ["hall", "well", "temple", "inn", "house", "barrels", "granary", "storehouse", "fence", "manual_hall", "training_ground", "seat_gate"] over their footprints with their stage's frame and shadow, a seat's kinds among them true, 14 fields tiled, 0 left undrawn; 2 of 2 structures without a kind left undrawn: pass
+world_art_test: 19 of 19 banners the templates name stand on their cells in their owner's colours, sect banners at 3 of 3 seats; 0 stand elsewhere: pass
+world_art_test: 14 fields tiled with the sown frames true, none with the burnt true: pass
+world_art_test: 144 of 144 decorated cells carry their template's tile, 81 of them a seat's; cells beside the villages bare true: pass
+world_art_test: 3 bodies drawn at the player's village (1400.0, 1506.0), 2 at the village at (160.0, 60.0); bodies outside their band's bounds: 0 refreshed in place, 0 after the jump []: pass
+world_art_test: a body moved from (8.6875, 6.515625) to (9.375, 7.03125) on the last tick is drawn at (9.03125, 6.773438) halfway to the next true, its ring there true, and at either end at a share of 0 and 1 true; army 1's roster changed, an index's body elsewhere than a tick before true, and its bodies are drawn where that tick left them true: pass
+world_art_test: after 2820 days a village founded hamlet on its square at (95, 44) of (3, 3): 0 structures without a sprite; 9 of 9 decorated cells carry their template's tile, the cell west of it bare true: pass
+world_art_test: after 8430 days, the workshops at the start [] and now ["smithy", "apothecary"]; 200 of 200 structures drawn as their kind, of every kind world_art.gd draws true (["hall", "well", "temple", "inn", "house", "barrels", "granary", "storehouse", "fence", "manual_hall", "training_ground", "seat_gate", "smithy", "apothecary"]); 14 hearths counted of 14 lights.json names, none beside the map true: pass
+world_art_test: 152 windows listed over the region against 152 expected, visiting 89 of 89 structures, the version held when unchanged true; 26 round a lit structure against 26, visiting 26, the version moved on true; the torch at (1400.0, 1506.0) true; 0 beside the map visiting 0, no torch there true or with no one steered true: pass
+world_art_test: the arts rise in ["9ac4cd", "cb88bd", "e9c36d"]; an art of an unnamed discipline in efe5c9: pass
+run_tests: 34 of 34 GDScript tests passed
+run_tests.gd ran the GDScript tests selected by: git ls-files --cached --others --exclude-standard -- '*_test.gd'

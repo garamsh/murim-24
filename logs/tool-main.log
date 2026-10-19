@@ -1,0 +1,13 @@
+ground_check: after the bake the grounds hold 0 viewports: pass
+ground_check: 6 of 6 chunks baked to the same ground, strips and trees twice, the mountain's chunk holding 21 strips: pass
+ground_check: the forest's edge runs within 3 pixels of the cells' side at x 384 on 0.38 of rows (100, 360) warped, from x 369 to 423, and on 0.86 without warp, 257 and 250 rows read: pass
+ground_check: across the built cells the forest begins at x 384 on 48 of 48 rows (388, 436), from x 384 to 384: pass
+ground_check: across the cells built on the slope the hills begin at x 480 on 0 of 34 rows read, from x 486 to 495; above them on 0 of 35 rows elsewhere, from x 484 to 494: FAIL
+ground_check: along the cells built below the face its foot is on row 431 on 4 of 35 columns, from row 423 to 442; past them on 6 distinct rows, from 432 to 442: FAIL
+ground_check: trodden earth on 32 of 48 pixels of the row along the built cells' side, on 21 and 2 two and three pixels out: FAIL
+ground_check: from y 736 to 855 across the map's bottom edge, 0 pixels unpainted, 0 of them beside the raised ground on the last rows: pass
+ground_check: given 87 past the bottom, 3 chunks baked again of the 3 on the bottom edge, the grounds holding 0 viewports: pass
+ground_check: from y 736 to 855 across the map's bottom edge, 0 pixels unpainted, 0 of them beside the raised ground on the last rows: pass
+ground_check: at (1024.0, 384.0) the first chunk is shown false: pass
+ground_check: back at the start the first chunk is shown with its 202 trees where they were true; at most 1 new chunks a frame: pass
+ground_check: 9 of 12 checks passed
