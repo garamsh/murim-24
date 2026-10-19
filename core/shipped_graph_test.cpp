@@ -24,6 +24,8 @@ constexpr std::int32_t WIDE = 300;
 constexpr std::int32_t TALL = 280;
 constexpr MapHash BUILT_FOR{0x5EED};
 constexpr MapHash ANOTHER{0xBEEF};
+constexpr Footprint VARIED{WIDE, TALL};
+constexpr Footprint ONE_AREA{AREA_SIDE, AREA_SIDE};
 
 // Open ground with a wall splitting the first area into two components, a
 // blocked cell in each area of the second row of areas, and a wall across the
@@ -100,7 +102,8 @@ TEST(ShippedGraph, AShippedGraphReadsBackAsTheGraphBuiltFromItsMap) {
   ASSERT_GT(built.columns(), REGION_AREAS);
   ASSERT_GT(built.node_count(), 0U);
 
-  const auto read = read_shipped_graph(ship_graph(built, BUILT_FOR), BUILT_FOR);
+  const auto read =
+      read_shipped_graph(ship_graph(built, BUILT_FOR), BUILT_FOR, VARIED);
 
   ASSERT_TRUE(std::holds_alternative<CoarseGraph>(read));
   EXPECT_TRUE(std::get<CoarseGraph>(read) == built);
@@ -110,8 +113,8 @@ TEST(ShippedGraph, AGraphShippedForAnotherMapIsRefused) {
   const std::vector<std::uint8_t> bytes =
       ship_graph(CoarseGraph{varied_map()}, BUILT_FOR);
 
-  const auto other = read_shipped_graph(bytes, ANOTHER);
-  const auto own = read_shipped_graph(bytes, BUILT_FOR);
+  const auto other = read_shipped_graph(bytes, ANOTHER, VARIED);
+  const auto own = read_shipped_graph(bytes, BUILT_FOR, VARIED);
 
   ASSERT_TRUE(std::holds_alternative<GraphFault>(other));
   EXPECT_EQ(std::get<GraphFault>(other), GraphFault::OTHER_MAP);
@@ -123,7 +126,7 @@ TEST(ShippedGraph, ADamagedOrForeignGraphIsRefusedForWhatIsWrongWithIt) {
       ship_graph(CoarseGraph{varied_map()}, BUILT_FOR);
   constexpr std::size_t VERSION_AT = 8;
   const auto fault = [](const std::vector<std::uint8_t>& read) {
-    const auto result = read_shipped_graph(read, BUILT_FOR);
+    const auto result = read_shipped_graph(read, BUILT_FOR, VARIED);
     return std::holds_alternative<GraphFault>(result)
                ? std::optional<GraphFault>{std::get<GraphFault>(result)}
                : std::nullopt;
@@ -142,19 +145,36 @@ TEST(ShippedGraph, ADamagedOrForeignGraphIsRefusedForWhatIsWrongWithIt) {
   EXPECT_EQ(fault(foreign), GraphFault::NOT_A_GRAPH);
   EXPECT_EQ(fault(cut), GraphFault::CORRUPTED);
   EXPECT_TRUE(std::holds_alternative<CoarseGraph>(
-      read_shipped_graph(bytes, BUILT_FOR)));
+      read_shipped_graph(bytes, BUILT_FOR, VARIED)));
 }
 
 TEST(ShippedGraph, ANodeOutsideItsAreaIsRefusedThoughItsChecksumHolds) {
-  const auto outside =
-      read_shipped_graph(framed(one_node_at(AREA_SIDE), BUILT_FOR), BUILT_FOR);
+  const auto outside = read_shipped_graph(
+      framed(one_node_at(AREA_SIDE), BUILT_FOR), BUILT_FOR, ONE_AREA);
   const auto inside = read_shipped_graph(
-      framed(one_node_at(AREA_SIDE - 1), BUILT_FOR), BUILT_FOR);
+      framed(one_node_at(AREA_SIDE - 1), BUILT_FOR), BUILT_FOR, ONE_AREA);
 
   ASSERT_TRUE(std::holds_alternative<GraphFault>(outside));
   EXPECT_EQ(std::get<GraphFault>(outside), GraphFault::CORRUPTED);
   ASSERT_TRUE(std::holds_alternative<CoarseGraph>(inside));
   EXPECT_EQ(std::get<CoarseGraph>(inside).node_count(), 1U);
+}
+
+TEST(ShippedGraph, AGraphOfAMapOfAnotherSizeIsRefusedThoughItsHashMatches) {
+  // A graph of one area, framed with the hash of the map it is read for, as
+  // anyone holding that hash can frame it.
+  const std::vector<std::uint8_t> small = ship_graph(
+      CoarseGraph{Map{std::vector<std::string>(
+          static_cast<std::size_t>(AREA_SIDE), std::string(AREA_SIDE, '.'))}},
+      BUILT_FOR);
+
+  const auto larger = read_shipped_graph(small, BUILT_FOR, VARIED);
+  // Control: read for a map of its own size, it is accepted.
+  const auto own = read_shipped_graph(small, BUILT_FOR, ONE_AREA);
+
+  ASSERT_TRUE(std::holds_alternative<GraphFault>(larger));
+  EXPECT_EQ(std::get<GraphFault>(larger), GraphFault::CORRUPTED);
+  EXPECT_TRUE(std::holds_alternative<CoarseGraph>(own));
 }
 
 }  // namespace

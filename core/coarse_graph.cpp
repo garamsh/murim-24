@@ -300,6 +300,8 @@ std::size_t CoarseGraph::area_of(Cell cell) const {
 
 std::int32_t CoarseGraph::columns() const { return columns_; }
 
+Footprint CoarseGraph::size() const { return Footprint{width_, height_}; }
+
 std::size_t CoarseGraph::node_count() const {
   std::size_t count = 0;
   for (const AreaGraph& area : areas_) {

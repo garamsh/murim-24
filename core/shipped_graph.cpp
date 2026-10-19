@@ -78,14 +78,15 @@ class GraphCodec {
     }
   }
 
-  // Reads a graph as write() wrote it, refusing any index or size out of
-  // range of its areas, nodes and regions.
-  static CoarseGraph read(Reader& input) {
+  // Reads a graph as write() wrote it of a map of `size` cells, refusing
+  // any other size, and any index or size out of range of its areas, nodes
+  // and regions.
+  static CoarseGraph read(Reader& input, Footprint size) {
     const auto costs = static_cast<AreaCosts>(input.tag(COSTS));
     const std::int32_t width = input.i32();
     const std::int32_t height = input.i32();
-    require(width >= 1 && height >= 1 && width <= MAX_MAP_SIDE &&
-            height <= MAX_MAP_SIDE);
+    require(width == size.width && height == size.height && width >= 1 &&
+            height >= 1 && width <= MAX_MAP_SIDE && height <= MAX_MAP_SIDE);
     CoarseGraph graph{costs, Footprint{width, height}};
     for (std::size_t area = 0; area < graph.areas_.size(); ++area) {
       graph.areas_.at(area) = read_area(input, graph, area);
@@ -271,7 +272,7 @@ std::vector<std::uint8_t> ship_graph(const CoarseGraph& graph, MapHash map) {
 }
 
 std::variant<CoarseGraph, GraphFault> read_shipped_graph(
-    const std::vector<std::uint8_t>& bytes, MapHash map) {
+    const std::vector<std::uint8_t>& bytes, MapHash map, Footprint size) {
   // The one handler for a refused graph: every refusal while it is read ends
   // here as CORRUPTED.
   try {
@@ -304,7 +305,7 @@ std::variant<CoarseGraph, GraphFault> read_shipped_graph(
       return GraphFault::OTHER_MAP;
     }
     Reader input{bytes, HEADER_BYTES, end};
-    CoarseGraph graph = GraphCodec::read(input);
+    CoarseGraph graph = GraphCodec::read(input, size);
     if (!input.done()) {
       return GraphFault::CORRUPTED;
     }

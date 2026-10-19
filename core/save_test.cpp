@@ -614,6 +614,24 @@ TEST(Save, ASaveKeepsTheAreasTiersAndAFarArmysAnchor) {
   EXPECT_NE(near.hash(), world.hash());
 }
 
+TEST(Save, ALoadGivenABareGraphOfAMapOfAnotherSizeIsRefused) {
+  const World world = tiered();
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const std::vector<std::string> rows(static_cast<std::size_t>(TIERED_SIDE),
+                                      std::string(TIERED_SIDE, '.'));
+
+  const auto smaller = load(
+      store, SLOT,
+      CoarseGraph{Map{std::vector<std::string>(
+          static_cast<std::size_t>(AREA_SIDE), std::string(AREA_SIDE, '.'))}});
+  // Control: the graph of the saved world's own bare map loads.
+  const auto own = load(store, SLOT, CoarseGraph{Map{rows}});
+
+  EXPECT_EQ(refusal(smaller), std::optional<LoadError>{LoadError::CORRUPTED});
+  EXPECT_EQ(refusal(own), std::nullopt);
+}
+
 TEST(Save, AFarArmyLoadedLeadsOutByTheNodeItDidWhenSaved) {
   const World world = tiered();
   const std::optional<NodeRef> held = world.far_node(1);

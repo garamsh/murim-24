@@ -1337,7 +1337,7 @@ std::optional<CoarseGraph> shipped_graph(const PackSource& source,
     return std::nullopt;
   }
   std::variant<CoarseGraph, GraphFault> graph =
-      read_shipped_graph(*bytes, map.hash());
+      read_shipped_graph(*bytes, map.hash(), Footprint{map.side(), map.side()});
   if (const auto* fault = std::get_if<GraphFault>(&graph)) {
     return refuse(*fault == GraphFault::OTHER_MAP ? ContentRefusal::INCONSISTENT
                                                   : ContentRefusal::UNREADABLE);

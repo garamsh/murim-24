@@ -444,8 +444,8 @@ struct Shipping {
 Shipping shipping(const Map& map, const CoarseGraph& graph) {
   const std::vector<std::uint8_t> shipped = ship_graph(graph, MapHash{0});
   const auto read_at = std::chrono::steady_clock::now();
-  std::variant<CoarseGraph, GraphFault> read =
-      read_shipped_graph(shipped, MapHash{0});
+  std::variant<CoarseGraph, GraphFault> read = read_shipped_graph(
+      shipped, MapHash{0}, Footprint{map.width(), map.height()});
   const double read_ms =
       milliseconds(std::chrono::steady_clock::now() - read_at);
   require(std::holds_alternative<CoarseGraph>(read) &&

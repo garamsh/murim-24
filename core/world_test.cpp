@@ -8097,6 +8097,22 @@ TEST(World, AWorldGivenItsMapsBareGraphRebuildsItWhereItsStructuresBlock) {
   EXPECT_TRUE(given.graph() == built.graph());
 }
 
+TEST(World, AWorldRefusesABareGraphOfAMapOfAnotherSize) {
+  constexpr std::size_t SIDE = 96;
+  const std::vector<std::string> rows = open_map(SIDE);
+  const ArmySpec walkers =
+      army(rows, Cell{5, 5}, Cell{90, 90}, 1, 1, 0, {IDLE});
+  const CoarseGraph smaller{Map{open_map(AREA_SIDE)}};
+  const auto created = [&](const CoarseGraph& bare) {
+    return World{Seed{1}, Map{rows}, {walkers}, {}, peaceful(0),
+                 {},      {},        {},        {}, bare};
+  };
+
+  EXPECT_THROW(static_cast<void>(created(smaller)), std::invalid_argument);
+  // Control: the graph of the world's own map is taken.
+  EXPECT_NO_THROW(static_cast<void>(created(CoarseGraph{Map{rows}})));
+}
+
 // A map of two rows of ten areas, open but for `structures`, with army 0
 // steered at its east end on the low profile, and armies bound east and south
 // from its first area, which its tiers then make far.

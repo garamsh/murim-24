@@ -77,7 +77,8 @@ bool save(const Saved& saved, SaveStore& store, Slot slot);
 /// Reads the save in `slot` of `store` as load() does, taking the world's
 /// coarse graph from `bare`, the graph of the map the world was created on
 /// before its structures blocked their cells, rebuilt where they block,
-/// rather than building it.
+/// rather than building it; a `bare` of a map of another size than the
+/// save's refuses it as CORRUPTED.
 [[nodiscard]] std::variant<Saved, LoadError> load(const SaveStore& store,
                                                   Slot slot,
                                                   const CoarseGraph& bare);

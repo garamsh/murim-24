@@ -766,7 +766,8 @@ class World {
   World(Map map, Rules rules, Life life, std::optional<CoarseGraph> bare);
 
   /// Returns `bare`, the coarse graph of `map` before `structures` blocked
-  /// their footprints, rebuilt over `map` where the blocking ones lie.
+  /// their footprints, rebuilt over `map` where the blocking ones lie. Throws
+  /// std::invalid_argument when `bare` is of a map of another size.
   [[nodiscard]] static CoarseGraph graph_of(
       const Map& map, CoarseGraph bare,
       const std::vector<Structure>& structures);

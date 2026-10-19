@@ -1102,6 +1102,9 @@ World::World(Map map, Rules rules, Life life, std::optional<CoarseGraph> bare)
 
 CoarseGraph World::graph_of(const Map& map, CoarseGraph bare,
                             const std::vector<Structure>& structures) {
+  if (bare.size().width != map.width() || bare.size().height != map.height()) {
+    throw std::invalid_argument("a bare graph must be of the world's map");
+  }
   std::vector<Cell> blocked;
   for (const Structure& structure : structures) {
     if (!structure.blocks || !spans(structure.footprint)) {

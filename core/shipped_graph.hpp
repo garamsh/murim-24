@@ -31,10 +31,11 @@ enum class GraphFault : std::uint8_t {
 [[nodiscard]] std::vector<std::uint8_t> ship_graph(const CoarseGraph& graph,
                                                    MapHash map);
 
-/// Reads the graph `bytes` ship for the compiled map whose hash is `map`, or
-/// why it is refused. Its indices are checked against its own areas and
-/// regions; that it is the graph of `map` rests on the hash.
+/// Reads the graph `bytes` ship for the compiled map whose hash is `map`, of
+/// `size` cells, or why it is refused. A graph of a map of another size is
+/// refused as CORRUPTED, and its indices are checked against its own areas
+/// and regions; that it is the graph of `map` rests on the hash.
 [[nodiscard]] std::variant<CoarseGraph, GraphFault> read_shipped_graph(
-    const std::vector<std::uint8_t>& bytes, MapHash map);
+    const std::vector<std::uint8_t>& bytes, MapHash map, Footprint size);
 
 }  // namespace murim

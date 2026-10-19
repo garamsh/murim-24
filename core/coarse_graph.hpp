@@ -206,6 +206,9 @@ class CoarseGraph {
   [[nodiscard]] bool costed_in_closed_form(std::size_t area) const;
 
   [[nodiscard]] std::int32_t columns() const;
+
+  /// Returns the size of the map the graph is of, in cells.
+  [[nodiscard]] Footprint size() const;
   [[nodiscard]] std::size_t area_of(Cell cell) const;
   [[nodiscard]] std::size_t node_count() const;
   [[nodiscard]] const CoarseNode& node(NodeRef ref) const;
