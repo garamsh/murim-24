@@ -9,13 +9,15 @@
 ## cells' side; that across cells something is built on, the same edge runs straight down the cells'
 ## side on every row; and that streaming shows the areas round the view, an area at most a frame
 ## once the first are shown, frees those it left, and shows an area's trees again where they were.
-## It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw.
+## Given a reach past the map's bottom before the bake, or after it, when it bakes the areas on that
+## edge again and frees the viewport, every pixel from above the map's drawn bottom down to that
+## reach is painted, beside raised ground on the last row as beside level ground (#400). It exits 0 when every check passes, 1 when one fails and 2 when it cannot draw.
 extends SceneTree
 
 const Ground := preload("res://world_art/ground.gd")
 # Plain, with forest from column EDGE on and a block of mountain toward the bottom left, so a chunk
-# holds raised strips.
-const SIZE := Vector2i(70, 40)
+# holds raised strips; two chunks deep, so the bottom edge's chunks end with the map.
+const SIZE := Vector2i(70, 64)
 const EDGE := 24
 const MOUNTAIN := Rect2i(2, 28, 10, 8)
 # Rows of the image, from its top, the edge is read along: ground at level 0 well away from the
@@ -32,6 +34,10 @@ const READ := 0.9
 # Cells built on across the edge, below ROWS and clear of the mountain, whose rows the edge must run
 # straight down.
 const BUILT := Rect2i(EDGE - 3, 25, 6, 4)
+# Ground raised on the map's last rows, so the bottom edge runs beside raised ground; and how far
+# past the bottom the view is given to show, covered() at 2048×1536 with the touch controls.
+const RAISED_EDGE := Rect2i(44, 60, 8, 4)
+const PAST := 87.0
 const VIEW := Vector2(640, 360)
 const FRAMES := 600
 
@@ -45,6 +51,7 @@ var _first_trees := []
 var _path := 0
 var _shown_before := 0
 var _most_new := 0
+var _bakes := 0
 
 
 func _initialize() -> void:
@@ -60,6 +67,9 @@ func _initialize() -> void:
 		for x in range(MOUNTAIN.position.x, MOUNTAIN.end.x):
 			relief.lay(Vector2i(x, y), "rock", 2 if Rect2i(MOUNTAIN).grow(-1).has_point(Vector2i(x, y)) else 4,
 					"rock_face", false)
+	for y in range(RAISED_EDGE.position.y, RAISED_EDGE.end.y):
+		for x in range(RAISED_EDGE.position.x, RAISED_EDGE.end.x):
+			relief.lay(Vector2i(x, y), "rock", 2, "rock_face", false)
 	for y in range(BUILT.position.y, BUILT.end.y):
 		for x in range(BUILT.position.x, BUILT.end.x):
 			relief.build(Vector2i(x, y))
@@ -68,6 +78,8 @@ func _initialize() -> void:
 	_warped = _ground(relief, {"open_at": open_at})
 	_again = _ground(relief, {"open_at": open_at})
 	_blocky = _ground(relief, {"open_at": open_at, "shader": {"warp": 0.0}})
+	# Given its reach past the bottom before it bakes, as the play scene gives it before the first.
+	_blocky.past_bottom = PAST
 
 
 func _ground(relief: Relief, options: Dictionary) -> Node2D:
@@ -96,7 +108,20 @@ func _process(_delta: float) -> bool:
 			_check_same()
 			_check_edge()
 			_check_built()
+			_check_past(_blocky)
 			_first_trees = _warped.trees_of(Vector2i.ZERO)
+			_bakes = _again.bake_usec.size()
+			_again.past_bottom = PAST
+			_phase = "reach"
+		"reach":
+			if _again.stream(Rect2(Vector2.ZERO, VIEW)):
+				_phase = "reached"
+		"reached":
+			var again: int = _again.bake_usec.size() - _bakes
+			var across := ceili(float(SIZE.x) / Ground.CHUNK)
+			_check("ground_check: given %.0f past the bottom, %d chunks baked again of the %d on the bottom edge, the grounds holding %d viewports" % [
+				PAST, again, across, _viewports()], again == across and _viewports() == 0)
+			_check_past(_again)
 			_phase = "stream"
 		"stream":
 			_stream_step()
@@ -158,6 +183,38 @@ func _check_built() -> void:
 	_check("ground_check: across the built cells the forest begins at x %d on %d of %d rows %s, from x %d to %d" % [
 		side, straight, rows.y - rows.x, rows, xs.min() if not xs.is_empty() else -1, xs.max() if not xs.is_empty() else -1],
 			xs.size() == rows.y - rows.x and straight == xs.size())
+
+
+# Every pixel of `ground`'s chunks on the map's bottom edge, its ground and its strips together, is
+# painted from the highest the last row is raised above the map's bottom down to PAST below it,
+# across the map; read beside RAISED_EDGE apart, where the issue saw the strip (#400).
+func _check_past(ground: Node2D) -> void:
+	var bottom := SIZE.y * int(Relief.CELL.y)
+	var rows := Vector2i(bottom - 2 * Relief.LEVEL_PX, bottom + int(PAST))
+	var clear := 0
+	var beside := 0
+	for cx in ceili(float(SIZE.x) / Ground.CHUNK):
+		var key := Vector2i(cx, (SIZE.y - 1) / Ground.CHUNK)
+		var images: Dictionary = ground.images_of(key)
+		var at: Vector2 = images.ground_at
+		var whole := (images.ground as Image).duplicate() as Image
+		for strip: Vector2i in images.strips:
+			var piece: Dictionary = images.strips[strip]
+			var image: Image = piece.image
+			whole.blend_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(piece.at - at))
+		for y in range(rows.x, rows.y):
+			for x in whole.get_width():
+				var column := int(at.x) + x
+				if column >= SIZE.x * int(Relief.CELL.x):
+					break
+				var inside := y - int(at.y) < whole.get_height()
+				if not inside or whole.get_pixel(x, y - int(at.y)).a < 1.0:
+					clear += 1
+					if column >= RAISED_EDGE.position.x * int(Relief.CELL.x) - 16 \
+							and column < RAISED_EDGE.end.x * int(Relief.CELL.x) + 16:
+						beside += 1
+	_check("ground_check: from y %d to %d across the map's bottom edge, %d pixels unpainted, %d of them beside the raised ground on the last rows" % [
+		rows.x, rows.y, clear, beside], clear == 0)
 
 
 # For each row of `rows` of `ground`'s first chunk, the first x from which four pixels running are

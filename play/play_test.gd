@@ -141,6 +141,7 @@ func run() -> bool:
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _camera_walk_pass() and _foot_pass() \
+			and _reach_pass() \
 			and _grade_pass()
 
 
@@ -283,6 +284,52 @@ func _foot_pass() -> bool:
 	var passed := at_edge and prompted > 0 and covered.is_empty() and centred
 	print("play_test: born in village 0, within two cells of the map's drawn bottom at every check %s; of %d checks, %d with the talk prompt; covered or off the room: %s; centred on the map's middle %s: %s" % [
 		at_edge, checks, prompted, covered if not covered.is_empty() else "none", centred, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
+
+
+# Born on the map's bottom edge, in village 0, every pixel the camera shows lies within what the
+# ground draws, on a PC at 1920×1080 and 1280×720 and with the touch controls at 2048×1536 and
+# 2400×1080, the ground reaching as far below the map as covered() (#400). Control: at 2048×1536 with
+# the touch controls, the ground held to its BOTTOM_PAD below the map falls short of the view. Setup:
+# at each the view shows past the map's drawn bottom, where the unpainted strip showed.
+func _reach_pass() -> bool:
+	var Play := preload("res://play/play.gd")
+	var ViewScale := preload("res://view_scale.gd")
+	var scene := _scene(0)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	var art: Node2D = scene.get_node("WorldArt")
+	var ground: Node2D = art.get_node("Ground")
+	var camera: Camera2D = scene.get_node("Camera")
+	var rows: PackedStringArray = scene.world.map_rows()
+	var bottom: float = Play.drawn_bounds(Vector2(rows[0].length(), rows.size()) * art.CELL, art.relief).end.y
+	var ends := []
+	var past := true
+	var short := []
+	var control := true
+	for layout: Array in [[Vector2(1920, 1080), false], [Vector2(1280, 720), false], [Vector2(2048, 1536), true],
+			[Vector2(2400, 1080), true]]:
+		var window: Vector2 = layout[0]
+		var zoom := float(ViewScale.world_scale(Vector2i(window), layout[1]))
+		camera.zoom = Vector2(zoom, zoom)
+		art.pixel_scale = zoom
+		hud.fit(Vector2i(window), layout[1])
+		scene.aim_camera(window)
+		var screen := window / zoom
+		var view := Rect2(camera.position - screen / 2.0, screen)
+		past = past and view.end.y > bottom
+		ends.append(view.end.y)
+		var drawn: Rect2 = ground.drawn()
+		if not drawn.encloses(view):
+			short.append("%s touch %s: the view %s, the ground %s" % [window, layout[1], view, drawn])
+		if window == Vector2(2048, 1536):
+			ground.past_bottom = 0.0
+			control = not ground.drawn().encloses(view)
+			print("play_test: at 2048×1536 with the touch controls, covered %.1f; the ground held to its pad ends at %.1f against the view's %.1f" % [
+				scene.covered(window), ground.drawn().end.y, view.end.y])
+	var passed := past and short.is_empty() and control
+	print("play_test: born in village 0, the view ends at %s, past the map's drawn bottom at %.1f at every layout %s; the ground short of it: %s; held to its pad, short at 2048×1536 %s: %s" % [
+		ends, bottom, past, short if not short.is_empty() else "none", control, "pass" if passed else "FAIL"])
 	scene.free()
 	return passed
 
