@@ -37,21 +37,28 @@ class WorldAdapter : public godot::RefCounted {
 
  public:
   /// Returns an adapter over a world created from `seed`, a map of
-  /// `map_rows`, `armies`, `structures`, `rules` and `leadership`, as the
-  /// core's constructor takes them, each struct as a Dictionary keyed by its
-  /// field names:
+  /// `map_rows`, `armies`, `structures`, `rules`, `leadership` and
+  /// `villages`, as the core's constructor takes them, each struct as a
+  /// Dictionary keyed by its field names:
   /// - army: `objective` (Vector2i cell), `members` (Array of members),
   ///   `faction` (int) and `skills` (Array of skills);
   /// - member: `cell` (Vector2i) and `health` (int), a new person;
   /// - skill: `range`, `radius`, `body_damage`, `structure_damage`,
   ///   `cooldown` (int) and `shape` (int, one of the SHAPE_* constants,
   ///   SHAPE_AREA where it is left out);
-  /// - structure: `cell` (Vector2i) and `durability` (int);
+  /// - structure: `cell` (Vector2i), `durability` (int), `footprint`
+  ///   (Vector2i, 1x1 where it is left out) and `kind` (String, none where it
+  ///   is left out), which structure_kind() gives back;
   /// - rules: `separation` (int), `hostile` (Array of Arrays of bool) and
   ///   `stage_floors` (Array of three ints);
   /// - leadership, one per faction, may be left out: `leader` (int, a
   ///   person) and `duel` (`members_only` and `allies_turn_hostile`, bool,
-  ///   and `yield_health`, int), each left out when the faction has none.
+  ///   and `yield_health`, int), each left out when the faction has none;
+  /// - village, all of them may be left out: `name` and `kind` (String, the
+  ///   template it was laid out from), `corner` and `area` (Vector2i),
+  ///   `residents` (int, an army) and `structures` (Array of ints), the core
+  ///   taking each structure's kind as what it names; villages() gives it
+  ///   back.
   /// Returns null, after push_error, when the core or the conversion to its
   /// types refuses the input.
   static godot::Ref<WorldAdapter> create(
@@ -59,7 +66,8 @@ class WorldAdapter : public godot::RefCounted {
       const godot::TypedArray<godot::Dictionary>& armies,
       const godot::TypedArray<godot::Dictionary>& structures,
       const godot::Dictionary& rules,
-      const godot::TypedArray<godot::Dictionary>& leadership = {});
+      const godot::TypedArray<godot::Dictionary>& leadership = {},
+      const godot::TypedArray<godot::Dictionary>& villages = {});
 
   /// Returns an adapter over the core's M1 benchmark scenario.
   static godot::Ref<WorldAdapter> create_m1();

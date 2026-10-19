@@ -189,8 +189,54 @@ murim::ArmySpec army_spec(const godot::Dictionary& fields) {
 }
 
 murim::Structure structure(const godot::Dictionary& fields) {
-  return murim::Structure{cell(fields, "cell"),
-                          integer<std::uint32_t>(fields, "durability")};
+  murim::Structure built{cell(fields, "cell"),
+                         integer<std::uint32_t>(fields, "durability")};
+  if (fields.has("footprint")) {
+    const murim::Cell size = cell(fields, "footprint");
+    built.footprint = murim::Footprint{size.x, size.y};
+  }
+  return built;
+}
+
+godot::String text(const godot::Dictionary& fields, const char* key) {
+  return field(fields, key, godot::Variant::STRING);
+}
+
+// A structure's `kind`, or none where it is left out.
+std::string kind_of(const godot::Dictionary& fields) {
+  return fields.has("kind") ? text(fields, "kind").utf8().get_data() : "";
+}
+
+// A village as villages() shows it. Its faction is left unset, since
+// villages() reads its residents' owner from the world.
+murim::Village village(const godot::Dictionary& fields) {
+  murim::Village shown{};
+  shown.name = text(fields, "name").utf8().get_data();
+  shown.kind = text(fields, "kind").utf8().get_data();
+  shown.corner = cell(fields, "corner");
+  const murim::Cell area = cell(fields, "area");
+  shown.area = murim::Footprint{area.x, area.y};
+  shown.army = integer<std::size_t>(fields, "residents");
+  shown.structures =
+      each(array(fields, "structures"), [](const godot::Variant& structure) {
+        return narrow<std::size_t>(
+            typed(structure, godot::Variant::INT, "structures"), "structures");
+      });
+  return shown;
+}
+
+// The core's spec of `village`, with each of its structures' kinds from
+// `kinds`. A structure out of range takes none and is left for the core to
+// refuse.
+murim::VillageSpec village_spec(const murim::Village& village,
+                                const std::vector<std::string>& kinds) {
+  std::vector<std::string> named;
+  named.reserve(village.structures.size());
+  for (const std::size_t structure : village.structures) {
+    named.push_back(structure < kinds.size() ? kinds.at(structure) : "");
+  }
+  return murim::VillageSpec{village.structures, village.army, {}, 0, {},
+                            std::move(named)};
 }
 
 std::vector<bool> hostile_row(const godot::Array& row) {
@@ -367,16 +413,26 @@ godot::Ref<WorldAdapter> WorldAdapter::create(
     const godot::TypedArray<godot::Dictionary>& armies,
     const godot::TypedArray<godot::Dictionary>& structures,
     const godot::Dictionary& rules,
-    const godot::TypedArray<godot::Dictionary>& leaderships) {
+    const godot::TypedArray<godot::Dictionary>& leaderships,
+    const godot::TypedArray<godot::Dictionary>& villages) {
   // The one handler for the core's refusal: it must not cross into Godot.
   try {
     std::vector<std::string> rows;
     for (const godot::String& row : map_rows) {
       rows.emplace_back(row.utf8().get_data());
     }
-    return over(murim::Seed{static_cast<std::uint64_t>(seed)}, std::move(rows),
-                each(armies, army_spec), each(structures, structure),
-                murim_godot::rules(rules), {}, each(leaderships, leadership));
+    std::vector<std::string> kinds = each(structures, kind_of);
+    const auto spec = [&kinds](const godot::Variant& given) {
+      return village_spec(village(given), kinds);
+    };
+    godot::Ref<WorldAdapter> adapter =
+        over(murim::Seed{static_cast<std::uint64_t>(seed)}, std::move(rows),
+             each(armies, army_spec), each(structures, structure),
+             murim_godot::rules(rules), each(villages, spec),
+             each(leaderships, leadership));
+    adapter->structure_kinds_ = std::move(kinds);
+    adapter->villages_ = each(villages, village);
+    return adapter;
   } catch (const std::invalid_argument& error) {
     godot::UtilityFunctions::push_error("WorldAdapter.create: ", error.what());
     return {};
@@ -1815,8 +1871,9 @@ void WorldAdapter::_bind_methods() {
   godot::ClassDB::bind_static_method(
       name,
       godot::D_METHOD("create", "seed", "map_rows", "armies", "structures",
-                      "rules", "leadership"),
-      &WorldAdapter::create, DEFVAL(godot::TypedArray<godot::Dictionary>()));
+                      "rules", "leadership", "villages"),
+      &WorldAdapter::create, DEFVAL(godot::TypedArray<godot::Dictionary>()),
+      DEFVAL(godot::TypedArray<godot::Dictionary>()));
   godot::ClassDB::bind_static_method(name, godot::D_METHOD("create_m1"),
                                      &WorldAdapter::create_m1);
   godot::ClassDB::bind_static_method(
