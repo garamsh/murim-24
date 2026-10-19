@@ -1136,6 +1136,33 @@ TEST(MapContent, AGraphShippedForAnotherMapRefusesTheContentAtTheGraph) {
   EXPECT_TRUE(own.data.has_value());
 }
 
+TEST(MapContent, TheGraphToShipIsItsMapsGraphForThePackPaintingIt) {
+  const Painting painting = ranged_map(ROUTE_SIDE, PassShift{0});
+  MemoryPacks mods;
+  add_map(mods, painting);
+  // A graph shipped for the map before it moved, which loading refuses, is
+  // ignored while its successor is built.
+  mods.ship(PAINTER,
+            its_graph(load_painting(ranged_map(ROUTE_SIDE, PassShift{1}))));
+  ASSERT_FALSE(
+      load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER})
+          .data.has_value());
+
+  const auto made =
+      graph_to_ship(BaseAndMods{mods}, murim_packs::BASE_PACK, {PAINTER});
+
+  ASSERT_TRUE(std::holds_alternative<GraphToShip>(made));
+  EXPECT_EQ(std::get<GraphToShip>(made).pack, PAINTER);
+  const LoadedContent loaded =
+      shipping(painting, std::get<GraphToShip>(made).bytes);
+  EXPECT_TRUE(loaded.errors.empty());
+  EXPECT_TRUE(holds_its_graph(loaded));
+  // Control: the base pack alone paints no map, so there is nothing to ship.
+  EXPECT_TRUE(std::holds_alternative<NoMap>(
+      graph_to_ship(murim_packs::DirectoryPacks{MURIM_PACKS_DIR},
+                    murim_packs::BASE_PACK, {})));
+}
+
 TEST(MapContent, AKeyRouteWalkedWithinAFifthOverItsLengthIsKept) {
   for (const std::int32_t shift : {-1, 0, 1}) {
     const LoadedContent kept =

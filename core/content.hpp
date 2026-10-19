@@ -179,4 +179,23 @@ struct LoadedContent {
 [[nodiscard]] std::optional<std::string> graph_pack(
     const PackSource& source, const std::vector<std::string>& order);
 
+/// A graph to ship: the pack it goes in and its bytes, as ship_graph gives
+/// them.
+struct GraphToShip {
+  std::string pack;
+  std::vector<std::uint8_t> bytes;
+};
+
+/// That the packs loaded paint no map.
+struct NoMap {};
+
+/// What the build tool ships with the map the base pack `base` and the mods
+/// `mods` paint, loaded from `source` as load_content() loads them but
+/// ignoring any graph they ship: the coarse graph of the compiled map's
+/// footing, for graph_pack(); NoMap when they paint none; or the errors
+/// refusing them.
+[[nodiscard]] std::variant<GraphToShip, NoMap, std::vector<ContentError>>
+graph_to_ship(const PackSource& source, const std::string& base,
+              const std::vector<std::string>& mods);
+
 }  // namespace murim

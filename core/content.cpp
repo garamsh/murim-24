@@ -1520,4 +1520,49 @@ std::optional<std::string> graph_pack(const PackSource& source,
   return *painter;
 }
 
+namespace {
+
+// `source` with no graph shipped in any pack, so one built for an earlier
+// map refuses nothing while its successor is built.
+class Unshipped : public PackSource {
+ public:
+  explicit Unshipped(const PackSource& source) : source_(&source) {}
+
+  [[nodiscard]] ContentRead read(const std::string& pack,
+                                 const std::string& document) const override {
+    return source_->read(pack, document);
+  }
+
+  [[nodiscard]] std::vector<std::string> documents(
+      const std::string& pack) const override {
+    return source_->documents(pack);
+  }
+
+  [[nodiscard]] GraphRead read_graph(
+      const std::string& /*pack*/) const override {
+    return NoGraph{};
+  }
+
+ private:
+  const PackSource* source_;
+};
+
+}  // namespace
+
+std::variant<GraphToShip, NoMap, std::vector<ContentError>> graph_to_ship(
+    const PackSource& source, const std::string& base,
+    const std::vector<std::string>& mods) {
+  const Unshipped unshipped{source};
+  LoadedContent loaded = load_content(unshipped, base, mods);
+  if (!loaded.data) {
+    return std::move(loaded.errors);
+  }
+  const std::optional<std::string> pack = graph_pack(source, loaded.order);
+  if (!loaded.map || !pack) {
+    return NoMap{};
+  }
+  const CoarseGraph graph{Map{footing_rows(*loaded.map)}};
+  return GraphToShip{*pack, ship_graph(graph, loaded.map->hash())};
+}
+
 }  // namespace murim

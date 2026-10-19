@@ -124,8 +124,10 @@ android: build
 # Not part of ci: it builds the macOS universal library with the host's SDK, so it runs on a Mac, and fetches
 # the Windows cross toolchain mingw-toolchain.sh pins. Every library is a release build, which a release export loads.
 # The Linux library is built by that toolchain's Clang and LLD against the glibc 2.31 sysroot linux-sysroot.sh pins (ADR 0074).
+# murim_map first writes the coarse graph of the map the base pack paints into it, so the export ships it (ADR 0047).
 EXTENSION_RELEASE := -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 -DGODOTCPP_TARGET=template_release
 export: build
+	$(BUILD_DIR)/packs_json/murim_map packs wuxia
 	SDKROOT=$$(xcrun --show-sdk-path) $(TOOLS)/cmake -S extension -B $(MACOS_BUILD_DIR) $(EXTENSION_RELEASE) -DCMAKE_OSX_ARCHITECTURES='arm64;x86_64'
 	$(TOOLS)/cmake --build $(MACOS_BUILD_DIR) --target murim_extension
 	./mingw-toolchain.sh $(MINGW_DIR)

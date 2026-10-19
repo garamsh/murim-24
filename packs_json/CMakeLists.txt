@@ -12,3 +12,9 @@ add_library(murim_packs_json json_packs.cpp)
 target_include_directories(murim_packs_json PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(murim_packs_json PUBLIC murim_core PRIVATE nlohmann_json::nlohmann_json)
 target_compile_options(murim_packs_json PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+
+# The build tool that ships a hand-made map's coarse graph in the pack
+# painting it (ADR 0047).
+add_executable(murim_map map_tool.cpp)
+target_link_libraries(murim_map PRIVATE murim_packs_json)
+target_compile_options(murim_map PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
