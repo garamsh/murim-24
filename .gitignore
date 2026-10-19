@@ -23,6 +23,9 @@ __pycache__/
 .venv/
 target/
 
+# The coarse graph murim_map writes into a pack painting a map (ADR 0047), built by make export
+packs/*/map/graph.bin
+
 # Godot (github/gitignore@0e5d690 Godot.gitignore, Mono lines dropped: no C#)
 .godot/
 /android/

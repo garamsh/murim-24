@@ -78,7 +78,8 @@ How the core generates a region from a seed: what exists of it now, and the deci
   - `murim_map`, the build tool in `packs_json/`, loads the packs, compiles their map, builds the graph of its footing and writes it to `map/graph.bin` of the last pack to author a map document, ignoring any graph the packs already ship; `make export` runs it over the base pack first, and it writes nothing while the packs paint no map;
   - the file is the save's encoding (ADR 0030) under a magic, a format version, the compiled map's hash and a checksum, every index checked against the graph's own areas and regions on read;
   - `load_content` reads that pack's graph, if it ships one, and refuses the merged set at its `map/graph` as `INCONSISTENT` when the graph was built for another map's hash, and as `UNREADABLE` when it cannot be read;
-  - a world created or loaded on the map takes the graph and rebuilds only the areas its blocking structures lie in (`simulation.md`).
+  - a world created or loaded on the map takes the graph and rebuilds it under its blocking structures, by the rebuild a lay makes (`simulation.md`);
+  - the file is written by `make export` and is not committed, as the compiled map is not (ADR 0047): `.gitignore` names it.
 - A compiled map of 8,192 cells holds 64 MiB of cells and 256 KiB of lands. Loading the base pack with the test map, which compiles, hashes and validates it, took about 145 ms in the Release build on the development Mac, at a load average of 30, measured by `MapContent.ATestMapOf8192CellsCompilesThroughTheBasePackToItsPinnedHash`, which loads two such maps in 283 to 295 ms over three runs. The delta layer, ADR 0070's 128 MiB budget with it full, and its 2 seconds' load wait for the steps that build the delta layer and the first map's content.
 
 ### A world on the map
