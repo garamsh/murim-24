@@ -9,6 +9,7 @@
 # points from one seed are the same, none nearer another than the spacing. The ground and its raised
 # strips are drawn with the ground's material, and its trees are not. The areas on the map's edges
 # draw the rows past them, and those on the bottom edge reach past_bottom, baked again as it grows.
+# No detail lands on what is built or the row along its sides, and it still does on the plain.
 extends RefCounted
 
 const Ground := preload("res://world_art/ground.gd")
@@ -17,6 +18,12 @@ const SIZE := Vector2i(100, 40)
 const FOREST := 20
 # Cells no tree may stand on, inside the forest.
 const CLEARED := Rect2i(24, 4, 6, 6)
+# Where the detail pass builds on the plain, in blocks of BLOCK cells a block apart, so the rows
+# along them run long; and as many blocks left natural below, its control. Trees are kept two cells
+# clear of both, so their shadows mark neither.
+const BUILT := Rect2i(2, 2, 16, 12)
+const NATURAL := Rect2i(2, 18, 16, 12)
+const BLOCK := 2
 const VIEW := Vector2(640, 360)
 
 var _calls := 0
@@ -26,7 +33,7 @@ var _raised_row := -1
 
 func run() -> bool:
 	return _seeds_pass() and _poisson_pass() and _waits_pass() and _bake_pass() and _stream_pass() \
-			and _placement_pass() and _material_pass() and _edges_pass()
+			and _placement_pass() and _material_pass() and _edges_pass() and _detail_pass()
 
 
 static func _relief() -> Relief:
@@ -51,8 +58,12 @@ func _render(key: Vector2i, pass_kind: int, image_at: Rect2i, relief: Relief, ro
 	return image
 
 
-func _ground(options := {}) -> Node2D:
+func _ground(options := {}, built: Array[Rect2i] = []) -> Node2D:
 	var relief := _relief()
+	for block in built:
+		for y in range(block.position.y, block.end.y):
+			for x in range(block.position.x, block.end.x):
+				relief.build(Vector2i(x, y))
 	var ground := Ground.new()
 	ground.standing = Node2D.new()
 	ground.render = func(key: Vector2i, pass_kind: int, image_at: Rect2i) -> Image:
@@ -274,3 +285,40 @@ func _edges_pass() -> bool:
 		redrawn, "pass" if passed else "FAIL"])
 	_free(ground)
 	return passed
+
+
+# The stand-in draws each cell flat in its kind's colour, so every other pixel of the plain is
+# detail. None lies on the cells built on over BUILT or the row of pixels along their sides (#411).
+# Control: some lies over the same blocks of NATURAL and the rows along them.
+func _detail_pass() -> bool:
+	var clear := func(cell: Vector2i) -> bool: return not (BUILT.grow(2).has_point(cell) or NATURAL.grow(2).has_point(cell))
+	var ground := _ground({"open_at": clear}, _blocks(BUILT))
+	ground.stream(Rect2(Vector2.ZERO, VIEW))
+	var image: Image = ground.images_of(Vector2i.ZERO).ground
+	var top := Vector2i(ground.images_of(Vector2i.ZERO).ground_at)
+	var plain := Color8(Relief.KINDS.find("plain") * 10, 120, 40)
+	var marked := func(blocks: Array[Rect2i]) -> int:
+		var count := 0
+		for block in blocks:
+			var pixels := Rect2i(block.position * Vector2i(Relief.CELL), block.size * Vector2i(Relief.CELL)).grow(1)
+			for y in range(pixels.position.y, pixels.end.y):
+				for x in range(pixels.position.x, pixels.end.x):
+					if image.get_pixelv(Vector2i(x, y) - top) != plain:
+						count += 1
+		return count
+	var on_built: int = marked.call(_blocks(BUILT))
+	var on_natural: int = marked.call(_blocks(NATURAL))
+	var passed: bool = ground.baked and on_built == 0 and on_natural > 0
+	print("ground_test: detail on %d pixels of %d built blocks and the rows along them, on %d of as many natural ones: %s" % [
+		on_built, _blocks(BUILT).size(), on_natural, "pass" if passed else "FAIL"])
+	_free(ground)
+	return passed
+
+
+# The blocks of BLOCK cells over `area`, a block apart along each row and column.
+static func _blocks(area: Rect2i) -> Array[Rect2i]:
+	var blocks: Array[Rect2i] = []
+	for y in range(area.position.y, area.end.y, 2 * BLOCK):
+		for x in range(area.position.x, area.end.x, 2 * BLOCK):
+			blocks.append(Rect2i(x, y, BLOCK, BLOCK))
+	return blocks

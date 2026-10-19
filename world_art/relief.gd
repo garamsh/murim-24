@@ -214,6 +214,13 @@ func cell_image_of(window: Rect2i) -> Image:
 	return Image.create_from_data(window.size.x, window.size.y, false, Image.FORMAT_RGBA8, data)
 
 
+## Whether `point`, in pixels on the unraised ground, lies on a cell something is built on or on the
+## row of pixels along its sides, where no ground effect reaches (#200), as ground.gdshader's crisp()
+## reads it.
+func crisp_at(point: Vector2) -> bool:
+	return _from_built(point) < 1.0
+
+
 ## The cells as lift_at() reads them, for a reader of its own: their `size`, each cell's `level`,
 ## whether it rises as a `slope` (1) or not (0), and its `flat` level plus one where the ground round
 ## it is flat, else 0.
