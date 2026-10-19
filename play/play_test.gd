@@ -77,7 +77,7 @@ const UNORTHODOX_VILLAGE := 2
 # Ticks a Cult body marched on the largest hostile army has to die there.
 const MARCH_LIMIT := 12000
 # A region whose growth forms an army after the player's within fifteen years of five-tick days.
-const GROWN_SEED := 3
+const GROWN_SEED := 0
 const GROWN_TICKS_PER_DAY := 5
 # The region the art slot is measured in: the first seed from 0 on which, ten years lived, an army's
 # lead knows one art skill, reaching otherwise than its army's first skill, and may cast it.
@@ -710,8 +710,8 @@ func _move_pass() -> bool:
 	return passed
 
 
-# Q holds the army's first skill, its targeted strike, and W its second, an area round the person
-# that shares the army's cooldown. Setup: key 1 leaves the person striking with the first alone,
+# Q holds the person's first skill, its weapon's targeted strike, and W its second, the army's area
+# round the person, which shares that strike's cooldown. Setup: key 1 leaves the person striking with the first alone,
 # which finds no foe at home, so its ready tick moves only for a cast. Cast on press: Q, with no one
 # selected and no foe in reach, is refused as no target, its reason on the HUD, and the ready tick
 # stays; W's press is accepted and the ready tick moves on the next tick; control, the same scene
@@ -742,7 +742,7 @@ func _cast_pass() -> bool:
 	var releasing := _cast_scene(true)
 	var aim: Node2D = releasing.get_node("Aim")
 	var person: Vector2 = releasing.get_node("WorldArt").to_screen(releasing.lead())
-	var reach: float = releasing.world.skills(releasing.steered)[0]["range"] * WorldArt.CELL.x \
+	var reach: float = releasing.world.person_skills(releasing.world.roster(releasing.steered)[0])[0]["range"] * WorldArt.CELL.x \
 			/ WorldAdapter.CELL_SIZE
 	var held: bool = not releasing.command(_key(KEY_Q)) and releasing.aiming() == KEY_Q
 	var shown: bool = aim.visible and aim.point == (person + CAST_OFFSET).floor() and aim.reach == reach
@@ -1655,14 +1655,14 @@ func _arts_pass() -> bool:
 
 
 # In a region of five-tick days lived ten years, steering the first lead of an army who knows one art
-# skill beyond its army's skills, reaching otherwise than its army's first skill and ready to cast,
+# skill beyond its drilled skills, reaching otherwise than its army's own first skill and ready to cast,
 # with that skill put on T from the arts panel: T's slot on the technique
 # bar shows it, its key's cap reads T, T held to aim shows its range, and the fifth skill button
 # dragged to the pad's edge casts it at its full range, and tapped casts it at whom the aim finds
 # within that range or at the point that far the way the person faces. Control: R's slot, empty,
-# shows and casts nothing, from the key and from the button, and Q held aims at its army skill's
-# range, which differs. Setup: the art skill's range differs from the army skill's, and the person
-# may cast it.
+# shows and casts nothing, from the key and from the button, and W held aims at its army skill's
+# range, which differs; Q holds the weapon's strike, which an art matches in reach. Setup: the art
+# skill's range differs from the army skill's, and the person may cast it.
 func _art_slot_pass() -> bool:
 	var lived := WorldAdapter.create_region(ART_SEED, 0, GROWN_TICKS_PER_DAY)
 	for i in 10 * 120 * GROWN_TICKS_PER_DAY:
@@ -1673,8 +1673,8 @@ func _art_slot_pass() -> bool:
 		if army >= 0 or roster.is_empty():
 			continue
 		var known := lived.person_skills(roster[0])
-		var first_art := lived.skills(each).size()
-		if known.size() == first_art + 1 and known[first_art].range != known[0].range \
+		var first_art := lived.skill_count(each)
+		if known.size() == first_art + 1 and known[first_art].range != known[1].range \
 				and lived.cast_refusal(roster[0], first_art, null) == WorldAdapter.CAST_NONE:
 			army = each
 	if army < 0:
@@ -1694,7 +1694,7 @@ func _art_slot_pass() -> bool:
 	hud.settings.chosen.cast = 1
 	var person: int = lived.roster(army)[0]
 	var skills := lived.person_skills(person)
-	var art_skill := lived.skills(army).size()
+	var art_skill := lived.skill_count(army)
 	var held := {"art": int(skills[art_skill].art), "skill": int(skills[art_skill].skill)}
 	scene.command(_key(scene.ARTS_KEY))
 	while hud.arts.selected != held and scene.command(_key(KEY_DOWN)):
@@ -1707,15 +1707,15 @@ func _art_slot_pass() -> bool:
 			and key.text == OS.get_keycode_string(scene.CAST_KEYS[4])
 	var pixels: float = WorldArt.CELL.x / WorldAdapter.CELL_SIZE
 	var art_reach: float = skills[art_skill].range * pixels
-	var army_reach: float = skills[0].range * pixels
+	var army_reach: float = skills[1].range * pixels
 	var aim: Node2D = scene.get_node("Aim")
 	scene.command(_motion(scene.get_node("WorldArt").to_screen(scene.lead()) + CAST_OFFSET, 0))
 	scene.command(_key(KEY_T))
 	var aimed: bool = aim.visible and aim.reach == art_reach
 	scene.command(_key(KEY_T))
-	scene.command(_key(KEY_Q))
+	scene.command(_key(KEY_W))
 	var army_aimed: bool = aim.visible and aim.reach == army_reach
-	scene.command(_key(KEY_Q))
+	scene.command(_key(KEY_W))
 	var empty_slot: bool = hud.slot_skills[3].is_empty() and hud.slot_icons[3].texture == null
 	scene.last_cast = {}
 	var r_refused: bool = scene.cast_at(3, scene.lead() * pixels + CAST_OFFSET) == WorldAdapter.CAST_NO_SKILL \
@@ -1749,7 +1749,7 @@ func _art_slot_pass() -> bool:
 	var button_empty: bool = scene.last_cast.is_empty() and touch.reach[3].is_empty() and touch.skill_count == 5
 	var set_up: bool = art_reach != army_reach and ready
 	var passed := set_up and shown and aimed and army_aimed and empty_slot and r_refused and reached and button_empty
-	print("play_test: army %d's person %d knows %d skills past its army's %d; the art skill %s on T shown %s; T aims at %.0f px %s, Q at %.0f px %s; R's empty slot shows none %s, casts none %s; the fifth button dragged cast %s and tapped %s at range %d %s; the fourth, empty, cast none %s (setup %s): %s" % [
+	print("play_test: army %d's person %d knows %d skills past its army's %d; the art skill %s on T shown %s; T aims at %.0f px %s, W at %.0f px %s; R's empty slot shows none %s, casts none %s; the fifth button dragged cast %s and tapped %s at range %d %s; the fourth, empty, cast none %s (setup %s): %s" % [
 		army, person, skills.size() - art_skill, art_skill, held, shown, art_reach, aimed, army_reach, army_aimed,
 		empty_slot, r_refused, dragged, tapped, skills[art_skill].range, reached, button_empty, set_up,
 		"pass" if passed else "FAIL"])

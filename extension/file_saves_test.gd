@@ -8,11 +8,11 @@ extends RefCounted
 
 const TestSaves := preload("res://extension/test_saves.gd")
 
-const REGION_SEED := 3
+const REGION_SEED := 0
 const OTHER_SEED := 8
 const TICKS_PER_DAY := 5
 # Fifteen years of five-tick days: this region's growth forms an army after the player's in its
-# thirteenth.
+# fourteenth.
 const LIVED_TICKS := 9000
 const MORE_TICKS := 1000
 const SLOT := 0

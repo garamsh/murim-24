@@ -45,7 +45,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
   - A bug, region or pack data the core cannot read or an invariant it breaks, is a `std::logic_error` that no handler catches, so it ends the process with its message rather than reading as a refusal. `create_region`, `load`, `region_refusal` and `load_refusal` each catch only the refusals named above.
 - Every order and every verdict is the core's: the adapter passes each order to the core, which decides whether it is valid, and each `*_refusal` read gives the core's own reason. A founded village is named by the core's `village_name`, and a grown structure's kind is the core's `laid_kind`.
 - The genealogy panel reads a person's name, parents, children, spouse, age and sect, and shows the family as its surname. No scene reads `names` or `person_family`, which the tests read.
-- `skills` gives an army's skills, which the tests read. The controls read a skill's range from `person_skills`, and the cooldown indicators read `body_ready` against `tick_count`.
+- `skills` gives an army's own skills, which the tests read, and `skill_count` how many skills an order of the army may name: with gear its members' basic strike first, then its own. The controls read a skill's range from `person_skills`, and the cooldown indicators read `body_ready` against `tick_count`.
 
 ### World art
 

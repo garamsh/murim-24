@@ -298,8 +298,9 @@ func _snapshot_pass() -> bool:
 
 
 # `lived`, a region lived ten years of five-tick days, reads its realms, and a person who knows an
-# art reads its qi within its store, a realm among them, its nature, and its skills: its army's
-# first, priced at no qi, then its art skills, named, with their cost and nature. Control: a world
+# art reads its qi within its store, a realm among them, its nature, and its skills: its drilled
+# ones first, its weapon's basic strike and its army's, priced at no qi, then its art skills,
+# named, with their cost and nature. Control: a world
 # from create() has no realms, and its people hold no qi, know no art and read only their army's
 # skills.
 func _qi_pass(lived: WorldAdapter) -> bool:
@@ -307,7 +308,8 @@ func _qi_pass(lived: WorldAdapter) -> bool:
 	var learned := -1
 	for army in lived.army_count():
 		for person: int in lived.roster(army):
-			if learned == -1 and lived.person_skills(person).size() > lived.skills(army).size():
+			var known := lived.person_skills(person)
+			if learned == -1 and not known.is_empty() and known.back().art >= 0:
 				learned = person
 	var right: bool = realms.size() == 8 and realms[0].korean == "삼류" and learned != -1
 	var skills: Array[Dictionary] = []
@@ -550,7 +552,11 @@ func _kin_pass() -> bool:
 # it, so the region's structures stand because their villages reach the core.
 func _villages_pass() -> bool:
 	var region := WorldAdapter.create_region(REGION_SEED, CULT_VILLAGE)
-	var torch: Dictionary = region.skills(region.army_count() - 1)[1]
+	# The torch: the player's army's skill that damages structures.
+	var torch: Dictionary = {"structure_damage": 0}
+	for skill: Dictionary in region.skills(region.army_count() - 1):
+		if skill.structure_damage > 0:
+			torch = skill
 	for i in VILLAGE_TICKS:
 		region.tick()
 	var intact := 0

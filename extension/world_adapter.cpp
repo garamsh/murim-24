@@ -820,7 +820,7 @@ std::int64_t WorldAdapter::army_count() const {
 }
 
 std::int64_t WorldAdapter::skill_count(std::int64_t army) const {
-  return static_cast<std::int64_t>(world().skills(army_index(army)).size());
+  return static_cast<std::int64_t>(world().drilled(army_index(army)));
 }
 
 godot::Dictionary WorldAdapter::date() const {

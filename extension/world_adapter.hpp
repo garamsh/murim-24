@@ -279,7 +279,8 @@ class WorldAdapter : public godot::RefCounted {
   /// against: a body may strike again once it reaches its ready tick.
   [[nodiscard]] std::int64_t tick_count() const;
 
-  /// Returns how many skills army `army` has now.
+  /// Returns how many skills an order of army `army` may name: with gear its
+  /// members' basic strike first, then the army's own.
   [[nodiscard]] std::int64_t skill_count(std::int64_t army) const;
 
   /// Returns the positions of army `army`'s living members, each one person,
