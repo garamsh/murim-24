@@ -141,8 +141,45 @@ func run() -> bool:
 			and _autosave_pass() and _stick_pass() and _stick_diagonal_pass() and _move_diagonal_pass() \
 			and _touch_cast_pass() and _taps_pass() and _arts_pass() and _art_slot_pass() and _loadout_save_pass() \
 			and _talk_pass() and _trade_pass() and _names_pass() and _intent_pass() and _camera_pass() and _camera_walk_pass() and _foot_pass() \
-			and _reach_pass() \
+			and _reach_pass() and _places_pass() \
 			and _grade_pass()
+
+
+# Born in a sect's seat, the player sees the seat named on a plaque by its sect, the label standing
+# in the room at 1920×1080 (#185). Control: a village whose middle lies past PLACE_REACH is not named.
+# Setup: the seat is one, and such a village exists.
+func _places_pass() -> bool:
+	var Play := preload("res://play/play.gd")
+	var Affiliation := preload("res://hud/affiliation.gd")
+	var seat := -1
+	var region := WorldAdapter.create_region(SEED)
+	for sect in region.sect_count():
+		seat = region.sect_seat(sect) if seat < 0 else seat
+	var scene := _scene(seat)
+	var hud: CanvasLayer = scene.get_node("Hud")
+	hud.fit(Vector2i(1920, 1080), false)
+	scene.aim_camera(Vector2(1920, 1080))
+	scene.show_places()
+	var world: WorldAdapter = scene.world
+	var at: Vector2 = scene.lead() / WorldAdapter.CELL_SIZE
+	var far := []
+	for village in world.villages().size():
+		var place: Dictionary = world.villages()[village]
+		if (Vector2(place.corner) + Vector2(place.area) / 2.0).distance_to(at) > Play.PLACE_REACH:
+			far.append(village)
+	var labels: Array = hud.place_labels.labels
+	var named := labels.map(func(label: Dictionary) -> int: return label.village)
+	var own: Dictionary = labels[named.find(seat)] if named.has(seat) else {}
+	var sect := 0
+	while sect < world.sect_count() and world.sect_seat(sect) != seat:
+		sect += 1
+	var plaque: bool = own.get("seat", false) and own.lines[0][0] == Affiliation.sect_name(world, sect)
+	var none_far := far.all(func(village: int) -> bool: return not named.has(village))
+	var passed: bool = seat >= 0 and not far.is_empty() and plaque and none_far
+	print("play_test: born in the seat, village %d, named on a plaque by its sect %s (%s); %d villages past the reach, none named %s; named %s: %s" % [
+		seat, plaque, own.get("lines", []), far.size(), none_far, named, "pass" if passed else "FAIL"])
+	scene.free()
+	return passed
 
 
 # The camera stops at the map's bounds: centred on a person at the map's corner, or at its bottom

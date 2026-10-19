@@ -106,6 +106,8 @@ var dialogue: Control
 var talk_prompt: Control
 ## The names over the people near the player.
 var nameplates: Control
+## The names of the places near the player, under the people's (#185).
+var place_labels: Control
 ## The player's silver on a strip, and the wares it holds on a belt beside the technique bar.
 var purse: Control
 ## The skills on the technique bar's slots and the touch arc's buttons.
@@ -443,6 +445,7 @@ func _place() -> void:
 	var on := touch.visible
 	var gained := room - NATIVE
 	nameplates.size = room
+	place_labels.size = room
 	_map_panel.position = MAP_AT[on] + Vector2(gained.x, 0)
 	shortcuts.top_right = _map_panel.position + Vector2(_map_panel.size.x, _map_panel.size.y + RAIL_GAP)
 	shortcuts.queue_redraw()
@@ -465,6 +468,18 @@ func _place() -> void:
 ## slip.
 func show_names(world: WorldAdapter, people: Dictionary, selected := -1, hovered := -1,
 		to_hud := Transform2D.IDENTITY) -> void:
+	nameplates.show_names(world, people, _kept_clear(), selected, hovered, to_hud)
+
+
+## Names the places of `places` in `world`, as place_labels.gd names them, clear of what
+## show_names() keeps its names clear of; `to_hud` takes their anchors to the HUD's pixels.
+func show_places(world: WorldAdapter, places: Array[Dictionary], to_hud := Transform2D.IDENTITY) -> void:
+	place_labels.show_places(world, places, _kept_clear(), to_hud)
+
+
+# What names stay clear of: every panel shown, the shortcut rail, the purse and the talk prompt's
+# slip.
+func _kept_clear() -> Array[Rect2]:
 	var clear: Array[Rect2] = [purse.strip_rect()]
 	if purse.belt:
 		clear.append(purse.belt_rect())
@@ -475,7 +490,7 @@ func show_names(world: WorldAdapter, people: Dictionary, selected := -1, hovered
 			clear.append((child as Control).get_rect())
 	if shortcuts.visible:
 		clear.append(shortcuts.rect())
-	nameplates.show_names(world, people, clear, selected, hovered, to_hud)
+	return clear
 
 
 # Queues a notice for each skill `person` learned and each realm it gained in `world`'s progress
@@ -641,7 +656,10 @@ func season_text(date: Dictionary) -> String:
 
 
 func _build() -> void:
-	# The names, first, so every panel draws over them.
+	# The names, first, so every panel draws over them, the places' under the people's.
+	place_labels = preload("res://hud/place_labels.gd").new()
+	place_labels.use_font(_theme.default_font)
+	add_child(place_labels)
 	nameplates = preload("res://hud/nameplates.gd").new()
 	nameplates.use_font(_theme.default_font)
 	add_child(nameplates)

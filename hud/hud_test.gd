@@ -33,10 +33,11 @@ const SHOWN := {
 # the dialogue window's, its wares' and the rumours' among them, of the lessons' words, which
 # _lessons_pass measures, of the purse's silver and its notices, which _purse_pass measures, and of
 # the map window, which map_window_test measures, and of the occupations' words, which
-# dialogue_test measures on a seller's card.
+# dialogue_test measures on a seller's card, and of the places' names, which place_labels_test
+# measures.
 const PANEL_PREFIXES := ["GENEALOGY_", "SECT_", "TITLE_", "NEW_GAME_", "PAUSE_", "CONTROLS_", "SETTINGS_", "LOCALE_",
 		"APPLICATION_", "REBIRTH_", "RUMOUR_", "DISCIPLINE_", "TOUCH_", "ARTS_", "NOTICE_", "FACTION_", "DECLARE_", "DIALOGUE_",
-		"BUY_", "WARE_", "SILVER", "CONSUME_", "MAP_", "OCCUPATION_"]
+		"BUY_", "WARE_", "SILVER", "CONSUME_", "MAP_", "OCCUPATION_", "PLACE_"]
 const Arts := preload("res://hud/arts.gd")
 const WordFit := preload("res://hud/word_fit.gd")
 # Ticks of five-tick days the lessons' check looks through for a lesson or a realm of a steered

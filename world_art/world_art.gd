@@ -40,6 +40,8 @@ const BUILDINGS := {
 	"training_ground": "structures/training_ground", "manual_hall": "structures/manual_hall",
 	"seat_gate": "structures/seat_gate", "temple": "structures/temple", "inn": "structures/inn",
 	"smithy": "structures/smithy", "apothecary": "structures/apothecary",
+	"main_hall": "structures/main_hall", "compound_wall": "structures/compound_wall",
+	"compound_wall_side": "structures/compound_wall_side", "compound_corner": "structures/compound_corner",
 }
 # The kinds laid with the ground, over the terrain and under everything standing.
 const GROUND_KINDS := ["training_ground"]

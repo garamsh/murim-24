@@ -76,6 +76,8 @@ SECT_SEAT,본산,Seat
 SECT_HELD,보유,Held
 SECT_LOST,함락,Lost
 SECT_FALLEN,멸문,Fallen
+PLACE_VILLAGE,마을 %d,Village %d
+PLACE_HAMLET,촌락 %d,Hamlet %d
 SECT_FACTION,세력,Faction
 SECT_MASTER,장문인,Master
 SECT_ELDERS,장로,Elders

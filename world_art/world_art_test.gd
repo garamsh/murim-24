@@ -54,6 +54,8 @@ const KIND_FOOTPRINTS := {
 	"fence": Vector2i(5, 1), "granary": Vector2i(2, 2), "storehouse": Vector2i(3, 2),
 	"training_ground": Vector2i(6, 4), "manual_hall": Vector2i(4, 3), "seat_gate": Vector2i(3, 1),
 	"temple": Vector2i(5, 4), "inn": Vector2i(5, 3), "smithy": Vector2i(3, 2), "apothecary": Vector2i(4, 2),
+	"main_hall": Vector2i(6, 4), "compound_wall": Vector2i(1, 1), "compound_wall_side": Vector2i(1, 1),
+	"compound_corner": Vector2i(1, 1),
 }
 const KINDS_WIDTH := 40
 const KINDS_HEIGHT := 20
@@ -109,7 +111,7 @@ func run() -> bool:
 	# bottom edges, raised with the ground, holding each stage's frame and showing its stage's; a
 	# training ground lies on the ground, under every body, and casts no shadow, and every other kind
 	# stands, its shadow on the ground from its footprint's top-left. Setup: the region holds a seat's
-	# training ground, manual hall and gate. Control: the structures above, made by create() with no
+	# training ground, manual hall, gate, main hall and compound wall (#185). Control: the structures above, made by create() with no
 	# kind, are counted undrawn by the same count.
 	var region := WorldAdapter.create_region(SEED)
 	var region_art: Node2D = load(SCENE).instantiate()
@@ -121,8 +123,9 @@ func run() -> bool:
 	var kinds: Dictionary = drawn.kinds
 	var undrawn := _undrawn(region, region_art)
 	var unkinded := _undrawn(world, art)
-	var seat_kinds := ["training_ground", "manual_hall", "seat_gate"].all(func(kind: String) -> bool: return kinds.has(kind))
-	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 12 \
+	var seat_kinds := ["training_ground", "manual_hall", "seat_gate", "main_hall", "compound_wall", "compound_wall_side",
+			"compound_corner"].all(func(kind: String) -> bool: return kinds.has(kind))
+	var buildings_right := placed + fields == region.structure_count() and kinds.size() == 16 \
 			and seat_kinds and undrawn == 0 and unkinded == world.structure_count() and unkinded > 0
 	print("world_art_test: %d of %d region structures drawn as their kind %s over their footprints with their stage's frame and shadow, a seat's kinds among them %s, %d fields tiled, %d left undrawn; %d of %d structures without a kind left undrawn: %s" % [
 		placed, region.structure_count(), kinds.keys(), seat_kinds, fields, undrawn, unkinded,

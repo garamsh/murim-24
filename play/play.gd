@@ -104,6 +104,10 @@ const SHORTCUTS: Array[Dictionary] = [
 const SAVE_SLOT := 0
 ## The in-game days between autosaves.
 const AUTOSAVE_DAYS := 3
+## How near, in cells, the steered person comes to a place's middle for the place to be named (#185).
+const PLACE_REACH := 24.0
+## How far above a place's back edge, in the world's pixels, its name stands: over the tallest roof.
+const PLACE_RISE := 72.0
 ## The file, in the saves' directory, the loadout is kept in beside SAVE_SLOT.
 const LOADOUT_FILE := "loadout_%d.cfg" % SAVE_SLOT
 
@@ -529,6 +533,7 @@ func _process(delta: float) -> void:
 	_hud.show_target(world, selected, steered)
 	show_talk()
 	show_names()
+	show_places()
 
 
 ## Draws the world within `view`, in the world's pixels, and measures taps on the ground and the
@@ -953,6 +958,21 @@ func show_names() -> void:
 	var people: Dictionary = _art.near if _hud.panel() == null else {}
 	var hovered := person_at(_cursor) if not _hud.touch.visible and _hud.panel() == null else -1
 	_hud.show_names(world, people, selected, hovered, _to_hud())
+
+
+## Names each place whose middle lies within PLACE_REACH cells of the steered person, while no panel
+## is open, its label standing PLACE_RISE over the middle of its back edge.
+func show_places() -> void:
+	var places: Array[Dictionary] = []
+	var at := lead() / WorldAdapter.CELL_SIZE
+	var villages := world.villages() if _hud.panel() == null else []
+	for village in villages.size():
+		var corner: Vector2i = villages[village].corner
+		var area: Vector2i = villages[village].area
+		if (Vector2(corner) + Vector2(area) / 2.0).distance_to(at) <= PLACE_REACH:
+			var back: Vector2 = _art.to_screen(Vector2(corner.x + area.x / 2.0, corner.y) * WorldAdapter.CELL_SIZE)
+			places.append({"village": village, "anchor": back - Vector2(0, PLACE_RISE)})
+	_hud.show_places(world, places, _to_hud())
 
 
 ## Opens the panel `keycode` opens over the world, on the steered person while it has a body: the
