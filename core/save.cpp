@@ -15,6 +15,7 @@
 #include "arts.hpp"
 #include "attack.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
 #include "encoding.hpp"
 #include "event.hpp"
@@ -1143,14 +1144,16 @@ class SaveCodec {
   }
 
   // Reads a world from `input`, noting in `parts`, if given, where its parts
-  // end.
-  static World read(Reader& input, SaveParts* parts) {
+  // end, and taking its coarse graph from `bare`, if given.
+  static World read(Reader& input, SaveParts* parts, const CoarseGraph* bare) {
     const std::uint64_t rng_state = input.u64();
     const std::uint64_t seed = input.u64();
     const std::uint64_t tick_count = input.u64();
     Map map = get_map(input);
     Rules rules = get_rules(input);
-    World world{std::move(map), std::move(rules), get_life(input)};
+    World world{
+        std::move(map), std::move(rules), get_life(input),
+        bare != nullptr ? std::optional<CoarseGraph>{*bare} : std::nullopt};
     world.rng_state_ = rng_state;
     world.seed_ = seed;
     world.tick_count_ = tick_count;
@@ -1314,6 +1317,10 @@ class SaveCodec {
       throw Refusal{LoadError::CORRUPTED};
     }
     world.restore();
+    if (bare != nullptr) {
+      world.graph_ = World::graph_of(world.map_, std::move(world.graph_),
+                                     world.structures_);
+    }
     return world;
   }
 };
@@ -1339,9 +1346,11 @@ bool save(const Saved& saved, SaveStore& store, Slot slot) {
 
 namespace {
 
-// Reads the save `bytes`, noting in `parts`, if given, where its parts end.
+// Reads the save `bytes`, noting in `parts`, if given, where its parts end,
+// and taking the world's coarse graph from `bare`, if given.
 std::variant<Saved, LoadError> decode(const std::vector<std::uint8_t>& bytes,
-                                      SaveParts* parts) {
+                                      SaveParts* parts,
+                                      const CoarseGraph* bare) {
   // The one handler for a refused save: every refusal while it is read ends
   // here as its LoadError.
   try {
@@ -1374,7 +1383,7 @@ std::variant<Saved, LoadError> decode(const std::vector<std::uint8_t>& bytes,
       const Seed region{input.u64()};
       return Origin{region, input.size()};
     });
-    World world = SaveCodec::read(input, parts);
+    World world = SaveCodec::read(input, parts, bare);
     if (!input.done()) {
       return LoadError::CORRUPTED;
     }
@@ -1395,13 +1404,22 @@ std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot) {
   if (!held) {
     return LoadError::MISSING;
   }
-  return decode(*held, nullptr);
+  return decode(*held, nullptr, nullptr);
+}
+
+std::variant<Saved, LoadError> load(const SaveStore& store, Slot slot,
+                                    const CoarseGraph& bare) {
+  const std::optional<std::vector<std::uint8_t>> held = store.get(slot);
+  if (!held) {
+    return LoadError::MISSING;
+  }
+  return decode(*held, nullptr, &bare);
 }
 
 std::variant<SaveParts, LoadError> save_parts(
     const std::vector<std::uint8_t>& bytes) {
   SaveParts parts;
-  const std::variant<Saved, LoadError> decoded = decode(bytes, &parts);
+  const std::variant<Saved, LoadError> decoded = decode(bytes, &parts, nullptr);
   if (const auto* error = std::get_if<LoadError>(&decoded)) {
     return *error;
   }

@@ -23,6 +23,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
@@ -8071,6 +8072,29 @@ TEST(World, APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule) {
   // a third.
   EXPECT_EQ(world.activity(NEWCOMER), Activity::AT_HOME);
   EXPECT_LE(cells_apart(cell_at(world, NEWCOMER), door_of(SECOND_HOUSE)), 1);
+}
+
+TEST(World, AWorldGivenItsMapsBareGraphRebuildsItWhereItsStructuresBlock) {
+  constexpr std::size_t SIDE = 96;
+  const std::vector<std::string> rows = open_map(SIDE);
+  // Two blocking structures astride area borders, cutting entrances, and one
+  // that blocks nothing.
+  const std::vector<Structure> structures{
+      Structure{{AREA_SIDE - 1, 40}, INTACT, {2, 2}, true},
+      Structure{{(2 * AREA_SIDE) - 1, 10}, INTACT, {2, 2}, true},
+      Structure{{10, 70}, INTACT, {2, 2}, false}};
+  const ArmySpec walkers =
+      army(rows, Cell{5, 5}, Cell{90, 90}, 1, 1, 0, {IDLE});
+  const CoarseGraph bare{Map{rows}};
+
+  const World given{Seed{1}, Map{rows}, {walkers}, structures, peaceful(0),
+                    {},      {},        {},        {},         bare};
+  const World built{Seed{1}, Map{rows}, {walkers}, structures, peaceful(0)};
+
+  // The structures change the graph, so the bare one matches only once it is
+  // rebuilt under them.
+  ASSERT_FALSE(bare == built.graph());
+  EXPECT_TRUE(given.graph() == built.graph());
 }
 
 }  // namespace

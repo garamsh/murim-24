@@ -137,6 +137,11 @@ class SaveCodec;
 /// The simulated world, advanced one deterministic step at a time.
 class World {
  public:
+  /// Creates a world on `map`. Its coarse graph is `bare` where one is given,
+  /// the graph of `map` before the structures block their cells, as
+  /// CoarseGraph builds it or a pack ships it, rebuilt where they block;
+  /// otherwise the world builds it.
+  ///
   /// Throws std::invalid_argument when the separation, the rumour reach, the
   /// talk reach, or a
   /// skill's range or radius, lies outside [0, MAX_REACH], `hostile` is not
@@ -188,7 +193,8 @@ class World {
         std::vector<Structure> structures, Rules rules,
         std::vector<VillageSpec> villages = {},
         std::vector<Leadership> leadership = {}, Life life = {},
-        std::vector<SectSpec> sects = {});
+        std::vector<SectSpec> sects = {},
+        std::optional<CoarseGraph> bare = std::nullopt);
 
   /// Gives army `army` an order, which it follows from the next tick on.
   /// With `challenge`, the army's lead also challenges that faction's
@@ -559,6 +565,9 @@ class World {
   /// Returns the fields people step by, for a measure to read.
   [[nodiscard]] const AreaFields& fields() const;
 
+  /// Returns the coarse graph over the map as its structures leave it.
+  [[nodiscard]] const CoarseGraph& graph() const;
+
   /// Returns where army `army` stands while it is far; nothing while it is
   /// live or stepped. Throws std::out_of_range when there is no such army.
   [[nodiscard]] std::optional<FarAnchor> far(std::size_t army) const;
@@ -740,8 +749,16 @@ class World {
   friend class SaveCodec;
 
   /// A world holding `map`, `rules` and `life` and nothing else yet, for a
-  /// save to fill in before restore().
-  World(Map map, Rules rules, Life life);
+  /// save to fill in before restore(), its coarse graph `bare` where one is
+  /// given, for graph_of() to rebuild under the structures the save holds,
+  /// and built over `map` otherwise.
+  World(Map map, Rules rules, Life life, std::optional<CoarseGraph> bare);
+
+  /// Returns `bare`, the coarse graph of `map` before `structures` blocked
+  /// their footprints, rebuilt over `map` where the blocking ones lie.
+  [[nodiscard]] static CoarseGraph graph_of(
+      const Map& map, CoarseGraph bare,
+      const std::vector<Structure>& structures);
 
   /// Rebuilds what a world derives from the rest of its state. Throws
   /// std::invalid_argument when that state breaks an invariant the

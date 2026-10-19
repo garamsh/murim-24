@@ -20,6 +20,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
+#include "coarse_graph.hpp"
 #include "diplomacy.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
@@ -266,6 +267,22 @@ TEST(Save, ALoadedRegionHashesAndTicksOnAsTheSavedOne) {
   const Saved other = lived_region(OTHER_SEED);
   EXPECT_NE(other.world.hash(), saved.world.hash());
   EXPECT_NE(ticked(other.world, MORE_TICKS).hash(),
+            ticked(saved.world, MORE_TICKS).hash());
+}
+
+TEST(Save, ALoadGivenItsMapsBareGraphRebuildsItUnderEveryStructureSaved) {
+  const Saved saved = lived_region(REGION_SEED);
+  const CoarseGraph bare{
+      Map{generate_region(REGION_SEED, base_data()).map_rows}};
+  // The region's structures, those growth laid among them, change the graph.
+  ASSERT_FALSE(bare == saved.world.graph());
+  MemorySaves store;
+  ASSERT_TRUE(save(saved, store, SLOT));
+
+  const Saved given = loaded(load(store, SLOT, bare));
+
+  EXPECT_TRUE(given.world.graph() == saved.world.graph());
+  EXPECT_EQ(ticked(given.world, MORE_TICKS).hash(),
             ticked(saved.world, MORE_TICKS).hash());
 }
 
