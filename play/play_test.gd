@@ -47,6 +47,10 @@ const TICKS := 600
 const SEARCH := 64
 # Ticks the person is given to walk toward each cell the cursor is held on.
 const WALK_TICKS := 60
+# How many ticks with no input a new game's steered person must stand still to have settled, pushed
+# apart from those born round it, and the most ticks given it to settle.
+const SETTLED := 10
+const SETTLE_TICKS := 120
 # Pixels east of the person the cursor is put for a cast, within arm's length, and further than any skill
 # reaches.
 const CAST_OFFSET := Vector2(16, 0)
@@ -692,6 +696,20 @@ func _tap(scene: Node2D, slot: int, at: Vector2, wait: bool) -> void:
 	scene.touch(_finger(9, at, false))
 
 
+# Ticks `scene` with no input until its steered person has stood still for SETTLED ticks, at most
+# SETTLE_TICKS; returns whether it settled.
+func _settle(scene: Node2D) -> bool:
+	var still := 0
+	var at: Vector2 = scene.lead()
+	for i in SETTLE_TICKS:
+		scene.step()
+		still = still + 1 if scene.lead() == at else 0
+		at = scene.lead()
+		if still == SETTLED:
+			return true
+	return false
+
+
 func _finger(index: int, at: Vector2, pressed: bool) -> InputEventScreenTouch:
 	var event := InputEventScreenTouch.new()
 	event.index = index
@@ -711,10 +729,12 @@ func _slide(index: int, at: Vector2) -> InputEventScreenDrag:
 # Held, the cursor moved to a second cell orders it there, and it walks closer to that. Released,
 # the cursor moved again orders nothing. Control: the same scene with no input, ticked as long,
 # leaves the person in place, so the walking is the button's. Setup: both cells are passable and
-# differ, and the second is not the person's cell when the cursor reaches it.
+# differ, and the second is not the person's cell when the cursor reaches it; and both scenes have
+# settled first, their person no longer pushed apart from those born round it.
 func _move_pass() -> bool:
 	var scene := _scene(0)
 	var control := _scene(0)
+	var settled := _settle(scene) and _settle(control)
 	var home := Vector2i((scene.lead() / WorldAdapter.CELL_SIZE).floor())
 	var first := _cell_near(scene.world, home, ".")
 	var second := _cell_near(scene.world, first, ".")
@@ -736,7 +756,7 @@ func _move_pass() -> bool:
 	var released: bool = not scene.command(release)
 	var after_release: bool = not scene.command(_drag(home, scene, 0))
 	var stood: float = (control.lead() - control_from).length() / WorldAdapter.CELL_SIZE
-	var setup := first != home and second != first and second_from > 0.0
+	var setup := settled and first != home and second != first and second_from > 0.0
 	var passed := setup and pressed and first_to < first_from and held_on and second_to < second_from \
 			and released and after_release and stood < 0.5
 	print("play_test: right button on %s from %s ordered %s, %.0f to %.0f away in %d ticks; held and moved to %s ordered %s, %.0f to %.0f away; released %s, then moved to %s ordered nothing %s; control without input moved %.2f cells: %s" % [
