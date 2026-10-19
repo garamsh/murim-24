@@ -474,9 +474,10 @@ Growth get_growth(Reader& input) {
 void put_gear(Writer& out, const Gear& gear) {
   put_all(out, gear.slots, [&out](const std::string& slot) { out.text(slot); });
   out.size(gear.striking);
-  put_all(out, gear.families, [&out](const WeaponFamily& family) {
+  put_all(out, gear.families, [&out](const Family& family) {
     out.text(family.name);
-    put_skill(out, family.strike);
+    put_maybe(out, family.strike,
+              [&out](const Skill& strike) { put_skill(out, strike); });
   });
   out.size(gear.bare);
   put_all(out, gear.needs, [&out](const std::vector<std::size_t>& needed) {
@@ -485,7 +486,8 @@ void put_gear(Writer& out, const Gear& gear) {
   put_all(out, gear.kinds, [&out](const ItemKind& kind) {
     out.text(kind.name);
     out.size(kind.slot);
-    put_index(out, kind.family);
+    out.size(kind.family);
+    out.u32(kind.tier);
     put_maybe(out, kind.damage,
               [&out](std::uint64_t damage) { out.u64(damage); });
     out.u32(kind.edge);
@@ -493,11 +495,11 @@ void put_gear(Writer& out, const Gear& gear) {
   });
   put_all(out, gear.loadouts, [&out](const Loadout& loadout) {
     put_index(out, loadout.faction);
-    put_index(out, loadout.sect);
+    out.flag(loadout.founders);
     out.flag(loadout.soldiers);
     put_all(out, loadout.slots, [&out](const std::vector<Choice>& choices) {
       put_all(out, choices, [&out](const Choice& choice) {
-        put_index(out, choice.kind);
+        put_index(out, choice.family);
         out.u32(choice.weight);
         out.flag(choice.art);
       });
@@ -509,10 +511,11 @@ Gear get_gear(Reader& input) {
   Gear gear;
   gear.slots = get_all<std::string>(input, [&input] { return input.text(); });
   gear.striking = input.size();
-  gear.families = get_all<WeaponFamily>(input, [&input] {
-    WeaponFamily family;
+  gear.families = get_all<Family>(input, [&input] {
+    Family family;
     family.name = input.text();
-    family.strike = get_skill(input);
+    family.strike =
+        get_maybe<Skill>(input, [&input] { return get_skill(input); });
     return family;
   });
   gear.bare = input.size();
@@ -522,7 +525,8 @@ Gear get_gear(Reader& input) {
     ItemKind kind;
     kind.name = input.text();
     kind.slot = input.size();
-    kind.family = get_index(input);
+    kind.family = input.size();
+    kind.tier = input.u32();
     kind.damage =
         get_maybe<std::uint64_t>(input, [&input] { return input.u64(); });
     kind.edge = input.u32();
@@ -532,12 +536,12 @@ Gear get_gear(Reader& input) {
   gear.loadouts = get_all<Loadout>(input, [&input] {
     Loadout loadout;
     loadout.faction = get_index(input);
-    loadout.sect = get_index(input);
+    loadout.founders = input.flag();
     loadout.soldiers = input.flag();
     loadout.slots = get_all<std::vector<Choice>>(input, [&input] {
       return get_all<Choice>(input, [&input] {
         Choice choice;
-        choice.kind = get_index(input);
+        choice.family = get_index(input);
         choice.weight = input.u32();
         choice.art = input.flag();
         return choice;

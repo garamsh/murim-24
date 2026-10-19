@@ -1,13 +1,13 @@
 [
   {
-    "id": "hwasan_founders",
-    "sect": "hwasan",
+    "id": "founders",
+    "founders": true,
     "wear": [
       {
         "slot": "weapon",
         "choices": [
           {
-            "item": "steel_sword"
+            "art": true
           }
         ]
       },
@@ -15,7 +15,7 @@
         "slot": "armour",
         "choices": [
           {
-            "item": "leather"
+            "family": "armour"
           }
         ]
       },
@@ -23,82 +23,7 @@
         "slot": "head",
         "choices": [
           {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "heavenly_demon_founders",
-    "sect": "heavenly_demon",
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "steel_saber"
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "leather"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "black_fang_founders",
-    "sect": "black_fang",
-    "wear": [
-      {
-        "slot": "weapon",
-        "choices": [
-          {
-            "item": "darts"
-          }
-        ]
-      },
-      {
-        "slot": "armour",
-        "choices": [
-          {
-            "item": "leather"
-          }
-        ]
-      },
-      {
-        "slot": "head",
-        "choices": [
-          {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
+            "family": "headwear"
           }
         ]
       }
@@ -120,7 +45,7 @@
         "slot": "armour",
         "choices": [
           {
-            "item": "lamellar"
+            "family": "armour"
           }
         ]
       },
@@ -128,7 +53,7 @@
         "slot": "head",
         "choices": [
           {
-            "item": "helmet"
+            "family": "helmet"
           }
         ]
       }
@@ -153,7 +78,7 @@
         "slot": "armour",
         "choices": [
           {
-            "item": "cloth"
+            "family": "clothes"
           }
         ]
       },
@@ -161,12 +86,7 @@
         "slot": "head",
         "choices": [
           {
-            "item": "headband",
-            "weight": 1
-          },
-          {
-            "item": "hat",
-            "weight": 1
+            "family": "headwear"
           }
         ]
       }

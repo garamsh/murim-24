@@ -15,7 +15,7 @@ Today's departures, each with its issue:
 - births are scaled by headroom under the village's cap and stop at it (ADR 0022), not governed by food (#296);
 - a ware's price and the daily wage are fixed data, with no household needs or markets behind them (#295);
 - animals are planned with their count capped by habitat (#171's text);
-- people are born wearing gear made from nothing, until smiths make it from materials (ADR 0052 step 5, ADR 0064; #295, #231).
+- people are born wearing gear made from nothing, at each family's lowest tier, until smiths make it from materials (ADR 0052 step 5, ADR 0064, ADR 0085; #295, #231).
 
 ### The world
 
@@ -168,20 +168,20 @@ Today's departures, each with its issue:
 ### Gear
 
 - People wear items by one rule, `Gear` in `Life` (ADR 0050, built in part by #295's step 1(a)):
-  - slots, weapon families, item kinds and loadouts are pack data. The base pack has four slots: weapon, armour, head and accessory. A pack may add more, and a slot no loadout fills is worn empty;
+  - slots, item families, item kinds and loadouts are pack data. Every kind belongs to a family, with a tier within it, and a weapon family gives a strike. The base pack has four slots: weapon, armour, head and accessory. A pack may add more, and a slot no loadout fills is worn empty;
   - one slot strikes. A person's first skill is the strike of its weapon's family there, or the bare-hands family's with the slot empty, and a kind may give its own damage in place of its family's. An army may then have no skills of its own;
   - an art skill needs a weapon of a family its discipline names. A cast without one is refused `WRONG_WEAPON`, and the automatic strike draws only among the art skills the weapon allows. A weapon's edge, per mille, multiplies the body damage of the art skills used with it, `PER_MILLE` bare-handed;
   - the guards of everything worn add up, to at most `MAX_GUARD`, 600 per mille, and take that share from the body damage the wearer takes;
-  - the one birth function dresses every person, at the world's creation and at each birth and rebirth alike. The first loadout that fits its calling gives each slot one choice drawn by weight. A calling is its faction, the sect it founds, if any, and whether it serves as a soldier, in an army other than its home's residents. The draw is a counter-based hash of the seed, the person and the slot, so it takes nothing from the world's stream;
-  - a choice may be the art's weapon: the first kind of the first family its faction's sect's art needs, the art of the first manual its first sect holding one starts with. So everyone born into a faction whose art needs a family draws that family, and its members may use the art (ADR 0050: "sect members carry their art's weapon"). It is derived on read, and a person who changes faction later keeps what it wears;
+  - the one birth function dresses every person, at the world's creation and at each birth and rebirth alike. The first loadout that fits its calling gives each slot one choice drawn by weight: a family, the art's weapon, or nothing. A drawn family gives a kind of its lowest tier, the same draw picking among several, so no one is born above it (ADR 0085). A calling is its faction, whether it founds a sect, and whether it serves as a soldier, in an army other than its home's residents. The draw is a counter-based hash of the seed, the person and the slot, so it takes nothing from the world's stream;
+  - a choice may be the art's weapon: the first family its faction's sect's art needs, the art of the first manual its first sect holding one starts with. So everyone born into a faction whose art needs a family draws that family, and its members may use the art (ADR 0050: "sect members carry their art's weapon"). It is derived on read, and a person who changes faction later keeps what it wears;
   - the gear and each person's worn slots are saved and hashed. A world without gear hashes as before.
 - The base pack's strikes, the step's reading of ADR 0050 and ADR 0066:
   - every family's strike is targeted, as ADR 0066 made the basic strike, at ADR 0050's ranges and cooldowns;
   - its damage is ADR 0050's scaled by 15/10, the factor by which ADR 0066 retuned the guard strike: bare hands 9, gauntlets 12, sword 15 (the old guard strike), saber 18, and darts 9 at 8 cells;
-  - steel deals a fifth more, with an edge of 1,200. The spear, staff and fan wait for a kind that carries them.
-- The base pack's loadouts, the step's reading of ADR 0050's:
-  - a sect's founders carry its art's weapon, steel or darts, in leather;
-  - soldiers carry the art's weapon, in lamellar and a helmet;
+  - steel, a tier above iron, deals a fifth more, with an edge of 1,200, and no one is born with it. The spear, staff and fan wait for a kind that carries them.
+- The base pack's loadouts, the step's reading of ADR 0050's with ADR 0085's tiers:
+  - a sect's founders carry its art's weapon in leather;
+  - soldiers carry the art's weapon, in leather and a helmet;
   - villagers wear cloth and a headband or a hat, and carry the art's weapon at even odds against none, so a village's later generations are not left bare-handed (#295);
   - the art's weapon is the iron sword for the Orthodox, the iron saber for the Demonic Cult and darts for the Unorthodox, by Hwasan's, the Heavenly Demon's and Black Fang's arts.
 - Wear and breaking into scrap, spares and wares as stacks come with the steps after (#295).
@@ -342,7 +342,7 @@ Today's departures, each with its issue:
     - the living number 3.65 for each married woman living with her husband, near the 3.5 a household ADR 0076 assumed.
 - Village caps from housing, food and storage, the daily feeding, hunger, migration and starvation, births slowed by headroom, and fields as structures that block nothing: ADR 0022 (`adr/0022-cap-each-village-by-its-housing-food-and-storage.md`), which supersedes ADR 0013's rule that every footprint blocks.
 - Workshops as per-kind capacities and qualities on `Holding`, daily healing while their capacity covers a village's people, and arms and tends among the holdings growth's scarcity rule compares, rather than shorter cooldowns, healing as a skill, or a trigger of its own: ADR 0029 (`adr/0029-let-villages-build-workshops-that-arm-and-tend-their-people.md`), whose edge on the strike rule ADR 0050 supersedes.
-- Gear as pack data in slots, the basic strike by weapon family, arts by weapon family, edge and guard, and loadouts drawn by the one birth function: ADR 0050 (`adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`), built in part by #295's step 1(a), with ADR 0066's targeted strike.
+- Gear as pack data in slots, the basic strike by weapon family, arts by weapon family, edge and guard, and loadouts drawn by the one birth function: ADR 0050 (`adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`), built in part by #295's step 1(a), with ADR 0066's targeted strike. Gear drawn at birth at each family's lowest tier, so a better tier comes only from production: ADR 0085 (`adr/0085-draw-the-gear-people-are-born-with-at-each-familys-lowest-tier.md`), which supersedes ADR 0050's starting tiers.
 - Sects as data with membership on the person and everything else derived, seats as villages, admission and leaving, the cap from a seat's pupils, falling and manuals, and the election by elders' favour: ADR 0026 (`adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`).
 - Applying to a sect through the port by the daily admission's thresholds, assessed once for both, with talent and attainment one reason: ADR 0031 (`adr/0031-let-a-person-apply-to-a-sect-by-the-admissions-thresholds.md`), which supersedes ADR 0026's rejection of joining through the port.
 - The ring of the latest events, a sect's fall noted when its last member leaves, and rumours derived by reach, kin and faction: ADR 0032 (`adr/0032-keep-a-bounded-ring-of-world-events-and-read-rumours-from-it.md`).

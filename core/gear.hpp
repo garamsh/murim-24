@@ -15,44 +15,48 @@ namespace murim {
 /// guards against, per mille, so a strike always lands (ADR 0050).
 constexpr std::uint32_t MAX_GUARD = 600;
 
-/// A weapon family (ADR 0050): its `name`, and the `strike`, a person's
-/// basic strike while its striking slot holds a weapon of the family.
-struct WeaponFamily {
+/// A family of items (ADR 0050): its `name`, and for a weapon family the
+/// `strike`, a person's basic strike while its striking slot holds a weapon
+/// of the family.
+struct Family {
   std::string name;
-  Skill strike;
+  std::optional<Skill> strike;
 };
 
-/// An item kind, as data: its `name` and the `slot` it is worn in. Worn, a
-/// weapon of `family` strikes with its family's strike, at `damage` in
-/// place of the strike's own when given, and multiplies the body damage of
-/// the art skills used with it by `edge` per mille; armour and headgear
-/// guard against `guard` per mille of the body damage their wearer takes.
+/// An item kind, as data: its `name`, the `slot` it is worn in, its `family`
+/// and its `tier` within the family. Worn, a weapon strikes with its
+/// family's strike, at `damage` in place of the strike's own when given, and
+/// multiplies the body damage of the art skills used with it by `edge` per
+/// mille; armour and headgear guard against `guard` per mille of the body
+/// damage their wearer takes.
 struct ItemKind {
   std::string name;
   std::size_t slot = 0;
-  std::optional<std::size_t> family;
+  std::size_t family = 0;
+  std::uint32_t tier = 0;
   std::optional<std::uint64_t> damage;
   std::uint32_t edge = PER_MILLE;
   std::uint32_t guard = 0;
 };
 
-/// One choice for a slot: item kind `kind`, the `art`'s weapon of the
-/// wearer's faction (art_weapons()), or else the slot left empty, drawn
-/// with `weight` against the slot's other choices.
+/// One choice for a slot: a kind of `family`, the `art`'s weapon family of
+/// the wearer's faction (art_families()), or else the slot left empty,
+/// drawn with `weight` against the slot's other choices. A family gives a
+/// kind of its lowest tier (ADR 0085).
 struct Choice {
-  std::optional<std::size_t> kind;
+  std::optional<std::size_t> family;
   std::uint32_t weight = 1;
   bool art = false;
 };
 
 /// What the people a loadout fits wear as they are born: in each slot, by
 /// index, one of its choices, drawn by the seed, and nothing in a slot with
-/// none. It fits people of `faction`, if given, and of them the founders of
-/// `sect`, if given, whatever they serve as; otherwise `soldiers`, serving in
-/// an army other than their home village's residents, or else the rest.
+/// none. It fits people of `faction`, if given; of them, the `founders` of a
+/// sect when set, whatever they serve as, and otherwise `soldiers`, serving
+/// in an army other than their home village's residents, or else the rest.
 struct Loadout {
   std::optional<std::size_t> faction;
-  std::optional<std::size_t> sect;
+  bool founders = false;
   bool soldiers = false;
   std::vector<std::vector<Choice>> slots;
 };
@@ -60,14 +64,14 @@ struct Loadout {
 /// The slots people wear items in, and the items, as data (ADR 0050): the
 /// `slots` by name; the `striking` slot, whose weapon gives a person's basic
 /// strike, and the `bare` family, whose strike it strikes with while that
-/// slot is empty; the weapon `families`; the families each discipline's arts
-/// need, by discipline, any at all for a discipline that names none; the
-/// item `kinds`; and the `loadouts`, of which a person born wears the first
-/// that fits it.
+/// slot is empty; the item `families`; the weapon families each discipline's
+/// arts need, by discipline, any at all for a discipline that names none;
+/// the item `kinds`; and the `loadouts`, of which a person born wears the
+/// first that fits it.
 struct Gear {
   std::vector<std::string> slots;
   std::size_t striking = 0;
-  std::vector<WeaponFamily> families;
+  std::vector<Family> families;
   std::size_t bare = 0;
   std::vector<std::vector<std::size_t>> needs;
   std::vector<ItemKind> kinds;
@@ -97,31 +101,34 @@ using Worn = std::vector<std::optional<std::size_t>>;
 [[nodiscard]] bool armed_for(const Gear& gear, const Worn& worn,
                              std::size_t discipline);
 
-/// Returns the first loadout that fits a person born into `faction`, a
-/// founder of `sect` if given, serving as a soldier or not; none when none
-/// fits.
-[[nodiscard]] const Loadout* loadout_for(const Gear& gear, std::size_t faction,
-                                         std::optional<std::size_t> sect,
-                                         bool soldier);
+/// Returns the kinds of family `family` at its lowest tier, in the order the
+/// gear lists them: what a person born draws of it (ADR 0085).
+[[nodiscard]] std::vector<std::size_t> lowest_tier(const Gear& gear,
+                                                   std::size_t family);
 
-/// Returns, by faction, the weapon an art's-weapon choice gives its people:
-/// the first kind of the first family needed by the discipline of the first
-/// art its first sect holding a manual holds, of `held` by sect and of
-/// `disciplines` by art; nothing where its art needs no family or none of
-/// `gear`'s kinds is of it. `sects` gives each sect's faction.
-[[nodiscard]] std::vector<std::optional<std::size_t>> art_weapons(
+/// Returns the first loadout that fits a person born into `faction`, a sect
+/// founder or not, serving as a soldier or not; none when none fits.
+[[nodiscard]] const Loadout* loadout_for(const Gear& gear, std::size_t faction,
+                                         bool founder, bool soldier);
+
+/// Returns, by faction, the family an art's-weapon choice gives its people:
+/// the first family needed by the discipline of the first art its first sect
+/// holding a manual holds, of `held` by sect and of `disciplines` by art;
+/// nothing where its art needs none. `sects` gives each sect's faction.
+[[nodiscard]] std::vector<std::optional<std::size_t>> art_families(
     const Gear& gear, std::size_t factions,
     const std::vector<std::size_t>& sects,
     const std::vector<std::vector<std::size_t>>& held,
     const std::vector<std::size_t>& disciplines);
 
 /// Throws std::invalid_argument when `gear` names a slot, family or kind it
-/// lacks, a faction or sect past `factions` or `sects`, needs for more than
-/// `disciplines` disciplines, a striking weapon without a family or another
-/// slot's item with one, an art's-weapon choice naming a kind or outside the
-/// striking slot, choices for a slot whose weights sum to 0, or a
-/// strike or damage outside MAX_BODY_DAMAGE or MAX_COOLDOWN.
-void check_gear(const Gear& gear, std::size_t disciplines, std::size_t factions,
-                std::size_t sects);
+/// lacks, a faction past `factions`, needs for more than `disciplines`
+/// disciplines, a kind in the striking slot of a family with no strike, a
+/// bare family with no strike, an art's-weapon choice naming a family or
+/// outside the striking slot, a choice of a family with no kind for its
+/// slot, choices for a slot whose weights sum to 0, or a strike or damage
+/// outside MAX_BODY_DAMAGE or MAX_COOLDOWN.
+void check_gear(const Gear& gear, std::size_t disciplines,
+                std::size_t factions);
 
 }  // namespace murim

@@ -824,12 +824,15 @@ TEST(Content, AGrowthWithTiersOutOfOrderIsRefusedAtLoad) {
 }
 
 // The base pack with mod `mod`, whose one entry, of kind `kind` and id
-// `id`, sets `field` to `value`.
+// `id`, sets `field` to `value`, and its family to headwear at tier 0.
 LoadedContent base_with(MemoryPacks& mods, const std::string& mod,
                         const std::string& kind, const std::string& id,
                         const std::string& field, const std::string& value) {
   add_mod(mods, mod);
-  mods.entry(mod, kind, id).text(field, value);
+  mods.entry(mod, kind, id)
+      .text(field, value)
+      .text("family", "headwear")
+      .set("tier", 0);
   return load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {mod});
 }
 
@@ -925,14 +928,20 @@ TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
   ASSERT_EQ(before_gear.families.size(), after_gear.families.size());
   std::size_t changed = 0;
   for (std::size_t family = 0; family < before_gear.families.size(); ++family) {
-    Skill expected = before_gear.families.at(family).strike;
+    ASSERT_EQ(before_gear.families.at(family).strike.has_value(),
+              after_gear.families.at(family).strike.has_value());
+    if (!before_gear.families.at(family).strike) {
+      continue;
+    }
+    Skill expected = before_gear.families.at(family).strike.value_or(Skill{});
     if (before_gear.families.at(family).name == "sword") {
       // The sword's strike: only its damage moves.
       EXPECT_NE(expected.body_damage, SHARPER_DAMAGE);
       expected.body_damage = SHARPER_DAMAGE;
       ++changed;
     }
-    expect_skill(after_gear.families.at(family).strike, expected);
+    expect_skill(after_gear.families.at(family).strike.value_or(Skill{}),
+                 expected);
   }
   EXPECT_EQ(changed, 1U);
   // No faction's own skills move.

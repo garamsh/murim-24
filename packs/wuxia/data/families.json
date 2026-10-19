@@ -19,5 +19,17 @@
   {
     "id": "hidden_weapons",
     "strike": "darts"
+  },
+  {
+    "id": "clothes"
+  },
+  {
+    "id": "armour"
+  },
+  {
+    "id": "headwear"
+  },
+  {
+    "id": "helmet"
   }
 ]

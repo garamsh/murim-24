@@ -3,64 +3,82 @@
     "id": "iron_gauntlets",
     "slot": "weapon",
     "family": "fist",
+    "tier": 0,
     "edge": 1200
   },
   {
     "id": "iron_sword",
     "slot": "weapon",
-    "family": "sword"
+    "family": "sword",
+    "tier": 0
   },
   {
     "id": "steel_sword",
     "slot": "weapon",
     "family": "sword",
+    "tier": 1,
     "damage": 18,
     "edge": 1200
   },
   {
     "id": "iron_saber",
     "slot": "weapon",
-    "family": "saber"
+    "family": "saber",
+    "tier": 0
   },
   {
     "id": "steel_saber",
     "slot": "weapon",
     "family": "saber",
+    "tier": 1,
     "damage": 22,
     "edge": 1200
   },
   {
     "id": "darts",
     "slot": "weapon",
-    "family": "hidden_weapons"
+    "family": "hidden_weapons",
+    "tier": 0
   },
   {
     "id": "cloth",
     "slot": "armour",
+    "family": "clothes",
+    "tier": 0,
     "guard": 50
   },
   {
     "id": "leather",
     "slot": "armour",
+    "family": "armour",
+    "tier": 0,
     "guard": 150
   },
   {
     "id": "lamellar",
     "slot": "armour",
+    "family": "armour",
+    "tier": 1,
     "guard": 250
   },
   {
     "id": "headband",
-    "slot": "head"
+    "slot": "head",
+    "family": "headwear",
+    "tier": 0
   },
   {
     "id": "hat",
     "slot": "head",
+    "family": "headwear",
+    "tier": 0,
     "guard": 25
   },
   {
     "id": "helmet",
     "slot": "head",
+    "family": "helmet",
+    "tier": 0,
     "guard": 75
   }
 ]

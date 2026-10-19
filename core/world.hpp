@@ -872,14 +872,14 @@ class World {
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] Challenging challenging(std::size_t army) const;
   /// Whom a person is born as, for the loadout it wears (ADR 0050): one of
-  /// `faction`, a founder of `sect` if given, and a soldier or not.
+  /// `faction`, a sect's `founder` or not, and a soldier or not.
   struct Calling {
     std::size_t faction = 0;
-    std::optional<std::size_t> sect;
+    bool founder = false;
     bool soldier = false;
   };
   void enlist(ArmySpec& army, std::size_t pairs, bool residents,
-              const std::vector<std::optional<std::size_t>>& founders,
+              const std::vector<bool>& founders,
               std::size_t& families);
   void add_village(VillageSpec spec);
   void add_sects(std::vector<SectSpec> sects);
@@ -1134,9 +1134,9 @@ class World {
   };
   std::vector<Sect> sects_;
   std::vector<Manual> manuals_;
-  /// By faction, the weapon an art's-weapon choice dresses its people in,
-  /// derived from the sects, the manuals they start with and the gear.
-  std::vector<std::optional<std::size_t>> art_weapons_;
+  /// By faction, the weapon family an art's-weapon choice dresses its people
+  /// in, derived from the sects, the manuals they start with and the gear.
+  std::vector<std::optional<std::size_t>> art_families_;
   /// The declaration standing between each two factions.
   Declarations declarations_;
   /// The latest events, oldest first, at most EVENT_CAPACITY.

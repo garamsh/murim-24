@@ -960,9 +960,10 @@ void fold_gear(const Fold& fold, const std::optional<Gear>& gear) {
   }
   fold(gear->striking);
   fold(gear->families.size());
-  for (const WeaponFamily& family : gear->families) {
+  for (const Family& family : gear->families) {
     fold_text(fold, family.name);
-    fold_skill(fold, family.strike);
+    fold(family.strike.has_value());
+    fold_skill(fold, family.strike.value_or(Skill{}));
   }
   fold(gear->bare);
   fold(gear->needs.size());
@@ -976,8 +977,8 @@ void fold_gear(const Fold& fold, const std::optional<Gear>& gear) {
   for (const ItemKind& kind : gear->kinds) {
     fold_text(fold, kind.name);
     fold(kind.slot);
-    fold(kind.family.has_value());
-    fold(kind.family.value_or(0));
+    fold(kind.family);
+    fold(kind.tier);
     fold(kind.damage.has_value());
     fold(kind.damage.value_or(0));
     fold(kind.edge);
@@ -987,15 +988,14 @@ void fold_gear(const Fold& fold, const std::optional<Gear>& gear) {
   for (const Loadout& loadout : gear->loadouts) {
     fold(loadout.faction.has_value());
     fold(loadout.faction.value_or(0));
-    fold(loadout.sect.has_value());
-    fold(loadout.sect.value_or(0));
+    fold(loadout.founders);
     fold(loadout.soldiers);
     fold(loadout.slots.size());
     for (const std::vector<Choice>& choices : loadout.slots) {
       fold(choices.size());
       for (const Choice& choice : choices) {
-        fold(choice.kind.has_value());
-        fold(choice.kind.value_or(0));
+        fold(choice.family.has_value());
+        fold(choice.family.value_or(0));
         fold(choice.weight);
         fold(choice.art);
       }
@@ -1079,8 +1079,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       life_(std::move(life)) {
   check_life(life_);
   if (life_.gear) {
-    check_gear(*life_.gear, life_.disciplines.size(), rules_.hostile.size(),
-               sects.size());
+    check_gear(*life_.gear, life_.disciplines.size(), rules_.hostile.size());
   }
   if (rules_.ticks_per_day == 0) {
     throw std::invalid_argument("a day must last at least one tick");
@@ -1145,12 +1144,12 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     sect_factions.push_back(sect.faction);
   }
   arm_factions(sect_factions);
-  // The sect each person founds, if any, by person.
-  std::vector<std::optional<std::size_t>> founders;
-  for (std::size_t sect = 0; sect < sects.size(); ++sect) {
-    for (const Founder& founder : sects.at(sect).founders) {
-      founders.resize(std::max(founders.size(), founder.person + 1));
-      founders.at(founder.person) = sect;
+  // Whether each person founds a sect, by person.
+  std::vector<bool> founders;
+  for (const SectSpec& sect : sects) {
+    for (const Founder& founder : sect.founders) {
+      founders.resize(std::max(founders.size(), founder.person + 1), false);
+      founders.at(founder.person) = true;
     }
   }
   const auto homeless = [&villages](const ArmySpec& army) {
@@ -1211,7 +1210,7 @@ void World::restore() {
   check_life(life_);
   const std::size_t factions = rules_.hostile.size();
   if (life_.gear) {
-    check_gear(*life_.gear, life_.disciplines.size(), factions, sects_.size());
+    check_gear(*life_.gear, life_.disciplines.size(), factions);
   }
   std::vector<std::size_t> sect_factions;
   for (const Sect& sect : sects_) {
@@ -1362,8 +1361,7 @@ bool World::rostered() const {
 // their own, numbered from `families` on, and marry. Founders were born
 // before the world began, by the founding age.
 void World::enlist(ArmySpec& army, std::size_t pairs, bool residents,
-                   const std::vector<std::optional<std::size_t>>& founders,
-                   std::size_t& families) {
+                   const std::vector<bool>& founders, std::size_t& families) {
   std::vector<std::size_t> every_skill(army.skills.size() +
                                        (life_.gear ? 1 : 0));
   std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
@@ -1383,8 +1381,7 @@ void World::enlist(ArmySpec& army, std::size_t pairs, bool residents,
     person.family = housed ? families++ : armies_.size();
     const std::size_t index = people_.size();
     found(person,
-          Calling{army.faction,
-                  index < founders.size() ? founders.at(index) : std::nullopt,
+          Calling{army.faction, index < founders.size() && founders.at(index),
                   !residents},
           sex);
     if (wife) {
@@ -4575,11 +4572,11 @@ void World::bear(Person& person, const Soul& soul, const Calling& calling,
   dress(person, calling);
 }
 
-// Sets, by faction, the weapon an art's-weapon choice gives, from the
+// Sets, by faction, the weapon family an art's-weapon choice gives, from the
 // faction of each of the world's `sects`, the manuals they start with and the
-// gear: the weapon its sect's art needs.
+// gear: the family its sect's art needs.
 void World::arm_factions(const std::vector<std::size_t>& sects) {
-  art_weapons_.clear();
+  art_families_.clear();
   if (!life_.gear) {
     return;
   }
@@ -4587,11 +4584,11 @@ void World::arm_factions(const std::vector<std::size_t>& sects) {
   for (const Art& art : life_.arts) {
     disciplines.push_back(art.discipline);
   }
-  art_weapons_ =
-      art_weapons(*life_.gear, rules_.hostile.size(), sects,
-                  life_.manuals ? life_.manuals->held
-                                : std::vector<std::vector<std::size_t>>{},
-                  disciplines);
+  art_families_ =
+      art_families(*life_.gear, rules_.hostile.size(), sects,
+                   life_.manuals ? life_.manuals->held
+                                 : std::vector<std::vector<std::size_t>>{},
+                   disciplines);
 }
 
 // With gear, dresses `person`, the next the world holds, in the first
@@ -4604,8 +4601,8 @@ void World::dress(Person& person, const Calling& calling) {
     return;
   }
   person.worn.assign(life_.gear->slots.size(), std::nullopt);
-  const Loadout* fit =
-      loadout_for(*life_.gear, calling.faction, calling.sect, calling.soldier);
+  const Loadout* fit = loadout_for(*life_.gear, calling.faction,
+                                   calling.founder, calling.soldier);
   for (std::size_t slot = 0; fit != nullptr && slot < fit->slots.size();
        ++slot) {
     const std::vector<Choice>& choices = fit->slots.at(slot);
@@ -4616,16 +4613,26 @@ void World::dress(Person& person, const Calling& calling) {
     if (total == 0) {
       continue;
     }
-    std::uint64_t drawn = mix(mix(mix(seed_) ^ people_.size()) ^ slot) % total;
+    const std::uint64_t draw = mix(mix(mix(seed_) ^ people_.size()) ^ slot);
+    std::uint64_t drawn = draw % total;
     for (const Choice& choice : choices) {
-      if (drawn < choice.weight) {
-        person.worn.at(slot) =
-            choice.art && calling.faction < art_weapons_.size()
-                ? art_weapons_.at(calling.faction)
-                : choice.kind;
-        break;
+      if (drawn >= choice.weight) {
+        drawn -= choice.weight;
+        continue;
       }
-      drawn -= choice.weight;
+      const std::optional<std::size_t> family =
+          choice.art && calling.faction < art_families_.size()
+              ? art_families_.at(calling.faction)
+              : choice.family;
+      // A family gives a kind of its lowest tier, the same draw picking
+      // among several.
+      const std::vector<std::size_t> lowest =
+          family ? lowest_tier(*life_.gear, *family)
+                 : std::vector<std::size_t>{};
+      if (!lowest.empty()) {
+        person.worn.at(slot) = lowest.at(mix(draw) % lowest.size());
+      }
+      break;
     }
   }
 }
@@ -4724,8 +4731,7 @@ void World::rebirth(Passing passing) {
   person.soul = soul_index;
   const std::size_t family_army = villages_.at(village).spec.residents;
   bear(person, soul,
-       Calling{armies_.at(family_army).faction, std::nullopt,
-               army != family_army});
+       Calling{armies_.at(family_army).faction, false, army != family_army});
   const std::size_t born = people_.size();
   for (const std::size_t parent : person.parents) {
     people_.at(parent).children.push_back(born);
@@ -5186,8 +5192,7 @@ void World::bear_child(std::size_t mother, const Kinship& kinship) {
   const std::size_t serving = army_serving(lineage);
   const bool soldier =
       !child.home || villages_.at(*child.home).spec.residents != serving;
-  bear(child, Soul{},
-       Calling{armies_.at(serving).faction, std::nullopt, soldier},
+  bear(child, Soul{}, Calling{armies_.at(serving).faction, false, soldier},
        kinship.balanced_sexes && child.home ? scarcer_sex(*child.home, kinship)
                                             : std::nullopt);
   const std::size_t born = people_.size();

@@ -613,7 +613,7 @@ void validate(const RegionData& data) {
   check_growth(*data.life.growth);
   if (data.life.gear) {
     check_gear(*data.life.gear, data.life.disciplines.size(),
-               data.factions.size(), data.sects.size());
+               data.factions.size());
   }
 }
 

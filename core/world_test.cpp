@@ -6394,8 +6394,9 @@ constexpr std::size_t STRIKER = 0;
 constexpr std::size_t TARGET = 1;
 
 // Two people a cell apart at war, each a soldier, with gear of a weapon, an
-// armour and a head slot: the striker wears `weapon`, if given, and the
-// target `armour`, each kind by index, a slot of none left empty.
+// armour and a head slot, each kind the one kind of a family of its own: the
+// striker wears `weapon`, if given, and the target `armour`, each kind by
+// index, a slot of none left empty.
 World dressed(std::optional<std::size_t> weapon,
               const std::vector<std::optional<std::size_t>>& armour) {
   const auto blow = [](std::uint64_t damage) {
@@ -6403,21 +6404,28 @@ World dressed(std::optional<std::size_t> weapon,
   };
   Gear gear;
   gear.slots = {"weapon", "armour", "head"};
-  gear.families = {WeaponFamily{"bare", blow(BARE_BLOW)},
-                   WeaponFamily{"sword", blow(SWORD_BLOW)}};
+  gear.families = {
+      Family{"bare", blow(BARE_BLOW)},        Family{"sword", blow(SWORD_BLOW)},
+      Family{"long sword", blow(SWORD_BLOW)}, Family{"mail", std::nullopt},
+      Family{"plate", std::nullopt},          Family{"helm", std::nullopt}};
   gear.kinds = {
-      ItemKind{"sword", 0, 1, std::nullopt, PER_MILLE, 0},
-      ItemKind{"long sword", 0, 1, LONG_SWORD_BLOW, PER_MILLE, 0},
-      ItemKind{"mail", 1, std::nullopt, std::nullopt, PER_MILLE, MAIL_GUARD},
-      ItemKind{"plate", 1, std::nullopt, std::nullopt, PER_MILLE, PLATE_GUARD},
-      ItemKind{"helm", 2, std::nullopt, std::nullopt, PER_MILLE, HELM_GUARD}};
+      ItemKind{"sword", 0, 1, 0, std::nullopt, PER_MILLE, 0},
+      ItemKind{"long sword", 0, 2, 0, LONG_SWORD_BLOW, PER_MILLE, 0},
+      ItemKind{"mail", 1, 3, 0, std::nullopt, PER_MILLE, MAIL_GUARD},
+      ItemKind{"plate", 1, 4, 0, std::nullopt, PER_MILLE, PLATE_GUARD},
+      ItemKind{"helm", 2, 5, 0, std::nullopt, PER_MILLE, HELM_GUARD}};
+  // Each kind's family follows the bare one, in the kinds' order.
+  const auto family_of_kind = [](std::optional<std::size_t> kind) {
+    return kind ? std::optional<std::size_t>{*kind + 1} : std::nullopt;
+  };
   std::vector<std::vector<Choice>> worn;
   for (const std::optional<std::size_t>& kind : armour) {
-    worn.push_back(kind ? std::vector<Choice>{Choice{kind, 1}}
+    worn.push_back(kind ? std::vector<Choice>{Choice{family_of_kind(kind), 1}}
                         : std::vector<Choice>{});
   }
-  gear.loadouts = {Loadout{0, std::nullopt, true, {{Choice{weapon, 1}}}},
-                   Loadout{1, std::nullopt, true, worn}};
+  gear.loadouts = {
+      Loadout{0, false, true, {{Choice{family_of_kind(weapon), 1}}}},
+      Loadout{1, false, true, worn}};
   Life life;
   life.gear = gear;
   return World{Seed{1},
@@ -6481,11 +6489,11 @@ constexpr std::size_t GEARED_STRIKE = STRIKE + 1;
 Cultivating geared(bool armed, std::uint32_t edge = PER_MILLE) {
   Gear gear;
   gear.slots = {"weapon"};
-  gear.families = {WeaponFamily{"bare", IDLE}, WeaponFamily{"sword", IDLE}};
+  gear.families = {Family{"bare", IDLE}, Family{"sword", IDLE}};
   gear.needs = {{1}};
-  gear.kinds = {ItemKind{"sword", 0, 1, std::nullopt, edge, 0}};
+  gear.kinds = {ItemKind{"sword", 0, 1, 0, std::nullopt, edge, 0}};
   if (armed) {
-    gear.loadouts = {Loadout{0, std::nullopt, true, {{Choice{0, 1}}}}};
+    gear.loadouts = {Loadout{0, false, true, {{Choice{1, 1}}}}};
   }
   Cultivating cultivating;
   cultivating.gear = gear;

@@ -47,18 +47,10 @@ const RegionData& base_data() {
   return data;
 }
 
-// Clears `data`'s sects, and the manuals and loadouts that name them.
+// Clears `data`'s sects, and the manuals they hold.
 void clear_sects(RegionData& data) {
   data.sects.clear();
   data.life.manuals.reset();
-  if (data.life.gear) {
-    std::vector<Loadout>& loadouts = data.life.gear->loadouts;
-    loadouts.erase(std::remove_if(loadouts.begin(), loadouts.end(),
-                                  [](const Loadout& loadout) {
-                                    return loadout.sect.has_value();
-                                  }),
-                   loadouts.end());
-  }
 }
 
 constexpr std::uint64_t SEEDS = 200;
@@ -539,15 +531,16 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
          ++member, ++person) {
       ASSERT_EQ(world.person(person).worn.size(), gear.slots.size());
       if (founded.count(person) > 0) {
-        // A sect's founders carry steel, or darts, in leather.
+        // A sect's founders carry their art's weapon at its lowest tier, iron
+        // or darts, in leather, the armour family's lowest.
         const std::string weapon = worn_in(world, gear, person, WEAPON);
-        EXPECT_TRUE(weapon == "steel_sword" || weapon == "steel_saber" ||
+        EXPECT_TRUE(weapon == "iron_sword" || weapon == "iron_saber" ||
                     weapon == "darts")
             << weapon;
         EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "leather");
         ++founders;
       } else if (!residents.at(army)) {
-        EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "lamellar");
+        EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "leather");
         EXPECT_EQ(worn_in(world, gear, person, HEAD), "helmet");
         ++soldiers;
       } else {
@@ -571,6 +564,23 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
   for (std::size_t born = first_born; born < world.population(); ++born) {
     EXPECT_FALSE(worn_in(world, gear, born, ARMOUR).empty()) << born;
   }
+  // Born at the lowest tier: ranked above leather, lamellar is not drawn,
+  // and ranked below it, it is.
+  RegionData lamellar_first = data;
+  Gear& ranked = lamellar_first.life.gear.value();
+  for (ItemKind& kind : ranked.kinds) {
+    if (kind.name == "lamellar") {
+      kind.tier = 0;
+    } else if (kind.name == "leather") {
+      kind.tier = 1;
+    }
+  }
+  Region relaid = generate_region(SEED, lamellar_first);
+  relaid.armies.push_back(born_in(relaid, 0));
+  const World lamellar_world = world_of(relaid);
+  const std::size_t soldier = lamellar_world.population() - 1;
+  EXPECT_EQ(worn_in(world_of(region), gear, soldier, ARMOUR), "leather");
+  EXPECT_EQ(worn_in(lamellar_world, ranked, soldier, ARMOUR), "lamellar");
   // Control: with no loadouts, no one wears anything.
   RegionData bare = data;
   if (bare.life.gear) {
@@ -640,17 +650,17 @@ TEST(Region, EveryoneBornArmedCarriesTheWeaponTheirFactionsArtNeeds) {
   // Unorthodox, whose art needs darts, carry none they may cast it with.
   RegionData swords = base_data();
   Gear& gear = swords.life.gear.value();
-  const auto sword = std::find_if(
-      gear.kinds.begin(), gear.kinds.end(),
-      [](const ItemKind& kind) { return kind.name == "iron_sword"; });
-  ASSERT_NE(sword, gear.kinds.end());
+  const auto sword =
+      std::find_if(gear.families.begin(), gear.families.end(),
+                   [](const Family& family) { return family.name == "sword"; });
+  ASSERT_NE(sword, gear.families.end());
   for (Loadout& loadout : gear.loadouts) {
     for (std::vector<Choice>& choices : loadout.slots) {
       for (Choice& choice : choices) {
         if (choice.art) {
           choice.art = false;
-          choice.kind = static_cast<std::size_t>(
-              std::distance(gear.kinds.begin(), sword));
+          choice.family = static_cast<std::size_t>(
+              std::distance(gear.families.begin(), sword));
         }
       }
     }
@@ -1711,8 +1721,10 @@ RegionData grown() {
 RegionData striking(std::uint64_t damage) {
   RegionData data = base_data();
   Gear& gear = data.life.gear.value();
-  for (WeaponFamily& family : gear.families) {
-    family.strike.body_damage = damage;
+  for (Family& family : gear.families) {
+    if (family.strike) {
+      family.strike->body_damage = damage;
+    }
   }
   for (ItemKind& kind : gear.kinds) {
     kind.damage.reset();
