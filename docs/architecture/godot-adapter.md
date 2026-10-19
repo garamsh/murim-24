@@ -56,6 +56,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - `world_art/ground.gd` draws the ground off the cell grid with `world_art/ground.gdshader`, as `docs/convention/stack-godot.md` §Ground sets out. `relief.gd` repeats the shader's heights, so bodies stand on what it draws.
   - Built cells, under a structure or paved, meet the ground in straight seams where the ground round them is flat.
   - Each 32-cell area is baked once, scattered with detail and decorative trees from a seed its index gives, and shown or freed as the view nears or leaves it. Without a renderer nothing is baked.
+  - Past the map's edges the cells continue the edge's ground, its kind, level and face, with nothing built on it. The areas on an edge draw it as far as their images reach, and those on the bottom edge as far as the camera may show below the map, baked again when that grows (#400).
 - Territory borders are drawn from `territory` in each owner's accent, and redrawn only when the territory moved or a village was founded.
 - Each structure is drawn over the footprint the core gives it, in its stage's frame of its kind's art, with a shadow while it stands. A structure from `create` has no kind and is not drawn.
 - Each village's paving, roads and banners come from `world_art/villages.json` by its template's name. They never block or break, and a founded village's are laid on the tick that finds it.
@@ -103,7 +104,7 @@ The GDExtension adapter through which Godot drives the simulation core: what exi
 - Each key is bound once, as a constant of `play.gd`, and the pause panel's guide is drawn from those constants.
 - On a PC, the HUD's shortcut rail lists `SHORTCUTS`, the play scene's one table of what each panel's row opens, with its key, icon and word. A click on a row presses its key through the same path a key takes.
 - The world ticks at the core's tick rate times the speed the settings choose, and no tick runs while a screen is open.
-- The camera follows the steered person where its body is drawn, and stops at the map's bounds at any scale, so nothing past them shows. On a map narrower than the screen it shows the map's middle, and a hit's shake stays inside the bounds.
+- The camera follows the steered person where its body is drawn, and stops at the map's bounds at any scale, but for the bottom, lowered by as far as the HUD's bars along the screen's foot reach up it, so they cover nothing of the map (#398); the ground drawn past the bottom edge reaches as far (#400). On a map narrower than the screen it shows the map's middle, and a hit's shake stays inside the bounds.
 - When a tick finds the player's soul born again, the play scene opens the rebirth screen, and no further tick runs that frame.
 - The pause panel's Save, and an autosave every few in-game days, write slot 0 and the loadout beside it, once a body carries the player's soul.
 

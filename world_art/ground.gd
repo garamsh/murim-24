@@ -1,8 +1,9 @@
 ## The ground of a region drawn off the cell grid (#212), baked once when the map is built and
 ## streamed by chunk round the camera. bake() draws every chunk of CHUNK x CHUNK cells with
-## ground.gdshader into a viewport freed as soon as the last is drawn, scatters detail over it and
-## decorative trees in clusters by Poisson-disc spacing from a seed the chunk's index gives, darkens
-## the ground under each tree, and cuts the chunk into its ground at level 0 and below and a strip
+## ground.gdshader into a viewport freed as soon as the last is drawn, and those on the map's bottom
+## edge again when past_bottom outgrows them; scatters detail over it and decorative trees in
+## clusters by Poisson-disc spacing from a seed the chunk's index gives, darkens the ground under
+## each tree, and cuts the chunk into its ground at level 0 and below and a strip
 ## for each raised row and level. stream() then shows the chunks within STREAM_MARGIN of the screen,
 ## at most BUILDS_PER_FRAME a frame once the first are shown, and frees those a chunk further out:
 ## the ground under everything standing, and the strips and trees among what stands, each sorted by
@@ -76,15 +77,24 @@ var baked := false
 ## The node strips and trees are sorted in, with everything else standing.
 var standing: Node2D
 ## Draws an area as ground.gdshader does, given its key, the pass (0 colour, 1 what each pixel is)
-## and the unraised pixel its image's top-left lies on, returning the image; when not set, the
+## and the unraised pixels its image covers, image_rect(), returning the image; when not set, the
 ## shader draws it in a viewport. A test gives one of its own, having no renderer.
 var render := Callable()
+## Pixels past the map's bottom edge the view may show. The chunks on that edge draw their ground
+## at least that far, and are baked again once it grows past what they hold (#400).
+var past_bottom := 0.0:
+	set(value):
+		past_bottom = value
+		if baked and _relief != null and image_rect(_last()).end.y > _baked_bottom:
+			_rebake_bottom()
 
 var _relief: Relief
 var _options := {}
 var _chunks := {}
 var _shown := {}
 var _baker: SubViewport
+# How far down the image of each chunk on the map's bottom edge was baked.
+var _baked_bottom := 0
 var _material: ShaderMaterial
 var _ramps: Array[Color] = []
 var _trees := {}
@@ -107,13 +117,18 @@ func prepare(relief: Relief, options := {}) -> void:
 		for step in STEPS:
 			_ramps.append(sheet.get_pixel(tags[tag] * STEPS + step, 0))
 	_read_detail()
+	_make_baker()
+
+
+# Readies what draws the chunks not yet baked: the stand-in, at once, or a viewport, from the frame
+# after it enters the tree. Without a renderer nothing draws them.
+func _make_baker() -> void:
 	if render.is_valid():
 		_asked_at = Engine.get_process_frames() - 2
 		return
 	if DisplayServer.get_name() == "headless":
 		return
 	_baker = SubViewport.new()
-	_baker.size = Vector2i(CHUNK * int(Relief.CELL.x), CHUNK * int(Relief.CELL.y) + TOP_PAD + BOTTOM_PAD)
 	_baker.transparent_bg = true
 	_baker.disable_3d = true
 	# The viewport draws only when bake() forces it, so it never draws again behind the bake's back.
@@ -121,22 +136,29 @@ func prepare(relief: Relief, options := {}) -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
 	var rect := ColorRect.new()
-	rect.size = Vector2(_baker.size)
 	rect.material = _material
 	_baker.add_child(rect)
+	_fit_baker()
 	add_child(_baker)
-	var cells: Image = relief.cell_image()
+	var cells: Image = _relief.cell_image()
 	_material.set_shader_parameter("cells", ImageTexture.create_from_image(cells))
-	_material.set_shader_parameter("map_size", relief.size)
-	_material.set_shader_parameter("image_size", Vector2(_baker.size))
+	_material.set_shader_parameter("map_size", _relief.size)
 	var ramps := PackedVector3Array()
 	for colour in _ramps:
 		ramps.append(Vector3(colour.r, colour.g, colour.b))
 	_material.set_shader_parameter("ramps", ramps)
-	var uniforms: Dictionary = options.get("shader", {})
+	var uniforms: Dictionary = _options.get("shader", {})
 	for name: String in uniforms:
 		_material.set_shader_parameter(name, uniforms[name])
 	_asked_at = Engine.get_process_frames()
+
+
+# Sizes the viewport to the largest image of a chunk, one on the map's bottom edge as past_bottom
+# reaches now; every chunk is drawn at that size and cut to its own image.
+func _fit_baker() -> void:
+	_baker.size = image_rect(_last()).size
+	(_baker.get_child(0) as ColorRect).size = Vector2(_baker.size)
+	_material.set_shader_parameter("image_size", Vector2(_baker.size))
 
 
 ## Colour `step`, 0 darkest, of kind `kind`'s ramp, an index of Relief.KINDS.
@@ -148,7 +170,11 @@ func ramp_colour(kind: int, step: int) -> Color:
 ## renderer can draw them; returns whether the ground is baked.
 func stream(view: Rect2) -> bool:
 	if not baked:
-		# The viewport draws from the frame after it entered the tree.
+		# The viewport draws at a size from the frame after it was given it, as from the frame after
+		# it entered the tree.
+		if _baker != null and _baker.size != image_rect(_last()).size:
+			_fit_baker()
+			_asked_at = Engine.get_process_frames()
 		if (_baker == null and not render.is_valid()) or Engine.get_process_frames() <= _asked_at + 1:
 			return false
 		_bake()
@@ -173,6 +199,37 @@ func stream(view: Rect2) -> bool:
 ## Pixels the chunk at `key` covers on the unraised ground.
 func chunk_rect(key: Vector2i) -> Rect2:
 	return Rect2(Vector2(key) * CHUNK * Relief.CELL, CHUNK * Relief.CELL)
+
+
+## The rows whose ground the chunk at `key` draws, from x up to y: its own, and on the map's top or
+## bottom edge every row past that edge its image reaches, so the cells past an edge, which the
+## shader reads as the edge's own, continue it there (#400). Its columns are its own, and its
+## image holds no others, so nothing is cut along the map's sides.
+func rows_of(key: Vector2i) -> Vector2i:
+	var from := key.y * CHUNK
+	var to := mini(from + CHUNK, _relief.size.y)
+	var image := image_rect(key)
+	if from == 0:
+		from = floori(image.position.y / Relief.CELL.y)
+	if to == _relief.size.y:
+		to = floori((image.end.y + _relief.highest() * Relief.LEVEL_PX) / Relief.CELL.y) + 1
+	return Vector2i(from, to)
+
+
+## Pixels the image of the chunk at `key` covers on the unraised ground: its cells with TOP_PAD
+## above and BOTTOM_PAD below, and on the map's bottom edge down to past_bottom below the map, if
+## that is further.
+func image_rect(key: Vector2i) -> Rect2i:
+	var top := Vector2i(key.x * CHUNK * int(Relief.CELL.x), key.y * CHUNK * int(Relief.CELL.y) - TOP_PAD)
+	var bottom := (key.y + 1) * CHUNK * int(Relief.CELL.y) + BOTTOM_PAD
+	if key.y == _last().y:
+		bottom = maxi(bottom, _relief.size.y * int(Relief.CELL.y) + ceili(past_bottom))
+	return Rect2i(top, Vector2i(CHUNK * int(Relief.CELL.x), bottom - top.y))
+
+
+## Pixels the ground draws over on the unraised ground: every chunk's image.
+func drawn() -> Rect2:
+	return Rect2(image_rect(Vector2i.ZERO)).merge(Rect2(image_rect(_last())))
 
 
 ## The keys of the chunks shown now.
@@ -213,50 +270,71 @@ func images_of(key: Vector2i) -> Dictionary:
 func _chunks_over(rect: Rect2) -> Dictionary:
 	var keys := {}
 	var size := CHUNK * Relief.CELL
-	var last := Vector2i((_relief.size.x - 1) / CHUNK, (_relief.size.y - 1) / CHUNK)
+	var last := _last()
 	for cx in range(maxi(floori(rect.position.x / size.x), 0), mini(floori(rect.end.x / size.x), last.x) + 1):
 		for cy in range(maxi(floori(rect.position.y / size.y), 0), mini(floori(rect.end.y / size.y), last.y) + 1):
 			keys[Vector2i(cx, cy)] = true
 	return keys
 
 
-# Bakes every chunk once, then frees the viewport, so nothing draws the shader again.
+# The key of the chunk at the map's bottom right corner.
+func _last() -> Vector2i:
+	return Vector2i((_relief.size.x - 1) / CHUNK, (_relief.size.y - 1) / CHUNK)
+
+
+# Bakes every chunk not yet baked, shows again those of them shown, then frees the viewport, so
+# nothing draws the shader again until one is to be baked again.
 func _bake() -> void:
-	for cx in range((_relief.size.x + CHUNK - 1) / CHUNK):
-		for cy in range((_relief.size.y + CHUNK - 1) / CHUNK):
+	for cx in range(_last().x + 1):
+		for cy in range(_last().y + 1):
+			var key := Vector2i(cx, cy)
+			if _chunks.has(key):
+				continue
 			var started := Time.get_ticks_usec()
-			_chunks[Vector2i(cx, cy)] = _compose(Vector2i(cx, cy))
+			_chunks[key] = _compose(key)
 			bake_usec.append(Time.get_ticks_usec() - started)
+			if _shown.has(key):
+				_hide(key)
+				_show(key)
+	_baked_bottom = image_rect(_last()).end.y
 	if _baker != null:
 		_baker.queue_free()
 		_baker = null
 	baked = true
 
 
-# Draws the chunk at `key` with the shader, in colour or, with `pass_kind` 1, what each pixel is;
-# the image's top-left is `top` on the unraised ground.
-func _render(key: Vector2i, pass_kind: int, top: Vector2i) -> Image:
+# Bakes the chunks on the map's bottom edge again, from the next frame on where the renderer can.
+func _rebake_bottom() -> void:
+	for cx in range(_last().x + 1):
+		_chunks.erase(Vector2i(cx, _last().y))
+	baked = false
+	_make_baker()
+
+
+# Draws the chunk at `key` with the shader, in colour or, with `pass_kind` 1, what each pixel is,
+# over image_rect(key).
+func _render(key: Vector2i, pass_kind: int) -> Image:
+	var image_at := image_rect(key)
 	if render.is_valid():
-		return render.call(key, pass_kind, top)
-	var origin := key * CHUNK
-	_material.set_shader_parameter("origin", Vector2(top))
-	_material.set_shader_parameter("row_from", origin.y)
-	_material.set_shader_parameter("row_to", mini(origin.y + CHUNK, _relief.size.y))
+		return render.call(key, pass_kind, image_at)
+	var rows := rows_of(key)
+	_material.set_shader_parameter("origin", Vector2(image_at.position))
+	_material.set_shader_parameter("row_from", rows.x)
+	_material.set_shader_parameter("row_to", rows.y)
 	_material.set_shader_parameter("pass_kind", pass_kind)
 	_baker.render_target_update_mode = SubViewport.UPDATE_ONCE
 	RenderingServer.force_draw(false)
 	var image := _baker.get_texture().get_image()
 	image.convert(Image.FORMAT_RGBA8)
-	return image
+	return image.get_region(Rect2i(Vector2i.ZERO, image_at.size)) if image.get_size() != image_at.size else image
 
 
 # The chunk at `key`: the shader's ground, detail and trees scattered over it from the chunk's seed,
 # shadows under the trees, cut into its ground and its raised strips.
 func _compose(key: Vector2i) -> Dictionary:
-	var origin := key * CHUNK
-	var top := Vector2i(origin.x * int(Relief.CELL.x), origin.y * int(Relief.CELL.y) - TOP_PAD)
-	var colour := _render(key, 0, top)
-	var what := _render(key, 1, top).get_data()
+	var top := image_rect(key).position
+	var colour := _render(key, 0)
+	var what := _render(key, 1).get_data()
 	var width := colour.get_width()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_of(key)
@@ -265,7 +343,7 @@ func _compose(key: Vector2i) -> Dictionary:
 	for tree: Dictionary in trees:
 		_contact_shadow(colour, what, width, tree.foot - Vector2(0, tree.level * Relief.LEVEL_PX) - Vector2(top),
 				tree.level)
-	var composed := _cut(colour, what, width, origin.y, top)
+	var composed := _cut(colour, what, width, rows_of(key).x, top)
 	composed.trees = trees
 	return composed
 

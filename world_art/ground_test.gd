@@ -7,7 +7,8 @@
 # area's trees again where they were; the same relief and seeds give the same ground and trees, and
 # no tree stands where the view says none may. Each area has a seed of its own, and Poisson-disc
 # points from one seed are the same, none nearer another than the spacing. The ground and its raised
-# strips are drawn with the ground's material, and its trees are not.
+# strips are drawn with the ground's material, and its trees are not. The areas on the map's edges
+# draw the rows past them, and those on the bottom edge reach past_bottom, baked again as it grows.
 extends RefCounted
 
 const Ground := preload("res://world_art/ground.gd")
@@ -17,7 +18,6 @@ const FOREST := 20
 # Cells no tree may stand on, inside the forest.
 const CLEARED := Rect2i(24, 4, 6, 6)
 const VIEW := Vector2(640, 360)
-const IMAGE := Vector2i(Ground.CHUNK * 16, Ground.CHUNK * 12 + Ground.TOP_PAD + Ground.BOTTOM_PAD)
 
 var _calls := 0
 # A row of cells the stand-in draws a level up, or -1 for none.
@@ -26,7 +26,7 @@ var _raised_row := -1
 
 func run() -> bool:
 	return _seeds_pass() and _poisson_pass() and _waits_pass() and _bake_pass() and _stream_pass() \
-			and _placement_pass() and _material_pass()
+			and _placement_pass() and _material_pass() and _edges_pass()
 
 
 static func _relief() -> Relief:
@@ -38,16 +38,16 @@ static func _relief() -> Relief:
 
 
 # The stand-in for the shader: each cell of the area's rows drawn flat over its own rectangle, in
-# a colour of its kind, or, in the second pass, as what it is.
-func _render(key: Vector2i, pass_kind: int, top: Vector2i, relief: Relief) -> Image:
+# a colour of its kind, or, in the second pass, as what it is, its row counted from `row_from`.
+func _render(key: Vector2i, pass_kind: int, image_at: Rect2i, relief: Relief, row_from: int) -> Image:
 	_calls += 1
-	var image := Image.create_empty(IMAGE.x, IMAGE.y, false, Image.FORMAT_RGBA8)
+	var image := Image.create_empty(image_at.size.x, image_at.size.y, false, Image.FORMAT_RGBA8)
 	for y in range(key.y * Ground.CHUNK, mini((key.y + 1) * Ground.CHUNK, SIZE.y)):
 		for x in range(key.x * Ground.CHUNK, mini((key.x + 1) * Ground.CHUNK, SIZE.x)):
 			var kind := Relief.KINDS.find(relief.kind_at(Vector2i(x, y)))
 			var colour := Color8(kind * 10, 120, 40) if pass_kind == 0 \
-					else Color8(y - key.y * Ground.CHUNK + 1, 3 if y == _raised_row else 2, kind, 255)
-			image.fill_rect(Rect2i(Vector2i(x * 16, y * 12) - top, Vector2i(16, 12)), colour)
+					else Color8(y - row_from + 1, 3 if y == _raised_row else 2, kind, 255)
+			image.fill_rect(Rect2i(Vector2i(x * 16, y * 12) - image_at.position, Vector2i(16, 12)), colour)
 	return image
 
 
@@ -55,8 +55,8 @@ func _ground(options := {}) -> Node2D:
 	var relief := _relief()
 	var ground := Ground.new()
 	ground.standing = Node2D.new()
-	ground.render = func(key: Vector2i, pass_kind: int, top: Vector2i) -> Image:
-		return _render(key, pass_kind, top, relief)
+	ground.render = func(key: Vector2i, pass_kind: int, image_at: Rect2i) -> Image:
+		return _render(key, pass_kind, image_at, relief, ground.rows_of(key).x)
 	ground.prepare(relief, options)
 	return ground
 
@@ -227,5 +227,50 @@ func _material_pass() -> bool:
 			and ground_shaded and strips_shaded and trees_plain
 	print("ground_test: %d ground sprites drawn with the ground's material %s, %d strips %s, %d trees without it %s: %s" % [
 		grounds.size(), ground_shaded, strips.size(), strips_shaded, trees.size(), trees_plain, "pass" if passed else "FAIL"])
+	_free(ground)
+	return passed
+
+
+# The areas on the map's top and bottom edges draw the rows past those edges as far as their images
+# reach, so the ground continues each edge there (#400), and the images of those on the bottom edge
+# reach past_bottom below the map: given more than they hold, they alone are baked again, and the
+# ones shown are shown with their new images. Control: an area on neither edge draws its own rows
+# alone, and a past_bottom the bottom areas already hold bakes nothing again. Setup: the bottom
+# areas are shown.
+func _edges_pass() -> bool:
+	var deep := Ground.new()
+	deep.prepare(Relief.new(Vector2i(40, 3 * Ground.CHUNK)))
+	var top: Vector2i = deep.rows_of(Vector2i(0, 0))
+	var middle: Vector2i = deep.rows_of(Vector2i(0, 1))
+	var bottom: Vector2i = deep.rows_of(Vector2i(0, 2))
+	var reach: Rect2i = deep.image_rect(Vector2i(0, 2))
+	deep.free()
+	var rows: bool = top == Vector2i(floori(-Ground.TOP_PAD / 12.0), Ground.CHUNK) \
+			and middle == Vector2i(Ground.CHUNK, 2 * Ground.CHUNK) and bottom.x == 2 * Ground.CHUNK \
+			and bottom.y * 12 >= reach.end.y
+	_calls = 0
+	var ground := _ground()
+	var view := Rect2(Vector2(0, SIZE.y * 12 - VIEW.y), VIEW)
+	ground.stream(view)
+	var last := Vector2i((SIZE.x - 1) / Ground.CHUNK, (SIZE.y - 1) / Ground.CHUNK)
+	var shown: bool = ground.shown_chunks().has(Vector2i(0, last.y))
+	var baked := _calls
+	ground.past_bottom = Ground.BOTTOM_PAD
+	ground.stream(view)
+	var held := _calls - baked
+	var past := 400
+	ground.past_bottom = past
+	ground.stream(view)
+	var again := _calls - baked - held
+	var image: Rect2i = ground.image_rect(Vector2i(0, last.y))
+	var drawn: Image = ground.images_of(Vector2i(0, last.y)).ground
+	var redrawn := ground.get_children().any(func(node: Node) -> bool:
+			return node is Sprite2D and not node.is_queued_for_deletion() \
+					and (node as Sprite2D).texture.get_height() == image.size.y)
+	var passed: bool = rows and shown and held == 0 and again == 2 * (last.x + 1) \
+			and image.end.y == SIZE.y * 12 + past and drawn.get_height() == image.size.y and redrawn
+	print("ground_test: rows drawn on the top edge %s, between the edges %s, on the bottom edge %s reaching %d against the image's %d; the bottom area shown %s; past_bottom held drew %d passes, past_bottom %d drew %d for %d bottom areas, their image to %d, shown again %s: %s" % [
+		top, middle, bottom, bottom.y * 12, reach.end.y, shown, held, past, again, last.x + 1, image.end.y,
+		redrawn, "pass" if passed else "FAIL"])
 	_free(ground)
 	return passed

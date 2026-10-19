@@ -94,9 +94,13 @@ ivec4 cell(ivec2 c) {
 	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)) & 127, t.a < 0.75 ? 1 : 0);
 }
 
-// Whether something is built on the cell under the point `p` on the ground.
+// Whether something is built on the cell under the point `p` on the ground. Past the map's edges,
+// where the cells continue the edge's ground, nothing is (#400).
 bool built(vec2 p) {
-	ivec2 c = clamp(ivec2(floor(vec2(p.x / CW, p.y / CD))), ivec2(0), map_size - 1);
+	ivec2 c = ivec2(floor(vec2(p.x / CW, p.y / CD)));
+	if (c != clamp(c, ivec2(0), map_size - 1)) {
+		return false;
+	}
 	return int(round(texelFetch(cells, c, 0).b * 255.0)) >= 128;
 }
 

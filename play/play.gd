@@ -275,19 +275,35 @@ static func camera_centre(at: Vector2, screen: Vector2, bounds: Rect2, zoom: flo
 
 ## Returns the bounds the camera stops at to follow `at`, in the world's pixels, in a window `window`
 ## pixels across and down: the drawn bounds, their bottom lowered past the lower of their own and `at`
-## by as far as the HUD's bars along the screen's foot reach up it, so those bars cover nothing above
-## either (#398).
+## by covered(), so the HUD's bars cover nothing above either (#398).
 func camera_bounds(window: Vector2, at: Vector2) -> Rect2:
-	var foot: Vector2 = _hud.to_window(Vector2(0, _hud.foot_top()))
-	var covered := (window.y - foot.y) / _camera.zoom.y
 	var bounds := _bounds
-	bounds.end.y = maxf(bounds.end.y, at.y) + maxf(covered, 0.0)
+	bounds.end.y = maxf(bounds.end.y, at.y) + covered(window)
+	return bounds
+
+
+## Returns how far the HUD's bars along the screen's foot reach up a window `window` pixels across and
+## down, in the world's pixels.
+func covered(window: Vector2) -> float:
+	var foot: Vector2 = _hud.to_window(Vector2(0, _hud.foot_top()))
+	return maxf((window.y - foot.y) / _camera.zoom.y, 0.0)
+
+
+## Centres the camera on the steered person in a window `window` pixels across and down, as
+## camera_centre() places it within camera_bounds(), and has the ground drawn covered() past the
+## map's bottom, as far as those bounds can reach below it (#400); returns the bounds.
+func aim_camera(window: Vector2) -> Rect2:
+	var lead := drawn_lead()
+	var bounds := camera_bounds(window, lead)
+	_camera.position = camera_centre(lead, window / _camera.zoom, bounds, _camera.zoom.x)
+	_art.get_node("Ground").past_bottom = covered(window)
 	return bounds
 
 
 ## Returns the part of a map `size` pixels across and down, on the unraised ground, that the view
-## draws ground over: all of it, but where raised ground along its last row is drawn above the
-## map's bottom edge, the bottom comes up to the highest of it, since nothing is drawn below.
+## draws the map's own ground over: all of it, but where raised ground along its last row is drawn
+## above the map's bottom edge, the bottom comes up to the highest of it. Below, the ground drawn
+## continues the edge (world_art/ground.gd).
 static func drawn_bounds(size: Vector2, relief: Relief) -> Rect2:
 	var lift := 0.0
 	for x in int(size.x):
@@ -495,9 +511,7 @@ func _process(delta: float) -> void:
 		return
 	var window := get_viewport_rect().size
 	var screen := window / _camera.zoom
-	var lead := drawn_lead()
-	var bounds := camera_bounds(window, lead)
-	_camera.position = camera_centre(lead, screen, bounds, _camera.zoom.x)
+	var bounds := aim_camera(window)
 	var view := Rect2(_camera.position - screen / 2.0, screen)
 	show_view(view)
 	# A hit on or from the player shakes the screen by whole screen pixels, never past the bounds.
