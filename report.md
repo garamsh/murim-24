@@ -34,3 +34,11 @@ Head `10966d19` on `fix/built-crisp-on-slopes`; main `af3dbfc6`.
 | 1 | 3093.8 ms | 3378.2 ms |
 | 2 | 3314.0 ms | 3332.0 ms |
 | 3 | 3252.1 ms | 3402.2 ms |
+
+## Review round 1 (head `0e2b1022`)
+
+- `logs/review/tool-0e2b1022.log`: 12 of 12 pass. The trodden check also reads the row past the map's bottom edge below cells built on the last rows (`AT_BOTTOM`). The face check's control compares warped with unwarped feet beside the built cells.
+- `logs/review/tool-without-s1.log`: with the shader's old early return off the map, 43 of 96 pixels of that row are trodden, and the check fails.
+- `harness/probe_lip.gd`: built cells just north of water, and below the face, at `10966d19` (`captures/review/pre_*`) and at head (`captures/review/fix_*`). By row:
+  - the lip: only the built cells' last row changes, 64 px across, which no longer takes the lit lip;
+  - below the face: only ground rows 432 to 435 change, which now carry one solid shadow row and nothing dithered below it.
