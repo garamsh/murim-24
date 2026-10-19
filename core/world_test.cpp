@@ -8067,10 +8067,6 @@ TEST(World, APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule) {
 // The cells people see in the appraisal tests, and each one's health.
 constexpr std::int32_t APPRAISAL_SIGHT = 6;
 constexpr std::uint64_t APPRAISED_HEALTH = 100;
-// The appraising band's first member: with the band, BAND, the second
-// army and this the second person, both appraise on the first tick, before
-// anyone moves.
-constexpr std::size_t FIRST_MEMBER = 1;
 
 // Where the people of an appraisal test stand: steered foes of faction 1,
 // the first army; a band of faction 0; and an army of faction 2 at each of
@@ -8116,23 +8112,24 @@ Rules three_factions(bool hostile) {
       STAGE_FLOORS};
 }
 
-TEST(World, AnArmysMergedSightCountsAFoeSeenByTwoMembersOnce) {
-  // Two members ten cells apart, out of each other's sight, and a foe five
-  // cells from each.
-  const Standing one_foe{{{7, 8}}, {{2, 8}, {12, 8}}, {}};
-  World shared = appraisers(one_foe);
-  run_ticks(shared, 1);
+TEST(World, AnArmySeesWhatItsLeadSees) {
+  // The band's lead and a second member ten cells east, out of each other's
+  // sight, and a foe two cells beyond the second, out of the lead's.
+  const Standing beyond_lead{{{14, 8}}, {{2, 8}, {12, 8}}, {}};
+  World unseen = appraisers(beyond_lead);
+  run_ticks(unseen, 1);
   // Setup: the steered foe stands where it began.
-  ASSERT_EQ(cells_apart(cell_at(shared, 0), one_foe.foes.front()), 0);
-  const std::optional<Appraisal> once = shared.army_appraisal(BAND);
-  ASSERT_TRUE(once.has_value());
-  EXPECT_EQ(once.value_or(Appraisal{}).ratio, PER_MILLE / 2);
-  EXPECT_EQ(once.value_or(Appraisal{}).tick, 1U);
-  // Control: two foes, each seen by one member, count twice.
-  const Standing two_foes{{{0, 8}, {14, 8}}, one_foe.members, {}};
-  World apart = appraisers(two_foes);
-  run_ticks(apart, 1);
-  EXPECT_EQ(apart.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
+  ASSERT_EQ(cells_apart(cell_at(unseen, 0), beyond_lead.foes.front()), 0);
+  const std::optional<Appraisal> lead = unseen.army_appraisal(BAND);
+  ASSERT_TRUE(lead.has_value());
+  EXPECT_EQ(lead.value_or(Appraisal{}).ratio, 0U);
+  EXPECT_EQ(lead.value_or(Appraisal{}).tick, 1U);
+  // Control: the foe five cells from the lead is weighed against the lead
+  // alone, the second member out of its sight.
+  const Standing near_lead{{{7, 8}}, beyond_lead.members, {}};
+  World seen = appraisers(near_lead);
+  run_ticks(seen, 1);
+  EXPECT_EQ(seen.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
 }
 
 TEST(World, AnAppraisalWithNoFoeInSightReadsNothing) {
@@ -8145,8 +8142,7 @@ TEST(World, AnAppraisalWithNoFoeInSightReadsNothing) {
   ASSERT_TRUE(band.has_value());
   EXPECT_EQ(band.value_or(Appraisal{}).ratio, 0U);
   EXPECT_EQ(band.value_or(Appraisal{}).tick, 1U);
-  EXPECT_EQ(alone.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio, 0U);
-  // Control: the foe within sight of both is weighed against the two.
+  // Control: the foe within the lead's sight is weighed against the two.
   const Standing in_sight{{{7, 8}}, out_of_sight.members, {}};
   World seen = appraisers(in_sight);
   run_ticks(seen, 1);
@@ -8161,12 +8157,11 @@ TEST(World, AnAppraisalCountsNeitherAFactionAtPeaceNorAsOwn) {
   World peace = appraisers(beside, three_factions(false));
   run_ticks(peace, 1);
   ASSERT_EQ(peace.faction_of(2), std::optional<std::size_t>{2});
-  EXPECT_EQ(peace.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio,
-            PER_MILLE);
+  EXPECT_EQ(peace.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
   // Control: the same person at war with the band is a threat.
   World war = appraisers(beside, three_factions(true));
   run_ticks(war, 1);
-  EXPECT_EQ(war.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio,
+  EXPECT_EQ(war.army_appraisal(BAND).value_or(Appraisal{}).ratio,
             2 * PER_MILLE);
 }
 
@@ -8196,8 +8191,7 @@ TEST(World, AFactionSharingTheBandsKindIsNotCountedAsOwn) {
   world.steer(0, true);
   run_ticks(world, 1);
   ASSERT_EQ(world.faction_of(2), std::optional<std::size_t>{KIN});
-  EXPECT_EQ(world.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio,
-            PER_MILLE);
+  EXPECT_EQ(world.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
   // Control: a person of the band's own faction there is counted, halving
   // the ratio.
   World own{Seed{1},
@@ -8207,7 +8201,7 @@ TEST(World, AFactionSharingTheBandsKindIsNotCountedAsOwn) {
             rules};
   own.steer(0, true);
   run_ticks(own, 1);
-  EXPECT_EQ(own.appraisal(FIRST_MEMBER).value_or(Appraisal{}).ratio,
+  EXPECT_EQ(own.army_appraisal(BAND).value_or(Appraisal{}).ratio,
             PER_MILLE / 2);
 }
 
@@ -8216,19 +8210,16 @@ TEST(World, ASteeredArmyOrOneHoldingAnAttackIntentIsNotAppraised) {
   World steered = appraisers(alone);
   steered.steer(BAND, true);
   run_ticks(steered, 1);
-  EXPECT_FALSE(steered.appraisal(FIRST_MEMBER).has_value());
   EXPECT_FALSE(steered.army_appraisal(BAND).has_value());
-  // Control: the same army unsteered is appraised, alone and as a band.
+  // Control: the same army unsteered is appraised.
   World free = appraisers(alone);
   run_ticks(free, 1);
-  EXPECT_TRUE(free.appraisal(FIRST_MEMBER).has_value());
   EXPECT_TRUE(free.army_appraisal(BAND).has_value());
 
   World intent = appraisers(alone);
   intent.order(BAND, Order{alone.members.front(), {0}, 0});
   run_ticks(intent, 1);
   ASSERT_EQ(intent.target(BAND), std::optional<std::size_t>{0});
-  EXPECT_FALSE(intent.appraisal(FIRST_MEMBER).has_value());
   EXPECT_FALSE(intent.army_appraisal(BAND).has_value());
   // Control: once the intent ends, the band appraises at its next phase.
   intent.end_intent(BAND);
@@ -8293,10 +8284,10 @@ TEST(World, AnAppraisalWeighsEachPersonByItsRealm) {
   run_ticks(weighted, 1);
   const std::vector<std::size_t>& band = weighted.roster(BAND);
   const std::uint32_t expected =
-      seen_ratio(weighted, band.front(), band, {REALM_WEIGHT});
+      seen_ratio(weighted, band.front(), {band.front()}, {REALM_WEIGHT});
   // Setup: the realm splits the two sides unevenly, so its weight moves the
   // ratio.
-  ASSERT_NE(expected, seen_ratio(weighted, band.front(), band, {1}));
+  ASSERT_NE(expected, seen_ratio(weighted, band.front(), {band.front()}, {1}));
   EXPECT_EQ(weighted.army_appraisal(BAND).value_or(Appraisal{}).ratio,
             expected);
   // Control: the same founders under a realm of weight 1 read the ratio of
@@ -8305,7 +8296,7 @@ TEST(World, AnAppraisalWeighsEachPersonByItsRealm) {
   run_ticks(flat, 1);
   const std::vector<std::size_t>& level = flat.roster(BAND);
   EXPECT_EQ(flat.army_appraisal(BAND).value_or(Appraisal{}).ratio,
-            seen_ratio(flat, level.front(), level, {1}));
+            seen_ratio(flat, level.front(), {level.front()}, {1}));
 }
 
 // Runs `world` to the tick before the one whose phase is `index`'s.
@@ -8354,7 +8345,30 @@ void run_to_rebirth(World& world) {
   }
 }
 
-TEST(World, ALivingIdentityBeyondTheCapacityIsAppraisedAsAnyOther) {
+TEST(World, OnlyAVillagesResidentsAppraiseOnTheirOwn) {
+  World world = reborn_beyond_capacity();
+  const std::size_t resident = world.roster(HOME_ARMY).front();
+  const std::size_t post = world.roster(POST).front();
+  run_to_phase(world, resident);
+  world.tick();
+  EXPECT_TRUE(world.appraisal(resident).has_value());
+  // Conscripted into an army of no village, it no longer reads one.
+  World conscripted = world;
+  conscripted.conscript(resident, FIELD);
+  EXPECT_FALSE(conscripted.appraisal(resident).has_value());
+  run_to_phase(world, HOME_ARMY);
+  world.tick();
+  EXPECT_FALSE(world.army_appraisal(HOME_ARMY).has_value());
+  // The post, of no village, appraises only through its army.
+  run_to_phase(world, post);
+  world.tick();
+  EXPECT_FALSE(world.appraisal(post).has_value());
+  run_to_phase(world, POST);
+  world.tick();
+  EXPECT_TRUE(world.army_appraisal(POST).has_value());
+}
+
+TEST(World, AnArmyLedByAnIdentityBeyondTheCapacityIsAppraisedAsAnyOther) {
   World world = reborn_beyond_capacity();
   run_to_rebirth(world);
   // Setup: the post died and was born again as person 5, the capacity, so
@@ -8365,18 +8379,14 @@ TEST(World, ALivingIdentityBeyondTheCapacityIsAppraisedAsAnyOther) {
   ASSERT_EQ(world.living(), REBORN_CAPACITY);
   ASSERT_EQ(world.roster(POST), std::vector<std::size_t>{reborn});
 
-  run_to_phase(world, reborn);
-  const std::uint32_t alone = seen_ratio(world, reborn, {reborn});
-  ASSERT_GT(alone, 0U);
-  world.tick();
-  EXPECT_EQ(world.appraisal(reborn).value_or(Appraisal{}).ratio, alone);
-  EXPECT_EQ(world.appraisal(reborn).value_or(Appraisal{}).tick,
-            world.tick_count());
   // Its army, the post's, appraises through it as its lead.
   run_to_phase(world, POST);
-  const std::uint32_t band = seen_ratio(world, reborn, world.roster(POST));
+  const std::uint32_t lead = seen_ratio(world, reborn, {reborn});
+  ASSERT_GT(lead, 0U);
   world.tick();
-  EXPECT_EQ(world.army_appraisal(POST).value_or(Appraisal{}).ratio, band);
+  EXPECT_EQ(world.army_appraisal(POST).value_or(Appraisal{}).ratio, lead);
+  EXPECT_EQ(world.army_appraisal(POST).value_or(Appraisal{}).tick,
+            world.tick_count());
   // Control: a resident, of an identity below the capacity, reads the same
   // way.
   const std::size_t resident = world.roster(HOME_ARMY).front();

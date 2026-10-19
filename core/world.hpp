@@ -722,19 +722,21 @@ class World {
   /// Returns person `person`'s latest appraisal of the danger in its own
   /// sight (ADR 0071): the strength of those in sight who would strike it,
   /// against its own side's, everyone in sight of its faction who would not.
-  /// A living person outside an exempt army appraises every APPRAISAL_TICKS
-  /// ticks, at its identity's phase. None while it is dead or its army is
+  /// A living village resident appraises on its own every APPRAISAL_TICKS
+  /// ticks, at its identity's phase; anyone else appraises only through its
+  /// army. None while it is dead, its army is no village's residents or is
   /// steered or holds an attack intent, or before it has appraised since the
   /// world was created or loaded. Throws std::out_of_range when there is no
   /// such person.
   [[nodiscard]] std::optional<Appraisal> appraisal(std::size_t person) const;
 
   /// Returns army `army`'s latest appraisal through its lead, the first of
-  /// its roster, of what any of its members sees, each person counted once.
-  /// An army that is not far appraises every APPRAISAL_TICKS ticks, at its
-  /// index's phase. None while it is steered, holds an attack intent or has
-  /// no members, or before it has appraised since the world was created or
-  /// loaded. Throws std::out_of_range when there is no such army.
+  /// its roster, of what its lead sees. An army that is not far and is no
+  /// village's residents appraises every APPRAISAL_TICKS ticks, at its
+  /// index's phase. None for a village's residents, while it is steered,
+  /// holds an attack intent or has no members, or before it has appraised
+  /// since the world was created or loaded. Throws std::out_of_range when
+  /// there is no such army.
   [[nodiscard]] std::optional<Appraisal> army_appraisal(std::size_t army) const;
 
   /// Returns why person `buyer` may not buy one of ware `ware` from person
@@ -845,9 +847,8 @@ class World {
                                   const Army& army, std::uint64_t due);
   void appraise(const Crowd& crowd);
   [[nodiscard]] static bool exempt(const Army& army);
-  template <typename Seers>
   [[nodiscard]] std::uint32_t weigh(std::size_t lead, std::size_t army,
-                                    const Seers& seers, const Crowd& crowd);
+                                    const Crowd& crowd) const;
   [[nodiscard]] std::uint64_t strength_of(const Person& person) const;
   void train();
   void cultivate();
@@ -1212,11 +1213,6 @@ class World {
   // phase after a load.
   std::vector<std::optional<Appraisal>> appraisals_;
   std::vector<std::optional<Appraisal>> army_appraisals_;
-  // The serial of the appraisal that last counted each crowd slot, sized to
-  // the living capacity, and the latest serial; scratch, neither saved nor
-  // hashed.
-  std::vector<std::uint32_t> stamps_;
-  std::uint32_t serial_ = 0;
 };
 
 }  // namespace murim

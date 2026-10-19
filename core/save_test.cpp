@@ -1800,10 +1800,11 @@ Temperaments shared(const std::array<std::uint32_t, TEMPERAMENTS>& shares) {
   return temperaments;
 }
 
-// The second person, of faction 0 and the second army, facing a steered foe
-// in each of the other two, so it appraises on the first tick at a ratio of
-// 2,000; everyone born with `temperaments`.
+// The second person, of faction 0 and the second army and its lead, facing
+// a steered foe in each of the other two, so its army appraises through it
+// on the first tick at a ratio of 2,000; everyone born with `temperaments`.
 constexpr std::size_t FACING = 1;
+constexpr std::size_t FACING_ARMY = 1;
 World outnumbered(const Temperaments& temperaments) {
   constexpr std::int32_t SIGHT = 6;
   Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
@@ -1841,7 +1842,7 @@ TEST(Save, ABoldLivingPersonComesBackBoldWithItsThresholds) {
   restored.tick();
   EXPECT_EQ(restored.hash(), ticked(bold, 1).hash());
   const std::uint32_t read =
-      restored.appraisal(FACING).value_or(Appraisal{0, 0}).ratio;
+      restored.army_appraisal(FACING_ARMY).value_or(Appraisal{0, 0}).ratio;
   ASSERT_EQ(read, OUTNUMBERED);
   // The bold person reads below its back-off ratio.
   EXPECT_LT(read, restored.thresholds(FACING).value_or(Thresholds{}).back_off);
@@ -1849,7 +1850,7 @@ TEST(Save, ABoldLivingPersonComesBackBoldWithItsThresholds) {
   World cautious = outnumbered(shared({0, PER_MILLE, 0}));
   cautious.tick();
   ASSERT_EQ(cautious.temperament(FACING), Temperament::CAUTIOUS);
-  ASSERT_EQ(cautious.appraisal(FACING).value_or(Appraisal{}).ratio,
+  ASSERT_EQ(cautious.army_appraisal(FACING_ARMY).value_or(Appraisal{}).ratio,
             OUTNUMBERED);
   EXPECT_GT(OUTNUMBERED,
             cautious.thresholds(FACING).value_or(Thresholds{}).back_off);

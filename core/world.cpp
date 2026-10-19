@@ -1089,7 +1089,6 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   // The first day's assignment, so a world has its occupations from tick 0.
   assign_occupations();
   prepare_grounds();
-  stamps_.assign(rules_.people_capacity, 0);
 }
 
 World::World(Map map, Rules rules, Life life)
@@ -1211,7 +1210,6 @@ void World::restore() {
   }
   structure_index_ = SpatialHash{centres_of(structures_)};
   prepare_grounds();
-  stamps_.assign(rules_.people_capacity, 0);
 }
 
 // Whether the events kept are as tick() keeps them: at most
@@ -4192,8 +4190,8 @@ std::optional<Thresholds> World::thresholds(std::size_t person) const {
 
 std::optional<Appraisal> World::appraisal(std::size_t person) const {
   const std::optional<std::size_t> army = army_of(person);
-  if (people_.at(person).health == 0 || !army || exempt(armies_.at(*army)) ||
-      person >= appraisals_.size()) {
+  if (people_.at(person).health == 0 || !army || !villages_.houses(*army) ||
+      exempt(armies_.at(*army)) || person >= appraisals_.size()) {
     return std::nullopt;
   }
   return appraisals_.at(person);
@@ -4214,10 +4212,10 @@ bool World::exempt(const Army& army) {
   return army.steered || army.order.target.has_value();
 }
 
-// Each person in `crowd` outside an exempt army appraises the danger in its
-// own sight, and each army in it not exempt the danger in its members'
-// merged sight, at its own phase of APPRAISAL_TICKS. Nothing reads an
-// appraisal in the tick yet (ADR 0071's step 1).
+// Each village resident in `crowd` outside an exempt army appraises the
+// danger in its own sight, and each other army in it not exempt the danger
+// in its lead's sight, at its own phase of APPRAISAL_TICKS (ADR 0071).
+// Nothing reads an appraisal in the tick yet (its step 1).
 void World::appraise(const Crowd& crowd) {
   appraisals_.resize(people_.size());
   army_appraisals_.resize(armies_.size());
@@ -4225,71 +4223,51 @@ void World::appraise(const Crowd& crowd) {
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     const std::size_t person = crowd.people.at(index);
     const std::size_t army = crowd.armies.at(index);
-    if (person % APPRAISAL_TICKS != phase || exempt(armies_.at(army))) {
+    if (person % APPRAISAL_TICKS != phase || !villages_.houses(army) ||
+        exempt(armies_.at(army))) {
       continue;
     }
-    appraisals_.at(person) = Appraisal{
-        weigh(person, army, std::array<std::size_t, 1>{person}, crowd),
-        tick_count_};
+    appraisals_.at(person) = Appraisal{weigh(person, army, crowd), tick_count_};
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     const Army& appraising = armies_.at(army);
     // A far army is not in the crowd.
-    if (army % APPRAISAL_TICKS != phase || exempt(appraising) ||
-        appraising.roster.empty() || far_off(appraising)) {
+    if (army % APPRAISAL_TICKS != phase || villages_.houses(army) ||
+        exempt(appraising) || appraising.roster.empty() ||
+        far_off(appraising)) {
       continue;
     }
-    army_appraisals_.at(army) = Appraisal{
-        weigh(appraising.roster.front(), army, appraising.roster, crowd),
-        tick_count_};
+    army_appraisals_.at(army) =
+        Appraisal{weigh(appraising.roster.front(), army, crowd), tick_count_};
   }
 }
 
-// The ratio of the strength that would strike person `lead`, of army `army`,
-// to its own side's, everyone of its faction who would not, among those in
-// sight of any of the people `seers`, each counted once; 0, its own side
-// uncounted, with no foe in their sight.
-template <typename Seers>
+// The ratio of the strength in person `lead`'s sight that would strike it,
+// of army `army`, to its own side's, everyone of its faction who would not;
+// 0, its own side uncounted, with no foe in its sight.
 std::uint32_t World::weigh(std::size_t lead, std::size_t army,
-                           const Seers& seers, const Crowd& crowd) {
+                           const Crowd& crowd) const {
   const std::uint64_t foe = foe_kinds(lead, armies_.at(army));
+  const Position centre = people_.at(lead).position;
   const std::int32_t sight = rules_.sight * CELL_SIZE;
-  const bool threatened =
-      std::any_of(seers.begin(), seers.end(), [&](std::size_t seer) {
-        return crowd.hash.any_within(
-            foe, people_.at(seer).position, sight, [&](std::size_t other) {
-              return foes(lead, army, crowd.people.at(other),
-                          crowd.armies.at(other));
-            });
-      });
-  if (!threatened) {
+  const auto strikes = [&](std::size_t other) {
+    return foes(lead, army, crowd.people.at(other), crowd.armies.at(other));
+  };
+  if (!crowd.hash.any_within(foe, centre, sight, strikes)) {
     return 0;
   }
-  // A new serial for each appraisal, so no slot keeps a mark from one before.
-  if (++serial_ == 0) {
-    std::fill(stamps_.begin(), stamps_.end(), 0);
-    serial_ = 1;
-  }
   const std::size_t faction = armies_.at(army).faction;
-  const std::uint64_t kinds = kind_of(faction) | foe;
   std::uint64_t own = 0;
   std::uint64_t threat = 0;
-  for (const std::size_t seer : seers) {
-    crowd.hash.visit_within(
-        kinds, people_.at(seer).position, sight, [&](std::size_t other) {
-          if (stamps_.at(other) == serial_) {
-            return;
-          }
-          stamps_.at(other) = serial_;
-          const std::size_t seen = crowd.people.at(other);
-          const std::size_t seen_army = crowd.armies.at(other);
-          if (foes(lead, army, seen, seen_army)) {
-            threat = add_strength(threat, strength_of(people_.at(seen)));
-          } else if (armies_.at(seen_army).faction == faction) {
-            own = add_strength(own, strength_of(people_.at(seen)));
-          }
-        });
-  }
+  crowd.hash.visit_within(
+      kind_of(faction) | foe, centre, sight, [&](std::size_t other) {
+        const std::size_t seen = crowd.people.at(other);
+        if (strikes(other)) {
+          threat = add_strength(threat, strength_of(people_.at(seen)));
+        } else if (armies_.at(crowd.armies.at(other)).faction == faction) {
+          own = add_strength(own, strength_of(people_.at(seen)));
+        }
+      });
   return ratio(threat, own);
 }
 
