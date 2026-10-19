@@ -338,7 +338,7 @@ func _compose(key: Vector2i) -> Dictionary:
 	var width := colour.get_width()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_of(key)
-	_scatter_detail(colour, what, width, rng)
+	_scatter_detail(colour, what, width, top, rng)
 	var trees := _scatter_trees(colour.get_size(), what, width, top, rng)
 	for tree: Dictionary in trees:
 		_contact_shadow(colour, what, width, tree.foot - Vector2(0, tree.level * Relief.LEVEL_PX) - Vector2(top),
@@ -388,8 +388,12 @@ static func poisson(rng: RandomNumberGenerator, size: Vector2i, spacing: float, 
 
 # Tufts, flowers and pebbles on grass, litter on the forest floor and reeds at the water's edge,
 # from the detail sheet: more of them near an edge between kinds, each drawn only on its own
-# ground, taking the ramp DETAIL_RAMP names.
-func _scatter_detail(colour: Image, what: PackedByteArray, width: int, rng: RandomNumberGenerator) -> void:
+# ground, taking the ramp DETAIL_RAMP names, and none of it on what is built or the row along its
+# sides (#411). The image's pixel `at` shows the ground `top` + `at` raised by its level.
+func _scatter_detail(colour: Image, what: PackedByteArray, width: int, top: Vector2i,
+		rng: RandomNumberGenerator) -> void:
+	var on_built := func(at: Vector2i, level: int) -> bool:
+		return _relief.crisp_at(Vector2(top + at) + Vector2(0.5, 0.5 + level * Relief.LEVEL_PX))
 	for point: Vector3 in poisson(rng, colour.get_size(), DETAIL_SPACING, DETAIL_TRIES):
 		var at := Vector2i(int(point.x), int(point.y))
 		var here := _what(what, width, at)
@@ -412,14 +416,15 @@ func _scatter_detail(colour: Image, what: PackedByteArray, width: int, rng: Rand
 				tag = "litter"
 			"water":
 				tag = "reed" if edge else ""
-		if tag.is_empty():
+		# Checked after the draws above, so detail elsewhere keeps the draws it had.
+		if tag.is_empty() or on_built.call(at, here.y):
 			continue
 		var frames: Array = _detail[tag]
 		var ramp := Relief.KINDS.find(DETAIL_RAMP.get(tag, kind))
 		for mark: Array in frames[int(pick * 30) % frames.size()]:
 			var p: Vector2i = at + mark[0]
 			var there := _what(what, width, p)
-			if there.x >= 0 and there.y == here.y and there.z < FACE_KINDS_FROM:
+			if there.x >= 0 and there.y == here.y and there.z < FACE_KINDS_FROM and not on_built.call(p, there.y):
 				colour.set_pixelv(p, ramp_colour(ramp, mark[1]) if mark[1] is int else mark[1])
 
 
