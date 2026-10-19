@@ -1,0 +1,13 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.1 Metal - 90.5 - Compatibility - Using Device: Apple - Apple M1
+
+ground_check: after the bake the grounds hold 0 viewports: pass
+ground_check: 6 of 6 chunks baked to the same ground, strips and trees twice, the mountain's chunk holding 9 strips: pass
+ground_check: the forest's edge runs within 3 pixels of the cells' side at x 384 on 0.38 of rows (100, 360) warped, from x 369 to 423, and on 0.86 without warp, 257 and 250 rows read: pass
+ground_check: across the built cells the forest begins at x 384 on 48 of 48 rows (388, 436), from x 384 to 384: pass
+ground_check: from y 736 to 855 across the map's bottom edge, 0 pixels unpainted, 0 of them beside the raised ground on the last rows: pass
+ground_check: given 87 past the bottom, 3 chunks baked again of the 3 on the bottom edge, the grounds holding 0 viewports: pass
+ground_check: from y 736 to 855 across the map's bottom edge, 0 pixels unpainted, 0 of them beside the raised ground on the last rows: pass
+ground_check: at (1024.0, 384.0) the first chunk is shown false: pass
+ground_check: back at the start the first chunk is shown with its 202 trees where they were true; at most 1 new chunks a frame: pass
+ground_check: 9 of 9 checks passed

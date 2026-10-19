@@ -1,0 +1,80 @@
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 38.9%, load1 3.42, after 465s wait; busiest:
+      14.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       8.3 claude
+       8.0 claude
+       8.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       5.4 claude
+       4.5 claude
+== round 1 main 79eda20b13a0b32bfad43ff5027999248475968f frame_bench_tool 11:04:11 load { 3.42 5.19 6.49 }
+frame time: p50 5.149 ms, p99 14.191 ms, max 25.813 ms
+PASS: p99 14.191 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 42.8%, load1 2.59, after 60s wait; busiest:
+      10.7 /bin/sh
+       9.4 claude
+       8.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+       7.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       4.5 /Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container
+       4.3 claude
+== round 1 head c1b02f6041cd8b218285e48beb0574f5d80695c8 frame_bench_tool 11:05:25 load { 2.59 4.53 6.13 }
+frame time: p50 5.044 ms, p99 10.900 ms, max 12.557 ms
+PASS: p99 10.900 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 39.7%, load1 3.85, after 135s wait; busiest:
+      92.8 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService
+      14.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      13.5 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       9.5 claude
+       7.0 claude
+       4.3 claude
+== round 2 main 79eda20b13a0b32bfad43ff5027999248475968f frame_bench_tool 11:07:53 load { 3.85 4.62 5.94 }
+frame time: p50 5.246 ms, p99 10.957 ms, max 13.279 ms
+PASS: p99 10.957 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 27.1%, load1 3.96, after 1200s wait; busiest:
+     107.9 /System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine
+      14.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      11.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       6.1 claude
+       5.7 claude
+       4.6 /Applications/BuhoCleaner.app/Contents/Library/LoginItems/BuhoCleanerMenu.app/Contents/MacOS/BuhoCleanerMenu
+== round 2 head c1b02f6041cd8b218285e48beb0574f5d80695c8 frame_bench_tool 11:28:12 load { 3.96 6.27 6.61 }
+frame time: p50 5.683 ms, p99 12.341 ms, max 16.859 ms
+PASS: p99 12.341 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 15.0%, load1 3.85, after 105s wait; busiest:
+      94.6 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService
+      77.4 /System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine
+      13.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      12.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       3.5 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       3.0 claude
+== round 3 main 79eda20b13a0b32bfad43ff5027999248475968f frame_bench_tool 11:30:13 load { 3.85 5.55 6.28 }
+frame time: p50 4.983 ms, p99 10.300 ms, max 14.477 ms
+PASS: p99 10.300 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 33.1%, load1 3.98, after 495s wait; busiest:
+      23.8 /System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine
+      18.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+      12.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      10.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared
+       9.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores
+       8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+== round 3 head c1b02f6041cd8b218285e48beb0574f5d80695c8 frame_bench_tool 11:38:43 load { 3.98 5.73 6.35 }
+frame time: p50 4.972 ms, p99 10.072 ms, max 10.997 ms
+PASS: p99 10.072 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 20.3%, load1 3.76, after 360s wait; busiest:
+      91.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService
+      22.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      17.2 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow
+       8.9 /Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container
+       8.7 /Applications/Firefox.app/Contents/MacOS/plugin-container.app/Contents/MacOS/plugin-container
+       8.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+== round 1 main 79eda20b13a0b32bfad43ff5027999248475968f pan_bench_tool 11:45:00 load { 3.86 5.64 6.19 }
+frame time: p50 3.630 ms, p99 9.579 ms, max 11.311 ms
+PASS: p99 9.579 ms against a 16.7 ms budget
+   gate passed on: outside CPU, less /System/ and /usr/libexec/, 16.1%, load1 3.80, after 0s wait; busiest:
+      86.1 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService
+      17.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+      11.7 /System/Library/PrivateFrameworks/CoreDuetContext.framework/Resources/ContextStoreAgent
+       7.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension
+       2.8 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+       2.6 /usr/libexec/audioanalyticsd
+== round 1 head c1b02f6041cd8b218285e48beb0574f5d80695c8 pan_bench_tool 11:45:11 load { 3.80 5.57 6.16 }
+frame time: p50 3.696 ms, p99 9.859 ms, max 10.870 ms
+PASS: p99 9.859 ms against a 16.7 ms budget
