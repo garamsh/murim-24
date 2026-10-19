@@ -1,12 +1,12 @@
 [
   {
     "id": "seat",
-    "width": 12,
-    "height": 9,
+    "width": 15,
+    "height": 13,
     "buildings": [
       {
-        "x": 0,
-        "y": 0,
+        "x": 1,
+        "y": 1,
         "width": 3,
         "height": 3,
         "durability": 10000,
@@ -14,8 +14,17 @@
         "households": 1
       },
       {
-        "x": 3,
-        "y": 0,
+        "x": 4,
+        "y": 1,
+        "width": 6,
+        "height": 4,
+        "durability": 10000,
+        "kind": "main_hall",
+        "households": 0
+      },
+      {
+        "x": 10,
+        "y": 1,
         "width": 4,
         "height": 3,
         "durability": 10000,
@@ -23,17 +32,8 @@
         "households": 0
       },
       {
-        "x": 7,
-        "y": 0,
-        "width": 5,
-        "height": 3,
-        "durability": 10000,
-        "kind": "hall",
-        "households": 0
-      },
-      {
-        "x": 0,
-        "y": 5,
+        "x": 1,
+        "y": 7,
         "width": 6,
         "height": 4,
         "durability": 10000,
@@ -41,8 +41,8 @@
         "households": 0
       },
       {
-        "x": 6,
-        "y": 5,
+        "x": 9,
+        "y": 8,
         "width": 2,
         "height": 2,
         "durability": 10000,
@@ -50,8 +50,8 @@
         "households": 0
       },
       {
-        "x": 9,
-        "y": 5,
+        "x": 11,
+        "y": 8,
         "width": 3,
         "height": 2,
         "durability": 10000,
@@ -59,31 +59,472 @@
         "households": 0
       },
       {
-        "x": 7,
-        "y": 8,
+        "x": 6,
+        "y": 12,
         "width": 3,
         "height": 1,
         "durability": 10000,
         "kind": "seat_gate",
         "households": 0
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_corner",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_corner",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_corner",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_corner",
+        "households": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 2,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 4,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 5,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 6,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 7,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 8,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 9,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 10,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 11,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 12,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 13,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 1,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 2,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 3,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 4,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 5,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 9,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 10,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 11,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 12,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 13,
+        "y": 12,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 1,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 1,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 2,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 2,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 3,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 3,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 4,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 4,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 5,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 5,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 6,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 6,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 7,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 7,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 8,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 8,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 9,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 9,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 10,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 10,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 0,
+        "y": 11,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
+      },
+      {
+        "x": 14,
+        "y": 11,
+        "width": 1,
+        "height": 1,
+        "durability": 10000,
+        "kind": "compound_wall_side",
+        "households": 0
       }
     ],
     "clearings": [
       {
-        "x": 0,
-        "y": 3,
-        "width": 12,
+        "x": 1,
+        "y": 5,
+        "width": 13,
         "height": 2
       },
       {
-        "x": 8,
-        "y": 5,
+        "x": 7,
+        "y": 7,
         "width": 1,
-        "height": 3
+        "height": 5
       },
       {
-        "x": 7,
-        "y": 9,
+        "x": 6,
+        "y": 13,
         "width": 3,
         "height": 2
       }

@@ -94,7 +94,7 @@
     "housing": 0,
     "storage": 0,
     "yield": 0,
-    "blocks": true,
+    "blocks": false,
     "pupils": 0,
     "role": "square"
   },
@@ -137,5 +137,41 @@
     "blocks": true,
     "pupils": 0,
     "role": "square"
+  },
+  {
+    "id": "main_hall",
+    "housing": 12,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 4,
+    "role": "square"
+  },
+  {
+    "id": "compound_wall",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "role": "edge"
+  },
+  {
+    "id": "compound_wall_side",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "role": "edge"
+  },
+  {
+    "id": "compound_corner",
+    "housing": 0,
+    "storage": 0,
+    "yield": 0,
+    "blocks": true,
+    "pupils": 0,
+    "role": "edge"
   }
 ]
