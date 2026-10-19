@@ -1,10 +1,12 @@
 // The ground drawn off the cell grid (#212) at the 2.5D angle of ADR 0059: a chunk's image, rendered
 // once when the map is built (world_art/ground.gd), from `cells`, one texel a cell: its ground kind
 // in red, its level plus one in green, the material of the face it drops by in blue, plus 128
-// where it is drawn straight, something built on it with flat ground round it, and alpha below
-// 0.75 where it rises as a slope (world_art/relief.gd, whose height_at() follows this file's). On
-// a straight cell the ground is neither warped nor dithered, its own kind and level up to the
-// cell's sides.
+// where something is built on it and 64 where something is built on it or a cell beside it, and
+// alpha below 0.75 where it rises as a slope
+// (world_art/relief.gd, whose height_at() follows this file's). No ground effect reaches what is
+// built or the row of pixels along its sides (#200): the warp fades out within FADE of it, so its
+// edges and faces meet the cells' sides and the height stays continuous, and there the ground is
+// its cell's own kind, with neither dither nor trodden earth nor scree.
 // For each pixel of the screen, as the world would be drawn unlifted from `origin`:
 // - the cells' values are read through coordinates warped by noise and interpolated between
 //   neighbouring cells, so edges and cliffs run along curves and not along the grid;
@@ -36,6 +38,9 @@ const float CW = 16.0;
 const float CD = 12.0;
 const float LP = 16.0;
 const float WARP_SCALE = 48.0;
+// How far from a built cell, in pixels, the warp takes to reach its full reach; no wider than a
+// cell, so the cells round a point hold every built cell nearer than it.
+const float FADE = 12.0;
 const int TOP = 5;
 const int LOW = -1;
 // The kinds, in the order of world_art/relief.gd's KINDS.
@@ -91,7 +96,7 @@ float bayer(ivec2 p) {
 ivec4 cell(ivec2 c) {
 	c = clamp(c, ivec2(0), map_size - 1);
 	vec4 t = texelFetch(cells, c, 0);
-	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)) & 127, t.a < 0.75 ? 1 : 0);
+	return ivec4(int(round(t.r * 255.0)), int(round(t.g * 255.0)) - 1, int(round(t.b * 255.0)) & 63, t.a < 0.75 ? 1 : 0);
 }
 
 // Whether something is built on the cell under the point `p` on the ground. Past the map's edges,
@@ -109,14 +114,37 @@ ivec4 cell_under(vec2 p) {
 	return cell(ivec2(floor(vec2(p.x / CW, p.y / CD))));
 }
 
-// Where a point on the ground reads its cells from: warped by noise, so edges wander. The noise
-// varies over WARP_SCALE pixels, slowly enough for `warp` that the warp never folds the ground
-// over, which would leave islands of one kind inside another.
-vec2 warped(vec2 p) {
-	if (built(p)) {
-		return p;
+// How far, in pixels, the point `p` on the ground lies from the nearest cell something is built
+// on, up to FADE; 0 on one.
+float from_built(vec2 p) {
+	ivec2 c = ivec2(floor(vec2(p.x / CW, p.y / CD)));
+	float nearest = FADE;
+	// Most cells have nothing built on them or beside them, which their texel says alone.
+	if (c != clamp(c, ivec2(0), map_size - 1) || (int(round(texelFetch(cells, c, 0).b * 255.0)) & 64) == 0) {
+		return nearest;
 	}
-	return p + (vec2(fbm(p / WARP_SCALE + vec2(7.0, 0.0), 11), fbm(p / WARP_SCALE + vec2(0.0, 5.0), 12)) - 0.5) * 2.0 * warp;
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			vec2 low = vec2(float(c.x + dx) * CW, float(c.y + dy) * CD);
+			if (built(low + vec2(CW, CD) * 0.5)) {
+				nearest = min(nearest, length(max(max(low - p, p - low - vec2(CW, CD)), vec2(0.0))));
+			}
+		}
+	}
+	return nearest;
+}
+
+// Whether the point `p` lies on a built cell or on the row of pixels along its sides.
+bool crisp(vec2 p) {
+	return from_built(p) < 1.0;
+}
+
+// Where a point on the ground reads its cells from: warped by noise, so edges wander, the less the
+// nearer what is built. The noise varies over WARP_SCALE pixels, slowly enough for `warp` that the
+// warp never folds the ground over, which would leave islands of one kind inside another.
+vec2 warped(vec2 p) {
+	float reach = warp * smoothstep(0.0, FADE, from_built(p));
+	return p + (vec2(fbm(p / WARP_SCALE + vec2(7.0, 0.0), 11), fbm(p / WARP_SCALE + vec2(0.0, 5.0), 12)) - 0.5) * 2.0 * reach;
 }
 
 // The height of the ground at a point, in levels: its cells' levels interpolated, then taken to
@@ -124,9 +152,6 @@ vec2 warped(vec2 p) {
 // ledge at a level none of them has; toward cells that rise as a slope, the interpolated height
 // itself, so the ground climbs without a cliff.
 float height_at(vec2 p) {
-	if (built(p)) {
-		return float(cell_under(p).y);
-	}
 	vec2 q = warped(p);
 	vec2 uv = vec2(q.x / CW, q.y / CD) - 0.5;
 	ivec2 c = ivec2(floor(uv));
@@ -160,7 +185,7 @@ bool drops(vec2 p, vec2 q) {
 // cells weigh most, those on the level first; a little noise in the weights dithers the band
 // where two kinds are nearly even.
 int kind_at(vec2 p, int level) {
-	if (built(p)) {
+	if (crisp(p)) {
 		return cell_under(p).x;
 	}
 	vec2 q = warped(p);
@@ -254,8 +279,8 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 		colour = ramp(kind == ROCK || kind == WATER ? kind : HILLS, 6);
 	}
 	// Ground trodden bare round what is built, a road's or paving's edge among it: a dithered band
-	// of earth, thinning from three pixels in four beside it to one in five three pixels out.
-	if (kind != WATER && !built(p)) {
+	// of earth past the seam's row, from nearly one pixel in two two pixels out to one in five three out.
+	if (kind != WATER && !crisp(p)) {
 		for (int r = 1; r <= 3; r++) {
 			if (near_built(p, r)) {
 				if (hash01(px.x, px.y, 42) < 0.95 - float(r) * 0.25) {
@@ -272,7 +297,7 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 			if (kind == WATER && d <= 2) {
 				colour = ramp(BANK, d == 1 ? 4 : 3);
 			}
-			if (kind != WATER && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
+			if (kind != WATER && !crisp(p) && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
 				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 6 : 2);
 			}
 			if (d <= 4 && hash01(px.x, px.y, 35) < (1.0 - float(d - 1) / 4.0) * 0.9) {
