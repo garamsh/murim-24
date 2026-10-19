@@ -219,6 +219,7 @@ World cultivated(const std::vector<Realm>& realms) {
                   Learning{},
                   std::nullopt,
                   std::nullopt,
+                  std::nullopt,
                   std::nullopt};
   Rules rules{0, {{false}}, STAGE_FLOORS};
   rules.ticks_per_day = 1;
@@ -384,6 +385,45 @@ TEST(Save, AVersion14SaveFromBeforeAnEngagementCouldHoldNoSlotIsRefused) {
   // Control: the same bytes at the current version load.
   store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, AVersion21SaveFromBeforeGearIsRefused) {
+  // Version 21 saves hold no gear and no person's worn slots (ADR 0050).
+  constexpr std::uint32_t BEFORE_GEAR = 21;
+  ASSERT_LT(BEFORE_GEAR, SAVE_VERSION);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(BEFORE_GEAR);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION);
+  // Control: the same bytes at the current version load.
+  store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+  EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
+}
+
+TEST(Save, ALoadedWorldKeepsWhatEachPersonWears) {
+  const Saved lived = lived_region(REGION_SEED);
+  // Setup: some of its people wear something.
+  std::size_t dressed = 0;
+  for (std::size_t person = 0; person < lived.world.population(); ++person) {
+    const Worn& worn = lived.world.person(person).worn;
+    dressed += std::any_of(worn.begin(), worn.end(),
+                           [](const std::optional<std::size_t>& kind) {
+                             return kind.has_value();
+                           })
+                   ? 1
+                   : 0;
+  }
+  ASSERT_GT(dressed, 0U);
+  MemorySaves store;
+  ASSERT_TRUE(save(lived, store, SLOT));
+  const Saved restored = loaded(load(store, SLOT));
+  ASSERT_EQ(restored.world.population(), lived.world.population());
+  for (std::size_t person = 0; person < lived.world.population(); ++person) {
+    EXPECT_EQ(restored.world.person(person).worn,
+              lived.world.person(person).worn)
+        << person;
+  }
+  EXPECT_EQ(restored.world.hash(), lived.world.hash());
 }
 
 TEST(Save, AVersion17SaveFromBeforeTiersNamedSquareKindsIsRefused) {

@@ -326,7 +326,7 @@ Range get_range(Reader& input) {
 void put_holding(Writer& out, const Holding& holding) {
   for (const std::uint32_t value :
        {holding.housing, holding.storage, holding.harvest, holding.pupils,
-        holding.arms, holding.tends, holding.edge, holding.healing}) {
+        holding.arms, holding.tends, holding.healing}) {
     out.u32(value);
   }
 }
@@ -335,7 +335,7 @@ Holding get_holding(Reader& input) {
   Holding holding;
   for (std::uint32_t* value :
        {&holding.housing, &holding.storage, &holding.harvest, &holding.pupils,
-        &holding.arms, &holding.tends, &holding.edge, &holding.healing}) {
+        &holding.arms, &holding.tends, &holding.healing}) {
     *value = input.u32();
   }
   return holding;
@@ -471,6 +471,81 @@ Growth get_growth(Reader& input) {
   return growth;
 }
 
+void put_gear(Writer& out, const Gear& gear) {
+  put_all(out, gear.slots, [&out](const std::string& slot) { out.text(slot); });
+  out.size(gear.striking);
+  put_all(out, gear.families, [&out](const WeaponFamily& family) {
+    out.text(family.name);
+    put_skill(out, family.strike);
+  });
+  out.size(gear.bare);
+  put_all(out, gear.needs, [&out](const std::vector<std::size_t>& needed) {
+    put_sizes(out, needed);
+  });
+  put_all(out, gear.kinds, [&out](const ItemKind& kind) {
+    out.text(kind.name);
+    out.size(kind.slot);
+    put_index(out, kind.family);
+    put_maybe(out, kind.damage,
+              [&out](std::uint64_t damage) { out.u64(damage); });
+    out.u32(kind.edge);
+    out.u32(kind.guard);
+  });
+  put_all(out, gear.loadouts, [&out](const Loadout& loadout) {
+    put_index(out, loadout.faction);
+    put_index(out, loadout.sect);
+    out.flag(loadout.soldiers);
+    put_all(out, loadout.slots, [&out](const std::vector<Choice>& choices) {
+      put_all(out, choices, [&out](const Choice& choice) {
+        put_index(out, choice.kind);
+        out.u32(choice.weight);
+      });
+    });
+  });
+}
+
+Gear get_gear(Reader& input) {
+  Gear gear;
+  gear.slots = get_all<std::string>(input, [&input] { return input.text(); });
+  gear.striking = input.size();
+  gear.families = get_all<WeaponFamily>(input, [&input] {
+    WeaponFamily family;
+    family.name = input.text();
+    family.strike = get_skill(input);
+    return family;
+  });
+  gear.bare = input.size();
+  gear.needs = get_all<std::vector<std::size_t>>(
+      input, [&input] { return get_sizes(input); });
+  gear.kinds = get_all<ItemKind>(input, [&input] {
+    ItemKind kind;
+    kind.name = input.text();
+    kind.slot = input.size();
+    kind.family = get_index(input);
+    kind.damage =
+        get_maybe<std::uint64_t>(input, [&input] { return input.u64(); });
+    kind.edge = input.u32();
+    kind.guard = input.u32();
+    return kind;
+  });
+  gear.loadouts = get_all<Loadout>(input, [&input] {
+    Loadout loadout;
+    loadout.faction = get_index(input);
+    loadout.sect = get_index(input);
+    loadout.soldiers = input.flag();
+    loadout.slots = get_all<std::vector<Choice>>(input, [&input] {
+      return get_all<Choice>(input, [&input] {
+        Choice choice;
+        choice.kind = get_index(input);
+        choice.weight = input.u32();
+        return choice;
+      });
+    });
+    return loadout;
+  });
+  return gear;
+}
+
 void put_life(Writer& out, const Life& life) {
   put_all(out, life.disciplines, [&out](const DisciplineDraw& draw) {
     out.text(draw.name);
@@ -574,6 +649,7 @@ void put_life(Writer& out, const Life& life) {
     out.u32(occupations.waking.from);
     out.u32(occupations.waking.to);
   });
+  put_maybe(out, life.gear, [&out](const Gear& gear) { put_gear(out, gear); });
 }
 
 Life get_life(Reader& input) {
@@ -707,6 +783,7 @@ Life get_life(Reader& input) {
     occupations.waking.to = input.u32();
     return occupations;
   });
+  life.gear = get_maybe<Gear>(input, [&input] { return get_gear(input); });
   return life;
 }
 
@@ -889,6 +966,9 @@ void put_person(Writer& out, const Person& person) {
   out.u64(person.silver);
   put_all(out, person.held, [&out](std::uint64_t held) { out.u64(held); });
   put_index(out, person.occupation);
+  put_all(out, person.worn, [&out](const std::optional<std::size_t>& kind) {
+    put_index(out, kind);
+  });
 }
 
 Person get_person(Reader& input) {
@@ -950,6 +1030,8 @@ Person get_person(Reader& input) {
   person.silver = input.u64();
   person.held = get_all<std::uint64_t>(input, [&input] { return input.u64(); });
   person.occupation = get_index(input);
+  person.worn = get_all<std::optional<std::size_t>>(
+      input, [&input] { return get_index(input); });
   return person;
 }
 

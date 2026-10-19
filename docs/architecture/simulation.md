@@ -14,7 +14,8 @@ The owner's design principle (#229, ADR 0063), confirmed as a review standard on
 Today's departures, each with its issue:
 - births are scaled by headroom under the village's cap and stop at it (ADR 0022), not governed by food (#296);
 - a ware's price and the daily wage are fixed data, with no household needs or markets behind them (#295);
-- animals are planned with their count capped by habitat (#171's text).
+- animals are planned with their count capped by habitat (#171's text);
+- people are born wearing gear made from nothing, until smiths make it from materials (ADR 0052 step 5, ADR 0064; #295, #231).
 
 ### The world
 
@@ -34,6 +35,7 @@ Today's departures, each with its issue:
   - `cultivation` the rules of cultivation and the martial arts: a person's realm rank, nature and heart method, whether a skill lies within its realm, how far an art agrees with it, the skill it may learn next, how its qi capacity grows and its qi recovers, and the chances it comprehends, reads a manual or is taught;
   - `diplomacy` relations and their refusals, and the declarations standing between factions, one place for each two, deciding how two factions stand by the declaration between them or else their stances, which declarations a faction may make and when, what a leader no driver steers seeks, and which factions a duel's winner's allies turn hostile;
   - `trade` wares and trade;
+  - `gear` the slots people wear items in, the weapon families, the item kinds and the loadouts, a worn weapon's strike and edge, what a wearer guards against, and which loadout dresses whom (ADR 0050);
   - `occupation` occupations as data, ADR 0081's trades, and the daily assignment that fills a village's openings from its people;
   - `schedule` the rules of the day a schedule reads: the hour and its band, the waking hours, households and the house each takes, a structure's door and the draws an errand takes;
   - `village_fields` a village's path fields, one per place over its window;
@@ -151,17 +153,36 @@ Today's departures, each with its issue:
 
 ### Skills and casting
 
-- A skill is data: range, radius, damage to people, damage to structures, cooldown, qi cost and shape. A person's skills are its army's, which share a cooldown, followed by the art skills it knows, each with its own.
+- A skill is data: range, radius, damage to people, damage to structures, cooldown, qi cost and shape. A person's skills are, with gear, its basic strike (§Gear), then its army's, which share a cooldown with it, followed by the art skills it knows, each with its own.
 - A skill's shape, `Shape`, is the ground one use covers, aimed toward a point: `AREA`, a disc at the point within range; `ARC`, a frontal sweep; `LINE`, a line from the user; `SELF`, a disc around the user; and `TARGETED`, one person alone. The region's basic strike is targeted (ADR 0066).
 - One rule resolves every skill, for every person alike, with one branch by shape and none by skill:
   - a person given no cast draws by the seed among its ready skills its qi pays for
   - it faces its attack intent's target while that lies in range, and otherwise, holding no intent, the nearest hostile person in range; the core keeps no facing
-  - every hostile person the shape covers takes the damage once, raised by its home's workshop edge and its realm's might, and for an art skill by its nature's potency; every structure the shape reaches takes the structure damage once
+  - every hostile person the shape covers takes the damage once, raised by its realm's might, and for an art skill by its nature's potency and its weapon's edge, less what the struck person wears guards against; every structure the shape reaches takes the structure damage once
   - damage to structures is signed: a negative amount restores durability up to the intact floor. Rebuilding is this rule, not a second one
   - damage to people lands after everyone has struck, and a person whose health reaches 0 dies
 - Each use on a tick is recorded, by `strikes()`, for the view to draw. The record holds the last tick's uses and is neither hashed nor saved.
 - A person may cast through the port, the player's body as any NPC: `cast` has it use one of its skills at a point, a person or itself on the next tick, in place of its automatic strike and through the same rule. A point beyond range is brought within it, and its cooldown starts even when it hits no one.
 - `cast_refusal` gives the first reason a cast may not be made, and `cast` refuses exactly when it names one. `aim` reads, with no change to the world, the hostile person a skill would aim at, favouring a facing it is given.
+
+### Gear
+
+- People wear items by one rule, `Gear` in `Life` (ADR 0050, built in part by #295's step 1(a)):
+  - slots, weapon families, item kinds and loadouts are pack data. The base pack has four slots: weapon, armour, head and accessory. A pack may add more, and a slot no loadout fills is worn empty;
+  - one slot strikes. A person's first skill is the strike of its weapon's family there, or the bare-hands family's with the slot empty, and a kind may give its own damage in place of its family's. An army may then have no skills of its own;
+  - an art skill needs a weapon of a family its discipline names. A cast without one is refused `WRONG_WEAPON`, and the automatic strike draws only among the art skills the weapon allows. A weapon's edge, per mille, multiplies the body damage of the art skills used with it, `PER_MILLE` bare-handed;
+  - the guards of everything worn add up, to at most `MAX_GUARD`, 600 per mille, and take that share from the body damage the wearer takes;
+  - the one birth function dresses every person, at the world's creation and at each birth and rebirth alike. The first loadout that fits its calling gives each slot one choice drawn by weight. A calling is its faction, the sect it founds, if any, and whether it serves as a soldier, in an army other than its home's residents. The draw is a counter-based hash of the seed, the person and the slot, so it takes nothing from the world's stream;
+  - the gear and each person's worn slots are saved and hashed. A world without gear hashes as before.
+- The base pack's strikes, the step's reading of ADR 0050 and ADR 0066:
+  - every family's strike is targeted, as ADR 0066 made the basic strike, at ADR 0050's ranges and cooldowns;
+  - its damage is ADR 0050's scaled by 15/10, the factor by which ADR 0066 retuned the guard strike: bare hands 9, gauntlets 12, sword 15 (the old guard strike), saber 18, and darts 9 at 8 cells;
+  - steel deals a fifth more, with an edge of 1,200. The spear, staff and fan wait for a kind that carries them.
+- The base pack's loadouts, the step's reading of ADR 0050's:
+  - a sect's founders carry its art's weapon, steel or darts, in leather;
+  - soldiers carry a sword or saber by faction, in lamellar and a helmet;
+  - villagers wear cloth and a headband or a hat, and their faction's weapon at even odds against none, so a village's later generations are not left bare-handed (#295).
+- Wear and breaking into scrap, spares and wares as stacks come with the steps after (#295).
 
 ### Qi and arts
 
@@ -190,7 +211,7 @@ Today's departures, each with its issue:
   - a person unfed too long moves to a village nearby with room and food, or dies
 - A village's cap is derived on each read: the least of its standing housing, its intact fields' yearly harvest and its standing storage, each in people. A birth's chance is scaled by the headroom under the child's village's cap.
 - A field shows its season, and is burnt whenever it is below its intact stage.
-- A workshop is a structure whose `Holding` arms or tends people: an edge on body damage, or healing a day. While a village's arms and tends cover its people, they strike with its best edge and heal by its best healing. A ruined workshop does neither. All of it is derived on read.
+- A workshop is a structure whose `Holding` arms or tends people. While a village's tends cover its people, they heal by its best healing a day; a ruined workshop heals no one. Its arms count among the holdings growth compares, and give no edge: weapons do (ADR 0050). All of it is derived on read.
 - Villages grow by one rule, `Growth` in `Life`, with no branch per faction. A village pressing against its cap takes the first expansion its owner's stance, per-faction data, allows:
   - build: lay, as rubble, the plan that most raises its scarcest holding, placed by its role within its tier's vicinity, which its residents raise by the repair rule
   - found: lay the growth's core as rubble, placed by role round a new centre drawn among the open sites nearby, and send settlers there, led by a founder whose children take a new branch of its family. A site is open where the first tier's square lies on free buildable land held by no other faction and no village's centre lies within `apart` cells, the test generation uses. `settlement()` reads the square a village was founded round
@@ -318,7 +339,8 @@ Today's departures, each with its issue:
     - the median village has 9 residents and the largest 44, so 103 of 814 reach the village tier and none the town;
     - the living number 3.65 for each married woman living with her husband, near the 3.5 a household ADR 0076 assumed.
 - Village caps from housing, food and storage, the daily feeding, hunger, migration and starvation, births slowed by headroom, and fields as structures that block nothing: ADR 0022 (`adr/0022-cap-each-village-by-its-housing-food-and-storage.md`), which supersedes ADR 0013's rule that every footprint blocks.
-- Workshops as per-kind capacities and qualities on `Holding`, an edge on the strike rule and daily healing while their capacity covers a village's people, and arms and tends among the holdings growth's scarcity rule compares, rather than shorter cooldowns, healing as a skill, or a trigger of its own: ADR 0029 (`adr/0029-let-villages-build-workshops-that-arm-and-tend-their-people.md`).
+- Workshops as per-kind capacities and qualities on `Holding`, daily healing while their capacity covers a village's people, and arms and tends among the holdings growth's scarcity rule compares, rather than shorter cooldowns, healing as a skill, or a trigger of its own: ADR 0029 (`adr/0029-let-villages-build-workshops-that-arm-and-tend-their-people.md`), whose edge on the strike rule ADR 0050 supersedes.
+- Gear as pack data in slots, the basic strike by weapon family, arts by weapon family, edge and guard, and loadouts drawn by the one birth function: ADR 0050 (`adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`), built in part by #295's step 1(a), with ADR 0066's targeted strike.
 - Sects as data with membership on the person and everything else derived, seats as villages, admission and leaving, the cap from a seat's pupils, falling and manuals, and the election by elders' favour: ADR 0026 (`adr/0026-keep-sect-membership-on-the-person-and-seat-each-sect-in-a-village.md`).
 - Applying to a sect through the port by the daily admission's thresholds, assessed once for both, with talent and attainment one reason: ADR 0031 (`adr/0031-let-a-person-apply-to-a-sect-by-the-admissions-thresholds.md`), which supersedes ADR 0026's rejection of joining through the port.
 - The ring of the latest events, a sect's fall noted when its last member leaves, and rumours derived by reach, kin and faction: ADR 0032 (`adr/0032-keep-a-bounded-ring-of-world-events-and-read-rumours-from-it.md`).
@@ -387,8 +409,8 @@ Today's departures, each with its issue:
   - **What stays code.** The rules, the set of skill shapes, the refusal reasons, the kinds of event, the calendar's seasons and years, the save's encoding, the hash and the limits such as `MAX_PEOPLE` stay code.
   - **Saves and the hash.** A save records the ordered identities, id and data hash, of the packs with simulation data, and is refused with `PACKS_DIFFER` under others. The hash folds them, and every pinned hash changes once. The save keeps the world's data as above.
   - **Theme words.** `Orientation` and `Polarity` become two axes of values the pack names. Qi becomes energy, realms levels, cultivation training and the heart method the first art. Names become text keys, so the core holds no display text.
-- **Gear, holders and the economy.** ADRs 0050, 0051 and 0052, proposed; nothing above changes until the pull requests that build them land.
-  - **Gear.** ADR 0050 (`adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`): items as pack data in four slots. The weapon gives the basic strike in place of the army's guard strike, an art needs its discipline's weapon family, and an empty weapon slot strikes bare-handed. Gear wears by hits, a broken piece empties its slot, and one rule wears the best piece held. It would supersede ADR 0046's guard strike as an army skill, ADR 0029's edge, ADR 0040's wares as counts and ADR 0035's draw among all skills whatever a person holds.
+- **Gear, holders and the economy.** ADRs 0050, 0051 and 0052, proposed. ADR 0050 is built in part (§Gear); nothing else above changes until the pull requests that build them land.
+  - **Gear.** ADR 0050 (`adr/0050-carry-and-wear-items-as-pack-data-in-four-slots-that-break-to-empty.md`): its slots, families, kinds, the basic strike, arts by family, edge, guard and loadouts are built (§Gear). Still to come: gear wearing by hits, a broken piece leaving its slot empty and scrap of its material (ADR 0064), one rule wearing the best piece held, and ADR 0040's wares as counts becoming stacks.
   - **Holders.** ADR 0051 (`adr/0051-give-every-item-one-holder-and-scatter-a-destroyed-warehouse-on-the-ground.md`): every item held by a person, a warehouse lot owned by an account, or a pile on the ground. The dead drop everything, piles expire, and soldiers at war carry loot home to their faction. A destroyed warehouse scatters, and caves open only to a steered body. It would supersede ADR 0040's rule that the dead keep their silver.
   - **The economy.** ADR 0052 (`adr/0052-run-the-economy-from-households-needs-through-town-markets-taxed-by-the-power-that-holds-the-land.md`): money in copper, and households with purses meeting needs by thresholds. The granary sells rations and pays its takings to field workers. Town markets move prices against demand between import and export prices, and merchant houses run caravans. One faction rate taxes trade, households and gates, and treasuries pay soldiers and gate the diplomacy. Discontent drives households to flee, and every holder sheds its excess so money stays bounded. It would supersede ADR 0040's sellers, prices, purse and wage, ADR 0022's free feeding, whole-harvest cap and migration by the person, ADR 0038's diplomacy by numbers alone, and ADR 0023's raiding party of a fixed count.
 - **Arts' families, tiers, mastery and lineage.** ADR 0055 (`adr/0055-give-arts-a-family-a-tier-and-a-mastery-and-gain-higher-arts-by-synthesis-over-a-lineage-graph.md`), proposed; nothing above changes until the pull requests that build it land.

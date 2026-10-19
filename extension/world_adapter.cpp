@@ -2320,7 +2320,7 @@ void WorldAdapter::_bind_methods() {
     godot::ClassDB::bind_integer_constant(name, "", constant,
                                           static_cast<int>(refusal));
   }
-  const std::array<std::pair<const char*, murim::CastRefusal>, 7> casts{{
+  const std::array<std::pair<const char*, murim::CastRefusal>, 8> casts{{
       {"CAST_NONE", murim::CastRefusal::NONE},
       {"CAST_DEAD", murim::CastRefusal::DEAD},
       {"CAST_NO_SKILL", murim::CastRefusal::NO_SKILL},
@@ -2328,6 +2328,7 @@ void WorldAdapter::_bind_methods() {
       {"CAST_NO_QI", murim::CastRefusal::NO_QI},
       {"CAST_NO_TARGET", murim::CastRefusal::NO_TARGET},
       {"CAST_OUT_OF_RANGE", murim::CastRefusal::OUT_OF_RANGE},
+      {"CAST_WRONG_WEAPON", murim::CastRefusal::WRONG_WEAPON},
   }};
   for (const auto& [constant, refusal] : casts) {
     godot::ClassDB::bind_integer_constant(name, "", constant,

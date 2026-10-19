@@ -1,0 +1,23 @@
+[
+  {
+    "id": "bare_hands",
+    "strike": "bare_hands",
+    "bare": true
+  },
+  {
+    "id": "fist",
+    "strike": "gauntlets"
+  },
+  {
+    "id": "sword",
+    "strike": "sword"
+  },
+  {
+    "id": "saber",
+    "strike": "saber"
+  },
+  {
+    "id": "hidden_weapons",
+    "strike": "darts"
+  }
+]

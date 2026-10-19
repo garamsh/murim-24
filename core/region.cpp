@@ -214,7 +214,7 @@ Holding holding_of(const StructureKind& kind, Footprint footprint) {
   const auto cells =
       static_cast<std::uint32_t>(footprint.width * footprint.height);
   return Holding{kind.housing, kind.storage, kind.yield * cells, kind.pupils,
-                 kind.arms,    kind.tends,   kind.edge,          kind.healing};
+                 kind.arms,    kind.tends,   kind.healing};
 }
 
 // The buildings of `kind` in the order they are placed: those of the square
@@ -594,9 +594,10 @@ void validate(const RegionData& data) {
   if (data.terrain.empty() || data.factions.empty() || data.villages.empty() ||
       std::any_of(data.terrain.begin(), data.terrain.end(), weightless) ||
       std::any_of(data.factions.begin(), data.factions.end(), unknown_enemy) ||
-      std::any_of(
-          data.factions.begin(), data.factions.end(),
-          [](const Faction& faction) { return faction.skills.empty(); }) ||
+      std::any_of(data.factions.begin(), data.factions.end(),
+                  [&data](const Faction& faction) {
+                    return faction.skills.empty() && !data.life.gear;
+                  }) ||
       !data.life.growth ||
       std::any_of(data.villages.begin(), data.villages.end(), unplaceable) ||
       (!data.sects.empty() && malformed(data.seat)) ||
@@ -610,6 +611,10 @@ void validate(const RegionData& data) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
   check_growth(*data.life.growth);
+  if (data.life.gear) {
+    check_gear(*data.life.gear, data.life.disciplines.size(),
+               data.factions.size(), data.sects.size());
+  }
 }
 
 // The land as generation builds on `map`: free where buildable, rough

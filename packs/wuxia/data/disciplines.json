@@ -2,6 +2,9 @@
   {
     "id": "sword",
     "name": "sword",
+    "weapons": [
+      "sword"
+    ],
     "growth": {
       "mean": 10,
       "spread": 5
@@ -14,6 +17,9 @@
   {
     "id": "saber",
     "name": "saber",
+    "weapons": [
+      "saber"
+    ],
     "growth": {
       "mean": 10,
       "spread": 5
@@ -26,6 +32,10 @@
   {
     "id": "fist",
     "name": "fist",
+    "weapons": [
+      "fist",
+      "bare_hands"
+    ],
     "growth": {
       "mean": 10,
       "spread": 5
@@ -38,6 +48,9 @@
   {
     "id": "hidden_weapons",
     "name": "hidden weapons",
+    "weapons": [
+      "hidden_weapons"
+    ],
     "growth": {
       "mean": 10,
       "spread": 5

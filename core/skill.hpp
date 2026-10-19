@@ -113,6 +113,9 @@ enum class CastRefusal : std::uint8_t {
   NO_TARGET,
   /// The target is a person farther from the caster than the skill's range.
   OUT_OF_RANGE,
+  /// The skill is an art's, and the caster's weapon is not of a family its
+  /// discipline needs (ADR 0050).
+  WRONG_WEAPON,
 };
 
 /// Why an army may not take a person as its attack intent's target, the first

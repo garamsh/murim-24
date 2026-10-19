@@ -412,15 +412,15 @@ class World {
   /// std::out_of_range when there is no such person.
   [[nodiscard]] std::size_t skill_count(std::size_t person) const;
 
-  /// Returns person `person`'s skill `skill`, by index among its army's
-  /// followed by those it knows. Throws std::out_of_range when it has no
-  /// such skill.
-  [[nodiscard]] const Skill& skill_of(std::size_t person,
-                                      std::size_t skill) const;
+  /// Returns person `person`'s skill `skill`, by index among its drilled
+  /// skills followed by those it knows: with gear, its basic strike first,
+  /// then its army's (ADR 0050); without, its army's. Throws
+  /// std::out_of_range when it has no such skill.
+  [[nodiscard]] Skill skill_of(std::size_t person, std::size_t skill) const;
 
   /// Returns the tick from which person `person` may use its skill `skill`
-  /// again: its army's skills share one, and each art skill it knows has its
-  /// own. Throws std::out_of_range when it has no such skill.
+  /// again: its drilled skills share one, and each art skill it knows has
+  /// its own. Throws std::out_of_range when it has no such skill.
   [[nodiscard]] std::uint64_t ready_at(std::size_t person,
                                        std::size_t skill) const;
 
@@ -768,7 +768,7 @@ class World {
 
   // Whether `army` is far.
   [[nodiscard]] static bool far_off(const Army& army);
-  [[nodiscard]] static std::int32_t structure_reach(const Army& army);
+  [[nodiscard]] std::int32_t structure_reach(const Army& army) const;
   [[nodiscard]] std::optional<std::size_t> bearing_on(std::size_t army) const;
   [[nodiscard]] bool standing_within(std::size_t village, Position from,
                                      std::int32_t reach) const;
@@ -803,21 +803,21 @@ class World {
                                                   const Skill& skill,
                                                   const Crowd& crowd) const;
   void strike(std::size_t user, const Crowd& crowd,
-              const std::vector<std::uint32_t>& edges,
               std::vector<std::uint64_t>& damage);
   void use(std::size_t user, const Crowd& crowd, std::size_t index,
            Position toward, std::optional<std::size_t> locked,
-           const std::vector<std::uint32_t>& edges,
            std::vector<std::uint64_t>& damage);
   bool cover(std::size_t user, const Crowd& crowd, const Skill& skill,
              Position toward, std::optional<std::size_t> locked,
              std::uint64_t body_damage, std::vector<std::uint64_t>& damage);
-  [[nodiscard]] const Skill& usable(const Person& person, const Army& army,
-                                    std::size_t skill) const;
+  [[nodiscard]] Skill usable(const Person& person, const Army& army,
+                             std::size_t skill) const;
+  [[nodiscard]] std::size_t drilled_skills(const Army& army) const;
+  [[nodiscard]] bool armed(const Person& person, const Known& known) const;
   [[nodiscard]] std::size_t army_with(std::size_t person,
                                       std::size_t skill) const;
-  [[nodiscard]] static bool ready(const Person& person, std::size_t skill,
-                                  const Army& army, std::uint64_t due);
+  [[nodiscard]] bool ready(const Person& person, std::size_t skill,
+                           const Army& army, std::uint64_t due) const;
   void train();
   void cultivate();
   void comprehend(std::size_t learner);
@@ -871,7 +871,16 @@ class World {
   void index_rosters();
   void start_duel(std::size_t army, std::size_t faction);
   [[nodiscard]] Challenging challenging(std::size_t army) const;
-  void enlist(ArmySpec& army, std::size_t pairs, std::size_t& families);
+  /// Whom a person is born as, for the loadout it wears (ADR 0050): one of
+  /// `faction`, a founder of `sect` if given, and a soldier or not.
+  struct Calling {
+    std::size_t faction = 0;
+    std::optional<std::size_t> sect;
+    bool soldier = false;
+  };
+  void enlist(ArmySpec& army, std::size_t pairs, bool residents,
+              const std::vector<std::optional<std::size_t>>& founders,
+              std::size_t& families);
   void add_village(VillageSpec spec);
   void add_sects(std::vector<SectSpec> sects);
   [[nodiscard]] std::uint32_t best_attainment(std::size_t person) const;
@@ -909,12 +918,13 @@ class World {
   [[nodiscard]] std::optional<std::size_t> first_seller(std::size_t buyer,
                                                         std::size_t ware) const;
   void dose(const Trade& trade);
-  void bear(Person& person, const Soul& soul,
+  void bear(Person& person, const Soul& soul, const Calling& calling,
             std::optional<Sex> sex = std::nullopt);
+  void dress(Person& person, const Calling& calling);
   [[nodiscard]] std::uint32_t draw(Range range);
   [[nodiscard]] std::int64_t age_in_days(const Person& person) const;
   void age();
-  void found(Person& person, std::optional<Sex> sex);
+  void found(Person& person, const Calling& calling, std::optional<Sex> sex);
   void kin(const Kinship& kinship);
   void husband(const Husbandry& husbandry);
   [[nodiscard]] Stages stages() const;

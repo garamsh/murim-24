@@ -48,11 +48,15 @@ constexpr std::array<std::string_view, 3> WHERES{"home", "work", "square"};
 // The kinds of content a pack may hold, in the order their tables are built,
 // so a kind is built after every kind it names. A map's kinds are its
 // authored sources (ADR 0049), named for the pack's `map/` documents.
-constexpr std::array<std::string_view, 20> KINDS{
-    "terrain",  "skills",       "factions",   "structure_kinds", "villages",
-    "seats",    "disciplines",  "arts",       "sects",           "realms",
-    "surnames", "female_names", "male_names", "wares",           "occupations",
-    "life",     "map/lands",    "map/places", "map/routes",      "map/map"};
+constexpr std::array<std::string_view, 24> KINDS{
+    "terrain",      "skills",     "weapon_families",
+    "slots",        "factions",   "structure_kinds",
+    "villages",     "seats",      "disciplines",
+    "arts",         "sects",      "items",
+    "loadouts",     "realms",     "surnames",
+    "female_names", "male_names", "wares",
+    "occupations",  "life",       "map/lands",
+    "map/places",   "map/routes", "map/map"};
 
 // Whether `name` is lowercase ASCII letters, digits and underscores, and not
 // empty.
@@ -437,6 +441,9 @@ struct Built {
   std::vector<Route> routes;
   std::vector<std::pair<std::string, std::string>> place_origins;
   std::vector<std::pair<std::string, std::string>> route_origins;
+  // How many slots strike and how many weapon families are bare hands.
+  std::size_t striking = 0;
+  std::size_t bare = 0;
 };
 
 // The id of entry `index` of kind `kind`, when building; none otherwise.
@@ -523,7 +530,6 @@ StructureKind read_structure_kind(Reader& reader, const std::string& name) {
   made.pupils = reader.number<std::uint32_t>("pupils", 0, 0U);
   made.arms = reader.number<std::uint32_t>("arms", 0, 0U);
   made.tends = reader.number<std::uint32_t>("tends", 0, 0U);
-  made.edge = reader.number<std::uint32_t>("edge", 0, 0U);
   made.healing = reader.number<std::uint32_t>("healing", 0, 0U);
   made.role = static_cast<Role>(reader.choice("role", ROLES));
   return made;
@@ -886,6 +892,61 @@ void add_ware(Life& life, Ware ware) {
   life.trade->wares.push_back(std::move(ware));
 }
 
+// The gear of `life`, given it if it has none.
+Gear& gear_of(Life& life) {
+  if (!life.gear) {
+    life.gear = Gear{};
+  }
+  return *life.gear;
+}
+
+// An item kind: the slot it is worn in and, for a weapon, its family, its
+// damage if it replaces its family's, and its edge; and the guard it gives.
+ItemKind read_item(Reader& reader, const std::string& name) {
+  ItemKind kind;
+  kind.name = name;
+  kind.slot = reader.reference("slot", "slots");
+  if (reader.has("family")) {
+    kind.family = reader.reference("family", "weapon_families");
+  }
+  if (reader.has("damage")) {
+    kind.damage = reader.number<std::uint64_t>("damage", 0);
+  }
+  kind.edge = reader.number<std::uint32_t>("edge", 0, PER_MILLE);
+  kind.guard = reader.number<std::uint32_t>("guard", 0, 0U);
+  return kind;
+}
+
+// A loadout: the faction and sect it fits, if any, whether it fits
+// soldiers, and the weighted choices it lists for each slot it wears.
+Loadout read_loadout(Reader& reader, std::size_t slots) {
+  Loadout loadout;
+  if (reader.has("faction")) {
+    loadout.faction = reader.reference("faction", "factions");
+  }
+  if (reader.has("sect")) {
+    loadout.sect = reader.reference("sect", "sects");
+  }
+  loadout.soldiers = reader.boolean("soldiers", false);
+  loadout.slots.resize(slots);
+  reader.each("wear", false, [&loadout](Reader& worn) {
+    const std::size_t slot = worn.reference("slot", "slots");
+    std::vector<Choice> choices;
+    worn.each("choices", false, [&choices](Reader& inner) {
+      Choice choice;
+      if (inner.has("item")) {
+        choice.kind = inner.reference("item", "items");
+      }
+      choice.weight = inner.number<std::uint32_t>("weight", 0, 1U);
+      choices.push_back(choice);
+    });
+    if (slot < loadout.slots.size()) {
+      loadout.slots.at(slot) = std::move(choices);
+    }
+  });
+  return loadout;
+}
+
 // Adds `occupation` to the occupations, giving `life` them if it has none.
 void add_occupation(Life& life, Occupation occupation) {
   if (!life.occupations) {
@@ -906,6 +967,22 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
         TerrainKind{name, footing, reader.number<std::int32_t>("weight", 1)});
   } else if (kind == "skills") {
     built.skills.push_back(read_skill(reader));
+  } else if (kind == "weapon_families") {
+    Gear& gear = gear_of(data.life);
+    const std::size_t skill = reader.reference("strike", "skills");
+    if (reader.boolean("bare", false)) {
+      gear.bare = gear.families.size();
+      ++built.bare;
+    }
+    gear.families.push_back(WeaponFamily{
+        name, skill < built.skills.size() ? built.skills.at(skill) : Skill{}});
+  } else if (kind == "slots") {
+    Gear& gear = gear_of(data.life);
+    if (reader.boolean("strikes", false)) {
+      gear.striking = gear.slots.size();
+      ++built.striking;
+    }
+    gear.slots.push_back(name);
   } else if (kind == "factions") {
     data.factions.push_back(read_faction(reader, built));
   } else if (kind == "structure_kinds") {
@@ -916,6 +993,15 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     data.seat = read_template(reader, name, context, true);
   } else if (kind == "disciplines") {
     data.life.disciplines.push_back(read_discipline(reader));
+    // With gear, each discipline names the families its arts need, if any.
+    const bool named = reader.has("weapons");
+    if (named || data.life.gear) {
+      Gear& gear = gear_of(data.life);
+      gear.needs.resize(data.life.disciplines.size() - 1);
+      gear.needs.push_back(named
+                               ? reader.references("weapons", "weapon_families")
+                               : std::vector<std::size_t>{});
+    }
   } else if (kind == "arts") {
     data.life.arts.push_back(read_art(reader));
   } else if (kind == "sects") {
@@ -923,6 +1009,11 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     data.sects.push_back(
         SectData{std::move(sect), reader.reference("faction", "factions")});
     built.manuals.push_back(reader.references("manuals", "arts"));
+  } else if (kind == "items") {
+    gear_of(data.life).kinds.push_back(read_item(reader, name));
+  } else if (kind == "loadouts") {
+    Gear& gear = gear_of(data.life);
+    gear.loadouts.push_back(read_loadout(reader, gear.slots.size()));
   } else if (kind == "realms") {
     data.life.realms.push_back(read_realm(reader));
   } else if (kind == "surnames") {
@@ -1249,6 +1340,12 @@ Built build_tables(const std::map<std::string, Merged>& merged,
       read_entry(std::string{kind}, reader, built, context);
       reader.finish();
     }
+  }
+  // Gear strikes from one slot, and bare-handed by one family.
+  if (built.data.life.gear && (built.striking != 1 || built.bare != 1)) {
+    errors.push_back(ContentError{
+        order.back(), built.striking != 1 ? "slots" : "weapon_families", "", "",
+        ContentRefusal::INCONSISTENT});
   }
   const std::size_t seats = ids.at("seats").size();
   if (built.lives != 1 || seats > 1) {

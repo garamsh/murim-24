@@ -79,6 +79,7 @@ const CAST_KEYS := {
 	WorldAdapter.CAST_NO_QI: "CAST_NO_QI",
 	WorldAdapter.CAST_NO_TARGET: "CAST_NO_TARGET",
 	WorldAdapter.CAST_OUT_OF_RANGE: "CAST_OUT_OF_RANGE",
+	WorldAdapter.CAST_WRONG_WEAPON: "CAST_WRONG_WEAPON",
 }
 # The translation key of each reason an attack is refused, by WorldAdapter.ATTACK_* constant.
 const ATTACK_KEYS := {

@@ -724,6 +724,11 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent,
   // Folded for everyone, none included, whatever the packs hold (ADR 0081).
   fold(person.occupation.has_value());
   fold(person.occupation.value_or(0));
+  // A slot for each of the gear's, so a world without gear hashes as before.
+  for (const std::optional<std::size_t>& kind : person.worn) {
+    fold(kind.has_value());
+    fold(kind.value_or(0));
+  }
   // Folded only when held, so a world where no one cultivates or knows an
   // art hashes as before.
   if (cultivates) {
@@ -858,6 +863,23 @@ bool stray_cultivation(const Person& person, const Life& life) {
          std::any_of(person.known.begin(), person.known.end(), unknown);
 }
 
+// Whether `person` wears other than a slot for each of `life`'s gear's, or a
+// kind the gear lacks or one not worn in the slot it fills.
+bool stray_worn(const Person& person, const Life& life) {
+  const std::size_t slots = life.gear ? life.gear->slots.size() : 0;
+  if (person.worn.size() != slots) {
+    return true;
+  }
+  for (std::size_t slot = 0; slot < slots; ++slot) {
+    const std::optional<std::size_t> kind = person.worn.at(slot);
+    if (kind && (*kind >= life.gear->kinds.size() ||
+                 life.gear->kinds.at(*kind).slot != slot)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Whether `person` holds a count for other than each of `life`'s wares.
 bool stray_purse(const Person& person, const Life& life) {
   return person.held.size() != (life.trade ? life.trade->wares.size() : 0);
@@ -925,6 +947,61 @@ void fold_occupations(const Fold& fold,
   fold(occupations->waking.to);
 }
 
+// Folds the gear's data into `fold`, only when given, so a world without it
+// keeps its hash.
+template <typename Fold>
+void fold_gear(const Fold& fold, const std::optional<Gear>& gear) {
+  if (!gear) {
+    return;
+  }
+  fold(gear->slots.size());
+  for (const std::string& slot : gear->slots) {
+    fold_text(fold, slot);
+  }
+  fold(gear->striking);
+  fold(gear->families.size());
+  for (const WeaponFamily& family : gear->families) {
+    fold_text(fold, family.name);
+    fold_skill(fold, family.strike);
+  }
+  fold(gear->bare);
+  fold(gear->needs.size());
+  for (const std::vector<std::size_t>& needed : gear->needs) {
+    fold(needed.size());
+    for (const std::size_t family : needed) {
+      fold(family);
+    }
+  }
+  fold(gear->kinds.size());
+  for (const ItemKind& kind : gear->kinds) {
+    fold_text(fold, kind.name);
+    fold(kind.slot);
+    fold(kind.family.has_value());
+    fold(kind.family.value_or(0));
+    fold(kind.damage.has_value());
+    fold(kind.damage.value_or(0));
+    fold(kind.edge);
+    fold(kind.guard);
+  }
+  fold(gear->loadouts.size());
+  for (const Loadout& loadout : gear->loadouts) {
+    fold(loadout.faction.has_value());
+    fold(loadout.faction.value_or(0));
+    fold(loadout.sect.has_value());
+    fold(loadout.sect.value_or(0));
+    fold(loadout.soldiers);
+    fold(loadout.slots.size());
+    for (const std::vector<Choice>& choices : loadout.slots) {
+      fold(choices.size());
+      for (const Choice& choice : choices) {
+        fold(choice.kind.has_value());
+        fold(choice.kind.value_or(0));
+        fold(choice.weight);
+      }
+    }
+  }
+}
+
 // Folds the trade's data into `fold`, only when given, so a world without
 // one keeps its hash.
 template <typename Fold>
@@ -975,7 +1052,6 @@ void fold_village(const Fold& fold, const Village& village) {
     fold(holding.harvest);
     fold(holding.arms);
     fold(holding.tends);
-    fold(holding.edge);
     fold(holding.healing);
   }
   fold(village.spec.kinds.size());
@@ -1001,6 +1077,10 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       structure_index_(centres_of(structures_)),
       life_(std::move(life)) {
   check_life(life_);
+  if (life_.gear) {
+    check_gear(*life_.gear, life_.disciplines.size(), rules_.hostile.size(),
+               sects.size());
+  }
   if (rules_.ticks_per_day == 0) {
     throw std::invalid_argument("a day must last at least one tick");
   }
@@ -1013,7 +1093,9 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
            !map_.passable(recruit.cell);
   };
   const auto invalid_army = [&](const ArmySpec& army) {
-    return army.skills.empty() || army.faction >= factions ||
+    // With gear its people strike with their weapons, so an army may have
+    // no skills of its own.
+    return (army.skills.empty() && !life_.gear) || army.faction >= factions ||
            !map_.passable(army.objective) ||
            std::any_of(army.skills.begin(), army.skills.end(), invalid_skill) ||
            std::any_of(army.members.begin(), army.members.end(),
@@ -1050,9 +1132,19 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   // The founders who start as households, by army: two for each household
   // of the village the army houses.
   std::vector<std::size_t> paired(armies.size(), 0);
+  std::vector<bool> residents(armies.size(), false);
   for (const VillageSpec& spec : villages) {
     if (spec.residents < armies.size()) {
       paired.at(spec.residents) = std::size_t{2} * spec.households;
+      residents.at(spec.residents) = true;
+    }
+  }
+  // The sect each person founds, if any, by person.
+  std::vector<std::optional<std::size_t>> founders;
+  for (std::size_t sect = 0; sect < sects.size(); ++sect) {
+    for (const Founder& founder : sects.at(sect).founders) {
+      founders.resize(std::max(founders.size(), founder.person + 1));
+      founders.at(founder.person) = sect;
     }
   }
   const auto homeless = [&villages](const ArmySpec& army) {
@@ -1063,7 +1155,8 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   }
   std::size_t families = armies.size();
   for (ArmySpec& army : armies) {
-    enlist(army, paired.at(armies_.size()), families);
+    const std::size_t index = armies_.size();
+    enlist(army, paired.at(index), residents.at(index), founders, families);
   }
   attacks_ = Attacks{people_.size()};
   // Each family, one for every army the world starts with and every head of
@@ -1111,6 +1204,9 @@ bool World::unplaced(const VillageRecord& village) const {
 void World::restore() {
   check_life(life_);
   const std::size_t factions = rules_.hostile.size();
+  if (life_.gear) {
+    check_gear(*life_.gear, life_.disciplines.size(), factions, sects_.size());
+  }
   const std::size_t people = people_.size();
   const std::size_t villages = villages_.size();
   const std::size_t structures = structures_.size();
@@ -1150,6 +1246,7 @@ void World::restore() {
            person.attainment.size() != disciplines ||
            (!given.empty() && person.given >= given.size()) ||
            stray_cultivation(person, life_) || stray_purse(person, life_) ||
+           stray_worn(person, life_) ||
            !below(person.occupation,
                   life_.occupations ? life_.occupations->list.size() : 0);
   };
@@ -1228,10 +1325,10 @@ bool World::rostered() const {
   const std::size_t people = people_.size();
   std::vector<std::size_t> rosters(people, 0);
   for (const Army& army : armies_) {
-    if (army.faction >= rules_.hostile.size() || army.skills.empty() ||
+    if (army.faction >= rules_.hostile.size() || drilled_skills(army) == 0 ||
         std::any_of(army.skills.begin(), army.skills.end(), invalid_skill) ||
         army.order.skills.empty() ||
-        !all_below(army.order.skills, army.skills.size()) ||
+        !all_below(army.order.skills, drilled_skills(army)) ||
         !all_below(army.roster, people) ||
         (army.order.target && *army.order.target >= people)) {
       return false;
@@ -1253,8 +1350,11 @@ bool World::rostered() const {
 // them, two to a household, are a man and a woman who each head a family of
 // their own, numbered from `families` on, and marry. Founders were born
 // before the world began, by the founding age.
-void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
-  std::vector<std::size_t> every_skill(army.skills.size());
+void World::enlist(ArmySpec& army, std::size_t pairs, bool residents,
+                   const std::vector<std::optional<std::size_t>>& founders,
+                   std::size_t& families) {
+  std::vector<std::size_t> every_skill(army.skills.size() +
+                                       (life_.gear ? 1 : 0));
   std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
   std::vector<std::size_t> members;
   for (const Recruit& recruit : army.members) {
@@ -1270,7 +1370,12 @@ void World::enlist(ArmySpec& army, std::size_t pairs, std::size_t& families) {
     person.health = recruit.health;
     person.home = army.home;
     person.family = housed ? families++ : armies_.size();
-    found(person, sex);
+    const std::size_t index = people_.size();
+    found(person,
+          Calling{army.faction,
+                  index < founders.size() ? founders.at(index) : std::nullopt,
+                  !residents},
+          sex);
     if (wife) {
       const std::size_t husband = people_.size() - 1;
       person.spouses.push_back(husband);
@@ -2554,7 +2659,7 @@ void World::reachable_from(Cell objective,
 void World::order(std::size_t army, Order order,
                   std::optional<std::size_t> challenge) {
   const auto lacking = [this, army](std::size_t skill) {
-    return skill >= armies_.at(army).skills.size();
+    return skill >= drilled_skills(armies_.at(army));
   };
   if (army >= armies_.size() || !map_.passable(order.objective) ||
       order.skills.empty() ||
@@ -2825,16 +2930,19 @@ void World::tick() {
   const Crowd crowd{SpatialHash{std::move(placed)}, std::move(people),
                     std::move(owners), std::move(slot)};
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
-  const std::vector<std::uint32_t> edges = served().edge;
   strikes_.clear();
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
-    strike(index, crowd, edges, damage);
+    strike(index, crowd, damage);
   }
   // Damage lands after everyone has struck, so the order people strike in
-  // does not decide who strikes. The dead leave their army's roster.
+  // does not decide who strikes, less what the struck wear guards against.
+  // The dead leave their army's roster.
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     Person& struck = people_.at(crowd.people.at(index));
-    struck.health -= std::min(damage.at(index), struck.health);
+    const std::uint64_t guard =
+        life_.gear ? guard_of(*life_.gear, struck.worn) : 0;
+    struck.health -= std::min(
+        damage.at(index) * (PER_MILLE - guard) / PER_MILLE, struck.health);
   }
   if (life_.trade) {
     dose(*life_.trade);
@@ -3160,6 +3268,7 @@ StateHash World::hash() const {
   fold_reaches(fold, rules_);
   fold_trade(fold, life_.trade);
   fold_occupations(fold, life_.occupations);
+  fold_gear(fold, life_.gear);
   for (const Event& event : events_.entries()) {
     fold_event(fold, event);
   }
@@ -3440,13 +3549,23 @@ bool World::far_off(const Army& army) {
 }
 
 // How far army `army`'s order's skills that damage structures reach from a
-// striker, range and radius; 0 when none does.
-std::int32_t World::structure_reach(const Army& army) {
+// striker, range and radius, its members' basic strikes among them; 0 when
+// none does.
+std::int32_t World::structure_reach(const Army& army) const {
   std::int32_t farthest = 0;
-  for (const std::size_t skill : army.order.skills) {
-    const Skill& used = army.skills.at(skill);
+  const auto note = [&farthest](const Skill& used) {
     if (used.structure_damage > 0) {
       farthest = std::max(farthest, used.range + used.radius);
+    }
+  };
+  const std::size_t basic = life_.gear ? 1 : 0;
+  for (const std::size_t skill : army.order.skills) {
+    if (skill >= basic) {
+      note(army.skills.at(skill - basic));
+      continue;
+    }
+    for (const std::size_t member : army.roster) {
+      note(basic_strike(*life_.gear, people_.at(member).worn));
     }
   }
   return farthest;
@@ -3670,7 +3789,6 @@ std::uint64_t World::next_random() {
 // person: its order's skills once their shared cooldown has passed, and each
 // art skill it knows that is ready and that its qi pays for.
 void World::strike(std::size_t user, const Crowd& crowd,
-                   const std::vector<std::uint32_t>& edges,
                    std::vector<std::uint64_t>& damage) {
   const std::size_t army = crowd.armies.at(user);
   const std::size_t self = crowd.people.at(user);
@@ -3683,7 +3801,7 @@ void World::strike(std::size_t user, const Crowd& crowd,
         (!aimed_at || may_aim(self, own, *aimed_at))) {
       use(user, crowd, cast->skill,
           landing(striker, usable(striker, own, cast->skill), cast->target),
-          person_aimed_at(cast->target), edges, damage);
+          person_aimed_at(cast->target), damage);
     }
     return;
   }
@@ -3692,7 +3810,8 @@ void World::strike(std::size_t user, const Crowd& crowd,
   const auto affordable = [&](const Known& known) {
     return known.ready_at <= tick_count_ &&
            striker.qi >=
-               life_.arts.at(known.art).skills.at(known.skill).skill.qi_cost;
+               life_.arts.at(known.art).skills.at(known.skill).skill.qi_cost &&
+           armed(striker, known);
   };
   const auto arts = static_cast<std::size_t>(
       std::count_if(striker.known.begin(), striker.known.end(), affordable));
@@ -3710,7 +3829,7 @@ void World::strike(std::size_t user, const Crowd& crowd,
     for (std::size_t known = 0; known < striker.known.size(); ++known) {
       if (affordable(striker.known.at(known))) {
         if (drawn == 0) {
-          index = own.skills.size() + known;
+          index = drilled_skills(own) + known;
           break;
         }
         --drawn;
@@ -3721,12 +3840,12 @@ void World::strike(std::size_t user, const Crowd& crowd,
   // A self skill, or one of range 0, reaches only its user, so it lands where
   // it stands.
   if (skill.shape == Shape::SELF || skill.range == 0) {
-    use(user, crowd, index, striker.position, std::nullopt, edges, damage);
+    use(user, crowd, index, striker.position, std::nullopt, damage);
     return;
   }
   if (const std::optional<std::size_t> target = aim_of(user, skill, crowd)) {
     use(user, crowd, index, crowd.hash.position(*target),
-        crowd.people.at(*target), edges, damage);
+        crowd.people.at(*target), damage);
   }
 }
 
@@ -3774,12 +3893,11 @@ bool World::may_aim(std::size_t self, const Army& own,
 // The one rule every skill resolves through, whoever uses it and however it
 // was aimed: each use of skill `index`, among the user's, toward `toward`,
 // spends its qi and hits once every hostile person its shape covers, or for
-// a targeted skill the person `locked` alone, as much harder as the edge
-// `edges` gives the user's home, the might of its realm and, for an art
-// skill, the potency of its nature, and every structure its shape reaches.
+// a targeted skill the person `locked` alone, as much harder as the might
+// of its realm gives and, for an art skill, the potency of its nature and the
+// edge of its weapon, and every structure its shape reaches.
 void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
                 Position toward, std::optional<std::size_t> locked,
-                const std::vector<std::uint32_t>& edges,
                 std::vector<std::uint64_t>& damage) {
   const std::size_t army = crowd.armies.at(user);
   const std::size_t self = crowd.people.at(user);
@@ -3787,8 +3905,8 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
   const Army& own = armies_.at(army);
   const Skill& skill = usable(striker, own, index);
   const std::optional<std::size_t> known =
-      index >= own.skills.size()
-          ? std::optional<std::size_t>{index - own.skills.size()}
+      index >= drilled_skills(own)
+          ? std::optional<std::size_t>{index - drilled_skills(own)}
           : std::nullopt;
   const std::uint64_t ready =
       tick_count_ + std::max<std::uint64_t>(skill.cooldown, 1);
@@ -3800,15 +3918,15 @@ void World::use(std::size_t user, const Crowd& crowd, std::size_t index,
     striker.ready_at = ready;
   }
   striker.qi -= skill.qi_cost;
-  const std::uint64_t edge = striker.home ? edges.at(*striker.home) : 0;
   const std::uint32_t rank = rank_of(striker, life_);
   const std::uint64_t might =
       rank > 0 ? life_.realms.at(rank - 1).might : PER_MILLE;
-  std::uint64_t body_damage =
-      skill.body_damage * (PER_MILLE + edge) / PER_MILLE * might / PER_MILLE;
+  std::uint64_t body_damage = skill.body_damage * might / PER_MILLE;
   if (art) {
-    body_damage =
-        body_damage * agreement(striker, *art, true, life_) / PER_MILLE;
+    const std::uint64_t edge =
+        life_.gear ? edge_of(*life_.gear, striker.worn) : PER_MILLE;
+    body_damage = body_damage * agreement(striker, *art, true, life_) /
+                  PER_MILLE * edge / PER_MILLE;
   }
   strikes_.push_back(Strike{self,
                             index,
@@ -3880,25 +3998,35 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
   return hit;
 }
 
-// Skill `skill` of person `person`, serving in `army`: the army's skills,
-// followed by the art skills it knows.
-const Skill& World::usable(const Person& person, const Army& army,
-                           std::size_t skill) const {
-  if (skill < army.skills.size()) {
-    return army.skills.at(skill);
+// Skill `skill` of person `person`, serving in `army`: with gear its basic
+// strike, then the army's skills, followed by the art skills it knows.
+Skill World::usable(const Person& person, const Army& army,
+                    std::size_t skill) const {
+  const std::size_t basic = life_.gear ? 1 : 0;
+  if (skill < basic) {
+    return basic_strike(*life_.gear, person.worn);
   }
-  const Known& known = person.known.at(skill - army.skills.size());
+  if (skill < drilled_skills(army)) {
+    return army.skills.at(skill - basic);
+  }
+  const Known& known = person.known.at(skill - drilled_skills(army));
   return life_.arts.at(known.art).skills.at(known.skill).skill;
+}
+
+// How many skills a person serving in `army` has before those it knows: with
+// gear its basic strike, and the army's.
+std::size_t World::drilled_skills(const Army& army) const {
+  return army.skills.size() + (life_.gear ? 1 : 0);
 }
 
 // Whether person `person`, serving in `army`, may use its skill `skill` on
 // tick `due`.
 bool World::ready(const Person& person, std::size_t skill, const Army& army,
-                  std::uint64_t due) {
+                  std::uint64_t due) const {
   const std::uint64_t ready_at =
-      skill < army.skills.size()
+      skill < drilled_skills(army)
           ? person.ready_at
-          : person.known.at(skill - army.skills.size()).ready_at;
+          : person.known.at(skill - drilled_skills(army)).ready_at;
   return ready_at <= due;
 }
 
@@ -4163,7 +4291,7 @@ bool World::claims(std::size_t village, Cell cell) const {
 std::int32_t World::reach(const Person& person, const Army& army) const {
   std::int32_t farthest = 0;
   for (const std::size_t skill : army.order.skills) {
-    farthest = std::max(farthest, army.skills.at(skill).range);
+    farthest = std::max(farthest, usable(person, army, skill).range);
   }
   for (const Known& known : person.known) {
     farthest = std::max(
@@ -4223,7 +4351,7 @@ CastRefusal World::assess_cast(std::size_t person,
     return CastRefusal::DEAD;
   }
   const Army& own = armies_.at(*army);
-  if (cast.skill >= own.skills.size() + caster.known.size()) {
+  if (cast.skill >= drilled_skills(own) + caster.known.size()) {
     return CastRefusal::NO_SKILL;
   }
   if (!ready(caster, cast.skill, own, due)) {
@@ -4248,7 +4376,17 @@ CastRefusal World::assess_cast(std::size_t person,
       return CastRefusal::OUT_OF_RANGE;
     }
   }
+  if (cast.skill >= drilled_skills(own) &&
+      !armed(caster, caster.known.at(cast.skill - drilled_skills(own)))) {
+    return CastRefusal::WRONG_WEAPON;
+  }
   return CastRefusal::NONE;
+}
+
+// Whether person `person` wears the weapon its known skill `known` needs.
+bool World::armed(const Person& person, const Known& known) const {
+  return !life_.gear || armed_for(*life_.gear, person.worn,
+                                  life_.arts.at(known.art).discipline);
 }
 
 std::optional<std::size_t> World::army_of(std::size_t person) const {
@@ -4386,9 +4524,11 @@ bool World::shift(std::size_t structure, Destroyer striker,
   return effect != 0;
 }
 
-// Draws `person`'s talent and lifespan, for a soul of `soul` history, and
-// its sex unless `sex` gives it: the one rule every birth follows.
-void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
+// Draws `person`'s talent and lifespan, for a soul of `soul` history, its
+// sex unless `sex` gives it, and with gear the loadout of its `calling`: the
+// one rule every birth follows.
+void World::bear(Person& person, const Soul& soul, const Calling& calling,
+                 std::optional<Sex> sex) {
   person.born = static_cast<std::int64_t>(tick_count_);
   person.talent.clear();
   for (std::size_t discipline = 0; discipline < life_.disciplines.size();
@@ -4421,12 +4561,47 @@ void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
   const std::vector<NameEntry>& given =
       person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
   person.given = given.empty() ? 0 : next_random() % given.size();
+  dress(person, calling);
+}
+
+// With gear, dresses `person`, the next the world holds, in the first
+// loadout that fits its `calling`, drawing one choice by weight for each slot
+// the loadout lists. Each draw is a counter-based hash of the seed, the
+// person and the slot, so dressing draws nothing from the world's stream.
+void World::dress(Person& person, const Calling& calling) {
+  person.worn.clear();
+  if (!life_.gear) {
+    return;
+  }
+  person.worn.assign(life_.gear->slots.size(), std::nullopt);
+  const Loadout* fit =
+      loadout_for(*life_.gear, calling.faction, calling.sect, calling.soldier);
+  for (std::size_t slot = 0; fit != nullptr && slot < fit->slots.size();
+       ++slot) {
+    const std::vector<Choice>& choices = fit->slots.at(slot);
+    std::uint64_t total = 0;
+    for (const Choice& choice : choices) {
+      total += choice.weight;
+    }
+    if (total == 0) {
+      continue;
+    }
+    std::uint64_t drawn = mix(mix(mix(seed_) ^ people_.size()) ^ slot) % total;
+    for (const Choice& choice : choices) {
+      if (drawn < choice.weight) {
+        person.worn.at(slot) = choice.kind;
+        break;
+      }
+      drawn -= choice.weight;
+    }
+  }
 }
 
 // Bears founder `person`, of `sex` if given, by the one birth rule, born the
 // founding age before the world began, if the life gives one.
-void World::found(Person& person, std::optional<Sex> sex) {
-  bear(person, Soul{}, sex);
+void World::found(Person& person, const Calling& calling,
+                  std::optional<Sex> sex) {
+  bear(person, Soul{}, calling, sex);
   if (life_.founding_age) {
     const std::uint64_t days = draw(range_of(*life_.founding_age));
     person.born = -static_cast<std::int64_t>(days * rules_.ticks_per_day);
@@ -4514,7 +4689,10 @@ void World::rebirth(Passing passing) {
       residents.begin() + static_cast<std::ptrdiff_t>(
                               std::min<std::size_t>(residents.size(), 2)));
   person.soul = soul_index;
-  bear(person, soul);
+  const std::size_t family_army = villages_.at(village).spec.residents;
+  bear(person, soul,
+       Calling{armies_.at(family_army).faction, std::nullopt,
+               army != family_army});
   const std::size_t born = people_.size();
   for (const std::size_t parent : person.parents) {
     people_.at(parent).children.push_back(born);
@@ -4528,7 +4706,7 @@ void World::rebirth(Passing passing) {
   enrol(born, army);
   serving.faction = family.faction;
   serving.skills = family.skills;
-  serving.order.skills.resize(serving.skills.size());
+  serving.order.skills.resize(drilled_skills(serving));
   std::iota(serving.order.skills.begin(), serving.order.skills.end(),
             std::size_t{0});
   const Cell birthplace = cell_of(people_.at(born).position);
@@ -4546,17 +4724,17 @@ const std::vector<Skill>& World::skills(std::size_t army) const {
 std::size_t World::skill_count(std::size_t person) const {
   const Person& caster = people_.at(person);
   const std::optional<std::size_t> army = army_of(person);
-  return army ? armies_.at(*army).skills.size() + caster.known.size() : 0;
+  return army ? drilled_skills(armies_.at(*army)) + caster.known.size() : 0;
 }
 
-const Skill& World::skill_of(std::size_t person, std::size_t skill) const {
+Skill World::skill_of(std::size_t person, std::size_t skill) const {
   return usable(people_.at(person), armies_.at(army_with(person, skill)),
                 skill);
 }
 
 std::uint64_t World::ready_at(std::size_t person, std::size_t skill) const {
   const std::size_t drilled =
-      armies_.at(army_with(person, skill)).skills.size();
+      drilled_skills(armies_.at(army_with(person, skill)));
   const Person& caster = people_.at(person);
   return skill < drilled ? caster.ready_at
                          : caster.known.at(skill - drilled).ready_at;
@@ -4566,7 +4744,7 @@ std::uint64_t World::ready_at(std::size_t person, std::size_t skill) const {
 // std::out_of_range when it has no such skill.
 std::size_t World::army_with(std::size_t person, std::size_t skill) const {
   const std::optional<std::size_t> army = army_of(person);
-  if (!army || skill >= armies_.at(*army).skills.size() +
+  if (!army || skill >= drilled_skills(armies_.at(*army)) +
                             people_.at(person).known.size()) {
     throw std::out_of_range("the person has no such skill");
   }
@@ -4972,7 +5150,11 @@ void World::bear_child(std::size_t mother, const Kinship& kinship) {
   child.home = parent.home;
   child.family = parent.family;
   child.parents = {father, mother};
+  const std::size_t serving = army_serving(lineage);
+  const bool soldier =
+      !child.home || villages_.at(*child.home).spec.residents != serving;
   bear(child, Soul{},
+       Calling{armies_.at(serving).faction, std::nullopt, soldier},
        kinship.balanced_sexes && child.home ? scarcer_sex(*child.home, kinship)
                                             : std::nullopt);
   const std::size_t born = people_.size();
@@ -4981,7 +5163,7 @@ void World::bear_child(std::size_t mother, const Kinship& kinship) {
   people_.push_back(std::move(child));
   attacks_.grow_to(people_.size());
   record(cell_of(people_.at(born).position), Born{born});
-  enrol(born, army_serving(lineage));
+  enrol(born, serving);
 }
 
 std::size_t World::cap(std::size_t village) const {
@@ -4989,7 +5171,7 @@ std::size_t World::cap(std::size_t village) const {
                        rules_.people_capacity);
 }
 
-// Each village's edge and healing from its standing structures, as its
+// Each village's healing from its standing structures, as its
 // people and the growth's self-reliance let them serve.
 Service World::served() const {
   if (villages_.empty()) {
@@ -5814,7 +5996,7 @@ std::size_t World::form(std::size_t village,
   for (const std::size_t member : members) {
     strike_off(member);
   }
-  std::vector<std::size_t> every_skill(armies_.at(from).skills.size());
+  std::vector<std::size_t> every_skill(drilled_skills(armies_.at(from)));
   std::iota(every_skill.begin(), every_skill.end(), std::size_t{0});
   Army formed{armies_.at(from).faction,
               armies_.at(from).skills,

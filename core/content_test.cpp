@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "compiled_map.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "map.hpp"
@@ -822,13 +823,90 @@ TEST(Content, AGrowthWithTiersOutOfOrderIsRefusedAtLoad) {
             2U);
 }
 
-// The damage the test mod gives the guard strike.
+// The base pack with mod `mod`, whose one entry, of kind `kind` and id
+// `id`, sets `field` to `value`.
+LoadedContent base_with(MemoryPacks& mods, const std::string& mod,
+                        const std::string& kind, const std::string& id,
+                        const std::string& field, const std::string& value) {
+  add_mod(mods, mod);
+  mods.entry(mod, kind, id).text(field, value);
+  return load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {mod});
+}
+
+TEST(Content, SlotsArePackDataAndAFifthLoadsWornEmpty) {
+  MemoryPacks mods;
+  add_mod(mods, "mounted");
+  mods.entry("mounted", "slots", "mount").flag("strikes", false);
+  const LoadedContent mounted =
+      load_content(BaseAndMods{mods}, murim_packs::BASE_PACK, {"mounted"});
+  EXPECT_TRUE(mounted.errors.empty());
+  ASSERT_TRUE(mounted.data.has_value());
+  const RegionData data = mounted.data.value_or(RegionData{});
+  const Gear gear = data.life.gear.value_or(Gear{});
+  ASSERT_EQ(gear.slots.size(), 5U);
+  EXPECT_EQ(gear.slots.back(), "mount");
+  // Everyone has the fifth slot, and no loadout fills it.
+  const Region region = generate_region(Seed{24}, data);
+  const World world{
+      region.seed,       Map{region.map_rows}, region.armies,
+      region.structures, region.rules,         village_specs(region),
+      region.leadership, region.life,          region.sects};
+  ASSERT_GT(world.population(), 0U);
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    ASSERT_EQ(world.person(person).worn.size(), 5U);
+    EXPECT_FALSE(world.person(person).worn.back().has_value());
+  }
+  // Control: slots of which none strikes are refused, since a person
+  // strikes from one.
+  MemoryPacks unarmed;
+  add_mod(unarmed, "unarmed");
+  unarmed.entry("unarmed", "slots", "weapon").flag("strikes", false);
+  const LoadedContent none =
+      load_content(BaseAndMods{unarmed}, murim_packs::BASE_PACK, {"unarmed"});
+  EXPECT_TRUE(refused_for(none, "unarmed", "", ContentRefusal::INCONSISTENT));
+  EXPECT_FALSE(none.data.has_value());
+}
+
+TEST(Content, AnItemWornInASlotThePacksLackIsRefused) {
+  MemoryPacks pocket;
+  const LoadedContent unknown =
+      base_with(pocket, "pockets", "items", "pouch", "slot", "pocket");
+  EXPECT_TRUE(
+      refused_for(unknown, "pockets", "slot", ContentRefusal::UNRESOLVED_ID));
+  EXPECT_FALSE(unknown.data.has_value());
+  // Control: the same item worn on the head loads there.
+  MemoryPacks head;
+  const LoadedContent known =
+      base_with(head, "hoods", "items", "pouch", "slot", "head");
+  EXPECT_TRUE(known.errors.empty());
+  ASSERT_TRUE(known.data.has_value());
+  const Gear gear =
+      known.data.value_or(RegionData{}).life.gear.value_or(Gear{});
+  const auto pouch =
+      std::find_if(gear.kinds.begin(), gear.kinds.end(),
+                   [](const ItemKind& kind) { return kind.name == "pouch"; });
+  ASSERT_NE(pouch, gear.kinds.end());
+  EXPECT_EQ(gear.slots.at(pouch->slot), "head");
+}
+
+// The damage the test mod gives the sword's strike.
 constexpr std::uint64_t SHARPER_DAMAGE = 40;
+
+// Expects `made` to be `expected` field by field.
+void expect_skill(const Skill& made, const Skill& expected) {
+  EXPECT_EQ(made.range, expected.range);
+  EXPECT_EQ(made.radius, expected.radius);
+  EXPECT_EQ(made.body_damage, expected.body_damage);
+  EXPECT_EQ(made.structure_damage, expected.structure_damage);
+  EXPECT_EQ(made.cooldown, expected.cooldown);
+  EXPECT_EQ(made.qi_cost, expected.qi_cost);
+  EXPECT_EQ(made.shape, expected.shape);
+}
 
 TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
   MemoryPacks mods;
   add_mod(mods, "sharper");
-  mods.entry("sharper", "skills", "guard")
+  mods.entry("sharper", "skills", "sword")
       .set("body_damage", static_cast<std::int64_t>(SHARPER_DAMAGE));
   const BaseAndMods source{mods};
   const LoadedContent base = load_content(source, murim_packs::BASE_PACK, {});
@@ -840,33 +918,34 @@ TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
   ASSERT_TRUE(sharper.data.has_value());
   const RegionData before_data = base.data.value_or(RegionData{});
   const RegionData after_data = sharper.data.value_or(RegionData{});
-  ASSERT_EQ(before_data.factions.size(), after_data.factions.size());
+  ASSERT_TRUE(before_data.life.gear.has_value());
+  ASSERT_TRUE(after_data.life.gear.has_value());
+  const Gear before_gear = before_data.life.gear.value_or(Gear{});
+  const Gear after_gear = after_data.life.gear.value_or(Gear{});
+  ASSERT_EQ(before_gear.families.size(), after_gear.families.size());
   std::size_t changed = 0;
+  for (std::size_t family = 0; family < before_gear.families.size(); ++family) {
+    Skill expected = before_gear.families.at(family).strike;
+    if (before_gear.families.at(family).name == "sword") {
+      // The sword's strike: only its damage moves.
+      EXPECT_NE(expected.body_damage, SHARPER_DAMAGE);
+      expected.body_damage = SHARPER_DAMAGE;
+      ++changed;
+    }
+    expect_skill(after_gear.families.at(family).strike, expected);
+  }
+  EXPECT_EQ(changed, 1U);
+  // No faction's own skills move.
+  ASSERT_EQ(before_data.factions.size(), after_data.factions.size());
   for (std::size_t faction = 0; faction < before_data.factions.size();
        ++faction) {
     const std::vector<Skill>& before = before_data.factions.at(faction).skills;
     const std::vector<Skill>& after = after_data.factions.at(faction).skills;
     ASSERT_EQ(before.size(), after.size());
     for (std::size_t skill = 0; skill < before.size(); ++skill) {
-      Skill expected = before.at(skill);
-      if (expected.shape == Shape::TARGETED) {
-        // The guard strike, every faction's first: only its damage moves.
-        EXPECT_NE(expected.body_damage, SHARPER_DAMAGE);
-        expected.body_damage = SHARPER_DAMAGE;
-        ++changed;
-      }
-      const Skill& made = after.at(skill);
-      EXPECT_EQ(made.range, expected.range);
-      EXPECT_EQ(made.radius, expected.radius);
-      EXPECT_EQ(made.body_damage, expected.body_damage);
-      EXPECT_EQ(made.structure_damage, expected.structure_damage);
-      EXPECT_EQ(made.cooldown, expected.cooldown);
-      EXPECT_EQ(made.qi_cost, expected.qi_cost);
-      EXPECT_EQ(made.shape, expected.shape);
+      expect_skill(after.at(skill), before.at(skill));
     }
   }
-  // Every faction strikes with the guard.
-  EXPECT_EQ(changed, before_data.factions.size());
   // Nothing else of the tables moves: the region they generate is the same
   // ground, villages and structures.
   constexpr Seed SEED{24};

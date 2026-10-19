@@ -163,7 +163,6 @@ Holding Villages::held(std::size_t village, Stage worst,
       total.pupils += holding.pupils;
       total.arms += holding.arms;
       total.tends += holding.tends;
-      total.edge = std::max(total.edge, holding.edge);
       total.healing = std::max(total.healing, holding.healing);
     }
     total.harvest += now == Stage::INTACT ? holding.harvest : 0;
@@ -196,14 +195,10 @@ std::size_t Villages::cap(std::size_t village, const Stages& stages,
 
 Service Villages::served(const std::vector<std::size_t>& population,
                          std::uint64_t reliance, const Stages& stages) const {
-  Service service{std::vector<std::uint32_t>(records_.size(), 0),
-                  std::vector<std::uint32_t>(records_.size(), 0)};
+  Service service{std::vector<std::uint32_t>(records_.size(), 0)};
   for (std::size_t village = 0; village < records_.size(); ++village) {
     const Holding standing = held(village, Stage::DAMAGED, stages);
     const std::uint64_t people = population.at(village);
-    if (reliance + standing.arms >= people) {
-      service.edge.at(village) = standing.edge;
-    }
     if (reliance + standing.tends >= people) {
       service.healing.at(village) = standing.healing;
     }

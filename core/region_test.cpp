@@ -1,5 +1,3 @@
-#include "region.hpp"
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -8,6 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <set>
@@ -21,6 +20,7 @@
 #include "chart.hpp"
 #include "compiled_map.hpp"
 #include "flow_field.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "kinship.hpp"
@@ -30,6 +30,7 @@
 #include "names.hpp"
 #include "occupation.hpp"
 #include "person.hpp"
+#include "region.hpp"
 #include "sect.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
@@ -43,6 +44,20 @@ namespace {
 const RegionData& base_data() {
   static const RegionData data = murim_packs::load_base(MURIM_PACKS_DIR);
   return data;
+}
+
+// Clears `data`'s sects, and the manuals and loadouts that name them.
+void clear_sects(RegionData& data) {
+  data.sects.clear();
+  data.life.manuals.reset();
+  if (data.life.gear) {
+    std::vector<Loadout>& loadouts = data.life.gear->loadouts;
+    loadouts.erase(std::remove_if(loadouts.begin(), loadouts.end(),
+                                  [](const Loadout& loadout) {
+                                    return loadout.sect.has_value();
+                                  }),
+                   loadouts.end());
+  }
 }
 
 constexpr std::uint64_t SEEDS = 200;
@@ -482,6 +497,93 @@ TEST(Region, TwoVillagesOfOneTemplateOnTwoSitesAreLaidOutApart) {
   }
 }
 
+// The name of the kind person `person` of `world` wears in slot `slot`, by
+// `gear`, or nothing.
+std::string worn_in(const World& world, const Gear& gear, std::size_t person,
+                    std::size_t slot) {
+  const std::optional<std::size_t> kind = world.person(person).worn.at(slot);
+  return kind ? gear.kinds.at(*kind).name : std::string{};
+}
+
+TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
+  constexpr std::size_t WEAPON = 0;
+  constexpr std::size_t ARMOUR = 1;
+  constexpr std::size_t HEAD = 2;
+  constexpr std::uint64_t YEARS = 10;
+  const RegionData& data = base_data();
+  ASSERT_TRUE(data.life.gear.has_value());
+  const Gear& gear = data.life.gear.value_or(Gear{});
+  Region region = generate_region(SEED, data);
+  region.rules.ticks_per_day = 1;
+  // A soldier: one born in a village, serving in an army of its own.
+  region.armies.push_back(born_in(region, 0));
+  std::vector<bool> residents(region.armies.size(), false);
+  for (const Village& village : region.villages) {
+    residents.at(village.army) = true;
+  }
+  std::map<std::size_t, std::string> founded;
+  for (const SectSpec& sect : region.sects) {
+    for (const Founder& founder : sect.founders) {
+      founded[founder.person] = sect.name;
+    }
+  }
+  World world = world_of(region);
+  std::size_t person = 0;
+  std::size_t founders = 0;
+  std::size_t soldiers = 0;
+  std::size_t armed = 0;
+  std::size_t unarmed = 0;
+  for (std::size_t army = 0; army < region.armies.size(); ++army) {
+    for (std::size_t member = 0; member < region.armies.at(army).members.size();
+         ++member, ++person) {
+      ASSERT_EQ(world.person(person).worn.size(), gear.slots.size());
+      if (founded.count(person) > 0) {
+        // A sect's founders carry steel, or darts, in leather.
+        const std::string weapon = worn_in(world, gear, person, WEAPON);
+        EXPECT_TRUE(weapon == "steel_sword" || weapon == "steel_saber" ||
+                    weapon == "darts")
+            << weapon;
+        EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "leather");
+        ++founders;
+      } else if (!residents.at(army)) {
+        EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "lamellar");
+        EXPECT_EQ(worn_in(world, gear, person, HEAD), "helmet");
+        ++soldiers;
+      } else {
+        EXPECT_EQ(worn_in(world, gear, person, ARMOUR), "cloth");
+        ++(worn_in(world, gear, person, WEAPON).empty() ? unarmed : armed);
+      }
+    }
+  }
+  // Setup: the region starts with each calling, and villagers drawn both
+  // armed and not.
+  EXPECT_GT(founders, 0U);
+  EXPECT_GT(soldiers, 0U);
+  EXPECT_GT(armed, 0U);
+  EXPECT_GT(unarmed, 0U);
+  // Those born later are dressed by the same birth rule.
+  const std::size_t first_born = world.population();
+  for (std::uint64_t day = 0; day < YEARS * DAYS_PER_YEAR; ++day) {
+    world.tick();
+  }
+  ASSERT_GT(world.population(), first_born);
+  for (std::size_t born = first_born; born < world.population(); ++born) {
+    EXPECT_FALSE(worn_in(world, gear, born, ARMOUR).empty()) << born;
+  }
+  // Control: with no loadouts, no one wears anything.
+  RegionData bare = data;
+  if (bare.life.gear) {
+    bare.life.gear->loadouts.clear();
+  }
+  Region undressed = generate_region(SEED, bare);
+  const World plain = world_of(undressed);
+  for (std::size_t each = 0; each < plain.population(); ++each) {
+    for (const std::optional<std::size_t>& kind : plain.person(each).worn) {
+      EXPECT_FALSE(kind.has_value());
+    }
+  }
+}
+
 TEST(Region, GeneratesAFourthFactionAddedAsData) {
   RegionData data = base_data();
   data.factions.push_back(Faction{"Martial clans",
@@ -494,8 +596,7 @@ TEST(Region, GeneratesAFourthFactionAddedAsData) {
   data.factions.at(1).hostile_to.push_back(3);
   // Without sects: four factions' territories leave a sect's seat no room on
   // 5 of 200 seeds.
-  data.sects.clear();
-  data.life.manuals.reset();
+  clear_sects(data);
 
   const Region region = generate_region(SEED, data);
   EXPECT_TRUE(region.rules.hostile.at(3).at(1));
@@ -1493,12 +1594,17 @@ RegionData grown() {
   return data;
 }
 
-// base_data() with the Demonic Cult's first skill, its strike, doing
-// `damage` to a person.
+// base_data() with every weapon family's strike, the basic strike, doing
+// `damage` to a person, whatever weapon strikes it.
 RegionData striking(std::uint64_t damage) {
   RegionData data = base_data();
-  data.factions.at(DEMONIC).skills.front().body_damage = damage;
-  data.factions.at(0).skills.front().body_damage = damage;
+  Gear& gear = data.life.gear.value();
+  for (WeaponFamily& family : gear.families) {
+    family.strike.body_damage = damage;
+  }
+  for (ItemKind& kind : gear.kinds) {
+    kind.damage.reset();
+  }
   return data;
 }
 
@@ -1558,12 +1664,9 @@ std::uint64_t struck_from(std::int32_t apart) {
   const Cell east{west.x + apart, west.y};
   const std::uint64_t health = data.life.newborn_health;
   const std::size_t first = region.armies.size();
-  region.armies.push_back(ArmySpec{
-      east, {Recruit{east, health}}, 0, {data.factions.at(0).skills.front()}});
-  region.armies.push_back(ArmySpec{west,
-                                   {Recruit{west, health}},
-                                   DEMONIC,
-                                   {data.factions.at(DEMONIC).skills.front()}});
+  // Each strikes only with the basic strike of the weapon it is born with.
+  region.armies.push_back(ArmySpec{east, {Recruit{east, health}}, 0, {}});
+  region.armies.push_back(ArmySpec{west, {Recruit{west, health}}, DEMONIC, {}});
   World world = world_of(region);
   const std::size_t orthodox = world.roster(first).front();
   for (std::uint64_t tick = 0; tick < SECOND; ++tick) {
@@ -2532,8 +2635,7 @@ constexpr Seed SONLESS{9};
 // rule depends on none of them.
 RegionData sectless() {
   RegionData data = base_data();
-  data.sects.clear();
-  data.life.manuals.reset();
+  clear_sects(data);
   data.life.cultivation.reset();
   data.life.diplomacy.reset();
   data.life.occupations.reset();

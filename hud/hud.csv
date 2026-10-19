@@ -46,6 +46,7 @@ CAST_ON_COOLDOWN,아직 기술을 다시 쓸 수 없다.,That skill is not ready
 CAST_NO_QI,내공이 모자라 기술을 쓸 수 없다.,Not enough inner energy for that skill.
 CAST_NO_TARGET,겨눌 상대가 없다.,There is no one to aim at.
 CAST_OUT_OF_RANGE,상대가 기술이 닿는 거리 밖에 있다.,The target is out of the skill's range.
+CAST_WRONG_WEAPON,이 무공에 맞는 병기를 들고 있지 않다.,You do not hold the weapon this art needs.
 ATTACK_NO_MEMBER,쓰러진 몸으로는 공격할 수 없다.,You cannot attack while fallen.
 ATTACK_NO_TARGET,공격할 상대가 없다.,There is no one to attack.
 ATTACK_NOT_A_FOE,적이 아닌 사람은 공격하지 않는다.,You do not attack one who is no foe.

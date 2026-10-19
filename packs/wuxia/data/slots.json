@@ -1,0 +1,15 @@
+[
+  {
+    "id": "weapon",
+    "strikes": true
+  },
+  {
+    "id": "armour"
+  },
+  {
+    "id": "head"
+  },
+  {
+    "id": "accessory"
+  }
+]

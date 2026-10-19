@@ -1,11 +1,51 @@
 [
   {
-    "id": "guard",
+    "id": "bare_hands",
+    "range": 384,
+    "radius": 0,
+    "body_damage": 9,
+    "structure_damage": 0,
+    "cooldown": 15,
+    "qi_cost": 0,
+    "shape": "targeted"
+  },
+  {
+    "id": "gauntlets",
+    "range": 384,
+    "radius": 0,
+    "body_damage": 12,
+    "structure_damage": 0,
+    "cooldown": 12,
+    "qi_cost": 0,
+    "shape": "targeted"
+  },
+  {
+    "id": "sword",
     "range": 384,
     "radius": 0,
     "body_damage": 15,
     "structure_damage": 0,
     "cooldown": 15,
+    "qi_cost": 0,
+    "shape": "targeted"
+  },
+  {
+    "id": "saber",
+    "range": 384,
+    "radius": 0,
+    "body_damage": 18,
+    "structure_damage": 0,
+    "cooldown": 18,
+    "qi_cost": 0,
+    "shape": "targeted"
+  },
+  {
+    "id": "darts",
+    "range": 2048,
+    "radius": 0,
+    "body_damage": 9,
+    "structure_damage": 0,
+    "cooldown": 30,
     "qi_cost": 0,
     "shape": "targeted"
   },

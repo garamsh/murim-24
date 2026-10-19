@@ -31,7 +31,6 @@ constexpr std::uint32_t FIELD_HARVEST = 720;
 constexpr std::uint32_t BARN_HOUSING = 9;
 constexpr std::uint32_t BARN_STORAGE = 240;
 constexpr std::uint32_t BIG_HARVEST = 1'200;
-constexpr std::uint32_t SMITHY_EDGE = 300;
 constexpr std::uint32_t HEALER_HEALING = 50;
 
 std::vector<Structure> built(const std::vector<std::uint32_t>& durabilities) {
@@ -203,31 +202,22 @@ TEST(Villages, FillAtHarvestUpToStorageAndFeedAllOrNone) {
 }
 
 TEST(Villages, ServeOnlyWhileTheirWorkshopsCoverTheirPeople) {
-  Holding smithy;
-  smithy.arms = 2;
-  smithy.edge = SMITHY_EDGE;
   Holding healer;
   healer.tends = 4;
   healer.healing = HEALER_HEALING;
-  const std::vector<Structure> intact = built({INTACT, INTACT});
+  const std::vector<Structure> intact = built({INTACT});
   const Stages stages{intact, FLOORS};
   Villages villages{intact.size()};
-  villages.add(VillageSpec{{0, 1}, 0, {smithy, healer}, 0, {}, {}}, ARMIES, 0,
-               stages);
-  // Control: within what they arm and tend, both serve.
-  const Service covered = villages.served({2}, 0, stages);
-  EXPECT_EQ(covered.edge, std::vector<std::uint32_t>{SMITHY_EDGE});
-  EXPECT_EQ(covered.healing, std::vector<std::uint32_t>{HEALER_HEALING});
-  // Past what the smithy arms, it gives no edge; the healer still tends.
-  const Service armed_short = villages.served({3}, 0, stages);
-  EXPECT_EQ(armed_short.edge, std::vector<std::uint32_t>{0});
-  EXPECT_EQ(armed_short.healing, std::vector<std::uint32_t>{HEALER_HEALING});
-  // Self-reliance covers the rest.
-  EXPECT_EQ(villages.served({3}, 1, stages).edge,
-            std::vector<std::uint32_t>{SMITHY_EDGE});
+  villages.add(VillageSpec{{0}, 0, {healer}, 0, {}, {}}, ARMIES, 0, stages);
+  // Within what it tends, it heals.
+  EXPECT_EQ(villages.served({4}, 0, stages).healing,
+            std::vector<std::uint32_t>{HEALER_HEALING});
   // Past what the healer tends, it heals no one.
   EXPECT_EQ(villages.served({5}, 0, stages).healing,
             std::vector<std::uint32_t>{0});
+  // Self-reliance covers the rest.
+  EXPECT_EQ(villages.served({5}, 1, stages).healing,
+            std::vector<std::uint32_t>{HEALER_HEALING});
 }
 
 TEST(Villages, ShelterOnlyWithRoomAndFood) {

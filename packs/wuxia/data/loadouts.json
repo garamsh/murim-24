@@ -1,0 +1,324 @@
+[
+  {
+    "id": "hwasan_founders",
+    "sect": "hwasan",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "steel_sword"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "leather"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "heavenly_demon_founders",
+    "sect": "heavenly_demon",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "steel_saber"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "leather"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "black_fang_founders",
+    "sect": "black_fang",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "darts"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "leather"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "orthodox_soldiers",
+    "faction": "orthodox",
+    "soldiers": true,
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_sword"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "lamellar"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "helmet"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "demonic_soldiers",
+    "faction": "demonic",
+    "soldiers": true,
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_saber"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "lamellar"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "helmet"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unorthodox_soldiers",
+    "faction": "unorthodox",
+    "soldiers": true,
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_sword"
+          },
+          {
+            "item": "iron_saber"
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "lamellar"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "helmet"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "orthodox_villagers",
+    "faction": "orthodox",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_sword",
+            "weight": 1
+          },
+          {
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "cloth"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "demonic_villagers",
+    "faction": "demonic",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_saber",
+            "weight": 1
+          },
+          {
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "cloth"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unorthodox_villagers",
+    "faction": "unorthodox",
+    "wear": [
+      {
+        "slot": "weapon",
+        "choices": [
+          {
+            "item": "iron_sword",
+            "weight": 1
+          },
+          {
+            "item": "iron_saber",
+            "weight": 1
+          },
+          {
+            "weight": 2
+          }
+        ]
+      },
+      {
+        "slot": "armour",
+        "choices": [
+          {
+            "item": "cloth"
+          }
+        ]
+      },
+      {
+        "slot": "head",
+        "choices": [
+          {
+            "item": "headband",
+            "weight": 1
+          },
+          {
+            "item": "hat",
+            "weight": 1
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -7,6 +7,7 @@
 
 #include "arts.hpp"
 #include "diplomacy.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "names.hpp"
@@ -34,7 +35,8 @@ namespace murim {
 /// `manuals`, if given. People cultivate qi by `cultivation`, if given, into
 /// `realms`, ascending by qi, and learn `arts` by `learning`. Silver and
 /// wares go round by `trade`, if given, and people take `occupations`, if
-/// given.
+/// given. People wear items by `gear`, if given, drawing their loadout as
+/// they are born (ADR 0050).
 struct Life {
   std::vector<DisciplineDraw> disciplines;
   std::uint64_t newborn_health = 1;
@@ -56,6 +58,7 @@ struct Life {
   std::optional<Diplomacy> diplomacy;
   std::optional<Trade> trade;
   std::optional<Occupations> occupations;
+  std::optional<Gear> gear;
 };
 
 /// Returns the range a soul with `soul` history draws discipline

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "iron_gauntlets",
+    "slot": "weapon",
+    "family": "fist",
+    "edge": 1200
+  },
+  {
+    "id": "iron_sword",
+    "slot": "weapon",
+    "family": "sword"
+  },
+  {
+    "id": "steel_sword",
+    "slot": "weapon",
+    "family": "sword",
+    "damage": 18,
+    "edge": 1200
+  },
+  {
+    "id": "iron_saber",
+    "slot": "weapon",
+    "family": "saber"
+  },
+  {
+    "id": "steel_saber",
+    "slot": "weapon",
+    "family": "saber",
+    "damage": 22,
+    "edge": 1200
+  },
+  {
+    "id": "darts",
+    "slot": "weapon",
+    "family": "hidden_weapons"
+  },
+  {
+    "id": "cloth",
+    "slot": "armour",
+    "guard": 50
+  },
+  {
+    "id": "leather",
+    "slot": "armour",
+    "guard": 150
+  },
+  {
+    "id": "lamellar",
+    "slot": "armour",
+    "guard": 250
+  },
+  {
+    "id": "headband",
+    "slot": "head"
+  },
+  {
+    "id": "hat",
+    "slot": "head",
+    "guard": 25
+  },
+  {
+    "id": "helmet",
+    "slot": "head",
+    "guard": 75
+  }
+]

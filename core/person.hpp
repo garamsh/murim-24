@@ -5,6 +5,7 @@
 #include <optional>
 #include <vector>
 
+#include "gear.hpp"
 #include "map.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
@@ -41,7 +42,8 @@ struct Known {
 /// a growth a day and a limit, holds `qi` of a store of `qi_capacity`, and
 /// knows the art skills `known`, in the order it learned them, each with a
 /// ready tick of its own; its army's skills share `ready_at`. It holds
-/// `silver`, and `held` of each of the trade's wares, by index.
+/// `silver`, and `held` of each of the trade's wares, by index. It wears
+/// `worn`, by the gear's slots.
 struct Person {
   Position position{};
   std::uint64_t health = 0;
@@ -68,6 +70,7 @@ struct Person {
   std::uint64_t silver = 0;
   std::vector<std::uint64_t> held;
   std::optional<std::size_t> occupation;
+  Worn worn;
 };
 
 }  // namespace murim

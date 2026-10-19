@@ -33,10 +33,9 @@ enum class FieldState : std::uint8_t { SOWN, GROWING, RIPE, FALLOW, BURNT };
 /// stores, the food it yields each harvest, which makes it a field, and the
 /// pupils it teaches a sect seated in the village. A workshop arms `arms` and
 /// tends `tends` of the people whose home the village is; while it stands
-/// and its village's arms cover them, they strike `edge` per mille harder,
-/// and while its tends cover them, they recover `healing` health a day. A
-/// village's capacities add up over its standing structures; its edge and
-/// healing are the greatest among them.
+/// and its village's tends cover them, they recover `healing` health a day.
+/// A village's capacities add up over its standing structures; its healing
+/// is the greatest among them.
 struct Holding {
   std::uint32_t housing = 0;
   std::uint32_t storage = 0;
@@ -44,7 +43,6 @@ struct Holding {
   std::uint32_t pupils = 0;
   std::uint32_t arms = 0;
   std::uint32_t tends = 0;
-  std::uint32_t edge = 0;
   std::uint32_t healing = 0;
 };
 
@@ -162,11 +160,10 @@ struct Reached {
   std::size_t tier;
 };
 
-/// What each village's standing workshops do for its people: the edge they
-/// strike with and the healing they recover, by village, each 0 where its
-/// arms or tends fall short of the people whose home it is.
+/// What each village's standing workshops do for its people: the healing
+/// they recover, by village, 0 where its tends fall short of the people
+/// whose home it is.
 struct Service {
-  std::vector<std::uint32_t> edge;
   std::vector<std::uint32_t> healing;
 };
 
@@ -281,9 +278,9 @@ class Villages {
                                 const std::optional<Husbandry>& husbandry,
                                 std::size_t capacity) const;
 
-  /// Returns each village's edge and healing from its standing structures,
-  /// each kept only while `reliance` and what they arm, or tend, cover the
-  /// `population` people whose home it is.
+  /// Returns each village's healing from its standing structures, kept only
+  /// while `reliance` and what they tend cover the `population` people whose
+  /// home it is.
   [[nodiscard]] Service served(const std::vector<std::size_t>& population,
                                std::uint64_t reliance,
                                const Stages& stages) const;

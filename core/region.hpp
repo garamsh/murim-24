@@ -52,8 +52,8 @@ struct SectData {
 /// A kind of structure, by `name`: the people it houses, the food it stores,
 /// the food each cell of its footprint yields each harvest, which makes it a
 /// field, whether it blocks movement, the pupils it teaches a sect seated in
-/// its village, for a workshop, the people it arms and tends, the edge per
-/// mille they strike with and the health a day they recover (Holding), and
+/// its village, for a workshop, the people it arms and tends and the health
+/// a day they recover (Holding), and
 /// the role by which a village places it (ADR 0076).
 struct StructureKind {
   std::string name;
@@ -64,7 +64,6 @@ struct StructureKind {
   std::uint32_t pupils;
   std::uint32_t arms = 0;
   std::uint32_t tends = 0;
-  std::uint32_t edge = 0;
   std::uint32_t healing = 0;
   Role role = Role::HOME;
 };

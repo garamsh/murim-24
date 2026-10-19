@@ -26,6 +26,7 @@
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "leadership.hpp"
@@ -1900,6 +1901,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               Learning{},
               std::nullopt,
               std::nullopt,
+              std::nullopt,
               std::nullopt};
 }
 
@@ -2445,9 +2447,7 @@ TEST(World, TheHungryWithNowhereToGoDie) {
 constexpr std::uint64_t WORKSHOP_BLOW = 100;
 constexpr std::uint64_t STRANGER_HEALTH = 100'000;
 constexpr std::uint64_t NEWBORN_HEALTH = 100;
-constexpr std::size_t STRANGER = 1;
-// A smithy's edge, half again as hard, and an apothecary's daily healing.
-constexpr std::uint32_t HALF_AGAIN = 500;
+// An apothecary's daily healing.
 constexpr std::uint32_t DAILY_HEALING = 25;
 // Durability in the damaged and the destroyed stage.
 constexpr std::uint32_t DAMAGED = 50;
@@ -2478,30 +2478,6 @@ World workshop_world(const Workshop& workshop) {
       {VillageSpec{{0}, 0, {workshop.holding}, 0, {}, {}}},
       {},
       life};
-}
-
-// The health the stranger lost to `workshop`'s residents' one strike each.
-std::uint64_t struck(const Workshop& workshop) {
-  World world = workshop_world(workshop);
-  run_ticks(world, 1);
-  return STRANGER_HEALTH - health_of(world, STRANGER);
-}
-
-TEST(World, ResidentsStrikeHarderWhileASmithyArmingThemStands) {
-  Holding smithy;
-  smithy.arms = 2;
-  smithy.edge = HALF_AGAIN;
-  // Two residents' blows land half again as hard, intact or damaged.
-  constexpr std::uint64_t PLAIN = 2 * WORKSHOP_BLOW;
-  constexpr std::uint64_t SHARPENED = PLAIN + (PLAIN / 2);
-  EXPECT_EQ(struck(Workshop{smithy}), SHARPENED);
-  EXPECT_EQ(struck(Workshop{smithy, DAMAGED}), SHARPENED);
-  // Ruined, it sharpens nothing.
-  EXPECT_EQ(struck(Workshop{smithy, DESTROYED}), PLAIN);
-  // Control: arming one of two residents, it sharpens nothing.
-  Holding small = smithy;
-  small.arms = 1;
-  EXPECT_EQ(struck(Workshop{small}), PLAIN);
 }
 
 // The health of `workshop`'s first resident after `days` days.
@@ -2626,7 +2602,6 @@ Growth growth_of(const Growing& growing) {
       Plan{"field", {2, 2}, false, Holding{0, 0, TEN_YEARS_FOOD}, Role::EDGE}};
   Holding smithy;
   smithy.arms = HOUSE_FOR_FOUR;
-  smithy.edge = HALF_AGAIN;
   Holding apothecary;
   apothecary.tends = HOUSE_FOR_FOUR;
   apothecary.healing = DAILY_HEALING;
@@ -6021,6 +5996,7 @@ struct Cultivating {
   std::vector<std::size_t> held{0, 1};
   std::uint32_t admission_chance = 0;
   std::int32_t rumour_reach = 0;
+  std::optional<Gear> gear;
 };
 
 constexpr std::size_t READER = 0;
@@ -6069,6 +6045,7 @@ World qi_world(const Cultivating& cultivating) {
           Nature{Orientation::DEMONIC, Polarity::YIN},
           {ArtSkill{{"일도", "Cut"}, strike, 1, false}}}};
   life.learning = cultivating.learning;
+  life.gear = cultivating.gear;
   // Every manual the sect holds scatters onto its seat's own cell when it
   // falls.
   life.manuals = Manuals{{cultivating.held}, PER_MILLE, 0};
@@ -6394,6 +6371,179 @@ TEST(World, ACastIsRefusedForLackOfQi) {
   ASSERT_GE(affordable.person(READER).qi, dear.strike_cost);
   EXPECT_EQ(affordable.cast_refusal(READER, STRIKE, Itself{}),
             CastRefusal::NONE);
+}
+
+// The blows of the dressed world's weapons, each targeted at two cells and
+// used once, and the health its people start with.
+constexpr std::uint64_t BARE_BLOW = 300;
+constexpr std::uint64_t SWORD_BLOW = 500;
+constexpr std::uint64_t LONG_SWORD_BLOW = 700;
+constexpr std::uint64_t DRESSED_HEALTH = 10'000;
+// The dressed world's item kinds: a sword, a long sword striking harder than
+// its family, mail and plate armour, and a helm.
+constexpr std::size_t SWORD = 0;
+constexpr std::size_t LONG_SWORD = 1;
+constexpr std::size_t MAIL = 2;
+constexpr std::size_t PLATE = 3;
+constexpr std::size_t HELM = 4;
+constexpr std::uint32_t MAIL_GUARD = 250;
+constexpr std::uint32_t PLATE_GUARD = 500;
+constexpr std::uint32_t HELM_GUARD = 500;
+// The striker, of faction 0, and the target, of faction 1, a cell apart.
+constexpr std::size_t STRIKER = 0;
+constexpr std::size_t TARGET = 1;
+
+// Two people a cell apart at war, each a soldier, with gear of a weapon, an
+// armour and a head slot: the striker wears `weapon`, if given, and the
+// target `armour`, each kind by index, a slot of none left empty.
+World dressed(std::optional<std::size_t> weapon,
+              const std::vector<std::optional<std::size_t>>& armour) {
+  const auto blow = [](std::uint64_t damage) {
+    return Skill{2 * CELL_SIZE, 0, damage, 0, NEVER_AGAIN, 0, Shape::TARGETED};
+  };
+  Gear gear;
+  gear.slots = {"weapon", "armour", "head"};
+  gear.families = {WeaponFamily{"bare", blow(BARE_BLOW)},
+                   WeaponFamily{"sword", blow(SWORD_BLOW)}};
+  gear.kinds = {
+      ItemKind{"sword", 0, 1, std::nullopt, PER_MILLE, 0},
+      ItemKind{"long sword", 0, 1, LONG_SWORD_BLOW, PER_MILLE, 0},
+      ItemKind{"mail", 1, std::nullopt, std::nullopt, PER_MILLE, MAIL_GUARD},
+      ItemKind{"plate", 1, std::nullopt, std::nullopt, PER_MILLE, PLATE_GUARD},
+      ItemKind{"helm", 2, std::nullopt, std::nullopt, PER_MILLE, HELM_GUARD}};
+  std::vector<std::vector<Choice>> worn;
+  for (const std::optional<std::size_t>& kind : armour) {
+    worn.push_back(kind ? std::vector<Choice>{Choice{kind, 1}}
+                        : std::vector<Choice>{});
+  }
+  gear.loadouts = {Loadout{0, std::nullopt, true, {{Choice{weapon, 1}}}},
+                   Loadout{1, std::nullopt, true, worn}};
+  Life life;
+  life.gear = gear;
+  return World{Seed{1},
+               Map{open_map(OPEN_SIDE)},
+               {army(SQUARE, SQUARE, 1, DRESSED_HEALTH, 0, {}),
+                army({SQUARE.x + 1, SQUARE.y}, {SQUARE.x + 1, SQUARE.y}, 1,
+                     DRESSED_HEALTH, 1, {})},
+               {},
+               at_war(0),
+               {},
+               {},
+               life};
+}
+
+// The health the target loses to the striker's one blow.
+std::uint64_t dressed_blow(World world) {
+  run_ticks(world, 1);
+  return DRESSED_HEALTH - world.person(TARGET).health;
+}
+
+TEST(World, APersonStrikesWithItsWeaponsFamilyOrBareHandedWithNone) {
+  const World armed = dressed(SWORD, {});
+  ASSERT_EQ(armed.person(STRIKER).worn.at(0),
+            std::optional<std::size_t>{SWORD});
+  EXPECT_EQ(armed.skill_of(STRIKER, 0).body_damage, SWORD_BLOW);
+  EXPECT_EQ(dressed_blow(armed), SWORD_BLOW);
+  // A kind may strike harder than its family.
+  EXPECT_EQ(dressed(LONG_SWORD, {}).skill_of(STRIKER, 0).body_damage,
+            LONG_SWORD_BLOW);
+  EXPECT_EQ(dressed_blow(dressed(LONG_SWORD, {})), LONG_SWORD_BLOW);
+  // Control: with the slot empty, it strikes bare-handed.
+  const World bare = dressed(std::nullopt, {});
+  ASSERT_FALSE(bare.person(STRIKER).worn.at(0).has_value());
+  EXPECT_EQ(bare.skill_of(STRIKER, 0).body_damage, BARE_BLOW);
+  EXPECT_EQ(dressed_blow(bare), BARE_BLOW);
+}
+
+TEST(World, WhatAPersonWearsGuardsAgainstBodyDamageUpToTheCap) {
+  const World mailed = dressed(SWORD, {std::nullopt, MAIL});
+  ASSERT_EQ(mailed.person(TARGET).worn.at(1), std::optional<std::size_t>{MAIL});
+  EXPECT_EQ(dressed_blow(mailed),
+            SWORD_BLOW * (PER_MILLE - MAIL_GUARD) / PER_MILLE);
+  // Plate and a helm guard against a thousand per mille together, held to
+  // MAX_GUARD so the blow still lands.
+  const World plated = dressed(SWORD, {std::nullopt, PLATE, HELM});
+  ASSERT_EQ(plated.person(TARGET).worn.at(2), std::optional<std::size_t>{HELM});
+  EXPECT_EQ(dressed_blow(plated),
+            SWORD_BLOW * (PER_MILLE - MAX_GUARD) / PER_MILLE);
+  // Control: unarmoured, it takes the whole blow.
+  EXPECT_EQ(dressed_blow(dressed(SWORD, {})), SWORD_BLOW);
+}
+
+// With gear the reader's skills start with its basic strike, so each of
+// its art skills sits one later.
+constexpr std::size_t GEARED_STRIKE = STRIKE + 1;
+
+// Cultivating{} with gear of a striking weapon slot, whose bare hands and
+// sword both strike with IDLE, the sword discipline's arts needing a sword;
+// the reader, a soldier of faction 0, is born with a sword of `edge` when
+// `armed`, and bare-handed otherwise.
+Cultivating geared(bool armed, std::uint32_t edge = PER_MILLE) {
+  Gear gear;
+  gear.slots = {"weapon"};
+  gear.families = {WeaponFamily{"bare", IDLE}, WeaponFamily{"sword", IDLE}};
+  gear.needs = {{1}};
+  gear.kinds = {ItemKind{"sword", 0, 1, std::nullopt, edge, 0}};
+  if (armed) {
+    gear.loadouts = {Loadout{0, std::nullopt, true, {{Choice{0, 1}}}}};
+  }
+  Cultivating cultivating;
+  cultivating.gear = gear;
+  return cultivating;
+}
+
+TEST(World, AnArtSkillIsRefusedWithoutAWeaponOfItsDisciplinesFamily) {
+  const World bare = facing(geared(false), GEARED_STRIKE);
+  // Setup: bare-handed, the reader knows the strike and stands within its
+  // reach of the foe.
+  ASSERT_FALSE(bare.person(READER).worn.at(0).has_value());
+  ASSERT_FALSE(known_by(bare, READER).empty());
+  EXPECT_EQ(known_by(bare, READER).front(),
+            (std::pair<std::size_t, std::size_t>{ORTHODOX_ART, 0}));
+  const std::int64_t reach = bare.skill_of(READER, GEARED_STRIKE).range;
+  const Position from = bare.person(READER).position;
+  const Position foe = bare.person(QI_FOE).position;
+  const std::int64_t across = std::int64_t{foe.x} - from.x;
+  const std::int64_t down = std::int64_t{foe.y} - from.y;
+  ASSERT_LE((across * across) + (down * down), reach * reach);
+  EXPECT_EQ(bare.cast_refusal(READER, GEARED_STRIKE, AtPerson{QI_FOE}),
+            CastRefusal::WRONG_WEAPON);
+  // Control: born with a sword, it may cast the same strike.
+  const World armed = facing(geared(true), GEARED_STRIKE);
+  ASSERT_TRUE(armed.person(READER).worn.at(0).has_value());
+  EXPECT_EQ(armed.cast_refusal(READER, GEARED_STRIKE, AtPerson{QI_FOE}),
+            CastRefusal::NONE);
+}
+
+// Whether the reader, facing the foe, uses skill `skill` of its own accord
+// within `ticks` ticks.
+bool used_unbidden(World world, std::size_t skill, std::uint64_t ticks) {
+  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+    world.tick();
+    for (const Strike& strike : world.strikes()) {
+      if (strike.person == READER && strike.skill == skill) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+TEST(World, TheAutomaticStrikeDrawsOnlyTheArtSkillsItsWeaponAllows) {
+  constexpr std::uint64_t TICKS = 300;
+  EXPECT_FALSE(used_unbidden(facing(geared(false), GEARED_STRIKE),
+                             GEARED_STRIKE, TICKS));
+  // Control: with a sword it strikes with the art of its own accord.
+  EXPECT_TRUE(
+      used_unbidden(facing(geared(true), GEARED_STRIKE), GEARED_STRIKE, TICKS));
+}
+
+TEST(World, AWeaponsEdgeScalesTheArtSkillsUsedWithIt) {
+  constexpr std::uint32_t HALF_AGAIN = 1'500;
+  EXPECT_EQ(cast_damage(geared(true, HALF_AGAIN), GEARED_STRIKE),
+            ART_DAMAGE * 3 / 2);
+  // Control: at an edge of PER_MILLE the art strikes at its own damage.
+  EXPECT_EQ(cast_damage(geared(true), GEARED_STRIKE), ART_DAMAGE);
 }
 
 TEST(World, AUseSpendsItsSkillsQi) {
