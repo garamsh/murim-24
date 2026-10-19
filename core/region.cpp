@@ -15,6 +15,7 @@
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "compiled_map.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "layout.hpp"
 #include "life.hpp"
@@ -612,8 +613,7 @@ void validate(const RegionData& data) {
   }
   check_growth(*data.life.growth);
   if (data.life.gear) {
-    check_gear(*data.life.gear, data.life.disciplines.size(),
-               data.factions.size());
+    check_gear(*data.life.gear, data.life.disciplines, data.factions.size());
   }
 }
 

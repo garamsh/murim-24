@@ -17,9 +17,11 @@
 #include "arts.hpp"
 #include "compiled_map.hpp"
 #include "diplomacy.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "leadership.hpp"
+#include "limits.hpp"
 #include "map.hpp"
 #include "names.hpp"
 #include "occupation.hpp"
@@ -951,20 +953,28 @@ void add_occupation(Life& life, Occupation occupation) {
   life.occupations->list.push_back(std::move(occupation));
 }
 
-// Reads the entry the context names, of kind `kind`, into `built`.
-void read_entry(const std::string& kind, Reader& reader, Built& built,
-                const Context& context) {
-  RegionData& data = built.data;
-  const std::string& name = context.entry;
-  if (kind == "terrain") {
-    const auto footing =
-        static_cast<Footing>(reader.choice("footing", FOOTINGS));
-    data.terrain.push_back(
-        TerrainKind{name, footing, reader.number<std::int32_t>("weight", 1)});
-  } else if (kind == "skills") {
-    built.skills.push_back(read_skill(reader));
-  } else if (kind == "families") {
-    Gear& gear = gear_of(data.life);
+// With gear, reads the weapon families the arts of the discipline just read
+// need, if any, into `life`'s gear.
+void read_needs(Reader& reader, Life& life) {
+  const bool named = reader.has("weapons");
+  if (named || life.gear) {
+    Gear& gear = gear_of(life);
+    gear.needs.resize(life.disciplines.size() - 1);
+    gear.needs.push_back(named ? reader.references("weapons", "families")
+                               : std::vector<std::size_t>{});
+  }
+}
+
+// Reads the entry `name`, of kind `kind`, into `built`'s gear when the kind
+// is one of gear's. Returns whether it was.
+bool read_gear_entry(const std::string& kind, Reader& reader, Built& built,
+                     const std::string& name) {
+  if (kind != "families" && kind != "slots" && kind != "items" &&
+      kind != "loadouts") {
+    return false;
+  }
+  Gear& gear = gear_of(built.data.life);
+  if (kind == "families") {
     std::optional<Skill> strike;
     if (reader.has("strike")) {
       const std::size_t skill = reader.reference("strike", "skills");
@@ -976,12 +986,34 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     }
     gear.families.push_back(Family{name, strike});
   } else if (kind == "slots") {
-    Gear& gear = gear_of(data.life);
     if (reader.boolean("strikes", false)) {
       gear.striking = gear.slots.size();
       ++built.striking;
     }
     gear.slots.push_back(name);
+  } else if (kind == "items") {
+    gear.kinds.push_back(read_item(reader, name));
+  } else {
+    gear.loadouts.push_back(read_loadout(reader, gear.slots.size()));
+  }
+  return true;
+}
+
+// Reads the entry the context names, of kind `kind`, into `built`.
+void read_entry(const std::string& kind, Reader& reader, Built& built,
+                const Context& context) {
+  RegionData& data = built.data;
+  const std::string& name = context.entry;
+  if (read_gear_entry(kind, reader, built, name)) {
+    return;
+  }
+  if (kind == "terrain") {
+    const auto footing =
+        static_cast<Footing>(reader.choice("footing", FOOTINGS));
+    data.terrain.push_back(
+        TerrainKind{name, footing, reader.number<std::int32_t>("weight", 1)});
+  } else if (kind == "skills") {
+    built.skills.push_back(read_skill(reader));
   } else if (kind == "factions") {
     data.factions.push_back(read_faction(reader, built));
   } else if (kind == "structure_kinds") {
@@ -992,14 +1024,7 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     data.seat = read_template(reader, name, context, true);
   } else if (kind == "disciplines") {
     data.life.disciplines.push_back(read_discipline(reader));
-    // With gear, each discipline names the families its arts need, if any.
-    const bool named = reader.has("weapons");
-    if (named || data.life.gear) {
-      Gear& gear = gear_of(data.life);
-      gear.needs.resize(data.life.disciplines.size() - 1);
-      gear.needs.push_back(named ? reader.references("weapons", "families")
-                                 : std::vector<std::size_t>{});
-    }
+    read_needs(reader, data.life);
   } else if (kind == "arts") {
     data.life.arts.push_back(read_art(reader));
   } else if (kind == "sects") {
@@ -1007,11 +1032,6 @@ void read_entry(const std::string& kind, Reader& reader, Built& built,
     data.sects.push_back(
         SectData{std::move(sect), reader.reference("faction", "factions")});
     built.manuals.push_back(reader.references("manuals", "arts"));
-  } else if (kind == "items") {
-    gear_of(data.life).kinds.push_back(read_item(reader, name));
-  } else if (kind == "loadouts") {
-    Gear& gear = gear_of(data.life);
-    gear.loadouts.push_back(read_loadout(reader, gear.slots.size()));
   } else if (kind == "realms") {
     data.life.realms.push_back(read_realm(reader));
   } else if (kind == "surnames") {
@@ -1304,6 +1324,17 @@ std::map<std::string, Merged> merge_packs(
   return merged;
 }
 
+// Records an error in `errors`, at pack `pack`, when `built` has gear that
+// does not strike from one slot and bare-handed by one family.
+void check_strikes(const Built& built, const std::string& pack,
+                   std::vector<ContentError>& errors) {
+  if (built.data.life.gear && (built.striking != 1 || built.bare != 1)) {
+    errors.push_back(ContentError{pack,
+                                  built.striking != 1 ? "slots" : "families",
+                                  "", "", ContentRefusal::INCONSISTENT});
+  }
+}
+
 // Builds the tables from `merged`, recording each error.
 Built build_tables(const std::map<std::string, Merged>& merged,
                    const std::vector<std::string>& order,
@@ -1339,12 +1370,7 @@ Built build_tables(const std::map<std::string, Merged>& merged,
       reader.finish();
     }
   }
-  // Gear strikes from one slot, and bare-handed by one family.
-  if (built.data.life.gear && (built.striking != 1 || built.bare != 1)) {
-    errors.push_back(ContentError{order.back(),
-                                  built.striking != 1 ? "slots" : "families",
-                                  "", "", ContentRefusal::INCONSISTENT});
-  }
+  check_strikes(built, order.back(), errors);
   const std::size_t seats = ids.at("seats").size();
   if (built.lives != 1 || seats > 1) {
     errors.push_back(ContentError{order.back(), seats > 1 ? "seats" : "life",

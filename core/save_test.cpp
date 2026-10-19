@@ -21,6 +21,7 @@
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "diplomacy.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
 #include "leadership.hpp"
@@ -400,20 +401,25 @@ TEST(Save, AVersion21SaveFromBeforeGearIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt);
 }
 
+// How many of `world`'s people wear anything.
+std::size_t dressed(const World& world) {
+  std::size_t count = 0;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const Worn& worn = world.person(person).worn;
+    count += std::any_of(worn.begin(), worn.end(),
+                         [](const std::optional<std::size_t>& kind) {
+                           return kind.has_value();
+                         })
+                 ? 1U
+                 : 0U;
+  }
+  return count;
+}
+
 TEST(Save, ALoadedWorldKeepsWhatEachPersonWears) {
   const Saved lived = lived_region(REGION_SEED);
   // Setup: some of its people wear something.
-  std::size_t dressed = 0;
-  for (std::size_t person = 0; person < lived.world.population(); ++person) {
-    const Worn& worn = lived.world.person(person).worn;
-    dressed += std::any_of(worn.begin(), worn.end(),
-                           [](const std::optional<std::size_t>& kind) {
-                             return kind.has_value();
-                           })
-                   ? 1
-                   : 0;
-  }
-  ASSERT_GT(dressed, 0U);
+  ASSERT_GT(dressed(lived.world), 0U);
   MemorySaves store;
   ASSERT_TRUE(save(lived, store, SLOT));
   const Saved restored = loaded(load(store, SLOT));

@@ -17,6 +17,7 @@
 #include "chart.hpp"
 #include "diplomacy.hpp"
 #include "event.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "leadership.hpp"

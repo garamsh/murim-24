@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include "areas.hpp"
+#include "arts.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
 #include "compiled_map.hpp"
@@ -567,7 +569,7 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
   // Born at the lowest tier: ranked above leather, lamellar is not drawn,
   // and ranked below it, it is.
   RegionData lamellar_first = data;
-  Gear& ranked = lamellar_first.life.gear.value();
+  Gear ranked = data.life.gear.value_or(Gear{});
   for (ItemKind& kind : ranked.kinds) {
     if (kind.name == "lamellar") {
       kind.tier = 0;
@@ -575,6 +577,7 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
       kind.tier = 1;
     }
   }
+  lamellar_first.life.gear = ranked;
   Region relaid = generate_region(SEED, lamellar_first);
   relaid.armies.push_back(born_in(relaid, 0));
   const World lamellar_world = world_of(relaid);
@@ -586,7 +589,7 @@ TEST(Region, EachPersonIsBornWearingTheLoadoutOfItsCalling) {
   if (bare.life.gear) {
     bare.life.gear->loadouts.clear();
   }
-  Region undressed = generate_region(SEED, bare);
+  const Region undressed = generate_region(SEED, bare);
   const World plain = world_of(undressed);
   for (std::size_t each = 0; each < plain.population(); ++each) {
     for (const std::optional<std::size_t>& kind : plain.person(each).worn) {
@@ -625,15 +628,36 @@ std::vector<std::pair<std::size_t, std::size_t>> armed_for_their_art(
     for (const std::size_t member : world.roster(army)) {
       const Worn& worn = world.person(member).worn;
       const bool founded = member < founder.size() && founder.at(member);
-      if (founded || !worn.at(gear.striking) || !art.at(faction)) {
+      const std::optional<std::size_t> needed = art.at(faction);
+      if (founded || !worn.at(gear.striking) || !needed) {
         continue;
       }
       ++counts.at(faction).first;
-      counts.at(faction).second +=
-          armed_for(gear, worn, *art.at(faction)) ? 1 : 0;
+      counts.at(faction).second += armed_for(gear, worn, *needed) ? 1U : 0U;
     }
   }
   return counts;
+}
+
+// base_data() with every loadout's art's weapon the sword family instead.
+RegionData swords_for_arts() {
+  RegionData data = base_data();
+  Gear gear = data.life.gear.value_or(Gear{});
+  const auto sword =
+      std::find_if(gear.families.begin(), gear.families.end(),
+                   [](const Family& family) { return family.name == "sword"; });
+  const auto family =
+      static_cast<std::size_t>(std::distance(gear.families.begin(), sword));
+  for (Loadout& loadout : gear.loadouts) {
+    for (std::vector<Choice>& choices : loadout.slots) {
+      for (Choice& choice : choices) {
+        choice.family = choice.art ? family : choice.family;
+        choice.art = false;
+      }
+    }
+  }
+  data.life.gear = gear;
+  return data;
 }
 
 TEST(Region, EveryoneBornArmedCarriesTheWeaponTheirFactionsArtNeeds) {
@@ -648,25 +672,8 @@ TEST(Region, EveryoneBornArmedCarriesTheWeaponTheirFactionsArtNeeds) {
   }
   // Control: with each loadout's art's weapon a sword in its place, the
   // Unorthodox, whose art needs darts, carry none they may cast it with.
-  RegionData swords = base_data();
-  Gear& gear = swords.life.gear.value();
-  const auto sword =
-      std::find_if(gear.families.begin(), gear.families.end(),
-                   [](const Family& family) { return family.name == "sword"; });
-  ASSERT_NE(sword, gear.families.end());
-  for (Loadout& loadout : gear.loadouts) {
-    for (std::vector<Choice>& choices : loadout.slots) {
-      for (Choice& choice : choices) {
-        if (choice.art) {
-          choice.art = false;
-          choice.family = static_cast<std::size_t>(
-              std::distance(gear.families.begin(), sword));
-        }
-      }
-    }
-  }
   const std::vector<std::pair<std::size_t, std::size_t>> unarted =
-      armed_for_their_art(swords);
+      armed_for_their_art(swords_for_arts());
   ASSERT_GT(unarted.at(UNORTHODOX).first, 0U);
   EXPECT_LT(unarted.at(UNORTHODOX).second, unarted.at(UNORTHODOX).first);
 }
@@ -1345,6 +1352,39 @@ enum class TokenGate : std::uint8_t { TOKENS, NONE };
 // until the duel is settled, or `limit` if it is not by then; with `beside`,
 // born where born_in() has it, beside the leader, with no occupations; without
 // the region's attack tokens under TokenGate::NONE.
+// The member of army `residents` standing nearest `cell`, `leader` aside;
+// none when it has no other.
+std::optional<std::size_t> nearest_fellow(const World& world,
+                                          std::size_t residents, Position cell,
+                                          std::size_t leader) {
+  std::optional<std::size_t> fellow;
+  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
+  for (const std::size_t resident : world.roster(residents)) {
+    const Position stands = world.person(resident).position;
+    const std::int64_t across = std::int64_t{stands.x} - cell.x;
+    const std::int64_t down = std::int64_t{stands.y} - cell.y;
+    const std::int64_t apart = (across * across) + (down * down);
+    if (resident != leader && apart < nearest) {
+      nearest = apart;
+      fellow = resident;
+    }
+  }
+  return fellow;
+}
+
+// Walks army `army`'s one member to `cell`, and expects it to arrive.
+void walk_to(World& world, std::size_t army, Cell cell) {
+  constexpr int LONGEST_WALK = 1'000;
+  const std::size_t member = world.roster(army).front();
+  world.order(army, Order{cell, {0, 1}});
+  for (int walked = 0; walked < LONGEST_WALK &&
+                       !same(cell_of(world.person(member).position), cell);
+       ++walked) {
+    world.tick();
+  }
+  EXPECT_TRUE(same(cell_of(world.person(member).position), cell));
+}
+
 std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
                          bool beside = false,
                          TokenGate gate = TokenGate::TOKENS) {
@@ -1385,18 +1425,8 @@ std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
   // born there takes its place among the residents.
   const std::size_t stand_in = world.roster(challenger).front();
   const Position cell = world.person(stand_in).position;
-  std::optional<std::size_t> fellow;
-  std::int64_t nearest = std::numeric_limits<std::int64_t>::max();
-  for (const std::size_t resident : world.roster(residents)) {
-    const Position at = world.person(resident).position;
-    const std::int64_t across = std::int64_t{at.x} - cell.x;
-    const std::int64_t down = std::int64_t{at.y} - cell.y;
-    const std::int64_t apart = (across * across) + (down * down);
-    if (resident != leader && apart < nearest) {
-      nearest = apart;
-      fellow = resident;
-    }
-  }
+  const std::optional<std::size_t> fellow =
+      nearest_fellow(world, residents, cell, leader);
   EXPECT_TRUE(fellow.has_value());
   const std::size_t duelist = fellow.value_or(leader);
   // Setup: both duelists wear what the residents' loadout drew for them.
@@ -1405,15 +1435,7 @@ std::uint64_t duel_ticks(const RegionData& data, Seed seed, std::uint64_t limit,
   world.conscript(stand_in, residents);
   // It first takes the challenger's cell, so the duel's walk-in is the one
   // the test places.
-  constexpr int LONGEST_WALK = 1'000;
-  const Cell start = cell_of(cell);
-  world.order(challenger, Order{start, {0, 1}});
-  for (int walked = 0; walked < LONGEST_WALK &&
-                       !same(cell_of(world.person(duelist).position), start);
-       ++walked) {
-    world.tick();
-  }
-  EXPECT_TRUE(same(cell_of(world.person(duelist).position), start));
+  walk_to(world, challenger, cell_of(cell));
   world.order(challenger, Order{cell_of(world.person(leader).position), {0, 1}},
               DEMONIC);
   // Setup: the challenge started a duel.
@@ -1722,7 +1744,7 @@ RegionData grown() {
 // `damage` to a person, whatever weapon strikes it.
 RegionData striking(std::uint64_t damage) {
   RegionData data = base_data();
-  Gear& gear = data.life.gear.value();
+  Gear gear = data.life.gear.value_or(Gear{});
   for (Family& family : gear.families) {
     if (family.strike) {
       family.strike->body_damage = damage;
@@ -1731,6 +1753,7 @@ RegionData striking(std::uint64_t damage) {
   for (ItemKind& kind : gear.kinds) {
     kind.damage.reset();
   }
+  data.life.gear = gear;
   return data;
 }
 

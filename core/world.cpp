@@ -27,6 +27,7 @@
 #include "diplomacy.hpp"
 #include "event.hpp"
 #include "flow_field.hpp"
+#include "gear.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
 #include "layout.hpp"
@@ -866,14 +867,15 @@ bool stray_cultivation(const Person& person, const Life& life) {
 // Whether `person` wears other than a slot for each of `life`'s gear's, or a
 // kind the gear lacks or one not worn in the slot it fills.
 bool stray_worn(const Person& person, const Life& life) {
-  const std::size_t slots = life.gear ? life.gear->slots.size() : 0;
-  if (person.worn.size() != slots) {
+  static const Gear none{};
+  const Gear& gear = life.gear ? *life.gear : none;
+  if (person.worn.size() != gear.slots.size()) {
     return true;
   }
-  for (std::size_t slot = 0; slot < slots; ++slot) {
+  for (std::size_t slot = 0; slot < gear.slots.size(); ++slot) {
     const std::optional<std::size_t> kind = person.worn.at(slot);
-    if (kind && (*kind >= life.gear->kinds.size() ||
-                 life.gear->kinds.at(*kind).slot != slot)) {
+    if (kind &&
+        (*kind >= gear.kinds.size() || gear.kinds.at(*kind).slot != slot)) {
       return true;
     }
   }
@@ -1079,7 +1081,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
       life_(std::move(life)) {
   check_life(life_);
   if (life_.gear) {
-    check_gear(*life_.gear, life_.disciplines.size(), rules_.hostile.size());
+    check_gear(*life_.gear, life_.disciplines, rules_.hostile.size());
   }
   if (rules_.ticks_per_day == 0) {
     throw std::invalid_argument("a day must last at least one tick");
@@ -1140,6 +1142,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
     }
   }
   std::vector<std::size_t> sect_factions;
+  sect_factions.reserve(sects.size());
   for (const SectSpec& sect : sects) {
     sect_factions.push_back(sect.faction);
   }
@@ -1210,9 +1213,10 @@ void World::restore() {
   check_life(life_);
   const std::size_t factions = rules_.hostile.size();
   if (life_.gear) {
-    check_gear(*life_.gear, life_.disciplines.size(), factions);
+    check_gear(*life_.gear, life_.disciplines, factions);
   }
   std::vector<std::size_t> sect_factions;
+  sect_factions.reserve(sects_.size());
   for (const Sect& sect : sects_) {
     sect_factions.push_back(sect.faction);
   }
@@ -2943,15 +2947,8 @@ void World::tick() {
     strike(index, crowd, damage);
   }
   // Damage lands after everyone has struck, so the order people strike in
-  // does not decide who strikes, less what the struck wear guards against.
-  // The dead leave their army's roster.
-  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
-    Person& struck = people_.at(crowd.people.at(index));
-    const std::uint64_t guard =
-        life_.gear ? guard_of(*life_.gear, struck.worn) : 0;
-    struck.health -= std::min(
-        damage.at(index) * (PER_MILLE - guard) / PER_MILLE, struck.health);
-  }
+  // does not decide who strikes. The dead leave their army's roster.
+  land(crowd, damage);
   if (life_.trade) {
     dose(*life_.trade);
   }
@@ -3573,7 +3570,7 @@ std::int32_t World::structure_reach(const Army& army) const {
       continue;
     }
     for (const std::size_t member : army.roster) {
-      note(basic_strike(*life_.gear, people_.at(member).worn));
+      note(usable(people_.at(member), army, skill));
     }
   }
   return farthest;
@@ -4006,13 +4003,25 @@ bool World::cover(std::size_t user, const Crowd& crowd, const Skill& skill,
   return hit;
 }
 
+// Lands `damage` on each person of `crowd`, less what it wears guards
+// against.
+void World::land(const Crowd& crowd, const std::vector<std::uint64_t>& damage) {
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    Person& struck = people_.at(crowd.people.at(index));
+    const std::uint64_t guard =
+        life_.gear ? guard_of(*life_.gear, struck.worn) : 0;
+    struck.health -= std::min(
+        damage.at(index) * (PER_MILLE - guard) / PER_MILLE, struck.health);
+  }
+}
+
 // Skill `skill` of person `person`, serving in `army`: with gear its basic
 // strike, then the army's skills, followed by the art skills it knows.
 Skill World::usable(const Person& person, const Army& army,
                     std::size_t skill) const {
   const std::size_t basic = life_.gear ? 1 : 0;
-  if (skill < basic) {
-    return basic_strike(*life_.gear, person.worn);
+  if (const std::optional<Gear>& gear = life_.gear; gear && skill == 0) {
+    return basic_strike(*gear, person.worn);
   }
   if (skill < drilled_skills(army)) {
     return army.skills.at(skill - basic);
@@ -4581,6 +4590,7 @@ void World::arm_factions(const std::vector<std::size_t>& sects) {
     return;
   }
   std::vector<std::size_t> disciplines;
+  disciplines.reserve(life_.arts.size());
   for (const Art& art : life_.arts) {
     disciplines.push_back(art.discipline);
   }
@@ -4758,6 +4768,10 @@ std::size_t World::faction(std::size_t army) const {
 
 const std::vector<Skill>& World::skills(std::size_t army) const {
   return armies_.at(army).skills;
+}
+
+std::size_t World::drilled(std::size_t army) const {
+  return drilled_skills(armies_.at(army));
 }
 
 std::size_t World::skill_count(std::size_t person) const {

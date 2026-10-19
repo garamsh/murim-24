@@ -6409,16 +6409,18 @@ World dressed(std::optional<std::size_t> weapon,
       Family{"long sword", blow(SWORD_BLOW)}, Family{"mail", std::nullopt},
       Family{"plate", std::nullopt},          Family{"helm", std::nullopt}};
   gear.kinds = {
-      ItemKind{"sword", 0, 1, 0, std::nullopt, PER_MILLE, 0},
-      ItemKind{"long sword", 0, 2, 0, LONG_SWORD_BLOW, PER_MILLE, 0},
-      ItemKind{"mail", 1, 3, 0, std::nullopt, PER_MILLE, MAIL_GUARD},
-      ItemKind{"plate", 1, 4, 0, std::nullopt, PER_MILLE, PLATE_GUARD},
-      ItemKind{"helm", 2, 5, 0, std::nullopt, PER_MILLE, HELM_GUARD}};
+      ItemKind{"sword", 0, SWORD + 1, 0, std::nullopt, PER_MILLE, 0},
+      ItemKind{"long sword", 0, LONG_SWORD + 1, 0, LONG_SWORD_BLOW, PER_MILLE,
+               0},
+      ItemKind{"mail", 1, MAIL + 1, 0, std::nullopt, PER_MILLE, MAIL_GUARD},
+      ItemKind{"plate", 1, PLATE + 1, 0, std::nullopt, PER_MILLE, PLATE_GUARD},
+      ItemKind{"helm", 2, HELM + 1, 0, std::nullopt, PER_MILLE, HELM_GUARD}};
   // Each kind's family follows the bare one, in the kinds' order.
   const auto family_of_kind = [](std::optional<std::size_t> kind) {
     return kind ? std::optional<std::size_t>{*kind + 1} : std::nullopt;
   };
   std::vector<std::vector<Choice>> worn;
+  worn.reserve(armour.size());
   for (const std::optional<std::size_t>& kind : armour) {
     worn.push_back(kind ? std::vector<Choice>{Choice{family_of_kind(kind), 1}}
                         : std::vector<Choice>{});
@@ -6524,9 +6526,10 @@ TEST(World, AnArtSkillIsRefusedWithoutAWeaponOfItsDisciplinesFamily) {
 }
 
 // Whether the reader, facing the foe, uses skill `skill` of its own accord
-// within `ticks` ticks.
-bool used_unbidden(World world, std::size_t skill, std::uint64_t ticks) {
-  for (std::uint64_t tick = 0; tick < ticks; ++tick) {
+// within 300 ticks.
+bool used_unbidden(World world, std::size_t skill) {
+  constexpr std::uint64_t TICKS = 300;
+  for (std::uint64_t tick = 0; tick < TICKS; ++tick) {
     world.tick();
     for (const Strike& strike : world.strikes()) {
       if (strike.person == READER && strike.skill == skill) {
@@ -6538,12 +6541,11 @@ bool used_unbidden(World world, std::size_t skill, std::uint64_t ticks) {
 }
 
 TEST(World, TheAutomaticStrikeDrawsOnlyTheArtSkillsItsWeaponAllows) {
-  constexpr std::uint64_t TICKS = 300;
-  EXPECT_FALSE(used_unbidden(facing(geared(false), GEARED_STRIKE),
-                             GEARED_STRIKE, TICKS));
+  EXPECT_FALSE(
+      used_unbidden(facing(geared(false), GEARED_STRIKE), GEARED_STRIKE));
   // Control: with a sword it strikes with the art of its own accord.
   EXPECT_TRUE(
-      used_unbidden(facing(geared(true), GEARED_STRIKE), GEARED_STRIKE, TICKS));
+      used_unbidden(facing(geared(true), GEARED_STRIKE), GEARED_STRIKE));
 }
 
 TEST(World, AWeaponsEdgeScalesTheArtSkillsUsedWithIt) {

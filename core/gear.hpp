@@ -8,6 +8,7 @@
 
 #include "limits.hpp"
 #include "skill.hpp"
+#include "talent.hpp"
 
 namespace murim {
 
@@ -122,13 +123,14 @@ using Worn = std::vector<std::optional<std::size_t>>;
     const std::vector<std::size_t>& disciplines);
 
 /// Throws std::invalid_argument when `gear` names a slot, family or kind it
-/// lacks, a faction past `factions`, needs for more than `disciplines`
-/// disciplines, a kind in the striking slot of a family with no strike, a
+/// lacks, a faction past `factions`, needs for more disciplines than
+/// `disciplines`, a kind in the striking slot of a family with no strike, a
 /// bare family with no strike, an art's-weapon choice naming a family or
 /// outside the striking slot, a choice of a family with no kind for its
 /// slot, choices for a slot whose weights sum to 0, or a strike or damage
 /// outside MAX_BODY_DAMAGE or MAX_COOLDOWN.
-void check_gear(const Gear& gear, std::size_t disciplines,
+void check_gear(const Gear& gear,
+                const std::vector<DisciplineDraw>& disciplines,
                 std::size_t factions);
 
 }  // namespace murim

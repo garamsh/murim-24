@@ -407,6 +407,10 @@ class World {
   /// Returns the skills army `army` has now.
   [[nodiscard]] const std::vector<Skill>& skills(std::size_t army) const;
 
+  /// Returns how many skills an order of army `army` may name: with gear its
+  /// members' basic strike first, then its own skills (ADR 0050).
+  [[nodiscard]] std::size_t drilled(std::size_t army) const;
+
   /// Returns how many skills person `person` may cast: its army's, followed
   /// by the art skills it knows; none once it is dead. Throws
   /// std::out_of_range when there is no such person.
@@ -807,6 +811,7 @@ class World {
   void use(std::size_t user, const Crowd& crowd, std::size_t index,
            Position toward, std::optional<std::size_t> locked,
            std::vector<std::uint64_t>& damage);
+  void land(const Crowd& crowd, const std::vector<std::uint64_t>& damage);
   bool cover(std::size_t user, const Crowd& crowd, const Skill& skill,
              Position toward, std::optional<std::size_t> locked,
              std::uint64_t body_damage, std::vector<std::uint64_t>& damage);
@@ -879,8 +884,7 @@ class World {
     bool soldier = false;
   };
   void enlist(ArmySpec& army, std::size_t pairs, bool residents,
-              const std::vector<bool>& founders,
-              std::size_t& families);
+              const std::vector<bool>& founders, std::size_t& families);
   void add_village(VillageSpec spec);
   void add_sects(std::vector<SectSpec> sects);
   [[nodiscard]] std::uint32_t best_attainment(std::size_t person) const;

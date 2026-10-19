@@ -9,6 +9,7 @@
 
 #include "limits.hpp"
 #include "skill.hpp"
+#include "talent.hpp"
 
 namespace murim {
 namespace {
@@ -162,7 +163,8 @@ std::vector<std::optional<std::size_t>> art_families(
   return families;
 }
 
-void check_gear(const Gear& gear, std::size_t disciplines,
+void check_gear(const Gear& gear,
+                const std::vector<DisciplineDraw>& disciplines,
                 std::size_t factions) {
   const auto valid_family = [](const Family& family) {
     return valid_strike(family.strike);
@@ -179,7 +181,8 @@ void check_gear(const Gear& gear, std::size_t disciplines,
     return valid_loadout(gear, loadout, factions);
   };
   if (gear.striking >= gear.slots.size() || gear.bare >= gear.families.size() ||
-      !gear.families.at(gear.bare).strike || gear.needs.size() > disciplines ||
+      !gear.families.at(gear.bare).strike ||
+      gear.needs.size() > disciplines.size() ||
       !std::all_of(gear.families.begin(), gear.families.end(), valid_family) ||
       !std::all_of(gear.needs.begin(), gear.needs.end(), within) ||
       !std::all_of(gear.kinds.begin(), gear.kinds.end(), valid) ||

@@ -11,6 +11,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -824,12 +825,12 @@ TEST(Content, AGrowthWithTiersOutOfOrderIsRefusedAtLoad) {
 }
 
 // The base pack with mod `mod`, whose one entry, of kind `kind` and id
-// `id`, sets `field` to `value`, and its family to headwear at tier 0.
+// `entry`, sets `field` to `value`, and its family to headwear at tier 0.
 LoadedContent base_with(MemoryPacks& mods, const std::string& mod,
-                        const std::string& kind, const std::string& id,
+                        const std::string& kind, const std::string& entry,
                         const std::string& field, const std::string& value) {
   add_mod(mods, mod);
-  mods.entry(mod, kind, id)
+  mods.entry(mod, kind, entry)
       .text(field, value)
       .text("family", "headwear")
       .set("tier", 0);
@@ -897,13 +898,12 @@ constexpr std::uint64_t SHARPER_DAMAGE = 40;
 
 // Expects `made` to be `expected` field by field.
 void expect_skill(const Skill& made, const Skill& expected) {
-  EXPECT_EQ(made.range, expected.range);
-  EXPECT_EQ(made.radius, expected.radius);
-  EXPECT_EQ(made.body_damage, expected.body_damage);
-  EXPECT_EQ(made.structure_damage, expected.structure_damage);
-  EXPECT_EQ(made.cooldown, expected.cooldown);
-  EXPECT_EQ(made.qi_cost, expected.qi_cost);
-  EXPECT_EQ(made.shape, expected.shape);
+  EXPECT_EQ(
+      std::tie(made.range, made.radius, made.body_damage, made.structure_damage,
+               made.cooldown, made.qi_cost, made.shape),
+      std::tie(expected.range, expected.radius, expected.body_damage,
+               expected.structure_damage, expected.cooldown, expected.qi_cost,
+               expected.shape));
 }
 
 TEST(Content, AModOverridingOneSkillsDamageChangesOnlyThatField) {
