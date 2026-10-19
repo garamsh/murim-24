@@ -8097,5 +8097,67 @@ TEST(World, AWorldGivenItsMapsBareGraphRebuildsItWhereItsStructuresBlock) {
   EXPECT_TRUE(given.graph() == built.graph());
 }
 
+// A map of two rows of ten areas, open but for `structures`, with army 0
+// steered at its east end on the low profile, and armies bound east and south
+// from its first area, which its tiers then make far.
+World far_from_the_first_area(std::vector<Structure> structures) {
+  constexpr std::int32_t WIDE = 10 * AREA_SIDE;
+  constexpr std::int32_t TALL = 2 * AREA_SIDE;
+  constexpr std::int32_t IN = 5;
+  const std::vector<std::string> rows(static_cast<std::size_t>(TALL),
+                                      std::string(WIDE, '.'));
+  World world{
+      Seed{1},
+      Map{rows},
+      {army(rows, Cell{WIDE - IN, IN}, Cell{WIDE - IN, IN}, 1, 1, 0, {IDLE}),
+       army(rows, Cell{IN, IN}, Cell{(2 * AREA_SIDE) + IN, IN}, 1, 1, 0,
+            {IDLE}),
+       army(rows, Cell{IN, 2 * IN}, Cell{IN, AREA_SIDE + IN}, 1, 1, 0, {IDLE})},
+      std::move(structures),
+      peaceful(0)};
+  world.set_profile(LOW_PROFILE);
+  world.steer(0, true);
+  world.retier();
+  return world;
+}
+
+TEST(World, AFarArmysNodeIsTheExitItsAnchorLeadsOutByTowardItsObjective) {
+  const World world = far_from_the_first_area({});
+  ASSERT_FALSE(world.far(0).has_value());
+  ASSERT_TRUE(world.far(1).has_value());
+  ASSERT_TRUE(world.far(2).has_value());
+
+  const std::optional<NodeRef> east = world.far_node(1);
+  const std::optional<NodeRef> south = world.far_node(2);
+
+  ASSERT_TRUE(east.has_value());
+  ASSERT_TRUE(south.has_value());
+  EXPECT_EQ(east.value_or(NodeRef{}).area, 0U);
+  EXPECT_EQ(world.graph().node(east.value_or(NodeRef{})).cell.x, AREA_SIDE - 1);
+  // Control: bound south from the same area, it leads out by the bottom.
+  EXPECT_EQ(world.graph().node(south.value_or(NodeRef{})).cell.y,
+            AREA_SIDE - 1);
+  EXPECT_FALSE(world.far_node(0).has_value());
+}
+
+TEST(World, AFarArmysNodeFollowsItsExitWhenItsAreasNodesAreNumberedAfresh) {
+  // A house on the first area's bottom border splits its bottom entrance in
+  // two, so the east exit's node, numbered after the bottom's, moves on.
+  const World plain = far_from_the_first_area({});
+  const World split = far_from_the_first_area(
+      {Structure{{AREA_SIDE / 2, AREA_SIDE - 1}, INTACT, {1, 1}, true}});
+  const std::optional<NodeRef> before = plain.far_node(1);
+  const std::optional<NodeRef> after = split.far_node(1);
+  ASSERT_TRUE(before.has_value());
+  ASSERT_TRUE(after.has_value());
+  ASSERT_NE(after.value_or(NodeRef{}).node, before.value_or(NodeRef{}).node);
+
+  const Cell was = plain.graph().node(before.value_or(NodeRef{})).cell;
+  const Cell now = split.graph().node(after.value_or(NodeRef{})).cell;
+
+  EXPECT_EQ(now.x, was.x);
+  EXPECT_EQ(now.y, was.y);
+}
+
 }  // namespace
 }  // namespace murim

@@ -614,6 +614,24 @@ TEST(Save, ASaveKeepsTheAreasTiersAndAFarArmysAnchor) {
   EXPECT_NE(near.hash(), world.hash());
 }
 
+TEST(Save, AFarArmyLoadedLeadsOutByTheNodeItDidWhenSaved) {
+  const World world = tiered();
+  const std::optional<NodeRef> held = world.far_node(1);
+  ASSERT_TRUE(held.has_value());
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+
+  const Saved restored = loaded(load(store, SLOT));
+
+  const std::optional<NodeRef> kept = restored.world.far_node(1);
+  ASSERT_TRUE(kept.has_value());
+  EXPECT_EQ(kept.value_or(NodeRef{}).area, held.value_or(NodeRef{}).area);
+  EXPECT_EQ(kept.value_or(NodeRef{}).node, held.value_or(NodeRef{}).node);
+  // Control: the steered army, not far, has no node either side of the save.
+  EXPECT_FALSE(world.far_node(0).has_value());
+  EXPECT_FALSE(restored.world.far_node(0).has_value());
+}
+
 TEST(Save, ASealedSaveNamingARecordTheWorldLacksIsRefused) {
   // One structure no village holds and no plan laid: the plans part ends
   // with its plan, absent, as one flag byte, and the engaged and charts parts

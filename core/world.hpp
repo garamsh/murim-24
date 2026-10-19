@@ -572,6 +572,17 @@ class World {
   /// live or stepped. Throws std::out_of_range when there is no such army.
   [[nodiscard]] std::optional<FarAnchor> far(std::size_t army) const;
 
+  /// Returns the coarse node army `army`'s anchor leads out by while it is
+  /// far (ADR 0044), derived from the graph whenever it is read, so no lay
+  /// leaves it stale: of the nodes of the anchor's area in the component its
+  /// cell lies in, the one whose walk from the cell within the area and cost
+  /// on to the objective together are least, the first in node order on a
+  /// tie, or the component's first node where the objective lies in that
+  /// component. Nothing while the army is not far, or where no such node
+  /// leads to the objective. Throws std::out_of_range when there is no such
+  /// army.
+  [[nodiscard]] std::optional<NodeRef> far_node(std::size_t army) const;
+
   /// Returns who last brought village `village` to ruins, if anyone has; it
   /// is kept when the village is rebuilt.
   [[nodiscard]] std::optional<Destroyer> destroyer(std::size_t village) const;

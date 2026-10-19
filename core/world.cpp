@@ -3355,6 +3355,48 @@ std::optional<FarAnchor> World::far(std::size_t army) const {
   return anchor != nullptr ? std::optional<FarAnchor>{*anchor} : std::nullopt;
 }
 
+std::optional<NodeRef> World::far_node(std::size_t army) const {
+  const Army& held = armies_.at(army);
+  const auto* anchor = std::get_if<FarAnchor>(&held.course);
+  if (anchor == nullptr || !map_.passable(anchor->cell)) {
+    return std::nullopt;
+  }
+  const std::size_t area = anchor->area;
+  const Cell objective = held.order.objective;
+  const std::uint16_t component = graph_.component_of(anchor->cell);
+  const auto in_component = [&](std::size_t node) {
+    return graph_.node(NodeRef{area, node}).component == component;
+  };
+  if (graph_.area_of(objective) == area && map_.passable(objective) &&
+      graph_.component_of(objective) == component) {
+    for (std::size_t node = 0; node < graph_.nodes_in(area); ++node) {
+      if (in_component(node)) {
+        return NodeRef{area, node};
+      }
+    }
+    return std::nullopt;
+  }
+  const std::vector<CoarseCost> walks =
+      graph_.walks_within(map_, area, anchor->cell);
+  GoalSearch search = graph_.toward(map_, objective);
+  std::optional<NodeRef> best;
+  CoarseCost least = CoarseGraph::NO_WALK;
+  for (std::size_t node = 0; node < graph_.nodes_in(area); ++node) {
+    const NodeRef ref{area, node};
+    const CoarseCost walk =
+        walks.at(graph_.slot_in(area, graph_.node(ref).cell));
+    if (!in_component(node) || walk == CoarseGraph::NO_WALK) {
+      continue;
+    }
+    const std::optional<CoarseCost> onward = graph_.cost_from(search, ref);
+    if (onward && walk + *onward < least) {
+      least = walk + *onward;
+      best = ref;
+    }
+  }
+  return best;
+}
+
 void World::retier() {
   std::vector<std::size_t> focus;
   std::vector<std::size_t> people(areas_.count(), 0);
