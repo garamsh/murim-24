@@ -88,14 +88,15 @@ bench: build
 	echo "make bench ran the tick benchmark (exit $$tick), the frame benchmark (exit $$frame) and the pan benchmark (exit $$pan)"; \
 	test $$tick -eq 0 && test $$frame -eq 0 && test $$pan -eq 0
 
-# Not part of ci: it measures how regions grow over seeds and years, which tunes data and gates nothing.
+# Not part of ci: it measures how regions grow over seeds and years against ADR 0063's bands, which tunes data. It fails when a seed's living reach CAPACITY, the region's when empty.
 FIRST_SEED ?= 0
-LAST_SEED ?= 49
+LAST_SEED ?= 199
 YEARS ?= 100
+CAPACITY ?=
 sweep: build
 	$(TOOLS)/cmake -S core -B $(BENCH_DIR) -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DCMAKE_OSX_SYSROOT=macosx -DCMAKE_BUILD_TYPE=Release
 	$(TOOLS)/cmake --build $(BENCH_DIR) --target murim_core_sweep
-	$(BENCH_DIR)/murim_core_sweep $(FIRST_SEED) $(LAST_SEED) $(YEARS)
+	$(BENCH_DIR)/murim_core_sweep $(FIRST_SEED) $(LAST_SEED) $(YEARS) $(CAPACITY)
 
 # Not part of ci: hosted ci builds with the runner's GCC, which warns, under core/CMakeLists.txt's -Werror, where
 # Apple Clang does not, as on a conversion to std::size_t from int. This builds the core and its tests with GCC

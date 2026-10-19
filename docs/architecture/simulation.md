@@ -278,7 +278,10 @@ Today's departures, each with its issue:
 - `make bench` measures it, and also measures the live scenario in `core/live_scenario.cpp`, issue #216's target for the live tier, against the same budget. That target is not yet in force: it is printed as met or missed every run and does not enter the exit status. ADR 0053 makes it binding once #216 meets it.
 - Each benchmark scenario sets its capacity above the people it holds, and fails its setup if the living ever reach it, since a world held back by its capacity no longer measures the people it was built for.
 - Timing depends on the machine, so `make ci` does not run the benchmark.
-- `make sweep` lives the generated region of a range of seeds for a number of years and prints, per seed, what the region's data produces. It tunes data and gates nothing, so `make ci` does not run it.
+- `make sweep` lives the generated region of a range of seeds for a number of years, seeds 0 to 199 for 100 years by default, and prints, per seed, what the region's data produces. It tunes data, so `make ci` does not run it.
+  - For seeds 0 to 49 it prints each decade's living, births, deaths and deaths by hunger, the harvest, wild food and stock a head at autumn's end, silver a head, and the peopled and founded villages (ADR 0063). Wild food is 0 until ADR 0056's slots exist.
+  - Over every seed it prints ADR 0063's bands as met or missed. Hungry households wait on ADR 0052's households, and births refused at capacity on ADR 0063's counter, so both print as not measurable.
+  - It fails when a seed's living reach the capacity, the region's or one it is given, standing in for that counter.
 - The core is built, tested, linted and formatted with the toolchain ADR 0003 chose. Lint parses it on every host against one pinned Ubuntu 24.04 sysroot, unpacked by `lint-sysroot.sh`.
 
 ## Rationale
@@ -407,7 +410,7 @@ Today's departures, each with its issue:
 - **Population bounded by food.** ADR 0063 (`adr/0063-bound-the-population-by-the-food-that-can-be-had-and-keep-the-living-bound-a-technical-capacity.md`), proposed; nothing above changes until the pull requests that build it land.
   - **Births.** A wife's chance is scaled by her household's provision, the days of food its purse and its village's stock give, full at 30, and by crowding past housing, in place of the headroom above. No birth stops at the cap, which growth, migration and the granary still read.
   - **The capacity.** `MAX_PEOPLE`, or the bound ADR 0048 measures, is a technical capacity. A birth at it is refused and counted, and the sweep and the bench fail on any.
-  - **Levers and the loop.** Field and wild food yields are pack data by biome and season. `make sweep` reports population, food, money, villages and hunger by decade against target bands.
+  - **Levers and the loop.** Field and wild food yields are pack data by biome and season. `make sweep`'s report by decade against the bands is built (above); tuning by yields waits on the steps after it.
 - **Making gear from materials, and recycling.** ADR 0064 (`adr/0064-make-gear-from-materials-by-recipe-and-reforge-broken-metal-at-a-loss.md`), proposed; nothing above changes until the pull requests that build it land.
   - **Recipes.** Every made kind carries its workshop, materials and labour as pack data. Each day a workshop makes the kind its market lacks most among those it has materials for, and treasuries order gear at their capital's market.
   - **Sources.** Ore comes from ore veins at the map's mine sites, gathered as ADR 0056 gathers, and a village gathers for its market's shortfall.

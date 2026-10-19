@@ -2364,6 +2364,19 @@ TEST(World, AVillagesCapIsTheLeastOfItsHousingFoodAndStorage) {
       MAX_PEOPLE);
 }
 
+TEST(World, AVillagesHarvestIsWhatItsIntactFieldsYieldPastItsStorage) {
+  constexpr std::uint32_t YIELD = 3 * DAYS_PER_YEAR;
+  const Holdings other = holding(1, DAYS_PER_YEAR, DAYS_PER_YEAR);
+  // Storage for one year's food bounds the stock, not the harvest.
+  const World world =
+      economy_world(holding(FOR_TWENTY, DAYS_PER_YEAR, YIELD), other, 1);
+  EXPECT_EQ(world.harvest(0), YIELD);
+  // Control: the same field burnt yields nothing.
+  Holdings burnt = holding(FOR_TWENTY, DAYS_PER_YEAR, YIELD);
+  burnt.field_durability = BURNT;
+  EXPECT_EQ(economy_world(burnt, other, 1).harvest(0), 0U);
+}
+
 TEST(World, AFieldBlocksNoOneAndATorchBurnsIt) {
   const Holdings fields = holding(1, DAYS_PER_YEAR, DAYS_PER_YEAR);
   World world = economy_world(fields, fields, 1);
