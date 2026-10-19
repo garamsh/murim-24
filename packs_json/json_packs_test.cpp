@@ -3,10 +3,12 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <ios>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "content.hpp"
@@ -94,6 +96,52 @@ TEST(JsonPacks, EachSourceServesAMapFileAsTheMapDocumentItNames) {
   EXPECT_EQ(file_of("map/places"), "map/places.json");
   EXPECT_TRUE(bytes.read("one", "map/places").tree.has_value());
   EXPECT_TRUE(directories.read("one", "map/places").tree.has_value());
+  std::filesystem::remove_all(root);
+}
+
+// Bytes with their high bit set, which a char holds negative.
+constexpr std::uint8_t HIGH_BIT = 0x80;
+constexpr std::uint8_t ALL_BITS = 0xFF;
+
+// A shipped graph's bytes as a file holds them.
+std::string shipped_bytes() { return std::string{"\x01\x80\xff", 3}; }
+
+// The same bytes as a source serves them.
+std::vector<std::uint8_t> served_bytes() { return {1, HIGH_BIT, ALL_BITS}; }
+
+// The bytes `read` serves; none where it serves no graph.
+std::vector<std::uint8_t> bytes_of(const murim::GraphRead& read) {
+  const auto* held = std::get_if<std::vector<std::uint8_t>>(&read);
+  return held != nullptr ? *held : std::vector<std::uint8_t>{};
+}
+
+TEST(JsonPacks, BytePacksServeAShippedGraphAsBytesAndNameNoDocumentForIt) {
+  BytePacks packs;
+  packs.add("one", "map/places.json", "[]");
+  packs.add("one", GRAPH_FILE, shipped_bytes());
+  packs.add("two", "map/places.json", "[]");
+
+  EXPECT_EQ(bytes_of(packs.read_graph("one")), served_bytes());
+  EXPECT_EQ(packs.documents("one"), std::vector<std::string>{"map/places"});
+  // Control: a pack shipping no graph serves none.
+  EXPECT_TRUE(std::holds_alternative<murim::NoGraph>(packs.read_graph("two")));
+}
+
+TEST(JsonPacks, DirectoryPacksServeAShippedGraphAsBytesAndNameNoDocumentForIt) {
+  const std::filesystem::path root =
+      std::filesystem::path{testing::TempDir()} / "json_packs_graph";
+  std::filesystem::remove_all(root);
+  for (const char* pack : {"one", "two"}) {
+    std::filesystem::create_directories(root / pack / "map");
+    std::ofstream(root / pack / "map" / "places.json") << "[]";
+  }
+  std::ofstream(root / "one" / GRAPH_FILE, std::ios::binary) << shipped_bytes();
+  const DirectoryPacks packs{root};
+
+  EXPECT_EQ(bytes_of(packs.read_graph("one")), served_bytes());
+  EXPECT_EQ(packs.documents("one"), std::vector<std::string>{"map/places"});
+  // Control: a pack shipping no graph serves none.
+  EXPECT_TRUE(std::holds_alternative<murim::NoGraph>(packs.read_graph("two")));
   std::filesystem::remove_all(root);
 }
 

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -103,6 +104,11 @@ class CompiledMap {
   std::vector<std::uint8_t> lands_;
   std::vector<Place> places_;
 };
+
+/// Returns `map`'s footing as the rows a Map is parsed from, a cell each its
+/// footing's tile_of: the map a world on it is created on before its
+/// structures block their cells.
+[[nodiscard]] std::vector<std::string> footing_rows(const CompiledMap& map);
 
 /// Why a compiled map is refused.
 enum class MapFault : std::uint8_t {

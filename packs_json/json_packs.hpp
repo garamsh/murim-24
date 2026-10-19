@@ -18,6 +18,14 @@ constexpr const char* BASE_PACK = "wuxia";
 /// pack's largest, so a broken file cannot exhaust memory.
 constexpr std::size_t DOCUMENT_LIMIT = std::size_t{4} << 20U;
 
+/// The file within a pack holding the coarse graph the build tool ships with
+/// the map the pack's documents author (ADR 0047).
+constexpr const char* GRAPH_FILE = "map/graph.bin";
+
+/// The largest shipped graph a pack may hold, in bytes: well above an
+/// 8,192-cell map's, so a broken file cannot exhaust memory.
+constexpr std::size_t GRAPH_LIMIT = std::size_t{64} << 20U;
+
 /// Parses `bytes` as a JSON document into the core's value tree. A number
 /// with a fraction or an exponent becomes a value the core refuses; a
 /// document not well formed is refused as unreadable, one past
@@ -31,8 +39,8 @@ constexpr std::size_t DOCUMENT_LIMIT = std::size_t{4} << 20U;
 [[nodiscard]] std::string file_of(const std::string& document);
 
 /// A pack source reading pack directories under a root, each document from
-/// its file_of under `<root>/<pack>/`. The sweep and the core's
-/// tests read the base pack through it.
+/// its file_of under `<root>/<pack>/`, and a shipped graph from GRAPH_FILE. The
+/// sweep and the core's tests read the base pack through it.
 class DirectoryPacks : public murim::PackSource {
  public:
   explicit DirectoryPacks(std::filesystem::path root);
@@ -41,6 +49,9 @@ class DirectoryPacks : public murim::PackSource {
       const std::string& pack, const std::string& document) const override;
 
   [[nodiscard]] std::vector<std::string> documents(
+      const std::string& pack) const override;
+
+  [[nodiscard]] murim::GraphRead read_graph(
       const std::string& pack) const override;
 
  private:
@@ -59,6 +70,9 @@ class BytePacks : public murim::PackSource {
       const std::string& pack, const std::string& document) const override;
 
   [[nodiscard]] std::vector<std::string> documents(
+      const std::string& pack) const override;
+
+  [[nodiscard]] murim::GraphRead read_graph(
       const std::string& pack) const override;
 
  private:

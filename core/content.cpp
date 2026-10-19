@@ -12,9 +12,11 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "arts.hpp"
+#include "coarse_graph.hpp"
 #include "compiled_map.hpp"
 #include "diplomacy.hpp"
 #include "growth.hpp"
@@ -24,6 +26,7 @@
 #include "names.hpp"
 #include "occupation.hpp"
 #include "region.hpp"
+#include "shipped_graph.hpp"
 #include "skill.hpp"
 #include "talent.hpp"
 #include "trade.hpp"
@@ -1310,6 +1313,38 @@ std::optional<CompiledMap> compile_map(const Built& built, MapSource source,
   return map;
 }
 
+// The coarse graph shipped for `map` by graph_pack(), if it ships one;
+// refused at that pack's SHIPPED_GRAPH, and recorded in `errors`, where it
+// cannot be read or was built for another map.
+std::optional<CoarseGraph> shipped_graph(const PackSource& source,
+                                         const std::vector<std::string>& order,
+                                         const CompiledMap& map,
+                                         std::vector<ContentError>& errors) {
+  const std::optional<std::string> painter = graph_pack(source, order);
+  if (!painter) {
+    return std::nullopt;
+  }
+  const auto refuse = [&errors, &painter](ContentRefusal refusal) {
+    errors.push_back(ContentError{*painter, SHIPPED_GRAPH, "", "", refusal});
+    return std::nullopt;
+  };
+  const GraphRead read = source.read_graph(*painter);
+  if (const auto* refusal = std::get_if<ContentRefusal>(&read)) {
+    return refuse(*refusal);
+  }
+  const auto* bytes = std::get_if<std::vector<std::uint8_t>>(&read);
+  if (bytes == nullptr) {
+    return std::nullopt;
+  }
+  std::variant<CoarseGraph, GraphFault> graph =
+      read_shipped_graph(*bytes, map.hash());
+  if (const auto* fault = std::get_if<GraphFault>(&graph)) {
+    return refuse(*fault == GraphFault::OTHER_MAP ? ContentRefusal::INCONSISTENT
+                                                  : ContentRefusal::UNREADABLE);
+  }
+  return std::get<CoarseGraph>(std::move(graph));
+}
+
 // Orders the packs of `wanted` not yet refused so that each follows the
 // packs it requires and names to load after, keeping `wanted`'s order where
 // it can; refuses the rest as in a cycle.
@@ -1458,10 +1493,31 @@ LoadedContent load_content(const PackSource& source, const std::string& base,
   if (loaded.errors.size() == before && built.map) {
     loaded.map = compile_map(built, *built.map, loaded.errors);
   }
+  if (loaded.map) {
+    loaded.graph =
+        shipped_graph(source, loaded.order, *loaded.map, loaded.errors);
+  }
   if (loaded.errors.size() == before) {
     loaded.data = std::move(built.data);
   }
   return loaded;
+}
+
+std::optional<std::string> graph_pack(const PackSource& source,
+                                      const std::vector<std::string>& order) {
+  const std::string_view prefix{"map/"};
+  const auto authors_map = [&source, prefix](const std::string& pack) {
+    const std::vector<std::string> documents = source.documents(pack);
+    return std::any_of(documents.begin(), documents.end(),
+                       [prefix](const std::string& document) {
+                         return document.compare(0, prefix.size(), prefix) == 0;
+                       });
+  };
+  const auto painter = std::find_if(order.rbegin(), order.rend(), authors_map);
+  if (painter == order.rend()) {
+    return std::nullopt;
+  }
+  return *painter;
 }
 
 }  // namespace murim

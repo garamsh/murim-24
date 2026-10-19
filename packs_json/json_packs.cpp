@@ -100,6 +100,8 @@ constexpr std::string_view MAP_DIRECTORY = "map";
 constexpr std::string_view MAP_PREFIX = "map/";
 constexpr std::string_view EXTENSION = ".json";
 constexpr std::size_t READ_CHUNK = std::size_t{64} << 10U;
+// GRAPH_FILE's name within MAP_DIRECTORY.
+constexpr std::string_view GRAPH_NAME = "graph.bin";
 
 // The document a file under `data/` named `name` holds: its name without
 // `.json`, or, for a file of another type, its whole name, which names no
@@ -173,14 +175,49 @@ std::vector<std::string> DirectoryPacks::documents(
         std::pair{MAP_DIRECTORY, MAP_PREFIX}}) {
     for (const auto& entry :
          std::filesystem::directory_iterator(root_ / pack / directory, error)) {
-      if (entry.is_regular_file(error)) {
-        names.push_back(std::string{prefix} +
-                        document_of(entry.path().filename().string()));
+      const std::string name = entry.path().filename().string();
+      if (entry.is_regular_file(error) &&
+          !(directory == MAP_DIRECTORY && name == GRAPH_NAME)) {
+        names.push_back(std::string{prefix} + document_of(name));
       }
     }
   }
   std::sort(names.begin(), names.end());
   return names;
+}
+
+murim::GraphRead DirectoryPacks::read_graph(const std::string& pack) const {
+  const std::filesystem::path path = root_ / pack / GRAPH_FILE;
+  std::error_code error;
+  const bool shipped = std::filesystem::exists(path, error);
+  if (error) {
+    return ContentRefusal::UNREADABLE;
+  }
+  if (!shipped) {
+    return murim::NoGraph{};
+  }
+  std::ifstream input(path, std::ios::binary);
+  if (!input) {
+    return ContentRefusal::UNREADABLE;
+  }
+  // Reads no more than a chunk past the limit, so a huge file is never held
+  // whole.
+  std::vector<std::uint8_t> bytes;
+  std::array<char, READ_CHUNK> chunk{};
+  while (input && bytes.size() <= GRAPH_LIMIT) {
+    input.read(chunk.data(), chunk.size());
+    const auto read = static_cast<std::size_t>(input.gcount());
+    for (std::size_t index = 0; index < read; ++index) {
+      bytes.push_back(static_cast<std::uint8_t>(chunk.at(index)));
+    }
+  }
+  if (input.bad()) {
+    return ContentRefusal::UNREADABLE;
+  }
+  if (bytes.size() > GRAPH_LIMIT) {
+    return ContentRefusal::TOO_LARGE;
+  }
+  return bytes;
 }
 
 void BytePacks::add(const std::string& pack, const std::string& path,
@@ -205,12 +242,29 @@ std::vector<std::string> BytePacks::documents(const std::string& pack) const {
     }
     if (path.compare(0, prefix.size(), prefix) == 0) {
       names.push_back(document_of(path.substr(prefix.size())));
-    } else if (path.compare(0, MAP_PREFIX.size(), MAP_PREFIX) == 0) {
+    } else if (path.compare(0, MAP_PREFIX.size(), MAP_PREFIX) == 0 &&
+               path != GRAPH_FILE) {
       names.push_back(document_of(path));
     }
   }
   std::sort(names.begin(), names.end());
   return names;
+}
+
+murim::GraphRead BytePacks::read_graph(const std::string& pack) const {
+  const auto found = files_.find({pack, GRAPH_FILE});
+  if (found == files_.end()) {
+    return murim::NoGraph{};
+  }
+  if (found->second.size() > GRAPH_LIMIT) {
+    return ContentRefusal::TOO_LARGE;
+  }
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(found->second.size());
+  for (const char byte : found->second) {
+    bytes.push_back(static_cast<std::uint8_t>(byte));
+  }
+  return bytes;
 }
 
 murim::RegionData load_base(const std::filesystem::path& root) {

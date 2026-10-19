@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <optional>
 #include <queue>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -145,6 +146,18 @@ std::optional<std::int32_t> walk_length(const CompiledMap& map, Cell from,
 }
 
 }  // namespace
+
+std::vector<std::string> footing_rows(const CompiledMap& map) {
+  const auto side = static_cast<std::size_t>(map.side());
+  std::vector<std::string> rows(side, std::string(side, ' '));
+  for (Cell cell{0, 0}; cell.y < map.side(); ++cell.y) {
+    for (cell.x = 0; cell.x < map.side(); ++cell.x) {
+      rows.at(static_cast<std::size_t>(cell.y))
+          .at(static_cast<std::size_t>(cell.x)) = tile_of(map.footing(cell));
+    }
+  }
+  return rows;
+}
 
 bool map_side_holds(std::int32_t side) {
   const bool power_of_two = side > 0 && (side & (side - 1)) == 0;
