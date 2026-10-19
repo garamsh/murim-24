@@ -8103,18 +8103,19 @@ TEST(World, AWorldGivenItsMapsBareGraphRebuildsItWhereItsStructuresBlock) {
 World far_from_the_first_area(std::vector<Structure> structures) {
   constexpr std::int32_t WIDE = 10 * AREA_SIDE;
   constexpr std::int32_t TALL = 2 * AREA_SIDE;
-  constexpr std::int32_t IN = 5;
+  constexpr std::int32_t INSET = 5;
   const std::vector<std::string> rows(static_cast<std::size_t>(TALL),
                                       std::string(WIDE, '.'));
-  World world{
-      Seed{1},
-      Map{rows},
-      {army(rows, Cell{WIDE - IN, IN}, Cell{WIDE - IN, IN}, 1, 1, 0, {IDLE}),
-       army(rows, Cell{IN, IN}, Cell{(2 * AREA_SIDE) + IN, IN}, 1, 1, 0,
-            {IDLE}),
-       army(rows, Cell{IN, 2 * IN}, Cell{IN, AREA_SIDE + IN}, 1, 1, 0, {IDLE})},
-      std::move(structures),
-      peaceful(0)};
+  World world{Seed{1},
+              Map{rows},
+              {army(rows, Cell{WIDE - INSET, INSET}, Cell{WIDE - INSET, INSET},
+                    1, 1, 0, {IDLE}),
+               army(rows, Cell{INSET, INSET},
+                    Cell{(2 * AREA_SIDE) + INSET, INSET}, 1, 1, 0, {IDLE}),
+               army(rows, Cell{INSET, 2 * INSET},
+                    Cell{INSET, AREA_SIDE + INSET}, 1, 1, 0, {IDLE})},
+              std::move(structures),
+              peaceful(0)};
   world.set_profile(LOW_PROFILE);
   world.steer(0, true);
   world.retier();
