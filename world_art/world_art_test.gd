@@ -1,8 +1,8 @@
 # Checks that world_art.tscn lays a world at the 2.5D angle: the relief it draws the ground with
 # raises the cells the map blocks as rock and leaves the rest plain at level 0; it draws every body
 # on screen and none off it; every structure of a region is drawn over its footprint with its
-# stage's frame of its kind's art, a seat's training ground on the ground, every kind among them
-# once the region has grown its workshops; each field is tiled with
+# stage's frame of its kind's art, a seat's training ground on the ground, and every kind stands in
+# a world create() is given one of each; each field is tiled with
 # its state's tag; each village's ground decorations cover the cells its template's data names, a
 # village the world founds as it runs included, and its banners stand on the cells it names; after the view jumps across the region, every body a
 # band holds lies inside the bounds the renderer culls that band by; and between ticks a body is
@@ -47,10 +47,16 @@ const VIEW := Vector2(480, 270)
 # 3,660 days.
 const SHORT_DAY := 5
 const FOUNDING_DAYS := 4500
-# Days of short days within which the region's growth builds a smithy and an apothecary: the
-# apothecary came at day 10,980 once settlers walked into their villages by their army's field
-# (#387). A stopgap tied to this seed's growth until #396 sets every kind up directly.
-const WORKSHOP_DAYS := 12000
+# The footprint of each kind BUILDINGS draws, as the base pack's templates give it, and the
+# map _every_kind_pass lays one of each on.
+const KIND_FOOTPRINTS := {
+	"house": Vector2i(3, 3), "hall": Vector2i(5, 3), "well": Vector2i(2, 2), "barrels": Vector2i(1, 1),
+	"fence": Vector2i(5, 1), "granary": Vector2i(2, 2), "storehouse": Vector2i(3, 2),
+	"training_ground": Vector2i(6, 4), "manual_hall": Vector2i(4, 3), "seat_gate": Vector2i(3, 1),
+	"temple": Vector2i(5, 4), "inn": Vector2i(5, 3), "smithy": Vector2i(3, 2), "apothecary": Vector2i(4, 2),
+}
+const KINDS_WIDTH := 40
+const KINDS_HEIGHT := 20
 # How far in from its left and bottom edges every structure's frame holds its footprint's
 # bottom-left corner, as docs/art-direction.md §Structures and damage stages gives it.
 const INSET := 8
@@ -291,51 +297,105 @@ func _entries(lights: PackedFloat32Array) -> Array:
 	return entries
 
 
+# Every kind world_art.gd draws stands from the first tick in a world create() makes: each kind of
+# BUILDINGS is drawn as its kind over its footprint, and both banners of BANNERS stand; each hearth
+# lights.json names for them is counted once over the map and none beside it. Setup: the world holds
+# every kind of BUILDINGS, and its villages' templates name every kind of BANNERS.
 func _every_kind_pass() -> bool:
-	var region := WorldAdapter.create_region(SEED, 0, SHORT_DAY)
+	var world := _every_kind_world(WorldArt.BUILDINGS.keys())
 	var art: Node2D = load(SCENE).instantiate()
-	art.show_world(region, region.army_count() - 1)
-	var workshops := ["smithy", "apothecary"]
-	var held := func() -> Array:
-		var found := []
-		for structure in region.structure_count():
-			var kind := region.structure_kind(structure)
-			if kind in workshops and not kind in found:
-				found.append(kind)
-		return found
-	var at_start: Array = held.call()
-	var ticks := 0
-	while held.call().size() < workshops.size() and ticks < WORKSHOP_DAYS * SHORT_DAY:
-		for step in 50:
-			region.tick()
-		ticks += 50
-	art.note_tick()
-	art.refresh(Rect2(Vector2.ZERO, Vector2(480, 270)))
-	var drawn := _placed(region, art)
+	art.show_world(world, -1)
+	var rows := world.map_rows()
+	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
+	art.refresh(whole)
+	# Setup: the world holds every kind BUILDINGS draws, and its villages' templates name every kind
+	# of BANNERS.
+	var held := {}
+	for structure in world.structure_count():
+		held[world.structure_kind(structure)] = true
+	var layouts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(WorldArt.DECORATIONS))
+	var named := {}
+	for village: Dictionary in world.villages():
+		for item: Dictionary in layouts.get(village.kind, []):
+			if not item.has("tile"):
+				named[item.keys()[0]] = true
+	var set_up := _same_keys(held, WorldArt.BUILDINGS) and _same_keys(named, WorldArt.BANNERS)
+	var drawn := _placed(world, art)
 	var every: bool = WorldArt.BUILDINGS.keys().all(func(kind: String) -> bool: return drawn.kinds.has(kind))
+	var bannered := {}
+	for sprite in art.get_node("Standing").get_children():
+		if sprite is Sprite2D and sprite.texture is AtlasTexture:
+			var path: String = (sprite.texture as AtlasTexture).atlas.resource_path
+			for banner: String in WorldArt.BANNERS:
+				if path == "res://art/%s.png" % WorldArt.BANNERS[banner]:
+					bannered[banner] = true
+	var banners_drawn := _same_keys(bannered, WorldArt.BANNERS)
 	# Each hearth lights.json names for a structure's kind at its stage, a light with no width or height,
 	# is counted as one, over the whole map and beside it none.
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://world_art/lights.json"))
 	var stages := ["intact", "damaged", "destroyed", "rubble"]
-	var rows := region.map_rows()
-	var whole := Rect2(Vector2.ZERO, Vector2(rows[0].length(), rows.size()) * WorldArt.CELL)
 	var hearths := 0
-	for structure in region.structure_count():
-		var of_kind: Dictionary = data.structures.get(region.structure_kind(structure), {})
-		for light: Array in of_kind.get(stages[region.structure_stage(structure)], []):
+	for structure in world.structure_count():
+		var of_kind: Dictionary = data.structures.get(world.structure_kind(structure), {})
+		for light: Array in of_kind.get(stages[world.structure_stage(structure)], []):
 			if light[2] == 0 and light[3] == 0:
 				hearths += 1
 	art.lights(whole)
 	var counted: int = art.hearths
 	art.lights(Rect2(Vector2(-10000, 0), Vector2(480, 270)))
 	var hearth_pass: bool = hearths > 0 and counted == hearths and art.hearths == 0
-	var passed: bool = at_start.is_empty() and held.call().size() == workshops.size() \
-			and drawn.placed + drawn.fields == region.structure_count() and every and drawn.batched and hearth_pass
-	print("world_art_test: after %d days, the workshops at the start %s and now %s; %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s); %d hearths counted of %d lights.json names, none beside the map %s: %s" % [
-		ticks / SHORT_DAY, at_start, held.call(), drawn.placed + drawn.fields, region.structure_count(), every,
-		drawn.kinds.keys(), counted, hearths, art.hearths == 0, "pass" if passed else "FAIL"])
+	var passed: bool = set_up and drawn.placed == world.structure_count() and every and banners_drawn \
+			and drawn.batched and hearth_pass
+	print("world_art_test: the world create() made holds the kinds %s and its villages' templates name the banners %s (setup %s); %d of %d structures drawn as their kind, of every kind world_art.gd draws %s (%s), both banners drawn %s (%s); %d hearths counted of %d lights.json names, none beside the map %s: %s" % [
+		held.keys(), named.keys(), set_up, drawn.placed, world.structure_count(), every, drawn.kinds.keys(),
+		banners_drawn, bannered.keys(), counted, hearths, art.hearths == 0, "pass" if passed else "FAIL"])
 	art.free()
 	return passed
+
+
+# A world create() makes holding one structure of each of `kinds`, at its footprint in
+# KIND_FOOTPRINTS, laid in rows from the top-left with a free cell between them; the first half
+# make a hamlet, its residents the first army, and the rest a seat, its residents the second.
+func _every_kind_world(kinds: Array) -> WorldAdapter:
+	var structures: Array[Dictionary] = []
+	var at := Vector2i.ZERO
+	var row := 0
+	for kind: String in kinds:
+		var footprint: Vector2i = KIND_FOOTPRINTS[kind]
+		if at.x + footprint.x > KINDS_WIDTH:
+			at = Vector2i(0, at.y + row + 1)
+			row = 0
+		structures.append({"cell": at, "durability": 100, "footprint": footprint, "kind": kind})
+		at.x += footprint.x + 1
+		row = maxi(row, footprint.y)
+	var rows: Array[String] = []
+	for y in KINDS_HEIGHT:
+		rows.append(".".repeat(KINDS_WIDTH))
+	var corner := Vector2i(KINDS_WIDTH - 1, KINDS_HEIGHT - 1)
+	var armies: Array[Dictionary] = [
+		{"objective": corner, "faction": 0, "skills": [BLAST], "members": [{"cell": corner, "health": 100}]},
+		{"objective": corner - Vector2i(1, 0), "faction": 1, "skills": [BLAST],
+			"members": [{"cell": corner - Vector2i(1, 0), "health": 100}]},
+	]
+	var half := structures.size() / 2
+	var area := Vector2i(KINDS_WIDTH, KINDS_HEIGHT / 2)
+	var villages: Array[Dictionary] = [
+		{"name": "hamlet", "kind": "hamlet", "corner": Vector2i.ZERO, "area": area, "residents": 0,
+			"structures": range(half)},
+		{"name": "seat", "kind": "seat", "corner": Vector2i(0, KINDS_HEIGHT / 2), "area": area, "residents": 1,
+			"structures": range(half, structures.size())},
+	]
+	var peace := {"separation": 256, "hostile": [[false, false], [false, false]], "stage_floors": [75, 25, 1]}
+	return WorldAdapter.create(SEED, PackedStringArray(rows), armies, structures, peace, [], villages)
+
+
+# Whether `found` holds exactly the keys of `expected`.
+func _same_keys(found: Dictionary, expected: Dictionary) -> bool:
+	var a := found.keys()
+	var b := expected.keys()
+	a.sort()
+	b.sort()
+	return a == b
 
 
 # Of `world`'s structures as `art` draws them, {placed, fields, kinds}: how many but fields stand
