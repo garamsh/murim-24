@@ -4,8 +4,8 @@
 # and slope, the same for the same cells; that no cliff drops between two points of ground the core
 # lets a person cross, across or down, with a control where hills rise without a slope and do drop
 # by one; that the point a screen pixel shows is the point drawn there, on flat ground and up a
-# slope; and that a cell something is built on is marked in the texture to be drawn straight where
-# the ground round it is flat, and not on the hills' edge, where it would drop by a cliff.
+# slope; and that a cell something is built on is marked in the texture, on the hills' edge as on
+# the plain, with no cliff dropping by it where the warp fades out round it.
 extends RefCounted
 
 const SIZE := Vector2i(16, 14)
@@ -157,10 +157,10 @@ func _under_pass() -> bool:
 	return passed
 
 
-# Cells built on along the hills' edge, where a straight ground at their own level would stand off
-# the slope by a cliff, are not marked straight, and no cliff drops between passable points.
-# Control: a cell built on in the open plain is marked, 128 more in its texel's blue, its
-# neighbour not.
+# Cells built on along the hills' edge and in the open plain are each marked built, 128 more in its
+# texel's blue, and near what is built, 64 more, and no cliff drops between passable points where
+# the warp fades out round them (#200). Control: the open cell's neighbour, built on by nothing, is
+# marked near what is built and not built, and the cell past it neither.
 func _built_pass() -> bool:
 	var edge: Array[Vector2i] = [Vector2i(4, 6), Vector2i(8, 8), Vector2i(6, 9)]
 	var open := Vector2i(13, 1)
@@ -171,13 +171,14 @@ func _built_pass() -> bool:
 	var data := built.cell_image().get_data()
 	var unbuilt := _relief().cell_image().get_data()
 	var blue := func(bytes: PackedByteArray, cell: Vector2i) -> int: return bytes[(cell.y * SIZE.x + cell.x) * 4 + 2]
-	var edge_marked := edge.filter(func(cell: Vector2i) -> bool: return blue.call(data, cell) != blue.call(unbuilt, cell))
+	var edge_marked := edge.filter(func(cell: Vector2i) -> bool: return blue.call(data, cell) == blue.call(unbuilt, cell) + 192)
 	var drops := _passable_drops(built)
 	var beside := open + Vector2i(1, 0)
-	var open_marked: bool = blue.call(data, open) == blue.call(unbuilt, open) + 128 \
-			and blue.call(data, beside) == blue.call(unbuilt, beside)
-	var passed: bool = edge.all(func(cell: Vector2i) -> bool: return built.built_at(cell)) and edge_marked.is_empty() \
+	var past := beside + Vector2i(1, 0)
+	var open_marked: bool = blue.call(data, open) == blue.call(unbuilt, open) + 192 \
+			and blue.call(data, beside) == blue.call(unbuilt, beside) + 64 and blue.call(data, past) == blue.call(unbuilt, past)
+	var passed: bool = edge.all(func(cell: Vector2i) -> bool: return built.built_at(cell)) and edge_marked == edge \
 			and drops == 0 and open_marked
-	print("relief_test: built on the hills' edge %s, marked straight %s, cliffs between passable points %d; built on the plain at %s marked %s: %s" % [
+	print("relief_test: built on the hills' edge %s, marked %s, cliffs between passable points %d; built on the plain at %s marked %s: %s" % [
 		edge, edge_marked, drops, open, open_marked, "pass" if passed else "FAIL"])
 	return passed

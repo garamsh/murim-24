@@ -23,6 +23,8 @@ const LOW := -1
 const WARP := 32.0
 ## Pixels the warp's noise varies over, as ground.gdshader's WARP_SCALE.
 const WARP_SCALE := 48.0
+## How far from a built cell, in pixels, the warp takes to reach WARP, as ground.gdshader's FADE.
+const FADE := minf(CELL.x, CELL.y)
 ## How many cells across and down a point on a cell can read its height from: the warp's reach,
 ## WARP over CELL rounded up, and the cell beside it the interpolation takes.
 const FLAT_REACH := Vector2i(3, 4)
@@ -37,10 +39,9 @@ var _kind := PackedByteArray()
 var _level := PackedInt32Array()
 var _face := PackedByteArray()
 var _slope := PackedByteArray()
-# Per cell, 1 where something built stands on it, a structure or paving: where the ground round it
-# is flat, the ground there is drawn straight, without warp or dither, so it meets what is built
-# along the cell's sides. On or beside a slope or a drop it is drawn as any ground, so the straight
-# ground never stands off the slope by a cliff the core does not block.
+# Per cell, 1 where something built stands on it, a structure or paving. The warp fades out within
+# FADE of it, so the ground meets what is built along the cell's sides with its height continuous,
+# and no cliff stands where the core blocks nothing (#200).
 var _built := PackedByteArray()
 # Per cell, its level plus one where every cell height_at() can read from a point on it is of that
 # level and none a slope, so the ground on it is flat; 0 where it is not. Built when first read
@@ -188,8 +189,8 @@ func highest() -> int:
 
 
 ## The cells as the shader reads them, one texel a cell: its kind in red, its level plus one in
-## green, its face material in blue, plus 128 where something is built on it and the ground round
-## it is flat, and alpha half where it rises as a slope.
+## green, its face material in blue, plus 128 where something is built on it and 64 where something
+## is built on it or on a cell beside it, and alpha half where it rises as a slope.
 func cell_image() -> Image:
 	return cell_image_of(Rect2i(Vector2i.ZERO, size))
 
@@ -207,7 +208,7 @@ func cell_image_of(window: Rect2i) -> Image:
 			var i := y * size.x + x
 			data[at] = _kind[i]
 			data[at + 1] = _level[i] + 1
-			data[at + 2] = _face[i] + (128 if _straight(i) else 0)
+			data[at + 2] = _face[i] + (128 if _built[i] == 1 else 0) + (64 if _near_built(x, y) else 0)
 			data[at + 3] = 128 if _slope[i] == 1 else 255
 			at += 4
 	return Image.create_from_data(window.size.x, window.size.y, false, Image.FORMAT_RGBA8, data)
@@ -224,18 +225,14 @@ func view_cells() -> Dictionary:
 
 ## The height of the ground, in levels, at `point`, in pixels on the unraised ground, as
 ## ground.gdshader's height_at() gives it: its cells' levels read through coordinates warped by
-## noise and interpolated, then taken to the nearest level one of them has, except toward cells
-## that rise as a slope; on a cell drawn straight, its own level.
+## noise, the less near what is built, and interpolated, then taken to the nearest level one of
+## them has, except toward cells that rise as a slope.
 func height_at(point: Vector2) -> float:
 	if _flat.is_empty():
 		_find_flat()
 	var on := _index(Vector2i((point / CELL).floor()))
 	if _flat[on] > 0:
 		return float(_flat[on] - 1)
-	# As the shader draws a straight cell; one is always flat, so this answers what the line above
-	# does, kept so the two read the same rule.
-	if _straight(on):
-		return float(_level[on])
 	var q := _warped(point)
 	var uv := Vector2(q.x / CELL.x, q.y / CELL.y) - Vector2(0.5, 0.5)
 	var c := Vector2i(uv.floor())
@@ -315,19 +312,38 @@ func _find_flat() -> void:
 			_flat[y * size.x + x] = level + 1 if flat else 0
 
 
-# Whether the ground on cell `i` is drawn straight: something is built on it and the ground round it
-# is flat.
-func _straight(i: int) -> bool:
-	return _built[i] == 1 and _flat[i] > 0
-
-
 func _index(at: Vector2i) -> int:
 	return clampi(at.y, 0, size.y - 1) * size.x + clampi(at.x, 0, size.x - 1)
 
 
 func _warped(p: Vector2) -> Vector2:
+	var reach := WARP * smoothstep(0.0, FADE, _from_built(p))
 	return p + (Vector2(_fbm(p / WARP_SCALE + Vector2(7.0, 0.0), 11), _fbm(p / WARP_SCALE + Vector2(0.0, 5.0), 12))
-			- Vector2(0.5, 0.5)) * 2.0 * WARP
+			- Vector2(0.5, 0.5)) * 2.0 * reach
+
+
+# Whether something is built on the cell at (`x`, `y`) or on a cell beside it.
+func _near_built(x: int, y: int) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if x + dx >= 0 and y + dy >= 0 and x + dx < size.x and y + dy < size.y and _built[(y + dy) * size.x + x + dx] == 1:
+				return true
+	return false
+
+
+# How far, in pixels, `p` lies from the nearest cell something is built on, up to FADE, as the
+# shader's from_built(); past the map's edges nothing is built.
+func _from_built(p: Vector2) -> float:
+	var c := Vector2i((p / CELL).floor())
+	var nearest := FADE
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var b := c + Vector2i(dx, dy)
+			if b.x < 0 or b.y < 0 or b.x >= size.x or b.y >= size.y or _built[b.y * size.x + b.x] == 0:
+				continue
+			var low := Vector2(b) * CELL
+			nearest = minf(nearest, (low - p).max(p - low - CELL).max(Vector2.ZERO).length())
+	return nearest
 
 
 func _fbm(p: Vector2, salt: int) -> float:

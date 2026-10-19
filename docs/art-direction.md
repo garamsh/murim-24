@@ -329,7 +329,7 @@ A walled town (#200) encloses a real town, at least about 40 x 30 cells inside i
 | Market stall | 2 x 1 | A striped awning of paper and crimson on four posts over a table of pots, greens and bolts of cloth |
 | Courtyard house | 5 x 5 | A grey wall round a paved court with a tree, the main hall across its back, a wing down each side, a gate in its front wall under a small roof |
 
-- What is built is drawn crisp: its edges run along the pixel grid, and where the ground round it is flat, the ground under its footprint is drawn without warp or dither up to the cells' sides, so the ground meets it in a straight seam; on a slope's edge the ground is drawn as any other, so no cliff stands where nothing blocks the way. Outside the seam the ground is trodden bare: a band of the bank's earth up to three pixels wide, dithered from three pixels in four beside what is built to one in five at its edge, so a road's or paving's square tiles fray into the ground round them.
+- What is built is drawn crisp, on flat ground, on a slope or below a face alike (#200): its edges run along the pixel grid, and no ground effect reaches its footprint or the row of pixels along its sides. The warp fades out within 12 pixels of it, so edges and faces meet the cells' sides in a straight seam and the ground's height stays continuous, with no cliff where nothing blocks the way; on the footprint and that row the ground is its cell's own kind, with no dither, trodden earth or scree, and at most a face's shadow. Past that row the ground is trodden bare: a band of the bank's earth, dithered from nearly one pixel in two two pixels out to one in five three pixels out, so a road's or paving's square tiles fray into the ground round them.
 
 ## Effects and HUD
 
