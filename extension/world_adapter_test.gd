@@ -10,7 +10,8 @@
 # applies to a sect, hears rumours and shows attainment through the adapter as the core holds them;
 # and that a snapshot reads in one call what the per-army, per-structure and per-strike reads give;
 # and that the date reads the tick within the day and the day's length; and that each person's
-# occupation and activity read as the core decides them.
+# occupation and activity read as the core decides them; and that create() gives back the kinds,
+# footprints and villages it is given.
 extends RefCounted
 
 const SEED := 42
@@ -157,11 +158,55 @@ func run() -> bool:
 	var event_people_pass := _event_people_pass()
 	var snapshot_pass := _snapshot_pass()
 	var activity_pass := _activity_pass()
+	var given_pass := _given_pass()
 	# Last, as it ticks `lived` on.
 	var use_reads_pass := _use_reads_pass(lived)
 	return snapshot_pass and activity_pass and use_reads_pass and hashes_match and bodies_match and accepted and refused == invalid.size() and orders_pass \
 			and reads_pass and villages_pass and kin_pass and economy_pass and days_pass and homes_pass and time_pass and sects_pass \
-			and play_loop_pass and qi_pass and lessons_pass and event_people_pass
+			and play_loop_pass and qi_pass and lessons_pass and event_people_pass and given_pass
+
+
+# create() gives back what it is given beside the core's inputs: a structure's kind and footprint,
+# none and 1x1 where they are left out, and a village's name, template, corner and area, its faction
+# its residents'. The core holds the village: one naming a structure that does not exist, or one
+# another village holds, is refused, as is one housing no army or missing its residents. Control:
+# a second village naming the other structure and housing the other army is accepted.
+func _given_pass() -> bool:
+	var structures: Array[Dictionary] = [
+		{"cell": Vector2i(10, 0), "durability": 100, "footprint": Vector2i(3, 2), "kind": "smithy"},
+		{"cell": Vector2i(14, 0), "durability": 100},
+	]
+	var hamlet := {"name": "Ahn", "kind": "hamlet", "corner": Vector2i(9, 0), "area": Vector2i(7, 3),
+		"residents": 1, "structures": [0]}
+	var world := WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), _armies, structures, RULES, [], [hamlet])
+	var read: Dictionary = world.villages()[0] if world != null and world.villages().size() == 1 else {}
+	var given: bool = world != null and world.structure_kind(0) == "smithy" \
+			and world.structure_footprint(0) == Vector2i(3, 2) and world.structure_kind(1) == "" \
+			and world.structure_footprint(1) == Vector2i(1, 1) and read.get("name") == "Ahn" \
+			and read.get("kind") == "hamlet" and read.get("corner") == Vector2i(9, 0) \
+			and read.get("area") == Vector2i(7, 3) and read.get("faction") == 1
+	var second := func(changes: Dictionary) -> Dictionary:
+		var village := {"name": "Bo", "kind": "village", "corner": Vector2i(0, 0), "area": Vector2i(3, 3),
+			"residents": 0, "structures": [1]}
+		village.merge(changes, true)
+		return village
+	var invalid: Array[Dictionary] = [
+		second.call({"structures": [2]}), second.call({"structures": [0]}), second.call({"residents": 2}),
+		second.call({"residents": 1}),
+	]
+	var missing: Dictionary = second.call({})
+	missing.erase("residents")
+	invalid.append(missing)
+	var refused := 0
+	for village in invalid:
+		if WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), _armies, structures, RULES, [], [hamlet, village]) == null:
+			refused += 1
+	var accepted := WorldAdapter.create(SEED, PackedStringArray(MAP_ROWS), _armies, structures, RULES, [],
+			[hamlet, second.call({})]) != null
+	var passed: bool = given and refused == invalid.size() and accepted
+	print("world_adapter_test: given back a structure's kind and footprint and a village %s, as given %s; %d of %d invalid villages refused, a valid second one accepted %s: %s" % [
+		read, given, refused, invalid.size(), accepted, "pass" if passed else "FAIL"])
+	return passed
 
 
 # In seed 2026's region at ACTIVITY_HOUR, when the base pack's trades are at work, the snapshot
