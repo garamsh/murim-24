@@ -1315,6 +1315,8 @@ constexpr std::uint64_t DUEL_MOST = 30 * SECOND;
 constexpr std::uint64_t SKIRMISH_LEAST = 10 * SECOND;
 constexpr std::uint64_t SKIRMISH_MOST = 2 * MINUTE;
 constexpr std::uint64_t RAID_LEAST = MINUTE;
+// A hamlet's floor: 55 seconds since gear (#295, `world-generation.md`).
+constexpr std::uint64_t HAMLET_RAID_LEAST = 55 * SECOND;
 constexpr std::uint64_t RAID_MOST = 5 * MINUTE;
 constexpr std::size_t DEMONIC = 1;
 constexpr std::size_t SKIRMISHERS = 20;
@@ -1807,7 +1809,7 @@ TEST(Region, AFactionsStrikeReachesAFoeAtArmsLengthAndNoFarther) {
 TEST(Region, ARaidLeavesAHamletInRuinsWithinItsTargetTime) {
   for (const Seed seed : PACED) {
     EXPECT_TRUE(within(raided(grown(), seed, HAMLET_RAID, RAID_MOST + 1).ticks,
-                       RAID_LEAST, RAID_MOST))
+                       HAMLET_RAID_LEAST, RAID_MOST))
         << "seed " << static_cast<std::uint64_t>(seed);
   }
   // Control: the placeholder torch of a tenth the damage leaves the hamlet

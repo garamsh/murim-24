@@ -36,8 +36,13 @@ How the core generates a region from a seed: what exists of it now, and the deci
 - Combat is paced by the tables' data against four targets, each measured on villages as full as grown ones:
   - a duel to the death
   - twenty a side on an open field until one side falls
-  - a band of raiders leaving a hamlet in ruins
+  - a band of raiders leaving a hamlet in ruins, in 55 seconds to 5 minutes
   - a larger band leaving the walled village in ruins
+
+  The hamlet's floor was a minute (#71) until armed raiders ruined hamlets about 5% faster. Its re-measurement on #295's gear (ADR 0050, ADR 0085) used the hamlet raid test's band over seeds 0 to 19 and 2026; seeds 3 and 12 have no hamlet to raid.
+  - On `main` at `fb3954d3` no raid ran under a minute, the fastest 1,868 ticks.
+  - With gear at each family's lowest tier, 6 of the 19 ran under a minute, on seeds 2, 6, 7, 8, 11 and 16, the fastest 1,713 ticks.
+  - The owner set the floor at 55 seconds, 1,650 ticks, on 2026-10-19 (#295), as within ADR 0046's intent of combat at a pace a player can follow.
 
   A raiding band stands on the open cells two cells clear of everything the village holds, nearest its centre by path. With villages laid out by role (ADR 0076), a band set west of a village could start behind water or a range. On 6 of seeds 0 to 19 it then marched round past another village, which killed it before it reached its target. So the band stands nearest by path, and a band of 20 again ruins a hamlet within the target on every one of those seeds.
 
