@@ -1,0 +1,11 @@
+dialogue_test: person 0 tells its 5 rumours newest first true, worded as rumour_text words them true, 5 births and deaths named true; scrolled to 0; back to the menu true; person 2, (30, 79) cells away, tells 3, 1 of them shared: FAIL
+res://hud/dialogue_test.gd: FAIL
+hud_test: 38 keys measured on 56 label spans and 2304 names across ["ko", "en"] in both layouts; unmeasured ["PLACE_VILLAGE", "PLACE_HAMLET"]; overruns []: FAIL
+res://hud/hud_test.gd: FAIL
+play_test: right button on (82, 103) from (84, 103) ordered true, 512 to 112 away in 60 ticks; held and moved to (80, 101) ordered true, 807 to 158 away; released true, then moved to (84, 103) ordered nothing true; control without input moved 0.55 cells: FAIL
+res://play/play_test.gd: FAIL
+sound_test: freed while 7 players sounded, the scene left 0 instances leaked and 0 resources in use at exit; 6 bare players left 0 and 0: FAIL
+res://sound/sound_test.gd: FAIL
+blood_test: on the hit tick 0, 0 spray(s) toward (0.0, 0.0) and 5 drop(s), 2 beyond the foe's feet and 2 pooled at them, given to draw as 8 and 15 pixels; out of reach, a use by tick -1, 0 spray(s) and 0 drop(s), 0 and 0 pixels: FAIL
+res://world_art/blood_test.gd: FAIL
+run_tests: 29 of 34 GDScript tests passed
