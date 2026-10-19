@@ -42,8 +42,19 @@ class AreaFields {
   /// tick.
   void end_tick();
 
-  /// Drops every field and cost, as after the map or the graph changes.
-  void clear();
+  /// Drops what blocking `cells` on the map, and the graph's rebuild for
+  /// them, can change, `map` and `graph` being the new ones: every search,
+  /// the walks within an area holding one of the cells, and each held field
+  /// whose area or margin holds one or whose seeds differ from those it was
+  /// built from. A seed whose line to the objective is walked keeps its cost
+  /// while no cell stops that line; any other keeps its walk over the graph
+  /// while that walk is cheaper than the octile cost through the window of
+  /// any area holding a cell, which every walk the rebuild changed passes; a
+  /// field with a seed neither keeps is sown again and compared. A field is a
+  /// function of its window's cells, its seeds and its objective, so each
+  /// field kept is the one a fresh build gives.
+  void changed(const Map& map, const CoarseGraph& graph,
+               const std::vector<Cell>& cells);
 
   /// How many fields are held, how many were built since the last
   /// end_tick(), and how many were built in all.
@@ -67,15 +78,42 @@ class AreaFields {
     // The walks within the objective's area from the objective.
     std::vector<CoarseCost> near;
   };
-  using Node = std::pair<std::size_t, std::size_t>;
+  // How a seed was sown: its walk over the graph to the objective, and
+  // whether its line to the objective is walked at the octile cost.
+  struct Sowing {
+    CoarseCost through;
+    bool line;
+  };
+  // The seeds a field was built from, and how each was sown.
+  struct Sown {
+    std::vector<FieldSeed> seeds;
+    std::vector<Sowing> sowing;
+  };
+  // The cells a field is built over: its area and a cell's margin round it,
+  // on the map.
+  struct Window {
+    Cell corner;
+    Footprint size;
+  };
+  // An area and a cell in it, a walk within the area starts from.
+  using Start = std::tuple<std::size_t, std::int32_t, std::int32_t>;
 
   [[nodiscard]] const std::vector<CoarseCost>& walks(const Map& map,
                                                      const CoarseGraph& graph,
-                                                     Node node);
+                                                     NodeRef node);
   [[nodiscard]] const std::vector<FieldSeed>& seeds(const Map& map,
                                                     const CoarseGraph& graph,
                                                     std::size_t area,
                                                     Cell objective);
+  // Returns the window of the area whose top-left cell is `area_corner`.
+  [[nodiscard]] static Window window_of(const Map& map, Cell area_corner);
+  // Whether the field sown as `sown` toward `objective` is sown the same
+  // after `cells` were blocked, the graph having changed only within
+  // `rebuilt`, without sowing it again.
+  [[nodiscard]] static bool unchanged(const Map& map, const Sown& sown,
+                                      Cell objective,
+                                      const std::vector<Cell>& cells,
+                                      const std::vector<Window>& rebuilt);
   // Whether a person bound for the key's objective stood this tick in its
   // area or one of the eight around it.
   [[nodiscard]] bool stood_near(const Key& key) const;
@@ -84,6 +122,7 @@ class AreaFields {
            Cell objective, Search& held);
 
   std::vector<FlowField> pool_;
+  std::vector<Sown> sown_;
   std::vector<std::size_t> free_;
   // The fields held, by key, and the keys asked for this tick, each the
   // area a person bound for the objective stands in.
@@ -91,10 +130,11 @@ class AreaFields {
   std::vector<Key> standing_;
   std::map<Objective, Search> searches_;
   std::vector<FieldSeed> scratch_;
-  // The walks within an area from each node, by area and node, kept while a
-  // held field's area is the area or borders it, and the graph's columns of
-  // areas, to tell which do.
-  std::map<Node, std::vector<CoarseCost>> walks_;
+  std::vector<Sowing> sowing_;
+  // The walks within an area from each node, by area and the node's cell,
+  // kept while a held field's area is the area or borders it, and the
+  // graph's columns of areas, to tell which do.
+  std::map<Start, std::vector<CoarseCost>> walks_;
   std::size_t columns_ = 0;
   std::size_t rows_ = 0;
   std::size_t built_ = 0;

@@ -5760,7 +5760,7 @@ std::optional<std::vector<std::size_t>> World::lay(
     return std::nullopt;
   }
   map_ = std::move(built);
-  fields_.clear();
+  fields_.changed(map_, graph_, blocked);
   // A village whose window a structure is laid on finds its grounds again;
   // the rest read no cell the structure covers.
   for (std::size_t village = 0; village < grounds_.size(); ++village) {
