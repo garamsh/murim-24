@@ -162,6 +162,89 @@ TEST(CoarseGraph, ARebuildAfterBlockingCellsMatchesAGraphBuiltAfresh) {
                map.passable(Cell{SMALL_SIDE - 1, 0}));
 }
 
+TEST(CoarseGraph, ARebuildMatchesAFreshBuildWhereverOnItsAreaACellIsBlocked) {
+  // On each edge of an area, at its corners and inside it: a cell on an edge
+  // changes the entrances of the area across it, one inside only its own.
+  constexpr std::int32_t MIDDLE = AREA_SIDE + (AREA_SIDE / 2);
+  constexpr std::int32_t WEST = AREA_SIDE;
+  constexpr std::int32_t EAST = (2 * AREA_SIDE) - 1;
+  const std::vector<Cell> cells{{WEST, MIDDLE},  {EAST, MIDDLE}, {MIDDLE, WEST},
+                                {MIDDLE, EAST},  {WEST, WEST},   {EAST, EAST},
+                                {MIDDLE, MIDDLE}};
+  constexpr std::uint64_t SEEDS = 2;
+  for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
+    for (const Cell cell : cells) {
+      Map map{random_rows(Scatter{seed, DENSE / 2})};
+      if (!map.passable(cell)) {
+        continue;
+      }
+      CoarseGraph graph{map};
+      map.block(cell);
+      static_cast<void>(graph.rebuild(map, {cell}));
+
+      EXPECT_TRUE(graph == CoarseGraph{map})
+          << seed << " " << cell.x << "," << cell.y;
+    }
+  }
+}
+
+TEST(CoarseGraph, ARebuildKeepsTheRegionBorderOfAnAreaItsRegionSeesUnchanged) {
+  // A row of areas one past a region wide. A cell blocked inside the last
+  // area of the first region leaves every walk between that area's nodes as
+  // it was, so its region is not built again, and its east node stays on the
+  // region's border.
+  constexpr std::int32_t WIDE = (REGION_AREAS + 1) * AREA_SIDE;
+  Map map{std::vector<std::string>(static_cast<std::size_t>(AREA_SIDE),
+                                   std::string(WIDE, '.'))};
+  const Cell inside{((REGION_AREAS - 1) * AREA_SIDE) + (AREA_SIDE / 2),
+                    AREA_SIDE - 2};
+  CoarseGraph graph{map};
+  const CoarseGraph before = graph;
+  map.block(inside);
+
+  static_cast<void>(graph.rebuild(map, {inside}));
+
+  // The rebuild costs the area by a search, no longer in closed form.
+  ASSERT_FALSE(graph.costed_in_closed_form(graph.area_of(inside)));
+  ASSERT_TRUE(before.costed_in_closed_form(before.area_of(inside)));
+  EXPECT_TRUE(graph == CoarseGraph{map});
+}
+
+TEST(CoarseGraph, ARebuildAcrossARegionsBorderMatchesAFreshBuild) {
+  // Two rows of areas one past a region wide, scattered with blocked cells;
+  // cells blocked one at a time in the areas either side of the region
+  // border, on their edges and inside them, each rebuilt.
+  constexpr std::int32_t WIDE = (REGION_AREAS + 1) * AREA_SIDE;
+  constexpr std::int32_t TALL = 2 * AREA_SIDE;
+  constexpr std::int32_t HUNDRED = 100;
+  constexpr int BLOCKS = 8;
+  constexpr std::uint64_t SEEDS = 2;
+  for (std::uint64_t seed = 0; seed < SEEDS; ++seed) {
+    Random random{seed};
+    std::vector<std::string> rows(static_cast<std::size_t>(TALL),
+                                  std::string(WIDE, '.'));
+    for (std::string& row : rows) {
+      for (char& cell : row) {
+        cell = random.below(HUNDRED) < DENSE / 2 ? '#' : '.';
+      }
+    }
+    Map map{rows};
+    CoarseGraph graph{map};
+    for (int block = 0; block < BLOCKS; ++block) {
+      const Cell cell{
+          ((REGION_AREAS - 1) * AREA_SIDE) + random.below(2 * AREA_SIDE),
+          random.below(TALL)};
+      if (!map.passable(cell)) {
+        continue;
+      }
+      map.block(cell);
+      static_cast<void>(graph.rebuild(map, {cell}));
+
+      EXPECT_TRUE(graph == CoarseGraph{map}) << seed << " " << block;
+    }
+  }
+}
+
 TEST(CoarseGraph, ARebuildRelinksTheNeighboursOfAnAreaWhoseNodesItRenumbers) {
   // A map of 3 by 2 areas. Blocking two cells of the lower middle area's top
   // row splits the entrance it shares with the upper middle area, so that

@@ -98,9 +98,10 @@ bool same(Cell one, Cell other) { return one.x == other.x && one.y == other.y; }
 
 CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
                                        const std::vector<Cell>& cells) {
-  // The areas holding a changed cell are rebuilt, and their neighbours too,
-  // whose entrances toward them change; every neighbour of a rebuilt area is
-  // relinked, since a rebuilt area's nodes are numbered afresh.
+  // The areas holding a changed cell are rebuilt, each once, and a neighbour
+  // too where a changed cell lies on the edge facing it, since only those
+  // cells make its entrances toward the area; every neighbour of a rebuilt
+  // area is relinked, since a rebuilt area's nodes are numbered afresh.
   const auto around = [this](std::size_t area, std::set<std::size_t>& into) {
     const auto column =
         static_cast<std::int32_t>(area % static_cast<std::size_t>(columns_));
@@ -120,8 +121,24 @@ CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
     }
   };
   std::set<std::size_t> changed;
+  const auto columns = static_cast<std::size_t>(columns_);
   for (const Cell cell : cells) {
-    around(area_of(cell), changed);
+    const std::size_t area = area_of(cell);
+    const Cell corner = area_corner(area);
+    const Footprint size = area_size(area);
+    changed.insert(area);
+    if (cell.x == corner.x && cell.x > 0) {
+      changed.insert(area - 1);
+    }
+    if (cell.x == corner.x + size.width - 1 && cell.x + 1 < width_) {
+      changed.insert(area + 1);
+    }
+    if (cell.y == corner.y && cell.y > 0) {
+      changed.insert(area - columns);
+    }
+    if (cell.y == corner.y + size.height - 1 && cell.y + 1 < height_) {
+      changed.insert(area + columns);
+    }
   }
   std::set<std::size_t> relinked;
   for (const std::size_t area : changed) {
@@ -148,21 +165,46 @@ CoarseGraph::Undo CoarseGraph::rebuild(const Map& map,
            std::equal(before.exits.begin(), before.exits.end(),
                       after.exits.begin(), after.exits.end(), exit);
   };
+  // An area that also keeps every edge among its nodes is, to its region,
+  // as it was: the region's walks cross areas only by those edges and exits.
+  const auto unchanged = [&kept](const AreaGraph& before,
+                                 const AreaGraph& after) {
+    const auto edges = [](const std::vector<Edge>& one,
+                          const std::vector<Edge>& other) {
+      return std::equal(one.begin(), one.end(), other.begin(), other.end(),
+                        [](const Edge& left, const Edge& right) {
+                          return left.to == right.to && left.cost == right.cost;
+                        });
+    };
+    return kept(before, after) &&
+           std::equal(before.within.begin(), before.within.end(),
+                      after.within.begin(), after.within.end(), edges);
+  };
   bool joins_kept = true;
+  std::set<std::size_t> altered;
   for (const std::size_t area : changed) {
     build_area(map, area);
     const auto before =
         std::find_if(undo.areas_.begin(), undo.areas_.end(),
                      [area](const auto& saved) { return saved.first == area; });
-    joins_kept = joins_kept && kept(before->second, areas_.at(area));
+    AreaGraph& after = areas_.at(area);
+    joins_kept = joins_kept && kept(before->second, after);
+    if (unchanged(before->second, after)) {
+      // Its region is not built again, so it keeps its place on the border.
+      after.border = before->second.border;
+    } else {
+      altered.insert(area);
+    }
   }
   for (const std::size_t area : relinked) {
     link_exits(area);
   }
-  // Where every area kept its nodes, an area merely relinked is as it was,
-  // so only the regions holding a rebuilt area change.
+  // An area merely relinked keeps its nodes, its place on its region's
+  // border and its walks, and an exit's far node is read only through the
+  // area it leads to, so only the regions holding an area that changed to
+  // its region change.
   std::set<std::size_t> regions;
-  for (const std::size_t area : joins_kept ? changed : relinked) {
+  for (const std::size_t area : altered) {
     regions.insert(region_of_area(area));
   }
   for (const std::size_t region : regions) {
