@@ -8502,5 +8502,256 @@ TEST(World, ASoulBornAgainDrawsItsOwnTemperament) {
   EXPECT_EQ(plain.temperament(REBORN_CAPACITY), Temperament::CAUTIOUS);
 }
 
+// A village's two residents, faction 0, facing one steered foe of faction
+// 1 on an open map at APPRAISAL_SIGHT. The subject is the second person, so
+// it appraises on the first tick.
+struct Facing {
+  Cell ally;
+  Cell subject;
+  Cell seat;
+  Cell foe;
+  std::uint64_t foe_health;
+  Temperaments temperaments;
+};
+constexpr std::size_t SUBJECT = 1;
+constexpr std::size_t THREAT = 2;
+// A strike of two cells' range, so a resident in reach of the foe hits it.
+const Skill REACHING_STRIKE{2 * CELL_SIZE, 0, 10, 0, 15};
+
+// The world `facing` describes: each resident of APPRAISED_HEALTH with
+// REACHING_STRIKE, the village's house in a far corner, its seat at
+// `facing.seat`.
+World facing_world(const Facing& facing) {
+  constexpr Cell CORNER{15, 15};
+  Rules rules = at_war(0);
+  rules.sight = APPRAISAL_SIGHT;
+  Life life;
+  life.temperaments = facing.temperaments;
+  World world{
+      Seed{1},
+      Map{open_map(OPEN_SIDE)},
+      {ArmySpec{facing.seat,
+                {Recruit{facing.ally, APPRAISED_HEALTH},
+                 Recruit{facing.subject, APPRAISED_HEALTH}},
+                0,
+                {REACHING_STRIKE}},
+       ArmySpec{
+           facing.foe, {Recruit{facing.foe, facing.foe_health}}, 1, {IDLE}}},
+      {{CORNER, HOME_DURABILITY}},
+      rules,
+      {{{0}, RESIDENTS, {}, 0, {}, {}}},
+      {},
+      std::move(life)};
+  world.steer(1, true);
+  return world;
+}
+
+// The squared distance between persons `one` and `other` of `world`.
+std::int64_t apart(const World& world, std::size_t one, std::size_t other) {
+  return distance_squared(world.person(one).position,
+                          world.person(other).position);
+}
+
+// The squared distance from person `person` of `world` to cell `cell`'s
+// centre.
+std::int64_t from_cell(const World& world, std::size_t person, Cell cell) {
+  return distance_squared(world.person(person).position, centre_of(cell));
+}
+
+TEST(World, ACautiousResidentBacksOffFromAThreatItCannotMeet) {
+  constexpr std::uint64_t OUTMATCHING = 4 * APPRAISED_HEALTH;
+  constexpr int WALK = 15;
+  // The seat lies beyond the foe, so a resident going about its day walks
+  // toward the foe.
+  const Facing cautious{{4, 7}, {4, 8},      {12, 8},
+                        {7, 8}, OUTMATCHING, shared({0, PER_MILLE, 0})};
+  World backing = facing_world(cautious);
+  run_ticks(backing, 1);
+  // Setup: a home, an ally in sight and a ratio of 2,000.
+  ASSERT_EQ(backing.person(SUBJECT).home, std::optional<std::size_t>{0});
+  ASSERT_EQ(backing.appraisal(SUBJECT).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+  EXPECT_EQ(backing.stance(SUBJECT), Stance::BACK_OFF);
+  EXPECT_EQ(backing.stance_tick(SUBJECT), 1U);
+  const std::int64_t before = apart(backing, SUBJECT, THREAT);
+  run_ticks(backing, WALK);
+  EXPECT_GT(apart(backing, SUBJECT, THREAT), before);
+  // Controls: a bold resident closes, walking on toward the seat past the
+  // foe, and a cautious one facing an even foe closes.
+  Facing bold = cautious;
+  bold.temperaments = shared({PER_MILLE, 0, 0});
+  World closing = facing_world(bold);
+  run_ticks(closing, 1);
+  EXPECT_EQ(closing.stance(SUBJECT), Stance::CLOSE);
+  run_ticks(closing, WALK);
+  EXPECT_LT(apart(closing, SUBJECT, THREAT), before);
+  Facing even = cautious;
+  even.foe_health = 2 * APPRAISED_HEALTH;
+  World level = facing_world(even);
+  run_ticks(level, 1);
+  ASSERT_EQ(level.appraisal(SUBJECT).value_or(Appraisal{}).ratio, PER_MILLE);
+  EXPECT_EQ(level.stance(SUBJECT), Stance::CLOSE);
+}
+
+TEST(World, ACowardlyResidentFleesToItsVillagesSeatAndStrikesNothing) {
+  constexpr std::uint64_t OUTMATCHING = 4 * APPRAISED_HEALTH;
+  constexpr int RUN = 30;
+  // The foe stands within the subject's reach and beyond the ally's, the
+  // seat away from them.
+  const Facing cowardly{{2, 7}, {4, 8},      {1, 8},
+                        {5, 8}, OUTMATCHING, shared({0, 0, PER_MILLE})};
+  World fleeing = facing_world(cowardly);
+  run_ticks(fleeing, 1);
+  ASSERT_EQ(fleeing.appraisal(SUBJECT).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+  EXPECT_EQ(fleeing.stance(SUBJECT), Stance::FLEE);
+  const std::int64_t before = from_cell(fleeing, SUBJECT, cowardly.seat);
+  run_ticks(fleeing, RUN);
+  EXPECT_LT(from_cell(fleeing, SUBJECT, cowardly.seat), before);
+  EXPECT_EQ(fleeing.person(THREAT).health, OUTMATCHING);
+  // Control: a bold resident in the same place strikes the foe.
+  Facing bold = cowardly;
+  bold.temperaments = shared({PER_MILLE, 0, 0});
+  World striking = facing_world(bold);
+  run_ticks(striking, 1 + RUN);
+  EXPECT_EQ(striking.stance(SUBJECT), Stance::CLOSE);
+  EXPECT_LT(striking.person(THREAT).health, OUTMATCHING);
+}
+
+TEST(World, AResidentOnItsHomeGroundHolds) {
+  constexpr std::uint64_t OUTMATCHING = 4 * APPRAISED_HEALTH;
+  constexpr int STAND = 15;
+  // The subject stands on the seat, the only cell a village claims with no
+  // growth.
+  const Facing home{{4, 7}, {4, 8},      {4, 8},
+                    {9, 8}, OUTMATCHING, shared({0, PER_MILLE, 0})};
+  World holding = facing_world(home);
+  run_ticks(holding, 1);
+  ASSERT_EQ(holding.appraisal(SUBJECT).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+  EXPECT_EQ(holding.stance(SUBJECT), Stance::HOLD);
+  const Position stood = holding.person(SUBJECT).position;
+  run_ticks(holding, STAND);
+  EXPECT_EQ(distance_squared(holding.person(SUBJECT).position, stood), 0);
+  // Control: a cell off the seat, it backs off.
+  Facing off = home;
+  off.subject = Cell{5, 8};
+  World backing = facing_world(off);
+  run_ticks(backing, 1);
+  EXPECT_EQ(backing.stance(SUBJECT), Stance::BACK_OFF);
+}
+
+TEST(World, AResidentAloneRegroupsBeforeEngaging) {
+  // The ally stands ten cells off, beyond the subject's sight, and the foe
+  // as strong as the subject.
+  const Facing alone{{4, 0},  {4, 10},          {1, 10},
+                     {7, 10}, APPRAISED_HEALTH, shared({0, PER_MILLE, 0})};
+  World straggler = facing_world(alone);
+  run_ticks(straggler, 1);
+  ASSERT_EQ(straggler.appraisal(SUBJECT).value_or(Appraisal{}).ratio,
+            PER_MILLE);
+  EXPECT_EQ(straggler.stance(SUBJECT), Stance::REGROUP);
+  // Control: the ally in sight, the ratio halves and it closes.
+  Facing together = alone;
+  together.ally = Cell{4, 9};
+  World joined = facing_world(together);
+  run_ticks(joined, 1);
+  ASSERT_EQ(joined.appraisal(SUBJECT).value_or(Appraisal{}).ratio,
+            PER_MILLE / 2);
+  EXPECT_EQ(joined.stance(SUBJECT), Stance::CLOSE);
+}
+
+// Three residents facing one steered foe of `health` on their village's
+// seat, the only cell it claims with no growth, so the residents engage it,
+// under one token a foe: an ally three cells off, a taker in reach and the
+// subject, the nearest, so it takes the token first; seed `seed`.
+constexpr std::size_t TAKER = 1;
+constexpr std::size_t HOLDER = 2;
+World token_world(const Temperaments& temperaments, std::uint64_t health,
+                  Seed seed) {
+  constexpr Cell CORNER{15, 15};
+  const Cell foe{6, 8};
+  Rules rules = at_war(0);
+  rules.sight = APPRAISAL_SIGHT;
+  rules.tokens = Tokens{{1}, APPRAISAL_TICKS, 0};
+  Life life;
+  life.temperaments = temperaments;
+  World world{seed,
+              Map{open_map(OPEN_SIDE)},
+              {ArmySpec{foe,
+                        {Recruit{{3, 8}, APPRAISED_HEALTH},
+                         Recruit{{7, 9}, APPRAISED_HEALTH},
+                         Recruit{{5, 8}, APPRAISED_HEALTH}},
+                        0,
+                        {REACHING_STRIKE}},
+               ArmySpec{foe, {Recruit{foe, health}}, 1, {IDLE}}},
+              {{CORNER, HOME_DURABILITY}},
+              rules,
+              {{{0}, RESIDENTS, {}, 0, {}, {}}},
+              {},
+              std::move(life)};
+  world.steer(1, true);
+  return world;
+}
+
+// Whether anyone but person `person` strikes in `world` within `ticks`.
+bool another_strikes(World& world, std::size_t person, int ticks) {
+  bool struck = false;
+  for (int tick = 0; tick < ticks; ++tick) {
+    world.tick();
+    for (const Strike& strike : world.strikes()) {
+      struck = struck || strike.person != person;
+    }
+  }
+  return struck;
+}
+
+TEST(World, ABackingOffResidentFreesItsTokenForAnother) {
+  constexpr std::uint64_t OUTMATCHING = 6 * APPRAISED_HEALTH;
+  constexpr int WATCH = 30;
+  // Even shares of bold and cautious; the seed draws the holder cautious and
+  // the taker bold.
+  const Temperaments even = shared({500, 500, 0});
+  constexpr Seed SEED{1};
+  World freed = token_world(even, OUTMATCHING, SEED);
+  ASSERT_EQ(freed.temperament(HOLDER), Temperament::CAUTIOUS);
+  ASSERT_EQ(freed.temperament(TAKER), Temperament::BOLD);
+  // The first tick, before the holder's phase, it strikes and the taker
+  // waits.
+  freed.tick();
+  ASSERT_EQ(freed.stance(TAKER), Stance::CLOSE);
+  freed.tick();
+  ASSERT_EQ(freed.appraisal(HOLDER).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+  ASSERT_EQ(freed.stance(HOLDER), Stance::BACK_OFF);
+  EXPECT_TRUE(another_strikes(freed, HOLDER, WATCH));
+  // Control: a bold holder keeps its token, and no one else strikes.
+  World kept = token_world(shared({PER_MILLE, 0, 0}), OUTMATCHING, SEED);
+  kept.tick();
+  kept.tick();
+  ASSERT_EQ(kept.stance(HOLDER), Stance::CLOSE);
+  EXPECT_FALSE(another_strikes(kept, HOLDER, WATCH));
+}
+
+TEST(World, AResidentOfAnArmyADriverCommandsKeepsClosing) {
+  constexpr std::uint64_t OUTMATCHING = 4 * APPRAISED_HEALTH;
+  const Facing cautious{{4, 7}, {4, 8},      {12, 8},
+                        {7, 8}, OUTMATCHING, shared({0, PER_MILLE, 0})};
+  World steered = facing_world(cautious);
+  steered.steer(RESIDENTS, true);
+  run_ticks(steered, 1);
+  EXPECT_EQ(steered.stance(SUBJECT), Stance::CLOSE);
+  World intent = facing_world(cautious);
+  intent.order(RESIDENTS, Order{cautious.seat, {0}, THREAT});
+  run_ticks(intent, 1);
+  ASSERT_EQ(intent.target(RESIDENTS), std::optional<std::size_t>{THREAT});
+  EXPECT_EQ(intent.stance(SUBJECT), Stance::CLOSE);
+  // Control: once the intent ends, it backs off at its next phase.
+  intent.end_intent(RESIDENTS);
+  run_ticks(intent, APPRAISAL_TICKS);
+  EXPECT_EQ(intent.stance(SUBJECT), Stance::BACK_OFF);
+  EXPECT_EQ(intent.stance_tick(SUBJECT), 1 + APPRAISAL_TICKS);
+}
+
 }  // namespace
 }  // namespace murim

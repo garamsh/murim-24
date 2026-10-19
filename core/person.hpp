@@ -18,6 +18,11 @@ enum class Sex : std::uint8_t { FEMALE, MALE };
 /// threat to own strength above which the person backs off and flees.
 enum class Temperament : std::uint8_t { BOLD, CAUTIOUS, COWARDLY };
 
+/// What a person does about the danger it sees (ADR 0071): close on a foe,
+/// hold its home ground, back off from the threat, flee to its refuge, or
+/// regroup toward its group.
+enum class Stance : std::uint8_t { CLOSE, HOLD, BACK_OFF, FLEE, REGROUP };
+
 /// A skill a person knows: skill `skill` of art `art`, which it may use again
 /// from tick `ready_at`.
 struct Known {
@@ -34,7 +39,8 @@ struct Known {
 /// tick `born`, before the world began for the people it starts with, into
 /// `family`, of `parents` if it had any, of sex `sex` with given name `given`
 /// among its sex's names, of temperament `temperament`, with `talent` and
-/// `attainment` per discipline, and
+/// `attainment` per discipline. It holds stance `stance` since tick
+/// `stance_tick`, backing off from `away` while it backs off, and
 /// lives `lifespan` days, extended by its attainment, if it ages at all. A
 /// founder of a village, and the children settling with it, take the new
 /// family it heads.
@@ -57,6 +63,9 @@ struct Person {
   std::vector<std::size_t> parents;
   Sex sex = Sex::FEMALE;
   Temperament temperament = Temperament::CAUTIOUS;
+  Stance stance = Stance::CLOSE;
+  std::uint64_t stance_tick = 0;
+  Position away{};
   std::size_t given = 0;
   std::vector<std::size_t> spouses;
   std::vector<std::size_t> children;

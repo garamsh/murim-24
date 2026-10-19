@@ -1893,5 +1893,179 @@ TEST(Save, ATemperamentNoneOfItsKindsHoldsIsRefused) {
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 
+TEST(Save, AVersion21Or22SaveFromBeforeStancesIsRefused) {
+  // Neither holds a person's stance, its tick or the point it backs off
+  // from (ADR 0071's step 2).
+  for (const std::uint32_t before_stances : {21U, 22U}) {
+    ASSERT_LT(before_stances, SAVE_VERSION);
+    MemorySaves store;
+    ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+    store.bytes(SLOT).at(VERSION_AT) =
+        static_cast<std::uint8_t>(before_stances);
+    EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION)
+        << before_stances;
+    // Control: the same bytes at the current version load.
+    store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+    EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt) << before_stances;
+  }
+}
+
+// A village's two residents of faction 0 facing one steered foe of `health`
+// at `foe`, the residents of 100 each at (3, 4) and the subject, the second
+// person, so it appraises at a tick of 1 modulo 15, at (4, 4), the seat at
+// (1, 4); sight 6 cells, everyone born with `temperaments`.
+constexpr std::size_t RESIDENT = 1;
+World resident_facing(const Temperaments& temperaments, Cell foe,
+                      std::uint64_t health) {
+  constexpr std::int32_t SIGHT = 6;
+  constexpr std::uint64_t RESIDENT_HEALTH = 100;
+  const Cell ally{3, 4};
+  const Cell subject{4, 4};
+  const Cell seat{1, 4};
+  const Cell house{15, 15};
+  const Skill idle{0, 0, 0, 0, 1};
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.sight = SIGHT;
+  Life life;
+  life.temperaments = temperaments;
+  World world{Seed{1},
+              Map{std::vector<std::string>(16, std::string(16, '.'))},
+              {ArmySpec{seat,
+                        {Recruit{ally, RESIDENT_HEALTH},
+                         Recruit{subject, RESIDENT_HEALTH}},
+                        0,
+                        {idle}},
+               ArmySpec{foe, {Recruit{foe, health}}, 1, {idle}}},
+              {{house, 1}},
+              rules,
+              {{{0}, 0, {}, 0, {}, {}}},
+              {},
+              life};
+  world.steer(1, true);
+  return world;
+}
+
+// `value`'s eight bytes, little-endian, as a save holds it.
+std::vector<std::uint8_t> le_bytes(std::uint64_t value) {
+  std::vector<std::uint8_t> bytes(sizeof(value));
+  for (std::size_t byte = 0; byte < sizeof(value); ++byte) {
+    bytes.at(byte) = static_cast<std::uint8_t>(value >> (byte * BYTE_BITS));
+  }
+  return bytes;
+}
+
+// The one place in `payload` holding a person of temperament `temperament`
+// in stance `stance` since `tick`, or payload.size() when there is not one.
+std::size_t stance_at(const std::vector<std::uint8_t>& payload,
+                      Temperament temperament, Stance stance,
+                      std::uint64_t tick) {
+  std::vector<std::uint8_t> held{static_cast<std::uint8_t>(temperament),
+                                 static_cast<std::uint8_t>(stance)};
+  const std::vector<std::uint8_t> since = le_bytes(tick);
+  held.insert(held.end(), since.begin(), since.end());
+  const auto found =
+      std::search(payload.begin(), payload.end(), held.begin(), held.end());
+  if (found == payload.end() ||
+      std::search(std::next(found), payload.end(), held.begin(), held.end()) !=
+          payload.end()) {
+    return payload.size();
+  }
+  return static_cast<std::size_t>(found - payload.begin());
+}
+
+// The payload of the save in `store`'s SLOT, and its header.
+std::pair<std::array<std::uint8_t, HEADER_BYTES>, std::vector<std::uint8_t>>
+opened(const MemorySaves& store) {
+  const std::vector<std::uint8_t>& bytes = store.bytes(SLOT);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(bytes.begin(), HEADER_BYTES, header.begin());
+  return {header,
+          {bytes.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+           bytes.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES)}};
+}
+
+TEST(Save, ABoldResidentSavedMidRetreatGoesOnAsTheWorldWould) {
+  constexpr int RETREATING = 5;
+  constexpr int ON = 60;
+  // Ratio 3,000, above a bold resident's back-off ratio.
+  const Cell foe{7, 4};
+  World world = ticked(resident_facing(shared({PER_MILLE, 0, 0}), foe, 600),
+                       1 + RETREATING);
+  ASSERT_EQ(world.temperament(RESIDENT), Temperament::BOLD);
+  ASSERT_EQ(world.stance(RESIDENT), Stance::BACK_OFF);
+  ASSERT_EQ(world.stance_tick(RESIDENT), 1U);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const World restored = loaded(load(store, SLOT)).world;
+  EXPECT_EQ(restored.stance(RESIDENT), Stance::BACK_OFF);
+  EXPECT_EQ(restored.stance_tick(RESIDENT), 1U);
+  EXPECT_EQ(restored.person(RESIDENT).away.x, world.person(RESIDENT).away.x);
+  EXPECT_EQ(restored.person(RESIDENT).away.y, world.person(RESIDENT).away.y);
+  EXPECT_EQ(restored.hash(), world.hash());
+  const World went_on = ticked(world, ON);
+  EXPECT_EQ(ticked(restored, ON).hash(), went_on.hash());
+  // Control: the same save with the stance reset to close goes on otherwise.
+  auto [header, payload] = opened(store);
+  const std::size_t at =
+      stance_at(payload, Temperament::BOLD, Stance::BACK_OFF, 1);
+  ASSERT_LT(at, payload.size());
+  payload.at(at + 1) = static_cast<std::uint8_t>(Stance::CLOSE);
+  store.bytes(SLOT) = resealed(header, payload);
+  const World reset = loaded(load(store, SLOT)).world;
+  ASSERT_EQ(reset.stance(RESIDENT), Stance::CLOSE);
+  EXPECT_NE(ticked(reset, ON).hash(), went_on.hash());
+}
+
+TEST(Save, AStanceTickPastThirtyTwoBitsKeepsItsFullAge) {
+  // The tick after the patched clock, 1 modulo 15, so the subject appraises
+  // on it.
+  constexpr std::uint64_t BEGUN = (std::uint64_t{1} << 32) + 15;
+  ASSERT_EQ(BEGUN % APPRAISAL_TICKS, RESIDENT);
+  // The foe at the edge of sight, ratio 2,000, so a cautious resident backs
+  // off and the foe leaves its sight.
+  const Cell edge{10, 4};
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt,
+                         resident_facing(shared({0, PER_MILLE, 0}), edge, 400)},
+                   store, SLOT));
+  auto [header, payload] = opened(store);
+  // The payload opens with the random state, the seed, then the tick count.
+  constexpr std::size_t TICK_AT = 2 * sizeof(std::uint64_t);
+  const std::vector<std::uint8_t> clock = le_bytes(BEGUN - 1);
+  std::copy(clock.begin(), clock.end(),
+            payload.begin() + static_cast<std::ptrdiff_t>(TICK_AT));
+  store.bytes(SLOT) = resealed(header, payload);
+  World world = ticked(loaded(load(store, SLOT)).world, 1);
+  ASSERT_EQ(world.tick_count(), BEGUN);
+  ASSERT_EQ(world.appraisal(RESIDENT).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+  ASSERT_EQ(world.stance(RESIDENT), Stance::BACK_OFF);
+  EXPECT_EQ(world.stance_tick(RESIDENT), BEGUN);
+  ASSERT_TRUE(save(Saved{std::nullopt, world}, store, SLOT));
+  const World restored = loaded(load(store, SLOT)).world;
+  EXPECT_EQ(restored.stance_tick(RESIDENT), BEGUN);
+  // Fifteen ticks on, the foe out of sight, it still backs off; thirty on,
+  // it closes.
+  const World phase_on = ticked(restored, static_cast<int>(APPRAISAL_TICKS));
+  ASSERT_EQ(phase_on.appraisal(RESIDENT).value_or(Appraisal{}).ratio, 0U);
+  EXPECT_EQ(phase_on.stance(RESIDENT), Stance::BACK_OFF);
+  EXPECT_EQ(
+      ticked(phase_on, static_cast<int>(APPRAISAL_TICKS)).stance(RESIDENT),
+      Stance::CLOSE);
+  // Control: the stance tick cut to its low 32 bits releases it early.
+  auto [held_header, held] = opened(store);
+  const std::size_t at =
+      stance_at(held, Temperament::CAUTIOUS, Stance::BACK_OFF, BEGUN);
+  ASSERT_LT(at, held.size());
+  const std::vector<std::uint8_t> cut = le_bytes(BEGUN & 0xFFFF'FFFFU);
+  std::copy(cut.begin(), cut.end(),
+            held.begin() + static_cast<std::ptrdiff_t>(at + 2));
+  store.bytes(SLOT) = resealed(held_header, held);
+  const World truncated = loaded(load(store, SLOT)).world;
+  EXPECT_EQ(ticked(truncated, static_cast<int>(APPRAISAL_TICKS))
+                .stance(RESIDENT),
+            Stance::CLOSE);
+}
+
 }  // namespace
 }  // namespace murim

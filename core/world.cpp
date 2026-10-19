@@ -715,6 +715,10 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent,
   fold(person.sect.value_or(absent));
   fold(person.sex);
   fold(person.temperament);
+  fold(person.stance);
+  fold(person.stance_tick);
+  fold(person.away.x);
+  fold(person.away.y);
   fold(person.given);
   for (const std::size_t spouse : person.spouses) {
     fold(spouse);
@@ -2961,23 +2965,33 @@ std::vector<World::Passing> World::passings() const {
 // with a foe in sight, closes on it instead, or stands to fight one within
 // its reach; one with an attack or waiting slot closes on the slot, `seeking`
 // its foe, by its index in the crowd, until it stands there, and one holding
-// for a token stands.
+// for a token stands. A resident's stance other than close takes the place
+// of both (ADR 0071).
 void World::steer(const Crowd& crowd, const std::vector<std::size_t>& fields,
                   const std::vector<Closing>& closings,
                   std::vector<Step>& pulls, std::vector<bool>& standing,
                   std::vector<std::size_t>& seeking) const {
-  for (const Army& army : armies_) {
+  for (std::size_t serving = 0; serving < armies_.size(); ++serving) {
+    const Army& army = armies_.at(serving);
     if (far_off(army)) {
       continue;
     }
     for (std::size_t rank = 0; rank < army.roster.size(); ++rank) {
+      const Person& member = people_.at(army.roster.at(rank));
       const std::size_t index = crowd.slot.at(army.roster.at(rank));
       const FlowField& field = fields_.field(fields.at(index));
+      const Position from = crowd.hash.position(index);
+      const Stance stance = acting(member, serving);
       const Pull pull =
-          pull_of(field, army, rank, cell_of(crowd.hash.position(index)));
+          stance == Stance::CLOSE
+              ? pull_of(field, army, rank, cell_of(from))
+              : stance_pull(stance, field, rank, from, member.away);
       pulls.at(index) = pull.step;
       standing.at(index) = pull.standing;
       const Closing& close = closings.at(index);
+      if (stance != Stance::CLOSE) {
+        continue;
+      }
       if (const std::optional<Step> engaged =
               closing(index, army, crowd, close)) {
         const bool still = engaged->x == 0 && engaged->y == 0;
@@ -3017,11 +3031,40 @@ World::Pull World::pull_of(const FlowField& field, const Army& army,
                                   std::abs(errand.spot.y - cell.y)) <= 1};
     }
   }
+  return field_pull(field, rank, cell);
+}
+
+// The pull on a member of rank `rank` standing on `cell` by its army's
+// `field`: none within its arrival ring, as many cells from the objective as
+// the square root of its rank, standing within two cells of that ring.
+World::Pull World::field_pull(const FlowField& field, std::size_t rank,
+                              Cell cell) {
   const auto ring =
       static_cast<std::uint32_t>(root(static_cast<std::int64_t>(rank)));
   const std::uint32_t distance = field.distance(cell);
   return Pull{distance > ring ? field.step(cell) : Step{0, 0},
               distance <= ring + STANDING_SLACK};
+}
+
+// The pull on a member of rank `rank` at `from` holding `stance`, other than
+// close (ADR 0071): none, standing, while it holds; while it backs off, the
+// open step nearest the line from `away` through `from`, standing when none
+// leads away; and while it flees or regroups, its army's `field` toward its
+// objective, a resident's refuge.
+World::Pull World::stance_pull(Stance stance, const FlowField& field,
+                               std::size_t rank, Position from,
+                               Position away) const {
+  const Cell cell = cell_of(from);
+  if (stance == Stance::BACK_OFF) {
+    const std::optional<Step> step =
+        step_along(std::int64_t{from.x} - away.x, std::int64_t{from.y} - away.y,
+                   [&](Step way) { return open(cell, way); });
+    return Pull{step.value_or(Step{0, 0}), !step};
+  }
+  if (stance == Stance::FLEE || stance == Stance::REGROUP) {
+    return field_pull(field, rank, cell);
+  }
+  return Pull{Step{0, 0}, true};
 }
 
 // Each member steps away from the people closer to it than the separation,
@@ -3690,6 +3733,10 @@ void World::strike(std::size_t user, const Crowd& crowd,
     }
     return;
   }
+  // Backing off, fleeing or regrouping, it strikes nothing (ADR 0071).
+  if (!engages(acting(striker, army))) {
+    return;
+  }
   const std::vector<std::size_t>& choice = own.order.skills;
   const bool drilled = striker.ready_at <= tick_count_;
   const auto affordable = [&](const Known& known) {
@@ -4025,12 +4072,18 @@ std::vector<World::Closing> World::close_in(const Crowd& crowd) {
   std::vector<Closing> closings(crowd.people.size());
   engaging_.clear();
   const std::vector<bool> free = granting(crowd);
-  for (const Army& army : armies_) {
+  for (std::size_t serving = 0; serving < armies_.size(); ++serving) {
+    const Army& army = armies_.at(serving);
     if (far_off(army)) {
       continue;
     }
     for (const std::size_t member : army.roster) {
       const std::size_t index = crowd.slot.at(member);
+      // One backing off, fleeing or regrouping engages no one, so it frees
+      // the slots and tokens it held before they are assigned (ADR 0071).
+      if (!engages(acting(people_.at(member), serving))) {
+        continue;
+      }
       const std::optional<std::size_t> foe =
           engaged_foe(index, army, crowd, free);
       closings.at(index).foe = foe;
@@ -4127,12 +4180,7 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
           ? sign(offset_y)
           : 0};
   const Cell cell = cell_of(from);
-  const auto open = [&](Step way) {
-    return map_.passable(Cell{cell.x + way.x, cell.y + way.y}) &&
-           map_.passable(Cell{cell.x + way.x, cell.y}) &&
-           map_.passable(Cell{cell.x, cell.y + way.y});
-  };
-  if (open(step)) {
+  if (open(cell, step)) {
     return step;
   }
   if (!army.order.target || step.x == 0 || step.y == 0) {
@@ -4145,11 +4193,20 @@ std::optional<Step> World::closing(std::size_t index, const Army& army,
   const bool x_first = std::abs(offset_x) >= std::abs(offset_y);
   for (const Step way :
        {x_first ? along_x : along_y, x_first ? along_y : along_x}) {
-    if (open(way)) {
+    if (open(cell, way)) {
       return way;
     }
   }
   return std::nullopt;
+}
+
+// Whether step `way` from cell `cell` is open as a flow field's is: into a
+// passable cell, and on a diagonal only where both cells beside it are
+// passable.
+bool World::open(Cell cell, Step way) const {
+  return map_.passable(Cell{cell.x + way.x, cell.y + way.y}) &&
+         map_.passable(Cell{cell.x + way.x, cell.y}) &&
+         map_.passable(Cell{cell.x, cell.y + way.y});
 }
 
 // Whether cell `cell` lies within the growth's claim of village `village`'s
@@ -4206,6 +4263,24 @@ std::optional<Appraisal> World::army_appraisal(std::size_t army) const {
   return army_appraisals_.at(army);
 }
 
+Stance World::stance(std::size_t person) const {
+  const std::optional<std::size_t> army = army_of(person);
+  return people_.at(person).health > 0 && army
+             ? acting(people_.at(person), *army)
+             : Stance::CLOSE;
+}
+
+std::uint64_t World::stance_tick(std::size_t person) const {
+  return people_.at(person).stance_tick;
+}
+
+// `person`'s stance as it acts serving in army `army`: its own as a
+// resident of a village's army no driver commands, and close otherwise.
+Stance World::acting(const Person& person, std::size_t army) const {
+  return villages_.houses(army) && !exempt(armies_.at(army)) ? person.stance
+                                                             : Stance::CLOSE;
+}
+
 // Whether `army`'s members are not appraised: a driver steers it, or it
 // holds an attack intent, a driver's order (ADR 0071).
 bool World::exempt(const Army& army) {
@@ -4213,9 +4288,9 @@ bool World::exempt(const Army& army) {
 }
 
 // Each village resident in `crowd` outside an exempt army appraises the
-// danger in its own sight, and each other army in it not exempt the danger
-// in its lead's sight, at its own phase of APPRAISAL_TICKS (ADR 0071).
-// Nothing reads an appraisal in the tick yet (its step 1).
+// danger in its own sight and takes its stance by it, and each other army in
+// it not exempt appraises the danger in its lead's sight, at its own phase
+// of APPRAISAL_TICKS (ADR 0071). A resident of an exempt army closes.
 void World::appraise(const Crowd& crowd) {
   appraisals_.resize(people_.size());
   army_appraisals_.resize(armies_.size());
@@ -4223,11 +4298,41 @@ void World::appraise(const Crowd& crowd) {
   for (std::size_t index = 0; index < crowd.people.size(); ++index) {
     const std::size_t person = crowd.people.at(index);
     const std::size_t army = crowd.armies.at(index);
-    if (person % APPRAISAL_TICKS != phase || !villages_.houses(army) ||
-        exempt(armies_.at(army))) {
+    if (person % APPRAISAL_TICKS != phase || !villages_.houses(army)) {
       continue;
     }
-    appraisals_.at(person) = Appraisal{weigh(person, army, crowd), tick_count_};
+    Person& resident = people_.at(person);
+    const auto take = [&](Stance stance) {
+      if (stance != resident.stance) {
+        resident.stance = stance;
+        resident.stance_tick = tick_count_;
+      }
+    };
+    if (exempt(armies_.at(army))) {
+      take(Stance::CLOSE);
+      continue;
+    }
+    const Weighing weighing = weigh(person, army, crowd);
+    appraisals_.at(person) = Appraisal{weighing.ratio, tick_count_};
+    const std::optional<Thresholds> limits = thresholds(person);
+    if (!limits) {
+      continue;
+    }
+    // A resident's refuge is its home village's seat, its army's objective.
+    const std::optional<std::size_t> home = resident.home;
+    const Reading reading{weighing.ratio, weighing.alone,
+                          home && claims(*home, cell_of(resident.position)),
+                          home.has_value()};
+    take(next_stance(resident.stance, tick_count_ - resident.stance_tick,
+                     reading, *limits));
+    if (resident.stance == Stance::BACK_OFF && weighing.threat) {
+      // The foes' mean lies among their positions, so on the map.
+      resident.away =
+          Position{static_cast<std::int32_t>(resident.position.x +
+                                             weighing.threat->first),
+                   static_cast<std::int32_t>(resident.position.y +
+                                             weighing.threat->second)};
+    }
   }
   for (std::size_t army = 0; army < armies_.size(); ++army) {
     const Army& appraising = armies_.at(army);
@@ -4237,16 +4342,17 @@ void World::appraise(const Crowd& crowd) {
         far_off(appraising)) {
       continue;
     }
-    army_appraisals_.at(army) =
-        Appraisal{weigh(appraising.roster.front(), army, crowd), tick_count_};
+    army_appraisals_.at(army) = Appraisal{
+        weigh(appraising.roster.front(), army, crowd).ratio, tick_count_};
   }
 }
 
 // The ratio of the strength in person `lead`'s sight that would strike it,
-// of army `army`, to its own side's, everyone of its faction who would not;
-// 0, its own side uncounted, with no foe in its sight.
-std::uint32_t World::weigh(std::size_t lead, std::size_t army,
-                           const Crowd& crowd) const {
+// of army `army`, to its own side's, everyone of its faction who would not,
+// whether it met no one of its side, and where the threat stands from it;
+// a ratio of 0, its own side uncounted, with no foe in its sight.
+World::Weighing World::weigh(std::size_t lead, std::size_t army,
+                             const Crowd& crowd) const {
   const std::uint64_t foe = foe_kinds(lead, armies_.at(army));
   const Position centre = people_.at(lead).position;
   const std::int32_t sight = rules_.sight * CELL_SIZE;
@@ -4254,21 +4360,28 @@ std::uint32_t World::weigh(std::size_t lead, std::size_t army,
     return foes(lead, army, crowd.people.at(other), crowd.armies.at(other));
   };
   if (!crowd.hash.any_within(foe, centre, sight, strikes)) {
-    return 0;
+    return Weighing{};
   }
   const std::size_t faction = armies_.at(army).faction;
   std::uint64_t own = 0;
   std::uint64_t threat = 0;
+  bool alone = true;
+  Centroid threat_at;
   crowd.hash.visit_within(
       kind_of(faction) | foe, centre, sight, [&](std::size_t other) {
         const std::size_t seen = crowd.people.at(other);
+        const std::uint64_t strong = strength_of(people_.at(seen));
         if (strikes(other)) {
-          threat = add_strength(threat, strength_of(people_.at(seen)));
+          threat = add_strength(threat, strong);
+          const Position at = crowd.hash.position(other);
+          threat_at.add(std::int64_t{at.x} - centre.x,
+                        std::int64_t{at.y} - centre.y, strong);
         } else if (armies_.at(crowd.armies.at(other)).faction == faction) {
-          own = add_strength(own, strength_of(people_.at(seen)));
+          own = add_strength(own, strong);
+          alone = alone && seen == lead;
         }
       });
-  return ratio(threat, own);
+  return Weighing{ratio(threat, own), alone, threat_at.mean()};
 }
 
 // `person`'s strength in an appraisal: its health, times its realm's might

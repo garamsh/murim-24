@@ -743,6 +743,15 @@ class World {
   /// there is no such army.
   [[nodiscard]] std::optional<Appraisal> army_appraisal(std::size_t army) const;
 
+  /// Returns person `person`'s stance as it acts (ADR 0071): its own while it
+  /// lives as a resident of a village's army that is not exempt, and close
+  /// otherwise. Throws std::out_of_range when there is no such person.
+  [[nodiscard]] Stance stance(std::size_t person) const;
+
+  /// Returns the tick person `person`'s own stance began. Throws
+  /// std::out_of_range when there is no such person.
+  [[nodiscard]] std::uint64_t stance_tick(std::size_t person) const;
+
   /// Returns why person `buyer` may not buy one of ware `ware` from person
   /// `seller`, or BuyRefusal::NONE when it may. Throws std::invalid_argument
   /// when there is no such person or ware.
@@ -851,8 +860,16 @@ class World {
                                   const Army& army, std::uint64_t due);
   void appraise(const Crowd& crowd);
   [[nodiscard]] static bool exempt(const Army& army);
-  [[nodiscard]] std::uint32_t weigh(std::size_t lead, std::size_t army,
-                                    const Crowd& crowd) const;
+  [[nodiscard]] Stance acting(const Person& person, std::size_t army) const;
+  // What an appraisal read: its ratio, whether its lead met no one of its
+  // side, and the strength-weighted mean offset of the foes from the lead.
+  struct Weighing {
+    std::uint32_t ratio = 0;
+    bool alone = false;
+    std::optional<std::pair<std::int64_t, std::int64_t>> threat;
+  };
+  [[nodiscard]] Weighing weigh(std::size_t lead, std::size_t army,
+                               const Crowd& crowd) const;
   [[nodiscard]] std::uint64_t strength_of(const Person& person) const;
   void train();
   void cultivate();
@@ -883,6 +900,7 @@ class World {
   [[nodiscard]] std::optional<Step> closing(std::size_t index, const Army& army,
                                             const Crowd& crowd,
                                             const Closing& close) const;
+  [[nodiscard]] bool open(Cell cell, Step way) const;
   [[nodiscard]] bool sighted(const std::vector<std::size_t>& roster,
                              Position point) const;
   void end_intents(const Crowd& crowd);
@@ -1046,6 +1064,11 @@ class World {
                                                 Cell cell) const;
   [[nodiscard]] Pull pull_of(const FlowField& field, const Army& army,
                              std::size_t rank, Cell cell) const;
+  [[nodiscard]] static Pull field_pull(const FlowField& field, std::size_t rank,
+                                       Cell cell);
+  [[nodiscard]] Pull stance_pull(Stance stance, const FlowField& field,
+                                 std::size_t rank, Position from,
+                                 Position away) const;
   [[nodiscard]] std::vector<std::size_t> homes() const;
   void migrate_or_starve(std::size_t person,
                          std::vector<std::size_t>& population,

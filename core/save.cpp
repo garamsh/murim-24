@@ -873,6 +873,10 @@ void put_person(Writer& out, const Person& person) {
   put_sizes(out, person.parents);
   out.u8(static_cast<std::uint8_t>(person.sex));
   out.u8(static_cast<std::uint8_t>(person.temperament));
+  out.u8(static_cast<std::uint8_t>(person.stance));
+  out.u64(person.stance_tick);
+  out.i32(person.away.x);
+  out.i32(person.away.y);
   out.size(person.given);
   put_sizes(out, person.spouses);
   put_sizes(out, person.children);
@@ -925,6 +929,11 @@ Person get_person(Reader& input) {
   person.sex = static_cast<Sex>(input.tag(SEXES));
   person.temperament = static_cast<Temperament>(
       input.tag(static_cast<std::uint8_t>(TEMPERAMENTS)));
+  person.stance =
+      static_cast<Stance>(input.tag(static_cast<std::uint8_t>(STANCES)));
+  person.stance_tick = input.u64();
+  person.away.x = input.i32();
+  person.away.y = input.i32();
   person.given = input.size();
   person.spouses = get_sizes(input);
   person.children = get_sizes(input);
