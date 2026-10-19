@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
@@ -522,6 +523,7 @@ void put_life(Writer& out, const Life& life) {
     put_name(out, realm.name);
     out.u32(realm.qi);
     out.u32(realm.might);
+    out.u32(realm.weight);
   });
   put_all(out, life.arts, [&out](const Art& art) {
     put_name(out, art.name);
@@ -573,6 +575,13 @@ void put_life(Writer& out, const Life& life) {
     put_bands(out, occupations.idle);
     out.u32(occupations.waking.from);
     out.u32(occupations.waking.to);
+  });
+  put_maybe(out, life.temperaments, [&out](const Temperaments& temperaments) {
+    for (const Disposition& disposition : temperaments) {
+      out.u32(disposition.share);
+      out.u32(disposition.thresholds.back_off);
+      out.u32(disposition.thresholds.flee);
+    }
   });
 }
 
@@ -638,6 +647,7 @@ Life get_life(Reader& input) {
     realm.name = get_name(input);
     realm.qi = input.u32();
     realm.might = input.u32();
+    realm.weight = input.u32();
     return realm;
   });
   life.arts = get_all<Art>(input, [&input] {
@@ -706,6 +716,15 @@ Life get_life(Reader& input) {
     occupations.waking.from = input.u32();
     occupations.waking.to = input.u32();
     return occupations;
+  });
+  life.temperaments = get_maybe<Temperaments>(input, [&input] {
+    Temperaments temperaments;
+    for (Disposition& disposition : temperaments) {
+      disposition.share = input.u32();
+      disposition.thresholds.back_off = input.u32();
+      disposition.thresholds.flee = input.u32();
+    }
+    return temperaments;
   });
   return life;
 }
@@ -853,6 +872,7 @@ void put_person(Writer& out, const Person& person) {
   out.size(person.family);
   put_sizes(out, person.parents);
   out.u8(static_cast<std::uint8_t>(person.sex));
+  out.u8(static_cast<std::uint8_t>(person.temperament));
   out.size(person.given);
   put_sizes(out, person.spouses);
   put_sizes(out, person.children);
@@ -903,6 +923,8 @@ Person get_person(Reader& input) {
   person.family = input.size();
   person.parents = get_sizes(input);
   person.sex = static_cast<Sex>(input.tag(SEXES));
+  person.temperament = static_cast<Temperament>(
+      input.tag(static_cast<std::uint8_t>(TEMPERAMENTS)));
   person.given = input.size();
   person.spouses = get_sizes(input);
   person.children = get_sizes(input);

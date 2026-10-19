@@ -1,6 +1,6 @@
 # ADR 0071: Weigh danger by one appraisal of the strength in sight, and back off, flee or regroup by temperament
 
-> Status: proposed
+> Status: proposed; its temperament folded only when not cautious superseded by ADR-0049's rule that no fold is conditional (#188), so every recorded person's temperament is folded; its step 1 built without the stances, which move to step 2 by the PM's ruling on #311, as `simulation.md` records: temperament drawn at every birth, realms' weights, the hash's query of some kinds, and each person's and army's appraisal every 15 ticks, which nothing acts on yet
 > Date: 2026-10-11
 
 Append-only: once merged, the body below is not rewritten. A fact later found wrong is corrected in an appended note, not edited out; a revised decision is a new ADR that supersedes this one.

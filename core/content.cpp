@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "arts.hpp"
 #include "compiled_map.hpp"
 #include "diplomacy.hpp"
@@ -742,6 +743,22 @@ void read_life(Reader& reader, Built& built, const Context& context) {
     });
     life.occupations = occupations;
   });
+  reader.object("temperaments", true, [&life](Reader& inner) {
+    constexpr std::array<const char*, TEMPERAMENTS> NAMES{"bold", "cautious",
+                                                          "cowardly"};
+    Temperaments temperaments;
+    for (std::size_t temperament = 0; temperament < TEMPERAMENTS;
+         ++temperament) {
+      Disposition& disposition = temperaments.at(temperament);
+      inner.object(NAMES.at(temperament), false, [&disposition](Reader& one) {
+        disposition.share = one.number<std::uint32_t>("share", 0);
+        disposition.thresholds.back_off =
+            one.number<std::uint32_t>("back_off", 0);
+        disposition.thresholds.flee = one.number<std::uint32_t>("flee", 0);
+      });
+    }
+    life.temperaments = temperaments;
+  });
   reader.object("trade", true, [&life](Reader& inner) {
     Trade trade = life.trade.value_or(Trade{});
     trade.purse = inner.number<std::uint64_t>("purse", 0);
@@ -757,6 +774,7 @@ Realm read_realm(Reader& reader) {
   realm.name = read_named(reader, "name");
   realm.qi = reader.number<std::uint32_t>("qi", 0);
   realm.might = reader.number<std::uint32_t>("might", 0);
+  realm.weight = reader.number<std::uint32_t>("weight", 1);
   return realm;
 }
 

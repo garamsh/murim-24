@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -98,6 +99,44 @@ std::optional<std::size_t> nearest_by_force(
     }
   }
   return best;
+}
+
+TEST(SpatialHash, VisitWithinKindsVisitsOnlyPositionsOfTheKindsSought) {
+  const std::vector<Position> positions = random_population(17);
+  // Each position is of one of four kinds, and the search asks for two.
+  constexpr std::uint64_t SOUGHT = 0b0110U;
+  constexpr std::int32_t REACH = 2 * CELL_SIZE;
+  std::vector<SpatialHash::Placed> placed;
+  placed.reserve(positions.size());
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    placed.push_back(SpatialHash::Placed{positions.at(index),
+                                         std::uint64_t{1} << (index % 4)});
+  }
+  const SpatialHash hash{placed};
+  std::size_t passed_over = 0;
+  std::size_t visited = 0;
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    std::vector<std::size_t> all;
+    hash.visit_within(positions.at(index), REACH,
+                      [&all](std::size_t other) { all.push_back(other); });
+    std::vector<std::size_t> expected;
+    std::copy_if(all.begin(), all.end(), std::back_inserter(expected),
+                 [&placed](std::size_t other) {
+                   return (placed.at(other).kinds & SOUGHT) != 0;
+                 });
+    std::sort(expected.begin(), expected.end());
+    std::vector<std::size_t> found;
+    hash.visit_within(SOUGHT, positions.at(index), REACH,
+                      [&found](std::size_t other) { found.push_back(other); });
+    std::sort(found.begin(), found.end());
+    EXPECT_EQ(found, expected) << "agent " << index;
+    passed_over += all.size() - expected.size();
+    visited += found.size();
+  }
+  EXPECT_GT(visited, 0U);
+  // Control: the search without kinds visits the others too, so some were
+  // passed over.
+  EXPECT_GT(passed_over, 0U);
 }
 
 TEST(SpatialHash, NearestMatchesABruteForceScan) {

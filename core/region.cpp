@@ -12,6 +12,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "attack.hpp"
 #include "calendar.hpp"
 #include "compiled_map.hpp"
@@ -610,6 +611,9 @@ void validate(const RegionData& data) {
     throw std::invalid_argument("region data is incomplete or inconsistent");
   }
   check_growth(*data.life.growth);
+  if (data.life.temperaments) {
+    check_temperaments(*data.life.temperaments);
+  }
 }
 
 // The land as generation builds on `map`: free where buildable, rough

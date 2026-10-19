@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(murim_core area_fields.cpp areas.cpp attack.cpp chart.cpp coarse_graph.cpp compiled_map.cpp content.cpp cultivation.cpp diplomacy.cpp event.cpp flow_field.cpp growth.cpp layout.cpp leadership.cpp life.cpp limits.cpp live_scenario.cpp m1_scenario.cpp map.cpp occupation.cpp progress.cpp random.cpp region.cpp save.cpp schedule.cpp skill.cpp spatial_hash.cpp talent.cpp trade.cpp village.cpp village_fields.cpp world.cpp)
+add_library(murim_core appraisal.cpp area_fields.cpp areas.cpp attack.cpp chart.cpp coarse_graph.cpp compiled_map.cpp content.cpp cultivation.cpp diplomacy.cpp event.cpp flow_field.cpp growth.cpp layout.cpp leadership.cpp life.cpp limits.cpp live_scenario.cpp m1_scenario.cpp map.cpp occupation.cpp progress.cpp random.cpp region.cpp save.cpp schedule.cpp skill.cpp spatial_hash.cpp talent.cpp trade.cpp village.cpp village_fields.cpp world.cpp)
 target_include_directories(murim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_options(murim_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
 
@@ -36,7 +36,7 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)
 
-add_executable(murim_core_test area_fields_test.cpp areas_test.cpp attack_test.cpp chart_test.cpp chronicle_test.cpp coarse_graph_test.cpp compiled_map_test.cpp content_test.cpp cultivation_test.cpp diplomacy_test.cpp event_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../packs_json/json_packs_test.cpp flow_field_test.cpp layout_test.cpp leadership_test.cpp occupation_test.cpp progress_test.cpp region_test.cpp save_test.cpp schedule_test.cpp spatial_hash_test.cpp village_fields_test.cpp village_test.cpp world_test.cpp)
+add_executable(murim_core_test appraisal_test.cpp area_fields_test.cpp areas_test.cpp attack_test.cpp chart_test.cpp chronicle_test.cpp coarse_graph_test.cpp compiled_map_test.cpp content_test.cpp cultivation_test.cpp diplomacy_test.cpp event_test.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../packs_json/json_packs_test.cpp flow_field_test.cpp layout_test.cpp leadership_test.cpp occupation_test.cpp progress_test.cpp region_test.cpp save_test.cpp schedule_test.cpp spatial_hash_test.cpp village_fields_test.cpp village_test.cpp world_test.cpp)
 target_link_libraries(murim_core_test PRIVATE murim_core murim_packs_json GTest::gtest_main)
 target_compile_definitions(murim_core_test PRIVATE MURIM_PACKS_DIR="${MURIM_PACKS_DIR}")
 target_compile_options(murim_core_test PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)

@@ -15,6 +15,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
@@ -217,6 +218,7 @@ World cultivated(const std::vector<Realm>& realms) {
                   realms,
                   {},
                   Learning{},
+                  std::nullopt,
                   std::nullopt,
                   std::nullopt,
                   std::nullopt};
@@ -1293,17 +1295,16 @@ TEST(Save, AnOccupationComesBackAsSavedAndOneTheDataLacksIsRefused) {
 
   // The person's record ends with its silver, none, its wares, none, and its
   // occupation, the second. Holding the first instead, the world loads and
-  // hashes otherwise, so the hash folds the occupation itself.
+  // hashes otherwise, so the hash folds the occupation itself. The same
+  // bytes also open its sex and temperament, after its family and parents,
+  // none, so the record's end is their last match.
   std::vector<std::uint8_t> held(2 * sizeof(std::uint64_t), 0);
   held.push_back(1);
   held.push_back(1);
   held.insert(held.end(), sizeof(std::uint64_t) - 1, 0);
   const auto record =
-      std::search(payload.begin(), payload.end(), held.begin(), held.end());
+      std::find_end(payload.begin(), payload.end(), held.begin(), held.end());
   ASSERT_NE(record, payload.end());
-  ASSERT_EQ(
-      std::search(std::next(record), payload.end(), held.begin(), held.end()),
-      payload.end());
   std::vector<std::uint8_t> other = payload;
   other.at(static_cast<std::size_t>(record - payload.begin()) +
            (2 * sizeof(std::uint64_t)) + 1) = 0;
@@ -1767,6 +1768,127 @@ TEST(Save, WakingHoursComeBackAsSavedAndTheHashFoldsThem) {
   std::vector<std::uint8_t> past = payload;
   past.at(until) = PAST_THE_DAY;
   store.bytes(SLOT) = resealed(header, past);
+  EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
+}
+
+TEST(Save, AVersion19Or20SaveFromBeforeTemperamentsIsRefused) {
+  // Version 19 saves, and 20's, hold no person's temperament, no
+  // temperaments and no realm's weight (ADR 0071).
+  for (const std::uint32_t before_temperaments : {19U, 20U}) {
+    ASSERT_LT(before_temperaments, SAVE_VERSION);
+    MemorySaves store;
+    ASSERT_TRUE(save(lived_region(REGION_SEED), store, SLOT));
+    store.bytes(SLOT).at(VERSION_AT) =
+        static_cast<std::uint8_t>(before_temperaments);
+    EXPECT_EQ(refusal(load(store, SLOT)), LoadError::UNSUPPORTED_VERSION)
+        << before_temperaments;
+    // Control: the same bytes at the current version load.
+    store.bytes(SLOT).at(VERSION_AT) = static_cast<std::uint8_t>(SAVE_VERSION);
+    EXPECT_EQ(refusal(load(store, SLOT)), std::nullopt) << before_temperaments;
+  }
+}
+
+// `shares`, a thousand per mille for bold, cautious and cowardly, with ADR
+// 0071's thresholds.
+Temperaments shared(const std::array<std::uint32_t, TEMPERAMENTS>& shares) {
+  constexpr Temperaments THRESHOLDS{
+      {{0, {2'500, 5'000}}, {0, {1'500, 3'000}}, {0, {1'000, 1'800}}}};
+  Temperaments temperaments = THRESHOLDS;
+  for (std::size_t temperament = 0; temperament < TEMPERAMENTS; ++temperament) {
+    temperaments.at(temperament).share = shares.at(temperament);
+  }
+  return temperaments;
+}
+
+// The second person, of faction 0 and the second army, facing a steered foe
+// in each of the other two, so it appraises on the first tick at a ratio of
+// 2,000; everyone born with `temperaments`.
+constexpr std::size_t FACING = 1;
+World outnumbered(const Temperaments& temperaments) {
+  constexpr std::int32_t SIGHT = 6;
+  Rules rules{0, {{false, true}, {true, false}}, STAGE_FLOORS};
+  rules.sight = SIGHT;
+  Life life;
+  life.temperaments = temperaments;
+  const Skill idle{0, 0, 0, 0, 1};
+  const Cell near_foe{4, 0};
+  const Cell facing{1, 0};
+  const Cell far_foe{5, 0};
+  World world{Seed{1},
+              Map{{"........", "........"}},
+              {ArmySpec{near_foe, {Recruit{near_foe, 1}}, 1, {idle}},
+               ArmySpec{facing, {Recruit{facing, 1}}, 0, {idle}},
+               ArmySpec{far_foe, {Recruit{far_foe, 1}}, 1, {idle}}},
+              {},
+              rules,
+              {},
+              {},
+              life};
+  world.steer(0, true);
+  world.steer(2, true);
+  return world;
+}
+
+TEST(Save, ABoldLivingPersonComesBackBoldWithItsThresholds) {
+  constexpr std::uint32_t OUTNUMBERED = 2 * PER_MILLE;
+  const World bold = outnumbered(shared({PER_MILLE, 0, 0}));
+  ASSERT_EQ(bold.temperament(FACING), Temperament::BOLD);
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, bold}, store, SLOT));
+  World restored = loaded(load(store, SLOT)).world;
+  EXPECT_EQ(restored.temperament(FACING), Temperament::BOLD);
+  EXPECT_EQ(restored.hash(), bold.hash());
+  restored.tick();
+  EXPECT_EQ(restored.hash(), ticked(bold, 1).hash());
+  const std::uint32_t read =
+      restored.appraisal(FACING).value_or(Appraisal{0, 0}).ratio;
+  ASSERT_EQ(read, OUTNUMBERED);
+  // The bold person reads below its back-off ratio.
+  EXPECT_LT(read, restored.thresholds(FACING).value_or(Thresholds{}).back_off);
+  // Control: an otherwise identical cautious person reads above its own.
+  World cautious = outnumbered(shared({0, PER_MILLE, 0}));
+  cautious.tick();
+  ASSERT_EQ(cautious.temperament(FACING), Temperament::CAUTIOUS);
+  ASSERT_EQ(cautious.appraisal(FACING).value_or(Appraisal{}).ratio,
+            OUTNUMBERED);
+  EXPECT_GT(OUTNUMBERED,
+            cautious.thresholds(FACING).value_or(Thresholds{}).back_off);
+  EXPECT_NE(cautious.hash(), restored.hash());
+}
+
+TEST(Save, ATemperamentNoneOfItsKindsHoldsIsRefused) {
+  // The one byte where a world of bold people saves 0 and one of cautious
+  // people 1, past their shares: the facing person's temperament.
+  MemorySaves store;
+  ASSERT_TRUE(save(Saved{std::nullopt, outnumbered(shared({PER_MILLE, 0, 0}))},
+                   store, SLOT));
+  const std::vector<std::uint8_t> bold = store.bytes(SLOT);
+  ASSERT_TRUE(save(Saved{std::nullopt, outnumbered(shared({0, PER_MILLE, 0}))},
+                   store, SLOT));
+  const std::vector<std::uint8_t> cautious = store.bytes(SLOT);
+  ASSERT_EQ(bold.size(), cautious.size());
+  std::vector<std::size_t> differing;
+  for (std::size_t at = HEADER_BYTES; at + CHECKSUM_BYTES < bold.size(); ++at) {
+    if (bold.at(at) == 0 && cautious.at(at) == 1) {
+      differing.push_back(at - HEADER_BYTES);
+    }
+  }
+  // Setup: one such byte for each of the three people.
+  ASSERT_EQ(differing.size(), 3U);
+  std::array<std::uint8_t, HEADER_BYTES> header{};
+  std::copy_n(bold.begin(), HEADER_BYTES, header.begin());
+  std::vector<std::uint8_t> payload(
+      bold.begin() + static_cast<std::ptrdiff_t>(HEADER_BYTES),
+      bold.end() - static_cast<std::ptrdiff_t>(CHECKSUM_BYTES));
+  // Control: the last temperament there is loads, cowardly.
+  payload.at(differing.back()) = 2;
+  store.bytes(SLOT) = resealed(header, payload);
+  const std::variant<Saved, LoadError> cowardly = load(store, SLOT);
+  ASSERT_EQ(refusal(cowardly), std::nullopt);
+  EXPECT_EQ(std::get<Saved>(cowardly).world.temperament(2),
+            Temperament::COWARDLY);
+  payload.at(differing.back()) = 3;
+  store.bytes(SLOT) = resealed(header, payload);
   EXPECT_EQ(refusal(load(store, SLOT)), LoadError::CORRUPTED);
 }
 

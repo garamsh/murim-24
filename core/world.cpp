@@ -17,6 +17,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
@@ -713,6 +714,7 @@ void fold_person(const Fold& fold, const Person& person, std::size_t absent,
   fold(person.soul.value_or(absent));
   fold(person.sect.value_or(absent));
   fold(person.sex);
+  fold(person.temperament);
   fold(person.given);
   for (const std::size_t spouse : person.spouses) {
     fold(spouse);
@@ -1087,6 +1089,7 @@ World::World(Seed seed, Map map, std::vector<ArmySpec> armies,
   // The first day's assignment, so a world has its occupations from tick 0.
   assign_occupations();
   prepare_grounds();
+  stamps_.assign(rules_.people_capacity, 0);
 }
 
 World::World(Map map, Rules rules, Life life)
@@ -1208,6 +1211,7 @@ void World::restore() {
   }
   structure_index_ = SpatialHash{centres_of(structures_)};
   prepare_grounds();
+  stamps_.assign(rules_.people_capacity, 0);
 }
 
 // Whether the events kept are as tick() keeps them: at most
@@ -2824,6 +2828,7 @@ void World::tick() {
   }
   const Crowd crowd{SpatialHash{std::move(placed)}, std::move(people),
                     std::move(owners), std::move(slot)};
+  appraise(crowd);
   std::vector<std::uint64_t> damage(crowd.people.size(), 0);
   const std::vector<std::uint32_t> edges = served().edge;
   strikes_.clear();
@@ -4172,6 +4177,121 @@ std::int32_t World::reach(const Person& person, const Army& army) const {
   return farthest;
 }
 
+Temperament World::temperament(std::size_t person) const {
+  return people_.at(person).temperament;
+}
+
+std::optional<Thresholds> World::thresholds(std::size_t person) const {
+  const Temperament temperament = people_.at(person).temperament;
+  if (!life_.temperaments) {
+    return std::nullopt;
+  }
+  return life_.temperaments->at(static_cast<std::size_t>(temperament))
+      .thresholds;
+}
+
+std::optional<Appraisal> World::appraisal(std::size_t person) const {
+  const std::optional<std::size_t> army = army_of(person);
+  if (people_.at(person).health == 0 || !army || exempt(armies_.at(*army)) ||
+      person >= appraisals_.size()) {
+    return std::nullopt;
+  }
+  return appraisals_.at(person);
+}
+
+std::optional<Appraisal> World::army_appraisal(std::size_t army) const {
+  const Army& appraising = armies_.at(army);
+  if (exempt(appraising) || appraising.roster.empty() ||
+      army >= army_appraisals_.size()) {
+    return std::nullopt;
+  }
+  return army_appraisals_.at(army);
+}
+
+// Whether `army`'s members are not appraised: a driver steers it, or it
+// holds an attack intent, a driver's order (ADR 0071).
+bool World::exempt(const Army& army) {
+  return army.steered || army.order.target.has_value();
+}
+
+// Each person in `crowd` outside an exempt army appraises the danger in its
+// own sight, and each army in it not exempt the danger in its members'
+// merged sight, at its own phase of APPRAISAL_TICKS. Nothing reads an
+// appraisal in the tick yet (ADR 0071's step 1).
+void World::appraise(const Crowd& crowd) {
+  appraisals_.resize(people_.size());
+  army_appraisals_.resize(armies_.size());
+  const std::uint64_t phase = tick_count_ % APPRAISAL_TICKS;
+  for (std::size_t index = 0; index < crowd.people.size(); ++index) {
+    const std::size_t person = crowd.people.at(index);
+    const std::size_t army = crowd.armies.at(index);
+    if (person % APPRAISAL_TICKS != phase || exempt(armies_.at(army))) {
+      continue;
+    }
+    appraisals_.at(person) = Appraisal{
+        weigh(person, army, std::array<std::size_t, 1>{person}, crowd),
+        tick_count_};
+  }
+  for (std::size_t army = 0; army < armies_.size(); ++army) {
+    const Army& appraising = armies_.at(army);
+    // A far army is not in the crowd.
+    if (army % APPRAISAL_TICKS != phase || exempt(appraising) ||
+        appraising.roster.empty() || far_off(appraising)) {
+      continue;
+    }
+    army_appraisals_.at(army) = Appraisal{
+        weigh(appraising.roster.front(), army, appraising.roster, crowd),
+        tick_count_};
+  }
+}
+
+// The ratio of the strength that would strike person `lead`, of army `army`,
+// to its own side's, everyone of its faction who would not, among those in
+// sight of any of the people `seers`, each counted once.
+template <typename Seers>
+std::uint32_t World::weigh(std::size_t lead, std::size_t army,
+                           const Seers& seers, const Crowd& crowd) {
+  // A new serial for each appraisal, so no slot keeps a mark from one before.
+  if (++serial_ == 0) {
+    std::fill(stamps_.begin(), stamps_.end(), 0);
+    serial_ = 1;
+  }
+  const std::size_t faction = armies_.at(army).faction;
+  const std::uint64_t kinds =
+      kind_of(faction) | foe_kinds(lead, armies_.at(army));
+  const std::int32_t sight = rules_.sight * CELL_SIZE;
+  std::uint64_t own = 0;
+  std::uint64_t threat = 0;
+  for (const std::size_t seer : seers) {
+    crowd.hash.visit_within(
+        kinds, people_.at(seer).position, sight, [&](std::size_t other) {
+          if (stamps_.at(other) == serial_) {
+            return;
+          }
+          stamps_.at(other) = serial_;
+          const std::size_t seen = crowd.people.at(other);
+          const std::size_t seen_army = crowd.armies.at(other);
+          if (foes(lead, army, seen, seen_army)) {
+            threat = add_strength(threat, strength_of(people_.at(seen)));
+          } else if (armies_.at(seen_army).faction == faction) {
+            own = add_strength(own, strength_of(people_.at(seen)));
+          }
+        });
+  }
+  return ratio(threat, own);
+}
+
+// `person`'s strength in an appraisal: its health, times its realm's might
+// over a thousand and its realm's weight, a thousand and 1 with no realm.
+std::uint64_t World::strength_of(const Person& person) const {
+  const std::uint32_t rank = rank_of(person, life_);
+  if (rank == 0) {
+    return strength(person.health, PER_MILLE, 1);
+  }
+  const Realm& realm = life_.realms.at(rank - 1);
+  return strength(person.health, realm.might, realm.weight);
+}
+
 // Whether person `person` of army `army` strikes person `other` of army
 // `other_army`: their factions are hostile, or the two fight a duel, whatever
 // their factions.
@@ -4386,8 +4506,9 @@ bool World::shift(std::size_t structure, Destroyer striker,
   return effect != 0;
 }
 
-// Draws `person`'s talent and lifespan, for a soul of `soul` history, and
-// its sex unless `sex` gives it: the one rule every birth follows.
+// Draws `person`'s talent and lifespan, for a soul of `soul` history, its sex
+// unless `sex` gives it, and its temperament: the one rule every birth
+// follows.
 void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
   person.born = static_cast<std::int64_t>(tick_count_);
   person.talent.clear();
@@ -4421,6 +4542,13 @@ void World::bear(Person& person, const Soul& soul, std::optional<Sex> sex) {
   const std::vector<NameEntry>& given =
       person.sex == Sex::FEMALE ? life_.names.female : life_.names.male;
   person.given = given.empty() ? 0 : next_random() % given.size();
+  // Every caller appends the person to the people next, so its identity is
+  // their count; the draw is its own, so no seeded stream moves.
+  person.temperament =
+      life_.temperaments
+          ? temperament_of(mix(mix(mix(seed_) ^ people_.size()) ^ tick_count_),
+                           *life_.temperaments)
+          : Temperament::CAUTIOUS;
 }
 
 // Bears founder `person`, of `sex` if given, by the one birth rule, born the

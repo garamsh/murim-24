@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "area_fields.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
@@ -708,6 +709,34 @@ class World {
   /// Returns the path fields the villages' schedules hold.
   [[nodiscard]] FieldUse schedule_fields() const;
 
+  /// Returns person `person`'s temperament, drawn at birth from the life's
+  /// temperaments, cautious where it names none. Throws std::out_of_range
+  /// when there is no such person.
+  [[nodiscard]] Temperament temperament(std::size_t person) const;
+
+  /// Returns the ratios above which person `person` backs off and flees, by
+  /// its temperament, or none where the life names no temperaments. Throws
+  /// std::out_of_range when there is no such person.
+  [[nodiscard]] std::optional<Thresholds> thresholds(std::size_t person) const;
+
+  /// Returns person `person`'s latest appraisal of the danger in its own
+  /// sight (ADR 0071): the strength of those in sight who would strike it,
+  /// against its own side's, everyone in sight of its faction who would not.
+  /// A living person outside an exempt army appraises every APPRAISAL_TICKS
+  /// ticks, at its identity's phase. None while it is dead or its army is
+  /// steered or holds an attack intent, or before it has appraised since the
+  /// world was created or loaded. Throws std::out_of_range when there is no
+  /// such person.
+  [[nodiscard]] std::optional<Appraisal> appraisal(std::size_t person) const;
+
+  /// Returns army `army`'s latest appraisal through its lead, the first of
+  /// its roster, of what any of its members sees, each person counted once.
+  /// An army that is not far appraises every APPRAISAL_TICKS ticks, at its
+  /// index's phase. None while it is steered, holds an attack intent or has
+  /// no members, or before it has appraised since the world was created or
+  /// loaded. Throws std::out_of_range when there is no such army.
+  [[nodiscard]] std::optional<Appraisal> army_appraisal(std::size_t army) const;
+
   /// Returns why person `buyer` may not buy one of ware `ware` from person
   /// `seller`, or BuyRefusal::NONE when it may. Throws std::invalid_argument
   /// when there is no such person or ware.
@@ -814,6 +843,12 @@ class World {
                                       std::size_t skill) const;
   [[nodiscard]] static bool ready(const Person& person, std::size_t skill,
                                   const Army& army, std::uint64_t due);
+  void appraise(const Crowd& crowd);
+  [[nodiscard]] static bool exempt(const Army& army);
+  template <typename Seers>
+  [[nodiscard]] std::uint32_t weigh(std::size_t lead, std::size_t army,
+                                    const Seers& seers, const Crowd& crowd);
+  [[nodiscard]] std::uint64_t strength_of(const Person& person) const;
   void train();
   void cultivate();
   void comprehend(std::size_t learner);
@@ -1172,6 +1207,16 @@ class World {
   std::uint64_t field_builds_ = 0;
   std::uint64_t lodging_finds_ = 0;
   std::uint64_t errand_finds_ = 0;
+  // Each person's and each army's latest appraisal (ADR 0071), by person and
+  // army index; neither saved nor hashed, and taken again at each one's next
+  // phase after a load.
+  std::vector<std::optional<Appraisal>> appraisals_;
+  std::vector<std::optional<Appraisal>> army_appraisals_;
+  // The serial of the appraisal that last counted each crowd slot, sized to
+  // the living capacity, and the latest serial; scratch, neither saved nor
+  // hashed.
+  std::vector<std::uint32_t> stamps_;
+  std::uint32_t serial_ = 0;
 };
 
 }  // namespace murim
