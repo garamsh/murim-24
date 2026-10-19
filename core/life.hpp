@@ -5,6 +5,7 @@
 #include <optional>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "arts.hpp"
 #include "diplomacy.hpp"
 #include "growth.hpp"
@@ -56,6 +57,9 @@ struct Life {
   std::optional<Diplomacy> diplomacy;
   std::optional<Trade> trade;
   std::optional<Occupations> occupations;
+  /// Each temperament's share of births and thresholds; with none, everyone
+  /// is cautious.
+  std::optional<Temperaments> temperaments;
 };
 
 /// Returns the range a soul with `soul` history draws discipline

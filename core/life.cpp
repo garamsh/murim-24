@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <stdexcept>
 
+#include "appraisal.hpp"
 #include "arts.hpp"
 #include "growth.hpp"
 #include "kinship.hpp"
@@ -32,6 +33,7 @@ void check_arts(const Life& life) {
   for (std::size_t realm = 0; realm < life.realms.size(); ++realm) {
     unordered =
         unordered || life.realms.at(realm).might > MAX_MIGHT ||
+        life.realms.at(realm).weight == 0 ||
         (realm > 0 && life.realms.at(realm).qi < life.realms.at(realm - 1).qi);
   }
   const auto stray_art = [&life](const Art& art) {
@@ -55,7 +57,8 @@ void check_arts(const Life& life) {
       std::any_of(life.arts.begin(), life.arts.end(), stray_art)) {
     throw std::invalid_argument(
         "cultivation must draw within MAX_TALENT and recover within PER_MILLE "
-        "on a tick or more, realms ascend with a might within MAX_MIGHT, arts "
+        "on a tick or more, realms ascend with a might within MAX_MIGHT and a "
+        "weight of at least 1, arts "
         "name known disciplines and hold valid skills of known ranks, and "
         "learning's chances, eases and potencies lie within PER_MILLE");
   }
@@ -113,6 +116,9 @@ void check_life(const Life& life) {
   if (life.occupations) {
     check_occupations(*life.occupations,
                       life.trade ? life.trade->wares.size() : 0);
+  }
+  if (life.temperaments) {
+    check_temperaments(*life.temperaments);
   }
 }
 

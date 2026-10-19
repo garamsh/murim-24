@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "areas.hpp"
 #include "arts.hpp"
 #include "attack.hpp"
@@ -272,7 +273,7 @@ TEST(World, SameSeedGivesSameHashAfterTenThousandTicks) {
 // the simulation's rules changes it on purpose.
 TEST(World, HashAfterTenThousandTicksIsTheSameOnEveryPlatform) {
   EXPECT_EQ(static_cast<std::uint64_t>(run_crossing(Seed{42})),
-            0xAB0A003912E54CCCULL);
+            0x97164C08B6C80FB2ULL);
 }
 
 TEST(World, PeopleReachTheirObjectiveAroundAWall) {
@@ -1898,6 +1899,7 @@ Life one_discipline(std::uint32_t limit_spread) {
               {},
               {Art{{"검법", "Sword art"}, 0, Nature{}, {}}},
               Learning{},
+              std::nullopt,
               std::nullopt,
               std::nullopt,
               std::nullopt};
@@ -6203,6 +6205,8 @@ TEST(World, QiDataPastItsLimitsIsRefused) {
   std::swap(descending.realms.at(0), descending.realms.at(1));
   Life mighty = life;
   mighty.realms.at(1).might = MAX_MIGHT + 1;
+  Life weightless = life;
+  weightless.realms.at(1).weight = 0;
   Life stray = life;
   stray.arts.at(0).discipline = 1;
   Life beyond = life;
@@ -6215,7 +6219,7 @@ TEST(World, QiDataPastItsLimitsIsRefused) {
   Life easy = life;
   easy.learning.orientation_ease = PER_MILLE + 1;
   for (const Life& refused :
-       {descending, mighty, stray, beyond, costly, never, easy}) {
+       {descending, mighty, weightless, stray, beyond, costly, never, easy}) {
     EXPECT_FALSE(cultivates_by(refused));
   }
 }
@@ -8071,6 +8075,431 @@ TEST(World, APersonConscriptedIntoTheResidentsMidDayFollowsTheirSchedule) {
   // a third.
   EXPECT_EQ(world.activity(NEWCOMER), Activity::AT_HOME);
   EXPECT_LE(cells_apart(cell_at(world, NEWCOMER), door_of(SECOND_HOUSE)), 1);
+}
+
+// The cells people see in the appraisal tests, and each one's health.
+constexpr std::int32_t APPRAISAL_SIGHT = 6;
+constexpr std::uint64_t APPRAISED_HEALTH = 100;
+
+// Where the people of an appraisal test stand: steered foes of faction 1,
+// the first army; a band of faction 0; and an army of faction 2 at each of
+// the others' cells.
+struct Standing {
+  std::vector<Cell> foes;
+  std::vector<Cell> members;
+  std::vector<Cell> others;
+};
+
+// The people of `standing` on an open map under `rules` at APPRAISAL_SIGHT
+// and `life`.
+World appraisers(const Standing& standing, Rules rules = at_war(0),
+                 Life life = {}) {
+  const auto recruits_at = [](const std::vector<Cell>& cells) {
+    std::vector<Recruit> recruits;
+    recruits.reserve(cells.size());
+    for (const Cell cell : cells) {
+      recruits.push_back(Recruit{cell, APPRAISED_HEALTH});
+    }
+    return recruits;
+  };
+  rules.sight = APPRAISAL_SIGHT;
+  std::vector<ArmySpec> armies{
+      ArmySpec{standing.foes.front(), recruits_at(standing.foes), 1, {IDLE}},
+      ArmySpec{
+          standing.members.front(), recruits_at(standing.members), 0, {IDLE}}};
+  for (const Cell cell : standing.others) {
+    armies.push_back(ArmySpec{cell, recruits_at({cell}), 2, {IDLE}});
+  }
+  World world{Seed{1}, Map{open_map(OPEN_SIDE)}, armies, {}, rules, {},
+              {},      std::move(life)};
+  world.steer(0, true);
+  return world;
+}
+
+// Factions 0 and 1 at war and faction 2 at peace with both, or at war with
+// faction 0 too if `hostile`.
+Rules three_factions(bool hostile) {
+  return Rules{
+      0,
+      {{false, true, hostile}, {true, false, false}, {hostile, false, false}},
+      STAGE_FLOORS};
+}
+
+TEST(World, AnArmySeesWhatItsLeadSees) {
+  // The band's lead and a second member ten cells east, out of each other's
+  // sight, and a foe two cells beyond the second, out of the lead's.
+  const Standing beyond_lead{{{14, 8}}, {{2, 8}, {12, 8}}, {}};
+  World unseen = appraisers(beyond_lead);
+  run_ticks(unseen, 1);
+  // Setup: the steered foe stands where it began.
+  ASSERT_EQ(cells_apart(cell_at(unseen, 0), beyond_lead.foes.front()), 0);
+  const std::optional<Appraisal> lead = unseen.army_appraisal(BAND);
+  ASSERT_TRUE(lead.has_value());
+  EXPECT_EQ(lead.value_or(Appraisal{}).ratio, 0U);
+  EXPECT_EQ(lead.value_or(Appraisal{}).tick, 1U);
+  // Control: the foe five cells from the lead is weighed against the lead
+  // alone, the second member out of its sight.
+  const Standing near_lead{{{7, 8}}, beyond_lead.members, {}};
+  World seen = appraisers(near_lead);
+  run_ticks(seen, 1);
+  EXPECT_EQ(seen.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
+}
+
+TEST(World, AnAppraisalWithNoFoeInSightReadsNothing) {
+  // Two members side by side, and the steered foe eleven cells from the
+  // nearer, beyond their sight.
+  const Standing out_of_sight{{{14, 8}}, {{2, 8}, {3, 8}}, {}};
+  World alone = appraisers(out_of_sight);
+  run_ticks(alone, 1);
+  const std::optional<Appraisal> band = alone.army_appraisal(BAND);
+  ASSERT_TRUE(band.has_value());
+  EXPECT_EQ(band.value_or(Appraisal{}).ratio, 0U);
+  EXPECT_EQ(band.value_or(Appraisal{}).tick, 1U);
+  // Control: the foe within the lead's sight is weighed against the two.
+  const Standing in_sight{{{7, 8}}, out_of_sight.members, {}};
+  World seen = appraisers(in_sight);
+  run_ticks(seen, 1);
+  EXPECT_EQ(seen.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            PER_MILLE / 2);
+}
+
+TEST(World, AnAppraisalCountsNeitherAFactionAtPeaceNorAsOwn) {
+  // The band's one member, a foe three cells east, and a person of faction 2
+  // one cell east.
+  const Standing beside{{{7, 8}}, {{4, 8}}, {{5, 8}}};
+  World peace = appraisers(beside, three_factions(false));
+  run_ticks(peace, 1);
+  ASSERT_EQ(peace.faction_of(2), std::optional<std::size_t>{2});
+  EXPECT_EQ(peace.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
+  // Control: the same person at war with the band is a threat.
+  World war = appraisers(beside, three_factions(true));
+  run_ticks(war, 1);
+  EXPECT_EQ(war.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            2 * PER_MILLE);
+}
+
+TEST(World, AFactionSharingTheBandsKindIsNotCountedAsOwn) {
+  // Faction 64 shares faction 0's bit among the 64 kinds, so the spatial
+  // hash hands its person, one cell east of the band's member, to the
+  // band's appraisal as well.
+  constexpr std::size_t FACTIONS = 65;
+  constexpr std::size_t KIN = 64;
+  std::vector<std::vector<bool>> hostile(FACTIONS,
+                                         std::vector<bool>(FACTIONS, false));
+  hostile.at(0).at(1) = true;
+  hostile.at(1).at(0) = true;
+  Rules rules{0, hostile, STAGE_FLOORS};
+  rules.sight = APPRAISAL_SIGHT;
+  const Cell foe{7, 8};
+  const Cell member{4, 8};
+  const Cell next_to{5, 8};
+  const auto army_at = [](Cell cell, std::size_t faction) {
+    return ArmySpec{cell, {Recruit{cell, APPRAISED_HEALTH}}, faction, {IDLE}};
+  };
+  World world{Seed{1},
+              Map{open_map(OPEN_SIDE)},
+              {army_at(foe, 1), army_at(member, 0), army_at(next_to, KIN)},
+              {},
+              rules};
+  world.steer(0, true);
+  run_ticks(world, 1);
+  ASSERT_EQ(world.faction_of(2), std::optional<std::size_t>{KIN});
+  EXPECT_EQ(world.army_appraisal(BAND).value_or(Appraisal{}).ratio, PER_MILLE);
+  // Control: a person of the band's own faction there is counted, halving
+  // the ratio.
+  World own{Seed{1},
+            Map{open_map(OPEN_SIDE)},
+            {army_at(foe, 1), army_at(member, 0), army_at(next_to, 0)},
+            {},
+            rules};
+  own.steer(0, true);
+  run_ticks(own, 1);
+  EXPECT_EQ(own.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            PER_MILLE / 2);
+}
+
+TEST(World, ASteeredArmyOrOneHoldingAnAttackIntentIsNotAppraised) {
+  const Standing alone{{{7, 8}}, {{4, 8}}, {}};
+  World steered = appraisers(alone);
+  steered.steer(BAND, true);
+  run_ticks(steered, 1);
+  EXPECT_FALSE(steered.army_appraisal(BAND).has_value());
+  // Control: the same army unsteered is appraised.
+  World free = appraisers(alone);
+  run_ticks(free, 1);
+  EXPECT_TRUE(free.army_appraisal(BAND).has_value());
+
+  World intent = appraisers(alone);
+  intent.order(BAND, Order{alone.members.front(), {0}, 0});
+  run_ticks(intent, 1);
+  ASSERT_EQ(intent.target(BAND), std::optional<std::size_t>{0});
+  EXPECT_FALSE(intent.army_appraisal(BAND).has_value());
+  // Control: once the intent ends, the band appraises at its next phase.
+  intent.end_intent(BAND);
+  run_ticks(intent, APPRAISAL_TICKS);
+  EXPECT_EQ(intent.army_appraisal(BAND).value_or(Appraisal{}).tick,
+            1 + APPRAISAL_TICKS);
+}
+
+// The ratio of the strength of the foes of person `lead` to that of its own
+// faction among the living within APPRAISAL_SIGHT cells of any of `seers`,
+// in `world`, which knows no duels: each one's health times `weights`' entry
+// for its realm, a realm's might a thousand, or its health with no realm.
+std::uint32_t seen_ratio(const World& world, std::size_t lead,
+                         const std::vector<std::size_t>& seers,
+                         const std::vector<std::uint32_t>& weights = {}) {
+  const std::size_t faction = world.faction_of(lead).value_or(0);
+  const std::int64_t sight = std::int64_t{APPRAISAL_SIGHT} * CELL_SIZE;
+  std::uint64_t own = 0;
+  std::uint64_t threat = 0;
+  for (std::size_t person = 0; person < world.population(); ++person) {
+    const std::optional<std::size_t> other = world.faction_of(person);
+    const Person& seen = world.person(person);
+    const bool in_sight =
+        std::any_of(seers.begin(), seers.end(), [&](std::size_t seer) {
+          return distance_squared(world.person(seer).position, seen.position) <=
+                 sight * sight;
+        });
+    if (seen.health == 0 || !other || !in_sight) {
+      continue;
+    }
+    const std::uint32_t rank = world.rank(person);
+    const std::uint64_t strength =
+        seen.health * (rank == 0 ? 1 : weights.at(rank - 1));
+    if (world.hostile(faction, *other)) {
+      threat += strength;
+    } else if (*other == faction) {
+      own += strength;
+    }
+  }
+  EXPECT_GT(own, 0U);
+  return static_cast<std::uint32_t>(threat * PER_MILLE / own);
+}
+
+// Founders under realm_life() are drawn ages up to twice REALM_QI days and
+// cultivate a qi a day, so some reach its one realm, of weight `weight`,
+// and some do not.
+constexpr std::uint32_t REALM_QI = 100;
+constexpr std::uint32_t REALM_WEIGHT = 8;
+
+Life realm_life(std::uint32_t weight) {
+  Life life;
+  life.cultivation = Cultivation{{1, 0}, {2 * REALM_QI, 0}, PER_MILLE, 1};
+  life.founding_age = Spread{REALM_QI, REALM_QI};
+  life.realms = {Realm{{"삼류", "Third-rate"}, REALM_QI, PER_MILLE, weight}};
+  return life;
+}
+
+TEST(World, AnAppraisalWeighsEachPersonByItsRealm) {
+  // Two foes and a band of three, all in each other's sight.
+  const Standing sides{{{6, 8}, {7, 8}}, {{3, 8}, {4, 8}, {5, 8}}, {}};
+  World weighted = appraisers(sides, at_war(0), realm_life(REALM_WEIGHT));
+  run_ticks(weighted, 1);
+  const std::vector<std::size_t>& band = weighted.roster(BAND);
+  const std::uint32_t expected =
+      seen_ratio(weighted, band.front(), {band.front()}, {REALM_WEIGHT});
+  // Setup: the realm splits the two sides unevenly, so its weight moves the
+  // ratio.
+  ASSERT_NE(expected, seen_ratio(weighted, band.front(), {band.front()}, {1}));
+  EXPECT_EQ(weighted.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            expected);
+  // Control: the same founders under a realm of weight 1 read the ratio of
+  // their health alone.
+  World flat = appraisers(sides, at_war(0), realm_life(1));
+  run_ticks(flat, 1);
+  const std::vector<std::size_t>& level = flat.roster(BAND);
+  EXPECT_EQ(flat.army_appraisal(BAND).value_or(Appraisal{}).ratio,
+            seen_ratio(flat, level.front(), {level.front()}, {1}));
+}
+
+// Runs `world` to the tick before the one whose phase is `index`'s.
+void run_to_phase(World& world, std::size_t index) {
+  while ((world.tick_count() + 1) % APPRAISAL_TICKS !=
+         index % APPRAISAL_TICKS) {
+    world.tick();
+  }
+}
+
+// conscription_world()'s village and post, the post carrying a soul and
+// bound for the village, with a steered foe of HOME_FOE_HEALTH five cells
+// east of it, under `life` and a living capacity of five, as many as live
+// at the start.
+constexpr std::size_t REBORN_CAPACITY = 5;
+constexpr std::uint64_t HOME_FOE_HEALTH = 1'000'000;
+
+World reborn_beyond_capacity(Life life = {}) {
+  const Skill strike{2 * CELL_SIZE, 0, 10, 0, 15};
+  const std::vector<ArmySpec> armies{
+      army(HOME, HOME, 3, 1'000, 0, {strike}),
+      ArmySpec{HOME, {}, 0, {strike}},
+      army(POST_CELL, POST_CELL, 1, POST_HEALTH, 1, {strike}),
+      army(Cell{HOME.x + 5, HOME.y}, Cell{HOME.x + 5, HOME.y}, 1,
+           HOME_FOE_HEALTH, 1, {IDLE}),
+  };
+  Rules rules = at_war(SEPARATION);
+  rules.sight = APPRAISAL_SIGHT;
+  rules.people_capacity = REBORN_CAPACITY;
+  World world{Seed{1}, Map{open_map(OPEN_SIDE)},
+              armies,  {{{2, 2}, HOME_DURABILITY}},
+              rules,   {{{0}, HOME_ARMY, {}, 0, {}, {}}},
+              {},      std::move(life)};
+  world.ensoul(world.roster(POST).front());
+  world.order(POST, {HOME, {0}});
+  world.steer(3, true);
+  return world;
+}
+
+// Runs `world` until a soul is born again, at most ARRIVAL_TICKS ticks.
+void run_to_rebirth(World& world) {
+  const std::size_t before = world.population();
+  for (int tick = 0; tick < ARRIVAL_TICKS && world.population() == before;
+       ++tick) {
+    world.tick();
+  }
+}
+
+TEST(World, OnlyAVillagesResidentsAppraiseOnTheirOwn) {
+  World world = reborn_beyond_capacity();
+  const std::size_t resident = world.roster(HOME_ARMY).front();
+  const std::size_t post = world.roster(POST).front();
+  run_to_phase(world, resident);
+  world.tick();
+  EXPECT_TRUE(world.appraisal(resident).has_value());
+  // Conscripted into an army of no village, it no longer reads one.
+  World conscripted = world;
+  conscripted.conscript(resident, FIELD);
+  EXPECT_FALSE(conscripted.appraisal(resident).has_value());
+  run_to_phase(world, HOME_ARMY);
+  world.tick();
+  EXPECT_FALSE(world.army_appraisal(HOME_ARMY).has_value());
+  // The post, of no village, appraises only through its army.
+  run_to_phase(world, post);
+  world.tick();
+  EXPECT_FALSE(world.appraisal(post).has_value());
+  run_to_phase(world, POST);
+  world.tick();
+  EXPECT_TRUE(world.army_appraisal(POST).has_value());
+}
+
+TEST(World, AnArmyLedByAnIdentityBeyondTheCapacityIsAppraisedAsAnyOther) {
+  World world = reborn_beyond_capacity();
+  run_to_rebirth(world);
+  // Setup: the post died and was born again as person 5, the capacity, so
+  // its identity lies beyond every crowd slot the five living can hold.
+  const std::size_t reborn = REBORN_CAPACITY;
+  ASSERT_EQ(world.population(), REBORN_CAPACITY + 1);
+  ASSERT_GT(world.person(reborn).health, 0U);
+  ASSERT_EQ(world.living(), REBORN_CAPACITY);
+  ASSERT_EQ(world.roster(POST), std::vector<std::size_t>{reborn});
+
+  // Its army, the post's, appraises through it as its lead.
+  run_to_phase(world, POST);
+  const std::uint32_t lead = seen_ratio(world, reborn, {reborn});
+  ASSERT_GT(lead, 0U);
+  world.tick();
+  EXPECT_EQ(world.army_appraisal(POST).value_or(Appraisal{}).ratio, lead);
+  EXPECT_EQ(world.army_appraisal(POST).value_or(Appraisal{}).tick,
+            world.tick_count());
+  // Control: a resident, of an identity below the capacity, reads the same
+  // way.
+  const std::size_t resident = world.roster(HOME_ARMY).front();
+  ASSERT_LT(resident, REBORN_CAPACITY);
+  run_to_phase(world, resident);
+  const std::uint32_t own = seen_ratio(world, resident, {resident});
+  world.tick();
+  EXPECT_EQ(world.appraisal(resident).value_or(Appraisal{}).ratio, own);
+}
+
+// `shares`, a thousand per mille for bold, cautious and cowardly, with ADR
+// 0071's thresholds.
+Temperaments shared(const std::array<std::uint32_t, TEMPERAMENTS>& shares) {
+  constexpr Temperaments THRESHOLDS{
+      {{0, {2'500, 5'000}}, {0, {1'500, 3'000}}, {0, {1'000, 1'800}}}};
+  Temperaments temperaments = THRESHOLDS;
+  for (std::size_t temperament = 0; temperament < TEMPERAMENTS; ++temperament) {
+    temperaments.at(temperament).share = shares.at(temperament);
+  }
+  return temperaments;
+}
+
+// How far apart `count` and `expected` lie.
+std::size_t gap_between(std::size_t count, std::size_t expected) {
+  return count > expected ? count - expected : expected - count;
+}
+
+// How many of `world`'s first `people` people hold each temperament.
+std::array<std::size_t, TEMPERAMENTS> temperament_counts(const World& world,
+                                                         std::size_t people) {
+  std::array<std::size_t, TEMPERAMENTS> counts{};
+  for (std::size_t person = 0; person < people; ++person) {
+    ++counts.at(static_cast<std::size_t>(world.temperament(person)));
+  }
+  return counts;
+}
+
+TEST(World, TemperamentsAreDrawnAtBirthByTheirShares) {
+  constexpr std::size_t BORN = 10'000;
+  constexpr std::int32_t SIDE = 128;
+  // Two points of a share, of BORN births.
+  constexpr std::size_t TOLERANCE = BORN / 50;
+  const std::vector<std::string> rows = open_map(SIDE);
+  constexpr Seed SEED{5};
+  const auto born = [&rows](Life life) {
+    Rules rules = peaceful(0);
+    rules.people_capacity = BORN;
+    return World{SEED,
+                 Map{rows},
+                 {army(rows, {SIDE / 2, SIDE / 2}, {SIDE / 2, SIDE / 2}, BORN,
+                       1, 0, {IDLE})},
+                 {},
+                 rules,
+                 {},
+                 {},
+                 std::move(life)};
+  };
+  const Temperaments adr = shared({200, 600, 200});
+  Life tempered;
+  tempered.temperaments = adr;
+  const World world = born(tempered);
+  ASSERT_EQ(world.population(), BORN);
+  const std::array<std::size_t, TEMPERAMENTS> counts =
+      temperament_counts(world, BORN);
+  constexpr std::array<std::size_t, TEMPERAMENTS> EXPECTED{2'000, 6'000, 2'000};
+  for (std::size_t temperament = 0; temperament < TEMPERAMENTS; ++temperament) {
+    EXPECT_LE(gap_between(counts.at(temperament), EXPECTED.at(temperament)),
+              TOLERANCE)
+        << temperament;
+  }
+  EXPECT_EQ(world.thresholds(0).value_or(Thresholds{}).back_off,
+            adr.at(static_cast<std::size_t>(world.temperament(0)))
+                .thresholds.back_off);
+  // Control: with no temperaments, everyone is cautious and has none.
+  const World untempered = born(Life{});
+  EXPECT_EQ(temperament_counts(untempered, BORN)
+                .at(static_cast<std::size_t>(Temperament::CAUTIOUS)),
+            BORN);
+  EXPECT_FALSE(untempered.thresholds(0).has_value());
+}
+
+TEST(World, ASoulBornAgainDrawsItsOwnTemperament) {
+  // Even shares of bold and cautious, so the soul's new draw need not match
+  // the temperament its old record holds.
+  const Temperaments even = shared({500, 500, 0});
+  Life halves;
+  halves.temperaments = even;
+  World world = reborn_beyond_capacity(halves);
+  const std::size_t post = world.roster(POST).front();
+  const Temperament before = world.temperament(post);
+  run_to_rebirth(world);
+  ASSERT_EQ(world.population(), REBORN_CAPACITY + 1);
+  // Under this seed the post's soul, born again, draws the other one.
+  EXPECT_NE(world.temperament(REBORN_CAPACITY), before);
+  EXPECT_EQ(world.temperament(post), before);
+  // Control: with no temperaments, the soul born again is cautious.
+  World plain = reborn_beyond_capacity();
+  run_to_rebirth(plain);
+  ASSERT_EQ(plain.population(), REBORN_CAPACITY + 1);
+  EXPECT_EQ(plain.temperament(REBORN_CAPACITY), Temperament::CAUTIOUS);
 }
 
 }  // namespace

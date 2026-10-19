@@ -14,6 +14,10 @@ namespace murim {
 /// A person's sex, drawn at birth.
 enum class Sex : std::uint8_t { FEMALE, MALE };
 
+/// A person's temperament, drawn at birth (ADR 0071): it names the ratios of
+/// threat to own strength above which the person backs off and flees.
+enum class Temperament : std::uint8_t { BOLD, CAUTIOUS, COWARDLY };
+
 /// A skill a person knows: skill `skill` of art `art`, which it may use again
 /// from tick `ready_at`.
 struct Known {
@@ -29,7 +33,8 @@ struct Known {
 /// village `home`, if it has one, when its army disbands. It was born on
 /// tick `born`, before the world began for the people it starts with, into
 /// `family`, of `parents` if it had any, of sex `sex` with given name `given`
-/// among its sex's names, with `talent` and `attainment` per discipline, and
+/// among its sex's names, of temperament `temperament`, with `talent` and
+/// `attainment` per discipline, and
 /// lives `lifespan` days, extended by its attainment, if it ages at all. A
 /// founder of a village, and the children settling with it, take the new
 /// family it heads.
@@ -51,6 +56,7 @@ struct Person {
   std::size_t family = 0;
   std::vector<std::size_t> parents;
   Sex sex = Sex::FEMALE;
+  Temperament temperament = Temperament::CAUTIOUS;
   std::size_t given = 0;
   std::vector<std::size_t> spouses;
   std::vector<std::size_t> children;

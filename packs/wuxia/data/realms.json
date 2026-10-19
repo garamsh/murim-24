@@ -6,7 +6,8 @@
       "romanised": "Third-rate"
     },
     "qi": 1000,
-    "might": 1100
+    "might": 1100,
+    "weight": 2
   },
   {
     "id": "second_rate",
@@ -15,7 +16,8 @@
       "romanised": "Second-rate"
     },
     "qi": 3000,
-    "might": 1200
+    "might": 1200,
+    "weight": 4
   },
   {
     "id": "first_rate",
@@ -24,7 +26,8 @@
       "romanised": "First-rate"
     },
     "qi": 6000,
-    "might": 1300
+    "might": 1300,
+    "weight": 8
   },
   {
     "id": "peak",
@@ -33,7 +36,8 @@
       "romanised": "Peak"
     },
     "qi": 10000,
-    "might": 1400
+    "might": 1400,
+    "weight": 16
   },
   {
     "id": "beyond_peak",
@@ -42,7 +46,8 @@
       "romanised": "Beyond peak"
     },
     "qi": 15000,
-    "might": 1500
+    "might": 1500,
+    "weight": 32
   },
   {
     "id": "transformation",
@@ -51,7 +56,8 @@
       "romanised": "Transformation"
     },
     "qi": 21000,
-    "might": 1600
+    "might": 1600,
+    "weight": 64
   },
   {
     "id": "mystery",
@@ -60,7 +66,8 @@
       "romanised": "Mystery"
     },
     "qi": 28000,
-    "might": 1700
+    "might": 1700,
+    "weight": 128
   },
   {
     "id": "life_and_death",
@@ -69,6 +76,7 @@
       "romanised": "Life and death"
     },
     "qi": 36000,
-    "might": 1800
+    "might": 1800,
+    "weight": 256
   }
 ]

@@ -165,6 +165,23 @@
         "from": 6,
         "to": 22
       }
+    },
+    "temperaments": {
+      "bold": {
+        "share": 200,
+        "back_off": 2500,
+        "flee": 5000
+      },
+      "cautious": {
+        "share": 600,
+        "back_off": 1500,
+        "flee": 3000
+      },
+      "cowardly": {
+        "share": 200,
+        "back_off": 1000,
+        "flee": 1800
+      }
     }
   }
 ]

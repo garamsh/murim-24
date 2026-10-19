@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "areas.hpp"
 #include "calendar.hpp"
 #include "chart.hpp"
@@ -3111,6 +3112,93 @@ TEST(Tiers, AFarArmyNeitherStrikesNorMoves) {
   // Control: with no tiers the two fight, and the second walks.
   const World live = far_fight(std::nullopt);
   EXPECT_LT(live.person(live.roster(1).front()).health, 100U);
+}
+
+// grown() as fertile as can be, a tick a day, with `temperaments`, lived
+// until its first child is born, at most a year.
+World first_child(std::optional<Temperaments> temperaments) {
+  RegionData fertile = grown();
+  fertile.life.husbandry.reset();
+  Kinship kinship = fertile.life.kinship.value_or(Kinship{});
+  kinship.marriage_chance = PER_MILLE;
+  kinship.birth_chance = PER_MILLE;
+  kinship.birth_spacing = 0;
+  fertile.life.kinship = kinship;
+  fertile.life.temperaments = temperaments;
+  Region region = generate_region(SEED, fertile);
+  region.rules.ticks_per_day = 1;
+  World world = world_of(region);
+  const std::size_t founders = world.population();
+  for (std::uint64_t day = 0;
+       day < DAYS_PER_YEAR && world.population() == founders; ++day) {
+    world.tick();
+  }
+  return world;
+}
+
+TEST(Region, FoundersAndChildrenEachDrawTheirTemperamentAtBirth) {
+  // Shares that make everyone born bold.
+  constexpr Temperaments BOLD{
+      {{PER_MILLE, {2'500, 5'000}}, {0, {1'500, 3'000}}, {0, {1'000, 1'800}}}};
+  const World bold = first_child(BOLD);
+  const std::size_t founders = bold.population() - 1;
+  // Setup: a child was born, not a soul born again.
+  ASSERT_FALSE(bold.person(founders).parents.empty());
+  ASSERT_FALSE(bold.person(founders).soul.has_value());
+  for (std::size_t person = 0; person <= founders; ++person) {
+    EXPECT_EQ(bold.temperament(person), Temperament::BOLD) << person;
+  }
+  // Control: with no temperaments, founders and child are cautious.
+  const World plain = first_child(std::nullopt);
+  ASSERT_EQ(plain.population(), founders + 1);
+  EXPECT_EQ(plain.temperament(0), Temperament::CAUTIOUS);
+  EXPECT_EQ(plain.temperament(founders), Temperament::CAUTIOUS);
+}
+
+TEST(Region, TemperamentsMoveNoSeededStream) {
+  // The base pack's region lived a year, a tick a day, with its temperaments
+  // and without them.
+  ASSERT_TRUE(base_data().life.temperaments.has_value());
+  const auto lived = [](bool tempered) {
+    RegionData data = base_data();
+    if (!tempered) {
+      data.life.temperaments.reset();
+    }
+    Region region = generate_region(SEED, data);
+    region.rules.ticks_per_day = 1;
+    World world = world_of(region);
+    for (std::uint64_t day = 0; day < DAYS_PER_YEAR; ++day) {
+      world.tick();
+    }
+    return world;
+  };
+  const World tempered = lived(true);
+  const World plain = lived(false);
+  // Setup: people were born during the year.
+  ASSERT_GT(tempered.population(),
+            world_of(generate_region(SEED, base_data())).population());
+  ASSERT_EQ(tempered.population(), plain.population());
+  bool drew = false;
+  for (std::size_t person = 0; person < tempered.population(); ++person) {
+    const Person& one = tempered.person(person);
+    const Person& other = plain.person(person);
+    EXPECT_EQ(one.sex, other.sex) << person;
+    EXPECT_EQ(one.given, other.given) << person;
+    EXPECT_EQ(one.position.x, other.position.x) << person;
+    EXPECT_EQ(one.position.y, other.position.y) << person;
+    EXPECT_EQ(one.talent.size(), other.talent.size()) << person;
+    for (std::size_t discipline = 0;
+         discipline < std::min(one.talent.size(), other.talent.size());
+         ++discipline) {
+      EXPECT_EQ(one.talent.at(discipline).limit,
+                other.talent.at(discipline).limit)
+          << person;
+    }
+    drew = drew || one.temperament != Temperament::CAUTIOUS;
+  }
+  EXPECT_TRUE(drew);
+  // Control: the temperaments are folded, so the hashes differ.
+  EXPECT_NE(tempered.hash(), plain.hash());
 }
 
 }  // namespace

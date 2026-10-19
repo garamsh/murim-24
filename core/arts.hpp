@@ -55,12 +55,14 @@ struct Manuals {
   std::int32_t scatter_reach = 0;
 };
 
-/// A realm of cultivation: its `name`, the qi capacity that reaches it, and
-/// the `might` per mille its people strike with.
+/// A realm of cultivation: its `name`, the qi capacity that reaches it, the
+/// `might` per mille its people strike with, and the `weight` their strength
+/// is multiplied by in an appraisal of danger (ADR 0071), at least 1.
 struct Realm {
   NameEntry name;
   std::uint32_t qi = 0;
   std::uint32_t might = PER_MILLE;
+  std::uint32_t weight = 1;
 };
 
 /// How people cultivate qi, as data. Each birth draws a growth a day and a

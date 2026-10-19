@@ -15,6 +15,7 @@
 #include <variant>
 #include <vector>
 
+#include "appraisal.hpp"
 #include "compiled_map.hpp"
 #include "growth.hpp"
 #include "json_packs.hpp"
@@ -1256,6 +1257,84 @@ TEST(MapContent, APaintedMapWithMoreThan256TerrainKindsIsRefused) {
                             return error.document == "terrain" &&
                                    error.reason == ContentRefusal::OUT_OF_RANGE;
                           }));
+}
+
+// The tiny base with a mod, "tempered", giving its life temperaments: a
+// bold share of `bold`, cautious of 600 fleeing above `flee`, and cowardly
+// of 200.
+MemoryPacks tempered(std::int64_t bold, std::int64_t flee) {
+  constexpr std::int64_t CAUTIOUS_SHARE = 600;
+  constexpr std::int64_t COWARDLY_SHARE = 200;
+  // ADR 0071's other thresholds.
+  constexpr std::int64_t BOLD_BACK_OFF = 2'500;
+  constexpr std::int64_t BOLD_FLEE = 5'000;
+  constexpr std::int64_t CAUTIOUS_BACK_OFF = 1'500;
+  constexpr std::int64_t COWARDLY_BACK_OFF = 1'000;
+  constexpr std::int64_t COWARDLY_FLEE = 1'800;
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  add_mod(packs, "tempered");
+  Node temperaments =
+      packs.entry("tempered", "life", "life").map("temperaments");
+  temperaments.map("bold")
+      .set("share", bold)
+      .set("back_off", BOLD_BACK_OFF)
+      .set("flee", BOLD_FLEE);
+  temperaments.map("cautious")
+      .set("share", CAUTIOUS_SHARE)
+      .set("back_off", CAUTIOUS_BACK_OFF)
+      .set("flee", flee);
+  temperaments.map("cowardly")
+      .set("share", COWARDLY_SHARE)
+      .set("back_off", COWARDLY_BACK_OFF)
+      .set("flee", COWARDLY_FLEE);
+  return packs;
+}
+
+TEST(Content,
+     TemperamentsSharingOtherThanAThousandOrFleeingAtTheirBackOffAreRefused) {
+  EXPECT_TRUE(
+      refused_for(load_content(tempered(199, 3'000), TINY, {"tempered"}),
+                  "tempered", "", ContentRefusal::INCONSISTENT));
+  EXPECT_TRUE(
+      refused_for(load_content(tempered(200, 1'500), TINY, {"tempered"}),
+                  "tempered", "", ContentRefusal::INCONSISTENT));
+  // Control: shares of a thousand, each fleeing above its back-off, load as
+  // given.
+  const LoadedContent loaded =
+      load_content(tempered(200, 3'000), TINY, {"tempered"});
+  EXPECT_TRUE(loaded.errors.empty());
+  const RegionData data = loaded.data.value_or(RegionData{});
+  ASSERT_TRUE(data.life.temperaments.has_value());
+  const Temperaments temperaments =
+      data.life.temperaments.value_or(Temperaments{});
+  EXPECT_EQ(temperaments.at(0).share, 200U);
+  EXPECT_EQ(temperaments.at(1).thresholds.back_off, 1'500U);
+  EXPECT_EQ(temperaments.at(1).thresholds.flee, 3'000U);
+  EXPECT_EQ(temperaments.at(2).thresholds.flee, 1'800U);
+}
+
+// The tiny base with one realm, of weight `weight`.
+MemoryPacks weighed(std::int64_t weight) {
+  constexpr std::int64_t REALM_QI = 1'000;
+  constexpr std::int64_t MIGHT = 1'100;
+  MemoryPacks packs;
+  add_tiny_base(packs);
+  Node realm = packs.entry(TINY, "realms", "third_rate");
+  realm.map("name").text("korean", "삼류").text("romanised", "Third-rate");
+  realm.set("qi", REALM_QI).set("might", MIGHT).set("weight", weight);
+  return packs;
+}
+
+TEST(Content, ARealmOfNoWeightIsRefused) {
+  EXPECT_TRUE(refused_for(load_content(weighed(0), TINY, {}), TINY, "weight",
+                          ContentRefusal::OUT_OF_RANGE));
+  // Control: a weight of 2 loads as given.
+  const LoadedContent loaded = load_content(weighed(2), TINY, {});
+  EXPECT_TRUE(loaded.errors.empty());
+  const RegionData data = loaded.data.value_or(RegionData{});
+  ASSERT_EQ(data.life.realms.size(), 1U);
+  EXPECT_EQ(data.life.realms.front().weight, 2U);
 }
 
 }  // namespace
