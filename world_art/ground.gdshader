@@ -40,7 +40,7 @@ const float LP = 16.0;
 const float WARP_SCALE = 48.0;
 // How far from a built cell, in pixels, the warp takes to reach its full reach; no wider than a
 // cell, so the cells round a point hold every built cell nearer than it.
-const float FADE = 12.0;
+const float FADE = min(CW, CD);
 const int TOP = 5;
 const int LOW = -1;
 // The kinds, in the order of world_art/relief.gd's KINDS.
@@ -119,8 +119,9 @@ ivec4 cell_under(vec2 p) {
 float from_built(vec2 p) {
 	ivec2 c = ivec2(floor(vec2(p.x / CW, p.y / CD)));
 	float nearest = FADE;
-	// Most cells have nothing built on them or beside them, which their texel says alone.
-	if (c != clamp(c, ivec2(0), map_size - 1) || (int(round(texelFetch(cells, c, 0).b * 255.0)) & 64) == 0) {
+	// Most cells have nothing built on them or beside them, which their texel says alone. Past the
+	// map's edges the edge cell's texel says it for the cells beside it there.
+	if ((int(round(texelFetch(cells, clamp(c, ivec2(0), map_size - 1), 0).b * 255.0)) & 64) == 0) {
 		return nearest;
 	}
 	for (int dy = -1; dy <= 1; dy++) {
@@ -274,8 +275,8 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 		return ramp(FOREST, step >= 3 ? 4 : 2);
 	}
 	vec3 colour = ramp(kind, step);
-	// The lit lip where the ground turns down into a face.
-	if (drops(p, p + vec2(0.0, 1.0))) {
+	// The lit lip where the ground turns down into a face, but on what is built.
+	if (!crisp(p) && drops(p, p + vec2(0.0, 1.0))) {
 		colour = ramp(kind == ROCK || kind == WATER ? kind : HILLS, 6);
 	}
 	// Ground trodden bare round what is built, a road's or paving's edge among it: a dithered band
@@ -292,6 +293,7 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 	}
 	// The foot of a face is in its shadow, thinning away from it, and scree lies there in
 	// clusters, more of it nearer the face; where water meets a bank's foot, a strip of wet sand.
+	// On what is built, the shadow is one solid row at the foot, and no scree lies.
 	for (int d = 1; d <= 6; d++) {
 		if (drops(p - vec2(0.0, float(d)), p - vec2(0.0, float(d - 1)))) {
 			if (kind == WATER && d <= 2) {
@@ -300,7 +302,7 @@ vec3 surface(vec2 p, vec2 screen, int level, int kind) {
 			if (kind != WATER && !crisp(p) && vnoise(p / 2.0, 32) > 0.35 + float(d) * 0.08 && hash01(px.x, px.y, 33) > 0.35) {
 				colour = ramp(ROCK, hash01(px.x, px.y, 34) > 0.6 ? 6 : 2);
 			}
-			if (d <= 4 && hash01(px.x, px.y, 35) < (1.0 - float(d - 1) / 4.0) * 0.9) {
+			if (crisp(p) ? d == 1 : d <= 4 && hash01(px.x, px.y, 35) < (1.0 - float(d - 1) / 4.0) * 0.9) {
 				colour = mix(colour, SHADE, 0.38);
 			}
 			break;

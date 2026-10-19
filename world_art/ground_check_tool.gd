@@ -9,7 +9,8 @@
 ## cells' side; that across cells something is built on, the same edge runs straight down the cells'
 ## side on every row, the hills' edge does across cells built on its slope, and the foot of a face
 ## does along the top of cells built below it, while beyond them each wanders, and that trodden earth
-## lies two and three pixels out from what is built and none on the row along its side (#200); and
+## lies two and three pixels out from what is built and none on the row along its side, past the
+## map's bottom edge as on it (#200); and
 ## that streaming shows the areas round the view, an area at most a frame
 ## once the first are shown, frees those it left, and shows an area's trees again where they were.
 ## Given a reach past the map's bottom before the bake, or after it, when it bakes the areas on that
@@ -43,6 +44,8 @@ const BUILT := Rect2i(EDGE - 3, 25, 6, 4)
 const HILLS := Rect2i(30, 38, 10, 12)
 const ON_SLOPE := Rect2i(28, 42, 4, 3)
 const BELOW_FACE := Rect2i(4, 36, 5, 2)
+# Cells built on the map's last rows, clear of RAISED_EDGE, with the ground #400 draws below them.
+const AT_BOTTOM := Rect2i(58, 62, 6, 2)
 # The shadow at a face's foot, as ground.gdshader's SHADE, mixed into the ground by 0.38.
 const SHADE := Color(0.078, 0.094, 0.157)
 # Ground raised on the map's last rows, so the bottom edge runs beside raised ground; and how far
@@ -85,14 +88,14 @@ func _initialize() -> void:
 	for y in range(HILLS.position.y, HILLS.end.y):
 		for x in range(HILLS.position.x, HILLS.end.x):
 			relief.lay(Vector2i(x, y), "hills", 2 if HILLS.grow(-3).has_point(Vector2i(x, y)) else 1, "bank_face", true)
-	for block: Rect2i in [BUILT, ON_SLOPE, BELOW_FACE]:
+	for block: Rect2i in [BUILT, ON_SLOPE, BELOW_FACE, AT_BOTTOM]:
 		for y in range(block.position.y, block.end.y):
 			for x in range(block.position.x, block.end.x):
 				relief.build(Vector2i(x, y))
 	_relief = relief
 	# No tree stands on the built cells, as world_art.gd keeps them off what is built.
 	var open_at := func(cell: Vector2i) -> bool: return not (BUILT.has_point(cell) or ON_SLOPE.has_point(cell)
-			or BELOW_FACE.has_point(cell))
+			or BELOW_FACE.has_point(cell) or AT_BOTTOM.has_point(cell))
 	_warped = _ground(relief, {"open_at": open_at})
 	_again = _ground(relief, {"open_at": open_at})
 	_blocky = _ground(relief, {"open_at": open_at, "shader": {"warp": 0.0}})
@@ -239,55 +242,71 @@ func _hills_edge(top: float, bottom: float) -> Array:
 
 
 # Along the cells built below the mountain's south face, the face's last pixel lies on the row above
-# the cells' top on every column. Control: along the same face past the built cells, it wanders.
+# the cells' top on every column. Control: along the same face on either side of the built cells,
+# beyond the warp's fade, the warp moves it off the row the unwarped ground puts it on, on most
+# columns read on both.
 func _check_face() -> void:
 	var top := BELOW_FACE.position.y * int(Relief.CELL.y)
-	var built := _face_feet(BELOW_FACE.position.x * 16, BELOW_FACE.end.x * 16)
-	var beyond := _face_feet(BELOW_FACE.end.x * 16 + 16, MOUNTAIN.end.x * 16 - 2)
-	var straight := built.filter(func(y: int) -> bool: return y == top - 1).size()
-	var rows := {}
-	for y: int in beyond:
-		rows[y] = true
-	_check("ground_check: along the cells built below the face its foot is on row %d on %d of %d columns, from row %d to %d; past them on %d distinct rows, from %d to %d" % [
-		top - 1, straight, built.size(), built.min(), built.max(), rows.size(), beyond.min(), beyond.max()],
-			built.size() == BELOW_FACE.size.x * 16 and straight == built.size() and rows.size() > 1)
+	var built := _face_feet(_warped, [Vector2i(BELOW_FACE.position.x * 16, BELOW_FACE.end.x * 16)])
+	var beside := [Vector2i(MOUNTAIN.position.x * 16 + 2, BELOW_FACE.position.x * 16 - 16),
+			Vector2i(BELOW_FACE.end.x * 16 + 16, MOUNTAIN.end.x * 16 - 2)]
+	var beyond := _face_feet(_warped, beside)
+	var unwarped := _face_feet(_blocky, beside)
+	var both := beyond.keys().filter(func(x: int) -> bool: return unwarped.has(x))
+	var moved := both.filter(func(x: int) -> bool: return beyond[x] != unwarped[x]).size()
+	var straight := built.values().filter(func(y: int) -> bool: return y == top - 1).size()
+	_check("ground_check: along the cells built below the face its foot is on row %d on %d of %d columns, from row %d to %d; beside them the warp moves it on %d of %d columns read warped and unwarped" % [
+		top - 1, straight, built.size(), built.values().min(), built.values().max(), moved, both.size()],
+			built.size() == BELOW_FACE.size.x * 16 and straight == built.size() and both.size() >= 16
+			and moved > both.size() / 2)
 
 
-# For each column from `from` to `to`, the last row, down from above the mountain's south face, before
-# four rows running of the plain's ramp, shaded or not: the face's foot.
-func _face_feet(from: int, to: int) -> Array:
+# For each column of `ground` within each of `spans`, from x to before y, the last row, down from
+# above the mountain's south face, before four rows running of the plain's ramp, shaded or not: the
+# face's foot, by column.
+func _face_feet(ground: Node2D, spans: Array) -> Dictionary:
 	var top := BELOW_FACE.position.y * int(Relief.CELL.y)
 	var plain := _ramp(Relief.KINDS.find("plain"))
 	for step in Ground.STEPS:
 		plain[_rgb(_warped.ramp_colour(Relief.KINDS.find("plain"), step).lerp(SHADE, 0.38))] = true
-	var shot := _composite(_warped, Rect2i(from, top - 5 * Relief.LEVEL_PX, to - from, 6 * Relief.LEVEL_PX))
-	var feet := []
-	for x in shot.get_width():
-		for y in shot.get_height() - 4:
-			if range(4).all(func(d: int) -> bool: return plain.has(_rgb(shot.get_pixel(x, y + d)))) \
-					and not plain.has(_rgb(shot.get_pixel(x, y - 1))) and y > 0:
-				feet.append(top - 5 * Relief.LEVEL_PX + y - 1)
-				break
+	var feet := {}
+	for span: Vector2i in spans:
+		var shot := _composite(ground, Rect2i(span.x, top - 5 * Relief.LEVEL_PX, span.y - span.x, 6 * Relief.LEVEL_PX))
+		for x in shot.get_width():
+			for y in range(1, shot.get_height() - 4):
+				if range(4).all(func(d: int) -> bool: return plain.has(_rgb(shot.get_pixel(x, y + d)))) \
+						and not plain.has(_rgb(shot.get_pixel(x, y - 1))):
+					feet[span.x + x] = top - 5 * Relief.LEVEL_PX + y - 1
+					break
 	return feet
 
 
-# No pixel of trodden earth lies on the column along the left side of BUILT, and some lie on each of
-# the two columns past it, its control (#200).
+# No pixel of trodden earth lies on the column along the left side of BUILT, nor on the row past the
+# map's bottom edge below AT_BOTTOM, and some lie on each of the two columns or rows past those, the
+# control (#200).
 func _check_trodden() -> void:
+	var side := BUILT.position.x * int(Relief.CELL.x)
+	var left := _trodden(Rect2i(side - 3, BUILT.position.y * int(Relief.CELL.y), 3, BUILT.size.y * int(Relief.CELL.y)), true)
+	var bottom := AT_BOTTOM.end.y * int(Relief.CELL.y)
+	var below := _trodden(Rect2i(AT_BOTTOM.position.x * int(Relief.CELL.x), bottom, AT_BOTTOM.size.x * int(Relief.CELL.x), 3), false)
+	_check("ground_check: trodden earth on %d of %d pixels of the column along the built cells' side, on %d and %d two and three pixels out; on %d of %d of the row below those on the map's last row, on %d and %d two and three out" % [
+		left[0], BUILT.size.y * int(Relief.CELL.y), left[1], left[2], below[0], AT_BOTTOM.size.x * int(Relief.CELL.x), below[1], below[2]],
+			left[0] == 0 and left[1] > 0 and left[2] > 0 and below[0] == 0 and below[1] > 0 and below[2] > 0)
+
+
+# The pixels of trodden earth in each of the three columns of `rect` from its right, when `columns`,
+# or in each of its three rows from its top: one, two and three pixels out from what is built.
+func _trodden(rect: Rect2i, columns: bool) -> Array:
 	var earth := {}
 	for step in [3, 4]:
 		earth[_rgb(_warped.ramp_colour(Relief.KINDS.size(), step))] = true
-	var side := BUILT.position.x * int(Relief.CELL.x)
-	var shot := _composite(_warped, Rect2i(side - 3, BUILT.position.y * int(Relief.CELL.y), 3, BUILT.size.y * int(Relief.CELL.y)))
-	var counts := []
-	for x in 3:
-		var count := 0
-		for y in shot.get_height():
-			if earth.has(_rgb(shot.get_pixel(2 - x, y))):
-				count += 1
-		counts.append(count)
-	_check("ground_check: trodden earth on %d of %d pixels of the row along the built cells' side, on %d and %d two and three pixels out" % [
-		counts[0], shot.get_height(), counts[1], counts[2]], counts[0] == 0 and counts[1] > 0 and counts[2] > 0)
+	var shot := _composite(_warped, rect)
+	var counts := [0, 0, 0]
+	for y in shot.get_height():
+		for x in shot.get_width():
+			if earth.has(_rgb(shot.get_pixel(x, y))):
+				counts[2 - x if columns else y] += 1
+	return counts
 
 
 # `ground`'s pixels over `rect`, in the unraised ground's pixels: each chunk's ground with its strips

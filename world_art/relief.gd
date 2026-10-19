@@ -24,7 +24,7 @@ const WARP := 32.0
 ## Pixels the warp's noise varies over, as ground.gdshader's WARP_SCALE.
 const WARP_SCALE := 48.0
 ## How far from a built cell, in pixels, the warp takes to reach WARP, as ground.gdshader's FADE.
-const FADE := 12.0
+const FADE := minf(CELL.x, CELL.y)
 ## How many cells across and down a point on a cell can read its height from: the warp's reach,
 ## WARP over CELL rounded up, and the cell beside it the interpolation takes.
 const FLAT_REACH := Vector2i(3, 4)
@@ -189,8 +189,8 @@ func highest() -> int:
 
 
 ## The cells as the shader reads them, one texel a cell: its kind in red, its level plus one in
-## green, its face material in blue, plus 128 where something is built on it and the ground round
-## it is flat, and alpha half where it rises as a slope.
+## green, its face material in blue, plus 128 where something is built on it and 64 where something
+## is built on it or on a cell beside it, and alpha half where it rises as a slope.
 func cell_image() -> Image:
 	return cell_image_of(Rect2i(Vector2i.ZERO, size))
 
