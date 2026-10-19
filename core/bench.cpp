@@ -471,6 +471,123 @@ Shipping shipping(const Map& map, const CoarseGraph& graph) {
   return Shipping{shipped.size(), read_ms, created_ms, loaded_ms};
 }
 
+// The structure counts the shipped graph's create and load are timed at on
+// the 8,192-cell map, the most about 100,000 people's by the live scenario's
+// 460 structures to 5,000 people.
+constexpr std::array<std::size_t, 4> STRUCTURE_COUNTS{0, 576, 2'304, 9'216};
+// A house's side, and where it stands in its area: inside it, or touching
+// its east edge, every other house, so a rebuild meets both.
+constexpr std::int32_t HOUSE = 3;
+constexpr std::int32_t HOUSE_INSET = 4;
+
+// How houses stand: one in each of `count` areas spread evenly over the map,
+// the worst case for a rebuild, or in villages of VILLAGE_HOUSES on a grid of
+// villages spread over it, as a grown world's stand.
+enum class Housing : std::uint8_t { SPREAD, VILLAGES };
+constexpr std::size_t VILLAGE_ROW = 8;
+constexpr std::size_t VILLAGE_HOUSES = VILLAGE_ROW * VILLAGE_ROW;
+// A house and the lane beside it, along each axis of a village.
+constexpr std::int32_t HOUSE_PITCH = HOUSE + 2;
+
+// `count` blocking houses on `map`, standing as `housing` has them, each on
+// the first cell east of where it is set whose footprint is passable and
+// covered by no other house.
+std::vector<Structure> houses(const Map& map, std::size_t count,
+                              Housing housing) {
+  std::vector<Structure> made;
+  const auto columns = static_cast<std::size_t>(map.width() / AREA_SIDE);
+  const std::size_t areas =
+      columns * static_cast<std::size_t>(map.height() / AREA_SIDE);
+  const std::size_t villages = (count + VILLAGE_HOUSES - 1) / VILLAGE_HOUSES;
+  std::size_t across_villages = 1;
+  while (across_villages * across_villages < villages) {
+    ++across_villages;
+  }
+  const auto village_pitch = static_cast<std::int32_t>(
+      static_cast<std::size_t>(map.width()) / across_villages);
+  std::vector<bool> covered(static_cast<std::size_t>(map.width()) *
+                                static_cast<std::size_t>(map.height()),
+                            false);
+  const auto slot = [&map](Cell cell) {
+    return (static_cast<std::size_t>(cell.y) *
+            static_cast<std::size_t>(map.width())) +
+           static_cast<std::size_t>(cell.x);
+  };
+  const auto clear = [&](Cell cell) {
+    const std::vector<Cell> cells = cells_of(cell, Footprint{HOUSE, HOUSE});
+    return std::all_of(cells.begin(), cells.end(), [&](Cell each) {
+      return map.passable(each) && !covered.at(slot(each));
+    });
+  };
+  for (std::size_t house = 0; house < count; ++house) {
+    Cell cell{};
+    if (housing == Housing::SPREAD) {
+      const std::size_t area = house * (areas / count);
+      const Cell corner{static_cast<std::int32_t>(area % columns) * AREA_SIDE,
+                        static_cast<std::int32_t>(area / columns) * AREA_SIDE};
+      cell = Cell{corner.x + (house % 2 == 0 ? HOUSE_INSET : AREA_SIDE - HOUSE),
+                  corner.y + HOUSE_INSET};
+    } else {
+      const std::size_t village = house / VILLAGE_HOUSES;
+      const std::size_t in_village = house % VILLAGE_HOUSES;
+      cell = Cell{(static_cast<std::int32_t>(village % across_villages) *
+                   village_pitch) +
+                      (static_cast<std::int32_t>(in_village % VILLAGE_ROW) *
+                       HOUSE_PITCH),
+                  (static_cast<std::int32_t>(village / across_villages) *
+                   village_pitch) +
+                      (static_cast<std::int32_t>(in_village / VILLAGE_ROW) *
+                       HOUSE_PITCH)};
+    }
+    while (!clear(cell)) {
+      ++cell.x;
+    }
+    for (const Cell each : cells_of(cell, Footprint{HOUSE, HOUSE})) {
+      covered.at(slot(each)) = true;
+    }
+    made.push_back(
+        Structure{cell, STAGE_FLOORS.front(), Footprint{HOUSE, HOUSE}, true});
+  }
+  return made;
+}
+
+// A world created on `map` with `count` houses from its shipped graph
+// `bare`, and a save of it loaded with that graph: each one's time.
+struct Housed {
+  std::size_t count;
+  Housing housing;
+  double created_ms;
+  double loaded_ms;
+};
+
+Housed housed(const Map& map, const CoarseGraph& bare, std::size_t count,
+              Housing housing) {
+  const auto created_at = std::chrono::steady_clock::now();
+  const World world{Seed{1},
+                    map,
+                    {},
+                    houses(map, count, housing),
+                    Rules{0, {{false}}, STAGE_FLOORS},
+                    {},
+                    {},
+                    {},
+                    {},
+                    bare};
+  const double created_ms =
+      milliseconds(std::chrono::steady_clock::now() - created_at);
+  HeldSaves store;
+  require(save(Saved{std::nullopt, world}, store, Slot{0}),
+          "the housed world must save");
+  const auto loaded_at = std::chrono::steady_clock::now();
+  const std::variant<Saved, LoadError> loaded = load(store, Slot{0}, bare);
+  const double loaded_ms =
+      milliseconds(std::chrono::steady_clock::now() - loaded_at);
+  require(std::holds_alternative<Saved>(loaded) &&
+              std::get<Saved>(loaded).world.graph() == world.graph(),
+          "a housed save loaded with the shipped graph must hold its graph");
+  return Housed{count, housing, created_ms, loaded_ms};
+}
+
 // Times a path corner to corner across the 8,192-cell map over the coarse
 // graph with its level of regions, against a frame, with the graph of areas
 // alone as the control (ADR 0070, step 2). Reports only: no budget in force
@@ -544,6 +661,12 @@ void run_paths() {
       milliseconds(std::chrono::steady_clock::now() - obstructed_at);
   const Shipping on_ranged = shipping(map, graph);
   const Shipping on_obstructed = shipping(obstructed, obstructed_graph);
+  std::vector<Housed> on_housed;
+  for (const Housing housing : {Housing::SPREAD, Housing::VILLAGES}) {
+    for (const std::size_t count : STRUCTURE_COUNTS) {
+      on_housed.push_back(housed(obstructed, obstructed_graph, count, housing));
+    }
+  }
   std::cout << "scenario: path across the " << MAP_SIDE << "-cell map, "
             << graph.node_count() << " nodes, built in " << build_ms << " ms\n"
             << "path by regions: median " << regions_ms << " ms of "
@@ -565,8 +688,18 @@ void run_paths() {
             << on_obstructed.read_ms << " ms; a world created from it in "
             << on_obstructed.created_ms
             << " ms, and a save of it loaded with it in "
-            << on_obstructed.loaded_ms << " ms\n"
-            << "lay's attempt, rebuilding the graph in place under a "
+            << on_obstructed.loaded_ms << " ms\n";
+  for (const Housed& each : on_housed) {
+    std::cout << "with a blocked cell in every area and " << each.count
+              << " houses "
+              << (each.housing == Housing::SPREAD
+                      ? "one to an area, spread evenly"
+                      : "in villages of 64")
+              << ": a world created from the shipped graph in "
+              << each.created_ms << " ms, and a save of it loaded with it in "
+              << each.loaded_ms << " ms\n";
+  }
+  std::cout << "lay's attempt, rebuilding the graph in place under a "
             << FOOTPRINT << " by " << FOOTPRINT
             << " footprint and reverting it: median " << lay_ms << " ms\n"
             << "first field toward a fresh objective across the map: "
@@ -717,15 +850,28 @@ void run_tiers() {
   for (const AreaTier tier : world.areas().tiers()) {
     ++areas_by_tier.at(static_cast<std::size_t>(tier));
   }
+  // The people of armies not far by the tier of the area each stands in, and
+  // those of far armies.
   std::vector<std::size_t> far_armies;
   std::size_t far_people = 0;
+  std::array<std::size_t, 2> near_people{};
   for (std::size_t army = 0; army < world.army_count(); ++army) {
     if (world.far(army)) {
       far_armies.push_back(army);
       far_people += world.roster(army).size();
+      continue;
+    }
+    for (const std::size_t member : world.roster(army)) {
+      const AreaTier tier = world.areas().tier(
+          world.areas().area_of(cell_of(world.person(member).position)));
+      near_people.at(tier == AreaTier::LIVE ? 0 : 1) += 1;
     }
   }
-  require(!far_armies.empty(), "armies must be far while the tiers run");
+  const std::size_t live_people = near_people.at(0);
+  require(live_people > 0 && live_people <= STANDARD_PROFILE.live_cap &&
+              near_people.at(1) > 0 && far_people > 0,
+          "people must stand live, stepped and far while the tiers run, the "
+          "live within the profile's cap");
   const double retier_ms = median_ms(RETIER_RUNS, [&world] { world.retier(); });
   // Every far army's node, derived from the graph as it is read.
   std::vector<std::chrono::steady_clock::duration> node_times;
@@ -770,7 +916,9 @@ void run_tiers() {
       << areas_by_tier.at(2) << "; far when timing ended: " << far_armies.size()
       << " armies, " << far_people << " people\n"
       << "tick time: p50 " << p50 << " ms, p99 " << p99 << " ms, max " << max
-      << " ms, against the live " << BUDGET_MS << " ms target\n"
+      << " ms, with " << live_people << " people in live areas, "
+      << near_people.at(1) << " in stepped areas and " << far_people
+      << " far; #216's 4 ms target is for 5,000 live, so it is not compared\n"
       << "fields: at most " << most_held << " held; built while timed "
       << static_cast<double>(built_timed) / TIMED_TICKS << " a tick, at most "
       << most_built << " in one tick\n"
