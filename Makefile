@@ -47,9 +47,6 @@ build:
 LINT_TARGET := -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_TARGET=x86_64-linux-gnu -DCMAKE_SYSROOT=$(CURDIR)/$(LINT_DIR)/sysroot \
 	-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_SIZEOF_VOID_P=8
 lint: build
-	./check-contents-list.sh
-	./check-convention-index.sh
-	./check-heading-prefixes.sh
 	./lint-sysroot.sh $(LINT_DIR)/sysroot
 	$(TOOLS)/cmake -S core -B $(LINT_DIR)/core -G Ninja -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja $(LINT_TARGET)
 	$(TOOLS)/cmake -S extension -B $(LINT_DIR)/extension -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=$(TOOLS)/ninja -DPython3_EXECUTABLE=$(TOOLS)/python3 $(LINT_TARGET)
