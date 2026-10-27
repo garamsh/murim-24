@@ -38,4 +38,3 @@ A sentence holding claims about two subjects is two claims; anchor each.
 
    Where the claim quantifies over a set, its members come from the enumeration §Anchor it, step 5 names; this step tests the expression that enumeration ran.
 3. Where the claim quantifies over a set (§Anchor it, step 5), re-run the enumeration at the revision named and apply the classification to its output. Re-reading the claim shows only the members it names.
-4. Run `make lint` before pushing; it prints the count of Markdown files each script read and the command that selected them.

@@ -47,7 +47,7 @@ Checked against C++17 (ISO/IEC 14882:2017), CMake 4.4.4, Ninja 1.13.2, LLVM 22.1
 | Name | What it runs |
 |---|---|
 | `make build` | CMake configures `core/` into `build/` with the Ninja generator, then builds every target, the tests included; then configures `extension/` into `build/extension/` the same way, as a Release build with `SDKROOT` set to the macOS SDK, and builds its default targets. |
-| `make lint` | `check-contents-list.sh` over every Markdown file, then `clang-tidy -p build` over every `core/*.cpp`, then `clang-tidy -p build/extension` over every `extension/*.cpp` with `core/.clang-tidy` and the `extension/` headers, each with warnings as errors. Runs `make build` first for `compile_commands.json`. |
+| `make lint` | `lint-sysroot.sh` unpacks the pinned Ubuntu 24.04 headers into `build/lint/sysroot/`; CMake configures `core/` into `build/lint/core/` and `extension/` into `build/lint/extension/` against them as an x86_64 Linux target with the platform's `clang++`, and Ninja generates the godot-cpp bindings there; then `clang-tidy -p build/lint/core` over every `core/*.cpp` and `packs_json/*.cpp`, then `clang-tidy -p build/lint/extension` over every `extension/*.cpp`, each with `core/.clang-tidy` and warnings as errors. Runs `make build` first. |
 | `make format` | `clang-format --style=file:core/.clang-format --dry-run --Werror` over every `.cpp` and `.hpp` in `core/` and `extension/`. `clang-format --style=file:core/.clang-format -i <file>` applies the style. |
 | `make test` | `ctest --no-tests=error` in `build/`. Runs `make build` first. |
 | `make ci` | `lint`, `format`, `test` and `build`, in that order. |
